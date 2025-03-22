@@ -1,0 +1,14 @@
+[project]
+name = "annotated-paper"
+version = "0.1.0"
+requires-python = ">= 3.12"
+description = "An Annotated Paper Application"
+readme = "README.md"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.34",
+    "pydantic>=2.10",
+    "python-dotenv>=1.0.1",
+    "google-genai>=1.7.0",
+    "requests>=2.32.3",
+]
