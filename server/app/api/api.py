@@ -46,10 +46,10 @@ async def get_paper_ids(db: Session = Depends(get_db)):
     """
     Get all paper IDs
     """
-    papers = db.query(Document.id).all()
+    papers = db.query(Document).all()
     return JSONResponse(
         status_code=200,
-        content={"papers": [{"id": paper.id, "filename": paper.filename} for paper in papers]}
+        content={"papers": [{"id": str(paper.id), "filename": paper.filename} for paper in papers]}
     )
 
 @router.get("/paper")
