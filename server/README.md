@@ -36,3 +36,26 @@ FastAPI automatically generates API documentation. Once the application is runni
 
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc` 
+
+# Database
+
+We're using a PostgreSQL database with SQLAlchemy ORM.
+Make sure to set the `DATABASE_URL` environment variable to your PostgreSQL connection string.
+
+# Migrations
+
+This project uses Alembic for database migrations. To create a new migration, run:
+
+```bash
+alembic revision --autogenerate -m "migration message"
+```
+To apply the migration, run:
+
+```bash
+alembic upgrade head
+```
+To downgrade the migration, run:
+
+```bash
+alembic downgrade -1
+```

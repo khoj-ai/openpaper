@@ -1,11 +1,10 @@
 import os
 from pathlib import Path
-from typing import Optional
-from fastapi import FastAPI, APIRouter, UploadFile, File, Request
+from fastapi import APIRouter, UploadFile, File, Request
 from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from google import genai # type: ignore
+
+from app.database.models import Document
 
 from dotenv import load_dotenv
 
@@ -18,24 +17,6 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
-
-app = FastAPI(
-    title="FastAPI App",
-    description="A FastAPI application with health checkpoint",
-    version="1.0.0"
-)
-
-# Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
-    allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
-)
-
-# Mount the uploads directory
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Create API router with prefix
 router = APIRouter(prefix="/api")
@@ -88,11 +69,4 @@ async def upload_pdf(request: Request, file: UploadFile = File(...)):
             "url": file_upload_url
         }
     )
-
-# Include the router in the main app
-app.include_router(router)
-
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.getenv("PORT", "8001"))
-    uvicorn.run("api:app", host="0.0.0.0", port=port, reload=True)
+    

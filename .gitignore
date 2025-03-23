@@ -3,6 +3,8 @@ server/__pycache__
 server/.env
 server/uploads
 .mypy_cache/
+__pycache__/
+.vscode/
 
 # dependencies
 client/node_modules

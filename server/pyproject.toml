@@ -11,4 +11,10 @@ dependencies = [
     "python-dotenv>=1.0.1",
     "google-genai>=1.7.0",
     "requests>=2.32.3",
+    "sqlalchemy>=2.0.39",
+    "psycopg2-binary>=2.9.10",
+    "alembic>=1.15.1",
+    "python-multipart>=0.0.20",
+    "pydantic-settings>=2.8.1",
+    "types-psycopg2>=2.9.21.20250318",
 ]
