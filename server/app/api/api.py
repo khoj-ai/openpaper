@@ -1,10 +1,12 @@
 import os
 from pathlib import Path
-from fastapi import APIRouter, UploadFile, File, Request
+from fastapi import APIRouter, UploadFile, File, Request, Depends
 from fastapi.responses import JSONResponse
 from google import genai # type: ignore
+from sqlalchemy.orm import Session
 
 from app.database.models import Document
+from app.database.database import get_db
 
 from dotenv import load_dotenv
 
@@ -39,8 +41,42 @@ async def explain_text(query: str):
     
     return response.text
 
+@router.get("/papers")
+async def get_paper_ids(db: Session = Depends(get_db)):
+    """
+    Get all paper IDs
+    """
+    papers = db.query(Document.id).all()
+    return JSONResponse(
+        status_code=200,
+        content={"papers": [{"id": paper.id, "filename": paper.filename} for paper in papers]}
+    )
+
+@router.get("/paper")
+async def get_pdf(request: Request, id: str, db: Session = Depends(get_db)):
+    """
+    Get a PDF file by ID
+    """
+    # Fetch the document from the database
+    document = db.query(Document).filter(Document.id == id).first()
+    
+    if not document:
+        return JSONResponse(
+            status_code=404,
+            content={"message": "Document not found"}
+        )
+    
+    # Return the file URL
+    return JSONResponse(
+        status_code=200,
+        content={
+            "filename": document.filename,
+            "url": document.file_url
+        }
+    )
+
 @router.post("/upload-pdf")
-async def upload_pdf(request: Request, file: UploadFile = File(...)):
+async def upload_pdf(request: Request, file: UploadFile = File(...), db: Session = Depends(get_db)):
     """
     Upload a PDF file
     """
@@ -61,12 +97,31 @@ async def upload_pdf(request: Request, file: UploadFile = File(...)):
     host_url = str(request.base_url)
     file_upload_url = f"{host_url}uploads/{safe_filename}"
     
-    return JSONResponse(
-        status_code=200,
-        content={
-            "message": "File uploaded successfully",
-            "filename": safe_filename,
-            "url": file_upload_url
-        }
-    )
+    # Create a new document record in the database
+    try:
+        document = Document(
+            filename=safe_filename,
+            file_url=str(file_upload_url),
+        )
+        db.add(document)
+        db.commit()
+        db.refresh(document)
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "message": "File uploaded successfully",
+                "filename": safe_filename,
+                "url": file_upload_url,
+                "document_id": str(document.id)
+            }
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "message": f"Error creating document record: {str(e)}",
+                "filename": safe_filename
+            }
+        )
     

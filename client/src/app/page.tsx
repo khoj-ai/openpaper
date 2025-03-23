@@ -2,18 +2,17 @@
 
 import { DataFetcher } from "@/components/DataFetcher";
 import { Button } from "@/components/ui/button";
-import { PdfViewer } from "@/components/PdfViewer";
-import { useState, useRef } from "react";
+import { useRef } from "react";
 import Image from "next/image";
 import { fetchFromApi } from "@/lib/api";
 
 interface PdfUploadResponse {
 	filename: string;
 	url: string;
+	document_id: string;
 }
 
 export default function Home() {
-	const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	const handleFileUpload = async (file: File) => {
@@ -30,7 +29,9 @@ export default function Home() {
 				},
 			});
 
-			setPdfUrl(response.url);
+			const redirectUrl = new URL(`/paper/${response.document_id}`, window.location.origin);
+
+			window.location.href = redirectUrl.toString();
 		} catch (error) {
 			console.error('Error uploading file:', error);
 			alert('Failed to upload PDF');
@@ -112,12 +113,6 @@ export default function Home() {
 						Link to a PDF
 					</Button>
 				</div>
-
-				{pdfUrl && (
-					<div className="w-full">
-						<PdfViewer pdfUrl={pdfUrl} />
-					</div>
-				)}
 				
 				<DataFetcher />
 			</main>
