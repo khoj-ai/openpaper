@@ -59,7 +59,7 @@ export function AppSidebar() {
         // Define an async function inside useEffect
         const fetchPapers = async () => {
             try {
-                const response = await fetchFromApi("/api/papers");
+                const response = await fetchFromApi("/api/paper/all");
                 setAllPapers(response.papers);
             } catch (error) {
                 console.error("Error fetching papers:", error)

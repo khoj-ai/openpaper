@@ -8,6 +8,8 @@ export async function fetchFromApi(endpoint: string, options: RequestInit = {}) 
         headers['Content-Type'] = 'application/json';
     }
 
+    console.log("Fetching from API:", `${API_BASE_URL}${endpoint}`, options);
+
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         ...options,
         headers: {
