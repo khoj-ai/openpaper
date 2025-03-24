@@ -20,7 +20,7 @@ export default function Home() {
 		formData.append('file', file);
 
 		try {
-			const response: PdfUploadResponse = await fetchFromApi('/api/upload-pdf', {
+			const response: PdfUploadResponse = await fetchFromApi('/api/paper/upload', {
 				method: 'POST',
 				body: formData,
 				// Don't set Content-Type header - browser will set it automatically with boundary

@@ -116,7 +116,15 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
+  }
+
+  .search-highlight {
+    background-color: rgba(255, 255, 0, 0.5);
+    border: 2px solid rgba(0, 0, 255, 0.5);
+    border-radius: 3px;
+    transition: background-color 0.3s ease;
   }
 }

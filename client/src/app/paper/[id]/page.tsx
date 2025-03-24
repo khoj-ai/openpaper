@@ -1,13 +1,22 @@
 'use client';
 
 import { PdfViewer } from '@/components/PdfViewer';
+import { Button } from '@/components/ui/button';
 import { fetchFromApi } from '@/lib/api';
 import { useParams } from 'next/navigation';
 import { useState, useEffect, FormEvent } from 'react';
 
 interface PaperData {
     filename: string;
-    url: string;
+    file_url: string;
+    authors: string[];
+    title: string;
+    abstract: string;
+    publish_date: string;
+    summary: string;
+    institutions: string[];
+    keywords: string[];
+    starter_questions: string[];
 }
 
 interface ChatMessage {
@@ -120,20 +129,89 @@ export default function PaperView() {
         }
     };
 
+    const isDateValid = (dateString: string) => {
+        const date = new Date(dateString);
+        return !isNaN(date.getTime());
+    };
+
     if (loading) return <div>Loading paper data...</div>;
 
     if (!paperData) return <div>Paper not found</div>;
 
     return (
         <div className="w-full h-screen grid grid-cols-2 items-center justify-center gap-4">
-            <div className="h-screen overflow-y-auto">
-                {paperData.url && (
+            <div className="h-screen overflow-y-auto border-r-2 border-gray-200">
+                {/* PDF Viewer Section */}
+                {paperData.file_url && (
                     <div className="w-full h-full">
-                        <PdfViewer pdfUrl={paperData.url} />
+                        <PdfViewer pdfUrl={paperData.file_url} />
                     </div>
                 )}
             </div>
             <div className="flex flex-col h-screen p-4">
+                {/* Paper Metadata Section */}
+                {paperData && (
+                    <div className="mb-4 bg-white rounded-lg shadow p-4">
+                        <h2 className="text-xl font-bold mb-3">{paperData.title}</h2>
+                        <table className="w-full text-sm">
+                            <tbody>
+                                {paperData.authors && paperData.authors.length > 0 && (
+                                    <tr>
+                                        <td className="font-semibold pr-2 py-1 align-top">Authors:</td>
+                                        <td>{paperData.authors.join(', ')}</td>
+                                    </tr>
+                                )}
+                                {paperData.institutions && paperData.institutions.length > 0 && (
+                                    <tr>
+                                        <td className="font-semibold pr-2 py-1 align-top">Institutions:</td>
+                                        <td>{paperData.institutions.join(', ')}</td>
+                                    </tr>
+                                )}
+                                {paperData.publish_date && isDateValid(paperData.publish_date) && (  
+                                    <tr>
+                                        <td className="font-semibold pr-2 py-1">Published:</td>
+                                        <td>{new Date(paperData.publish_date).toLocaleDateString()}</td>
+                                    </tr>
+                                )}
+                                {paperData.keywords && paperData.keywords.length > 0 && (
+                                    <tr>
+                                        <td className="font-semibold pr-2 py-1 align-top">Keywords:</td>
+                                        <td>
+                                            <div className="flex flex-wrap gap-1">
+                                                {paperData.keywords.map((keyword, i) => (
+                                                    <span key={i} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                                                        {keyword}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                                {
+                                    paperData.starter_questions && paperData.starter_questions.length > 0 && (
+                                        <tr>
+                                            <td className="font-semibold pr-2 py-1 align-top">Starter Questions:</td>
+                                            <td>
+                                                <ul className="list-disc pl-5">
+                                                    {paperData.starter_questions.map((question, i) => (
+                                                        <li key={i}>{question}</li>
+                                                    ))}
+                                                </ul>
+                                            </td>
+                                        </tr>
+                                    )}
+                                {paperData.abstract && (
+                                    <tr>
+                                        <td className="font-semibold pr-2 py-1 align-top">Abstract:</td>
+                                        <td>{paperData.abstract}</td>
+                                    </tr>
+                                )}
+
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
                 <div className="flex-1 overflow-y-auto mb-4 space-y-4">
                     {messages.length === 0 ? (
                         <div className="text-center text-gray-500 my-4">
@@ -144,8 +222,8 @@ export default function PaperView() {
                             <div
                                 key={index}
                                 className={`p-3 rounded-lg ${msg.role === 'user'
-                                        ? 'bg-blue-100 ml-12'
-                                        : 'bg-gray-100 mr-12'
+                                    ? 'bg-blue-100 ml-12'
+                                    : 'bg-gray-100 mr-12'
                                     }`}
                             >
                                 <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -162,14 +240,14 @@ export default function PaperView() {
                         className="flex-1 p-2 border rounded-md"
                         disabled={isStreaming}
                     />
-                    <button
+                    <Button
                         type="submit"
                         className={`px-4 py-2 bg-blue-500 text-white rounded-md ${isStreaming ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'
                             }`}
                         disabled={isStreaming}
                     >
                         {isStreaming ? 'Sending...' : 'Send'}
-                    </button>
+                    </Button>
                 </form>
             </div>
         </div>

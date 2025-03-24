@@ -17,4 +17,6 @@ dependencies = [
     "python-multipart>=0.0.20",
     "pydantic-settings>=2.8.1",
     "types-psycopg2>=2.9.21.20250318",
+    "types-requests>=2.32.0.20250306",
+    "markitdown[pdf]>=0.1.0",
 ]
