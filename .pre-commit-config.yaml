@@ -1,0 +1,23 @@
+repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+    -   id: trailing-whitespace
+    -   id: end-of-file-fixer
+    -   id: check-yaml
+    -   id: check-added-large-files
+
+-   repo: https://github.com/psf/black
+    rev: 24.3.0  # Use the latest version
+    hooks:
+    -   id: black
+        language_version: python3
+        files: ^server/
+        # Optional args: --line-length=100
+
+-   repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+    -   id: isort
+        files: ^server/
+        args: ["--profile", "black"]

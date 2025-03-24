@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/sidebar"
 import { useEffect, useState } from "react"
 import { fetchFromApi } from "@/lib/api"
+import { Button } from "./ui/button"
 
 // Menu items.
 const items = [
@@ -97,7 +98,10 @@ export function AppSidebar() {
                                         allPapers.map((paper) => (
                                             <SidebarMenuSubItem key={paper.id}>
                                                 <SidebarMenuSubButton asChild>
-                                                    <a href={`/paper/${paper.id}`}>
+                                                    <a
+                                                        href={`/paper/${paper.id}`}
+                                                        className="text-sm font-medium w-full h-fit"
+                                                    >
                                                         {paper.filename}
                                                     </a>
                                                 </SidebarMenuSubButton>

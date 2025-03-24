@@ -8,6 +8,7 @@ import "react-pdf/dist/esm/Page/TextLayer.css";
 import "../app/globals.css";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Search, ArrowLeft, ArrowRight, X, Minus, Plus } from "lucide-react";
 
 interface PdfViewerProps {
 	pdfUrl: string;
@@ -126,7 +127,7 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 		// Remove styling from any existing highlights
 		const existingHighlights = document.querySelectorAll('.react-pdf__Page__textContent span.border-2');
 		existingHighlights.forEach(span => {
-			span.classList.remove('border-2', 'border-yellow-500');	
+			span.classList.remove('border-2', 'border-yellow-500');
 		});
 
 		// Highlight the text by selecting the text layer
@@ -166,53 +167,43 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 
 	return (
 		<div ref={containerRef} className="flex flex-col items-center gap-4 h-screen w-full overflow-y-auto" id="pdf-container">
-			{/* Zoom controls */}
-			<div className="sticky top-4 z-10 flex flex-col gap-2 bg-white p-3 rounded-md shadow-md mb-4 w-full max-w-3xl">
-
-				<div className="flex gap-2 items-center">
+			<div className="sticky top-0 z-10 flex items-center justify-between bg-white/80 backdrop-blur-sm p-2 rounded-none w-full border-b border-gray-300">
+				<div className="flex items-center gap-2 flex-grow max-w-md">
 					<Input
 						type="text"
-						placeholder="Search in document..."
+						placeholder="Search..."
 						value={searchText}
 						onChange={(e) => setSearchText(e.target.value)}
 						onKeyDown={(e) => e.key === 'Enter' && performSearch()}
-						className="flex-grow"
+						className="h-8 text-sm"
 					/>
-					<Button onClick={performSearch} className="px-3 py-1">
-						Search
+					<Button onClick={performSearch} size="sm" variant="ghost" className="h-8 px-2">
+						<Search size={16} />
 					</Button>
 				</div>
 
 				{searchResults.length > 0 && (
-					<div className="flex items-center gap-2 mt-2">
-						<span className="text-sm">
-							{currentMatch + 1} of {searchResults.length} results
-						</span>
-						<Button onClick={goToPreviousMatch} className="px-2 py-1">
-							Previous
+					<div className="flex items-center gap-1 mx-2">
+						<span className="text-xs text-gray-600">{currentMatch + 1}/{searchResults.length}</span>
+						<Button onClick={goToPreviousMatch} size="sm" variant="ghost" className="h-8 w-8 p-0">
+							<ArrowLeft size={16} />
 						</Button>
-						<Button onClick={goToNextMatch} className="px-2 py-1">
-							Next
+						<Button onClick={goToNextMatch} size="sm" variant="ghost" className="h-8 w-8 p-0">
+							<ArrowRight size={16} />
 						</Button>
-						<Button onClick={() => setSearchResults([])} className="px-2 py-1">
-							Clear
+						<Button onClick={() => setSearchResults([])} size="sm" variant="ghost" className="h-8 w-8 p-0">
+							<X size={16} />
 						</Button>
 					</div>
 				)}
-				<div className="flex gap-4 mt-2">
 
-					<Button
-						onClick={zoomOut}
-						className="px-3 py-1 rounded"
-					>
-						Zoom Out
+				<div className="flex items-center gap-1">
+					<Button onClick={zoomOut} size="sm" variant="ghost" className="h-8 w-8 p-0">
+						<Minus size={16} />
 					</Button>
-					<span className="px-3 py-1">{Math.round(scale * 100)}%</span>
-					<Button
-						onClick={zoomIn}
-						className="px-3 py-1 rounded"
-					>
-						Zoom In
+					<span className="text-xs w-12 text-center">{Math.round(scale * 100)}%</span>
+					<Button onClick={zoomIn} size="sm" variant="ghost" className="h-8 w-8 p-0">
+						<Plus size={16} />
 					</Button>
 				</div>
 			</div>
