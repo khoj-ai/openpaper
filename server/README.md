@@ -29,13 +29,13 @@ The application will start on `http://localhost:8000`
 
 - Health Check: `GET /health`
   - Returns the health status of the application
-  
+
 ## API Documentation
 
 FastAPI automatically generates API documentation. Once the application is running, you can access:
 
 - Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc` 
+- ReDoc: `http://localhost:8000/redoc`
 
 # Database
 

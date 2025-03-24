@@ -43,7 +43,7 @@ export default function Home() {
 			// Fetch the PDF file
 			const response = await fetch(url);
 			if (!response.ok) throw new Error('Failed to fetch PDF');
-			
+
 			// Get the filename from the URL or Content-Disposition header
 			const contentDisposition = response.headers.get('content-disposition');
 			let filename = 'document.pdf';
@@ -63,10 +63,10 @@ export default function Home() {
 
 			// Convert the response to a blob
 			const blob = await response.blob();
-			
+
 			// Create a File object
 			const file = new File([blob], filename, { type: 'application/pdf' });
-			
+
 			// Upload the file
 			await handleFileUpload(file);
 		} catch (error) {
@@ -113,7 +113,7 @@ export default function Home() {
 						Link to a PDF
 					</Button>
 				</div>
-				
+
 				<DataFetcher />
 			</main>
 			<footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">

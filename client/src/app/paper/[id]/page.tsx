@@ -167,7 +167,7 @@ export default function PaperView() {
                                         <td>{paperData.institutions.join(', ')}</td>
                                     </tr>
                                 )}
-                                {paperData.publish_date && isDateValid(paperData.publish_date) && (  
+                                {paperData.publish_date && isDateValid(paperData.publish_date) && (
                                     <tr>
                                         <td className="font-semibold pr-2 py-1">Published:</td>
                                         <td>{new Date(paperData.publish_date).toLocaleDateString()}</td>

@@ -1,23 +1,19 @@
-import os
 import logging
+import os
 import sys
 
+import uvicorn  # type: ignore
+from app.api.api import router
+from app.api.document_api import document_router
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-import uvicorn # type: ignore
-from dotenv import load_dotenv
-
-
-from app.api.api import router
-from app.api.document_api import document_router
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
+    handlers=[logging.StreamHandler(sys.stdout)],
 )
 
 load_dotenv()
@@ -25,7 +21,7 @@ load_dotenv()
 app = FastAPI(
     title="Annotated Paper",
     description="A web application for uploading and annotating papers.",
-    version="1.0.0"
+    version="1.0.0",
 )
 
 # Configure CORS
@@ -46,4 +42,6 @@ app.include_router(document_router, prefix="/api/paper")
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
-    uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=True, log_level="debug")
+    uvicorn.run(
+        "app.main:app", host="0.0.0.0", port=port, reload=True, log_level="debug"
+    )
