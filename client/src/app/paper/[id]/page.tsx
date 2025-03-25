@@ -5,7 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
 import { useParams } from 'next/navigation';
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, Fragment, Children } from 'react';
+
+// Reference to react-markdown documents: https://github.com/remarkjs/react-markdown?tab=readme-ov-file
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeKatex from 'rehype-katex';
+import remarkMath from 'remark-math';
+import 'katex/dist/katex.min.css' // `rehype-katex` does not import the CSS for you
 
 import {
     Collapsible,
@@ -31,7 +38,7 @@ interface ChatMessage {
     id?: string;
     role: 'user' | 'assistant';
     content: string;
-    references?: Record<string, Record<string, string | number>[]>;
+    references?: Reference;
 }
 
 const isDateValid = (dateString: string) => {
@@ -43,11 +50,80 @@ const googleScholarUrl = (searchTerm: string) => {
     return `https://scholar.google.com/scholar?q=${encodeURIComponent(searchTerm)}`;
 }
 
+interface Reference {
+    citations: Citation[];
+}
+
+interface Citation {
+    key: string;
+    reference: string;
+}
+
 interface IPaperMetadata {
     paperData: PaperData;
     onClickStarterQuestion: (question: string) => void;
     hasMessages: boolean;
 }
+
+const CustomCitationLink = ({ children, handleCitationClick, messageIndex, ...props }: any) => {
+    return (
+        <p {...props}>
+            {Children.map(children, (child) => {
+                // If the child is a string, process it for citations
+                if (typeof child === 'string') {
+                    const citationRegex = /\[\^(\d+|[a-zA-Z]+)\]/g;
+
+                    if (citationRegex.test(child)) {
+                        // Reset regex state
+                        citationRegex.lastIndex = 0;
+
+                        // Create a React element array from the string with replaced citations
+                        const parts: React.ReactNode[] = [];
+                        let lastIndex = 0;
+                        let match;
+
+                        while ((match = citationRegex.exec(child)) !== null) {
+                            // Add text before the citation
+                            if (match.index > lastIndex) {
+                                parts.push(child.substring(lastIndex, match.index));
+                            }
+
+                            // Add the citation link
+                            const citationKey = match[1];
+
+                            parts.push(
+                                <a
+                                    key={`citation-${citationKey}-${match.index}`}
+                                    href={`#citation-${citationKey}`}
+                                    className="text-slate-600 font-medium hover:underline text-sm bg-slate-200 rounded-xl px-1 py-0.5"
+                                    id={`citation-ref-${citationKey}`}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        handleCitationClick(citationKey, messageIndex);
+                                    }}
+                                >
+                                    {match[1]}
+                                </a>
+                            );
+
+                            // Update lastIndex to continue after current match
+                            lastIndex = match.index + match[0].length;
+                        }
+
+                        // Add remaining text
+                        if (lastIndex < child.length) {
+                            parts.push(child.substring(lastIndex));
+                        }
+
+                        return <>{parts}</>;
+                    }
+                    return child;
+                }
+                return child;
+            })}
+        </p>
+    );
+};
 
 function PaperMetadata(props: IPaperMetadata) {
     const { paperData } = props;
@@ -61,7 +137,7 @@ function PaperMetadata(props: IPaperMetadata) {
         <Collapsible
             open={isOpen}
             onOpenChange={setIsOpen}
-            className="mb-4 bg-white rounded-lg shadow"
+            className="mb-4 rounded-lg shadow"
         >
             <div className="p-4">
                 <CollapsibleTrigger className="flex w-full items-center justify-between">
@@ -132,7 +208,7 @@ function PaperMetadata(props: IPaperMetadata) {
                             )}
                             {paperData.starter_questions && paperData.starter_questions.length > 0 && (
                                 <tr>
-                                    <td className="font-semibold pr-2 py-1 align-top">Starter Questions:</td>
+                                    <td className="font-semibold pr-2 py-1 align-top">Start:</td>
                                     <td>
                                         <div className="flex gap-2 mt-2 flex-wrap">
                                             {paperData.starter_questions.map((question, i) => (
@@ -167,6 +243,25 @@ export default function PaperView() {
     const [currentMessage, setCurrentMessage] = useState('');
     const [isStreaming, setIsStreaming] = useState(false);
     const [conversationId, setConversationId] = useState<string | null>(null);
+    const [activeCitationKey, setActiveCitationKey] = useState<string | null>(null);
+    const [activeCitationMessageIndex, setActiveCitationMessageIndex] = useState<number | null>(null);
+
+
+    // Add this function to handle citation clicks
+    const handleCitationClick = (key: string, messageIndex: number) => {
+
+        setActiveCitationKey(key);
+        setActiveCitationMessageIndex(messageIndex);
+
+        // Scroll to the citation
+        const element = document.getElementById(`citation-${key}`);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Clear the highlight after a few seconds
+        setTimeout(() => setActiveCitationKey(null), 3000);
+    };
 
     useEffect(() => {
         // Only fetch data when id is available
@@ -174,10 +269,7 @@ export default function PaperView() {
 
         async function fetchPaper() {
             try {
-                console.log(`Fetching paper with ID: ${id}`);
-
                 const response: PaperData = await fetchFromApi(`/api/paper?id=${id}`);
-                console.log('Paper data:', response);
                 setPaperData(response);
             } catch (error) {
                 console.error('Error fetching paper:', error);
@@ -222,8 +314,6 @@ export default function PaperView() {
                     console.error('Error fetching conversation:', error);
                 }
             }
-
-            console.log("Conversation ID:", retrievedConversationId);
         }
 
         fetchConversation();
@@ -246,7 +336,6 @@ export default function PaperView() {
                     id: msg.id,
                     references: msg.references || {}
                 }));
-                console.log('Initial messages:', initialMessages);
                 setMessages(initialMessages);
             } catch (error) {
                 console.error('Error fetching messages:', error);
@@ -285,7 +374,7 @@ export default function PaperView() {
             const reader = stream.getReader();
             const decoder = new TextDecoder();
             let accumulatedContent = '';
-            let references: Record<string, Record<string, string | number>[]> = {};
+            let references: Reference | undefined = undefined;
 
             // Debug counters
             let chunkCount = 0;
@@ -323,7 +412,7 @@ export default function PaperView() {
                             updatedMessages[updatedMessages.length - 1] = {
                                 ...updatedMessages[updatedMessages.length - 1],
                                 content: accumulatedContent,
-                                ...(Object.keys(references).length > 0 ? { references } : {})
+                                references
                             };
                             return updatedMessages;
                         });
@@ -383,6 +472,10 @@ export default function PaperView() {
         }
     };
 
+    const matchesCurrentCitation = (key: string, messageIndex: number) => {
+        return activeCitationKey === key.toString() && activeCitationMessageIndex === messageIndex;
+    }
+
     if (loading) return <div>Loading paper data...</div>;
 
     if (!paperData) return <div>Paper not found</div>;
@@ -419,30 +512,43 @@ export default function PaperView() {
                             <div
                                 key={index}
                                 className={`p-3 rounded-lg ${msg.role === 'user'
-                                    ? 'bg-blue-100 text-blue-800 ml-12'
+                                    ? 'bg-blue-200 text-blue-800 ml-12'
                                     : 'w-full'
                                     }`}
                             >
-                                <p className="whitespace-pre-wrap">{msg.content}</p>
+                                <Markdown
+                                    remarkPlugins={[remarkGfm, remarkMath]}
+                                    rehypePlugins={[rehypeKatex]}
+                                    components={{
+                                        // Apply the custom component to text nodes
+                                        p: (props) => <CustomCitationLink {...props} handleCitationClick={handleCitationClick} messageIndex={index} />,
+                                        li: (props) => <CustomCitationLink {...props} handleCitationClick={handleCitationClick} messageIndex={index} />,
+                                        div: (props) => <CustomCitationLink {...props} handleCitationClick={handleCitationClick} messageIndex={index} />,
+                                    }}
+                                >
+                                    {msg.content}
+                                </Markdown>
                                 {
                                     msg.references && msg.references['citations']?.length > 0 && (
-                                        <div className="mt-2">
-                                            <strong>References:</strong>
+                                        <div className="mt-2" id="references-section">
                                             <ul className="list-disc pl-5">
-                                                {Object.entries(msg.references['citations']).map(([key, value]) => (
-                                                    <div key={key} className="flex flex-row gap-2">
-                                                        <div className="text-xs text-gray-500">
-                                                            {value.key}
+                                                {Object.entries(msg.references['citations']).map(([refIndex, value]) => (
+                                                    <div
+                                                        key={refIndex}
+                                                        className={`flex flex-row gap-2 ${matchesCurrentCitation(value.key, index) ? 'bg-blue-100 dark:bg-blue-900 rounded p-1 transition-colors duration-300' : ''}`}
+                                                        id={`citation-${value.key}`}
+                                                    >
+                                                        <div className="text-xs text-secondary-foreground">
+                                                            <a href={`#citation-ref-${value.key}`}>{value.key}</a>
                                                         </div>
-                                                        <div className="text-xs text-gray-500">
+                                                        <div className="text-xs text-secondary-foreground">
                                                             {value.reference}
                                                         </div>
                                                     </div>
                                                 ))}
                                             </ul>
                                         </div>
-                                    )
-                                }
+                                    )}
                             </div>
                         ))
                     )}

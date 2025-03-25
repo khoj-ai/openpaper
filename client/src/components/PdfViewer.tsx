@@ -17,6 +17,7 @@ interface PdfViewerProps {
 export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 	const [numPages, setNumPages] = useState<number | null>(null);
 	const [selectedText, setSelectedText] = useState<string>("");
+	const [tooltipPosition, setTooltipPosition] = useState<{ x: number, y: number } | null>(null);
 	const [workerInitialized, setWorkerInitialized] = useState(false);
 
 	const [scale, setScale] = useState(1.2); // Higher scale for better resolution
@@ -63,15 +64,40 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 		pagesRef.current = new Array(numPages).fill(null);
 	};
 
-	const handleTextSelection = () => {
+	// Update document event listener to capture mouse position
+	useEffect(() => {
+		// Add mouseup listener to detect selection end
+		document.addEventListener("mouseup", handleTextSelection);
+
+		return () => {
+			document.removeEventListener("mouseup", handleTextSelection);
+		};
+	}, []);
+
+	const handleTextSelection = (e: React.MouseEvent | MouseEvent) => {
 		const selection = window.getSelection();
 		if (selection && selection.toString()) {
-			setSelectedText(selection.toString());
-			console.log("Selected text:", selection.toString());
-			// You can add your callback logic here
-			// For example, show a popup or trigger some action
+			const text = selection.toString();
+			setSelectedText(text);
+			console.log("Selected text:", text);
+
+			// Set tooltip position near cursor
+			setTooltipPosition({
+				x: e.clientX,
+				y: e.clientY
+			});
+		} else {
+			// If no text is selected, hide the tooltip after a small delay
+			// to allow clicking on the tooltip buttons
+			setTimeout(() => {
+				if (!window.getSelection()?.toString()) {
+					setSelectedText("");
+					setTooltipPosition(null);
+				}
+			}, 100);
 		}
 	};
+
 
 	const zoomIn = () => setScale(prev => Math.min(prev + 0.2, 2.5));
 	const zoomOut = () => setScale(prev => Math.max(prev - 0.2, 0.7));
@@ -167,7 +193,7 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 
 	return (
 		<div ref={containerRef} className="flex flex-col items-center gap-4 h-screen w-full overflow-y-auto" id="pdf-container">
-			<div className="sticky top-0 z-10 flex items-center justify-between bg-white/80 backdrop-blur-sm p-2 rounded-none w-full border-b border-gray-300">
+			<div className="sticky top-0 z-10 flex items-center justify-between bg-white/80 dark:bg-white/10 backdrop-blur-sm p-2 rounded-none w-full border-b border-gray-300">
 				<div className="flex items-center gap-2 flex-grow max-w-md">
 					<Input
 						type="text"
@@ -184,7 +210,7 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 
 				{searchResults.length > 0 && (
 					<div className="flex items-center gap-1 mx-2">
-						<span className="text-xs text-gray-600">{currentMatch + 1}/{searchResults.length}</span>
+						<span className="text-xs text-secondary-foreground">{currentMatch + 1}/{searchResults.length}</span>
 						<Button onClick={goToPreviousMatch} size="sm" variant="ghost" className="h-8 w-8 p-0">
 							<ArrowLeft size={16} />
 						</Button>
@@ -235,16 +261,35 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 				))}
 			</Document>
 
-			{selectedText && (
-				<div className="fixed bottom-4 right-4 p-4 bg-white shadow-lg rounded-lg max-w-md z-20">
-					<p className="font-bold">Selected Text:</p>
-					<p>{selectedText}</p>
-					<button
-						onClick={() => setSelectedText("")}
-						className="mt-2 px-2 py-1 text-sm bg-gray-200 rounded hover:bg-gray-300"
-					>
-						Dismiss
-					</button>
+			{/* Replace the fixed position div with a tooltip */}
+			{selectedText && tooltipPosition && (
+				<div
+					className="fixed z-30 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+					style={{
+						left: `${Math.min(tooltipPosition.x, window.innerWidth - 200)}px`,
+						top: `${tooltipPosition.y + 20}px`, // Position slightly below the cursor
+					}}
+				>
+					<div className="flex gap-2 text-sm">
+						<button
+							className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+							onClick={() => {
+								// Add your action here (e.g., copy, highlight, etc.)
+								console.log("Action on:", selectedText);
+							}}
+						>
+							Annotate
+						</button>
+						<button
+							className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded hover:bg-gray-300 dark:hover:bg-gray-500"
+							onClick={() => {
+								setSelectedText("");
+								setTooltipPosition(null);
+							}}
+						>
+							Cancel
+						</button>
+					</div>
 				</div>
 			)}
 		</div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { Calendar, FileText, Home, Inbox, Search, Settings } from "lucide-react";
+import { Calendar, FileText, Home, Inbox, Moon, Search, Settings, Sun } from "lucide-react";
 
 import {
     Sidebar,
@@ -45,8 +45,38 @@ interface PaperItem {
 
 export function AppSidebar() {
     const [allPapers, setAllPapers] = useState<PaperItem[]>([])
+    const [darkMode, setDarkMode] = useState<boolean>(false);
+
+    // Function to toggle dark mode
+    const toggleDarkMode = () => {
+        const newDarkMode = !darkMode;
+        setDarkMode(newDarkMode);
+
+        // Update document class
+        if (newDarkMode) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+
+        // Save preference to localStorage
+        localStorage.setItem('darkMode', newDarkMode ? 'dark' : 'light');
+    };
 
     useEffect(() => {
+        // Check for system preference or stored preference
+        const isDarkMode = localStorage.getItem('darkMode') === 'dark' ||
+            (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+        setDarkMode(isDarkMode);
+
+        // Apply dark mode class if needed
+        if (isDarkMode) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+
         // Define an async function inside useEffect
         const fetchPapers = async () => {
             try {
@@ -78,6 +108,13 @@ export function AppSidebar() {
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                             ))}
+                            {/* Dark Mode Toggle */}
+                            <SidebarMenuItem>
+                                <SidebarMenuButton onClick={toggleDarkMode}>
+                                    {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+                                    <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
                             <SidebarMenuItem>
                                 <SidebarMenuButton>
                                     <FileText size={16} />

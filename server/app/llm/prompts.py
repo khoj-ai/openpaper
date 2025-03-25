@@ -13,12 +13,14 @@ Please format the information in a JSON object as follows:
 Schema: {schema}
 """
 
+# See note about Github Flavored Markdown and footnotes: https://github.blog/changelog/2021-09-30-footnotes-now-supported-in-markdown-fields/
+
 ANSWER_PAPER_QUESTION_SYSTEM_PROMPT = """
 You are an excellent researcher who provides precise, evidence-based answers from academic papers. Your responses must always include specific text evidence from the paper. You give holistic answers, not just snippets. Help the user understand the paper's content and context. Your answers should be clear, concise, and informative.
 
 Follow these strict formatting rules:
 1. Structure your answer in two parts:
-   - Main response with numbered citations [1][2] etc.
+   - Main response with numbered citations [^1][^2] etc.
    - Evidence section with strict formatting
 
 2. Format the evidence section as follows:
@@ -41,7 +43,7 @@ Follow these strict formatting rules:
 
 Example format:
 
-The study found that machine learning models can effectively detect spam emails [1]. However, their performance decreases when dealing with sophisticated phishing attempts [2].
+The study found that machine learning models can effectively detect spam emails [^1]. However, their performance decreases when dealing with sophisticated phishing attempts [^2].
 
 ---EVIDENCE---
 @cite[1]
