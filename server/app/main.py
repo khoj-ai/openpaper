@@ -1,20 +1,22 @@
 import logging
 import os
-import sys
 
 import uvicorn  # type: ignore
 from app.api.api import router
+from app.api.conversation_api import conversation_router
 from app.api.document_api import document_router
+from app.api.message_api import message_router
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.ERROR,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
 )
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -39,9 +41,24 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 # Include the router in the main app
 app.include_router(router, prefix="/api")
 app.include_router(document_router, prefix="/api/paper")
+app.include_router(conversation_router, prefix="/api/conversation")
+app.include_router(message_router, prefix="/api/message")
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", "8000"))
+    port = int(os.getenv("PORT", "8001"))
+    log_config = uvicorn.config.LOGGING_CONFIG
+    log_config["formatters"]["access"][
+        "fmt"
+    ] = "%(asctime)s - %(levelname)s - %(message)s"
+    log_config["formatters"]["default"][
+        "fmt"
+    ] = "%(asctime)s - %(levelname)s - %(message)s"
+    # Set higher log level to see more details
     uvicorn.run(
-        "app.main:app", host="0.0.0.0", port=port, reload=True, log_level="debug"
+        "app.main:app",
+        host="0.0.0.0",
+        port=port,
+        reload=True,
+        log_level="debug",
+        log_config=log_config,
     )

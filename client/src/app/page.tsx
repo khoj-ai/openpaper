@@ -46,7 +46,18 @@ export default function Home() {
 
 			// Get the filename from the URL or Content-Disposition header
 			const contentDisposition = response.headers.get('content-disposition');
-			let filename = 'document.pdf';
+			const randomFilename = Math.random().toString(36).substring(2, 15) + '.pdf';
+			let filename = randomFilename;
+
+			if (contentDisposition && contentDisposition.includes('attachment')) {
+				// Extract filename from Content-Disposition header
+				const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+				const matches = filenameRegex.exec(contentDisposition);
+				if (matches != null && matches[1]) {
+					filename = matches[1].replace(/['"]/g, '');
+				}
+			}
+
 			if (contentDisposition) {
 				const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(contentDisposition);
 				if (matches != null && matches[1]) {

@@ -1,13 +1,16 @@
+import logging
 import os
+import uuid
 from pathlib import Path
 
+from app.database.crud.coversation_crud import conversation_crud
 from app.database.crud.document_crud import (
     DocumentCreate,
     DocumentUpdate,
     document_crud,
 )
 from app.database.database import get_db
-from app.database.models import Document
+from app.database.models import Conversation, Document
 from app.llm.operations import Operations
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, File, Request, UploadFile
@@ -15,6 +18,8 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 # Create uploads directory if it doesn't exist
 UPLOAD_DIR = Path("uploads")
@@ -50,10 +55,50 @@ async def get_paper_ids(db: Session = Depends(get_db)):
         status_code=200,
         content={
             "papers": [
-                {"id": str(paper.id), "filename": paper.filename} for paper in papers
+                {"id": str(paper.id), "filename": paper.filename, "title": paper.title}
+                for paper in papers
             ]
         },
     )
+
+
+@document_router.get("/conversation")
+async def get_mru_paper_conversation(document_id: str, db: Session = Depends(get_db)):
+    """
+    Get latest conversation associated with specific document
+    """
+    casted_document_id = uuid.UUID(document_id)
+
+    # Fetch the document from the database
+    document = document_crud.get(db, id=document_id)
+
+    if not document:
+        return JSONResponse(status_code=404, content={"message": "Document not found"})
+
+    # Fetch the latest conversation associated with the document
+    conversations = conversation_crud.get_document_conversations(
+        db, document_id=casted_document_id
+    )
+
+    if not conversations or len(conversations) == 0:
+        # No conversations found for the document
+        logger.info(f"No conversations found for document ID {document_id}")
+        return JSONResponse(
+            status_code=404, content={"message": "No conversations found"}
+        )
+
+    latest_conversation = conversations[-1]
+
+    # Prepare the response data
+    conversation_data = (
+        latest_conversation.to_dict()
+    )  # Assuming to_dict() method exists
+
+    # Explicitly add ID to the response
+    conversation_data["id"] = str(latest_conversation.id)
+
+    # Return the conversation data
+    return JSONResponse(status_code=200, content=conversation_data)
 
 
 @document_router.get("")
@@ -129,6 +174,10 @@ async def upload_pdf(
             },
         )
     except Exception as e:
+        logger.error(
+            f"Error creating document record: {str(e)}",
+            exc_info=True,
+        )
         return JSONResponse(
             status_code=500,
             content={

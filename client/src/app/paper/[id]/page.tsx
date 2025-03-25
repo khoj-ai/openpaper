@@ -2,6 +2,7 @@
 
 import { PdfViewer } from '@/components/PdfViewer';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { fetchFromApi } from '@/lib/api';
 import { useParams } from 'next/navigation';
 import { useState, useEffect, FormEvent } from 'react';
@@ -20,8 +21,10 @@ interface PaperData {
 }
 
 interface ChatMessage {
+    id?: string;
     role: 'user' | 'assistant';
     content: string;
+    references?: Record<string, any>;
 }
 
 export default function PaperView() {
@@ -33,7 +36,7 @@ export default function PaperView() {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [currentMessage, setCurrentMessage] = useState('');
     const [isStreaming, setIsStreaming] = useState(false);
-
+    const [conversationId, setConversationId] = useState<string | null>(null);
 
     useEffect(() => {
         // Only fetch data when id is available
@@ -56,6 +59,70 @@ export default function PaperView() {
         fetchPaper();
     }, [id]);
 
+    useEffect(() => {
+        if (!paperData) return;
+
+        // Initialize conversation once paper data is available
+        async function fetchConversation() {
+            let retrievedConversationId = null;
+            try {
+                const response = await fetchFromApi(`/api/paper/conversation?document_id=${id}`, {
+                    method: 'GET',
+                });
+
+                if (response && response.id) {
+                    retrievedConversationId = response.id;
+                }
+                setConversationId(retrievedConversationId);
+            } catch (error) {
+                console.error('Error fetching conversation ID:', error);
+
+                try {
+
+                    if (!retrievedConversationId) {
+                        // If no conversation ID is returned, create a new one
+                        const newConversationResponse = await fetchFromApi(`/api/conversation/${id}`, {
+                            method: 'POST',
+                        });
+                        retrievedConversationId = newConversationResponse.id;
+                    }
+
+                    setConversationId(retrievedConversationId);
+                } catch (error) {
+                    console.error('Error fetching conversation:', error);
+                }
+            }
+
+            console.log("Conversation ID:", retrievedConversationId);
+        }
+
+        fetchConversation();
+    }, [paperData]);
+
+    useEffect(() => {
+        if (!conversationId) return;
+
+        // Fetch initial messages for the conversation
+        async function fetchMessages() {
+            try {
+                const response = await fetchFromApi(`/api/conversation/${conversationId}`, {
+                    method: 'GET',
+                });
+
+                // Map the response messages to the expected format
+                const initialMessages = response.messages.map((msg: any) => ({
+                    role: msg.role,
+                    content: msg.content,
+                    id: msg.id,
+                    references: msg.references,
+                }));
+                setMessages(initialMessages);
+            } catch (error) {
+                console.error('Error fetching messages:', error);
+            }
+        }
+        fetchMessages();
+    }, [conversationId]);
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
@@ -77,12 +144,13 @@ export default function PaperView() {
             // For streaming implementation, you would typically:
             // 1. Make a fetch request with appropriate headers for streaming
             // 2. Process the chunks as they arrive and update the last message
-            const response = await fetch('/api/chat', {
+            const response = await fetchFromApi('/api/message/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    message: userMessage.content,
-                    paperId: id
+                    user_query: userMessage.content,
+                    conversation_id: conversationId,
+                    paper_id: id
                 })
             });
 
@@ -206,6 +274,14 @@ export default function PaperView() {
                                         <td>{paperData.abstract}</td>
                                     </tr>
                                 )}
+                                {
+                                    paperData.summary && (
+                                        <tr>
+                                            <td className="font-semibold pr-2 py-1 align-top">Summary:</td>
+                                            <td>{paperData.summary}</td>
+                                        </tr>
+                                    )
+                                }
 
                             </tbody>
                         </table>
@@ -215,7 +291,7 @@ export default function PaperView() {
                 <div className="flex-1 overflow-y-auto mb-4 space-y-4">
                     {messages.length === 0 ? (
                         <div className="text-center text-gray-500 my-4">
-                            Ask questions about this paper
+                            What do you want to know?
                         </div>
                     ) : (
                         messages.map((msg, index) => (
@@ -232,7 +308,7 @@ export default function PaperView() {
                     )}
                 </div>
                 <form onSubmit={handleSubmit} className="flex gap-2">
-                    <input
+                    <Input
                         type="text"
                         value={currentMessage}
                         onChange={(e) => setCurrentMessage(e.target.value)}

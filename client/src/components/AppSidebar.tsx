@@ -72,7 +72,7 @@ export function AppSidebar() {
     }, [])
 
     return (
-        <Sidebar>
+        <Sidebar variant="floating">
             <SidebarContent>
                 <SidebarGroup>
                     <SidebarGroupLabel>The Annotated Paper</SidebarGroupLabel>

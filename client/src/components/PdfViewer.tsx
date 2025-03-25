@@ -225,7 +225,7 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 						<Page
 							key={`page_${index + 1}`}
 							pageNumber={index + 1}
-							className="mb-8 shadow-lg"
+							className="mb-8 border-b border-gray-300"
 							renderTextLayer={true}
 							renderAnnotationLayer={true}
 							scale={scale}

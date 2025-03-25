@@ -1,11 +1,13 @@
 import json
 import os
-from typing import Optional, Union
+import uuid
+from typing import Any, Generator, Optional, Union
 
 from app.database.crud.document_crud import document_crud
+from app.database.crud.message_crud import message_crud
 from app.database.database import get_db
-from app.database.models import Document
-from app.llm.prompts import EXTRACT_PAPER_METADATA
+from app.database.models import Document, Message
+from app.llm.prompts import ANSWER_PAPER_QUESTION, EXTRACT_PAPER_METADATA
 from app.llm.schemas import PaperMetadataExtraction
 from fastapi import Depends
 from google import genai  # type: ignore
@@ -71,6 +73,20 @@ class Operations:
             "Please ensure the response contains proper JSON format."
         )
 
+    def convert_chat_history_to_api_format(
+        self,
+        messages: list[Message],
+    ) -> str:
+        """
+        Convert chat history to Chat API format
+        """
+        api_format = []
+        for message in messages:
+            api_format.append(
+                {"role": f"{message.role}", "parts": [f"{message.content}"]}
+            )
+        return json.dumps(api_format)
+
     async def explain_text(
         self, contents: str, model: Optional[str] = "gemini-2.0-flash"
     ):
@@ -125,3 +141,56 @@ class Operations:
         # Parse the response and return the metadata
         metadata = PaperMetadataExtraction.model_validate(response_json)
         return metadata
+
+    def chat_with_paper(
+        self,
+        paper_id: str,
+        conversation_id: str,
+        question: str,
+        file_path: Optional[str] = None,
+        db: Session = Depends(get_db),
+    ) -> Generator[Any, Any, Any]:
+        """
+        Chat with the paper using the specified model
+        """
+        paper = document_crud.get(db, id=paper_id)
+
+        if not paper:
+            raise ValueError(f"Paper with ID {paper_id} not found.")
+
+        # Load and extract raw data from the PDF
+        raw_file = document_crud.read_raw_document_content(
+            db, document_id=paper_id, file_path=file_path
+        )
+        if not raw_file:
+            raise ValueError(
+                f"Raw file content for paper ID {paper_id} could not be retrieved."
+            )
+
+        casted_conversation_id = uuid.UUID(conversation_id)
+
+        conversation_history = message_crud.get_conversation_messages(
+            db, conversation_id=casted_conversation_id
+        )
+
+        chatml_history = self.convert_chat_history_to_api_format(conversation_history)
+
+        chat_session = self.client.chats.create(
+            model=self.default_model,
+            history=chatml_history,
+        )
+
+        formatted_prompt = ANSWER_PAPER_QUESTION.format(
+            paper=raw_file, question=question
+        )
+
+        # Extract metadata using the LLM
+        for chunk in chat_session.send_message_stream(
+            contents=formatted_prompt,
+            temperature=0.0,
+            max_output_tokens=512,
+            top_p=1.0,
+            top_k=40,
+        ):
+            # Process the chunk of generated content
+            yield chunk.text
