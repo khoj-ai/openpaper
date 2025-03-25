@@ -1,7 +1,7 @@
 // Example component using the API
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { fetchFromApi } from "@/lib/api";
 
 export function DataFetcher() {

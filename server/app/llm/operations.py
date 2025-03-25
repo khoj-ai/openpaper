@@ -1,16 +1,21 @@
 import json
 import os
 import uuid
-from typing import Any, Generator, Optional, Union
+from typing import Any, AsyncGenerator, Generator, Optional, Sequence, Union
 
 from app.database.crud.document_crud import document_crud
 from app.database.crud.message_crud import message_crud
 from app.database.database import get_db
 from app.database.models import Document, Message
-from app.llm.prompts import ANSWER_PAPER_QUESTION, EXTRACT_PAPER_METADATA
+from app.llm.prompts import (
+    ANSWER_PAPER_QUESTION_SYSTEM_PROMPT,
+    ANSWER_PAPER_QUESTION_USER_MESSAGE,
+    EXTRACT_PAPER_METADATA,
+)
 from app.llm.schemas import PaperMetadataExtraction
 from fastapi import Depends
 from google import genai  # type: ignore
+from google.genai.types import Content  # type: ignore
 from sqlalchemy.orm import Session
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -76,16 +81,19 @@ class Operations:
     def convert_chat_history_to_api_format(
         self,
         messages: list[Message],
-    ) -> str:
+    ) -> list[Content]:
         """
         Convert chat history to Chat API format
         """
         api_format = []
         for message in messages:
             api_format.append(
-                {"role": f"{message.role}", "parts": [f"{message.content}"]}
+                Content(
+                    role="user" if message.role == "user" else "model",
+                    parts=[{"text": message.content}],
+                )
             )
-        return json.dumps(api_format)
+        return api_format
 
     async def explain_text(
         self, contents: str, model: Optional[str] = "gemini-2.0-flash"
@@ -142,14 +150,14 @@ class Operations:
         metadata = PaperMetadataExtraction.model_validate(response_json)
         return metadata
 
-    def chat_with_paper(
+    async def chat_with_paper(
         self,
         paper_id: str,
         conversation_id: str,
         question: str,
         file_path: Optional[str] = None,
         db: Session = Depends(get_db),
-    ) -> Generator[Any, Any, Any]:
+    ) -> AsyncGenerator[str, None]:
         """
         Chat with the paper using the specified model
         """
@@ -173,24 +181,25 @@ class Operations:
             db, conversation_id=casted_conversation_id
         )
 
-        chatml_history = self.convert_chat_history_to_api_format(conversation_history)
+        chat_history = self.convert_chat_history_to_api_format(conversation_history)
+
+        formatted_system_prompt = ANSWER_PAPER_QUESTION_SYSTEM_PROMPT.format(
+            paper=raw_file
+        )
 
         chat_session = self.client.chats.create(
             model=self.default_model,
-            history=chatml_history,
+            history=chat_history,
+            config={
+                "system_instruction": formatted_system_prompt,
+            },
         )
 
-        formatted_prompt = ANSWER_PAPER_QUESTION.format(
-            paper=raw_file, question=question
-        )
+        formatted_prompt = ANSWER_PAPER_QUESTION_USER_MESSAGE.format(question=question)
 
         # Extract metadata using the LLM
         for chunk in chat_session.send_message_stream(
-            contents=formatted_prompt,
-            temperature=0.0,
-            max_output_tokens=512,
-            top_p=1.0,
-            top_k=40,
+            message=formatted_prompt,
         ):
             # Process the chunk of generated content
             yield chunk.text

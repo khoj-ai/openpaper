@@ -5,7 +5,7 @@ from uuid import UUID
 from app.database.crud.base_crud import CRUDBase
 from app.database.models import Message
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
 
@@ -53,15 +53,23 @@ class MessageCRUD(CRUDBase[Message, MessageCreate, MessageUpdate]):
     def get_conversation_messages(
         self, db: Session, *, conversation_id: UUID, page: int = 1, page_size: int = 10
     ) -> list[Message]:
-        """Get all messages for a conversation, ordered by sequence"""
-        return (
+        """
+        Get messages for a conversation:
+        1. Order by sequence DESC for correct pagination (most recent first)
+        2. Apply offset and limit
+        3. Reverse final results for chronological display
+        """
+        messages = (
             db.query(Message)
             .filter(Message.conversation_id == conversation_id)
-            .order_by(Message.sequence)
+            .order_by(desc(Message.sequence))  # newest first for pagination
             .offset((page - 1) * page_size)
             .limit(page_size)
             .all()
         )
+
+        # Reverse the results to get chronological order
+        return list(reversed(messages))
 
     def resequence_messages(
         self, db: Session, *, conversation_id: UUID, gap: int = 10

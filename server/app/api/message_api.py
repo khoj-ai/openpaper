@@ -53,18 +53,8 @@ async def chat_message_stream(
                     db=db,
                 ):
                     full_response.append(chunk)
+                    logger.info(f"Streaming chunk: {chunk}")
                     yield f"data: {chunk}\n\n"
-
-                # After streaming completes, save the assistant's message
-                full_response = "".join(
-                    chunk
-                    async for chunk in llm_operations.chat_with_paper(
-                        paper_id=request.paper_id,
-                        conversation_id=request.conversation_id,
-                        question=request.user_query,
-                        db=db,
-                    )
-                )
 
                 # Finally, save the new user and assistant messages to the database
                 message_crud.create(
@@ -86,7 +76,7 @@ async def chat_message_stream(
                 )
 
             except Exception as e:
-                logger.error(f"Error in streaming response: {e}")
+                logger.error(f"Error in streaming response: {e}", exc_info=True)
                 yield f"data: Error: {str(e)}\n\n"
 
         return StreamingResponse(response_generator(), media_type="text/event-stream")

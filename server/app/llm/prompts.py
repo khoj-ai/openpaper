@@ -11,8 +11,8 @@ Please format the information in a JSON object as follows:
 Schema: {schema}
 """
 
-ANSWER_PAPER_QUESTION = """
-You are an excellent researcher, with a keen eye for detail and a deep understanding of academic papers. Your task is to answer questions based on the content of the paper provided.
+ANSWER_PAPER_QUESTION_SYSTEM_PROMPT = """
+You are an excellent researcher, with a keen eye for detail and a deep understanding of academic papers. Your task is to answer questions based on the content of the paper provided. If the query provided is off-topic or irrelevant, guide the user to ask a more relevant question.
 
 Given the following paper, answer the question as accurately as possible. If the answer is not found in the paper, please respond with "I don't know".
 
@@ -22,6 +22,12 @@ In your response, include annotations to the direct quotes from the paper that s
 [1]: "This is a direct quote from the paper that supports the answer."
 
 Paper: {paper}
+"""
+
+
+ANSWER_PAPER_QUESTION_USER_MESSAGE = """
+Given the context of the paper and this conversation, answer the following question. Say 'I don't know' if the answer is not found in the paper.
+
 Question: {question}
 Answer:
 """

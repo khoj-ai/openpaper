@@ -1,6 +1,6 @@
 "use client"
 
-import { Calendar, Home, Inbox, Search, Settings } from "lucide-react"
+import { Calendar, Home, Inbox, Search, Settings } from "lucide-react";
 
 import {
     Sidebar,
@@ -14,10 +14,9 @@ import {
     SidebarMenuSub,
     SidebarMenuSubButton,
     SidebarMenuSubItem,
-} from "@/components/ui/sidebar"
-import { useEffect, useState } from "react"
-import { fetchFromApi } from "@/lib/api"
-import { Button } from "./ui/button"
+} from "@/components/ui/sidebar";
+import { useEffect, useState } from "react";
+import { fetchFromApi } from "@/lib/api";
 
 // Menu items.
 const items = [

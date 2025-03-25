@@ -3,7 +3,7 @@
 import { PdfViewer } from '@/components/PdfViewer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { fetchFromApi } from '@/lib/api';
+import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
 import { useParams } from 'next/navigation';
 import { useState, useEffect, FormEvent } from 'react';
 
@@ -24,7 +24,85 @@ interface ChatMessage {
     id?: string;
     role: 'user' | 'assistant';
     content: string;
-    references?: Record<string, any>;
+}
+
+const isDateValid = (dateString: string) => {
+    const date = new Date(dateString);
+    return !isNaN(date.getTime());
+};
+
+function PaperMetadata(props: PaperData) {
+    const paperData = props;
+
+    return (
+        <div className="mb-4 bg-white rounded-lg shadow p-4">
+            <h2 className="text-xl font-bold mb-3">{paperData.title}</h2>
+            <table className="w-full text-sm">
+                <tbody>
+                    {paperData.authors && paperData.authors.length > 0 && (
+                        <tr>
+                            <td className="font-semibold pr-2 py-1 align-top">Authors:</td>
+                            <td>{paperData.authors.join(', ')}</td>
+                        </tr>
+                    )}
+                    {paperData.institutions && paperData.institutions.length > 0 && (
+                        <tr>
+                            <td className="font-semibold pr-2 py-1 align-top">Institutions:</td>
+                            <td>{paperData.institutions.join(', ')}</td>
+                        </tr>
+                    )}
+                    {paperData.publish_date && isDateValid(paperData.publish_date) && (
+                        <tr>
+                            <td className="font-semibold pr-2 py-1">Published:</td>
+                            <td>{new Date(paperData.publish_date).toLocaleDateString()}</td>
+                        </tr>
+                    )}
+                    {paperData.keywords && paperData.keywords.length > 0 && (
+                        <tr>
+                            <td className="font-semibold pr-2 py-1 align-top">Keywords:</td>
+                            <td>
+                                <div className="flex flex-wrap gap-1">
+                                    {paperData.keywords.map((keyword, i) => (
+                                        <span key={i} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                                            {keyword}
+                                        </span>
+                                    ))}
+                                </div>
+                            </td>
+                        </tr>
+                    )}
+                    {
+                        paperData.starter_questions && paperData.starter_questions.length > 0 && (
+                            <tr>
+                                <td className="font-semibold pr-2 py-1 align-top">Starter Questions:</td>
+                                <td>
+                                    <ul className="list-disc pl-5">
+                                        {paperData.starter_questions.map((question, i) => (
+                                            <li key={i}>{question}</li>
+                                        ))}
+                                    </ul>
+                                </td>
+                            </tr>
+                        )}
+                    {/* {paperData.abstract && (
+                        <tr>
+                            <td className="font-semibold pr-2 py-1 align-top">Abstract:</td>
+                            <td>{paperData.abstract}</td>
+                        </tr>
+                    )} */}
+                    {
+                        paperData.summary && (
+                            <tr>
+                                <td className="font-semibold pr-2 py-1 align-top">Summary:</td>
+                                <td>{paperData.summary}</td>
+                            </tr>
+                        )
+                    }
+
+                </tbody>
+            </table>
+        </div>
+    );
 }
 
 export default function PaperView() {
@@ -110,11 +188,10 @@ export default function PaperView() {
                 });
 
                 // Map the response messages to the expected format
-                const initialMessages = response.messages.map((msg: any) => ({
+                const initialMessages = response.messages.map((msg: ChatMessage) => ({
                     role: msg.role,
                     content: msg.content,
                     id: msg.id,
-                    references: msg.references,
                 }));
                 setMessages(initialMessages);
             } catch (error) {
@@ -141,10 +218,8 @@ export default function PaperView() {
         setIsStreaming(true);
 
         try {
-            // For streaming implementation, you would typically:
-            // 1. Make a fetch request with appropriate headers for streaming
-            // 2. Process the chunks as they arrive and update the last message
-            const response = await fetchFromApi('/api/message/chat', {
+            // Use fetchStreamFromApi instead of direct fetch
+            const stream = await fetchStreamFromApi('/api/message/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -154,52 +229,51 @@ export default function PaperView() {
                 })
             });
 
-            if (!response.ok) throw new Error('Failed to send message');
+            const reader = stream.getReader();
+            const decoder = new TextDecoder();
+            let accumulatedContent = '';
 
-            if (response.body) {
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let done = false;
+            while (true) {
+                const { done, value } = await reader.read();
 
-                while (!done) {
-                    const { value, done: doneReading } = await reader.read();
-                    done = doneReading;
+                if (done) {
+                    break;
+                }
 
-                    if (value) {
-                        const chunk = decoder.decode(value);
+                const chunk = decoder.decode(value);
+                console.log("Raw chunk:", chunk); // Debug log
 
-                        // Update the last message with new content
+                // Process SSE format (data: content\n\n)
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.substring(6);
+                        accumulatedContent += data;
                         setMessages(prev => {
-                            const newMessages = [...prev];
-                            const lastMessage = newMessages[newMessages.length - 1];
-                            newMessages[newMessages.length - 1] = {
-                                ...lastMessage,
-                                content: lastMessage.content + chunk
+                            const updatedMessages = [...prev];
+                            updatedMessages[updatedMessages.length - 1] = {
+                                ...updatedMessages[updatedMessages.length - 1],
+                                content: accumulatedContent,
                             };
-                            return newMessages;
+                            return updatedMessages;
                         });
                     }
                 }
             }
         } catch (error) {
-            console.error('Error sending message:', error);
-            // Update the assistant message to show error
+            console.error('Error during streaming:', error);
             setMessages(prev => {
-                const newMessages = [...prev];
-                newMessages[newMessages.length - 1] = {
-                    role: 'assistant',
-                    content: 'Sorry, there was an error processing your request.'
+                const updatedMessages = [...prev];
+                updatedMessages[updatedMessages.length - 1] = {
+                    ...updatedMessages[updatedMessages.length - 1],
+                    content: "An error occurred while processing your request.",
                 };
-                return newMessages;
+                return updatedMessages;
             });
         } finally {
             setIsStreaming(false);
         }
-    };
-
-    const isDateValid = (dateString: string) => {
-        const date = new Date(dateString);
-        return !isNaN(date.getTime());
     };
 
     if (loading) return <div>Loading paper data...</div>;
@@ -219,73 +293,18 @@ export default function PaperView() {
             <div className="flex flex-col h-screen p-4">
                 {/* Paper Metadata Section */}
                 {paperData && (
-                    <div className="mb-4 bg-white rounded-lg shadow p-4">
-                        <h2 className="text-xl font-bold mb-3">{paperData.title}</h2>
-                        <table className="w-full text-sm">
-                            <tbody>
-                                {paperData.authors && paperData.authors.length > 0 && (
-                                    <tr>
-                                        <td className="font-semibold pr-2 py-1 align-top">Authors:</td>
-                                        <td>{paperData.authors.join(', ')}</td>
-                                    </tr>
-                                )}
-                                {paperData.institutions && paperData.institutions.length > 0 && (
-                                    <tr>
-                                        <td className="font-semibold pr-2 py-1 align-top">Institutions:</td>
-                                        <td>{paperData.institutions.join(', ')}</td>
-                                    </tr>
-                                )}
-                                {paperData.publish_date && isDateValid(paperData.publish_date) && (
-                                    <tr>
-                                        <td className="font-semibold pr-2 py-1">Published:</td>
-                                        <td>{new Date(paperData.publish_date).toLocaleDateString()}</td>
-                                    </tr>
-                                )}
-                                {paperData.keywords && paperData.keywords.length > 0 && (
-                                    <tr>
-                                        <td className="font-semibold pr-2 py-1 align-top">Keywords:</td>
-                                        <td>
-                                            <div className="flex flex-wrap gap-1">
-                                                {paperData.keywords.map((keyword, i) => (
-                                                    <span key={i} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
-                                                        {keyword}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )}
-                                {
-                                    paperData.starter_questions && paperData.starter_questions.length > 0 && (
-                                        <tr>
-                                            <td className="font-semibold pr-2 py-1 align-top">Starter Questions:</td>
-                                            <td>
-                                                <ul className="list-disc pl-5">
-                                                    {paperData.starter_questions.map((question, i) => (
-                                                        <li key={i}>{question}</li>
-                                                    ))}
-                                                </ul>
-                                            </td>
-                                        </tr>
-                                    )}
-                                {paperData.abstract && (
-                                    <tr>
-                                        <td className="font-semibold pr-2 py-1 align-top">Abstract:</td>
-                                        <td>{paperData.abstract}</td>
-                                    </tr>
-                                )}
-                                {
-                                    paperData.summary && (
-                                        <tr>
-                                            <td className="font-semibold pr-2 py-1 align-top">Summary:</td>
-                                            <td>{paperData.summary}</td>
-                                        </tr>
-                                    )
-                                }
-
-                            </tbody>
-                        </table>
-                    </div>
+                    <PaperMetadata
+                        filename={paperData.filename}
+                        authors={paperData.authors}
+                        title={paperData.title}
+                        abstract={paperData.abstract}
+                        publish_date={paperData.publish_date}
+                        summary={paperData.summary}
+                        institutions={paperData.institutions}
+                        file_url={paperData.file_url}
+                        keywords={paperData.keywords}
+                        starter_questions={paperData.starter_questions}
+                    />
                 )}
 
                 <div className="flex-1 overflow-y-auto mb-4 space-y-4">
