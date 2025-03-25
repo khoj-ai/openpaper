@@ -18,6 +18,7 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 	const [numPages, setNumPages] = useState<number | null>(null);
 	const [selectedText, setSelectedText] = useState<string>("");
 	const [tooltipPosition, setTooltipPosition] = useState<{ x: number, y: number } | null>(null);
+	const [isAnnotating, setIsAnnotating] = useState(false);
 	const [workerInitialized, setWorkerInitialized] = useState(false);
 
 	const [scale, setScale] = useState(1.2); // Higher scale for better resolution
@@ -65,21 +66,22 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 	};
 
 	// Update document event listener to capture mouse position
-	useEffect(() => {
-		// Add mouseup listener to detect selection end
-		document.addEventListener("mouseup", handleTextSelection);
+	// useEffect(() => {
+	// 	// Add mouseup listener to detect selection end
+	// 	document.addEventListener("mouseup", handleTextSelection);
 
-		return () => {
-			document.removeEventListener("mouseup", handleTextSelection);
-		};
-	}, []);
+	// 	return () => {
+	// 		document.removeEventListener("mouseup", handleTextSelection);
+	// 	};
+	// }, []);
 
 	const handleTextSelection = (e: React.MouseEvent | MouseEvent) => {
+		if (isAnnotating) return; // Ignore if annotating
+
 		const selection = window.getSelection();
 		if (selection && selection.toString()) {
 			const text = selection.toString();
 			setSelectedText(text);
-			console.log("Selected text:", text);
 
 			// Set tooltip position near cursor
 			setTooltipPosition({
@@ -192,7 +194,7 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 
 
 	return (
-		<div ref={containerRef} className="flex flex-col items-center gap-4 h-screen w-full overflow-y-auto" id="pdf-container">
+		<div ref={containerRef} className="flex flex-col items-center gap-4 w-full overflow-y-auto" id="pdf-container">
 			<div className="sticky top-0 z-10 flex items-center justify-between bg-white/80 dark:bg-white/10 backdrop-blur-sm p-2 rounded-none w-full border-b border-gray-300">
 				<div className="flex items-center gap-2 flex-grow max-w-md">
 					<Input
@@ -269,22 +271,39 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 						left: `${Math.min(tooltipPosition.x, window.innerWidth - 200)}px`,
 						top: `${tooltipPosition.y + 20}px`, // Position slightly below the cursor
 					}}
+					onClick={(e) => e.stopPropagation()} // Stop click events from bubbling
 				>
 					<div className="flex gap-2 text-sm">
 						<button
 							className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-							onClick={() => {
-								// Add your action here (e.g., copy, highlight, etc.)
-								console.log("Action on:", selectedText);
+							onMouseDown={(e) => e.preventDefault()} // Prevent text deselection
+							onClick={(e) => {
+								e.stopPropagation(); // Stop event propagation
+								setIsAnnotating(true);
+								// Your annotation logic here
+								console.log("Annotating:", selectedText);
+
+								// If you want to implement an annotation form or other UI
+								// instead of immediately closing the tooltip:
+								// - Keep the tooltip open
+								// - Show annotation UI
+
+								// If you want to close the tooltip after annotating:
+								// setSelectedText("");
+								// setTooltipPosition(null);
+								// setIsAnnotating(false);
 							}}
 						>
 							Annotate
 						</button>
 						<button
 							className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded hover:bg-gray-300 dark:hover:bg-gray-500"
-							onClick={() => {
+							onMouseDown={(e) => e.preventDefault()} // Prevent text deselection
+							onClick={(e) => {
+								e.stopPropagation(); // Stop event propagation
 								setSelectedText("");
 								setTooltipPosition(null);
+								setIsAnnotating(false);
 							}}
 						>
 							Cancel
