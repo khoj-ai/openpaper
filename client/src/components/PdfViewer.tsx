@@ -227,7 +227,7 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 							pageNumber={index + 1}
 							className="mb-8 border-b border-gray-300"
 							renderTextLayer={true}
-							renderAnnotationLayer={true}
+							renderAnnotationLayer={false}
 							scale={scale}
 							width={width > 0 ? width : undefined}
 						/>

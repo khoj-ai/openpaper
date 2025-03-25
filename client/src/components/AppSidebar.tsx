@@ -1,6 +1,6 @@
 "use client"
 
-import { Calendar, Home, Inbox, Search, Settings } from "lucide-react";
+import { Calendar, FileText, Home, Inbox, Search, Settings } from "lucide-react";
 
 import {
     Sidebar,
@@ -26,16 +26,6 @@ const items = [
         icon: Home,
     },
     {
-        title: "Inbox",
-        url: "#",
-        icon: Inbox,
-    },
-    {
-        title: "Calendar",
-        url: "#",
-        icon: Calendar,
-    },
-    {
         title: "Search",
         url: "#",
         icon: Search,
@@ -50,6 +40,7 @@ const items = [
 interface PaperItem {
     id: string
     filename: string
+    title: string
 }
 
 export function AppSidebar() {
@@ -89,7 +80,8 @@ export function AppSidebar() {
                             ))}
                             <SidebarMenuItem>
                                 <SidebarMenuButton>
-                                    <span>My Papers</span>
+                                    <FileText size={16} />
+                                    <span>Papers</span>
                                 </SidebarMenuButton>
                                 <SidebarMenuSub>
                                     {
@@ -99,9 +91,9 @@ export function AppSidebar() {
                                                 <SidebarMenuSubButton asChild>
                                                     <a
                                                         href={`/paper/${paper.id}`}
-                                                        className="text-sm font-medium w-full h-fit"
+                                                        className="text-xs font-medium w-full h-fit my-1"
                                                     >
-                                                        {paper.filename}
+                                                        {paper.title || paper.filename}
                                                     </a>
                                                 </SidebarMenuSubButton>
                                             </SidebarMenuSubItem>

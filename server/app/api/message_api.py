@@ -16,6 +16,8 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+logger.setLevel(logging.INFO)
+
 # Create uploads directory if it doesn't exist
 UPLOAD_DIR = Path("uploads")
 

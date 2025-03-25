@@ -2,9 +2,17 @@
 
 import { DataFetcher } from "@/components/DataFetcher";
 import { Button } from "@/components/ui/button";
-import { useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import { fetchFromApi } from "@/lib/api";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import { Loader2 } from "lucide-react";
 
 interface PdfUploadResponse {
 	filename: string;
@@ -14,8 +22,37 @@ interface PdfUploadResponse {
 
 export default function Home() {
 	const fileInputRef = useRef<HTMLInputElement>(null);
+	const [isUploading, setIsUploading] = useState(false);
+	const [loadingMessage, setLoadingMessage] = useState("Preparing your paper...");
+
+	// Loading messages to cycle through
+	const loadingMessages = [
+		"Crunching the numbers...",
+		"Building an index...",
+		"Squeezing the database...",
+		"Analyzing content...",
+		"Processing pages...",
+		"Extracting insights...",
+		"Preparing annotations...",
+		"Organizing references...",
+		"Setting up your workspace...",
+		"Almost there..."
+	];
+
+	// Cycle through loading messages
+	useEffect(() => {
+		if (!isUploading) return;
+
+		const interval = setInterval(() => {
+			const randomIndex = Math.floor(Math.random() * loadingMessages.length);
+			setLoadingMessage(loadingMessages[randomIndex]);
+		}, 3000);
+
+		return () => clearInterval(interval);
+	}, [isUploading]);
 
 	const handleFileUpload = async (file: File) => {
+		setIsUploading(true);
 		const formData = new FormData();
 		formData.append('file', file);
 
@@ -30,15 +67,16 @@ export default function Home() {
 			});
 
 			const redirectUrl = new URL(`/paper/${response.document_id}`, window.location.origin);
-
 			window.location.href = redirectUrl.toString();
 		} catch (error) {
 			console.error('Error uploading file:', error);
 			alert('Failed to upload PDF');
+			setIsUploading(false);
 		}
 	};
 
 	const handlePdfUrl = async (url: string) => {
+		setIsUploading(true);
 		try {
 			// Fetch the PDF file
 			const response = await fetch(url);
@@ -83,6 +121,7 @@ export default function Home() {
 		} catch (error) {
 			console.error('Error processing PDF URL:', error);
 			alert('Failed to process PDF URL');
+			setIsUploading(false);
 		}
 	};
 
@@ -144,6 +183,23 @@ export default function Home() {
 					Learn
 				</a>
 			</footer>
+
+			<Dialog open={isUploading} onOpenChange={(open) => !open && setIsUploading(false)}>
+				<DialogContent className="sm:max-w-md">
+					<DialogHeader>
+						<DialogTitle className="text-center">Processing Your Paper</DialogTitle>
+						<DialogDescription className="text-center">
+							This will just take a moment
+						</DialogDescription>
+					</DialogHeader>
+					<div className="flex flex-col items-center justify-center py-8 space-y-6">
+						<Loader2 className="h-12 w-12 animate-spin text-primary" />
+						<p className="text-center text-lg transition-all duration-500 ease-in-out">
+							{loadingMessage}
+						</p>
+					</div>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }

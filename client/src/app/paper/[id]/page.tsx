@@ -7,6 +7,13 @@ import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
 import { useParams } from 'next/navigation';
 import { useState, useEffect, FormEvent } from 'react';
 
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger
+} from "@/components/ui/collapsible";
+import { ChevronDown, ChevronUp } from 'lucide-react';
+
 interface PaperData {
     filename: string;
     file_url: string;
@@ -31,77 +38,121 @@ const isDateValid = (dateString: string) => {
     return !isNaN(date.getTime());
 };
 
-function PaperMetadata(props: PaperData) {
-    const paperData = props;
+const googleScholarUrl = (searchTerm: string) => {
+    return `https://scholar.google.com/scholar?q=${encodeURIComponent(searchTerm)}`;
+}
+
+interface IPaperMetadata {
+    paperData: PaperData;
+    onClickStarterQuestion: (question: string) => void;
+    hasMessages: boolean;
+}
+
+function PaperMetadata(props: IPaperMetadata) {
+    const { paperData } = props;
+    const [isOpen, setIsOpen] = useState(!props.hasMessages);
+
+    useEffect(() => {
+        setIsOpen(!props.hasMessages);
+    }, [props.hasMessages]);
 
     return (
-        <div className="mb-4 bg-white rounded-lg shadow p-4">
-            <h2 className="text-xl font-bold mb-3">{paperData.title}</h2>
-            <table className="w-full text-sm">
-                <tbody>
-                    {paperData.authors && paperData.authors.length > 0 && (
-                        <tr>
-                            <td className="font-semibold pr-2 py-1 align-top">Authors:</td>
-                            <td>{paperData.authors.join(', ')}</td>
-                        </tr>
-                    )}
-                    {paperData.institutions && paperData.institutions.length > 0 && (
-                        <tr>
-                            <td className="font-semibold pr-2 py-1 align-top">Institutions:</td>
-                            <td>{paperData.institutions.join(', ')}</td>
-                        </tr>
-                    )}
-                    {paperData.publish_date && isDateValid(paperData.publish_date) && (
-                        <tr>
-                            <td className="font-semibold pr-2 py-1">Published:</td>
-                            <td>{new Date(paperData.publish_date).toLocaleDateString()}</td>
-                        </tr>
-                    )}
-                    {paperData.keywords && paperData.keywords.length > 0 && (
-                        <tr>
-                            <td className="font-semibold pr-2 py-1 align-top">Keywords:</td>
-                            <td>
-                                <div className="flex flex-wrap gap-1">
-                                    {paperData.keywords.map((keyword, i) => (
-                                        <span key={i} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
-                                            {keyword}
-                                        </span>
-                                    ))}
-                                </div>
-                            </td>
-                        </tr>
-                    )}
-                    {
-                        paperData.starter_questions && paperData.starter_questions.length > 0 && (
-                            <tr>
-                                <td className="font-semibold pr-2 py-1 align-top">Starter Questions:</td>
-                                <td>
-                                    <ul className="list-disc pl-5">
-                                        {paperData.starter_questions.map((question, i) => (
-                                            <li key={i}>{question}</li>
-                                        ))}
-                                    </ul>
-                                </td>
-                            </tr>
-                        )}
-                    {/* {paperData.abstract && (
-                        <tr>
-                            <td className="font-semibold pr-2 py-1 align-top">Abstract:</td>
-                            <td>{paperData.abstract}</td>
-                        </tr>
-                    )} */}
-                    {
-                        paperData.summary && (
-                            <tr>
-                                <td className="font-semibold pr-2 py-1 align-top">Summary:</td>
-                                <td>{paperData.summary}</td>
-                            </tr>
-                        )
-                    }
+        <Collapsible
+            open={isOpen}
+            onOpenChange={setIsOpen}
+            className="mb-4 bg-white rounded-lg shadow"
+        >
+            <div className="p-4">
+                <CollapsibleTrigger className="flex w-full items-center justify-between">
+                    <h2 className="text-xl font-bold">{paperData.title}</h2>
+                    <div className="text-gray-500">
+                        {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                    </div>
+                </CollapsibleTrigger>
+            </div>
 
-                </tbody>
-            </table>
-        </div>
+            <CollapsibleContent>
+                <div className="px-4 pb-4">
+                    <table className="w-full text-sm">
+                        <tbody>
+                            {paperData.authors && paperData.authors.length > 0 && (
+                                <tr>
+                                    <td className="font-semibold pr-2 py-1 align-top">Authors:</td>
+                                    <td>
+                                        {
+                                            paperData.authors.length > 0 && (
+                                                paperData.authors.map((author, i) => (
+                                                    <a
+                                                        key={i}
+                                                        href={googleScholarUrl(author)}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-500 hover:underline mr-2"
+                                                    >
+                                                        {author}
+                                                    </a>
+                                                ))
+                                            )
+                                        }
+                                    </td>
+                                </tr>
+                            )}
+                            {paperData.institutions && paperData.institutions.length > 0 && (
+                                <tr>
+                                    <td className="font-semibold pr-2 py-1 align-top">Institutions:</td>
+                                    <td>{paperData.institutions.join(', ')}</td>
+                                </tr>
+                            )}
+                            {paperData.publish_date && isDateValid(paperData.publish_date) && (
+                                <tr>
+                                    <td className="font-semibold pr-2 py-1">Published:</td>
+                                    <td>{new Date(paperData.publish_date).toLocaleDateString()}</td>
+                                </tr>
+                            )}
+                            {paperData.keywords && paperData.keywords.length > 0 && (
+                                <tr>
+                                    <td className="font-semibold pr-2 py-1 align-top">Keywords:</td>
+                                    <td>
+                                        <div className="flex flex-wrap gap-1">
+                                            {paperData.keywords.map((keyword, i) => (
+                                                <span key={i} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                                                    {keyword}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+                            {paperData.summary && (
+                                <tr>
+                                    <td className="font-semibold pr-2 py-1 align-top">Summary:</td>
+                                    <td>{paperData.summary}</td>
+                                </tr>
+                            )}
+                            {paperData.starter_questions && paperData.starter_questions.length > 0 && (
+                                <tr>
+                                    <td className="font-semibold pr-2 py-1 align-top">Starter Questions:</td>
+                                    <td>
+                                        <div className="flex gap-2 mt-2 flex-wrap">
+                                            {paperData.starter_questions.map((question, i) => (
+                                                <Button
+                                                    key={i}
+                                                    variant="outline"
+                                                    className="text-xs font-medium p-2 max-w-full whitespace-normal h-auto text-left justify-start break-words"
+                                                    onClick={() => props.onClickStarterQuestion(question)}
+                                                >
+                                                    {question}
+                                                </Button>
+                                            ))}
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </CollapsibleContent>
+        </Collapsible>
     );
 }
 
@@ -218,7 +269,6 @@ export default function PaperView() {
         setIsStreaming(true);
 
         try {
-            // Use fetchStreamFromApi instead of direct fetch
             const stream = await fetchStreamFromApi('/api/message/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -232,6 +282,7 @@ export default function PaperView() {
             const reader = stream.getReader();
             const decoder = new TextDecoder();
             let accumulatedContent = '';
+            let buffer = ''; // Add a buffer to handle partial chunks
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -240,15 +291,18 @@ export default function PaperView() {
                     break;
                 }
 
-                const chunk = decoder.decode(value);
-                console.log("Raw chunk:", chunk); // Debug log
+                // Append new chunk to buffer
+                buffer += decoder.decode(value, { stream: true });
 
-                // Process SSE format (data: content\n\n)
-                const lines = chunk.split('\n');
+                // Process complete SSE messages
+                let boundary = buffer.indexOf('\n\n');
+                while (boundary !== -1) {
+                    const message = buffer.substring(0, boundary);
+                    buffer = buffer.substring(boundary + 2);
 
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        const data = line.substring(6);
+                    // Process the complete message
+                    if (message.startsWith('data: ')) {
+                        const data = message.substring(6);
                         accumulatedContent += data;
                         setMessages(prev => {
                             const updatedMessages = [...prev];
@@ -259,7 +313,23 @@ export default function PaperView() {
                             return updatedMessages;
                         });
                     }
+
+                    boundary = buffer.indexOf('\n\n');
                 }
+            }
+
+            // Handle any remaining content in the buffer
+            if (buffer.startsWith('data: ')) {
+                const data = buffer.substring(6);
+                accumulatedContent += data;
+                setMessages(prev => {
+                    const updatedMessages = [...prev];
+                    updatedMessages[updatedMessages.length - 1] = {
+                        ...updatedMessages[updatedMessages.length - 1],
+                        content: accumulatedContent,
+                    };
+                    return updatedMessages;
+                });
             }
         } catch (error) {
             console.error('Error during streaming:', error);
@@ -282,7 +352,7 @@ export default function PaperView() {
 
     return (
         <div className="w-full h-screen grid grid-cols-2 items-center justify-center gap-4">
-            <div className="h-screen overflow-y-auto border-r-2 border-gray-200">
+            <div className="h-screen overflow-y-auto border-r-2 border-l-2 border-gray-200">
                 {/* PDF Viewer Section */}
                 {paperData.file_url && (
                     <div className="w-full h-full">
@@ -294,16 +364,11 @@ export default function PaperView() {
                 {/* Paper Metadata Section */}
                 {paperData && (
                     <PaperMetadata
-                        filename={paperData.filename}
-                        authors={paperData.authors}
-                        title={paperData.title}
-                        abstract={paperData.abstract}
-                        publish_date={paperData.publish_date}
-                        summary={paperData.summary}
-                        institutions={paperData.institutions}
-                        file_url={paperData.file_url}
-                        keywords={paperData.keywords}
-                        starter_questions={paperData.starter_questions}
+                        paperData={paperData}
+                        hasMessages={messages.length > 0}
+                        onClickStarterQuestion={(question) => {
+                            setCurrentMessage(question);
+                        }}
                     />
                 )}
 
@@ -317,8 +382,8 @@ export default function PaperView() {
                             <div
                                 key={index}
                                 className={`p-3 rounded-lg ${msg.role === 'user'
-                                    ? 'bg-blue-100 ml-12'
-                                    : 'bg-gray-100 mr-12'
+                                    ? 'bg-blue-100 text-blue-800 ml-12'
+                                    : 'w-full'
                                     }`}
                             >
                                 <p className="whitespace-pre-wrap">{msg.content}</p>
