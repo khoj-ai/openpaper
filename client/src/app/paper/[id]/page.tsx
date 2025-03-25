@@ -282,7 +282,10 @@ export default function PaperView() {
             const reader = stream.getReader();
             const decoder = new TextDecoder();
             let accumulatedContent = '';
-            let buffer = ''; // Add a buffer to handle partial chunks
+
+            // Debug counters
+            let chunkCount = 0;
+            let processedDataCount = 0;
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -291,46 +294,36 @@ export default function PaperView() {
                     break;
                 }
 
-                // Append new chunk to buffer
-                buffer += decoder.decode(value, { stream: true });
+                // Decode the chunk - most importantly, don't use stream option
+                // so that multi-byte characters across chunks are handled correctly
+                const chunk = decoder.decode(value);
+                chunkCount++;
+                console.log(`Processing chunk #${chunkCount}:`, chunk);
 
-                // Process complete SSE messages
-                let boundary = buffer.indexOf('\n\n');
-                while (boundary !== -1) {
-                    const message = buffer.substring(0, boundary);
-                    buffer = buffer.substring(boundary + 2);
+                // Each chunk starts with 'data: ' so extract just the content part
+                if (chunk.startsWith('data: ')) {
+                    const dataContent = chunk.substring(6); // Remove the 'data: ' prefix
+                    processedDataCount++;
+                    console.log(`Extracted data #${processedDataCount}:`, dataContent);
 
-                    // Process the complete message
-                    if (message.startsWith('data: ')) {
-                        const data = message.substring(6);
-                        accumulatedContent += data;
-                        setMessages(prev => {
-                            const updatedMessages = [...prev];
-                            updatedMessages[updatedMessages.length - 1] = {
-                                ...updatedMessages[updatedMessages.length - 1],
-                                content: accumulatedContent,
-                            };
-                            return updatedMessages;
-                        });
-                    }
+                    // Add this chunk to our accumulated content
+                    accumulatedContent += dataContent.trim();
 
-                    boundary = buffer.indexOf('\n\n');
+                    // Update the message in the UI with the latest accumulated content
+                    setMessages(prev => {
+                        const updatedMessages = [...prev];
+                        updatedMessages[updatedMessages.length - 1] = {
+                            ...updatedMessages[updatedMessages.length - 1],
+                            content: accumulatedContent,
+                        };
+                        return updatedMessages;
+                    });
                 }
             }
 
-            // Handle any remaining content in the buffer
-            if (buffer.startsWith('data: ')) {
-                const data = buffer.substring(6);
-                accumulatedContent += data;
-                setMessages(prev => {
-                    const updatedMessages = [...prev];
-                    updatedMessages[updatedMessages.length - 1] = {
-                        ...updatedMessages[updatedMessages.length - 1],
-                        content: accumulatedContent,
-                    };
-                    return updatedMessages;
-                });
-            }
+            console.log(`Stream completed. Processed ${chunkCount} chunks with ${processedDataCount} data parts.`);
+            console.log("Final accumulated content:", accumulatedContent);
+
         } catch (error) {
             console.error('Error during streaming:', error);
             setMessages(prev => {
