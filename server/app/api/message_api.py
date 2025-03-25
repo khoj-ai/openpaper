@@ -1,6 +1,8 @@
+import json
 import logging
 import uuid
 from pathlib import Path
+from typing import Union
 
 from app.database.crud.message_crud import MessageCreate, message_crud
 from app.database.database import get_db
@@ -42,23 +44,38 @@ async def chat_message_stream(
     Send a chat message and stream the response from the LLM
     """
     try:
-        # Create generator function for streaming
+
         async def response_generator():
             try:
-                full_response = []
+                content_chunks = []
+                evidence: dict[str, list[dict[str, Union[str, int]]]] | None = None  # type: ignore
 
-                # Stream the AI response and accumulate it
                 async for chunk in llm_operations.chat_with_paper(
                     paper_id=request.paper_id,
                     conversation_id=request.conversation_id,
                     question=request.user_query,
                     db=db,
                 ):
-                    full_response.append(chunk)
-                    logger.info(f"Streaming chunk: {chunk}")
-                    yield f"data: {chunk}\n\n"
+                    # Parse the chunk as a dictionary
+                    if isinstance(chunk, dict):
+                        chunk_type = chunk.get("type")
+                        chunk_content = chunk.get("content", "")
 
-                # Finally, save the new user and assistant messages to the database
+                        if chunk_type == "content":
+                            content_chunks.append(chunk_content)
+                            # Stream content chunks immediately
+                            yield f"{json.dumps({'type': 'content', 'content': chunk_content})}"
+                        elif chunk_type == "references":
+                            evidence = chunk_content
+                            # Stream evidence when received
+                            yield f"{json.dumps({'type': 'references', 'content': evidence})}"
+                    else:
+                        logger.warning(f"Received unexpected chunk format: {chunk}")
+
+                # Save the complete message to the database
+                full_content = "".join(content_chunks)
+
+                # Save user message
                 message_crud.create(
                     db,
                     obj_in=MessageCreate(
@@ -68,18 +85,20 @@ async def chat_message_stream(
                     ),
                 )
 
+                # Save assistant message with both content and evidence
                 message_crud.create(
                     db,
                     obj_in=MessageCreate(
                         conversation_id=uuid.UUID(request.conversation_id),
                         role="assistant",
-                        content="".join(full_response),
+                        content=full_content,
+                        references=evidence if evidence else None,
                     ),
                 )
 
             except Exception as e:
                 logger.error(f"Error in streaming response: {e}", exc_info=True)
-                yield f"data: Error: {str(e)}\n\n"
+                yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
 
         return StreamingResponse(response_generator(), media_type="text/event-stream")
 

@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import uuid
 from typing import Any, AsyncGenerator, Generator, Optional, Sequence, Union
 
@@ -157,10 +158,54 @@ class Operations:
         question: str,
         file_path: Optional[str] = None,
         db: Session = Depends(get_db),
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[Union[str, dict], None]:
         """
         Chat with the paper using the specified model
         """
+
+        def parse_evidence_block(evidence_text: str) -> list[dict]:
+            """
+            Parse evidence block into structured citations
+            Handles multi-line citations between @cite markers
+
+            Incoming format of evidence_text:
+            @cite[1]
+            "First piece of evidence"
+            @cite[2]
+            "Second piece of evidence"
+            """
+            citations = []
+            lines = evidence_text.strip().split("\n")
+            current_citation: dict[str, Union[int, str]] | None = None
+            current_text_lines: list[str] = []
+
+            for line in lines:
+                line = line.strip()
+                if line.startswith("@cite["):
+                    # If we have a previous citation pending, save it
+                    if current_citation is not None:
+                        current_citation["reference"] = " ".join(
+                            current_text_lines
+                        ).strip()
+                        citations.append(current_citation)
+
+                    # Start new citation
+                    match = re.search(r"@cite\[(\d+)\]", line)
+                    if match:
+                        number = int(match.group(1))
+                        current_citation = {"key": number, "reference": ""}
+                        current_text_lines = []
+                elif current_citation is not None and line:
+                    # Accumulate lines for the current citation
+                    current_text_lines.append(line)
+
+            # Don't forget to save the last citation
+            if current_citation is not None and current_text_lines:
+                current_citation["reference"] = " ".join(current_text_lines).strip()
+                citations.append(current_citation)
+
+            return citations
+
         paper = document_crud.get(db, id=paper_id)
 
         if not paper:
@@ -197,9 +242,67 @@ class Operations:
 
         formatted_prompt = ANSWER_PAPER_QUESTION_USER_MESSAGE.format(question=question)
 
+        evidence_buffer: list[str] = []
+        text_buffer: str = ""
+        in_evidence_section = False
+
+        START_DELIMITER = "---EVIDENCE---"
+        END_DELIMITER = "---END-EVIDENCE---"
+
         # Extract metadata using the LLM
         for chunk in chat_session.send_message_stream(
             message=formatted_prompt,
         ):
-            # Process the chunk of generated content
-            yield chunk.text
+            text = chunk.text
+            text_buffer += text
+
+            # Check for start delimiter
+            if not in_evidence_section and START_DELIMITER in text_buffer:
+                in_evidence_section = True
+                # Split at delimiter and yield any content that came before
+                pre_evidence = text_buffer.split(START_DELIMITER)[0]
+                if pre_evidence:
+                    yield {"type": "content", "content": pre_evidence}
+                # Start the evidence buffer
+                evidence_buffer = [text_buffer.split(START_DELIMITER)[1]]
+                # Clear the text buffer
+                text_buffer = ""
+                continue
+
+            if in_evidence_section and END_DELIMITER in text_buffer:
+                # Split at delimiter
+                evidence_part, remaining = text_buffer.split(END_DELIMITER)
+                evidence_buffer.append(evidence_part)
+
+                # Parse the complete evidence block
+                raw_evidence = "".join(evidence_buffer).strip()
+                structured_evidence = parse_evidence_block(raw_evidence)
+
+                # Yield both raw and structured evidence
+                yield {
+                    "type": "references",
+                    "content": {
+                        "citations": structured_evidence,
+                    },
+                }
+
+                # Reset buffers and state
+                in_evidence_section = False
+                evidence_buffer = []
+                text_buffer = remaining
+
+                # Yield any remaining content after evidence section
+                if remaining:
+                    yield {"type": "content", "content": remaining}
+                continue
+
+            # Handle normal streaming
+            if in_evidence_section:
+                evidence_buffer.append(text)
+                text_buffer = ""
+            else:
+                # Keep a reasonable buffer size for detecting delimiters
+                if len(text_buffer) > len(START_DELIMITER) * 2:
+                    to_yield = text_buffer[: -len(START_DELIMITER)]
+                    yield {"type": "content", "content": to_yield}
+                    text_buffer = text_buffer[-len(START_DELIMITER) :]

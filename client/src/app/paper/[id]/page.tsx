@@ -31,6 +31,7 @@ interface ChatMessage {
     id?: string;
     role: 'user' | 'assistant';
     content: string;
+    references?: Record<string, Record<string, string | number>[]>;
 }
 
 const isDateValid = (dateString: string) => {
@@ -243,7 +244,9 @@ export default function PaperView() {
                     role: msg.role,
                     content: msg.content,
                     id: msg.id,
+                    references: msg.references || {}
                 }));
+                console.log('Initial messages:', initialMessages);
                 setMessages(initialMessages);
             } catch (error) {
                 console.error('Error fetching messages:', error);
@@ -282,10 +285,12 @@ export default function PaperView() {
             const reader = stream.getReader();
             const decoder = new TextDecoder();
             let accumulatedContent = '';
+            let references: Record<string, Record<string, string | number>[]> = {};
 
             // Debug counters
             let chunkCount = 0;
-            let processedDataCount = 0;
+            let contentChunks = 0;
+            let referenceChunks = 0;
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -294,35 +299,74 @@ export default function PaperView() {
                     break;
                 }
 
-                // Decode the chunk - most importantly, don't use stream option
-                // so that multi-byte characters across chunks are handled correctly
+                // Decode the chunk
                 const chunk = decoder.decode(value);
                 chunkCount++;
                 console.log(`Processing chunk #${chunkCount}:`, chunk);
 
-                // Each chunk starts with 'data: ' so extract just the content part
-                if (chunk.startsWith('data: ')) {
-                    const dataContent = chunk.substring(6); // Remove the 'data: ' prefix
-                    processedDataCount++;
-                    console.log(`Extracted data #${processedDataCount}:`, dataContent);
+                try {
+                    // Parse the JSON chunk
+                    const parsedChunk = JSON.parse(chunk);
+                    const chunkType = parsedChunk.type;
+                    const chunkContent = parsedChunk.content;
 
-                    // Add this chunk to our accumulated content
-                    accumulatedContent += dataContent.trim();
+                    if (chunkType === 'content') {
+                        contentChunks++;
+                        console.log(`Processing content chunk #${contentChunks}:`, chunkContent);
 
-                    // Update the message in the UI with the latest accumulated content
+                        // Add this content to our accumulated content
+                        accumulatedContent += chunkContent;
+
+                        // Update the message with the new content
+                        setMessages(prev => {
+                            const updatedMessages = [...prev];
+                            updatedMessages[updatedMessages.length - 1] = {
+                                ...updatedMessages[updatedMessages.length - 1],
+                                content: accumulatedContent,
+                                ...(Object.keys(references).length > 0 ? { references } : {})
+                            };
+                            return updatedMessages;
+                        });
+                    }
+                    else if (chunkType === 'references') {
+                        referenceChunks++;
+                        console.log(`Processing references chunk #${referenceChunks}:`, chunkContent);
+
+                        // Store the references
+                        references = chunkContent;
+
+                        // Update the message with the references
+                        setMessages(prev => {
+                            const updatedMessages = [...prev];
+                            updatedMessages[updatedMessages.length - 1] = {
+                                ...updatedMessages[updatedMessages.length - 1],
+                                content: accumulatedContent,
+                                references
+                            };
+                            return updatedMessages;
+                        });
+                    }
+                    else {
+                        console.warn(`Unknown chunk type: ${chunkType}`);
+                    }
+                } catch (error) {
+                    console.error('Error processing chunk:', error, 'Raw chunk:', chunk);
+                    // Handle the error gracefully
                     setMessages(prev => {
                         const updatedMessages = [...prev];
                         updatedMessages[updatedMessages.length - 1] = {
                             ...updatedMessages[updatedMessages.length - 1],
-                            content: accumulatedContent,
+                            content: "An error occurred while processing the response. Can you try again?",
                         };
                         return updatedMessages;
                     });
+                    break;
                 }
             }
 
-            console.log(`Stream completed. Processed ${chunkCount} chunks with ${processedDataCount} data parts.`);
+            console.log(`Stream completed. Processed ${chunkCount} chunks (${contentChunks} content, ${referenceChunks} references).`);
             console.log("Final accumulated content:", accumulatedContent);
+            console.log("Final references:", references);
 
         } catch (error) {
             console.error('Error during streaming:', error);
@@ -380,6 +424,25 @@ export default function PaperView() {
                                     }`}
                             >
                                 <p className="whitespace-pre-wrap">{msg.content}</p>
+                                {
+                                    msg.references && msg.references['citations']?.length > 0 && (
+                                        <div className="mt-2">
+                                            <strong>References:</strong>
+                                            <ul className="list-disc pl-5">
+                                                {Object.entries(msg.references['citations']).map(([key, value]) => (
+                                                    <div key={key} className="flex flex-row gap-2">
+                                                        <div className="text-xs text-gray-500">
+                                                            {value.key}
+                                                        </div>
+                                                        <div className="text-xs text-gray-500">
+                                                            {value.reference}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )
+                                }
                             </div>
                         ))
                     )}

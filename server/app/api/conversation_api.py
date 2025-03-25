@@ -48,8 +48,8 @@ async def get_conversation(
         messages = message_crud.get_conversation_messages(
             db, conversation_id=casted_conversation_id, page=page, page_size=page_size
         )
+        formatted_messages = message_crud.messages_to_dict(messages)
 
-        formatted_messages = [message.to_dict() for message in messages]
         return JSONResponse(
             status_code=200,
             content={
