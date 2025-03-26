@@ -481,8 +481,8 @@ export default function PaperView() {
     if (!paperData) return <div>Paper not found</div>;
 
     return (
-        <div className="w-full h-screen grid grid-cols-2 items-center justify-center gap-4">
-            <div className="h-screen overflow-y-auto border-r-2 border-l-2 border-gray-200">
+        <div className="w-full h-full grid grid-cols-2 items-center justify-center gap-4">
+            <div className="h-[calc(100vh-64px)] overflow-y-auto border-2 border-gray-200 p-2">
                 {/* PDF Viewer Section */}
                 {paperData.file_url && (
                     <div className="w-full h-full">
@@ -490,7 +490,7 @@ export default function PaperView() {
                     </div>
                 )}
             </div>
-            <div className="flex flex-col h-screen p-4">
+            <div className="flex flex-col h-full p-4">
                 {/* Paper Metadata Section */}
                 {paperData && (
                     <PaperMetadata
