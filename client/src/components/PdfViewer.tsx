@@ -305,6 +305,7 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 							if (e.target.value.trim() === "") {
 								setSearchResults([]);
 								setCurrentMatch(-1);
+								setSearchText("");
 								setNotFound(false);
 							} else {
 								setSearchText(e.target.value);
