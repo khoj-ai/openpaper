@@ -19,7 +19,18 @@ import {
     CollapsibleContent,
     CollapsibleTrigger
 } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Highlighter, NotebookText, MessageCircle, Focus } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import {
+    Sidebar,
+    SidebarContent,
+    SidebarGroup,
+    SidebarGroupContent,
+    SidebarMenu,
+    SidebarMenuButton,
+    SidebarMenuItem,
+    SidebarProvider,
+} from "@/components/ui/sidebar";
 
 interface PaperData {
     filename: string;
@@ -128,6 +139,15 @@ const CustomCitationLink = ({ children, handleCitationClick, messageIndex, ...pr
         })
     );
 };
+
+const data = {
+    nav: [
+        { name: "Chat", icon: MessageCircle },
+        { name: "Notes", icon: NotebookText },
+        { name: "Annotations", icon: Highlighter },
+        { name: "Focus", icon: Focus }
+    ],
+}
 
 function PaperMetadata(props: IPaperMetadata) {
     const { paperData } = props;
@@ -254,6 +274,8 @@ export default function PaperView() {
     const [activeCitationMessageIndex, setActiveCitationMessageIndex] = useState<number | null>(null);
     const [pageNumberConversationHistory, setPageNumberConversationHistory] = useState<number>(1);
     const [explicitSearchTerm, setExplicitSearchTerm] = useState<string | undefined>(undefined);
+
+    const [rightSideFunction, setRightSideFunction] = useState<string>('Chat');
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
 
@@ -580,122 +602,170 @@ export default function PaperView() {
     if (!paperData) return <div>Paper not found</div>;
 
     return (
-        <div className="w-full h-full grid grid-cols-2 items-center justify-center gap-4">
-            <div className="border-2 border-gray-200 p-2">
-                {/* PDF Viewer Section */}
-                {paperData.file_url && (
-                    <div className="w-full h-full">
-                        <PdfViewer
-                            pdfUrl={paperData.file_url}
-                            explicitSearchTerm={explicitSearchTerm}
-                        />
-                    </div>
-                )}
-            </div>
-            <div className="flex flex-col h-[calc(100vh-64px)] px-2">
-                {/* Paper Metadata Section */}
-                {paperData && (
-                    <PaperMetadata
-                        paperData={paperData}
-                        hasMessages={messages.length > 0}
-                        onClickStarterQuestion={(question) => {
-                            setCurrentMessage(question);
-                        }}
-                    />
-                )}
-
-                <div
-                    className="flex-1 overflow-y-auto mb-4 space-y-4"
-                    ref={messagesContainerRef}
-                    onScroll={handleScroll}
-                >
-                    {hasMoreMessages && messages.length > 0 && (
-                        <div className="text-center py-2">
-                            {isLoadingMoreMessages ? (
-                                <div className="text-sm text-gray-500">Loading messages...</div>
-                            ) : (
-                                <button
-                                    className="text-sm text-blue-500 hover:text-blue-700"
-                                    onClick={fetchMoreMessages}
-                                >
-                                    Load earlier messages
-                                </button>
-                            )}
+        <div className="flex flex-row w-full h-[calc(100vh-64px)]">
+            <div className="w-full h-full grid grid-cols-3 items-center justify-center gap-0">
+                <div className="border-2 border-gray-200 p-2 col-span-2">
+                    {/* PDF Viewer Section */}
+                    {paperData.file_url && (
+                        <div className="w-full h-full">
+                            <PdfViewer
+                                pdfUrl={paperData.file_url}
+                                explicitSearchTerm={explicitSearchTerm}
+                            />
                         </div>
                     )}
-
-                    {messages.length === 0 ? (
-                        <div className="text-center text-gray-500 my-4">
-                            What do you want to understand about this paper?
-                        </div>
-                    ) : (
-                        messages.map((msg, index) => (
-                            <div
-                                key={index}
-                                className={`p-3 rounded-lg ${msg.role === 'user'
-                                    ? 'bg-blue-200 text-blue-800 ml-12'
-                                    : 'w-full'
-                                    }`}
-                            >
-                                <Markdown
-                                    remarkPlugins={[remarkGfm, remarkMath]}
-                                    rehypePlugins={[rehypeKatex]}
-                                    components={{
-                                        // Apply the custom component to text nodes
-                                        p: (props) => <CustomCitationLink {...props} handleCitationClick={handleCitationClick} messageIndex={index} />,
-                                        li: (props) => <CustomCitationLink {...props} handleCitationClick={handleCitationClick} messageIndex={index} />,
-                                        div: (props) => <CustomCitationLink {...props} handleCitationClick={handleCitationClick} messageIndex={index} />,
-                                    }}
-                                >
-                                    {msg.content}
-                                </Markdown>
-                                {
-                                    msg.references && msg.references['citations']?.length > 0 && (
-                                        <div className="mt-2" id="references-section">
-                                            <ul className="list-disc pl-5">
-                                                {Object.entries(msg.references['citations']).map(([refIndex, value]) => (
-                                                    <div
-                                                        key={refIndex}
-                                                        className={`flex flex-row gap-2 ${matchesCurrentCitation(value.key, index) ? 'bg-blue-100 dark:bg-blue-900 rounded p-1 transition-colors duration-300' : ''}`}
-                                                        id={`citation-${value.key}-${index}`}
-                                                        onClick={() => handleCitationClick(value.key, index)}
-                                                    >
-                                                        <div className="text-xs text-secondary-foreground">
-                                                            <a href={`#citation-ref-${value.key}`}>{value.key}</a>
-                                                        </div>
-                                                        <div
-                                                            id={`citation-ref-${value.key}-${index}`}
-                                                            className="text-xs text-secondary-foreground"
-                                                        >
-                                                            {value.reference}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
-                            </div>
-                        ))
-                    )}
-                    <div ref={messagesEndRef} />
                 </div>
-                <form onSubmit={handleSubmit} className="flex gap-2">
-                    <Input
-                        type="text"
-                        value={currentMessage}
-                        onChange={(e) => setCurrentMessage(e.target.value)}
-                        placeholder="Ask something about this paper..."
-                        className="flex-1 border rounded-md"
-                        disabled={isStreaming}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleSubmit(e);
-                            }
-                        }}
-                    />
-                </form>
+                {
+                    rightSideFunction === 'Notes' && (
+                        <div className='p-2 w-full h-full'>
+                            {/* Notes section */}
+                            <Textarea
+                                className='w-full h-full'
+                            />
+                        </div>
+                    )
+                }
+                {
+                    rightSideFunction === 'Chat' && (
+                        <div className="flex flex-col h-[calc(100vh-64px)] px-2">
+                            {/* Paper Metadata Section */}
+                            {paperData && (
+                                <PaperMetadata
+                                    paperData={paperData}
+                                    hasMessages={messages.length > 0}
+                                    onClickStarterQuestion={(question) => {
+                                        setCurrentMessage(question);
+                                    }}
+                                />
+                            )}
+
+                            <div
+                                className="flex-1 overflow-y-auto mb-4 space-y-4"
+                                ref={messagesContainerRef}
+                                onScroll={handleScroll}
+                            >
+                                {hasMoreMessages && messages.length > 0 && (
+                                    <div className="text-center py-2">
+                                        {isLoadingMoreMessages ? (
+                                            <div className="text-sm text-gray-500">Loading messages...</div>
+                                        ) : (
+                                            <button
+                                                className="text-sm text-blue-500 hover:text-blue-700"
+                                                onClick={fetchMoreMessages}
+                                            >
+                                                Load earlier messages
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+
+                                {messages.length === 0 ? (
+                                    <div className="text-center text-gray-500 my-4">
+                                        What do you want to understand about this paper?
+                                    </div>
+                                ) : (
+                                    messages.map((msg, index) => (
+                                        <div
+                                            key={index}
+                                            className={`p-3 rounded-lg ${msg.role === 'user'
+                                                ? 'bg-blue-200 text-blue-800 ml-12'
+                                                : 'w-full'
+                                                }`}
+                                        >
+                                            <Markdown
+                                                remarkPlugins={[remarkGfm, remarkMath]}
+                                                rehypePlugins={[rehypeKatex]}
+                                                components={{
+                                                    // Apply the custom component to text nodes
+                                                    p: (props) => <CustomCitationLink {...props} handleCitationClick={handleCitationClick} messageIndex={index} />,
+                                                    li: (props) => <CustomCitationLink {...props} handleCitationClick={handleCitationClick} messageIndex={index} />,
+                                                    div: (props) => <CustomCitationLink {...props} handleCitationClick={handleCitationClick} messageIndex={index} />,
+                                                }}
+                                            >
+                                                {msg.content}
+                                            </Markdown>
+                                            {
+                                                msg.references && msg.references['citations']?.length > 0 && (
+                                                    <div className="mt-2" id="references-section">
+                                                        <ul className="list-disc pl-5">
+                                                            {Object.entries(msg.references['citations']).map(([refIndex, value]) => (
+                                                                <div
+                                                                    key={refIndex}
+                                                                    className={`flex flex-row gap-2 ${matchesCurrentCitation(value.key, index) ? 'bg-blue-100 dark:bg-blue-900 rounded p-1 transition-colors duration-300' : ''}`}
+                                                                    id={`citation-${value.key}-${index}`}
+                                                                    onClick={() => handleCitationClick(value.key, index)}
+                                                                >
+                                                                    <div className="text-xs text-secondary-foreground">
+                                                                        <a href={`#citation-ref-${value.key}`}>{value.key}</a>
+                                                                    </div>
+                                                                    <div
+                                                                        id={`citation-ref-${value.key}-${index}`}
+                                                                        className="text-xs text-secondary-foreground"
+                                                                    >
+                                                                        {value.reference}
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                        </div>
+                                    ))
+                                )}
+                                <div ref={messagesEndRef} />
+                            </div>
+                            <form onSubmit={handleSubmit} className="flex gap-2">
+                                <Input
+                                    type="text"
+                                    value={currentMessage}
+                                    onChange={(e) => setCurrentMessage(e.target.value)}
+                                    placeholder="Ask something about this paper..."
+                                    className="flex-1 border rounded-md"
+                                    disabled={isStreaming}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleSubmit(e);
+                                        }
+                                    }}
+                                />
+                            </form>
+                        </div>
+                    )
+                }
+
+            </div>
+            <div className="hidden md:flex flex-col w-fit h-[calc(100vh-64px)] border-l-2 border-gray-200">
+                <SidebarProvider className="items-start h-[calc(100vh-64px)] min-h-fit">
+                    <Sidebar collapsible="none" className="hidden md:flex">
+                        <SidebarContent>
+                            <SidebarGroup>
+                                <SidebarGroupContent>
+                                    <SidebarMenu>
+                                        {data.nav.map((item) => (
+                                            <SidebarMenuItem key={item.name}>
+                                                <SidebarMenuButton
+                                                    asChild
+                                                    isActive={item.name === rightSideFunction}
+                                                    onClick={() => {
+                                                        setRightSideFunction(item.name);
+                                                    }}
+                                                >
+                                                    <p>
+                                                        <item.icon />
+                                                        <span>{item.name}</span>
+                                                    </p>
+                                                </SidebarMenuButton>
+                                            </SidebarMenuItem>
+                                        ))}
+                                    </SidebarMenu>
+                                </SidebarGroupContent>
+                            </SidebarGroup>
+                        </SidebarContent>
+                    </Sidebar>
+                </SidebarProvider>
             </div>
         </div>
+
     );
 }
