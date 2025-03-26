@@ -12,9 +12,10 @@ import { Search, ArrowLeft, ArrowRight, X, Minus, Plus } from "lucide-react";
 
 interface PdfViewerProps {
 	pdfUrl: string;
+	explicitSearchTerm?: string;
 }
 
-export function PdfViewer({ pdfUrl }: PdfViewerProps) {
+export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 	const [numPages, setNumPages] = useState<number | null>(null);
 	const [currentPage, setCurrentPage] = useState<number>(1);
 	const [selectedText, setSelectedText] = useState<string>("");
@@ -30,8 +31,11 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 	const [searchResults, setSearchResults] = useState<Array<{
 		pageIndex: number;
 		matchIndex: number;
+		nodes: Element[];
 	}>>([]);
 	const [currentMatch, setCurrentMatch] = useState(-1);
+	const [notFound, setNotFound] = useState(false);
+
 	const pagesRef = useRef<(HTMLDivElement | null)[]>([]);
 	const containerRef = useRef<HTMLDivElement>(null);
 
@@ -43,6 +47,13 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 			setWorkerInitialized(true);
 		}
 	}, [workerInitialized]);
+
+	useEffect(() => {
+		// If an explicit search term is provided, set it and perform the search
+		if (explicitSearchTerm) {
+			performSearch(explicitSearchTerm);
+		}
+	}, [explicitSearchTerm]);
 
 	// Calculate container width for responsive sizing
 	useEffect(() => {
@@ -149,34 +160,82 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 	const zoomOut = () => setScale(prev => Math.max(prev - 0.2, 0.7));
 
 
-	// Search functionality
-	const performSearch = () => {
-		if (!searchText.trim()) {
+	const performSearch = (term?: string) => {
+		console.log("performing search with searchText:", searchText);
+		const textToSearch = term || searchText;
+		if (!textToSearch.trim()) {
 			setSearchResults([]);
 			setCurrentMatch(-1);
 			return;
 		}
 
-		const results: Array<{ pageIndex: number; matchIndex: number }> = [];
+		const results: Array<{ pageIndex: number; matchIndex: number; nodes: Element[] }> = [];
 
-		// Find all text layer divs in the document
+		// Process one page at a time
 		const textLayers = document.querySelectorAll('.react-pdf__Page__textContent');
 
+		setNotFound(false);
+
 		textLayers.forEach((layer, pageIndex) => {
-			const pageText = layer.textContent || '';
+			// Get all text spans within this page
+			const textNodes = Array.from(layer.querySelectorAll('span'));
+
+			if (textNodes.length === 0) return;
+
+			// Create a single string representation of the page
+			const filteredTextNodes = textNodes.filter(node => node.textContent && node.textContent.trim() !== '');
+			const fullPageText = filteredTextNodes.map(node => node.textContent || '').join(' ');
+
+			// Find all occurrences of the search text in the full page text
+			const searchTextLower = textToSearch.toLowerCase();
+			const fullPageTextLower = fullPageText.toLowerCase();
+
 			let startIndex = 0;
 			let matchIndex = 0;
 
-			// Find all occurrences in this page
-			while (startIndex < pageText.length) {
-				const index = pageText.toLowerCase().indexOf(searchText.toLowerCase(), startIndex);
-				if (index === -1) break;
+			while (startIndex < fullPageTextLower.length) {
+				const foundIndex = fullPageTextLower.indexOf(searchTextLower, startIndex);
+				if (foundIndex === -1) break;
 
-				results.push({ pageIndex, matchIndex });
-				matchIndex++;
-				startIndex = index + 1;
+				// Found a match, now map it back to the individual text nodes
+				const matchStart = foundIndex;
+				const matchEnd = matchStart + searchTextLower.length;
+
+				// Find which nodes contain parts of the match
+				let currentPosition = 0;
+				const matchingNodes: Element[] = [];
+
+				for (const node of filteredTextNodes) {
+					const nodeText = node.textContent || '';
+					const nodeLength = nodeText.length + 1; // +1 for the added space
+
+					const nodeStart = currentPosition;
+					const nodeEnd = currentPosition + nodeLength;
+
+					// Check if this node overlaps with the match
+					if (
+						(matchStart >= nodeStart && matchStart < nodeEnd) || // Match starts in this node
+						(matchEnd > nodeStart && matchEnd <= nodeEnd) || // Match ends in this node
+						(matchStart <= nodeStart && matchEnd >= nodeEnd) // Match completely contains this node
+					) {
+						matchingNodes.push(node);
+					}
+
+					currentPosition += nodeLength;
+				}
+
+				if (matchingNodes.length > 0) {
+					results.push({ pageIndex, matchIndex, nodes: matchingNodes });
+					matchIndex++;
+				}
+
+				startIndex = foundIndex + 1;
 			}
 		});
+
+		if (results.length === 0) {
+			setNotFound(true);
+		}
 
 		setSearchResults(results);
 		setCurrentMatch(results.length > 0 ? 0 : -1);
@@ -187,7 +246,7 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 		}
 	};
 
-	const scrollToMatch = (match: { pageIndex: number; matchIndex: number }) => {
+	const scrollToMatch = (match: { pageIndex: number; matchIndex: number; nodes: Element[] }) => {
 		if (!match) return;
 
 		const pageDiv = pagesRef.current[match.pageIndex];
@@ -199,26 +258,22 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 		// Remove styling from any existing highlights
 		const existingHighlights = document.querySelectorAll('.react-pdf__Page__textContent span.border-2');
 		existingHighlights.forEach(span => {
-			span.classList.remove('border-2', 'border-yellow-500');
+			span.classList.remove('border-2', 'border-yellow-500', 'bg-yellow-100', 'rounded', 'opacity-20');
 		});
 
-		// Highlight the text by selecting the text layer
+		// Highlight all nodes that contain parts of the match
 		setTimeout(() => {
-			const textLayer = pageDiv.querySelector('.react-pdf__Page__textContent');
-			if (!textLayer) return;
+			match.nodes.forEach(node => {
+				node.classList.add('border-2', 'border-yellow-500', 'bg-yellow-100', 'rounded', 'opacity-20');
+			});
 
-			// This is a basic approach - for better highlighting, you'd need a more
-			// sophisticated approach to find the exact text nodes
-			const textNodes = Array.from(textLayer.querySelectorAll('span'))
-				.filter(span => span.textContent?.toLowerCase().includes(searchText.toLowerCase()));
-
-			if (textNodes.length > match.matchIndex) {
-				textNodes[match.matchIndex].classList.add('border-2', 'border-yellow-500');
-				// Scroll to the highlighted text
-				textNodes[match.matchIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+			// Scroll to the first matching node
+			if (match.nodes.length > 0) {
+				match.nodes[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
 			}
 		}, 100);
 	};
+
 
 	const goToNextMatch = () => {
 		if (searchResults.length === 0) return;
@@ -246,11 +301,20 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 						type="text"
 						placeholder="Search..."
 						value={searchText}
-						onChange={(e) => setSearchText(e.target.value)}
+						onChange={(e) => {
+							if (e.target.value.trim() === "") {
+								setSearchResults([]);
+								setCurrentMatch(-1);
+								setNotFound(false);
+							} else {
+								setSearchText(e.target.value);
+								setNotFound(false);
+							}
+						}}
 						onKeyDown={(e) => e.key === 'Enter' && performSearch()}
 						className="h-8 text-sm"
 					/>
-					<Button onClick={performSearch} size="sm" variant="ghost" className="h-8 px-2">
+					<Button onClick={() => performSearch()} size="sm" variant="ghost" className="h-8 px-2">
 						<Search size={16} />
 					</Button>
 				</div>
@@ -269,6 +333,17 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 						</Button>
 					</div>
 				)}
+
+				{
+					searchText && notFound && (
+						<div className="flex items-center gap-1 mx-2">
+							<span className="text-xs text-red-500">No results found</span>
+							<Button onClick={() => setSearchText("")} size="sm" variant="ghost" className="h-8 w-8 p-0">
+								<X size={16} />
+							</Button>
+						</div>
+					)
+				}
 
 				{/* Add page navigation controls */}
 				<div className="flex items-center gap-1 mx-2">

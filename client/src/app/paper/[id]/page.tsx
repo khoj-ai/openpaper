@@ -253,6 +253,7 @@ export default function PaperView() {
     const [activeCitationKey, setActiveCitationKey] = useState<string | null>(null);
     const [activeCitationMessageIndex, setActiveCitationMessageIndex] = useState<number | null>(null);
     const [pageNumberConversationHistory, setPageNumberConversationHistory] = useState<number>(1);
+    const [explicitSearchTerm, setExplicitSearchTerm] = useState<string | undefined>(undefined);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
 
@@ -265,6 +266,16 @@ export default function PaperView() {
         // Scroll to the citation
         const element = document.getElementById(`citation-${key}-${messageIndex}`);
         if (element) {
+
+            const refValueElement = document.getElementById(`citation-ref-${key}-${messageIndex}`);
+            if (refValueElement) {
+                const refValueText = refValueElement.innerText;
+                const refValue = refValueText.replace(/^\[\^(\d+|[a-zA-Z]+)\]/, '').trim();
+
+                // since the first and last terms are quotes, remove them
+                const searchTerm = refValue.substring(1, refValue.length - 1);
+                setExplicitSearchTerm(searchTerm);
+            }
             element.scrollIntoView({ behavior: 'smooth' });
         }
 
@@ -574,7 +585,10 @@ export default function PaperView() {
                 {/* PDF Viewer Section */}
                 {paperData.file_url && (
                     <div className="w-full h-full">
-                        <PdfViewer pdfUrl={paperData.file_url} />
+                        <PdfViewer
+                            pdfUrl={paperData.file_url}
+                            explicitSearchTerm={explicitSearchTerm}
+                        />
                     </div>
                 )}
             </div>
@@ -649,7 +663,10 @@ export default function PaperView() {
                                                         <div className="text-xs text-secondary-foreground">
                                                             <a href={`#citation-ref-${value.key}`}>{value.key}</a>
                                                         </div>
-                                                        <div className="text-xs text-secondary-foreground">
+                                                        <div
+                                                            id={`citation-ref-${value.key}-${index}`}
+                                                            className="text-xs text-secondary-foreground"
+                                                        >
                                                             {value.reference}
                                                         </div>
                                                     </div>
