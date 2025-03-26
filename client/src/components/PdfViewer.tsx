@@ -16,6 +16,7 @@ interface PdfViewerProps {
 
 export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 	const [numPages, setNumPages] = useState<number | null>(null);
+	const [currentPage, setCurrentPage] = useState<number>(1);
 	const [selectedText, setSelectedText] = useState<string>("");
 	const [tooltipPosition, setTooltipPosition] = useState<{ x: number, y: number } | null>(null);
 	const [isAnnotating, setIsAnnotating] = useState(false);
@@ -59,21 +60,64 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 		return () => window.removeEventListener('resize', updateWidth);
 	}, []);
 
+	const goToPreviousPage = () => {
+		if (currentPage > 1) {
+			setCurrentPage(currentPage - 1);
+			// Scroll to the new page
+			pagesRef.current[currentPage - 2]?.scrollIntoView({ behavior: 'smooth' });
+		}
+	};
+
+	const goToNextPage = () => {
+		if (numPages && currentPage < numPages) {
+			setCurrentPage(currentPage + 1);
+			// Scroll to the new page
+			pagesRef.current[currentPage]?.scrollIntoView({ behavior: 'smooth' });
+		}
+	};
+
+	// Add an effect to update current page when scrolling
+	useEffect(() => {
+		const handleScroll = () => {
+			if (!containerRef.current || pagesRef.current.length === 0) return;
+
+			// Find the page that's most visible in the viewport
+			let maxVisiblePage = 1;
+			let maxVisibleArea = 0;
+
+			pagesRef.current.forEach((pageRef, index) => {
+				if (!pageRef) return;
+
+				const rect = pageRef.getBoundingClientRect();
+				const containerRect = containerRef.current!.getBoundingClientRect();
+
+				// Calculate how much of the page is visible in the viewport
+				const visibleTop = Math.max(rect.top, containerRect.top);
+				const visibleBottom = Math.min(rect.bottom, containerRect.bottom);
+
+				if (visibleBottom > visibleTop) {
+					const visibleArea = visibleBottom - visibleTop;
+					if (visibleArea > maxVisibleArea) {
+						maxVisibleArea = visibleArea;
+						maxVisiblePage = index + 1;
+					}
+				}
+			});
+
+			if (maxVisiblePage !== currentPage) {
+				setCurrentPage(maxVisiblePage);
+			}
+		};
+
+		containerRef.current?.addEventListener('scroll', handleScroll);
+		return () => containerRef.current?.removeEventListener('scroll', handleScroll);
+	}, [currentPage]);
+
 	const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
 		setNumPages(numPages);
 		// Initialize page refs array
 		pagesRef.current = new Array(numPages).fill(null);
 	};
-
-	// Update document event listener to capture mouse position
-	// useEffect(() => {
-	// 	// Add mouseup listener to detect selection end
-	// 	document.addEventListener("mouseup", handleTextSelection);
-
-	// 	return () => {
-	// 		document.removeEventListener("mouseup", handleTextSelection);
-	// 	};
-	// }, []);
 
 	const handleTextSelection = (e: React.MouseEvent | MouseEvent) => {
 		if (isAnnotating) return; // Ignore if annotating
@@ -194,7 +238,7 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 
 
 	return (
-		<div ref={containerRef} className="flex flex-col items-center gap-4 w-full overflow-y-auto" id="pdf-container">
+		<div ref={containerRef} className="flex flex-col items-center gap-4 w-full h-[calc(100vh-100px)] overflow-y-auto" id="pdf-container">
 			{/* Toolbar */}
 			<div className="sticky top-0 z-10 flex items-center justify-between bg-white/80 dark:bg-white/10 backdrop-blur-sm p-2 rounded-none w-full border-b border-gray-300">
 				<div className="flex items-center gap-2 flex-grow max-w-md">
@@ -225,6 +269,31 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 						</Button>
 					</div>
 				)}
+
+				{/* Add page navigation controls */}
+				<div className="flex items-center gap-1 mx-2">
+					<Button
+						onClick={goToPreviousPage}
+						size="sm"
+						variant="ghost"
+						className="h-8 w-8 p-0"
+						disabled={currentPage <= 1}
+					>
+						<ArrowLeft size={16} />
+					</Button>
+					<span className="text-xs text-secondary-foreground">
+						{currentPage} of {numPages || '?'}
+					</span>
+					<Button
+						onClick={goToNextPage}
+						size="sm"
+						variant="ghost"
+						className="h-8 w-8 p-0"
+						disabled={!numPages || currentPage >= numPages}
+					>
+						<ArrowRight size={16} />
+					</Button>
+				</div>
 
 				<div className="flex items-center gap-1">
 					<Button onClick={zoomOut} size="sm" variant="ghost" className="h-8 w-8 p-0">

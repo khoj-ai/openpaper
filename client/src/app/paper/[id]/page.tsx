@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
 import { useParams } from 'next/navigation';
-import { useState, useEffect, FormEvent, Fragment, Children } from 'react';
+import { useState, useEffect, FormEvent, Fragment, Children, useRef, createElement } from 'react';
 
 // Reference to react-markdown documents: https://github.com/remarkjs/react-markdown?tab=readme-ov-file
 import Markdown from 'react-markdown';
@@ -66,62 +66,66 @@ interface IPaperMetadata {
 }
 
 const CustomCitationLink = ({ children, handleCitationClick, messageIndex, ...props }: any) => {
-    return (
-        <p {...props}>
-            {Children.map(children, (child) => {
-                // If the child is a string, process it for citations
-                if (typeof child === 'string') {
-                    const citationRegex = /\[\^(\d+|[a-zA-Z]+)\]/g;
+    // Create a clone of props to avoid mutating the original
+    const elementProps = { ...props };
 
-                    if (citationRegex.test(child)) {
-                        // Reset regex state
-                        citationRegex.lastIndex = 0;
+    return createElement(
+        // Use the original component type from props
+        props.node?.tagName || 'span',
+        elementProps,
+        Children.map(children, (child) => {
+            // If the child is a string, process it for citations
+            if (typeof child === 'string') {
+                const citationRegex = /\[\^(\d+|[a-zA-Z]+)\]/g;
 
-                        // Create a React element array from the string with replaced citations
-                        const parts: React.ReactNode[] = [];
-                        let lastIndex = 0;
-                        let match;
+                if (citationRegex.test(child)) {
+                    // Reset regex state
+                    citationRegex.lastIndex = 0;
 
-                        while ((match = citationRegex.exec(child)) !== null) {
-                            // Add text before the citation
-                            if (match.index > lastIndex) {
-                                parts.push(child.substring(lastIndex, match.index));
-                            }
+                    // Create a React element array from the string with replaced citations
+                    const parts: React.ReactNode[] = [];
+                    let lastIndex = 0;
+                    let match;
 
-                            // Add the citation link
-                            const citationKey = match[1];
-
-                            parts.push(
-                                <a
-                                    key={`citation-${citationKey}-${match.index}`}
-                                    href={`#citation-${citationKey}`}
-                                    className="text-slate-600 font-medium hover:underline text-sm bg-slate-200 rounded-xl px-1 py-0.5"
-                                    id={`citation-ref-${citationKey}`}
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        handleCitationClick(citationKey, messageIndex);
-                                    }}
-                                >
-                                    {match[1]}
-                                </a>
-                            );
-
-                            // Update lastIndex to continue after current match
-                            lastIndex = match.index + match[0].length;
+                    while ((match = citationRegex.exec(child)) !== null) {
+                        // Add text before the citation
+                        if (match.index > lastIndex) {
+                            parts.push(child.substring(lastIndex, match.index));
                         }
 
-                        // Add remaining text
-                        if (lastIndex < child.length) {
-                            parts.push(child.substring(lastIndex));
-                        }
+                        // Add the citation link
+                        const citationKey = match[1];
 
-                        return <>{parts}</>;
+                        parts.push(
+                            <a
+                                key={`citation-${citationKey}-${match.index}`}
+                                href={`#citation-${citationKey}`}
+                                className="text-slate-600 font-medium hover:underline text-sm bg-slate-200 rounded-xl px-1 py-0.5"
+                                id={`citation-ref-${citationKey}`}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    handleCitationClick(citationKey, messageIndex);
+                                }}
+                            >
+                                {match[1]}
+                            </a>
+                        );
+
+                        // Update lastIndex to continue after current match
+                        lastIndex = match.index + match[0].length;
                     }
-                    return child;
+
+                    // Add remaining text
+                    if (lastIndex < child.length) {
+                        parts.push(child.substring(lastIndex));
+                    }
+
+                    return <>{parts}</>;
                 }
                 return child;
-            })}
-        </p>
+            }
+            return child;
+        })
     );
 };
 
@@ -137,9 +141,9 @@ function PaperMetadata(props: IPaperMetadata) {
         <Collapsible
             open={isOpen}
             onOpenChange={setIsOpen}
-            className="mb-4 rounded-lg shadow"
+            className="mb-4 border-b-2 border-secondary"
         >
-            <div className="p-4">
+            <div className="p-2">
                 <CollapsibleTrigger className="flex w-full items-center justify-between">
                     <h2 className="text-xl font-bold">{paperData.title}</h2>
                     <div className="text-gray-500">
@@ -240,11 +244,16 @@ export default function PaperView() {
     const [loading, setLoading] = useState(true);
 
     const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [isLoadingMoreMessages, setIsLoadingMoreMessages] = useState(false);
+    const [hasMoreMessages, setHasMoreMessages] = useState(true);
+    const messagesContainerRef = useRef<HTMLDivElement>(null);
     const [currentMessage, setCurrentMessage] = useState('');
     const [isStreaming, setIsStreaming] = useState(false);
     const [conversationId, setConversationId] = useState<string | null>(null);
     const [activeCitationKey, setActiveCitationKey] = useState<string | null>(null);
     const [activeCitationMessageIndex, setActiveCitationMessageIndex] = useState<number | null>(null);
+    const [pageNumberConversationHistory, setPageNumberConversationHistory] = useState<number>(1);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
 
 
     // Add this function to handle citation clicks
@@ -254,13 +263,29 @@ export default function PaperView() {
         setActiveCitationMessageIndex(messageIndex);
 
         // Scroll to the citation
-        const element = document.getElementById(`citation-${key}`);
+        const element = document.getElementById(`citation-${key}-${messageIndex}`);
         if (element) {
             element.scrollIntoView({ behavior: 'smooth' });
         }
 
         // Clear the highlight after a few seconds
         setTimeout(() => setActiveCitationKey(null), 3000);
+    };
+
+    // Add this effect to scroll to bottom when messages change or streaming is active
+    useEffect(() => {
+        // Only auto-scroll when messages are being added at the bottom (during streaming)
+        if (isStreaming) {
+            scrollToBottom();
+        }
+    }, [messages, isStreaming]);
+
+    const scrollToBottom = () => {
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        } else if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+        }
     };
 
     useEffect(() => {
@@ -325,24 +350,87 @@ export default function PaperView() {
         // Fetch initial messages for the conversation
         async function fetchMessages() {
             try {
-                const response = await fetchFromApi(`/api/conversation/${conversationId}`, {
+                const response = await fetchFromApi(`/api/conversation/${conversationId}?page=${pageNumberConversationHistory}`, {
                     method: 'GET',
                 });
 
                 // Map the response messages to the expected format
-                const initialMessages = response.messages.map((msg: ChatMessage) => ({
+                const fetchedMessages = response.messages.map((msg: ChatMessage) => ({
                     role: msg.role,
                     content: msg.content,
                     id: msg.id,
                     references: msg.references || {}
                 }));
-                setMessages(initialMessages);
+                if (fetchedMessages.length === 0) {
+                    setHasMoreMessages(false);
+                    return;
+                }
+
+                setMessages(prev => [...fetchedMessages, ...prev]);
+                setPageNumberConversationHistory(pageNumberConversationHistory + 1);
             } catch (error) {
                 console.error('Error fetching messages:', error);
             }
         }
         fetchMessages();
     }, [conversationId]);
+
+
+    // Handle scroll to load more messages
+    const handleScroll = () => {
+        if (!messagesContainerRef.current) return;
+
+        const { scrollTop } = messagesContainerRef.current;
+
+        // If user has scrolled close to the top (within 50px), load more messages
+        if (scrollTop < 50 && hasMoreMessages && !isLoadingMoreMessages && conversationId) {
+            fetchMoreMessages();
+        }
+    };
+
+    const fetchMoreMessages = async () => {
+        if (!hasMoreMessages || isLoadingMoreMessages) return;
+
+        setIsLoadingMoreMessages(true);
+        try {
+            const response = await fetchFromApi(`/api/conversation/${conversationId}?page=${pageNumberConversationHistory}`, {
+                method: 'GET',
+            });
+
+            const fetchedMessages = response.messages.map((msg: ChatMessage) => ({
+                role: msg.role,
+                content: msg.content,
+                id: msg.id,
+                references: msg.references || {}
+            }));
+
+            if (fetchedMessages.length === 0) {
+                setHasMoreMessages(false);
+                return;
+            }
+
+            // Store current scroll position and height
+            const container = messagesContainerRef.current;
+            const scrollHeight = container?.scrollHeight || 0;
+
+            // Add new messages to the top
+            setMessages(prev => [...fetchedMessages, ...prev]);
+            setPageNumberConversationHistory(pageNumberConversationHistory + 1);
+
+            // After the component re-renders with new messages
+            setTimeout(() => {
+                if (container) {
+                    // Scroll to maintain the same relative position
+                    const newScrollHeight = container.scrollHeight;
+                    container.scrollTop = newScrollHeight - scrollHeight;
+                }
+            }, 0);
+        } catch (error) {
+            console.error('Error fetching more messages:', error);
+        } finally {
+            setIsLoadingMoreMessages(false);
+        }
+    };
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
@@ -482,7 +570,7 @@ export default function PaperView() {
 
     return (
         <div className="w-full h-full grid grid-cols-2 items-center justify-center gap-4">
-            <div className="h-[calc(100vh-64px)] overflow-y-auto border-2 border-gray-200 p-2">
+            <div className="border-2 border-gray-200 p-2">
                 {/* PDF Viewer Section */}
                 {paperData.file_url && (
                     <div className="w-full h-full">
@@ -490,7 +578,7 @@ export default function PaperView() {
                     </div>
                 )}
             </div>
-            <div className="flex flex-col h-[calc(100vh-64px)] p-4">
+            <div className="flex flex-col h-[calc(100vh-64px)] px-2">
                 {/* Paper Metadata Section */}
                 {paperData && (
                     <PaperMetadata
@@ -502,10 +590,29 @@ export default function PaperView() {
                     />
                 )}
 
-                <div className="flex-1 overflow-y-auto mb-4 space-y-4">
+                <div
+                    className="flex-1 overflow-y-auto mb-4 space-y-4"
+                    ref={messagesContainerRef}
+                    onScroll={handleScroll}
+                >
+                    {hasMoreMessages && messages.length > 0 && (
+                        <div className="text-center py-2">
+                            {isLoadingMoreMessages ? (
+                                <div className="text-sm text-gray-500">Loading messages...</div>
+                            ) : (
+                                <button
+                                    className="text-sm text-blue-500 hover:text-blue-700"
+                                    onClick={fetchMoreMessages}
+                                >
+                                    Load earlier messages
+                                </button>
+                            )}
+                        </div>
+                    )}
+
                     {messages.length === 0 ? (
                         <div className="text-center text-gray-500 my-4">
-                            What do you want to know?
+                            What do you want to understand about this paper?
                         </div>
                     ) : (
                         messages.map((msg, index) => (
@@ -536,7 +643,8 @@ export default function PaperView() {
                                                     <div
                                                         key={refIndex}
                                                         className={`flex flex-row gap-2 ${matchesCurrentCitation(value.key, index) ? 'bg-blue-100 dark:bg-blue-900 rounded p-1 transition-colors duration-300' : ''}`}
-                                                        id={`citation-${value.key}`}
+                                                        id={`citation-${value.key}-${index}`}
+                                                        onClick={() => handleCitationClick(value.key, index)}
                                                     >
                                                         <div className="text-xs text-secondary-foreground">
                                                             <a href={`#citation-ref-${value.key}`}>{value.key}</a>
@@ -552,6 +660,7 @@ export default function PaperView() {
                             </div>
                         ))
                     )}
+                    <div ref={messagesEndRef} />
                 </div>
                 <form onSubmit={handleSubmit} className="flex gap-2">
                     <Input
