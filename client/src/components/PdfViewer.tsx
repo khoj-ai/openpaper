@@ -195,6 +195,7 @@ export function PdfViewer({ pdfUrl }: PdfViewerProps) {
 
 	return (
 		<div ref={containerRef} className="flex flex-col items-center gap-4 w-full overflow-y-auto" id="pdf-container">
+			{/* Toolbar */}
 			<div className="sticky top-0 z-10 flex items-center justify-between bg-white/80 dark:bg-white/10 backdrop-blur-sm p-2 rounded-none w-full border-b border-gray-300">
 				<div className="flex items-center gap-2 flex-grow max-w-md">
 					<Input

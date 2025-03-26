@@ -490,7 +490,7 @@ export default function PaperView() {
                     </div>
                 )}
             </div>
-            <div className="flex flex-col h-full p-4">
+            <div className="flex flex-col h-[calc(100vh-64px)] p-4">
                 {/* Paper Metadata Section */}
                 {paperData && (
                     <PaperMetadata
@@ -559,17 +559,15 @@ export default function PaperView() {
                         value={currentMessage}
                         onChange={(e) => setCurrentMessage(e.target.value)}
                         placeholder="Ask something about this paper..."
-                        className="flex-1 p-2 border rounded-md"
+                        className="flex-1 border rounded-md"
                         disabled={isStreaming}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSubmit(e);
+                            }
+                        }}
                     />
-                    <Button
-                        type="submit"
-                        className={`px-4 py-2 bg-blue-500 text-white rounded-md ${isStreaming ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'
-                            }`}
-                        disabled={isStreaming}
-                    >
-                        {isStreaming ? 'Sending...' : 'Send'}
-                    </Button>
                 </form>
             </div>
         </div>
