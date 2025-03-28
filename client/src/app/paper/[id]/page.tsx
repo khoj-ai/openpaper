@@ -56,9 +56,10 @@ interface ChatMessage {
     references?: Reference;
 }
 
-interface PaperHighlight {
-    "raw_text": string;
-    "annotation": string;
+export interface PaperHighlight {
+    raw_text: string;
+    annotation: string;
+    occurrence_index: number;
 }
 
 const isDateValid = (dateString: string) => {

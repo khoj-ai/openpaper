@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import "../lib/promisePolyfill";
-import { Document, Page, pdfjs } from "react-pdf";
+import { Document, Outline, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/esm/Page/AnnotationLayer.css";
 import "react-pdf/dist/esm/Page/TextLayer.css";
 import "../app/globals.css";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, ArrowLeft, ArrowRight, X, Minus, Plus } from "lucide-react";
 import { CommandShortcut } from "./ui/command";
+import { PaperHighlight } from "@/app/paper/[id]/page";
 
 interface PdfViewerProps {
 	pdfUrl: string;
@@ -28,7 +29,13 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 	const [width, setWidth] = useState<number>(0);
 
 	// Highlight functionality
-	const [highlights, setHighlights] = useState<Array<{ text: string; page: number }>>([]);
+	const [highlights, setHighlights] = useState<Array<PaperHighlight>>([]);
+	const [highlightResults, setHighlightResults] = useState<Array<{
+		pageIndex: number;
+		matchIndex: number;
+		nodes: Element[];
+	}>>([]);
+	const [isHighlightInteraction, setIsHighlightInteraction] = useState(false);
 
 	// Search functionality
 	const [searchText, setSearchText] = useState("");
@@ -39,6 +46,9 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 	}>>([]);
 	const [currentMatch, setCurrentMatch] = useState(-1);
 	const [notFound, setNotFound] = useState(false);
+
+	const [pagesLoaded, setPagesLoaded] = useState<boolean[]>([]);
+	const [allPagesLoaded, setAllPagesLoaded] = useState(false);
 
 	const pagesRef = useRef<(HTMLDivElement | null)[]>([]);
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -97,6 +107,122 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 		return () => window.removeEventListener("keydown", down);
 	}, [isAnnotating, selectedText]);
 
+	const findAllHighlightedPassages = (allHighlights: Array<PaperHighlight>) => {
+		const results: Array<{ pageIndex: number; matchIndex: number; nodes: Element[], rawText: string }> = [];
+
+		for (const highlight of allHighlights) {
+			const textToSearch = highlight.raw_text.toLowerCase();
+			const match = getSpecificMatchInPdf(textToSearch, highlight.occurrence_index);
+
+			if (match) {
+				results.push({
+					pageIndex: match.pageIndex,
+					matchIndex: match.matchIndex,
+					nodes: match.nodes,
+					rawText: highlight.raw_text
+				});
+			}
+		}
+		return results;
+	}
+
+	// Also modify the addHighlightToNodes function to be more reliable
+	const addHighlightToNodes = (nodes: Element[], rawText: string) => {
+		nodes.forEach(node => {
+			// First remove any existing highlights to avoid duplicates
+			node.classList.remove('border-2', 'border-blue-500', 'bg-blue-100', 'rounded', 'opacity-20');
+
+			// Then add the highlight classes
+			node.classList.add('border-2', 'border-blue-500', 'bg-blue-100', 'rounded', 'opacity-20');
+
+			// Create a new node with the same content
+			const newNode = node.cloneNode(true);
+
+			// Add click handler directly to the new node
+			newNode.addEventListener('click', (event) => {
+				// Get coordinates at the time of the click
+				const rect = (event.target as Element).getBoundingClientRect();
+
+				setIsHighlightInteraction(true);
+				setSelectedText(rawText);
+				setTooltipPosition({
+					x: rect.left + (rect.width / 2), // Center horizontally
+					y: rect.top // Top of the element
+				});
+				setIsAnnotating(true);
+
+				// Prevent event propagation
+				event.stopPropagation();
+			});
+
+			// Replace the original node with the new one
+			if (node.parentNode) {
+				node.parentNode.replaceChild(newNode, node);
+			}
+		});
+	};
+
+	const saveHighlightsToLocalStorage = (highlights: Array<PaperHighlight>) => {
+		// Save highlights to local storage
+		localStorage.setItem("highlights", JSON.stringify(highlights));
+	}
+
+	// Also modify loadHighlightsFromLocalStorage to better handle the results
+	const loadHighlightsFromLocalStorage = () => {
+		// Load highlights from local storage
+		const storedHighlights = localStorage.getItem("highlights");
+		if (storedHighlights) {
+			try {
+				const parsedHighlights = JSON.parse(storedHighlights);
+				console.log("Loaded highlights from local storage:", parsedHighlights);
+
+				// Clear any existing highlights from DOM
+				const existingHighlights = document.querySelectorAll('.react-pdf__Page__textContent span.border-2.border-blue-500');
+				existingHighlights.forEach(node => {
+					node.classList.remove('border-2', 'border-blue-500', 'bg-blue-100', 'rounded', 'opacity-20');
+
+					// Remove event listeners by cloning and replacing the node
+					const newNode = node.cloneNode(true);
+					if (node.parentNode) {
+						node.parentNode.replaceChild(newNode, node);
+					}
+				});
+
+				// Set highlights state, which will trigger the useEffect that applies them
+				setHighlights(parsedHighlights);
+			} catch (error) {
+				console.error("Error parsing highlights from local storage:", error);
+			}
+		}
+	};
+
+	useEffect(() => {
+		console.log("Highlights changed:", highlights);
+		if (highlights.length > 0) {
+			// if (!highlightResults) {
+			const allMatches = findAllHighlightedPassages(highlights);
+			setHighlightResults(allMatches);
+			for (const match of allMatches) {
+				addHighlightToNodes(match.nodes, match.rawText);
+			}
+			saveHighlightsToLocalStorage(highlights);
+
+			// } else {
+			// 	// Just process the latest highlight.
+			// 	const latestHighlight = highlights[highlights.length - 1];
+
+			// 	// Save
+			// 	saveHighlightsToLocalStorage(highlights);
+			// 	const latestMatch = findAllHighlightedPassages([latestHighlight]);
+			// 	if (latestMatch.length > 0) {
+			// 		setHighlightResults(prev => [...prev, ...latestMatch]);
+			// 		addHighlightToNodes(latestMatch[0].nodes, latestMatch[0].rawText);
+			// 	}
+			// }
+		}
+	}, [highlights]);
+
+
 	const goToPreviousPage = () => {
 		if (currentPage > 1) {
 			setCurrentPage(currentPage - 1);
@@ -154,6 +280,57 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 		setNumPages(numPages);
 		// Initialize page refs array
 		pagesRef.current = new Array(numPages).fill(null);
+
+		// Initialize pagesLoaded array with false for each page
+		setPagesLoaded(new Array(numPages).fill(false));
+	};
+
+	// Add a new useEffect to check when all pages are loaded
+	useEffect(() => {
+		if (pagesLoaded.length > 0 && pagesLoaded.every(loaded => loaded)) {
+			setAllPagesLoaded(true);
+		}
+	}, [pagesLoaded]);
+
+	useEffect(() => {
+		if (allPagesLoaded) {
+			console.log("All pages loaded, checking text layers...");
+
+			// Create a timer that repeatedly checks if text layers are ready
+			const checkInterval = setInterval(() => {
+				if (checkTextLayersReady()) {
+					console.log("Text layers are ready, applying highlights");
+					clearInterval(checkInterval);
+
+					loadHighlightsFromLocalStorage();
+
+					// Apply highlights after loading
+					setTimeout(() => {
+						if (highlights.length > 0) {
+							const allMatches = findAllHighlightedPassages(highlights);
+							console.log("Found highlight matches:", allMatches.length);
+							setHighlightResults(allMatches);
+							for (const match of allMatches) {
+								addHighlightToNodes(match.nodes, match.rawText);
+							}
+						}
+					}, 100);
+				} else {
+					console.log("Text layers not ready yet, waiting...");
+				}
+			}, 200); // Check every 200ms
+
+			// Clean up the interval if component unmounts
+			return () => clearInterval(checkInterval);
+		}
+	}, [allPagesLoaded]);
+
+	const handlePageLoadSuccess = (pageIndex: number) => {
+		setPagesLoaded(prevLoaded => {
+			const newLoaded = [...prevLoaded];
+			newLoaded[pageIndex] = true;
+			return newLoaded;
+		});
 	};
 
 	const handleTextSelection = (e: React.MouseEvent | MouseEvent) => {
@@ -192,10 +369,11 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 			// If no text is selected, hide the tooltip after a small delay
 			// to allow clicking on the tooltip buttons
 			setTimeout(() => {
-				if (!window.getSelection()?.toString()) {
+				if (!window.getSelection()?.toString() && !isHighlightInteraction) {
 					setSelectedText("");
 					setTooltipPosition(null);
 				}
+				setIsHighlightInteraction(false); // Reset it after check
 			}, 10);
 		}
 	};
@@ -203,6 +381,60 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 
 	const zoomIn = () => setScale(prev => Math.min(prev + 0.2, 2.5));
 	const zoomOut = () => setScale(prev => Math.max(prev - 0.2, 0.7));
+
+	const getOccurrenceIndexOfSelection = (text: string) => {
+		// Get all occurrences of this text in the document
+		const allOccurrences = getMatchingNodesInPdf(text);
+
+		// Get the current selection
+		const selection = window.getSelection();
+		if (!selection || !selection.rangeCount) return 0;
+
+		const range = selection.getRangeAt(0);
+		const selectionNode = range.startContainer.parentElement;
+
+		// Find which occurrence this selection belongs to
+		for (let i = 0; i < allOccurrences.length; i++) {
+			const nodes = allOccurrences[i].nodes;
+			if (nodes.some(node => node === selectionNode || node.contains(selectionNode))) {
+				return i;
+			}
+		}
+
+		return 0; // Default to first occurrence if not found
+	};
+
+	const getSpecificMatchInPdf = (searchTerm: string, occurrenceIndex: number = 0) => {
+		const allMatches = getMatchingNodesInPdf(searchTerm);
+
+		// Check if the requested occurrence exists
+		if (occurrenceIndex >= 0 && occurrenceIndex < allMatches.length) {
+			return allMatches[occurrenceIndex];
+		}
+
+		// Return null or undefined if not found
+		return null;
+	};
+
+	const checkTextLayersReady = () => {
+		const textLayers = document.querySelectorAll('.react-pdf__Page__textContent');
+		let allReady = true;
+
+		// A page's text layer is ready if it contains span elements
+		textLayers.forEach(layer => {
+			const textNodes = layer.querySelectorAll('span');
+			if (textNodes.length === 0) {
+				allReady = false;
+			}
+		});
+
+		// Make sure we have the expected number of text layers
+		if (textLayers.length !== numPages) {
+			allReady = false;
+		}
+
+		return allReady && textLayers.length > 0;
+	};
 
 	const getMatchingNodesInPdf = (searchTerm: string) => {
 		const results: Array<{ pageIndex: number; matchIndex: number; nodes: Element[] }> = [];
@@ -262,7 +494,6 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 
 
 	const performSearch = (term?: string) => {
-		console.log("performing search with searchText:", searchText);
 		const textToSearch = term || searchText;
 		if (!textToSearch.trim()) {
 			setSearchResults([]);
@@ -297,8 +528,8 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 		pageDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
 		// Remove styling from any existing highlights
-		const existingHighlights = document.querySelectorAll('.react-pdf__Page__textContent span.border-2');
-		existingHighlights.forEach(span => {
+		const pdfTextElements = document.querySelectorAll('.react-pdf__Page__textContent span.border-2');
+		pdfTextElements.forEach(span => {
 			span.classList.remove('border-2', 'border-yellow-500', 'bg-yellow-100', 'rounded', 'opacity-20');
 		});
 
@@ -347,6 +578,14 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 		<div ref={containerRef} className="flex flex-col items-center gap-4 w-full h-[calc(100vh-100px)] overflow-y-auto" id="pdf-container">
 			{/* Toolbar */}
 			<div className="sticky top-0 z-10 flex items-center justify-between bg-white/80 dark:bg-white/10 backdrop-blur-sm p-2 rounded-none w-full border-b border-gray-300">
+				<Button
+					onClick={() => {
+						// Save highlights to local storage
+						loadHighlightsFromLocalStorage();
+					}}
+				>
+					Load Highlights
+				</Button>
 				<div className="flex items-center gap-2 flex-grow max-w-md">
 					<Input
 						type="text"
@@ -432,14 +671,26 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 					</Button>
 				</div>
 			</div>
-
 			<Document
 				file={pdfUrl}
 				onLoadSuccess={onDocumentLoadSuccess}
+				onLoadProgress={({ loaded, total }) => {
+					// Handle loading progress if needed
+					console.log(`Loading PDF: ${Math.round((loaded / total) * 100)}%`);
+				}}
 				onMouseUp={handleTextSelection}
 				onLoadError={(error) => console.error("Error loading PDF:", error)}
 				onContextMenu={handleTextSelection}
 			>
+				{/* <Outline
+					onItemClick={(item) => {
+						if (item.dest) {
+							const pageIndex = item.pageNumber - 1;
+							setCurrentPage(pageIndex + 1);
+							pagesRef.current[pageIndex]?.scrollIntoView({ behavior: 'smooth' });
+						}
+					}}
+				/> */}
 				{Array.from(new Array(numPages || 0), (_, index) => (
 					<div
 						ref={(el) => {
@@ -452,6 +703,7 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 							pageNumber={index + 1}
 							className="mb-8 border-b border-gray-300"
 							renderTextLayer={true}
+							onLoadSuccess={() => handlePageLoadSuccess(index)}
 							renderAnnotationLayer={false}
 							scale={scale}
 							width={width > 0 ? width : undefined}
@@ -490,36 +742,39 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 							className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
 							onMouseDown={(e) => e.preventDefault()} // Prevent text deselection
 							onClick={(e) => {
-								e.stopPropagation(); // Stop event propagation
-								// setIsAnnotating(true);
-								// Your annotation logic here
-								console.log("Annotating:", selectedText);
+								e.stopPropagation();
 
-								// If you want to implement an annotation form or other UI
-								// instead of immediately closing the tooltip:
-								// - Keep the tooltip open
-								// - Show annotation UI
+								// Get the current page number
+								const pageNumber = currentPage;
 
-								// If you want to close the tooltip after annotating:
-								// setSelectedText("");
-								// setTooltipPosition(null);
-								// setIsAnnotating(false);
+								// Get which occurrence of this text this selection represents
+								const occurrenceIndex = getOccurrenceIndexOfSelection(selectedText);
+
+								// Add to highlights with occurrence information
+								setHighlights([
+									...highlights,
+									{
+										raw_text: selectedText,
+										annotation: "",
+										occurrence_index: occurrenceIndex
+									}
+								]);
+
+								console.log("Annotating:", selectedText, "Page:", pageNumber, "Occurrence:", occurrenceIndex);
 							}}
 						>
 							Annotate
 						</Button>
-						{/* <Button
-							className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded hover:bg-gray-300 dark:hover:bg-gray-500"
-							onMouseDown={(e) => e.preventDefault()} // Prevent text deselection
-							onClick={(e) => {
-								e.stopPropagation(); // Stop event propagation
+						<Button
+							variant={'ghost'}
+							onClick={() => {
 								setSelectedText("");
 								setTooltipPosition(null);
 								setIsAnnotating(false);
 							}}
 						>
-							Cancel
-						</Button> */}
+							<X size={16} />
+						</Button>
 					</div>
 				</div>
 			)}
