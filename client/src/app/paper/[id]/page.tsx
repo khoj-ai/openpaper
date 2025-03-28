@@ -45,6 +45,10 @@ interface PaperData {
     starter_questions: string[];
 }
 
+interface PaperNoteData {
+    content: string;
+}
+
 interface ChatMessage {
     id?: string;
     role: 'user' | 'assistant';
@@ -262,6 +266,7 @@ export default function PaperView() {
     const id = params.id as string;
     const [paperData, setPaperData] = useState<PaperData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [paperNoteData, setPaperNoteData] = useState<PaperNoteData | null>(null);
 
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isLoadingMoreMessages, setIsLoadingMoreMessages] = useState(false);
@@ -274,9 +279,13 @@ export default function PaperView() {
     const [activeCitationMessageIndex, setActiveCitationMessageIndex] = useState<number | null>(null);
     const [pageNumberConversationHistory, setPageNumberConversationHistory] = useState<number>(1);
     const [explicitSearchTerm, setExplicitSearchTerm] = useState<string | undefined>(undefined);
+    const [paperNoteContent, setPaperNoteContent] = useState<string | undefined>(undefined);
+    const [lastPaperNoteSaveTime, setLastPaperNoteSaveTime] = useState<number | null>(null);
 
     const [rightSideFunction, setRightSideFunction] = useState<string>('Chat');
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    // Reference to track the save timeout
+    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
 
     // Add this function to handle citation clicks
@@ -304,6 +313,30 @@ export default function PaperView() {
         // Clear the highlight after a few seconds
         setTimeout(() => setActiveCitationKey(null), 3000);
     };
+
+    // Clear the paper note timeout on component unmount
+    useEffect(() => {
+        return () => {
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    // Check for unsaved notes in local storage on load
+    useEffect(() => {
+        if (id) {
+            try {
+                const savedNote = localStorage.getItem(`paper-note-${id}`);
+                if (savedNote && (!paperNoteContent || savedNote !== paperNoteContent)) {
+                    setPaperNoteContent(savedNote);
+                    // Optionally update the server with this content
+                }
+            } catch (error) {
+                console.error('Error retrieving from local storage:', error);
+            }
+        }
+    }, [id, paperNoteContent]);
 
     // Add this effect to scroll to bottom when messages change or streaming is active
     useEffect(() => {
@@ -336,6 +369,17 @@ export default function PaperView() {
             }
         }
 
+        async function fetchPaperNote() {
+            try {
+                const response: PaperNoteData = await fetchFromApi(`/api/paper/note?document_id=${id}`);
+                setPaperNoteData(response);
+                setPaperNoteContent(response.content);
+            } catch (error) {
+                console.error('Error fetching paper note:', error);
+            }
+        }
+
+        fetchPaperNote();
         fetchPaper();
     }, [id]);
 
@@ -463,6 +507,58 @@ export default function PaperView() {
         } finally {
             setIsLoadingMoreMessages(false);
         }
+    };
+
+    // Update your existing updateNote function to include success handling
+    const updateNote = async (note: string) => {
+        if (!id) return;
+        try {
+            if (!paperNoteData) {
+                const response = await fetchFromApi(`/api/paper/note?document_id=${id}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ content: note }),
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                setPaperNoteData(response);
+            } else {
+                await fetchFromApi(`/api/paper/note?document_id=${id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ content: note }),
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            }
+
+            setLastPaperNoteSaveTime(Date.now());
+
+            // On successful save, clear the local storage version
+            localStorage.removeItem(`paper-note-${id}`);
+        } catch (error) {
+            console.error('Error updating note:', error);
+            // Keep the local storage version for retry later
+        }
+    };
+
+    // Function to handle note changes with debounce
+    const handlePaperNoteInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const newContent = e.target.value;
+        setPaperNoteContent(newContent);
+
+        // Save to local storage immediately
+        try {
+            localStorage.setItem(`paper-note-${id}`, newContent);
+        } catch (error) {
+            console.error('Error saving to local storage:', error);
+        }
+
+        // Clear any existing timeout
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+        }
+
+        // Set a new timeout to save to the server after 2 seconds of inactivity
+        saveTimeoutRef.current = setTimeout(() => {
+            updateNote(newContent);
+        }, 2000);
     };
 
     const handleSubmit = async (e: FormEvent) => {
@@ -617,11 +713,24 @@ export default function PaperView() {
                 </div>
                 {
                     rightSideFunction === 'Notes' && (
-                        <div className='p-2 w-full h-full'>
+                        <div className='p-2 w-full h-full flex flex-col'>
                             {/* Notes section */}
                             <Textarea
                                 className='w-full h-full'
+                                value={paperNoteContent}
+                                onChange={(e) =>
+                                    handlePaperNoteInput(e)
+                                }
                             />
+                            <div className="text-xs text-gray-500 mt-2">
+                                Note length: {paperNoteContent?.length} characters
+                            </div>
+                            {
+                                paperNoteContent && lastPaperNoteSaveTime && (
+                                    <div className="text-xs text-green-500 mt-2">
+                                        Last saved: {new Date(lastPaperNoteSaveTime).toLocaleTimeString()}
+                                    </div>
+                                )}
                         </div>
                     )
                 }

@@ -2,6 +2,7 @@ import logging
 import os
 import uuid
 from pathlib import Path
+from typing import Optional
 
 from app.database.crud.coversation_crud import conversation_crud
 from app.database.crud.document_crud import (
@@ -9,12 +10,18 @@ from app.database.crud.document_crud import (
     DocumentUpdate,
     document_crud,
 )
+from app.database.crud.paper_note_crud import (
+    PaperNoteCreate,
+    PaperNoteUpdate,
+    paper_note_crud,
+)
 from app.database.database import get_db
 from app.database.models import Conversation, Document
 from app.llm.operations import Operations
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, File, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 load_dotenv()
@@ -28,6 +35,14 @@ UPLOAD_DIR = Path("uploads")
 document_router = APIRouter()
 
 llm_operations = Operations()
+
+
+class CreatePaperNoteSchema(BaseModel):
+    content: Optional[str]
+
+
+class UpdatePaperNoteSchema(BaseModel):
+    content: str
 
 
 @document_router.get("/explain")
@@ -60,6 +75,88 @@ async def get_paper_ids(db: Session = Depends(get_db)):
             ]
         },
     )
+
+
+@document_router.get("/note")
+async def get_paper_note(document_id: str, db: Session = Depends(get_db)):
+    """
+    Get the paper note associated with this document.
+    """
+    target_paper = document_crud.get(db, id=document_id)
+
+    if not target_paper:
+        raise HTTPException(
+            status_code=404, detail=f"No document with id {document_id}"
+        )
+
+    paper_note = paper_note_crud.get_paper_note_by_document_id(
+        db, document_id=document_id
+    )
+
+    if paper_note:
+        return JSONResponse(content=paper_note.to_dict(), status_code=200)
+
+    raise HTTPException(
+        status_code=404, detail=f"Paper Note does not exist for document {document_id}"
+    )
+
+
+@document_router.post("/note")
+async def create_paper_note(
+    document_id: str, request: CreatePaperNoteSchema, db: Session = Depends(get_db)
+):
+    """
+    Create the paper note associated with this document
+    """
+    content = request.content
+    target_paper = document_crud.get(db, id=document_id)
+
+    if not target_paper:
+        raise HTTPException(
+            status_code=404, detail=f"No document with id {document_id}"
+        )
+
+    paper_note_to_create = PaperNoteCreate(
+        document_id=uuid.UUID(document_id), content=content
+    )
+
+    paper_note = paper_note_crud.create(db, obj_in=paper_note_to_create)
+
+    return JSONResponse(content=paper_note.to_dict(), status_code=200)
+
+
+@document_router.put("/note")
+async def update_paper_note(
+    document_id: str, request: UpdatePaperNoteSchema, db: Session = Depends(get_db)
+):
+    """
+    Update the paper note associated with this document
+    """
+    content = request.content
+    target_paper = document_crud.get(db, id=document_id)
+
+    if not target_paper:
+        raise HTTPException(
+            status_code=404, detail=f"No document with id {document_id}"
+        )
+
+    paper_note = paper_note_crud.get_paper_note_by_document_id(
+        db, document_id=document_id
+    )
+
+    if not paper_note:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No paper note associated with document ID {document_id}",
+        )
+
+    paper_note_to_update = PaperNoteUpdate(content=content)
+
+    updated_paper_note = paper_note_crud.update(
+        db=db, db_obj=paper_note, obj_in=paper_note_to_update
+    )
+
+    return JSONResponse(content=updated_paper_note.to_dict(), status_code=200)
 
 
 @document_router.get("/conversation")

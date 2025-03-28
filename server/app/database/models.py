@@ -51,6 +51,7 @@ class Document(Base):
     raw_content = Column(Text, nullable=True)
 
     conversations = relationship("Conversation", back_populates="document")
+    paper_notes = relationship("PaperNote", back_populates="document")
 
 
 class Message(Base):
@@ -82,3 +83,17 @@ class Conversation(Base):
     messages = relationship(
         "Message", back_populates="conversation", order_by=Message.sequence
     )
+
+
+class PaperNote(Base):
+    __tablename__ = "paper_notes"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # Ensure each document has only one associated paper note
+    document_id = Column(
+        UUID(as_uuid=True), ForeignKey("documents.id"), nullable=False, unique=True
+    )
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    document = relationship("Document", back_populates="paper_notes")
