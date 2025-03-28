@@ -9,6 +9,7 @@ import "../app/globals.css";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, ArrowLeft, ArrowRight, X, Minus, Plus } from "lucide-react";
+import { CommandShortcut } from "./ui/command";
 
 interface PdfViewerProps {
 	pdfUrl: string;
@@ -25,6 +26,9 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 
 	const [scale, setScale] = useState(1.2); // Higher scale for better resolution
 	const [width, setWidth] = useState<number>(0);
+
+	// Highlight functionality
+	const [highlights, setHighlights] = useState<Array<{ text: string; page: number }>>([]);
 
 	// Search functionality
 	const [searchText, setSearchText] = useState("");
@@ -70,6 +74,28 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 		window.addEventListener('resize', updateWidth);
 		return () => window.removeEventListener('resize', updateWidth);
 	}, []);
+
+	useEffect(() => {
+		const down = (e: KeyboardEvent) => {
+			// Only handle keyboard events if annotating is active
+			if (isAnnotating) {
+				if (e.key === "Escape") {
+					// Reset selected text and tooltip position on Escape
+					setSelectedText("");
+					setTooltipPosition(null);
+					setIsAnnotating(false);
+				}
+
+				if (e.key === 'c' && (e.ctrlKey || e.metaKey)) {
+					// Copy selected text to clipboard
+					navigator.clipboard.writeText(selectedText);
+				}
+			}
+		};
+
+		window.addEventListener("keydown", down);
+		return () => window.removeEventListener("keydown", down);
+	}, [isAnnotating, selectedText]);
 
 	const goToPreviousPage = () => {
 		if (currentPage > 1) {
@@ -135,7 +161,26 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 
 		const selection = window.getSelection();
 		if (selection && selection.toString()) {
-			const text = selection.toString();
+			let text = selection.toString();
+
+			// Normalize the text while preserving paragraph structure
+
+			// 1. Identify and preserve paragraph breaks (double newlines, or newlines after sentence endings)
+			// Mark paragraph breaks with a special character sequence
+			text = text.replace(/(\.\s*)\n+/g, '$1{PARA_BREAK}'); // Period followed by newline
+			text = text.replace(/(\?\s*)\n+/g, '$1{PARA_BREAK}'); // Question mark followed by newline
+			text = text.replace(/(\!\s*)\n+/g, '$1{PARA_BREAK}'); // Exclamation mark followed by newline
+			text = text.replace(/\n\s*\n+/g, '{PARA_BREAK}');     // Multiple newlines
+
+			// 2. Replace remaining newlines with spaces (these are likely just line breaks in the same paragraph)
+			text = text.replace(/\n/g, ' ');
+
+			// 3. Restore paragraph breaks with actual newlines
+			text = text.replace(/{PARA_BREAK}/g, '\n\n');
+
+			// 4. Clean up any excessive spaces
+			text = text.replace(/\s+/g, ' ').trim();
+
 			setSelectedText(text);
 
 			// Set tooltip position near cursor
@@ -151,7 +196,7 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 					setSelectedText("");
 					setTooltipPosition(null);
 				}
-			}, 100);
+			}, 10);
 		}
 	};
 
@@ -159,35 +204,17 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 	const zoomIn = () => setScale(prev => Math.min(prev + 0.2, 2.5));
 	const zoomOut = () => setScale(prev => Math.max(prev - 0.2, 0.7));
 
-
-	const performSearch = (term?: string) => {
-		console.log("performing search with searchText:", searchText);
-		const textToSearch = term || searchText;
-		if (!textToSearch.trim()) {
-			setSearchResults([]);
-			setCurrentMatch(-1);
-			return;
-		}
-
+	const getMatchingNodesInPdf = (searchTerm: string) => {
 		const results: Array<{ pageIndex: number; matchIndex: number; nodes: Element[] }> = [];
-
-		// Process one page at a time
 		const textLayers = document.querySelectorAll('.react-pdf__Page__textContent');
-
-		setNotFound(false);
-
 		textLayers.forEach((layer, pageIndex) => {
-			// Get all text spans within this page
 			const textNodes = Array.from(layer.querySelectorAll('span'));
-
 			if (textNodes.length === 0) return;
 
-			// Create a single string representation of the page
 			const filteredTextNodes = textNodes.filter(node => node.textContent && node.textContent.trim() !== '');
 			const fullPageText = filteredTextNodes.map(node => node.textContent || '').join(' ');
 
-			// Find all occurrences of the search text in the full page text
-			const searchTextLower = textToSearch.toLowerCase();
+			const searchTextLower = searchTerm.toLowerCase();
 			const fullPageTextLower = fullPageText.toLowerCase();
 
 			let startIndex = 0;
@@ -197,11 +224,9 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 				const foundIndex = fullPageTextLower.indexOf(searchTextLower, startIndex);
 				if (foundIndex === -1) break;
 
-				// Found a match, now map it back to the individual text nodes
 				const matchStart = foundIndex;
 				const matchEnd = matchStart + searchTextLower.length;
 
-				// Find which nodes contain parts of the match
 				let currentPosition = 0;
 				const matchingNodes: Element[] = [];
 
@@ -212,11 +237,10 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 					const nodeStart = currentPosition;
 					const nodeEnd = currentPosition + nodeLength;
 
-					// Check if this node overlaps with the match
 					if (
-						(matchStart >= nodeStart && matchStart < nodeEnd) || // Match starts in this node
-						(matchEnd > nodeStart && matchEnd <= nodeEnd) || // Match ends in this node
-						(matchStart <= nodeStart && matchEnd >= nodeEnd) // Match completely contains this node
+						(matchStart >= nodeStart && matchStart < nodeEnd) ||
+						(matchEnd > nodeStart && matchEnd <= nodeEnd) ||
+						(matchStart <= nodeStart && matchEnd >= nodeEnd)
 					) {
 						matchingNodes.push(node);
 					}
@@ -232,6 +256,23 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 				startIndex = foundIndex + 1;
 			}
 		});
+
+		return results;
+	}
+
+
+	const performSearch = (term?: string) => {
+		console.log("performing search with searchText:", searchText);
+		const textToSearch = term || searchText;
+		if (!textToSearch.trim()) {
+			setSearchResults([]);
+			setCurrentMatch(-1);
+			return;
+		}
+
+		setNotFound(false);
+
+		const results: Array<{ pageIndex: number; matchIndex: number; nodes: Element[] }> = getMatchingNodesInPdf(textToSearch);
 
 		if (results.length === 0) {
 			setNotFound(true);
@@ -290,6 +331,16 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 		setCurrentMatch(prevMatch);
 		scrollToMatch(searchResults[prevMatch]);
 	};
+
+	const localizeCommandToOS = (key: string) => {
+		// Check if the user is on macOS using userAgent
+		const isMac = /(Mac|iPhone|iPod|iPad)/i.test(navigator.userAgent);
+		if (isMac) {
+			return `⌘ ${key}`;
+		} else {
+			return `Ctrl ${key}`;
+		}
+	}
 
 
 	return (
@@ -420,12 +471,27 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 					onClick={(e) => e.stopPropagation()} // Stop click events from bubbling
 				>
 					<div className="flex gap-2 text-sm">
-						<button
+						<Button
+							variant={'ghost'}
+							onClick={() => {
+								navigator.clipboard.writeText(selectedText);
+								setSelectedText("");
+								setTooltipPosition(null);
+								setIsAnnotating(false);
+							}}
+						>
+							<CommandShortcut>
+								<span className="text-secondary-foreground">
+									{localizeCommandToOS('C')}
+								</span>
+							</CommandShortcut>
+						</Button>
+						<Button
 							className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
 							onMouseDown={(e) => e.preventDefault()} // Prevent text deselection
 							onClick={(e) => {
 								e.stopPropagation(); // Stop event propagation
-								setIsAnnotating(true);
+								// setIsAnnotating(true);
 								// Your annotation logic here
 								console.log("Annotating:", selectedText);
 
@@ -441,8 +507,8 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 							}}
 						>
 							Annotate
-						</button>
-						<button
+						</Button>
+						{/* <Button
 							className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded hover:bg-gray-300 dark:hover:bg-gray-500"
 							onMouseDown={(e) => e.preventDefault()} // Prevent text deselection
 							onClick={(e) => {
@@ -453,7 +519,7 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 							}}
 						>
 							Cancel
-						</button>
+						</Button> */}
 					</div>
 				</div>
 			)}

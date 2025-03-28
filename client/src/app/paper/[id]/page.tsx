@@ -56,6 +56,11 @@ interface ChatMessage {
     references?: Reference;
 }
 
+interface PaperHighlight {
+    "raw_text": string;
+    "annotation": string;
+}
+
 const isDateValid = (dateString: string) => {
     const date = new Date(dateString);
     return !isNaN(date.getTime());
@@ -182,7 +187,7 @@ function PaperMetadata(props: IPaperMetadata) {
                         <tbody>
                             {paperData.authors && paperData.authors.length > 0 && (
                                 <tr>
-                                    <td className="font-semibold pr-2 py-1 align-top">Authors:</td>
+                                    <td className="font-semibold pr-2 py-1 align-top">Authors</td>
                                     <td>
                                         {
                                             paperData.authors.length > 0 && (
@@ -204,7 +209,7 @@ function PaperMetadata(props: IPaperMetadata) {
                             )}
                             {paperData.institutions && paperData.institutions.length > 0 && (
                                 <tr>
-                                    <td className="font-semibold pr-2 py-1 align-top">Institutions:</td>
+                                    <td className="font-semibold pr-2 py-1 align-top">Institutions</td>
                                     <td>{paperData.institutions.join(', ')}</td>
                                 </tr>
                             )}
@@ -216,7 +221,7 @@ function PaperMetadata(props: IPaperMetadata) {
                             )}
                             {paperData.keywords && paperData.keywords.length > 0 && (
                                 <tr>
-                                    <td className="font-semibold pr-2 py-1 align-top">Keywords:</td>
+                                    <td className="font-semibold pr-2 py-1 align-top">Keywords</td>
                                     <td>
                                         <div className="flex flex-wrap gap-1">
                                             {paperData.keywords.map((keyword, i) => (
@@ -230,13 +235,13 @@ function PaperMetadata(props: IPaperMetadata) {
                             )}
                             {paperData.summary && (
                                 <tr>
-                                    <td className="font-semibold pr-2 py-1 align-top">Summary:</td>
+                                    <td className="font-semibold pr-2 py-1 align-top">Summary</td>
                                     <td>{paperData.summary}</td>
                                 </tr>
                             )}
                             {paperData.starter_questions && paperData.starter_questions.length > 0 && (
                                 <tr>
-                                    <td className="font-semibold pr-2 py-1 align-top">Start:</td>
+                                    <td className="font-semibold pr-2 py-1 align-top">Start</td>
                                     <td>
                                         <div className="flex gap-2 mt-2 flex-wrap">
                                             {paperData.starter_questions.map((question, i) => (
