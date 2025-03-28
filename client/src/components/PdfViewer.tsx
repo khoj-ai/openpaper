@@ -11,33 +11,149 @@ import { Input } from "@/components/ui/input";
 import { Search, ArrowLeft, ArrowRight, X, Minus, Plus } from "lucide-react";
 import { CommandShortcut } from "./ui/command";
 import { PaperHighlight } from "@/app/paper/[id]/page";
+import { getMatchingNodesInPdf } from "./utils/PdfTextUtils";
 
 interface PdfViewerProps {
 	pdfUrl: string;
 	explicitSearchTerm?: string;
 }
 
-export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
+export function usePdfLoader() {
 	const [numPages, setNumPages] = useState<number | null>(null);
-	const [currentPage, setCurrentPage] = useState<number>(1);
-	const [selectedText, setSelectedText] = useState<string>("");
-	const [tooltipPosition, setTooltipPosition] = useState<{ x: number, y: number } | null>(null);
-	const [isAnnotating, setIsAnnotating] = useState(false);
+	const [pagesLoaded, setPagesLoaded] = useState<boolean[]>([]);
+	const [allPagesLoaded, setAllPagesLoaded] = useState(false);
 	const [workerInitialized, setWorkerInitialized] = useState(false);
 
-	const [scale, setScale] = useState(1.2); // Higher scale for better resolution
+	// Initialize PDF.js worker
+	useEffect(() => {
+		if (!workerInitialized) {
+			pdfjs.GlobalWorkerOptions.workerSrc = `/pdf.worker.mjs`;
+			setWorkerInitialized(true);
+		}
+	}, [workerInitialized]);
+
+	// Check when all pages are loaded
+	useEffect(() => {
+		if (pagesLoaded.length > 0 && pagesLoaded.every(loaded => loaded)) {
+			setAllPagesLoaded(true);
+		}
+	}, [pagesLoaded]);
+
+	const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
+		setNumPages(numPages);
+		setPagesLoaded(new Array(numPages).fill(false));
+	};
+
+	const handlePageLoadSuccess = (pageIndex: number) => {
+		setPagesLoaded(prevLoaded => {
+			const newLoaded = [...prevLoaded];
+			newLoaded[pageIndex] = true;
+			return newLoaded;
+		});
+	};
+
+	return {
+		numPages,
+		allPagesLoaded,
+		workerInitialized,
+		onDocumentLoadSuccess,
+		handlePageLoadSuccess,
+	};
+}
+
+export function usePdfNavigation(numPages: number | null) {
+	const [currentPage, setCurrentPage] = useState<number>(1);
+	const [scale, setScale] = useState(1.2);
 	const [width, setWidth] = useState<number>(0);
+	const pagesRef = useRef<(HTMLDivElement | null)[]>([]);
+	const containerRef = useRef<HTMLDivElement>(null);
 
-	// Highlight functionality
-	const [highlights, setHighlights] = useState<Array<PaperHighlight>>([]);
-	const [highlightResults, setHighlightResults] = useState<Array<{
-		pageIndex: number;
-		matchIndex: number;
-		nodes: Element[];
-	}>>([]);
-	const [isHighlightInteraction, setIsHighlightInteraction] = useState(false);
+	// Set up page refs when numPages changes
+	useEffect(() => {
+		if (numPages) {
+			pagesRef.current = new Array(numPages).fill(null);
+		}
+	}, [numPages]);
 
-	// Search functionality
+	// Calculate container width for responsive sizing
+	useEffect(() => {
+		const updateWidth = () => {
+			const container = document.getElementById('pdf-container');
+			if (container) {
+				setWidth(container.clientWidth - 32);
+			}
+		};
+
+		updateWidth();
+		window.addEventListener('resize', updateWidth);
+		return () => window.removeEventListener('resize', updateWidth);
+	}, []);
+
+	// Update current page when scrolling
+	useEffect(() => {
+		const handleScroll = () => {
+			if (!containerRef.current || pagesRef.current.length === 0) return;
+
+			let maxVisiblePage = 1;
+			let maxVisibleArea = 0;
+
+			pagesRef.current.forEach((pageRef, index) => {
+				if (!pageRef) return;
+
+				const rect = pageRef.getBoundingClientRect();
+				const containerRect = containerRef.current!.getBoundingClientRect();
+				const visibleTop = Math.max(rect.top, containerRect.top);
+				const visibleBottom = Math.min(rect.bottom, containerRect.bottom);
+
+				if (visibleBottom > visibleTop) {
+					const visibleArea = visibleBottom - visibleTop;
+					if (visibleArea > maxVisibleArea) {
+						maxVisibleArea = visibleArea;
+						maxVisiblePage = index + 1;
+					}
+				}
+			});
+
+			if (maxVisiblePage !== currentPage) {
+				setCurrentPage(maxVisiblePage);
+			}
+		};
+
+		containerRef.current?.addEventListener('scroll', handleScroll);
+		return () => containerRef.current?.removeEventListener('scroll', handleScroll);
+	}, [currentPage]);
+
+	const goToPreviousPage = () => {
+		if (currentPage > 1) {
+			setCurrentPage(currentPage - 1);
+			pagesRef.current[currentPage - 2]?.scrollIntoView({ behavior: 'smooth' });
+		}
+	};
+
+	const goToNextPage = () => {
+		if (numPages && currentPage < numPages) {
+			setCurrentPage(currentPage + 1);
+			pagesRef.current[currentPage]?.scrollIntoView({ behavior: 'smooth' });
+		}
+	};
+
+	const zoomIn = () => setScale(prev => Math.min(prev + 0.2, 2.5));
+	const zoomOut = () => setScale(prev => Math.max(prev - 0.2, 0.7));
+
+	return {
+		currentPage,
+		scale,
+		width,
+		pagesRef,
+		containerRef,
+		goToPreviousPage,
+		goToNextPage,
+		zoomIn,
+		zoomOut,
+	};
+}
+
+export function usePdfSearch(explicitSearchTerm?: string) {
 	const [searchText, setSearchText] = useState("");
 	const [searchResults, setSearchResults] = useState<Array<{
 		pageIndex: number;
@@ -47,43 +163,113 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 	const [currentMatch, setCurrentMatch] = useState(-1);
 	const [notFound, setNotFound] = useState(false);
 
-	const [pagesLoaded, setPagesLoaded] = useState<boolean[]>([]);
-	const [allPagesLoaded, setAllPagesLoaded] = useState(false);
-
-	const pagesRef = useRef<(HTMLDivElement | null)[]>([]);
-	const containerRef = useRef<HTMLDivElement>(null);
-
-	// Set up the worker in useEffect to ensure it only runs in the browser
+	// Handle explicit search term if provided
 	useEffect(() => {
-		if (!workerInitialized) {
-			// Use the .mjs worker file we found
-			pdfjs.GlobalWorkerOptions.workerSrc = `/pdf.worker.mjs`;
-			setWorkerInitialized(true);
-		}
-	}, [workerInitialized]);
-
-	useEffect(() => {
-		// If an explicit search term is provided, set it and perform the search
 		if (explicitSearchTerm) {
 			performSearch(explicitSearchTerm);
 		}
 	}, [explicitSearchTerm]);
 
-	// Calculate container width for responsive sizing
-	useEffect(() => {
-		const updateWidth = () => {
-			// Get container width and use it for PDF rendering
-			const container = document.getElementById('pdf-container');
-			if (container) {
-				// Subtract some padding to avoid horizontal scrollbar
-				setWidth(container.clientWidth - 32);
-			}
-		};
+	const performSearch = (term?: string) => {
+		const textToSearch = term || searchText;
+		if (!textToSearch.trim()) {
+			setSearchResults([]);
+			setCurrentMatch(-1);
+			return;
+		}
 
-		updateWidth();
-		window.addEventListener('resize', updateWidth);
-		return () => window.removeEventListener('resize', updateWidth);
-	}, []);
+		setNotFound(false);
+		const results = getMatchingNodesInPdf(textToSearch);
+
+		if (results.length === 0) {
+			setNotFound(true);
+		}
+
+		setSearchResults(results);
+		setCurrentMatch(results.length > 0 ? 0 : -1);
+
+		// Scroll to first match if found
+		if (results.length > 0) {
+			scrollToMatch(results[0]);
+		}
+	};
+
+	const scrollToMatch = (match: { pageIndex: number; matchIndex: number; nodes: Element[] }) => {
+		if (!match) return;
+
+		// Get the page div from the document
+		const pageDiv = document.querySelectorAll('.react-pdf__Page')[match.pageIndex];
+		if (!pageDiv) return;
+
+		// Scroll to the page
+		pageDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+		// Remove styling from any existing highlights
+		const pdfTextElements = document.querySelectorAll('.react-pdf__Page__textContent span.border-2');
+		pdfTextElements.forEach(span => {
+			span.classList.remove('border-2', 'border-yellow-500', 'bg-yellow-100', 'rounded', 'opacity-20');
+		});
+
+		// Highlight all nodes that contain parts of the match
+		setTimeout(() => {
+			match.nodes.forEach(node => {
+				node.classList.add('border-2', 'border-yellow-500', 'bg-yellow-100', 'rounded', 'opacity-20');
+			});
+
+			// Scroll to the first matching node
+			if (match.nodes.length > 0) {
+				match.nodes[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+			}
+		}, 100);
+	};
+
+	const goToNextMatch = () => {
+		if (searchResults.length === 0) return;
+
+		const nextMatch = (currentMatch + 1) % searchResults.length;
+		setCurrentMatch(nextMatch);
+		scrollToMatch(searchResults[nextMatch]);
+	};
+
+	const goToPreviousMatch = () => {
+		if (searchResults.length === 0) return;
+
+		const prevMatch = (currentMatch - 1 + searchResults.length) % searchResults.length;
+		setCurrentMatch(prevMatch);
+		scrollToMatch(searchResults[prevMatch]);
+	};
+
+	return {
+		searchText,
+		setSearchText,
+		searchResults,
+		currentMatch,
+		notFound,
+		performSearch,
+		goToNextMatch,
+		goToPreviousMatch,
+		setSearchResults,
+		setNotFound,
+		setCurrentMatch,
+	};
+}
+
+export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
+	const [currentPage, setCurrentPage] = useState<number>(1);
+	const [selectedText, setSelectedText] = useState<string>("");
+	const [tooltipPosition, setTooltipPosition] = useState<{ x: number, y: number } | null>(null);
+	const [isAnnotating, setIsAnnotating] = useState(false);
+	const [workerInitialized, setWorkerInitialized] = useState(false);
+
+	const { numPages, allPagesLoaded, onDocumentLoadSuccess, handlePageLoadSuccess } = usePdfLoader();
+	const { scale, width, pagesRef, containerRef, goToPreviousPage, goToNextPage, zoomIn, zoomOut } = usePdfNavigation(numPages);
+
+	// Highlight functionality
+	const [highlights, setHighlights] = useState<Array<PaperHighlight>>([]);
+	const [isHighlightInteraction, setIsHighlightInteraction] = useState(false);
+
+	// Search functionality
+	const { searchText, setSearchText, searchResults, currentMatch, notFound, performSearch, goToNextMatch, goToPreviousMatch, setSearchResults, setNotFound, setCurrentMatch } = usePdfSearch(explicitSearchTerm);
 
 	useEffect(() => {
 		const down = (e: KeyboardEvent) => {
@@ -201,43 +387,13 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 		if (highlights.length > 0) {
 			// if (!highlightResults) {
 			const allMatches = findAllHighlightedPassages(highlights);
-			setHighlightResults(allMatches);
 			for (const match of allMatches) {
 				addHighlightToNodes(match.nodes, match.rawText);
 			}
 			saveHighlightsToLocalStorage(highlights);
-
-			// } else {
-			// 	// Just process the latest highlight.
-			// 	const latestHighlight = highlights[highlights.length - 1];
-
-			// 	// Save
-			// 	saveHighlightsToLocalStorage(highlights);
-			// 	const latestMatch = findAllHighlightedPassages([latestHighlight]);
-			// 	if (latestMatch.length > 0) {
-			// 		setHighlightResults(prev => [...prev, ...latestMatch]);
-			// 		addHighlightToNodes(latestMatch[0].nodes, latestMatch[0].rawText);
-			// 	}
-			// }
 		}
 	}, [highlights]);
 
-
-	const goToPreviousPage = () => {
-		if (currentPage > 1) {
-			setCurrentPage(currentPage - 1);
-			// Scroll to the new page
-			pagesRef.current[currentPage - 2]?.scrollIntoView({ behavior: 'smooth' });
-		}
-	};
-
-	const goToNextPage = () => {
-		if (numPages && currentPage < numPages) {
-			setCurrentPage(currentPage + 1);
-			// Scroll to the new page
-			pagesRef.current[currentPage]?.scrollIntoView({ behavior: 'smooth' });
-		}
-	};
 
 	// Add an effect to update current page when scrolling
 	useEffect(() => {
@@ -276,22 +432,6 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 		return () => containerRef.current?.removeEventListener('scroll', handleScroll);
 	}, [currentPage]);
 
-	const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
-		setNumPages(numPages);
-		// Initialize page refs array
-		pagesRef.current = new Array(numPages).fill(null);
-
-		// Initialize pagesLoaded array with false for each page
-		setPagesLoaded(new Array(numPages).fill(false));
-	};
-
-	// Add a new useEffect to check when all pages are loaded
-	useEffect(() => {
-		if (pagesLoaded.length > 0 && pagesLoaded.every(loaded => loaded)) {
-			setAllPagesLoaded(true);
-		}
-	}, [pagesLoaded]);
-
 	useEffect(() => {
 		if (allPagesLoaded) {
 			console.log("All pages loaded, checking text layers...");
@@ -309,7 +449,6 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 						if (highlights.length > 0) {
 							const allMatches = findAllHighlightedPassages(highlights);
 							console.log("Found highlight matches:", allMatches.length);
-							setHighlightResults(allMatches);
 							for (const match of allMatches) {
 								addHighlightToNodes(match.nodes, match.rawText);
 							}
@@ -325,13 +464,6 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 		}
 	}, [allPagesLoaded]);
 
-	const handlePageLoadSuccess = (pageIndex: number) => {
-		setPagesLoaded(prevLoaded => {
-			const newLoaded = [...prevLoaded];
-			newLoaded[pageIndex] = true;
-			return newLoaded;
-		});
-	};
 
 	const handleTextSelection = (e: React.MouseEvent | MouseEvent) => {
 		if (isAnnotating) return; // Ignore if annotating
@@ -377,10 +509,6 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 			}, 10);
 		}
 	};
-
-
-	const zoomIn = () => setScale(prev => Math.min(prev + 0.2, 2.5));
-	const zoomOut = () => setScale(prev => Math.max(prev - 0.2, 0.7));
 
 	const getOccurrenceIndexOfSelection = (text: string) => {
 		// Get all occurrences of this text in the document
@@ -434,133 +562,6 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 		}
 
 		return allReady && textLayers.length > 0;
-	};
-
-	const getMatchingNodesInPdf = (searchTerm: string) => {
-		const results: Array<{ pageIndex: number; matchIndex: number; nodes: Element[] }> = [];
-		const textLayers = document.querySelectorAll('.react-pdf__Page__textContent');
-		textLayers.forEach((layer, pageIndex) => {
-			const textNodes = Array.from(layer.querySelectorAll('span'));
-			if (textNodes.length === 0) return;
-
-			const filteredTextNodes = textNodes.filter(node => node.textContent && node.textContent.trim() !== '');
-			const fullPageText = filteredTextNodes.map(node => node.textContent || '').join(' ');
-
-			const searchTextLower = searchTerm.toLowerCase();
-			const fullPageTextLower = fullPageText.toLowerCase();
-
-			let startIndex = 0;
-			let matchIndex = 0;
-
-			while (startIndex < fullPageTextLower.length) {
-				const foundIndex = fullPageTextLower.indexOf(searchTextLower, startIndex);
-				if (foundIndex === -1) break;
-
-				const matchStart = foundIndex;
-				const matchEnd = matchStart + searchTextLower.length;
-
-				let currentPosition = 0;
-				const matchingNodes: Element[] = [];
-
-				for (const node of filteredTextNodes) {
-					const nodeText = node.textContent || '';
-					const nodeLength = nodeText.length + 1; // +1 for the added space
-
-					const nodeStart = currentPosition;
-					const nodeEnd = currentPosition + nodeLength;
-
-					if (
-						(matchStart >= nodeStart && matchStart < nodeEnd) ||
-						(matchEnd > nodeStart && matchEnd <= nodeEnd) ||
-						(matchStart <= nodeStart && matchEnd >= nodeEnd)
-					) {
-						matchingNodes.push(node);
-					}
-
-					currentPosition += nodeLength;
-				}
-
-				if (matchingNodes.length > 0) {
-					results.push({ pageIndex, matchIndex, nodes: matchingNodes });
-					matchIndex++;
-				}
-
-				startIndex = foundIndex + 1;
-			}
-		});
-
-		return results;
-	}
-
-
-	const performSearch = (term?: string) => {
-		const textToSearch = term || searchText;
-		if (!textToSearch.trim()) {
-			setSearchResults([]);
-			setCurrentMatch(-1);
-			return;
-		}
-
-		setNotFound(false);
-
-		const results: Array<{ pageIndex: number; matchIndex: number; nodes: Element[] }> = getMatchingNodesInPdf(textToSearch);
-
-		if (results.length === 0) {
-			setNotFound(true);
-		}
-
-		setSearchResults(results);
-		setCurrentMatch(results.length > 0 ? 0 : -1);
-
-		// Scroll to first match if found
-		if (results.length > 0) {
-			scrollToMatch(results[0]);
-		}
-	};
-
-	const scrollToMatch = (match: { pageIndex: number; matchIndex: number; nodes: Element[] }) => {
-		if (!match) return;
-
-		const pageDiv = pagesRef.current[match.pageIndex];
-		if (!pageDiv) return;
-
-		// Scroll to the page
-		pageDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-		// Remove styling from any existing highlights
-		const pdfTextElements = document.querySelectorAll('.react-pdf__Page__textContent span.border-2');
-		pdfTextElements.forEach(span => {
-			span.classList.remove('border-2', 'border-yellow-500', 'bg-yellow-100', 'rounded', 'opacity-20');
-		});
-
-		// Highlight all nodes that contain parts of the match
-		setTimeout(() => {
-			match.nodes.forEach(node => {
-				node.classList.add('border-2', 'border-yellow-500', 'bg-yellow-100', 'rounded', 'opacity-20');
-			});
-
-			// Scroll to the first matching node
-			if (match.nodes.length > 0) {
-				match.nodes[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
-			}
-		}, 100);
-	};
-
-
-	const goToNextMatch = () => {
-		if (searchResults.length === 0) return;
-
-		const nextMatch = (currentMatch + 1) % searchResults.length;
-		setCurrentMatch(nextMatch);
-		scrollToMatch(searchResults[nextMatch]);
-	};
-
-	const goToPreviousMatch = () => {
-		if (searchResults.length === 0) return;
-
-		const prevMatch = (currentMatch - 1 + searchResults.length) % searchResults.length;
-		setCurrentMatch(prevMatch);
-		scrollToMatch(searchResults[prevMatch]);
 	};
 
 	const localizeCommandToOS = (key: string) => {
