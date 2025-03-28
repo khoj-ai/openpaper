@@ -699,7 +699,9 @@ export default function PaperView() {
 
     return (
         <div className="flex flex-row w-full h-[calc(100vh-64px)]">
-            <div className="w-full h-full grid grid-cols-3 items-center justify-center gap-0">
+            <div
+                className={`w-full h-full grid ${rightSideFunction === 'Focus' ? 'grid-cols-2' : 'grid-cols-3'} items-center justify-center gap-0`}>
+
                 <div className="border-2 border-gray-200 p-2 col-span-2">
                     {/* PDF Viewer Section */}
                     {paperData.file_url && (
