@@ -13,6 +13,7 @@ import { CommandShortcut } from "@/components/ui/command";
 import { PaperHighlight } from "@/app/paper/[id]/page";
 import { getMatchingNodesInPdf, getOccurrenceIndexOfSelection } from "./utils/PdfTextUtils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Textarea } from "@/components/ui/textarea";
 
 interface PdfViewerProps {
 	pdfUrl: string;
@@ -190,13 +191,13 @@ function InlineAnnotationMenu({
 					</PopoverTrigger>
 					<PopoverContent>
 						<div className="flex flex-col gap-2">
-							<Input
-								type="text"
+							<Textarea
 								placeholder="Add a note..."
 								value={annotationText}
 								onChange={(e) => setAnnotationText(e.target.value)}
 							/>
 							<Button
+								className="w-fit"
 								onClick={() => {
 									console.log("Adding annotation:", annotationText);
 									console.log("Selected text:", selectedText);
@@ -469,7 +470,7 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 	}, [isAnnotating, selectedText]);
 
 	const findAllHighlightedPassages = (allHighlights: Array<PaperHighlight>) => {
-		const results: Array<{ pageIndex: number; matchIndex: number; nodes: Element[], rawText: string }> = [];
+		const results: Array<{ pageIndex: number; matchIndex: number; nodes: Element[], sourceHighlight: PaperHighlight }> = [];
 
 		for (const highlight of allHighlights) {
 			const textToSearch = highlight.raw_text.toLowerCase();
@@ -480,7 +481,7 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 					pageIndex: match.pageIndex,
 					matchIndex: match.matchIndex,
 					nodes: match.nodes,
-					rawText: highlight.raw_text
+					sourceHighlight: highlight
 				});
 			}
 		}
@@ -522,19 +523,71 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 		};
 	}, [tooltipPosition]);
 
-	const addHighlightToNodes = (nodes: Element[], rawText: string) => {
+	const addHighlightToNodes = (nodes: Element[], sourceHighlight: PaperHighlight) => {
 		nodes.forEach(node => {
-			// First remove any existing highlights to avoid duplicates
-			node.classList.remove('border-2', 'border-blue-500', 'bg-blue-100', 'rounded', 'opacity-20');
+			// Partition node segments into sub-blocks if entire text content is not present in `rawText`
+
+			if (!node.textContent) return;
+
+			const subNodes: Element[] = [];
+
+			if (sourceHighlight.raw_text.indexOf(node.textContent) === -1) {
+				// Alternatively, could iterate through the node.TextContent, removing words until the substring matches. Then split it into two sub-spans. But need to edit the canvas text render layer to have these subspans, and the positioning logic is tricky to recreate. It currently works with the parent setting absolute positioning of the span, and then setting the innertext.
+
+				// Partition nodes
+				console.log("not fully matching text.content", node.textContent);
+				console.log('target text', sourceHighlight.raw_text);
+
+				// Split node.textContent on words, creating individual spans for each of them.
+				const splitWords = node.textContent.split(" ");
+
+				// Clear existing innertext of the node span
+				node.innerText = '';
+				node.classList.add('flex', 'flex-row');
+
+				// Find first matching index of the substring that is present in node.textContent. All nodes after that should be added to the new highlight nodes.
+				for (const word of splitWords) {
+					console.log('split word', word);
+					const subNode = document.createElement("div");
+					subNode.innerText = word;
+					// How to calculate position at which re-rendered text should be?
+					if (sourceHighlight.raw_text.indexOf(word) !== -1) {
+						subNode.classList.add('border-2', 'border-blue-500', 'bg-blue-100', 'rounded', 'opacity-20');
+
+					}
+					subNodes.push(subNode);
+					node.appendChild(subNode);
+					// Hmm, not sure how this can work. Basically, it's the parent element that needs to be replaced with these spans. Can we force the pdf.js to generate the canvas with individual words separated?
+				}
+			}
+
+			// Would it be simpler to just user a custom renderer here?
 
 			// Then add the highlight classes
-			node.classList.add('border-2', 'border-blue-500', 'bg-blue-100', 'rounded', 'opacity-20');
+			if (subNodes.length === 0) {
+				node.classList.add('border-2', 'border-blue-500', 'bg-blue-100', 'rounded', 'opacity-20');
+			}
+
+			// console.log(node.textContent);
 
 			// Create a new node with the same content
 			const newNode = node.cloneNode(true);
 
+			if (sourceHighlight.annotation) {
+				console.log("sourcehighlight.annotation", sourceHighlight.annotation);
+				const annotationButton = document.createElement("button");
+				annotationButton.innerText = "click me";
+				annotationButton.addEventListener('click', (event) => {
+					alert(sourceHighlight.annotation);
+				});
+				annotationButton.classList.add("bg-blue-800");
+				newNode.appendChild(annotationButton);
+			}
+
 			// Add click handler directly to the new node
 			newNode.addEventListener('click', (event) => {
+				// Rather than passing around these awkward state variables, can we just add a click event handler directly here that renders the inline annotation menu? Then the metadata and highlighter-specific context can be sent via props.
+
 				// Set highlight interaction flag immediately
 				setIsHighlightInteraction(true);
 
@@ -543,7 +596,7 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 
 				// Set state for annotation menu - delay slightly to ensure flag is set first
 				setTimeout(() => {
-					setSelectedText(rawText);
+					setSelectedText(sourceHighlight.raw_text);
 					setTooltipPosition({
 						x: rect.left + (rect.width / 2),
 						y: rect.top
@@ -559,6 +612,9 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 			// Replace the original node with the new one
 			if (node.parentNode) {
 				node.parentNode.replaceChild(newNode, node);
+				if (subNodes.length > 0) {
+					console.log(node.parentNode);
+				}
 			}
 		});
 	};
@@ -600,13 +656,17 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 		}
 	};
 
+	const clearHighlights = () => {
+		localStorage.removeItem("highlights");
+	}
+
 	useEffect(() => {
 		console.log("Highlights changed:", highlights);
 		if (highlights.length > 0) {
 			// if (!highlightResults) {
 			const allMatches = findAllHighlightedPassages(highlights);
 			for (const match of allMatches) {
-				addHighlightToNodes(match.nodes, match.rawText);
+				addHighlightToNodes(match.nodes, match.sourceHighlight);
 			}
 			saveHighlightsToLocalStorage(highlights);
 		} else {
@@ -674,7 +734,7 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 							const allMatches = findAllHighlightedPassages(highlights);
 							console.log("Found highlight matches:", allMatches.length);
 							for (const match of allMatches) {
-								addHighlightToNodes(match.nodes, match.rawText);
+								addHighlightToNodes(match.nodes, match.sourceHighlight);
 							}
 						}
 					}, 100);
@@ -792,6 +852,12 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 					}}
 				>
 					Load Highlights
+				</Button>
+				<Button
+					onClick={() => {
+						clearHighlights();
+					}}>
+					Clear Highlights
 				</Button>
 				<div className="flex items-center gap-2 flex-grow max-w-md">
 					<Input

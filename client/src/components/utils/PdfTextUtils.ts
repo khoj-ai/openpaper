@@ -15,6 +15,8 @@ export const getMatchingNodesInPdf = (searchTerm: string) => {
         let matchIndex = 0;
 
         while (startIndex < fullPageTextLower.length) {
+            // If we see that the target searchTerm is present at some point in the PDF, we take the starting index, and greedily add all subsequent nodes until we have a text length equal to the length of the search term.
+            // Since we're just looking for a match of our string anywhere in the target text, we will likely end up adding notes that are extended beyond the scope of the search term. Typically, the span in the canvas layer is a single line of the PDF. It maybe be a substring of the line if there is some special formatting (like italics, bolding) within the line.
             const foundIndex = fullPageTextLower.indexOf(searchTextLower, startIndex);
             if (foundIndex === -1) break;
 
@@ -23,6 +25,8 @@ export const getMatchingNodesInPdf = (searchTerm: string) => {
 
             let currentPosition = 0;
             const matchingNodes: Element[] = [];
+
+            // Can we more efficiently jump to the first node after (inclusive) `foundIndex`? A sub of filtered nodes?
 
             for (const node of filteredTextNodes) {
                 const nodeText = node.textContent || '';
