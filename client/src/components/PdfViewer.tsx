@@ -381,12 +381,14 @@ export function usePdfSearch(explicitSearchTerm?: string) {
 		// Remove styling from any existing highlights
 		const pdfTextElements = document.querySelectorAll('.react-pdf__Page__textContent span.border-2');
 		pdfTextElements.forEach(span => {
+			if (span.classList.contains('bg-blue-100')) return;
 			span.classList.remove('border-2', 'border-yellow-500', 'bg-yellow-100', 'rounded', 'opacity-20');
 		});
 
 		// Highlight all nodes that contain parts of the match
 		setTimeout(() => {
 			match.nodes.forEach(node => {
+				if (node.classList.contains('bg-blue-100')) return;
 				node.classList.add('border-2', 'border-yellow-500', 'bg-yellow-100', 'rounded', 'opacity-20');
 			});
 
