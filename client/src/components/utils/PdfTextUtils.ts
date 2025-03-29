@@ -53,3 +53,25 @@ export const getMatchingNodesInPdf = (searchTerm: string) => {
 
     return results;
 }
+
+export const getOccurrenceIndexOfSelection = (text: string) => {
+    // Get all occurrences of this text in the document
+    const allOccurrences = getMatchingNodesInPdf(text);
+
+    // Get the current selection
+    const selection = window.getSelection();
+    if (!selection || !selection.rangeCount) return 0;
+
+    const range = selection.getRangeAt(0);
+    const selectionNode = range.startContainer.parentElement;
+
+    // Find which occurrence this selection belongs to
+    for (let i = 0; i < allOccurrences.length; i++) {
+        const nodes = allOccurrences[i].nodes;
+        if (nodes.some(node => node === selectionNode || node.contains(selectionNode))) {
+            return i;
+        }
+    }
+
+    return 0; // Default to first occurrence if not found
+};

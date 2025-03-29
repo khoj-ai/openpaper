@@ -8,10 +8,11 @@ import "react-pdf/dist/esm/Page/TextLayer.css";
 import "../app/globals.css";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, ArrowLeft, ArrowRight, X, Minus, Plus } from "lucide-react";
-import { CommandShortcut } from "./ui/command";
+import { Search, ArrowLeft, ArrowRight, X, Minus, Plus, Highlighter } from "lucide-react";
+import { CommandShortcut } from "@/components/ui/command";
 import { PaperHighlight } from "@/app/paper/[id]/page";
-import { getMatchingNodesInPdf } from "./utils/PdfTextUtils";
+import { getMatchingNodesInPdf, getOccurrenceIndexOfSelection } from "./utils/PdfTextUtils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface PdfViewerProps {
 	pdfUrl: string;
@@ -59,6 +60,179 @@ export function usePdfLoader() {
 		onDocumentLoadSuccess,
 		handlePageLoadSuccess,
 	};
+}
+
+function InlineAnnotationMenu({
+	selectedText,
+	tooltipPosition,
+	setSelectedText,
+	setTooltipPosition,
+	setIsAnnotating,
+	highlights,
+	setHighlights,
+	isHighlightInteraction
+}: {
+	selectedText: string;
+	tooltipPosition: { x: number; y: number } | null;
+	setSelectedText: (text: string) => void;
+	setTooltipPosition: (position: { x: number; y: number } | null) => void;
+	setIsAnnotating: (isAnnotating: boolean) => void;
+	highlights: Array<PaperHighlight>;
+	setHighlights: (highlights: Array<PaperHighlight>) => void;
+	isHighlightInteraction: boolean;
+}) {
+
+	const localizeCommandToOS = (key: string) => {
+		// Check if the user is on macOS using userAgent
+		const isMac = /(Mac|iPhone|iPod|iPad)/i.test(navigator.userAgent);
+		if (isMac) {
+			return `⌘ ${key}`;
+		} else {
+			return `Ctrl ${key}`;
+		}
+	}
+
+	const [annotationText, setAnnotationText] = useState<string>("");
+
+	if (!tooltipPosition) return null;
+
+	return (
+		<div
+			className="fixed z-30 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+			style={{
+				left: `${Math.min(tooltipPosition.x, window.innerWidth - 200)}px`,
+				top: `${tooltipPosition.y + 20}px`, // Position slightly below the cursor
+			}}
+			onClick={(e) => e.stopPropagation()} // Stop click events from bubbling
+			onMouseDown={(e) => e.stopPropagation()} // Also prevent mousedown from bubbling
+		>
+			<div className="flex flex-col gap-2 text-sm">
+				<Button
+					variant={'ghost'}
+					onClick={() => {
+						navigator.clipboard.writeText(selectedText);
+						setSelectedText("");
+						setTooltipPosition(null);
+						setIsAnnotating(false);
+					}}
+				>
+					<CommandShortcut>
+						<span className="text-secondary-foreground">
+							{localizeCommandToOS('C')}
+						</span>
+					</CommandShortcut>
+				</Button>
+				<Button
+					className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+					onMouseDown={(e) => e.preventDefault()} // Prevent text deselection
+					onClick={(e) => {
+						e.stopPropagation();
+						console.log("Adding highlight:", selectedText);
+
+						// Get which occurrence of this text this selection represents
+						const occurrenceIndex = getOccurrenceIndexOfSelection(selectedText);
+
+						// Add to highlights with occurrence information
+						setHighlights([
+							...highlights,
+							{
+								raw_text: selectedText,
+								annotation: "",
+								occurrence_index: occurrenceIndex
+							}
+						]);
+					}}
+				>
+					<Highlighter size={16} />
+					<span className="text-white">Highlight</span>
+				</Button>
+				{
+					isHighlightInteraction && (
+						<Button
+							variant={'ghost'}
+							onMouseDown={(e) => e.preventDefault()} // Prevent text deselection
+							onClick={(e) => {
+								e.stopPropagation();
+
+								// Remove the highlight
+								const occurrenceIndex = getOccurrenceIndexOfSelection(selectedText);
+
+								// Reformat selected Text
+
+								const newHighlights = highlights.filter((highlight, index) => {
+									// Remove the highlight if it matches the selected text
+									return highlight.raw_text !== selectedText || highlight.occurrence_index !== occurrenceIndex;
+								});
+
+								setHighlights(newHighlights);
+								setSelectedText("");
+								setTooltipPosition(null);
+								setIsAnnotating(false);
+							}}
+						>
+							<Minus size={16} />
+						</Button>
+					)
+				}
+				<Popover>
+					<PopoverTrigger
+						asChild>
+						<Button
+							variant={'ghost'}
+							onMouseDown={(e) => e.preventDefault()} // Prevent text deselection
+							onClick={(e) => {
+								e.stopPropagation();
+								setIsAnnotating(true);
+							}}
+						>
+							Annotate
+						</Button>
+					</PopoverTrigger>
+					<PopoverContent>
+						<div className="flex flex-col gap-2">
+							<Input
+								type="text"
+								placeholder="Add a note..."
+								value={annotationText}
+								onChange={(e) => setAnnotationText(e.target.value)}
+							/>
+							<Button
+								onClick={() => {
+									console.log("Adding annotation:", annotationText);
+									console.log("Selected text:", selectedText);
+									setHighlights([
+										...highlights,
+										{
+											raw_text: selectedText,
+											annotation: annotationText,
+											occurrence_index: getOccurrenceIndexOfSelection(selectedText)
+										}
+									]);
+									setAnnotationText("");
+									setSelectedText("");
+									setTooltipPosition(null);
+									setIsAnnotating(false);
+								}}
+							>
+								Add Annotation
+							</Button>
+						</div>
+					</PopoverContent>
+				</Popover>
+
+				<Button
+					variant={'ghost'}
+					onClick={() => {
+						setSelectedText("");
+						setTooltipPosition(null);
+						setIsAnnotating(false);
+					}}
+				>
+					<X size={16} />
+				</Button>
+			</div>
+		</div>
+	)
 }
 
 export function usePdfNavigation(numPages: number | null) {
@@ -259,7 +433,6 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 	const [selectedText, setSelectedText] = useState<string>("");
 	const [tooltipPosition, setTooltipPosition] = useState<{ x: number, y: number } | null>(null);
 	const [isAnnotating, setIsAnnotating] = useState(false);
-	const [workerInitialized, setWorkerInitialized] = useState(false);
 
 	const { numPages, allPagesLoaded, onDocumentLoadSuccess, handlePageLoadSuccess } = usePdfLoader();
 	const { scale, width, pagesRef, containerRef, goToPreviousPage, goToNextPage, zoomIn, zoomOut } = usePdfNavigation(numPages);
@@ -312,7 +485,41 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 		return results;
 	}
 
-	// Also modify the addHighlightToNodes function to be more reliable
+	// Add this new effect for handling outside clicks
+	useEffect(() => {
+		if (!tooltipPosition) return; // Only add listener when tooltip is shown
+
+		const handleOutsideClick = (e: MouseEvent) => {
+			// Check if the click is outside both the tooltip and any highlighted text
+			const tooltipElement = document.querySelector('.fixed.z-30'); // The tooltip element
+			if (!tooltipElement) return;
+
+			// If the click target is not inside the tooltip and not a highlight
+			if (
+				!tooltipElement.contains(e.target as Node) &&
+				!(e.target as Element)?.classList?.contains('border-blue-500')
+			) {
+				// Reset everything with a slight delay to avoid conflicts
+				setTimeout(() => {
+					setIsHighlightInteraction(false);
+					setSelectedText("");
+					setTooltipPosition(null);
+					setIsAnnotating(false);
+				}, 10);
+			}
+		};
+
+		// Add the listener after a brief delay to avoid it triggering immediately
+		const timerId = setTimeout(() => {
+			document.addEventListener('mousedown', handleOutsideClick);
+		}, 100);
+
+		return () => {
+			clearTimeout(timerId);
+			document.removeEventListener('mousedown', handleOutsideClick);
+		};
+	}, [tooltipPosition]);
+
 	const addHighlightToNodes = (nodes: Element[], rawText: string) => {
 		nodes.forEach(node => {
 			// First remove any existing highlights to avoid duplicates
@@ -326,19 +533,25 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 
 			// Add click handler directly to the new node
 			newNode.addEventListener('click', (event) => {
+				// Set highlight interaction flag immediately
+				setIsHighlightInteraction(true);
+
 				// Get coordinates at the time of the click
 				const rect = (event.target as Element).getBoundingClientRect();
 
-				setIsHighlightInteraction(true);
-				setSelectedText(rawText);
-				setTooltipPosition({
-					x: rect.left + (rect.width / 2), // Center horizontally
-					y: rect.top // Top of the element
-				});
-				setIsAnnotating(true);
+				// Set state for annotation menu - delay slightly to ensure flag is set first
+				setTimeout(() => {
+					setSelectedText(rawText);
+					setTooltipPosition({
+						x: rect.left + (rect.width / 2),
+						y: rect.top
+					});
+					setIsAnnotating(true);
+				}, 0);
 
-				// Prevent event propagation
+				// Prevent event bubbling to stop any conflicting handlers
 				event.stopPropagation();
+				event.preventDefault();
 			});
 
 			// Replace the original node with the new one
@@ -350,7 +563,10 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 
 	const saveHighlightsToLocalStorage = (highlights: Array<PaperHighlight>) => {
 		// Save highlights to local storage
-		localStorage.setItem("highlights", JSON.stringify(highlights));
+		const deduplicatedHighlights = highlights.filter((highlight, index, self) =>
+			index === self.findIndex(h => h.raw_text === highlight.raw_text && h.occurrence_index === highlight.occurrence_index)
+		);
+		localStorage.setItem("highlights", JSON.stringify(deduplicatedHighlights));
 	}
 
 	// Also modify loadHighlightsFromLocalStorage to better handle the results
@@ -391,6 +607,12 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 				addHighlightToNodes(match.nodes, match.rawText);
 			}
 			saveHighlightsToLocalStorage(highlights);
+		} else {
+			// Clear all highlights if none are present
+			const pdfTextElements = document.querySelectorAll('.react-pdf__Page__textContent span.border-2.border-blue-500');
+			pdfTextElements.forEach(span => {
+				span.classList.remove('border-2', 'border-blue-500', 'bg-blue-100', 'rounded', 'opacity-20');
+			});
 		}
 	}, [highlights]);
 
@@ -464,13 +686,23 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 		}
 	}, [allPagesLoaded]);
 
+	// Add this effect to reset isHighlightInteraction when selectedText becomes empty
+	useEffect(() => {
+		if (!selectedText) {
+			// If there is no selected text, we're not in a highlight interaction anymore
+			setIsHighlightInteraction(false);
+		}
+	}, [selectedText]);
+
 
 	const handleTextSelection = (e: React.MouseEvent | MouseEvent) => {
 		if (isAnnotating) return; // Ignore if annotating
 
+		// Reset the highlight interaction flag when making a new selection
 		const selection = window.getSelection();
 		if (selection && selection.toString()) {
 			let text = selection.toString();
+			setIsHighlightInteraction(false);
 
 			// Normalize the text while preserving paragraph structure
 
@@ -498,38 +730,18 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 				y: e.clientY
 			});
 		} else {
-			// If no text is selected, hide the tooltip after a small delay
-			// to allow clicking on the tooltip buttons
-			setTimeout(() => {
-				if (!window.getSelection()?.toString() && !isHighlightInteraction) {
-					setSelectedText("");
-					setTooltipPosition(null);
-				}
-				setIsHighlightInteraction(false); // Reset it after check
-			}, 10);
-		}
-	};
-
-	const getOccurrenceIndexOfSelection = (text: string) => {
-		// Get all occurrences of this text in the document
-		const allOccurrences = getMatchingNodesInPdf(text);
-
-		// Get the current selection
-		const selection = window.getSelection();
-		if (!selection || !selection.rangeCount) return 0;
-
-		const range = selection.getRangeAt(0);
-		const selectionNode = range.startContainer.parentElement;
-
-		// Find which occurrence this selection belongs to
-		for (let i = 0; i < allOccurrences.length; i++) {
-			const nodes = allOccurrences[i].nodes;
-			if (nodes.some(node => node === selectionNode || node.contains(selectionNode))) {
-				return i;
+			// If no text is selected and we're not in a highlight interaction,
+			// schedule a cleanup with a delay
+			if (!isHighlightInteraction) {
+				setTimeout(() => {
+					const currentSelection = window.getSelection();
+					if (!currentSelection?.toString()) {
+						setSelectedText("");
+						setTooltipPosition(null);
+					}
+				}, 200);
 			}
 		}
-
-		return 0; // Default to first occurrence if not found
 	};
 
 	const getSpecificMatchInPdf = (searchTerm: string, occurrenceIndex: number = 0) => {
@@ -564,15 +776,7 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 		return allReady && textLayers.length > 0;
 	};
 
-	const localizeCommandToOS = (key: string) => {
-		// Check if the user is on macOS using userAgent
-		const isMac = /(Mac|iPhone|iPod|iPad)/i.test(navigator.userAgent);
-		if (isMac) {
-			return `⌘ ${key}`;
-		} else {
-			return `Ctrl ${key}`;
-		}
-	}
+
 
 
 	return (
@@ -714,71 +918,20 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 			</Document>
 
 			{/* Replace the fixed position div with a tooltip */}
-			{selectedText && tooltipPosition && (
-				<div
-					className="fixed z-30 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-2 border border-gray-200 dark:border-gray-700"
-					style={{
-						left: `${Math.min(tooltipPosition.x, window.innerWidth - 200)}px`,
-						top: `${tooltipPosition.y + 20}px`, // Position slightly below the cursor
-					}}
-					onClick={(e) => e.stopPropagation()} // Stop click events from bubbling
-				>
-					<div className="flex gap-2 text-sm">
-						<Button
-							variant={'ghost'}
-							onClick={() => {
-								navigator.clipboard.writeText(selectedText);
-								setSelectedText("");
-								setTooltipPosition(null);
-								setIsAnnotating(false);
-							}}
-						>
-							<CommandShortcut>
-								<span className="text-secondary-foreground">
-									{localizeCommandToOS('C')}
-								</span>
-							</CommandShortcut>
-						</Button>
-						<Button
-							className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-							onMouseDown={(e) => e.preventDefault()} // Prevent text deselection
-							onClick={(e) => {
-								e.stopPropagation();
-
-								// Get the current page number
-								const pageNumber = currentPage;
-
-								// Get which occurrence of this text this selection represents
-								const occurrenceIndex = getOccurrenceIndexOfSelection(selectedText);
-
-								// Add to highlights with occurrence information
-								setHighlights([
-									...highlights,
-									{
-										raw_text: selectedText,
-										annotation: "",
-										occurrence_index: occurrenceIndex
-									}
-								]);
-
-								console.log("Annotating:", selectedText, "Page:", pageNumber, "Occurrence:", occurrenceIndex);
-							}}
-						>
-							Annotate
-						</Button>
-						<Button
-							variant={'ghost'}
-							onClick={() => {
-								setSelectedText("");
-								setTooltipPosition(null);
-								setIsAnnotating(false);
-							}}
-						>
-							<X size={16} />
-						</Button>
-					</div>
-				</div>
-			)}
+			{
+				tooltipPosition && (
+					<InlineAnnotationMenu
+						selectedText={selectedText}
+						tooltipPosition={tooltipPosition}
+						setSelectedText={setSelectedText}
+						setTooltipPosition={setTooltipPosition}
+						setIsAnnotating={setIsAnnotating}
+						highlights={highlights}
+						setHighlights={setHighlights}
+						isHighlightInteraction={isHighlightInteraction}
+					/>
+				)
+			}
 		</div>
 	);
 }
