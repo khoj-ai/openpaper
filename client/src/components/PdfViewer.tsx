@@ -524,99 +524,199 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 	}, [tooltipPosition]);
 
 	const addHighlightToNodes = (nodes: Element[], sourceHighlight: PaperHighlight) => {
-		nodes.forEach(node => {
-			// Partition node segments into sub-blocks if entire text content is not present in `rawText`
+		// First, check if we have a complete match across all nodes combined
+		const combinedText = nodes.map(node => node.textContent || "").join("");
+		const isExactMatch = combinedText === sourceHighlight.raw_text;
 
+		nodes.forEach(node => {
 			if (!node.textContent) return;
 
-			const subNodes: Element[] = [];
-
-			if (sourceHighlight.raw_text.indexOf(node.textContent) === -1) {
-				// Alternatively, could iterate through the node.TextContent, removing words until the substring matches. Then split it into two sub-spans. But need to edit the canvas text render layer to have these subspans, and the positioning logic is tricky to recreate. It currently works with the parent setting absolute positioning of the span, and then setting the innertext.
-
-				// Partition nodes
-				console.log("not fully matching text.content", node.textContent);
-				console.log('target text', sourceHighlight.raw_text);
-
-				// Split node.textContent on words, creating individual spans for each of them.
-				const splitWords = node.textContent.split(" ");
-
-				// Clear existing innertext of the node span
-				node.innerText = '';
-				node.classList.add('flex', 'flex-row');
-
-				// Find first matching index of the substring that is present in node.textContent. All nodes after that should be added to the new highlight nodes.
-				for (const word of splitWords) {
-					console.log('split word', word);
-					const subNode = document.createElement("div");
-					subNode.innerText = word;
-					// How to calculate position at which re-rendered text should be?
-					if (sourceHighlight.raw_text.indexOf(word) !== -1) {
-						subNode.classList.add('border-2', 'border-blue-500', 'bg-blue-100', 'rounded', 'opacity-20');
-
-					}
-					subNodes.push(subNode);
-					node.appendChild(subNode);
-					// Hmm, not sure how this can work. Basically, it's the parent element that needs to be replaced with these spans. Can we force the pdf.js to generate the canvas with individual words separated?
-				}
+			// Case 1: The node contains the entire highlight text (perfect match)
+			if (node.textContent === sourceHighlight.raw_text) {
+				applyHighlightToNode(node, sourceHighlight);
+				return;
 			}
 
-			// Would it be simpler to just user a custom renderer here?
+			// Case 2: The node contains part of the highlight text, or the highlight contains the node text
+			// Need to determine if this node should be fully or partially highlighted
+			const nodeText = node.textContent;
+			const highlightText = sourceHighlight.raw_text;
 
-			// Then add the highlight classes
-			if (subNodes.length === 0) {
-				node.classList.add('border-2', 'border-blue-500', 'bg-blue-100', 'rounded', 'opacity-20');
+			// Check if node text is completely contained within the highlight
+			if (highlightText.includes(nodeText)) {
+				applyHighlightToNode(node, sourceHighlight);
+				return;
 			}
 
-			// console.log(node.textContent);
+			// Check if part of the highlight text is in this node
+			if (nodeText.includes(highlightText) ||
+				highlightText.includes(nodeText.substring(0, Math.min(nodeText.length, 30))) ||
+				highlightText.includes(nodeText.substring(Math.max(0, nodeText.length - 30)))) {
 
-			// Create a new node with the same content
-			const newNode = node.cloneNode(true);
-
-			if (sourceHighlight.annotation) {
-				console.log("sourcehighlight.annotation", sourceHighlight.annotation);
-				const annotationButton = document.createElement("button");
-				annotationButton.innerText = "click me";
-				annotationButton.addEventListener('click', (event) => {
-					alert(sourceHighlight.annotation);
-				});
-				annotationButton.classList.add("bg-blue-800");
-				newNode.appendChild(annotationButton);
-			}
-
-			// Add click handler directly to the new node
-			newNode.addEventListener('click', (event) => {
-				// Rather than passing around these awkward state variables, can we just add a click event handler directly here that renders the inline annotation menu? Then the metadata and highlighter-specific context can be sent via props.
-
-				// Set highlight interaction flag immediately
-				setIsHighlightInteraction(true);
-
-				// Get coordinates at the time of the click
-				const rect = (event.target as Element).getBoundingClientRect();
-
-				// Set state for annotation menu - delay slightly to ensure flag is set first
-				setTimeout(() => {
-					setSelectedText(sourceHighlight.raw_text);
-					setTooltipPosition({
-						x: rect.left + (rect.width / 2),
-						y: rect.top
-					});
-					setIsAnnotating(true);
-				}, 0);
-
-				// Prevent event bubbling to stop any conflicting handlers
-				event.stopPropagation();
-				event.preventDefault();
-			});
-
-			// Replace the original node with the new one
-			if (node.parentNode) {
-				node.parentNode.replaceChild(newNode, node);
-				if (subNodes.length > 0) {
-					console.log(node.parentNode);
-				}
+				// Create a fragment with highlighted sections
+				createHighlightedTextFragments(node, sourceHighlight);
 			}
 		});
+	};
+
+	// Helper function to apply full highlight to a node
+	const applyHighlightToNode = (node: Element, sourceHighlight: PaperHighlight) => {
+		// Clone the node to preserve its properties
+		const newNode = node.cloneNode(true) as Element;
+
+		// Add highlight styles
+		newNode.classList.add('border-2', 'border-blue-500', 'bg-blue-100', 'rounded', 'opacity-20');
+
+		// Add click handler for interaction
+		addHighlightClickHandler(newNode, sourceHighlight);
+
+		// Replace the original node
+		if (node.parentNode) {
+			node.parentNode.replaceChild(newNode, node);
+		}
+	};
+
+	// Helper function to create text fragments with partial highlighting
+	const createHighlightedTextFragments = (node: Element, sourceHighlight: PaperHighlight) => {
+		if (!node.textContent) return;
+
+		const nodeText = node.textContent;
+		const highlightText = sourceHighlight.raw_text;
+
+		// Create a container to replace the original node
+		const container = document.createElement('span');
+
+		// Copy ALL styles from the original node, not just a few
+		if (node instanceof HTMLElement) {
+			// Copy all computed styles to ensure exact match
+			const computedStyle = window.getComputedStyle(node);
+			Array.from(computedStyle).forEach(key => {
+				container.style[key as any] = computedStyle.getPropertyValue(key);
+			});
+
+			// Make sure we're setting the correct position
+			container.style.position = 'absolute';
+			container.style.left = node.style.left;
+			container.style.top = node.style.top;
+		}
+
+		// Find the start index of the highlight within the node text
+		const startIndex = nodeText.indexOf(highlightText);
+
+		if (startIndex >= 0) {
+			// Case: The highlight is within this node - split into before, highlight, after
+
+			// Add text before the highlight
+			if (startIndex > 0) {
+				const beforeText = document.createElement('span');
+				beforeText.textContent = nodeText.substring(0, startIndex);
+				beforeText.style.position = 'relative';
+				beforeText.style.display = 'inline';
+				container.appendChild(beforeText);
+			}
+
+			// Add the highlighted text
+			const highlightSpan = document.createElement('span');
+			highlightSpan.textContent = highlightText;
+			highlightSpan.style.position = 'relative';
+			highlightSpan.style.display = 'inline';
+			highlightSpan.classList.add('border-blue-500', 'bg-blue-100', 'rounded', 'opacity-20');
+			addHighlightClickHandler(highlightSpan, sourceHighlight);
+			container.appendChild(highlightSpan);
+
+			// Add text after the highlight
+			const endIndex = startIndex + highlightText.length;
+			if (endIndex < nodeText.length) {
+				const afterText = document.createElement('span');
+				afterText.textContent = nodeText.substring(endIndex);
+				afterText.style.position = 'relative';
+				afterText.style.display = 'inline';
+				container.appendChild(afterText);
+			}
+		} else {
+			// For more complex cases where we can't find an exact substring match
+
+			// Use a single flat container and just directly add the text as is
+			// but wrap individual words that need highlighting in spans
+
+			const nodeWords = nodeText.split(/(\s+)/); // Split by whitespace but keep the whitespace
+			const highlightWords = new Set(highlightText.split(/\s+/));
+
+			// Process each word and the whitespace that follows it
+			for (let i = 0; i < nodeWords.length; i++) {
+				const word = nodeWords[i];
+
+				if (/^\s+$/.test(word)) {
+					// It's just whitespace, add it directly
+					const textNode = document.createTextNode(word);
+					container.appendChild(textNode);
+					continue;
+				}
+
+				// It's a word
+				if (highlightWords.has(word) || highlightText.includes(word)) {
+					// This word should be highlighted
+					const wordSpan = document.createElement('span');
+					wordSpan.textContent = word;
+					wordSpan.style.display = 'inline';
+					wordSpan.classList.add('border-blue-500', 'bg-blue-100', 'rounded', 'opacity-40', '!relative');
+
+					// Only add click handler to longer words to avoid false positives
+					if (word.length > 3) {
+						addHighlightClickHandler(wordSpan, sourceHighlight);
+					}
+
+					container.appendChild(wordSpan);
+				} else {
+					// Just add the word directly
+					const textNode = document.createTextNode(word);
+					container.appendChild(textNode);
+				}
+			}
+		}
+
+		// Replace the original node with our container of fragments
+		if (node.parentNode) {
+			node.parentNode.replaceChild(container, node);
+		}
+	};
+
+	// Helper function to add click handler to highlighted elements
+	const addHighlightClickHandler = (node: Element, sourceHighlight: PaperHighlight) => {
+		node.addEventListener('click', (event) => {
+			// Set highlight interaction flag immediately
+			setIsHighlightInteraction(true);
+
+			// Get coordinates at the time of the click
+			const rect = (event.target as Element).getBoundingClientRect();
+
+			// Set state for annotation menu
+			setTimeout(() => {
+				setSelectedText(sourceHighlight.raw_text);
+				setTooltipPosition({
+					x: rect.left + (rect.width / 2),
+					y: rect.top
+				});
+				setIsAnnotating(true);
+			}, 0);
+
+			// Prevent event bubbling
+			event.stopPropagation();
+			event.preventDefault();
+		});
+
+		// Add annotation indicator if needed
+		if (sourceHighlight.annotation) {
+			const annotationIndicator = document.createElement('span');
+			annotationIndicator.textContent = '📝'; // Note icon
+			annotationIndicator.style.position = 'absolute';
+			annotationIndicator.style.right = '-5px';
+			annotationIndicator.style.top = '-5px';
+			annotationIndicator.style.fontSize = '12px';
+			annotationIndicator.title = 'Click to view annotation';
+			node.style.position = 'relative';
+			node.appendChild(annotationIndicator);
+		}
 	};
 
 	const saveHighlightsToLocalStorage = (highlights: Array<PaperHighlight>) => {
