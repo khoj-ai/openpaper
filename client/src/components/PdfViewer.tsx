@@ -635,42 +635,104 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 			}
 		} else {
 			// For more complex cases where we can't find an exact substring match
+			// Find the longest common substring
+			const findLongestCommonSubstring = (str1: string, str2: string): [number, number, number] => {
+				let longestLength = 0;
+				let longestStartIndex1 = 0;
+				let longestStartIndex2 = 0;
 
-			// Use a single flat container and just directly add the text as is
-			// but wrap individual words that need highlighting in spans
+				const str1Lower = str1.toLowerCase();
+				const str2Lower = str2.toLowerCase();
 
-			const nodeWords = nodeText.split(/(\s+)/); // Split by whitespace but keep the whitespace
-			const highlightWords = new Set(highlightText.split(/\s+/));
+				for (let i = 0; i < str1Lower.length; i++) {
+					for (let j = 0; j < str2Lower.length; j++) {
+						let length = 0;
+						while (
+							i + length < str1Lower.length &&
+							j + length < str2Lower.length &&
+							str1Lower[i + length] === str2Lower[j + length]
+						) {
+							length++;
+						}
 
-			// Process each word and the whitespace that follows it
-			for (let i = 0; i < nodeWords.length; i++) {
-				const word = nodeWords[i];
-
-				if (/^\s+$/.test(word)) {
-					// It's just whitespace, add it directly
-					const textNode = document.createTextNode(word);
-					container.appendChild(textNode);
-					continue;
+						if (length > longestLength) {
+							longestLength = length;
+							longestStartIndex1 = i;
+							longestStartIndex2 = j;
+						}
+					}
 				}
 
-				// It's a word
-				if (highlightWords.has(word) || highlightText.includes(word)) {
-					// This word should be highlighted
-					const wordSpan = document.createElement('span');
-					wordSpan.textContent = word;
-					wordSpan.style.display = 'inline';
-					wordSpan.classList.add('border-blue-500', 'bg-blue-100', 'rounded', 'opacity-40', '!relative');
+				return [longestLength, longestStartIndex1, longestStartIndex2];
+			};
 
-					// Only add click handler to longer words to avoid false positives
-					if (word.length > 3) {
-						addHighlightClickHandler(wordSpan, sourceHighlight);
+			const [longestLength, nodeStartIndex, _] = findLongestCommonSubstring(nodeText, highlightText);
+
+			// Only proceed if we found a substantial match (to avoid highlighting common short words)
+			if (longestLength > 3) {
+				// Add text before the match
+				if (nodeStartIndex > 0) {
+					const beforeText = document.createElement('span');
+					beforeText.textContent = nodeText.substring(0, nodeStartIndex);
+					beforeText.style.position = 'relative';
+					beforeText.style.display = 'inline';
+					container.appendChild(beforeText);
+				}
+
+				// Add the highlighted text
+				const matchedText = nodeText.substring(nodeStartIndex, nodeStartIndex + longestLength);
+				const highlightSpan = document.createElement('span');
+				highlightSpan.textContent = matchedText;
+				highlightSpan.style.position = 'relative';
+				highlightSpan.style.display = 'inline';
+				highlightSpan.classList.add('border-2', 'border-blue-500', 'bg-blue-100', 'rounded', 'opacity-20');
+				addHighlightClickHandler(highlightSpan, sourceHighlight);
+				container.appendChild(highlightSpan);
+
+				// Add text after the match
+				const endIndex = nodeStartIndex + longestLength;
+				if (endIndex < nodeText.length) {
+					const afterText = document.createElement('span');
+					afterText.textContent = nodeText.substring(endIndex);
+					afterText.style.position = 'relative';
+					afterText.style.display = 'inline';
+					container.appendChild(afterText);
+				}
+			} else {
+				// Fall back to word-by-word highlighting for short matches
+				const nodeWords = nodeText.split(/(\s+)/); // Split by whitespace but keep the whitespace
+				const highlightWords = new Set(highlightText.split(/\s+/));
+
+				// Process each word and the whitespace that follows it
+				for (let i = 0; i < nodeWords.length; i++) {
+					const word = nodeWords[i];
+
+					if (/^\s+$/.test(word)) {
+						// It's just whitespace, add it directly
+						const textNode = document.createTextNode(word);
+						container.appendChild(textNode);
+						continue;
 					}
 
-					container.appendChild(wordSpan);
-				} else {
-					// Just add the word directly
-					const textNode = document.createTextNode(word);
-					container.appendChild(textNode);
+					// It's a word
+					if (highlightWords.has(word) || highlightText.includes(word)) {
+						// This word should be highlighted
+						const wordSpan = document.createElement('span');
+						wordSpan.textContent = word;
+						wordSpan.style.display = 'inline';
+						wordSpan.classList.add('border-2', 'border-blue-500', 'bg-blue-100', 'rounded', 'opacity-40', '!relative');
+
+						// Only add click handler to longer words to avoid false positives
+						if (word.length > 3) {
+							addHighlightClickHandler(wordSpan, sourceHighlight);
+						}
+
+						container.appendChild(wordSpan);
+					} else {
+						// Just add the word directly
+						const textNode = document.createTextNode(word);
+						container.appendChild(textNode);
+					}
 				}
 			}
 		}
