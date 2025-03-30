@@ -8,10 +8,10 @@ import "react-pdf/dist/esm/Page/TextLayer.css";
 import "../app/globals.css";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, ArrowLeft, ArrowRight, X, Minus, Plus, Highlighter } from "lucide-react";
+import { Search, ArrowLeft, ArrowRight, X, Minus, Plus, Highlighter, FileText } from "lucide-react";
 import { CommandShortcut } from "@/components/ui/command";
 import { PaperHighlight } from "@/app/paper/[id]/page";
-import { getMatchingNodesInPdf, getOccurrenceIndexOfSelection } from "./utils/PdfTextUtils";
+import { getMatchingNodesInPdf, getNodesFromCurrentSelection, getOccurrenceIndexOfSelection } from "./utils/PdfTextUtils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -71,7 +71,8 @@ function InlineAnnotationMenu({
 	setIsAnnotating,
 	highlights,
 	setHighlights,
-	isHighlightInteraction
+	isHighlightInteraction,
+	activeHighlight,
 }: {
 	selectedText: string;
 	tooltipPosition: { x: number; y: number } | null;
@@ -81,6 +82,7 @@ function InlineAnnotationMenu({
 	highlights: Array<PaperHighlight>;
 	setHighlights: (highlights: Array<PaperHighlight>) => void;
 	isHighlightInteraction: boolean;
+	activeHighlight: PaperHighlight | null;
 }) {
 
 	const localizeCommandToOS = (key: string) => {
@@ -201,14 +203,25 @@ function InlineAnnotationMenu({
 								onClick={() => {
 									console.log("Adding annotation:", annotationText);
 									console.log("Selected text:", selectedText);
-									setHighlights([
-										...highlights,
-										{
-											raw_text: selectedText,
-											annotation: annotationText,
-											occurrence_index: getOccurrenceIndexOfSelection(selectedText)
-										}
-									]);
+									// If using an activeHighlight, first get the matching one in the current set of highlights, then update it
+									if (activeHighlight) {
+										const updatedHighlights = highlights.map(highlight => {
+											if (highlight.occurrence_index === activeHighlight.occurrence_index) {
+												return { ...highlight, annotation: annotationText };
+											}
+											return highlight;
+										});
+										setHighlights(updatedHighlights);
+									} else {
+										setHighlights([
+											...highlights,
+											{
+												raw_text: selectedText,
+												annotation: annotationText,
+												occurrence_index: getOccurrenceIndexOfSelection(selectedText)
+											}
+										]);
+									}
 									setAnnotationText("");
 									setSelectedText("");
 									setTooltipPosition(null);
@@ -436,6 +449,7 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 	const [selectedText, setSelectedText] = useState<string>("");
 	const [tooltipPosition, setTooltipPosition] = useState<{ x: number, y: number } | null>(null);
 	const [isAnnotating, setIsAnnotating] = useState(false);
+	const [activeHighlight, setActiveHighlight] = useState<PaperHighlight | null>(null);
 
 	const { numPages, allPagesLoaded, onDocumentLoadSuccess, handlePageLoadSuccess } = usePdfLoader();
 	const { scale, width, pagesRef, containerRef, goToPreviousPage, goToNextPage, zoomIn, zoomOut } = usePdfNavigation(numPages);
@@ -532,7 +546,7 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 			if (!node.textContent) return;
 
 			// Case 1: The node contains the entire highlight text (perfect match)
-			if (node.textContent === sourceHighlight.raw_text) {
+			if (isExactMatch) {
 				applyHighlightToNode(node, sourceHighlight);
 				return;
 			}
@@ -554,9 +568,41 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 				highlightText.includes(nodeText.substring(Math.max(0, nodeText.length - 30)))) {
 
 				// Create a fragment with highlighted sections
-				createHighlightedTextFragments(node, sourceHighlight);
+				createHighlightedTextFragments(node, sourceHighlight, node === nodes[0]);
 			}
 		});
+
+		// Add annotation indicator if needed
+		if (sourceHighlight.annotation) {
+			console.log("has annotation");
+			const firstNode = nodes[0];
+			console.log("firstNode", firstNode);
+			if (!firstNode) return;
+			const annotationButton = document.createElement('button');
+			annotationButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>';
+
+			// Style the button
+			annotationButton.style.position = 'absolute';
+			annotationButton.style.right = '-8px';
+			annotationButton.style.top = '-8px';
+			annotationButton.style.width = '18px';
+			annotationButton.style.height = '18px';
+			annotationButton.style.borderRadius = '50%';
+			annotationButton.style.backgroundColor = '#3b82f6'; // blue-500
+			annotationButton.style.color = 'white';
+			annotationButton.style.border = 'none';
+			annotationButton.style.padding = '2px';
+			annotationButton.style.display = 'flex';
+			annotationButton.style.alignItems = 'center';
+			annotationButton.style.justifyContent = 'center';
+			annotationButton.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+			annotationButton.title = 'Click to view annotation';
+
+			// Add classes for z-index and cursor
+			annotationButton.classList.add('z-10', 'cursor-pointer');
+
+			firstNode.appendChild(annotationButton);
+		}
 	};
 
 	// Helper function to apply full highlight to a node
@@ -577,7 +623,7 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 	};
 
 	// Helper function to create text fragments with partial highlighting
-	const createHighlightedTextFragments = (node: Element, sourceHighlight: PaperHighlight) => {
+	const createHighlightedTextFragments = (node: Element, sourceHighlight: PaperHighlight, isFirstNode = false) => {
 		if (!node.textContent) return;
 
 		const nodeText = node.textContent;
@@ -739,6 +785,26 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 
 		// Replace the original node with our container of fragments
 		if (node.parentNode) {
+			if (isFirstNode && sourceHighlight.annotation) {
+				const annotationButton = document.createElement('button');
+				annotationButton.innerHTML = FileText.toString();
+
+				// Style the button
+				annotationButton.classList.add('absolute', 'z-10', 'cursor-pointer', '-right-8', 'top-0', 'flex', 'items-center', 'justify-center', 'w-6', 'h-6', 'rounded-full', 'bg-blue-200', 'opacity-20', 'text-white', 'border-none', 'p-1');
+				annotationButton.title = 'Click to view annotation';
+
+				// Add classes for z-index and cursor
+				annotationButton.classList.add('z-10', 'cursor-pointer');
+
+				container.appendChild(annotationButton);
+
+				annotationButton.addEventListener('click', () => {
+					// Show the annotation in a tooltip or modal
+					alert(sourceHighlight.annotation);
+				});
+
+			}
+
 			node.parentNode.replaceChild(container, node);
 		}
 	};
@@ -746,6 +812,10 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 	// Helper function to add click handler to highlighted elements
 	const addHighlightClickHandler = (node: Element, sourceHighlight: PaperHighlight) => {
 		node.addEventListener('click', (event) => {
+			// Prevent event bubbling
+			event.stopPropagation();
+			event.preventDefault();
+
 			// Set highlight interaction flag immediately
 			setIsHighlightInteraction(true);
 
@@ -753,32 +823,14 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 			const rect = (event.target as Element).getBoundingClientRect();
 
 			// Set state for annotation menu
-			setTimeout(() => {
-				setSelectedText(sourceHighlight.raw_text);
-				setTooltipPosition({
-					x: rect.left + (rect.width / 2),
-					y: rect.top
-				});
-				setIsAnnotating(true);
-			}, 0);
-
-			// Prevent event bubbling
-			event.stopPropagation();
-			event.preventDefault();
+			setSelectedText(sourceHighlight.raw_text);
+			setTooltipPosition({
+				x: rect.left + (rect.width / 2),
+				y: rect.top
+			});
+			setIsAnnotating(true);
+			setActiveHighlight(sourceHighlight);
 		});
-
-		// Add annotation indicator if needed
-		if (sourceHighlight.annotation) {
-			const annotationIndicator = document.createElement('span');
-			annotationIndicator.textContent = '📝'; // Note icon
-			annotationIndicator.style.position = 'absolute';
-			annotationIndicator.style.right = '-5px';
-			annotationIndicator.style.top = '-5px';
-			annotationIndicator.style.fontSize = '12px';
-			annotationIndicator.title = 'Click to view annotation';
-			node.style.position = 'relative';
-			node.appendChild(annotationIndicator);
-		}
 	};
 
 	const saveHighlightsToLocalStorage = (highlights: Array<PaperHighlight>) => {
@@ -823,9 +875,7 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 	}
 
 	useEffect(() => {
-		console.log("Highlights changed:", highlights);
 		if (highlights.length > 0) {
-			// if (!highlightResults) {
 			const allMatches = findAllHighlightedPassages(highlights);
 			for (const match of allMatches) {
 				addHighlightToNodes(match.nodes, match.sourceHighlight);
@@ -918,49 +968,55 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 		}
 	}, [selectedText]);
 
-
+	// When the user makes a selection
 	const handleTextSelection = (e: React.MouseEvent | MouseEvent) => {
-		if (isAnnotating) return; // Ignore if annotating
-
-		// Reset the highlight interaction flag when making a new selection
 		const selection = window.getSelection();
 		if (selection && selection.toString()) {
-			let text = selection.toString();
-			setIsHighlightInteraction(false);
+			// Get nodes corresponding to the selection
+			const selectedNodes = getNodesFromCurrentSelection();
 
-			// Normalize the text while preserving paragraph structure
+			if (selectedNodes) {
+				// Use the nodes to highlight or annotate
+				console.log(`Found ${selectedNodes.length} nodes`);
 
-			// 1. Identify and preserve paragraph breaks (double newlines, or newlines after sentence endings)
-			// Mark paragraph breaks with a special character sequence
-			text = text.replace(/(\.\s*)\n+/g, '$1{PARA_BREAK}'); // Period followed by newline
-			text = text.replace(/(\?\s*)\n+/g, '$1{PARA_BREAK}'); // Question mark followed by newline
-			text = text.replace(/(\!\s*)\n+/g, '$1{PARA_BREAK}'); // Exclamation mark followed by newline
-			text = text.replace(/\n\s*\n+/g, '{PARA_BREAK}');     // Multiple newlines
+				let text = selection.toString();
+				setIsHighlightInteraction(false);
 
-			// 2. Replace remaining newlines with spaces (these are likely just line breaks in the same paragraph)
-			text = text.replace(/\n/g, ' ');
+				// Normalize the text while preserving paragraph structure
 
-			// 3. Restore paragraph breaks with actual newlines
-			text = text.replace(/{PARA_BREAK}/g, '\n\n');
+				// 1. Identify and preserve paragraph breaks (double newlines, or newlines after sentence endings)
+				// Mark paragraph breaks with a special character sequence
+				text = text.replace(/(\.\s*)\n+/g, '$1{PARA_BREAK}'); // Period followed by newline
+				text = text.replace(/(\?\s*)\n+/g, '$1{PARA_BREAK}'); // Question mark followed by newline
+				text = text.replace(/(\!\s*)\n+/g, '$1{PARA_BREAK}'); // Exclamation mark followed by newline
+				text = text.replace(/\n\s*\n+/g, '{PARA_BREAK}');     // Multiple newlines
 
-			// 4. Clean up any excessive spaces
-			text = text.replace(/\s+/g, ' ').trim();
+				// 2. Replace remaining newlines with spaces (these are likely just line breaks in the same paragraph)
+				text = text.replace(/\n/g, ' ');
 
-			setSelectedText(text);
+				// 3. Restore paragraph breaks with actual newlines
+				text = text.replace(/{PARA_BREAK}/g, '\n\n');
 
-			// Set tooltip position near cursor
-			setTooltipPosition({
-				x: e.clientX,
-				y: e.clientY
-			});
+				// 4. Clean up any excessive spaces
+				text = text.replace(/\s+/g, ' ').trim();
+
+				setSelectedText(text);
+
+				// Set tooltip position near cursor
+				setTooltipPosition({
+					x: e.clientX,
+					y: e.clientY
+				});
+			}
 		} else {
-			// If no text is selected and we're not in a highlight interaction,
-			// schedule a cleanup with a delay
-			if (!isHighlightInteraction) {
+			console.log("isHighlightInteraction", isHighlightInteraction);
+			if (!isHighlightInteraction && selectedText) {
 				setTimeout(() => {
-					const currentSelection = window.getSelection();
-					if (!currentSelection?.toString()) {
-						setSelectedText("");
+					if (!isHighlightInteraction) {
+						const currentSelection = window.getSelection();
+						if (!currentSelection?.toString()) {
+							setSelectedText("");
+						}
 						setTooltipPosition(null);
 					}
 				}, 200);
@@ -999,8 +1055,6 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 
 		return allReady && textLayers.length > 0;
 	};
-
-
 
 
 	return (
@@ -1159,6 +1213,7 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 						highlights={highlights}
 						setHighlights={setHighlights}
 						isHighlightInteraction={isHighlightInteraction}
+						activeHighlight={activeHighlight}
 					/>
 				)
 			}
