@@ -1,6 +1,6 @@
 "use client"
 
-import { Calendar, FileText, Home, Inbox, Moon, Search, Settings, Sun } from "lucide-react";
+import { FileText, Home, Moon, Search, Settings, Sun } from "lucide-react";
 
 import {
     Sidebar,

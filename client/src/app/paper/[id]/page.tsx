@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
 import { useParams } from 'next/navigation';
-import { useState, useEffect, FormEvent, Fragment, Children, useRef, createElement } from 'react';
+import { useState, useEffect, FormEvent, Fragment, Children, useRef, createElement, HTMLAttributes, ReactNode } from 'react';
 
 // Reference to react-markdown documents: https://github.com/remarkjs/react-markdown?tab=readme-ov-file
 import Markdown from 'react-markdown';
@@ -87,7 +87,19 @@ interface IPaperMetadata {
     hasMessages: boolean;
 }
 
-const CustomCitationLink = ({ children, handleCitationClick, messageIndex, ...props }: any) => {
+// Interface for the CustomCitationLink component props
+interface CustomCitationLinkProps extends HTMLAttributes<HTMLElement> {
+    children?: ReactNode;
+    handleCitationClick: (key: string, messageIndex: number) => void;
+    messageIndex: number;
+    node?: {
+        tagName?: string;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        properties?: Record<string, any>;
+    };
+}
+
+const CustomCitationLink = ({ children, handleCitationClick, messageIndex, ...props }: CustomCitationLinkProps) => {
     // Create a clone of props to avoid mutating the original
     const elementProps = { ...props };
 
@@ -426,7 +438,7 @@ export default function PaperView() {
         }
 
         fetchConversation();
-    }, [paperData]);
+    }, [paperData, id]);
 
     useEffect(() => {
         if (!conversationId) return;
@@ -457,7 +469,7 @@ export default function PaperView() {
             }
         }
         fetchMessages();
-    }, [conversationId]);
+    }, [conversationId, pageNumberConversationHistory]);
 
 
     // Handle scroll to load more messages

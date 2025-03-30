@@ -59,12 +59,12 @@ export function useHighlights() {
         const storedHighlights = localStorage.getItem("highlights");
         if (storedHighlights) {
             try {
-                const parsedHighlights = JSON.parse(storedHighlights);
+                const parsedHighlights: PaperHighlight[] = JSON.parse(storedHighlights);
                 console.log("Loaded highlights from local storage:", parsedHighlights);
 
                 // Check if stored highlights have the required fields
                 const validHighlights = parsedHighlights.filter(
-                    (h: any) => h.raw_text &&
+                    (h: PaperHighlight) => h.raw_text &&
                         typeof h.start_offset === 'number' &&
                         typeof h.end_offset === 'number'
                 );

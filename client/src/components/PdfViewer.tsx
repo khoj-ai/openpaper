@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import "../lib/promisePolyfill";
-import { Document, Outline, Page } from "react-pdf";
+import { Document, Page } from "react-pdf";
 import "react-pdf/dist/esm/Page/AnnotationLayer.css";
 import "react-pdf/dist/esm/Page/TextLayer.css";
 import "../app/globals.css";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, ArrowLeft, ArrowRight, X, Minus, Plus, Highlighter, FileText } from "lucide-react";
+import { Search, ArrowLeft, ArrowRight, X, Minus, Plus, Highlighter } from "lucide-react";
 import { CommandShortcut } from "@/components/ui/command";
 import { PaperHighlight } from "@/app/paper/[id]/page";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -203,7 +203,7 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 	const { numPages, allPagesLoaded, onDocumentLoadSuccess, handlePageLoadSuccess } = usePdfLoader();
 	const { scale, width, pagesRef, containerRef, goToPreviousPage, goToNextPage, zoomIn, zoomOut } = usePdfNavigation(numPages);
 	// Highlight functionality
-	const { highlights, setHighlights, selectedText, setSelectedText, tooltipPosition, setTooltipPosition, isAnnotating, setIsAnnotating, isHighlightInteraction, setIsHighlightInteraction, activeHighlight, setActiveHighlight, handleTextSelection, loadHighlightsFromLocalStorage, clearHighlights, addHighlight } = useHighlights();
+	const { highlights, setHighlights, selectedText, setSelectedText, tooltipPosition, setTooltipPosition, isAnnotating, setIsAnnotating, isHighlightInteraction, setIsHighlightInteraction, activeHighlight, setActiveHighlight, handleTextSelection, loadHighlightsFromLocalStorage, addHighlight } = useHighlights();
 
 
 	// Search functionality

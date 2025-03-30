@@ -1,5 +1,13 @@
 import { PaperHighlight } from "@/app/paper/[id]/page";
 
+export interface HighlightHandlers {
+    setIsHighlightInteraction: (value: boolean) => void;
+    setSelectedText: (text: string) => void;
+    setTooltipPosition: (position: { x: number; y: number } | null) => void;
+    setIsAnnotating: (value: boolean) => void;
+    setActiveHighlight: (highlight: PaperHighlight | null) => void;
+}
+
 export function findAllHighlightedPassages(highlights: PaperHighlight[]) {
     // Get ALL text content layers (one per page)
     const textLayers = document.querySelectorAll('.react-pdf__Page__textContent');
@@ -179,7 +187,7 @@ export function addHighlightToNodes(
 function applyHighlightToNode(
     node: Element,
     sourceHighlight: PaperHighlight,
-    handlers: any
+    handlers: HighlightHandlers
 ) {
     // Add highlighting to the node
     node.classList.add('border-2', 'border-blue-500', 'bg-blue-100', 'rounded', 'opacity-20');
@@ -198,7 +206,7 @@ function applyHighlightToNode(
 function createHighlightedTextFragments(
     node: Element,
     sourceHighlight: PaperHighlight,
-    handlers: any,
+    handlers: HighlightHandlers,
     startOffset: number,
     endOffset: number
 ) {
@@ -221,7 +229,7 @@ function createHighlightedTextFragments(
     highlightSpan.classList.add('border-2', 'border-blue-500', 'bg-blue-100', 'rounded', 'opacity-20');
 
     // Add click event to show highlight options
-    highlightSpan.addEventListener('click', (e) => {
+    highlightSpan.addEventListener('click', (e: MouseEvent) => {
         e.stopPropagation();
         handlers.setIsHighlightInteraction(true);
         handlers.setSelectedText(sourceHighlight.raw_text);
