@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import "../lib/promisePolyfill";
 import { Document, Outline, Page } from "react-pdf";
 import "react-pdf/dist/esm/Page/AnnotationLayer.css";
@@ -11,10 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Search, ArrowLeft, ArrowRight, X, Minus, Plus, Highlighter, FileText } from "lucide-react";
 import { CommandShortcut } from "@/components/ui/command";
 import { PaperHighlight } from "@/app/paper/[id]/page";
-import { getMatchingNodesInPdf, getNodesFromCurrentSelection, getOccurrenceIndexOfSelection } from "./utils/PdfTextUtils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
-import { addHighlightToNodes, applyHighlightToNode, createHighlightedTextFragments, findAllHighlightedPassages } from "./utils/PdfHighlightUtils";
+import { addHighlightToNodes, findAllHighlightedPassages } from "./utils/PdfHighlightUtils";
 import { usePdfSearch } from "./hooks/PdfSearch";
 import { usePdfNavigation } from "./hooks/PdfNavigation";
 import { usePdfLoader } from "./hooks/PdfLoader";
@@ -35,6 +34,7 @@ function InlineAnnotationMenu({
 	setHighlights,
 	isHighlightInteraction,
 	activeHighlight,
+	addHighlight
 }: {
 	selectedText: string;
 	tooltipPosition: { x: number; y: number } | null;
@@ -45,6 +45,7 @@ function InlineAnnotationMenu({
 	setHighlights: (highlights: Array<PaperHighlight>) => void;
 	isHighlightInteraction: boolean;
 	activeHighlight: PaperHighlight | null;
+	addHighlight: (selectedText: string, annotation?: string) => void;
 }) {
 
 	const localizeCommandToOS = (key: string) => {
@@ -94,18 +95,8 @@ function InlineAnnotationMenu({
 						e.stopPropagation();
 						console.log("Adding highlight:", selectedText);
 
-						// Get which occurrence of this text this selection represents
-						const occurrenceIndex = getOccurrenceIndexOfSelection(selectedText);
-
-						// Add to highlights with occurrence information
-						setHighlights([
-							...highlights,
-							{
-								raw_text: selectedText,
-								annotation: "",
-								occurrence_index: occurrenceIndex
-							}
-						]);
+						// Use the new addHighlight function that uses offsets
+						addHighlight(selectedText, "");
 					}}
 				>
 					<Highlighter size={16} />
@@ -119,20 +110,19 @@ function InlineAnnotationMenu({
 							onClick={(e) => {
 								e.stopPropagation();
 
-								// Remove the highlight
-								const occurrenceIndex = getOccurrenceIndexOfSelection(selectedText);
+								// Remove the highlight based on offsets
+								if (activeHighlight) {
+									const newHighlights = highlights.filter((highlight) => {
+										// Remove the highlight if it matches the active highlight based on offsets
+										return !(highlight.start_offset === activeHighlight.start_offset &&
+											highlight.end_offset === activeHighlight.end_offset);
+									});
 
-								// Reformat selected Text
-
-								const newHighlights = highlights.filter((highlight, index) => {
-									// Remove the highlight if it matches the selected text
-									return highlight.raw_text !== selectedText || highlight.occurrence_index !== occurrenceIndex;
-								});
-
-								setHighlights(newHighlights);
-								setSelectedText("");
-								setTooltipPosition(null);
-								setIsAnnotating(false);
+									setHighlights(newHighlights);
+									setSelectedText("");
+									setTooltipPosition(null);
+									setIsAnnotating(false);
+								}
 							}}
 						>
 							<Minus size={16} />
@@ -168,21 +158,16 @@ function InlineAnnotationMenu({
 									// If using an activeHighlight, first get the matching one in the current set of highlights, then update it
 									if (activeHighlight) {
 										const updatedHighlights = highlights.map(highlight => {
-											if (highlight.occurrence_index === activeHighlight.occurrence_index) {
+											if (highlight.start_offset === activeHighlight.start_offset &&
+												highlight.end_offset === activeHighlight.end_offset) {
 												return { ...highlight, annotation: annotationText };
 											}
 											return highlight;
 										});
 										setHighlights(updatedHighlights);
 									} else {
-										setHighlights([
-											...highlights,
-											{
-												raw_text: selectedText,
-												annotation: annotationText,
-												occurrence_index: getOccurrenceIndexOfSelection(selectedText)
-											}
-										]);
+										// Use the new addHighlight function with annotation
+										addHighlight(selectedText, annotationText);
 									}
 									setAnnotationText("");
 									setSelectedText("");
@@ -210,7 +195,6 @@ function InlineAnnotationMenu({
 		</div>
 	)
 }
-
 
 
 export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
@@ -394,20 +378,6 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 		<div ref={containerRef} className="flex flex-col items-center gap-4 w-full h-[calc(100vh-100px)] overflow-y-auto" id="pdf-container">
 			{/* Toolbar */}
 			<div className="sticky top-0 z-10 flex items-center justify-between bg-white/80 dark:bg-white/10 backdrop-blur-sm p-2 rounded-none w-full border-b border-gray-300">
-				<Button
-					onClick={() => {
-						// Save highlights to local storage
-						loadHighlightsFromLocalStorage();
-					}}
-				>
-					Load Highlights
-				</Button>
-				<Button
-					onClick={() => {
-						clearHighlights();
-					}}>
-					Clear Highlights
-				</Button>
 				<div className="flex items-center gap-2 flex-grow max-w-md">
 					<Input
 						type="text"
@@ -535,21 +505,20 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 			</Document>
 
 			{/* Replace the fixed position div with a tooltip */}
-			{
-				tooltipPosition && (
-					<InlineAnnotationMenu
-						selectedText={selectedText}
-						tooltipPosition={tooltipPosition}
-						setSelectedText={setSelectedText}
-						setTooltipPosition={setTooltipPosition}
-						setIsAnnotating={setIsAnnotating}
-						highlights={highlights}
-						setHighlights={setHighlights}
-						isHighlightInteraction={isHighlightInteraction}
-						activeHighlight={activeHighlight}
-					/>
-				)
-			}
+			{tooltipPosition && (
+				<InlineAnnotationMenu
+					selectedText={selectedText}
+					tooltipPosition={tooltipPosition}
+					setSelectedText={setSelectedText}
+					setTooltipPosition={setTooltipPosition}
+					setIsAnnotating={setIsAnnotating}
+					highlights={highlights}
+					setHighlights={setHighlights}
+					isHighlightInteraction={isHighlightInteraction}
+					activeHighlight={activeHighlight}
+					addHighlight={addHighlight}
+				/>
+			)}
 		</div>
 	);
 }

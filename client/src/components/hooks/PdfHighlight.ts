@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { PaperHighlight } from '@/app/paper/[id]/page';
-import { getOccurrenceIndexOfSelection } from '../utils/PdfTextUtils';
+import { getSelectionOffsets } from '../utils/PdfTextUtils';
 import { addHighlightToNodes, findAllHighlightedPassages } from '../utils/PdfHighlightUtils';
 
 export function useHighlights() {
@@ -47,7 +47,8 @@ export function useHighlights() {
         const deduplicatedHighlights = highlights.filter((highlight, index, self) =>
             index === self.findIndex(h =>
                 h.raw_text === highlight.raw_text &&
-                h.occurrence_index === highlight.occurrence_index
+                h.start_offset === highlight.start_offset &&
+                h.end_offset === highlight.end_offset
             )
         );
         localStorage.setItem("highlights", JSON.stringify(deduplicatedHighlights));
@@ -61,8 +62,15 @@ export function useHighlights() {
                 const parsedHighlights = JSON.parse(storedHighlights);
                 console.log("Loaded highlights from local storage:", parsedHighlights);
 
+                // Check if stored highlights have the required fields
+                const validHighlights = parsedHighlights.filter(
+                    (h: any) => h.raw_text &&
+                        typeof h.start_offset === 'number' &&
+                        typeof h.end_offset === 'number'
+                );
+
                 clearHighlightsFromDOM();
-                setHighlights(parsedHighlights);
+                setHighlights(validHighlights);
             } catch (error) {
                 console.error("Error parsing highlights from local storage:", error);
             }
@@ -144,18 +152,25 @@ export function useHighlights() {
         return text;
     };
 
-    // Add a new highlight
     const addHighlight = (selectedText: string, annotation: string = "") => {
-        // Get which occurrence of this text this selection represents
-        const occurrenceIndex = getOccurrenceIndexOfSelection(selectedText);
+        // Get offsets from the current selection
+        const offsets = getSelectionOffsets();
 
-        // Add to highlights with occurrence information
+        console.log("offsets", offsets);
+
+        if (!offsets) {
+            console.error("Couldn't determine text offsets for selection");
+            return;
+        }
+
+        // Add to highlights with offset information
         setHighlights([
             ...highlights,
             {
                 raw_text: selectedText,
                 annotation,
-                occurrence_index: occurrenceIndex
+                start_offset: offsets.start,
+                end_offset: offsets.end
             }
         ]);
 

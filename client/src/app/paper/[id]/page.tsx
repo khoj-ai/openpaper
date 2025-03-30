@@ -59,7 +59,8 @@ interface ChatMessage {
 export interface PaperHighlight {
     raw_text: string;
     annotation: string;
-    occurrence_index: number;
+    start_offset: number;
+    end_offset: number;
 }
 
 const isDateValid = (dateString: string) => {
