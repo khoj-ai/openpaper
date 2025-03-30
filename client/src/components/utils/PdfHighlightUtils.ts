@@ -179,8 +179,14 @@ export function addHighlightToNodes(
 
     // Add annotation indicator if needed
     if (sourceHighlight.annotation && nodes.length > 0) {
-        const firstNode = nodes[0];
-        addAnnotationButton(firstNode as HTMLElement, sourceHighlight);
+        // Find the first node within the highlighted nodes. Since some of the nodes may be fragmented, we need to find the first one that's actually part of the highlight.
+        const firstNode = nodes.find(node => {
+            return node.classList.contains('border-blue-500');
+        });
+
+        if (firstNode) {
+            addAnnotationButton(firstNode as HTMLElement, sourceHighlight);
+        }
     }
 }
 
@@ -255,13 +261,13 @@ function addAnnotationButton(node: HTMLElement, sourceHighlight: PaperHighlight)
 
     // Create annotation indicator
     const indicator = document.createElement('div');
-    indicator.className = 'annotation-indicator absolute -top-2 -right-2 bg-yellow-300 rounded-full w-4 h-4';
+    indicator.className = 'annotation-indicator absolute -top-2 -right-2 bg-yellow-300 rounded-full w-4 h-4 z-10';
     indicator.title = sourceHighlight.annotation;
 
     // Position the node properly if it's not already
-    if (node.style.position !== 'relative' && node.style.position !== 'absolute') {
-        node.style.position = 'relative';
-    }
+    // if (node.style.position !== 'relative' && node.style.position !== 'absolute') {
+    //     node.style.position = 'relative';
+    // }
 
     node.appendChild(indicator);
 }

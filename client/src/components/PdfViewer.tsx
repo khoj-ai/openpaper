@@ -153,8 +153,6 @@ function InlineAnnotationMenu({
 							<Button
 								className="w-fit"
 								onClick={() => {
-									console.log("Adding annotation:", annotationText);
-									console.log("Selected text:", selectedText);
 									// If using an activeHighlight, first get the matching one in the current set of highlights, then update it
 									if (activeHighlight) {
 										const updatedHighlights = highlights.map(highlight => {
