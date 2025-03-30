@@ -152,9 +152,21 @@ export function useHighlights() {
         return text;
     };
 
-    const addHighlight = (selectedText: string, annotation: string = "") => {
+    const addHighlight = (
+        selectedText: string,
+        annotation: string = "",
+        startOffset: number | undefined,
+        endOffset: number | undefined) => {
         // Get offsets from the current selection
-        const offsets = getSelectionOffsets();
+        let offsets;
+        if (!startOffset || !endOffset) {
+            offsets = getSelectionOffsets();
+        } else {
+            offsets = {
+                start: startOffset,
+                end: endOffset
+            };
+        }
 
         console.log("offsets", offsets);
 

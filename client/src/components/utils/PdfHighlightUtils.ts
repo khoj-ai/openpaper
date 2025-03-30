@@ -93,8 +93,6 @@ export function addHighlightToNodes(
 ) {
     const { start_offset, end_offset } = sourceHighlight;
 
-    console.log("Adding highlight to nodes:", nodes.length, sourceHighlight.raw_text.substring(0, 30));
-
     // Get ALL text content layers (one per page)
     const textLayers = document.querySelectorAll('.react-pdf__Page__textContent');
     if (textLayers.length === 0) return;

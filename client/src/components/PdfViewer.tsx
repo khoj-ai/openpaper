@@ -18,6 +18,7 @@ import { usePdfSearch } from "./hooks/PdfSearch";
 import { usePdfNavigation } from "./hooks/PdfNavigation";
 import { usePdfLoader } from "./hooks/PdfLoader";
 import { useHighlights } from "./hooks/PdfHighlight";
+import { getSelectionOffsets } from "./utils/PdfTextUtils";
 
 interface PdfViewerProps {
 	pdfUrl: string;
@@ -45,7 +46,7 @@ function InlineAnnotationMenu({
 	setHighlights: (highlights: Array<PaperHighlight>) => void;
 	isHighlightInteraction: boolean;
 	activeHighlight: PaperHighlight | null;
-	addHighlight: (selectedText: string, annotation?: string) => void;
+	addHighlight: (selectedText: string, annotation?: string, startOffset?: number, endOffset?: number) => void;
 }) {
 
 	const localizeCommandToOS = (key: string) => {
@@ -59,8 +60,18 @@ function InlineAnnotationMenu({
 	}
 
 	const [annotationText, setAnnotationText] = useState<string>("");
+	const [offsets, setOffsets] = useState<{ start: number; end: number } | null>(null);
 
 	if (!tooltipPosition) return null;
+
+	useEffect(() => {
+		if (selectedText) {
+			const offsets = getSelectionOffsets();
+			if (offsets) {
+				setOffsets(offsets);
+			}
+		}
+	}, [selectedText]);
 
 	return (
 		<div
@@ -137,7 +148,6 @@ function InlineAnnotationMenu({
 							onMouseDown={(e) => e.preventDefault()} // Prevent text deselection
 							onClick={(e) => {
 								e.stopPropagation();
-								setIsAnnotating(true);
 							}}
 						>
 							Annotate
@@ -165,7 +175,7 @@ function InlineAnnotationMenu({
 										setHighlights(updatedHighlights);
 									} else {
 										// Use the new addHighlight function with annotation
-										addHighlight(selectedText, annotationText);
+										addHighlight(selectedText, annotationText, offsets?.start, offsets?.end);
 									}
 									setAnnotationText("");
 									setSelectedText("");
