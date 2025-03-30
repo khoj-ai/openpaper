@@ -35,7 +35,8 @@ function InlineAnnotationMenu({
 	setHighlights,
 	isHighlightInteraction,
 	activeHighlight,
-	addHighlight
+	addHighlight,
+	removeHighlight
 }: {
 	selectedText: string;
 	tooltipPosition: { x: number; y: number } | null;
@@ -47,6 +48,7 @@ function InlineAnnotationMenu({
 	isHighlightInteraction: boolean;
 	activeHighlight: PaperHighlight | null;
 	addHighlight: (selectedText: string, annotation?: string, startOffset?: number, endOffset?: number) => void;
+	removeHighlight: (highlight: PaperHighlight) => void;
 }) {
 
 	const localizeCommandToOS = (key: string) => {
@@ -123,13 +125,7 @@ function InlineAnnotationMenu({
 
 								// Remove the highlight based on offsets
 								if (activeHighlight) {
-									const newHighlights = highlights.filter((highlight) => {
-										// Remove the highlight if it matches the active highlight based on offsets
-										return !(highlight.start_offset === activeHighlight.start_offset &&
-											highlight.end_offset === activeHighlight.end_offset);
-									});
-
-									setHighlights(newHighlights);
+									removeHighlight(activeHighlight);
 									setSelectedText("");
 									setTooltipPosition(null);
 									setIsAnnotating(false);
@@ -211,7 +207,7 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 	const { numPages, allPagesLoaded, onDocumentLoadSuccess, handlePageLoadSuccess } = usePdfLoader();
 	const { scale, width, pagesRef, containerRef, goToPreviousPage, goToNextPage, zoomIn, zoomOut } = usePdfNavigation(numPages);
 	// Highlight functionality
-	const { highlights, setHighlights, selectedText, setSelectedText, tooltipPosition, setTooltipPosition, isAnnotating, setIsAnnotating, isHighlightInteraction, setIsHighlightInteraction, activeHighlight, setActiveHighlight, handleTextSelection, loadHighlightsFromLocalStorage, addHighlight } = useHighlights();
+	const { highlights, setHighlights, selectedText, setSelectedText, tooltipPosition, setTooltipPosition, isAnnotating, setIsAnnotating, isHighlightInteraction, setIsHighlightInteraction, activeHighlight, setActiveHighlight, handleTextSelection, loadHighlightsFromLocalStorage, addHighlight, removeHighlight } = useHighlights();
 
 
 	// Search functionality
@@ -525,6 +521,7 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 					isHighlightInteraction={isHighlightInteraction}
 					activeHighlight={activeHighlight}
 					addHighlight={addHighlight}
+					removeHighlight={removeHighlight}
 				/>
 			)}
 		</div>

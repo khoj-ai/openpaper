@@ -77,6 +77,14 @@ export function useHighlights() {
         }
     };
 
+    const removeHighlight = (highlight: PaperHighlight) => {
+        const updatedHighlights = highlights.filter(h => h !== highlight);
+        setHighlights(updatedHighlights);
+        saveHighlightsToLocalStorage(updatedHighlights);
+        clearHighlightsFromDOM();
+        loadHighlightsFromLocalStorage();
+    };
+
     // Clear highlights from DOM
     const clearHighlightsFromDOM = () => {
         const existingHighlights = document.querySelectorAll(
@@ -209,5 +217,6 @@ export function useHighlights() {
         loadHighlightsFromLocalStorage,
         clearHighlights,
         addHighlight,
+        removeHighlight
     };
 }
