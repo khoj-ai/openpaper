@@ -2,7 +2,7 @@ import json
 import logging
 import uuid
 from pathlib import Path
-from typing import Union
+from typing import List, Optional, Union
 
 from app.database.crud.message_crud import MessageCreate, message_crud
 from app.database.database import get_db
@@ -34,6 +34,7 @@ class ChatMessageRequest(BaseModel):
     paper_id: str
     conversation_id: str
     user_query: str
+    user_references: Optional[List[str]] = None
 
 
 @message_router.post("/chat")
@@ -54,6 +55,7 @@ async def chat_message_stream(
                     paper_id=request.paper_id,
                     conversation_id=request.conversation_id,
                     question=request.user_query,
+                    user_references=request.user_references,
                     db=db,
                 ):
                     # Parse the chunk as a dictionary
@@ -82,6 +84,7 @@ async def chat_message_stream(
                         conversation_id=uuid.UUID(request.conversation_id),
                         role="user",
                         content=request.user_query,
+                        references=request.user_references,
                     ),
                 )
 

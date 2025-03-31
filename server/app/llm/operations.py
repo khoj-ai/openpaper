@@ -2,7 +2,7 @@ import json
 import os
 import re
 import uuid
-from typing import Any, AsyncGenerator, Generator, Optional, Sequence, Union
+from typing import Any, AsyncGenerator, Generator, List, Optional, Sequence, Union
 
 from app.database.crud.document_crud import document_crud
 from app.database.crud.message_crud import message_crud
@@ -79,6 +79,45 @@ class Operations:
             "Please ensure the response contains proper JSON format."
         )
 
+    def convert_references_to_citations(
+        self, references: Optional[Sequence[str]]
+    ) -> str:
+        """
+        Convert user references to structured citations
+        """
+        if not references:
+            return ""
+
+        citations = []
+        for idx, ref in enumerate(references):
+            citations.append(
+                {
+                    "key": idx + 1,
+                    "reference": ref,
+                }
+            )
+
+        return self.format_citations(citations)
+
+    def format_citations(
+        self,
+        citations: list[dict],
+    ) -> str:
+        """
+        Format citations into a structured string
+        """
+        citation_format = "---EVIDENCE---\n"
+
+        citation_format = "\n".join(
+            [
+                f"@cite[{citation['key']}]\n{citation['reference']}"
+                for citation in citations
+            ]
+        )
+
+        citation_format += "\n---END-EVIDENCE---"
+        return citation_format
+
     def convert_chat_history_to_api_format(
         self,
         messages: list[Message],
@@ -88,10 +127,16 @@ class Operations:
         """
         api_format = []
         for message in messages:
+            references = self.format_citations(message.references["citations"]) if message.references else None  # type: ignore
+
+            f_message = (
+                f"{message.content}\n\n{references}" if references else message.content
+            )
+
             api_format.append(
                 Content(
                     role="user" if message.role == "user" else "model",
-                    parts=[{"text": message.content}],
+                    parts=[{"text": f_message}],
                 )
             )
         return api_format
@@ -156,6 +201,7 @@ class Operations:
         paper_id: str,
         conversation_id: str,
         question: str,
+        user_references: Optional[Sequence[str]] = None,
         file_path: Optional[str] = None,
         db: Session = Depends(get_db),
     ) -> AsyncGenerator[Union[str, dict], None]:
@@ -206,6 +252,12 @@ class Operations:
 
             return citations
 
+        user_citations = (
+            self.convert_references_to_citations(user_references)
+            if user_references
+            else None
+        )
+
         paper = document_crud.get(db, id=paper_id)
 
         if not paper:
@@ -240,7 +292,9 @@ class Operations:
             },
         )
 
-        formatted_prompt = ANSWER_PAPER_QUESTION_USER_MESSAGE.format(question=question)
+        formatted_prompt = ANSWER_PAPER_QUESTION_USER_MESSAGE.format(
+            question=f"{question}\n\n{user_citations}" if user_citations else question
+        )
 
         evidence_buffer: list[str] = []
         text_buffer: str = ""
@@ -306,3 +360,6 @@ class Operations:
                     to_yield = text_buffer[: -len(START_DELIMITER)]
                     yield {"type": "content", "content": to_yield}
                     text_buffer = text_buffer[-len(START_DELIMITER) :]
+
+        if text_buffer:
+            yield {"type": "content", "content": text_buffer}
