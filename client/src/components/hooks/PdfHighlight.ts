@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { PaperHighlight } from '@/app/paper/[id]/page';
 import { getSelectionOffsets } from '../utils/PdfTextUtils';
 import { addHighlightToNodes, findAllHighlightedPassages } from '../utils/PdfHighlightUtils';
+import { fetchFromApi } from '@/lib/api';
 
 export function useHighlights() {
     const [highlights, setHighlights] = useState<Array<PaperHighlight>>([]);
@@ -41,6 +42,19 @@ export function useHighlights() {
             setIsHighlightInteraction(false);
         }
     }, [selectedText]);
+
+    useEffect(() => {
+        // Scroll to the active highlight.
+        if (activeHighlight) {
+            const highlightElement = document.querySelector(
+                `.react-pdf__Page__textContent span[data-highlight-id="${activeHighlight.id}"]`
+            );
+
+            if (highlightElement) {
+                highlightElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+    }, [activeHighlight]);
 
     // Save highlights to local storage
     const saveHighlightsToLocalStorage = (highlights: Array<PaperHighlight>) => {
@@ -140,6 +154,73 @@ export function useHighlights() {
         }
     };
 
+    const sendHighlightToServer = async (highlight: PaperHighlight) => {
+        try {
+            const response = await fetchFromApi('/api/annotations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(highlight)
+            });
+
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+
+            const data = await response.json();
+            console.log('Highlight saved:', data);
+        } catch (error) {
+            console.error('Error sending highlight to server:', error);
+        }
+    }
+
+    const removeHighlightFromServer = async (highlight: PaperHighlight) => {
+        try {
+            const response = await fetchFromApi(`/api/annotations/${highlight.id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+
+            const data = await response.json();
+            console.log('Highlight removed from server:', data);
+        }
+        catch (error) {
+            console.error('Error removing highlight from server:', error);
+        }
+    }
+
+    const loadAllHighlightsFromServer = async () => {
+        try {
+            const response = await fetchFromApi('/api/annotations', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+
+            const data = await response.json();
+            console.log('Loaded highlights from server:', data);
+            setHighlights(data);
+        }
+        catch (error) {
+            console.error('Error loading highlights from server:', error);
+        }
+    }
+
     // Helper function to normalize selected text
     const normalizeSelectedText = (text: string): string => {
         // 1. Identify and preserve paragraph breaks
@@ -176,12 +257,12 @@ export function useHighlights() {
             };
         }
 
-        console.log("offsets", offsets);
-
         if (!offsets) {
             console.error("Couldn't determine text offsets for selection");
             return;
         }
+
+        const randomId = Math.random().toString(36).substring(2, 15);
 
         // Add to highlights with offset information
         setHighlights([
@@ -190,7 +271,8 @@ export function useHighlights() {
                 raw_text: selectedText,
                 annotation,
                 start_offset: offsets.start,
-                end_offset: offsets.end
+                end_offset: offsets.end,
+                id: randomId
             }
         ]);
 
@@ -217,6 +299,7 @@ export function useHighlights() {
         loadHighlightsFromLocalStorage,
         clearHighlights,
         addHighlight,
-        removeHighlight
+        removeHighlight,
+        loadAllHighlightsFromServer,
     };
 }

@@ -19,7 +19,7 @@ import {
     CollapsibleContent,
     CollapsibleTrigger
 } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronUp, Highlighter, NotebookText, MessageCircle, Focus } from 'lucide-react';
+import { ChevronDown, ChevronUp, Highlighter, NotebookText, MessageCircle, Focus, Minus, X } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import {
     Sidebar,
@@ -57,6 +57,7 @@ interface ChatMessage {
 }
 
 export interface PaperHighlight {
+    id: string;
     raw_text: string;
     annotation: string;
     start_offset: number;
@@ -300,6 +301,7 @@ export default function PaperView() {
     const [explicitSearchTerm, setExplicitSearchTerm] = useState<string | undefined>(undefined);
     const [paperNoteContent, setPaperNoteContent] = useState<string | undefined>(undefined);
     const [lastPaperNoteSaveTime, setLastPaperNoteSaveTime] = useState<number | null>(null);
+    const [userMessageReferences, setUserMessageReferences] = useState<string[]>([]);
 
     const [rightSideFunction, setRightSideFunction] = useState<string>('Chat');
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -580,13 +582,24 @@ export default function PaperView() {
         }, 2000);
     };
 
+    const transformReferencesToFormat = (references: string[]) => {
+        const citations = references.map((ref, index) => ({
+            key: `${index + 1}`,
+            reference: ref,
+        }));
+
+        return {
+            "citations": citations,
+        }
+    }
+
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
 
         if (!currentMessage.trim() || isStreaming) return;
 
         // Add user message to chat
-        const userMessage: ChatMessage = { role: 'user', content: currentMessage };
+        const userMessage: ChatMessage = { role: 'user', content: currentMessage , references: transformReferencesToFormat(userMessageReferences)};
         setMessages(prev => [...prev, userMessage]);
 
         // Clear input field
@@ -603,9 +616,12 @@ export default function PaperView() {
                 body: JSON.stringify({
                     user_query: userMessage.content,
                     conversation_id: conversationId,
-                    paper_id: id
+                    paper_id: id,
+                    user_references: userMessageReferences,
                 })
             });
+
+            setUserMessageReferences([]);
 
             const reader = stream.getReader();
             const decoder = new TextDecoder();
@@ -728,6 +744,7 @@ export default function PaperView() {
                             <PdfViewer
                                 pdfUrl={paperData.file_url}
                                 explicitSearchTerm={explicitSearchTerm}
+                                setUserMessageReferences={setUserMessageReferences}
                             />
                         </div>
                     )}
@@ -844,13 +861,46 @@ export default function PaperView() {
                                 )}
                                 <div ref={messagesEndRef} />
                             </div>
-                            <form onSubmit={handleSubmit} className="flex gap-2">
-                                <Input
-                                    type="text"
+                            <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+                                {
+                                    userMessageReferences.length > 0 && (
+                                        <div className='flex flex-row gap-2'>
+                                            {userMessageReferences.map((ref, index) => (
+                                                <div key={index} className="text-xs text-secondary-foreground flex bg-secondary p-2 rounded-lg">
+                                                    <p
+                                                        className='
+                                                        overflow-hidden
+                                                        text-ellipsis
+                                                        whitespace-normal
+                                                        max-w-[200px]
+                                                        text-secondary-foreground
+                                                        line-clamp-2
+                                                        '
+                                                        onClick={() =>
+                                                            setExplicitSearchTerm(ref)
+                                                        }
+                                                    >
+                                                        {ref}
+                                                    </p>
+                                                    <Button
+                                                        variant='ghost'
+                                                        className='h-auto w-fit p-0 !px-0'
+                                                        onClick={() =>
+                                                            setUserMessageReferences(prev => prev.filter((_, i) => i !== index))
+                                                        }
+                                                    >
+                                                        <X size={2} />
+                                                    </Button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )
+                                }
+                                <Textarea
                                     value={currentMessage}
                                     onChange={(e) => setCurrentMessage(e.target.value)}
                                     placeholder="Ask something about this paper..."
-                                    className="flex-1 border rounded-md"
+                                    className="flex-1 border rounded-md resize-none p-2"
                                     disabled={isStreaming}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter' && !e.shiftKey) {

@@ -8,232 +8,32 @@ import "react-pdf/dist/esm/Page/TextLayer.css";
 import "../app/globals.css";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, ArrowLeft, ArrowRight, X, Minus, Plus, Highlighter } from "lucide-react";
-import { CommandShortcut } from "@/components/ui/command";
-import { PaperHighlight } from "@/app/paper/[id]/page";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Textarea } from "@/components/ui/textarea";
+import { Search, ArrowLeft, ArrowRight, X, Minus, Plus } from "lucide-react";
 import { addHighlightToNodes, findAllHighlightedPassages } from "./utils/PdfHighlightUtils";
 import { usePdfSearch } from "./hooks/PdfSearch";
 import { usePdfNavigation } from "./hooks/PdfNavigation";
 import { usePdfLoader } from "./hooks/PdfLoader";
 import { useHighlights } from "./hooks/PdfHighlight";
-import { getSelectionOffsets } from "./utils/PdfTextUtils";
+import InlineAnnotationMenu from "./InlineAnnotationMenu";
 
 interface PdfViewerProps {
 	pdfUrl: string;
 	explicitSearchTerm?: string;
+	setUserMessageReferences: React.Dispatch<React.SetStateAction<string[]>>;
+
 }
 
-function InlineAnnotationMenu({
-	selectedText,
-	tooltipPosition,
-	setSelectedText,
-	setTooltipPosition,
-	setIsAnnotating,
-	highlights,
-	setHighlights,
-	isHighlightInteraction,
-	activeHighlight,
-	addHighlight,
-	removeHighlight
-}: {
-	selectedText: string;
-	tooltipPosition: { x: number; y: number } | null;
-	setSelectedText: (text: string) => void;
-	setTooltipPosition: (position: { x: number; y: number } | null) => void;
-	setIsAnnotating: (isAnnotating: boolean) => void;
-	highlights: Array<PaperHighlight>;
-	setHighlights: (highlights: Array<PaperHighlight>) => void;
-	isHighlightInteraction: boolean;
-	activeHighlight: PaperHighlight | null;
-	addHighlight: (selectedText: string, annotation?: string, startOffset?: number, endOffset?: number) => void;
-	removeHighlight: (highlight: PaperHighlight) => void;
-}) {
-
-	const localizeCommandToOS = (key: string) => {
-		// Check if the user is on macOS using userAgent
-		const isMac = /(Mac|iPhone|iPod|iPad)/i.test(navigator.userAgent);
-		if (isMac) {
-			return `⌘ ${key}`;
-		} else {
-			return `Ctrl ${key}`;
-		}
-	}
-
-	const [annotationText, setAnnotationText] = useState<string>("");
-	const [offsets, setOffsets] = useState<{ start: number; end: number } | null>(null);
-
-	if (!tooltipPosition) return null;
-
-	useEffect(() => {
-		if (selectedText) {
-			const offsets = getSelectionOffsets();
-			if (offsets) {
-				setOffsets(offsets);
-			}
-		}
-	}, [selectedText]);
-
-	return (
-		<div
-			className="fixed z-30 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-2 border border-gray-200 dark:border-gray-700"
-			style={{
-				left: `${Math.min(tooltipPosition.x, window.innerWidth - 200)}px`,
-				top: `${tooltipPosition.y + 20}px`, // Position slightly below the cursor
-			}}
-			onClick={(e) => e.stopPropagation()} // Stop click events from bubbling
-			onMouseDown={(e) => e.stopPropagation()} // Also prevent mousedown from bubbling
-		>
-			<div className="flex flex-col gap-2 text-sm">
-				<Button
-					variant={'ghost'}
-					onClick={() => {
-						navigator.clipboard.writeText(selectedText);
-						setSelectedText("");
-						setTooltipPosition(null);
-						setIsAnnotating(false);
-					}}
-				>
-					<CommandShortcut>
-						<span className="text-secondary-foreground">
-							{localizeCommandToOS('C')}
-						</span>
-					</CommandShortcut>
-				</Button>
-				<Button
-					className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-					onMouseDown={(e) => e.preventDefault()} // Prevent text deselection
-					onClick={(e) => {
-						e.stopPropagation();
-						console.log("Adding highlight:", selectedText);
-
-						// Use the new addHighlight function that uses offsets
-						addHighlight(selectedText, "");
-					}}
-				>
-					<Highlighter size={16} />
-					<span className="text-white">Highlight</span>
-				</Button>
-				{
-					isHighlightInteraction && (
-						<Button
-							variant={'ghost'}
-							onMouseDown={(e) => e.preventDefault()} // Prevent text deselection
-							onClick={(e) => {
-								e.stopPropagation();
-
-								// Remove the highlight based on offsets
-								if (activeHighlight) {
-									removeHighlight(activeHighlight);
-									setSelectedText("");
-									setTooltipPosition(null);
-									setIsAnnotating(false);
-								}
-							}}
-						>
-							<Minus size={16} />
-						</Button>
-					)
-				}
-				<Popover>
-					<PopoverTrigger
-						asChild>
-						<Button
-							variant={'ghost'}
-							onMouseDown={(e) => e.preventDefault()} // Prevent text deselection
-							onClick={(e) => {
-								e.stopPropagation();
-							}}
-						>
-							Annotate
-						</Button>
-					</PopoverTrigger>
-					<PopoverContent>
-						<div className="flex flex-col gap-2">
-							<Textarea
-								placeholder="Add a note..."
-								value={annotationText}
-								onChange={(e) => setAnnotationText(e.target.value)}
-							/>
-							<Button
-								className="w-fit"
-								onClick={() => {
-									// If using an activeHighlight, first get the matching one in the current set of highlights, then update it
-									if (activeHighlight) {
-										const updatedHighlights = highlights.map(highlight => {
-											if (highlight.start_offset === activeHighlight.start_offset &&
-												highlight.end_offset === activeHighlight.end_offset) {
-												return { ...highlight, annotation: annotationText };
-											}
-											return highlight;
-										});
-										setHighlights(updatedHighlights);
-									} else {
-										// Use the new addHighlight function with annotation
-										addHighlight(selectedText, annotationText, offsets?.start, offsets?.end);
-									}
-									setAnnotationText("");
-									setSelectedText("");
-									setTooltipPosition(null);
-									setIsAnnotating(false);
-								}}
-							>
-								Add Annotation
-							</Button>
-						</div>
-					</PopoverContent>
-				</Popover>
-
-				<Button
-					variant={'ghost'}
-					onClick={() => {
-						setSelectedText("");
-						setTooltipPosition(null);
-						setIsAnnotating(false);
-					}}
-				>
-					<X size={16} />
-				</Button>
-			</div>
-		</div>
-	)
-}
-
-
-export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
+export function PdfViewer({ pdfUrl, explicitSearchTerm, setUserMessageReferences }: PdfViewerProps) {
 	const [currentPage, setCurrentPage] = useState<number>(1);
 
 	const { numPages, allPagesLoaded, onDocumentLoadSuccess, handlePageLoadSuccess } = usePdfLoader();
 	const { scale, width, pagesRef, containerRef, goToPreviousPage, goToNextPage, zoomIn, zoomOut } = usePdfNavigation(numPages);
 	// Highlight functionality
-	const { highlights, setHighlights, selectedText, setSelectedText, tooltipPosition, setTooltipPosition, isAnnotating, setIsAnnotating, isHighlightInteraction, setIsHighlightInteraction, activeHighlight, setActiveHighlight, handleTextSelection, loadHighlightsFromLocalStorage, addHighlight, removeHighlight } = useHighlights();
+	const { highlights, setHighlights, selectedText, setSelectedText, tooltipPosition, setTooltipPosition, isAnnotating, setIsAnnotating, isHighlightInteraction, setIsHighlightInteraction, activeHighlight, setActiveHighlight, handleTextSelection, loadHighlightsFromLocalStorage, addHighlight, removeHighlight, loadAllHighlightsFromServer } = useHighlights();
 
 
 	// Search functionality
 	const { searchText, setSearchText, searchResults, currentMatch, notFound, performSearch, goToNextMatch, goToPreviousMatch, setSearchResults, setNotFound, setCurrentMatch } = usePdfSearch(explicitSearchTerm);
-
-	useEffect(() => {
-		const down = (e: KeyboardEvent) => {
-			// Only handle keyboard events if annotating is active
-			if (isAnnotating) {
-				if (e.key === "Escape") {
-					// Reset selected text and tooltip position on Escape
-					setSelectedText("");
-					setTooltipPosition(null);
-					setIsAnnotating(false);
-				}
-
-				if (e.key === 'c' && (e.ctrlKey || e.metaKey)) {
-					// Copy selected text to clipboard
-					navigator.clipboard.writeText(selectedText);
-				}
-			}
-		};
-
-		window.addEventListener("keydown", down);
-		return () => window.removeEventListener("keydown", down);
-	}, [isAnnotating, selectedText]);
 
 
 	// Add this new effect for handling outside clicks
@@ -320,7 +120,9 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 					clearInterval(checkInterval);
 
 					loadHighlightsFromLocalStorage();
+					loadAllHighlightsFromServer();
 
+					// Highlighting logic
 					// Apply highlights after loading
 					setTimeout(() => {
 						if (highlights.length > 0) {
@@ -522,6 +324,7 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm }: PdfViewerProps) {
 					activeHighlight={activeHighlight}
 					addHighlight={addHighlight}
 					removeHighlight={removeHighlight}
+					setUserMessageReferences={setUserMessageReferences}
 				/>
 			)}
 		</div>

@@ -77,6 +77,10 @@ async def chat_message_stream(
                 # Save the complete message to the database
                 full_content = "".join(content_chunks)
 
+                formatted_references = llm_operations.convert_references_to_dict(
+                    references=request.user_references
+                )
+
                 # Save user message
                 message_crud.create(
                     db,
@@ -84,7 +88,7 @@ async def chat_message_stream(
                         conversation_id=uuid.UUID(request.conversation_id),
                         role="user",
                         content=request.user_query,
-                        references=request.user_references,
+                        references=formatted_references,
                     ),
                 )
 

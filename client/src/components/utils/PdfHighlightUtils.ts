@@ -186,6 +186,12 @@ export function addHighlightToNodes(
             addAnnotationButton(firstNode as HTMLElement, sourceHighlight);
         }
     }
+
+    // Add a data-id property to the node for easy identification. Pick either the first node or the only node.
+    const node = nodes[0];
+    if (node) {
+        node.setAttribute('data-highlight-id', sourceHighlight.id);
+    }
 }
 
 function applyHighlightToNode(

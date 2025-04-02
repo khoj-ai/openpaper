@@ -79,6 +79,22 @@ class Operations:
             "Please ensure the response contains proper JSON format."
         )
 
+    def convert_references_to_dict(self, references: Sequence[str]) -> dict:
+        """
+        Convert user references to structured citations
+        """
+        citations = []
+        for idx, ref in enumerate(references):
+            citations.append(
+                {
+                    "key": idx + 1,
+                    "reference": ref,
+                }
+            )
+        return {
+            "citations": citations,
+        }
+
     def convert_references_to_citations(
         self, references: Optional[Sequence[str]]
     ) -> str:
@@ -88,16 +104,9 @@ class Operations:
         if not references:
             return ""
 
-        citations = []
-        for idx, ref in enumerate(references):
-            citations.append(
-                {
-                    "key": idx + 1,
-                    "reference": ref,
-                }
-            )
-
-        return self.format_citations(citations)
+        return self.format_citations(
+            self.convert_references_to_dict(references)["citations"]
+        )
 
     def format_citations(
         self,
@@ -108,7 +117,7 @@ class Operations:
         """
         citation_format = "---EVIDENCE---\n"
 
-        citation_format = "\n".join(
+        citation_format += "\n".join(
             [
                 f"@cite[{citation['key']}]\n{citation['reference']}"
                 for citation in citations
