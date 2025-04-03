@@ -37,7 +37,7 @@ Follow these strict formatting rules:
    - Have a unique citation number `n` for each piece of evidence
    - Include only relevant quotes that directly support your claims
 
-4. If you cannot find evidence in the paper, respond only with "I don't know."
+4. If you cannot find evidence in the paper, or you're not sure about the answer, let the user know you're uncertain. Provide your best guess, but do not fabricate information.
 
 5. Citations should always be numbered sequentially, starting from 1.
 

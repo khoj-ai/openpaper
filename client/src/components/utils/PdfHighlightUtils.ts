@@ -1,4 +1,4 @@
-import { PaperHighlight } from "@/app/paper/[id]/page";
+import { PaperHighlight, PaperHighlightAnnotation } from "@/app/paper/[id]/page";
 
 export interface HighlightHandlers {
     setIsHighlightInteraction: (value: boolean) => void;
@@ -175,21 +175,9 @@ export function addHighlightToNodes(
         }
     }
 
-    // Add annotation indicator if needed
-    if (sourceHighlight.annotation && nodes.length > 0) {
-        // Find the first node within the highlighted nodes. Since some of the nodes may be fragmented, we need to find the first one that's actually part of the highlight.
-        const firstNode = nodes.find(node => {
-            return node.classList.contains('border-blue-500');
-        });
-
-        if (firstNode) {
-            addAnnotationButton(firstNode as HTMLElement, sourceHighlight);
-        }
-    }
-
     // Add a data-id property to the node for easy identification. Pick either the first node or the only node.
     const node = nodes[0];
-    if (node) {
+    if (node && sourceHighlight.id) {
         node.setAttribute('data-highlight-id', sourceHighlight.id);
     }
 }
@@ -256,22 +244,4 @@ function createHighlightedTextFragments(
 
     // Replace the original text node with our fragment
     node.replaceChild(fragment, textNode);
-}
-
-function addAnnotationButton(node: HTMLElement, sourceHighlight: PaperHighlight) {
-    // Check if an annotation indicator already exists
-    const existingIndicator = node.querySelector('.annotation-indicator');
-    if (existingIndicator) return;
-
-    // Create annotation indicator
-    const indicator = document.createElement('div');
-    indicator.className = 'annotation-indicator absolute -top-2 -right-2 bg-yellow-300 rounded-full w-4 h-4 z-10';
-    indicator.title = sourceHighlight.annotation;
-
-    // Position the node properly if it's not already
-    // if (node.style.position !== 'relative' && node.style.position !== 'absolute') {
-    //     node.style.position = 'relative';
-    // }
-
-    node.appendChild(indicator);
 }

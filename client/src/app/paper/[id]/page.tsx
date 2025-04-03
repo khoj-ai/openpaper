@@ -2,7 +2,6 @@
 
 import { PdfViewer } from '@/components/PdfViewer';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
 import { useParams } from 'next/navigation';
 import { useState, useEffect, FormEvent, Fragment, Children, useRef, createElement, HTMLAttributes, ReactNode } from 'react';
@@ -19,7 +18,7 @@ import {
     CollapsibleContent,
     CollapsibleTrigger
 } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronUp, Highlighter, NotebookText, MessageCircle, Focus, Minus, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Highlighter, NotebookText, MessageCircle, Focus, X } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import {
     Sidebar,
@@ -31,6 +30,9 @@ import {
     SidebarMenuItem,
     SidebarProvider,
 } from "@/components/ui/sidebar";
+import { AnnotationsView } from '@/components/AnnotationsView';
+import { useHighlights } from '@/components/hooks/PdfHighlight';
+import { useAnnotations } from '@/components/hooks/PdfAnnotation';
 
 interface PaperData {
     filename: string;
@@ -57,11 +59,18 @@ interface ChatMessage {
 }
 
 export interface PaperHighlight {
-    id: string;
+    id?: string;
     raw_text: string;
-    annotation: string;
     start_offset: number;
     end_offset: number;
+}
+
+export interface PaperHighlightAnnotation {
+    id: string;
+    highlight_id: string;
+    document_id: string;
+    content: string;
+    created_at: string;
 }
 
 const isDateValid = (dateString: string) => {
@@ -291,6 +300,37 @@ export default function PaperView() {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isLoadingMoreMessages, setIsLoadingMoreMessages] = useState(false);
     const [hasMoreMessages, setHasMoreMessages] = useState(true);
+    const {
+        highlights,
+        setHighlights,
+        selectedText,
+        setSelectedText,
+        tooltipPosition,
+        setTooltipPosition,
+        isAnnotating,
+        setIsAnnotating,
+        isHighlightInteraction,
+        setIsHighlightInteraction,
+        activeHighlight,
+        setActiveHighlight,
+        handleTextSelection,
+        clearHighlights,
+        addHighlight,
+        removeHighlight,
+        loadHighlights
+    } = useHighlights(id);
+
+    const {
+        annotations,
+        setAnnotations,
+        addAnnotation,
+        removeAnnotation,
+        updateAnnotation,
+        loadAnnotationsFromServer,
+        getAnnotationsForHighlight,
+        renderAnnotations,
+    } = useAnnotations(id);
+
     const messagesContainerRef = useRef<HTMLDivElement>(null);
     const [currentMessage, setCurrentMessage] = useState('');
     const [isStreaming, setIsStreaming] = useState(false);
@@ -334,6 +374,14 @@ export default function PaperView() {
         // Clear the highlight after a few seconds
         setTimeout(() => setActiveCitationKey(null), 3000);
     };
+
+    const handleHighlightClick = (highlight: PaperHighlight) => {
+        setActiveHighlight(highlight);
+    };
+
+    useEffect(() => {
+        setRightSideFunction('Chat');
+    }, [userMessageReferences]);
 
     // Clear the paper note timeout on component unmount
     useEffect(() => {
@@ -459,9 +507,14 @@ export default function PaperView() {
                     id: msg.id,
                     references: msg.references || {}
                 }));
+
                 if (fetchedMessages.length === 0) {
                     setHasMoreMessages(false);
                     return;
+                }
+
+                if (messages.length === 0) {
+                    scrollToBottom();
                 }
 
                 setMessages(prev => [...fetchedMessages, ...prev]);
@@ -599,7 +652,7 @@ export default function PaperView() {
         if (!currentMessage.trim() || isStreaming) return;
 
         // Add user message to chat
-        const userMessage: ChatMessage = { role: 'user', content: currentMessage , references: transformReferencesToFormat(userMessageReferences)};
+        const userMessage: ChatMessage = { role: 'user', content: currentMessage, references: transformReferencesToFormat(userMessageReferences) };
         setMessages(prev => [...prev, userMessage]);
 
         // Clear input field
@@ -745,6 +798,24 @@ export default function PaperView() {
                                 pdfUrl={paperData.file_url}
                                 explicitSearchTerm={explicitSearchTerm}
                                 setUserMessageReferences={setUserMessageReferences}
+                                setSelectedText={setSelectedText}
+                                setTooltipPosition={setTooltipPosition}
+                                setIsAnnotating={setIsAnnotating}
+                                setIsHighlightInteraction={setIsHighlightInteraction}
+                                isAnnotating={isAnnotating}
+                                isHighlightInteraction={isHighlightInteraction}
+                                highlights={highlights}
+                                setHighlights={setHighlights}
+                                selectedText={selectedText}
+                                tooltipPosition={tooltipPosition}
+                                setActiveHighlight={setActiveHighlight}
+                                activeHighlight={activeHighlight}
+                                addHighlight={addHighlight}
+                                loadHighlights={loadHighlights}
+                                removeHighlight={removeHighlight}
+                                handleTextSelection={handleTextSelection}
+                                renderAnnotations={renderAnnotations}
+                                annotations={annotations}
                             />
                         </div>
                     )}
@@ -769,6 +840,21 @@ export default function PaperView() {
                                         Last saved: {new Date(lastPaperNoteSaveTime).toLocaleTimeString()}
                                     </div>
                                 )}
+                        </div>
+                    )
+                }
+                {
+                    rightSideFunction === 'Annotations' && (
+                        <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto">
+                            <AnnotationsView
+                                annotations={annotations}
+                                highlights={highlights}
+                                onHighlightClick={handleHighlightClick}
+                                addAnnotation={addAnnotation}
+                                activeHighlight={activeHighlight}
+                                updateAnnotation={updateAnnotation}
+                                removeAnnotation={removeAnnotation}
+                            />
                         </div>
                     )
                 }

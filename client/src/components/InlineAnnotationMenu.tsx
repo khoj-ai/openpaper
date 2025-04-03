@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { CommandShortcut } from "./ui/command";
 import { Highlighter, Minus, Plus, X } from "lucide-react";
-import { Popover, PopoverContent, PopoverTrigger } from "@radix-ui/react-popover";
-import { Textarea } from "./ui/textarea";
 
 interface InlineAnnotationMenuProps {
     selectedText: string;
@@ -17,7 +15,7 @@ interface InlineAnnotationMenuProps {
     setHighlights: (highlights: Array<PaperHighlight>) => void;
     isHighlightInteraction: boolean;
     activeHighlight: PaperHighlight | null;
-    addHighlight: (selectedText: string, annotation?: string, startOffset?: number, endOffset?: number) => void;
+    addHighlight: (selectedText: string, startOffset?: number, endOffset?: number) => void;
     removeHighlight: (highlight: PaperHighlight) => void;
     setUserMessageReferences: React.Dispatch<React.SetStateAction<string[]>>;
 }
@@ -72,17 +70,19 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
 
     return (
         <div
-            className="fixed z-30 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+            className="fixed z-30 bg-background shadow-lg rounded-lg p-3 border border-border w-[200px]"
             style={{
-                left: `${Math.min(tooltipPosition.x, window.innerWidth - 200)}px`,
-                top: `${tooltipPosition.y + 20}px`, // Position slightly below the cursor
+                left: `${Math.min(tooltipPosition.x, window.innerWidth - 220)}px`,
+                top: `${tooltipPosition.y + 20}px`,
             }}
-            onClick={(e) => e.stopPropagation()} // Stop click events from bubbling
-            onMouseDown={(e) => e.stopPropagation()} // Also prevent mousedown from bubbling
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
         >
-            <div className="flex flex-col gap-2 text-sm">
+            <div className="flex flex-col gap-1.5">
+                {/* Copy Button */}
                 <Button
-                    variant={'ghost'}
+                    variant="ghost"
+                    className="w-full justify-between text-sm font-normal h-9"
                     onClick={() => {
                         navigator.clipboard.writeText(selectedText);
                         setSelectedText("");
@@ -90,131 +90,88 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                         setIsAnnotating(false);
                     }}
                 >
-                    <CommandShortcut>
-                        <span className="text-secondary-foreground">
-                            {localizeCommandToOS('C')}
-                        </span>
+                    Copy
+                    <CommandShortcut className="text-muted-foreground">
+                        {localizeCommandToOS('C')}
                     </CommandShortcut>
                 </Button>
+
+                {/* Highlight Button */}
                 <Button
-                    className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-                    onMouseDown={(e) => e.preventDefault()} // Prevent text deselection
+                    variant="default"
+                    className="w-full justify-start gap-2 text-sm h-9"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={(e) => {
                         e.stopPropagation();
-                        console.log("Adding highlight:", selectedText);
-
-                        // Use the new addHighlight function that uses offsets
-                        addHighlight(selectedText, "");
+                        addHighlight(selectedText, offsets?.start, offsets?.end);
                     }}
                 >
-                    <Highlighter size={16} />
-                    <span className="text-white">Highlight</span>
+                    <Highlighter size={14} />
+                    Highlight
                 </Button>
-                {
-                    isHighlightInteraction && (
-                        <Button
-                            variant={'ghost'}
-                            onMouseDown={(e) => e.preventDefault()} // Prevent text deselection
-                            onClick={(e) => {
-                                e.stopPropagation();
 
-                                // Remove the highlight based on offsets
-                                if (activeHighlight) {
-                                    removeHighlight(activeHighlight);
-                                    setSelectedText("");
-                                    setTooltipPosition(null);
-                                    setIsAnnotating(false);
-                                }
-                            }}
-                        >
-                            <Minus size={16} />
-                        </Button>
-                    )
-                }
+                {/* Remove Highlight Button - Only show when interacting with highlight */}
+                {isHighlightInteraction && (
+                    <Button
+                        variant="destructive"
+                        className="w-full justify-start gap-2 text-sm h-9"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (activeHighlight) {
+                                removeHighlight(activeHighlight);
+                                setSelectedText("");
+                                setTooltipPosition(null);
+                                setIsAnnotating(false);
+                            }
+                        }}
+                    >
+                        <Minus size={14} />
+                        Remove Highlight
+                    </Button>
+                )}
+
+                {/* Add to Chat Button */}
                 <Button
-                    variant={'ghost'}
-                    onMouseDown={(e) => e.preventDefault()} // Prevent text deselection
+                    variant="ghost"
+                    className="w-full justify-between text-sm font-normal h-9"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={(e) => {
-                        setUserMessageReferences((prev: string[]) => {
-                            const newReferences = [...prev, selectedText];
-                            return Array.from(new Set(newReferences)); // Remove duplicates
-                        });
+                        setUserMessageReferences(prev => Array.from(new Set([...prev, selectedText])));
                         setSelectedText("");
                         setTooltipPosition(null);
                         setIsAnnotating(false);
                         e.stopPropagation();
                     }}
                 >
-                    <span>Add to Chat</span>
-                    <Plus size={16} />
-                    <CommandShortcut>
-                        <span className="text-secondary-foreground">
-                            {localizeCommandToOS('A')}
-                        </span>
+                    <div className="flex items-center gap-2">
+                        <Plus size={14} />
+                        Add to Chat
+                    </div>
+                    <CommandShortcut className="text-muted-foreground">
+                        {localizeCommandToOS('A')}
                     </CommandShortcut>
                 </Button>
-                <Popover>
-                    <PopoverTrigger
-                        asChild>
-                        <Button
-                            variant={'ghost'}
-                            onMouseDown={(e) => e.preventDefault()} // Prevent text deselection
-                            onClick={(e) => {
-                                e.stopPropagation();
-                            }}
-                        >
-                            Annotate
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                        className="p-2 bg-background"
-                    >
-                        <div className="flex flex-col gap-2">
-                            <Textarea
-                                placeholder="Add a note..."
-                                value={annotationText}
-                                onChange={(e) => setAnnotationText(e.target.value)}
-                            />
-                            <Button
-                                className="w-fit"
-                                onClick={() => {
-                                    // If using an activeHighlight, first get the matching one in the current set of highlights, then update it
-                                    if (activeHighlight) {
-                                        const updatedHighlights = highlights.map(highlight => {
-                                            if (highlight.start_offset === activeHighlight.start_offset &&
-                                                highlight.end_offset === activeHighlight.end_offset) {
-                                                return { ...highlight, annotation: annotationText };
-                                            }
-                                            return highlight;
-                                        });
-                                        setHighlights(updatedHighlights);
-                                    } else {
-                                        // Use the new addHighlight function with annotation
-                                        addHighlight(selectedText, annotationText, offsets?.start, offsets?.end);
-                                    }
-                                    setAnnotationText("");
-                                    setSelectedText("");
-                                    setTooltipPosition(null);
-                                    setIsAnnotating(false);
-                                }}
-                            >
-                                Add Annotation
-                            </Button>
-                        </div>
-                    </PopoverContent>
-                </Popover>
 
+                {/* Close Button */}
                 <Button
-                    variant={'ghost'}
+                    variant="ghost"
+                    className="w-full justify-start gap-2 text-sm h-9"
                     onClick={() => {
                         setSelectedText("");
                         setTooltipPosition(null);
                         setIsAnnotating(false);
                     }}
                 >
-                    <X size={16} />
+                    <div className="flex items-center gap-2">
+                        <X size={14} />
+                        Close
+                    </div>
+                    <CommandShortcut className="text-muted-foreground">
+                        Esc
+                    </CommandShortcut>
                 </Button>
             </div>
         </div>
-    )
+    );
 }

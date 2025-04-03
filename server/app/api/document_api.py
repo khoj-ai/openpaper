@@ -191,9 +191,6 @@ async def get_mru_paper_conversation(document_id: str, db: Session = Depends(get
         latest_conversation.to_dict()
     )  # Assuming to_dict() method exists
 
-    # Explicitly add ID to the response
-    conversation_data["id"] = str(latest_conversation.id)
-
     # Return the conversation data
     return JSONResponse(status_code=200, content=conversation_data)
 

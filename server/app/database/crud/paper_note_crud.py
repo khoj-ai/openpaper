@@ -2,7 +2,6 @@ from typing import Optional
 from uuid import UUID
 
 from app.database.crud.base_crud import CRUDBase
-from app.database.crud.document_crud import document_crud
 from app.database.models import PaperNote
 from pydantic import BaseModel
 from sqlalchemy.orm import Session

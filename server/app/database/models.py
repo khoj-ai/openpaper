@@ -30,7 +30,6 @@ class Base(DeclarativeBase):
         return {
             column.name: _to_json_friendly(getattr(self, column.name))
             for column in self.__table__.columns
-            if column.name != "id"
         }
 
 
@@ -97,3 +96,28 @@ class PaperNote(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     document = relationship("Document", back_populates="paper_notes")
+
+
+class Highlight(Base):
+    __tablename__ = "highlights"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    document_id = Column(
+        UUID(as_uuid=True), ForeignKey("documents.id"), nullable=False
+    )  # type: ignore
+    raw_text = Column(Text, nullable=False)
+    start_offset = Column(Integer, nullable=False)
+    end_offset = Column(Integer, nullable=False)
+
+
+class Annotation(Base):
+    __tablename__ = "annotations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    highlight_id = Column(
+        UUID(as_uuid=True), ForeignKey("highlights.id"), nullable=False
+    )  # type: ignore
+    document_id = Column(
+        UUID(as_uuid=True), ForeignKey("documents.id"), nullable=False
+    )  # type: ignore
+    content = Column(Text, nullable=False)

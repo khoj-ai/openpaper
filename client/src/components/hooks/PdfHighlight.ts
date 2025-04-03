@@ -4,13 +4,15 @@ import { getSelectionOffsets } from '../utils/PdfTextUtils';
 import { addHighlightToNodes, findAllHighlightedPassages } from '../utils/PdfHighlightUtils';
 import { fetchFromApi } from '@/lib/api';
 
-export function useHighlights() {
+export function useHighlights(documentId: string) {
     const [highlights, setHighlights] = useState<Array<PaperHighlight>>([]);
     const [selectedText, setSelectedText] = useState<string>("");
     const [tooltipPosition, setTooltipPosition] = useState<{ x: number, y: number } | null>(null);
     const [isAnnotating, setIsAnnotating] = useState(false);
     const [isHighlightInteraction, setIsHighlightInteraction] = useState(false);
     const [activeHighlight, setActiveHighlight] = useState<PaperHighlight | null>(null);
+
+    const highlightsStorageName = `highlights-${documentId}`;
 
     // Apply highlights whenever they change
     useEffect(() => {
@@ -28,8 +30,6 @@ export function useHighlights() {
             for (const match of allMatches) {
                 addHighlightToNodes(match.nodes, match.sourceHighlight, handlers);
             }
-
-            saveHighlightsToLocalStorage(highlights);
         } else {
             // Clear all highlights if none are present
             clearHighlightsFromDOM();
@@ -44,6 +44,10 @@ export function useHighlights() {
     }, [selectedText]);
 
     useEffect(() => {
+        loadHighlights();
+    }, []);
+
+    useEffect(() => {
         // Scroll to the active highlight.
         if (activeHighlight) {
             const highlightElement = document.querySelector(
@@ -56,47 +60,8 @@ export function useHighlights() {
         }
     }, [activeHighlight]);
 
-    // Save highlights to local storage
-    const saveHighlightsToLocalStorage = (highlights: Array<PaperHighlight>) => {
-        const deduplicatedHighlights = highlights.filter((highlight, index, self) =>
-            index === self.findIndex(h =>
-                h.raw_text === highlight.raw_text &&
-                h.start_offset === highlight.start_offset &&
-                h.end_offset === highlight.end_offset
-            )
-        );
-        localStorage.setItem("highlights", JSON.stringify(deduplicatedHighlights));
-    };
-
-    // Load highlights from local storage
-    const loadHighlightsFromLocalStorage = () => {
-        const storedHighlights = localStorage.getItem("highlights");
-        if (storedHighlights) {
-            try {
-                const parsedHighlights: PaperHighlight[] = JSON.parse(storedHighlights);
-                console.log("Loaded highlights from local storage:", parsedHighlights);
-
-                // Check if stored highlights have the required fields
-                const validHighlights = parsedHighlights.filter(
-                    (h: PaperHighlight) => h.raw_text &&
-                        typeof h.start_offset === 'number' &&
-                        typeof h.end_offset === 'number'
-                );
-
-                clearHighlightsFromDOM();
-                setHighlights(validHighlights);
-            } catch (error) {
-                console.error("Error parsing highlights from local storage:", error);
-            }
-        }
-    };
-
     const removeHighlight = (highlight: PaperHighlight) => {
-        const updatedHighlights = highlights.filter(h => h !== highlight);
-        setHighlights(updatedHighlights);
-        saveHighlightsToLocalStorage(updatedHighlights);
-        clearHighlightsFromDOM();
-        loadHighlightsFromLocalStorage();
+        removeHighlightFromServer(highlight);
     };
 
     // Clear highlights from DOM
@@ -118,7 +83,7 @@ export function useHighlights() {
 
     // Clear all highlights
     const clearHighlights = () => {
-        localStorage.removeItem("highlights");
+        localStorage.removeItem(highlightsStorageName);
         setHighlights([]);
     };
 
@@ -155,22 +120,33 @@ export function useHighlights() {
     };
 
     const sendHighlightToServer = async (highlight: PaperHighlight) => {
+        const isDuplicate = highlights.some(h =>
+            h.raw_text === highlight.raw_text &&
+            h.start_offset === highlight.start_offset &&
+            h.end_offset === highlight.end_offset
+        );
+        // Check if the highlight already exists in the local highlights
+        if (isDuplicate) {
+            console.log('Duplicate highlight, not sending to server');
+            return;
+        }
+
+        const payload = {
+            ...highlight,
+            document_id: documentId
+        }
+
         try {
-            const response = await fetchFromApi('/api/annotations', {
+            const data = await fetchFromApi(`/api/highlight`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json'
                 },
-                body: JSON.stringify(highlight)
+                body: JSON.stringify(payload)
             });
-
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-
-            const data = await response.json();
             console.log('Highlight saved:', data);
+            return data;
         } catch (error) {
             console.error('Error sending highlight to server:', error);
         }
@@ -178,7 +154,7 @@ export function useHighlights() {
 
     const removeHighlightFromServer = async (highlight: PaperHighlight) => {
         try {
-            const response = await fetchFromApi(`/api/annotations/${highlight.id}`, {
+            const data = await fetchFromApi(`/api/highlight/${highlight.id}`, {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json',
@@ -186,11 +162,11 @@ export function useHighlights() {
                 }
             });
 
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
+            const updatedHighlights = highlights.filter(h => h.id !== highlight.id);
+            setHighlights(updatedHighlights);
+            clearHighlightsFromDOM();
+            loadHighlights();
 
-            const data = await response.json();
             console.log('Highlight removed from server:', data);
         }
         catch (error) {
@@ -198,9 +174,9 @@ export function useHighlights() {
         }
     }
 
-    const loadAllHighlightsFromServer = async () => {
+    const loadHighlights = async () => {
         try {
-            const response = await fetchFromApi('/api/annotations', {
+            const data: PaperHighlight[] = await fetchFromApi(`/api/highlight/${documentId}`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -208,11 +184,25 @@ export function useHighlights() {
                 }
             });
 
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
+            // Check if highlights have the required fields
+            const validHighlights: PaperHighlight[] = data.filter(
+                (h: PaperHighlight) => h.raw_text &&
+                    typeof h.start_offset === 'number' &&
+                    typeof h.end_offset === 'number'
+            );
 
-            const data = await response.json();
+            const deduplicatedHighlights = validHighlights.filter((highlight, index, self) =>
+                index === self.findIndex(h =>
+                    h.raw_text === highlight.raw_text &&
+                    h.start_offset === highlight.start_offset &&
+                    h.end_offset === highlight.end_offset
+                )
+            );
+
+
+            clearHighlightsFromDOM();
+            setHighlights(deduplicatedHighlights);
+
             console.log('Loaded highlights from server:', data);
             setHighlights(data);
         }
@@ -241,9 +231,8 @@ export function useHighlights() {
         return text;
     };
 
-    const addHighlight = (
+    const addHighlight = async (
         selectedText: string,
-        annotation: string = "",
         startOffset: number | undefined,
         endOffset: number | undefined) => {
         // Get offsets from the current selection
@@ -262,19 +251,20 @@ export function useHighlights() {
             return;
         }
 
-        const randomId = Math.random().toString(36).substring(2, 15);
-
-        // Add to highlights with offset information
-        setHighlights([
-            ...highlights,
-            {
+        try {
+            const newHighlight = await sendHighlightToServer({
                 raw_text: selectedText,
-                annotation,
                 start_offset: offsets.start,
                 end_offset: offsets.end,
-                id: randomId
-            }
-        ]);
+            });
+
+            const updatedHighlights = [...highlights, newHighlight];
+
+
+            setHighlights(updatedHighlights);
+        } catch (error) {
+            console.error("Error adding highlight:", error);
+        }
 
         // Reset states
         setSelectedText("");
@@ -296,10 +286,9 @@ export function useHighlights() {
         activeHighlight,
         setActiveHighlight,
         handleTextSelection,
-        loadHighlightsFromLocalStorage,
         clearHighlights,
         addHighlight,
         removeHighlight,
-        loadAllHighlightsFromServer,
+        loadHighlights,
     };
 }

@@ -13,24 +13,62 @@ import { addHighlightToNodes, findAllHighlightedPassages } from "./utils/PdfHigh
 import { usePdfSearch } from "./hooks/PdfSearch";
 import { usePdfNavigation } from "./hooks/PdfNavigation";
 import { usePdfLoader } from "./hooks/PdfLoader";
-import { useHighlights } from "./hooks/PdfHighlight";
 import InlineAnnotationMenu from "./InlineAnnotationMenu";
+import { PaperHighlight, PaperHighlightAnnotation } from "@/app/paper/[id]/page";
 
 interface PdfViewerProps {
 	pdfUrl: string;
 	explicitSearchTerm?: string;
 	setUserMessageReferences: React.Dispatch<React.SetStateAction<string[]>>;
-
+	highlights: PaperHighlight[];
+	setHighlights: (highlights: PaperHighlight[]) => void;
+	selectedText: string;
+	setSelectedText: (text: string) => void;
+	tooltipPosition: { x: number; y: number } | null;
+	setTooltipPosition: (position: { x: number; y: number } | null) => void;
+	isAnnotating: boolean;
+	setIsAnnotating: (isAnnotating: boolean) => void;
+	isHighlightInteraction: boolean;
+	setIsHighlightInteraction: (isHighlightInteraction: boolean) => void;
+	activeHighlight: PaperHighlight | null;
+	setActiveHighlight: (highlight: PaperHighlight | null) => void;
+	addHighlight: (selectedText: string, startOffset?: number, endOffset?: number) => void;
+	removeHighlight: (highlight: PaperHighlight) => void;
+	loadHighlights: () => Promise<void>;
+	handleTextSelection: (e: React.MouseEvent) => void;
+	renderAnnotations: (highlights: PaperHighlightAnnotation[]) => void;
+	annotations: PaperHighlightAnnotation[];
 }
 
-export function PdfViewer({ pdfUrl, explicitSearchTerm, setUserMessageReferences }: PdfViewerProps) {
+export function PdfViewer(props: PdfViewerProps) {
+	const {
+		pdfUrl,
+		explicitSearchTerm,
+		setUserMessageReferences,
+		highlights,
+		setHighlights,
+		selectedText,
+		setSelectedText,
+		tooltipPosition,
+		setTooltipPosition,
+		isAnnotating,
+		setIsAnnotating,
+		isHighlightInteraction,
+		setIsHighlightInteraction,
+		activeHighlight,
+		setActiveHighlight,
+		addHighlight,
+		removeHighlight,
+		loadHighlights,
+		handleTextSelection,
+		renderAnnotations,
+		annotations,
+	} = props;
+
 	const [currentPage, setCurrentPage] = useState<number>(1);
 
 	const { numPages, allPagesLoaded, onDocumentLoadSuccess, handlePageLoadSuccess } = usePdfLoader();
 	const { scale, width, pagesRef, containerRef, goToPreviousPage, goToNextPage, zoomIn, zoomOut } = usePdfNavigation(numPages);
-	// Highlight functionality
-	const { highlights, setHighlights, selectedText, setSelectedText, tooltipPosition, setTooltipPosition, isAnnotating, setIsAnnotating, isHighlightInteraction, setIsHighlightInteraction, activeHighlight, setActiveHighlight, handleTextSelection, loadHighlightsFromLocalStorage, addHighlight, removeHighlight, loadAllHighlightsFromServer } = useHighlights();
-
 
 	// Search functionality
 	const { searchText, setSearchText, searchResults, currentMatch, notFound, performSearch, goToNextMatch, goToPreviousMatch, setSearchResults, setNotFound, setCurrentMatch } = usePdfSearch(explicitSearchTerm);
@@ -119,8 +157,8 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm, setUserMessageReferences
 					console.log("Text layers are ready, applying highlights");
 					clearInterval(checkInterval);
 
-					loadHighlightsFromLocalStorage();
-					loadAllHighlightsFromServer();
+					loadHighlights();
+					renderAnnotations(annotations);
 
 					// Highlighting logic
 					// Apply highlights after loading
@@ -158,6 +196,10 @@ export function PdfViewer({ pdfUrl, explicitSearchTerm, setUserMessageReferences
 			setIsHighlightInteraction(false);
 		}
 	}, [selectedText]);
+
+	useEffect(() => {
+		renderAnnotations(annotations);
+	}, [annotations]);
 
 	const checkTextLayersReady = () => {
 		const textLayers = document.querySelectorAll('.react-pdf__Page__textContent');
