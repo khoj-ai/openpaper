@@ -180,6 +180,7 @@ class Operations:
         raw_file = document_crud.read_raw_document_content(
             db, document_id=paper_id, file_path=file_path
         )
+
         if not raw_file:
             raise ValueError(
                 f"Raw file content for paper ID {paper_id} could not be retrieved."

@@ -1,6 +1,7 @@
 import logging
 import os
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -242,6 +243,31 @@ async def upload_pdf(
         extract_metadata = llm_operations.extract_paper_metadata(
             paper_id=str(created_doc.id), file_path=str(file_path), db=db
         )
+
+        # Try parse date into a valid datetime object. If four digits, then assume year
+        if extract_metadata.publish_date:
+            # Try full date format first (YYYY-MM-DD)
+            try:
+                parsed_date = datetime.strptime(
+                    extract_metadata.publish_date, "%Y-%m-%d"
+                )
+            except ValueError:
+                # If that fails, try just the year
+                if (
+                    extract_metadata.publish_date.isdigit()
+                    and len(extract_metadata.publish_date) == 4
+                ):
+                    # Convert year to a full date (assume January 1st)
+                    parsed_date = datetime.strptime(
+                        f"{extract_metadata.publish_date}-01-01", "%Y-%m-%d"
+                    )
+                else:
+                    raise ValueError(
+                        f"Could not parse date: {extract_metadata.publish_date}"
+                    )
+
+            # Format back to string in YYYY-MM-DD format
+            extract_metadata.publish_date = parsed_date.strftime("%Y-%m-%d")
 
         update_doc = DocumentUpdate(
             authors=extract_metadata.authors,
