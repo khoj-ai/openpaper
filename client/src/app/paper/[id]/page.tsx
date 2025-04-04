@@ -920,7 +920,7 @@ export default function PaperView() {
                                             {
                                                 msg.references && msg.references['citations']?.length > 0 && (
                                                     <div className="mt-2" id="references-section">
-                                                        <ul className="list-disc pl-5">
+                                                        <ul className="list-none p-0">
                                                             {Object.entries(msg.references['citations']).map(([refIndex, value]) => (
                                                                 <div
                                                                     key={refIndex}
