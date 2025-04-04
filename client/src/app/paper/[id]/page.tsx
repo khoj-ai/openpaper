@@ -107,11 +107,15 @@ interface CustomCitationLinkProps extends HTMLAttributes<HTMLElement> {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         properties?: Record<string, any>;
     };
+    className?: string;
 }
 
-const CustomCitationLink = ({ children, handleCitationClick, messageIndex, ...props }: CustomCitationLinkProps) => {
+const CustomCitationLink = ({ children, handleCitationClick, messageIndex, className, ...props }: CustomCitationLinkProps) => {
     // Create a clone of props to avoid mutating the original
-    const elementProps = { ...props };
+    const elementProps = {
+        ...props,
+        className: `${className || ''}`
+    };
 
     return createElement(
         // Use the original component type from props
@@ -790,7 +794,7 @@ export default function PaperView() {
             <div
                 className={`w-full h-full grid ${rightSideFunction === 'Focus' ? 'grid-cols-2' : 'grid-cols-3'} items-center justify-center gap-0`}>
 
-                <div className="border-2 border-gray-200 p-2 col-span-2">
+                <div className="border-r-2 dark:border-gray-800 border-gray-200 p-2 col-span-2">
                     {/* PDF Viewer Section */}
                     {paperData.file_url && (
                         <div className="w-full h-full">
@@ -910,9 +914,22 @@ export default function PaperView() {
                                                 rehypePlugins={[rehypeKatex]}
                                                 components={{
                                                     // Apply the custom component to text nodes
-                                                    p: (props) => <CustomCitationLink {...props} handleCitationClick={handleCitationClick} messageIndex={index} />,
-                                                    li: (props) => <CustomCitationLink {...props} handleCitationClick={handleCitationClick} messageIndex={index} />,
-                                                    div: (props) => <CustomCitationLink {...props} handleCitationClick={handleCitationClick} messageIndex={index} />,
+                                                    p: (props) => <CustomCitationLink
+                                                        {...props}
+                                                        handleCitationClick={handleCitationClick}
+                                                        messageIndex={index}
+                                                        className={`${msg.role !== 'user' ? 'pt-2' : ''}`}
+                                                    />,
+                                                    li: (props) => <CustomCitationLink
+                                                        {...props}
+                                                        handleCitationClick={handleCitationClick}
+                                                        messageIndex={index}
+                                                    />,
+                                                    div: (props) => <CustomCitationLink
+                                                        {...props}
+                                                        handleCitationClick={handleCitationClick}
+                                                        messageIndex={index}
+                                                    />,
                                                 }}
                                             >
                                                 {msg.content}
@@ -1001,9 +1018,9 @@ export default function PaperView() {
                 }
 
             </div>
-            <div className="hidden md:flex flex-col w-fit h-[calc(100vh-64px)] border-l-2 border-gray-200">
-                <SidebarProvider className="items-start h-[calc(100vh-64px)] min-h-fit">
-                    <Sidebar collapsible="none" className="hidden md:flex">
+            <div className="hidden md:flex flex-col w-fit h-[calc(100vh-64px)]">
+                <SidebarProvider className="items-start h-[calc(100vh-64px)] min-h-fit w-fit">
+                    <Sidebar collapsible="none" className="hidden md:flex w-fit">
                         <SidebarContent>
                             <SidebarGroup>
                                 <SidebarGroupContent>
