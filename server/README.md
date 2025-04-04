@@ -21,6 +21,10 @@ To run the application:
 
 ```bash
 uvicorn api:app --reload
+
+# or
+
+python3 -m app.main
 ```
 
 The application will start on `http://localhost:8000`
