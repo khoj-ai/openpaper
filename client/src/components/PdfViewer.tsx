@@ -302,11 +302,23 @@ export function PdfViewer(props: PdfViewerProps) {
 				</div>
 
 				<div className="flex items-center gap-1">
-					<Button onClick={zoomOut} size="sm" variant="ghost" className="h-8 w-8 p-0">
+					<Button
+						onClick={() => {
+							zoomOut();
+						}}
+						size="sm"
+						variant="ghost"
+						className="h-8 w-8 p-0">
 						<Minus size={16} />
 					</Button>
 					<span className="text-xs w-12 text-center">{Math.round(scale * 100)}%</span>
-					<Button onClick={zoomIn} size="sm" variant="ghost" className="h-8 w-8 p-0">
+					<Button
+						onClick={() => {
+							zoomIn();
+						}}
+						size="sm"
+						variant="ghost"
+						className="h-8 w-8 p-0">
 						<Plus size={16} />
 					</Button>
 				</div>
