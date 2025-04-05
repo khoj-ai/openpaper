@@ -49,8 +49,12 @@ class Document(Base):
     starter_questions = Column(ARRAY(String), nullable=True)  # type: ignore
     raw_content = Column(Text, nullable=True)
 
-    conversations = relationship("Conversation", back_populates="document")
-    paper_notes = relationship("PaperNote", back_populates="document")
+    conversations = relationship(
+        "Conversation", back_populates="document", cascade="all, delete-orphan"
+    )
+    paper_notes = relationship(
+        "PaperNote", back_populates="document", cascade="all, delete-orphan"
+    )
 
 
 class Message(Base):
@@ -75,7 +79,11 @@ class Conversation(Base):
     __tablename__ = "conversations"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id"), nullable=False)
+    document_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     title = Column(String, nullable=True)  # Optional conversation title
 
     document = relationship("Document", back_populates="conversations")
@@ -90,7 +98,10 @@ class PaperNote(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     # Ensure each document has only one associated paper note
     document_id = Column(
-        UUID(as_uuid=True), ForeignKey("documents.id"), nullable=False, unique=True
+        UUID(as_uuid=True),
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
     )
     content = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -102,9 +113,13 @@ class Highlight(Base):
     __tablename__ = "highlights"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
     document_id = Column(
-        UUID(as_uuid=True), ForeignKey("documents.id"), nullable=False
-    )  # type: ignore
+        UUID(as_uuid=True),
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
     raw_text = Column(Text, nullable=False)
     start_offset = Column(Integer, nullable=False)
     end_offset = Column(Integer, nullable=False)
@@ -117,7 +132,11 @@ class Annotation(Base):
     highlight_id = Column(
         UUID(as_uuid=True), ForeignKey("highlights.id"), nullable=False
     )  # type: ignore
+
     document_id = Column(
-        UUID(as_uuid=True), ForeignKey("documents.id"), nullable=False
-    )  # type: ignore
+        UUID(as_uuid=True),
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
     content = Column(Text, nullable=False)

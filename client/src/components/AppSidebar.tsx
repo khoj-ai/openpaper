@@ -35,12 +35,18 @@ const items = [
         url: "#",
         icon: Settings,
     },
+    {
+        title: "Papers",
+        url: "/papers",
+        icon: FileText,
+    }
 ]
 
-interface PaperItem {
+export interface PaperItem {
     id: string
     filename: string
     title: string
+    created_at?: string
 }
 
 export function AppSidebar() {
@@ -120,7 +126,13 @@ export function AppSidebar() {
         const fetchPapers = async () => {
             try {
                 const response = await fetchFromApi("/api/paper/all");
-                setAllPapers(response.papers);
+                const sortedPapers = response.papers.sort((a: PaperItem, b: PaperItem) => {
+                    return new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime();
+                });
+                // Retain the 5 MRU papers
+                const mruPapers = sortedPapers.slice(0, 5);
+                // Set the state with the sorted papers
+                setAllPapers(mruPapers);
             } catch (error) {
                 console.error("Error fetching papers:", error)
             }

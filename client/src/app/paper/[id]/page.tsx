@@ -33,6 +33,7 @@ import {
 import { AnnotationsView } from '@/components/AnnotationsView';
 import { useHighlights } from '@/components/hooks/PdfHighlight';
 import { useAnnotations } from '@/components/hooks/PdfAnnotation';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface PaperData {
     filename: string;
@@ -271,18 +272,20 @@ function PaperMetadata(props: IPaperMetadata) {
                                 <tr>
                                     <td className="font-semibold pr-2 py-1 align-top">Start</td>
                                     <td>
-                                        <div className="flex gap-2 mt-2 flex-wrap">
-                                            {paperData.starter_questions.map((question, i) => (
-                                                <Button
-                                                    key={i}
-                                                    variant="outline"
-                                                    className="text-xs font-medium p-2 max-w-full whitespace-normal h-auto text-left justify-start break-words"
-                                                    onClick={() => props.onClickStarterQuestion(question)}
-                                                >
-                                                    {question}
-                                                </Button>
-                                            ))}
-                                        </div>
+                                        <ScrollArea className="h-8">
+                                            <div className="flex gap-2 mt-2 flex-wrap">
+                                                {paperData.starter_questions.map((question, i) => (
+                                                    <Button
+                                                        key={i}
+                                                        variant="outline"
+                                                        className="text-xs font-medium p-2 max-w-full whitespace-normal h-auto text-left justify-start break-words"
+                                                        onClick={() => props.onClickStarterQuestion(question)}
+                                                    >
+                                                        {question}
+                                                    </Button>
+                                                ))}
+                                            </div>
+                                        </ScrollArea>
                                     </td>
                                 </tr>
                             )}

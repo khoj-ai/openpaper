@@ -71,7 +71,12 @@ async def get_paper_ids(db: Session = Depends(get_db)):
         status_code=200,
         content={
             "papers": [
-                {"id": str(paper.id), "filename": paper.filename, "title": paper.title}
+                {
+                    "id": str(paper.id),
+                    "filename": paper.filename,
+                    "title": paper.title,
+                    "created_at": str(paper.created_at),
+                }
                 for paper in papers
             ]
         },
@@ -211,6 +216,29 @@ async def get_pdf(request: Request, id: str, db: Session = Depends(get_db)):
 
     # Return the file URL
     return JSONResponse(status_code=200, content=paper_data)
+
+
+@document_router.delete("")
+async def delete_pdf(request: Request, id: str, db: Session = Depends(get_db)):
+    """
+    Delete a document by ID
+    """
+    # Fetch the document from the database
+    document = document_crud.get(db, id=id)
+
+    if not document:
+        return JSONResponse(status_code=404, content={"message": "Document not found"})
+
+    # Delete the document from the database
+    try:
+        document_crud.remove(db, id=id)
+        return JSONResponse(status_code=200, content={"message": "Document deleted"})
+    except Exception as e:
+        logger.error(f"Error deleting document: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"message": f"Error deleting document: {str(e)}"},
+        )
 
 
 @document_router.post("/upload")
