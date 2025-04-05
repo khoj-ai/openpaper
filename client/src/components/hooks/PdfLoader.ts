@@ -29,6 +29,13 @@ export function usePdfLoader() {
     };
 
     const handlePageLoadSuccess = (pageIndex: number) => {
+        if (allPagesLoaded) {
+            // Something has triggered a reload of the pages
+            // Reset the state
+            setAllPagesLoaded(false);
+            setPagesLoaded([]);
+        }
+
         setPagesLoaded(prevLoaded => {
             const newLoaded = [...prevLoaded];
             newLoaded[pageIndex] = true;
