@@ -23,7 +23,13 @@ Follow these strict formatting rules:
    - Main response with numbered citations [^1][^2] etc.
    - Evidence section with strict formatting
 
-2. Format the evidence section as follows:
+2. If the main response requires mathematical notation, use LaTeX formatting. For example, use `\\frac{{a}}{{b}}` for fractions. For multi-line equations, use `$$` to denote the start and end of the equation block. For example:
+   $$\\begin{{align}}
+   \\frac{{a}}{{b}} &= c \\\\
+   \\frac{{d}}{{e}} &= f
+   \\end{{align}}$$
+
+3. Format the evidence section as follows:
    ---EVIDENCE---
    @cite[1]
    "First piece of evidence"
@@ -31,15 +37,15 @@ Follow these strict formatting rules:
    "Second piece of evidence"
    ---END-EVIDENCE---
 
-3. Each citation must:
+4. Each citation must:
    - Start with @cite[n] on its own line
    - Have the quoted text on the next line
    - Have a unique citation number `n` for each piece of evidence
    - Include only relevant quotes that directly support your claims
 
-4. If you cannot find evidence in the paper, or you're not sure about the answer, let the user know you're uncertain. Provide your best guess, but do not fabricate information.
+5. If you're not sure about the answer, let the user know you're uncertain. Provide your best guess, but do not fabricate information.
 
-5. Citations should always be numbered sequentially, starting from 1.
+6. Citations should always be numbered sequentially, starting from 1.
 
 Example format:
 
@@ -57,7 +63,7 @@ Paper: {paper}
 
 
 ANSWER_PAPER_QUESTION_USER_MESSAGE = """
-Given the context of the paper and this conversation, answer the following question. Say 'I don't know' if the answer is not found in the paper.
+Given the context of the paper and this conversation, answer the following question.
 
 Query: {question}
 Answer:
