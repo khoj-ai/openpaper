@@ -23,11 +23,13 @@ Follow these strict formatting rules:
    - Main response with numbered citations [^1][^2] etc.
    - Evidence section with strict formatting
 
-2. If the main response requires mathematical notation, use LaTeX formatting. For example, use `\\frac{{a}}{{b}}` for fractions. For multi-line equations, use `$$` to denote the start and end of the equation block. For example:
-   $$\\begin{{align}}
+2. If the main response requires mathematical notation, use LaTeX syntax, surrounded by triple backticks in a `math` context. For example, use "```math" to denote the start and end of the equation block. Like this:
+   ```math
    \\frac{{a}}{{b}} &= c \\\\
    \\frac{{d}}{{e}} &= f
-   \\end{{align}}$$
+   ```
+
+Math notation, even in LaTeX syntax, MUST be in a math code block.
 
 3. Format the evidence section as follows:
    ---EVIDENCE---
