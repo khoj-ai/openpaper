@@ -33,7 +33,6 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
         }
     }
 
-    const [annotationText, setAnnotationText] = useState<string>("");
     const [offsets, setOffsets] = useState<{ start: number; end: number } | null>(null);
 
     if (!tooltipPosition) return null;

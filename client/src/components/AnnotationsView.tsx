@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { PaperHighlight, PaperHighlightAnnotation } from '@/app/paper/[id]/page';
-import { ScrollText, Quote, CornerDownRight, MessageSquarePlus, Trash2, Pencil } from 'lucide-react';
+import { MessageSquarePlus, Trash2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardFooter, CardHeader } from './ui/card';
+import { Card, CardContent, CardFooter } from './ui/card';
 
 export interface AnnotationButtonProps {
 	highlightId: string;
@@ -171,6 +171,19 @@ interface AnnotationsViewProps {
 export function AnnotationsView({ highlights, annotations, onHighlightClick, addAnnotation, activeHighlight, removeAnnotation, updateAnnotation }: AnnotationsViewProps) {
 	const [sortedHighlights, setSortedHighlights] = React.useState<PaperHighlight[]>([]);
 	const [highlightAnnotationMap, setHighlightAnnotationMap] = React.useState<Map<string, PaperHighlightAnnotation[] | null>>(new Map());
+	const highlightRefs = useRef(new Map<string, React.RefObject<HTMLDivElement | null>>());
+
+	useEffect(() => {
+		if (activeHighlight?.id) {
+			const ref = highlightRefs.current.get(activeHighlight.id);
+			if (ref?.current) {
+				ref.current.scrollIntoView({
+					behavior: 'smooth',
+					block: 'center'
+				});
+			}
+		}
+	}, [activeHighlight]);
 
 	useEffect(() => {
 		const sorted = [...highlights].sort((a, b) => {
@@ -201,50 +214,59 @@ export function AnnotationsView({ highlights, annotations, onHighlightClick, add
 				</p>
 			) : (
 				<div className="space-y-4">
-					{sortedHighlights.map((highlight) => (
-						<Card
-							key={highlight.id}
-							className="border rounded-lg p-4 hover:bg-secondary/50 transition-colors cursor-pointer px-0"
-							onClick={() => onHighlightClick(highlight)}
-						>
-							<CardContent>
+					{sortedHighlights.map((highlight) => {
+						if (highlight.id && !highlightRefs.current.has(highlight.id)) {
+							const ref = React.createRef<HTMLDivElement>();
+							if (ref && ref !== null) {
+								highlightRefs.current.set(highlight.id, ref);
+							}
+						}
+						return (
+							<Card
+								key={highlight.id}
+								ref={highlight.id ? highlightRefs.current.get(highlight.id) : undefined}
+								className="border rounded-lg p-4 hover:bg-secondary/50 transition-colors cursor-pointer px-0"
+								onClick={() => onHighlightClick(highlight)}
+							>
+								<CardContent>
 
-								<p className="text-sm font-normal mb-2">
-									&ldquo;{highlight.raw_text}&rdquo;
-								</p>
-								{
-									highlight.id &&
-									highlightAnnotationMap.has(highlight.id) && (
-										<>
-											{
-												highlightAnnotationMap.get(highlight.id)?.map((annotation) => (
-													<AnnotationCard
-														key={annotation.id}
-														annotation={annotation}
-														removeAnnotation={removeAnnotation}
-														updateAnnotation={updateAnnotation}
-													/>
-												))
-											}
-											{
-												highlightAnnotationMap.get(highlight.id)?.length === 0 && <p className="text-sm text-muted-foreground">No annotation yet.</p>
-											}
-										</>
-									)
-								}
-								{
-									highlight.id && activeHighlight?.id === highlight.id && (
-										<div className="flex justify-between items-center">
-											<AnnotationButton
-												highlightId={highlight.id}
-												addAnnotation={addAnnotation}
-											/>
-										</div>
-									)
-								}
-							</CardContent>
-						</Card>
-					))}
+									<p className="text-sm font-normal mb-2">
+										&ldquo;{highlight.raw_text}&rdquo;
+									</p>
+									{
+										highlight.id &&
+										highlightAnnotationMap.has(highlight.id) && (
+											<>
+												{
+													highlightAnnotationMap.get(highlight.id)?.map((annotation) => (
+														<AnnotationCard
+															key={annotation.id}
+															annotation={annotation}
+															removeAnnotation={removeAnnotation}
+															updateAnnotation={updateAnnotation}
+														/>
+													))
+												}
+												{
+													highlightAnnotationMap.get(highlight.id)?.length === 0 && <p className="text-sm text-muted-foreground">No annotation yet.</p>
+												}
+											</>
+										)
+									}
+									{
+										highlight.id && activeHighlight?.id === highlight.id && (
+											<div className="flex justify-between items-center">
+												<AnnotationButton
+													highlightId={highlight.id}
+													addAnnotation={addAnnotation}
+												/>
+											</div>
+										)
+									}
+								</CardContent>
+							</Card>
+						);
+					})}
 				</div>
 			)}
 		</div>

@@ -31,7 +31,7 @@ class Operations:
 
     def __init__(self):
         self.client = genai.Client(api_key=GEMINI_API_KEY)
-        self.default_model = "gemini-2.0-flash"
+        self.default_model = "gemini-2.5-pro-preview-03-25"
 
     def validate_and_extract_json(self, json_data: str) -> dict:
         """
