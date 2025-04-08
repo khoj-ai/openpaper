@@ -318,6 +318,10 @@ class Operations:
             message=formatted_prompt,
         ):
             text = chunk.text
+
+            if not text:
+                continue
+
             text_buffer += text
 
             # Check for start delimiter
