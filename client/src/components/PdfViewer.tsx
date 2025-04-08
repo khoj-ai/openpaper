@@ -38,6 +38,7 @@ interface PdfViewerProps {
 	handleTextSelection: (e: React.MouseEvent) => void;
 	renderAnnotations: (highlights: PaperHighlightAnnotation[]) => void;
 	annotations: PaperHighlightAnnotation[];
+	setAddedContentForPaperNote: (content: string) => void;
 }
 
 export function PdfViewer(props: PdfViewerProps) {
@@ -63,6 +64,7 @@ export function PdfViewer(props: PdfViewerProps) {
 		handleTextSelection,
 		renderAnnotations,
 		annotations,
+		setAddedContentForPaperNote,
 	} = props;
 
 	const [currentPage, setCurrentPage] = useState<number>(1);
@@ -379,6 +381,7 @@ export function PdfViewer(props: PdfViewerProps) {
 					addHighlight={addHighlight}
 					removeHighlight={removeHighlight}
 					setUserMessageReferences={setUserMessageReferences}
+					setAddedContentForPaperNote={setAddedContentForPaperNote}
 				/>
 			)}
 		</div>

@@ -56,6 +56,18 @@ export function useHighlights(documentId: string) {
 
             if (highlightElement) {
                 highlightElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                // Add a small delay to allow scrolling to complete
+                setTimeout(() => {
+                    // Get the element's position after scrolling
+                    const rect = highlightElement.getBoundingClientRect();
+
+                    // Update tooltip position to be near the highlight
+                    setTooltipPosition({
+                        x: rect.right,
+                        y: rect.top + (rect.height / 2)
+                    });
+                }, 300); // Adjust timeout as needed based on scroll duration
             }
         }
     }, [activeHighlight]);

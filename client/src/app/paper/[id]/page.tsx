@@ -349,6 +349,7 @@ export default function PaperView() {
     const [paperNoteContent, setPaperNoteContent] = useState<string | undefined>(undefined);
     const [lastPaperNoteSaveTime, setLastPaperNoteSaveTime] = useState<number | null>(null);
     const [userMessageReferences, setUserMessageReferences] = useState<string[]>([]);
+    const [addedContentForPaperNote, setAddedContentForPaperNote] = useState<string | null>(null);
 
     const [rightSideFunction, setRightSideFunction] = useState<string>('Chat');
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -412,7 +413,7 @@ export default function PaperView() {
                 console.error('Error retrieving from local storage:', error);
             }
         }
-    }, [id, paperNoteContent]);
+    }, [id]);
 
     // Add this effect to scroll to bottom when messages change or streaming is active
     useEffect(() => {
@@ -533,6 +534,24 @@ export default function PaperView() {
         fetchMessages();
     }, [conversationId, pageNumberConversationHistory]);
 
+    useEffect(() => {
+        if (addedContentForPaperNote) {
+            const newNoteContent = paperNoteContent ? `${paperNoteContent}` + `\n` + `${addedContentForPaperNote}` : `${addedContentForPaperNote}`;
+
+            setPaperNoteContent(newNoteContent);
+
+            // Set local storage
+            try {
+                localStorage.setItem(`paper-note-${id}`, newNoteContent);
+            } catch (error) {
+                console.error('Error saving to local storage:', error);
+            }
+
+            setAddedContentForPaperNote(null);
+            setRightSideFunction('Notes');
+        }
+
+    }, [addedContentForPaperNote]);
 
     // Handle scroll to load more messages
     const handleScroll = () => {
@@ -619,28 +638,26 @@ export default function PaperView() {
         }
     };
 
-    // Function to handle note changes with debounce
-    const handlePaperNoteInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        const newContent = e.target.value;
-        setPaperNoteContent(newContent);
+    useEffect(() => {
+        if (paperNoteContent) {
+            // Save to local storage
+            try {
+                localStorage.setItem(`paper-note-${id}`, paperNoteContent);
+            } catch (error) {
+                console.error('Error saving to local storage:', error);
+            }
 
-        // Save to local storage immediately
-        try {
-            localStorage.setItem(`paper-note-${id}`, newContent);
-        } catch (error) {
-            console.error('Error saving to local storage:', error);
+            // Clear existing timeout
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+            }
+
+            // Set new timeout for server save
+            saveTimeoutRef.current = setTimeout(() => {
+                updateNote(paperNoteContent);
+            }, 2000);
         }
-
-        // Clear any existing timeout
-        if (saveTimeoutRef.current) {
-            clearTimeout(saveTimeoutRef.current);
-        }
-
-        // Set a new timeout to save to the server after 2 seconds of inactivity
-        saveTimeoutRef.current = setTimeout(() => {
-            updateNote(newContent);
-        }, 2000);
-    };
+    }, [paperNoteContent]);
 
     const transformReferencesToFormat = (references: string[]) => {
         const citations = references.map((ref, index) => ({
@@ -823,6 +840,7 @@ export default function PaperView() {
                                 handleTextSelection={handleTextSelection}
                                 renderAnnotations={renderAnnotations}
                                 annotations={annotations}
+                                setAddedContentForPaperNote={setAddedContentForPaperNote}
                             />
                         </div>
                     )}
@@ -835,7 +853,7 @@ export default function PaperView() {
                                 className='w-full h-full'
                                 value={paperNoteContent}
                                 onChange={(e) =>
-                                    handlePaperNoteInput(e)
+                                    setPaperNoteContent(e.target.value)
                                 }
                             />
                             <div className="text-xs text-gray-500 mt-2">

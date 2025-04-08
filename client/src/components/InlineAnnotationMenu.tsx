@@ -18,10 +18,11 @@ interface InlineAnnotationMenuProps {
     addHighlight: (selectedText: string, startOffset?: number, endOffset?: number) => void;
     removeHighlight: (highlight: PaperHighlight) => void;
     setUserMessageReferences: React.Dispatch<React.SetStateAction<string[]>>;
+    setAddedContentForPaperNote: (content: string) => void;
 }
 
 export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
-    const { selectedText, tooltipPosition, setSelectedText, setTooltipPosition, setIsAnnotating, highlights, setHighlights, isHighlightInteraction, activeHighlight, addHighlight, removeHighlight, setUserMessageReferences } = props;
+    const { selectedText, tooltipPosition, setSelectedText, setTooltipPosition, setIsAnnotating, highlights, setHighlights, isHighlightInteraction, activeHighlight, addHighlight, removeHighlight, setUserMessageReferences, setAddedContentForPaperNote } = props;
 
     const localizeCommandToOS = (key: string) => {
         // Check if the user is on macOS using userAgent
@@ -60,6 +61,13 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                     const newReferences = [...prev, selectedText];
                     return Array.from(new Set(newReferences)); // Remove duplicates
                 });
+            }
+
+            if (e.key === "n" && (e.ctrlKey || e.metaKey)) {
+                setAddedContentForPaperNote(selectedText);
+                setSelectedText("");
+                setTooltipPosition(null);
+                setIsAnnotating(false);
             }
         }
 
@@ -107,6 +115,26 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                 >
                     <Highlighter size={14} />
                     Highlight
+                </Button>
+
+                {/* Add Note Button */}
+                <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-2 text-sm h-9"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setAddedContentForPaperNote(selectedText);
+                        setSelectedText("");
+                        setTooltipPosition(null);
+                        setIsAnnotating(false);
+                    }}
+                >
+                    <Plus size={14} />
+                    Add to Note
+                    <CommandShortcut className="text-muted-foreground">
+                        {localizeCommandToOS('N')}
+                    </CommandShortcut>
                 </Button>
 
                 {/* Remove Highlight Button - Only show when interacting with highlight */}
