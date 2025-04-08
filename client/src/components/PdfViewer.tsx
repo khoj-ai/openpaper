@@ -52,7 +52,6 @@ export function PdfViewer(props: PdfViewerProps) {
 		setSelectedText,
 		tooltipPosition,
 		setTooltipPosition,
-		isAnnotating,
 		setIsAnnotating,
 		isHighlightInteraction,
 		setIsHighlightInteraction,
