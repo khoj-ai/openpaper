@@ -6,6 +6,7 @@ import { useEffect, useState } from "react"
 import { PaperItem } from "@/components/AppSidebar"
 import { Button } from "@/components/ui/button"
 import { Trash2 } from "lucide-react"
+import { Input } from "@/components/ui/input"
 
 
 export default function PapersPage() {
@@ -67,7 +68,7 @@ export default function PapersPage() {
     return (
         <div className="container mx-auto w-1/2 p-8">
             <div className="mb-4">
-                <input
+                <Input
                     type="text"
                     placeholder="Search your paper bank"
                     value={searchTerm}
