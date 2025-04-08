@@ -1,8 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { PaperHighlight, PaperHighlightAnnotation } from '@/app/paper/[id]/page';
-import { MessageSquarePlus, Trash2, Pencil } from 'lucide-react';
+import { Trash2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardFooter } from './ui/card';
 
@@ -12,60 +11,51 @@ export interface AnnotationButtonProps {
 }
 
 export function AnnotationButton({ highlightId, addAnnotation }: AnnotationButtonProps) {
-	const [isOpen, setIsOpen] = useState(false);
 	const [content, setContent] = useState("");
+	const [isTyping, setIsTyping] = useState(false);
+
+	const handleSave = async () => {
+		if (content.trim()) {
+			await addAnnotation(highlightId, content);
+			setContent("");
+			setIsTyping(false);
+		}
+	};
+
+	const handleCancel = () => {
+		setContent("");
+		setIsTyping(false);
+	};
 
 	return (
-		<Popover open={isOpen} onOpenChange={setIsOpen}>
-			<PopoverTrigger asChild>
-				<Button
-					variant="ghost"
-					size="sm"
-					className="flex items-center gap-2"
-				>
-					<MessageSquarePlus size={16} />
-					{'Add annotation'}
-				</Button>
-			</PopoverTrigger>
-			<PopoverContent className="w-80">
-				<div className="space-y-4">
-					<div className="space-y-2">
-						<label htmlFor="annotation">Annotation</label>
-						<Textarea
-							id="annotation"
-							value={content}
-							onChange={(e) => setContent(e.target.value)}
-							placeholder="Add your notes here..."
-							className="min-h-[100px]"
-						/>
-					</div>
-					<div className="flex justify-end gap-2">
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={() => {
-								setIsOpen(false);
-								setContent("");
-							}}
-						>
-							Cancel
-						</Button>
-						<Button
-							size="sm"
-							onClick={async () => {
-								if (content.trim()) {
-									await addAnnotation(highlightId, content);
-									setContent("");
-									setIsOpen(false);
-								}
-							}}
-						>
-							Save
-						</Button>
-					</div>
+		<div className="space-y-2 w-full">
+			<Textarea
+				value={content}
+				onChange={(e) => {
+					setContent(e.target.value);
+					if (!isTyping) setIsTyping(true);
+				}}
+				placeholder="Add annotation..."
+				className="text-sm w-full"
+			/>
+			{isTyping && (
+				<div className="flex justify-end gap-2">
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={handleCancel}
+					>
+						Cancel
+					</Button>
+					<Button
+						size="sm"
+						onClick={handleSave}
+					>
+						Save
+					</Button>
 				</div>
-			</PopoverContent>
-		</Popover>
+			)}
+		</div>
 	);
 }
 
