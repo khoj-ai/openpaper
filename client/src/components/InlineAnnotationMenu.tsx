@@ -22,7 +22,7 @@ interface InlineAnnotationMenuProps {
 }
 
 export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
-    const { selectedText, tooltipPosition, setSelectedText, setTooltipPosition, setIsAnnotating, highlights, setHighlights, isHighlightInteraction, activeHighlight, addHighlight, removeHighlight, setUserMessageReferences, setAddedContentForPaperNote } = props;
+    const { selectedText, tooltipPosition, setSelectedText, setTooltipPosition, setIsAnnotating, isHighlightInteraction, activeHighlight, addHighlight, removeHighlight, setUserMessageReferences, setAddedContentForPaperNote } = props;
 
     const localizeCommandToOS = (key: string) => {
         // Check if the user is on macOS using userAgent
@@ -36,7 +36,6 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
 
     const [offsets, setOffsets] = useState<{ start: number; end: number } | null>(null);
 
-    if (!tooltipPosition) return null;
 
     useEffect(() => {
         if (selectedText) {
@@ -74,6 +73,8 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
         window.addEventListener("keydown", handleMouseDown);
         return () => window.removeEventListener("keydown", handleMouseDown);
     }, [selectedText]);
+
+    if (!tooltipPosition) return null;
 
     return (
         <div

@@ -338,7 +338,6 @@ export default function PaperView() {
         activeHighlight,
         setActiveHighlight,
         handleTextSelection,
-        clearHighlights,
         addHighlight,
         removeHighlight,
         loadHighlights
@@ -346,12 +345,9 @@ export default function PaperView() {
 
     const {
         annotations,
-        setAnnotations,
         addAnnotation,
         removeAnnotation,
         updateAnnotation,
-        loadAnnotationsFromServer,
-        getAnnotationsForHighlight,
         renderAnnotations,
     } = useAnnotations(id);
 

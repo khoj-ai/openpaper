@@ -1,4 +1,4 @@
-import { PaperHighlight, PaperHighlightAnnotation } from "@/app/paper/[id]/page";
+import { PaperHighlight } from "@/app/paper/[id]/page";
 
 export interface HighlightHandlers {
     setIsHighlightInteraction: (value: boolean) => void;
