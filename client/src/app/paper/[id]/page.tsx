@@ -18,6 +18,14 @@ import {
     CollapsibleContent,
     CollapsibleTrigger
 } from "@/components/ui/collapsible";
+
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from "@/components/ui/accordion"
+
 import { ChevronDown, ChevronUp, Highlighter, NotebookText, MessageCircle, Focus, X, Eye, Edit } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -192,6 +200,8 @@ function PaperMetadata(props: IPaperMetadata) {
     const { paperData } = props;
     const [isOpen, setIsOpen] = useState(!props.hasMessages);
 
+    const showAccordion = paperData.authors?.length > 0 || paperData.institutions?.length > 0;
+
     useEffect(() => {
         setIsOpen(!props.hasMessages);
     }, [props.hasMessages]);
@@ -212,86 +222,92 @@ function PaperMetadata(props: IPaperMetadata) {
             </div>
 
             <CollapsibleContent>
-                <div className="px-4 pb-4">
-                    <table className="w-full text-sm">
-                        <tbody>
+                <div className="px-4 pb-4 space-y-4">
+                    {
+                        paperData.publish_date && isDateValid(paperData.publish_date) && (
+                            <div className='text-secondary-foreground text-xs w-fit p-1 rounded-lg bg-secondary'>
+                                {new Date(paperData.publish_date).toLocaleDateString()}
+                            </div>
+                        )
+                    }
+                    {
+                        paperData.summary && (
+                            <div className='text-sm'>
+                                {paperData.summary}
+                            </div>
+                        )
+                    }
+
+
+                    {paperData.starter_questions && paperData.starter_questions.length > 0 && (
+                        <div>
+                            <ScrollArea className="h-36">
+                                <div className="flex gap-2 flex-wrap">
+                                    {paperData.starter_questions.map((question, i) => (
+                                        <Button
+                                            key={i}
+                                            variant="outline"
+                                            className="text-xs font-medium p-2 max-w-full whitespace-normal h-auto text-left justify-start break-words bg-secondary text-secondary-foreground hover:bg-secondary/50"
+                                            onClick={() => props.onClickStarterQuestion(question)}
+                                        >
+                                            {question}
+                                        </Button>
+                                    ))}
+                                </div>
+                            </ScrollArea>
+                        </div>
+                    )}
+
+                    {showAccordion && (
+                        <Accordion type="single" collapsible className='text-sm'>
                             {paperData.authors && paperData.authors.length > 0 && (
-                                <tr>
-                                    <td className="font-semibold pr-2 py-1 align-top">Authors</td>
-                                    <td>
-                                        {
-                                            paperData.authors.length > 0 && (
-                                                paperData.authors.map((author, i) => (
-                                                    <a
-                                                        key={i}
-                                                        href={googleScholarUrl(author)}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 hover:underline mr-2"
-                                                    >
-                                                        {author}
-                                                    </a>
-                                                ))
-                                            )
-                                        }
-                                    </td>
-                                </tr>
-                            )}
-                            {paperData.institutions && paperData.institutions.length > 0 && (
-                                <tr>
-                                    <td className="font-semibold pr-2 py-1 align-top">Institutions</td>
-                                    <td>{paperData.institutions.join(', ')}</td>
-                                </tr>
-                            )}
-                            {paperData.publish_date && isDateValid(paperData.publish_date) && (
-                                <tr>
-                                    <td className="font-semibold pr-2 py-1">Published:</td>
-                                    <td>{new Date(paperData.publish_date).toLocaleDateString()}</td>
-                                </tr>
-                            )}
-                            {paperData.keywords && paperData.keywords.length > 0 && (
-                                <tr>
-                                    <td className="font-semibold pr-2 py-1 align-top">Keywords</td>
-                                    <td>
-                                        <div className="flex flex-wrap gap-1">
-                                            {paperData.keywords.map((keyword, i) => (
-                                                <span key={i} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
-                                                    {keyword}
-                                                </span>
+                                <AccordionItem value="item-1">
+                                    <AccordionTrigger className="flex justify-between items-center">
+                                        Authors
+                                    </AccordionTrigger>
+                                    <AccordionContent>
+                                        <div className="flex gap-2 flex-wrap">
+                                            {paperData.authors.map((author, i) => (
+                                                <a
+                                                    key={i}
+                                                    href={googleScholarUrl(author)}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-500 hover:underline mr-2"
+                                                >
+                                                    {author}
+                                                </a>
                                             ))}
                                         </div>
-                                    </td>
-                                </tr>
+                                    </AccordionContent>
+                                </AccordionItem>
                             )}
-                            {paperData.summary && (
-                                <tr>
-                                    <td className="font-semibold pr-2 py-1 align-top">Summary</td>
-                                    <td>{paperData.summary}</td>
-                                </tr>
+                            {paperData.institutions && paperData.institutions.length > 0 && (
+                                <AccordionItem value="item-2">
+                                    <AccordionTrigger className="flex justify-between items-center">
+                                        Institutions
+                                    </AccordionTrigger>
+                                    <AccordionContent>
+                                        <div className="flex gap-2 flex-wrap">
+                                            {paperData.institutions.map((institution, i) => (
+                                                <a
+                                                    key={i}
+                                                    href={googleScholarUrl(institution)}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-500 hover:underline mr-2"
+                                                >
+                                                    {institution}
+                                                </a>
+                                            ))}
+                                        </div>
+                                    </AccordionContent>
+                                </AccordionItem>
                             )}
-                            {paperData.starter_questions && paperData.starter_questions.length > 0 && (
-                                <tr>
-                                    <td className="font-semibold pr-2 py-1 align-top">Start</td>
-                                    <td>
-                                        <ScrollArea className="h-8">
-                                            <div className="flex gap-2 mt-2 flex-wrap">
-                                                {paperData.starter_questions.map((question, i) => (
-                                                    <Button
-                                                        key={i}
-                                                        variant="outline"
-                                                        className="text-xs font-medium p-2 max-w-full whitespace-normal h-auto text-left justify-start break-words"
-                                                        onClick={() => props.onClickStarterQuestion(question)}
-                                                    >
-                                                        {question}
-                                                    </Button>
-                                                ))}
-                                            </div>
-                                        </ScrollArea>
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
+                        </Accordion>
+                    )}
+
+
                 </div>
             </CollapsibleContent>
         </Collapsible>
@@ -1078,14 +1094,12 @@ export default function PaperView() {
                                                 <SidebarMenuButton
                                                     asChild
                                                     isActive={item.name === rightSideFunction}
+                                                    title={item.name}
                                                     onClick={() => {
                                                         setRightSideFunction(item.name);
                                                     }}
                                                 >
-                                                    <p>
-                                                        <item.icon />
-                                                        <span>{item.name}</span>
-                                                    </p>
+                                                    <item.icon />
                                                 </SidebarMenuButton>
                                             </SidebarMenuItem>
                                         ))}
