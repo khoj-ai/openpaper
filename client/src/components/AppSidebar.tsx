@@ -1,6 +1,6 @@
 "use client"
 
-import { FileText, Home, Moon, Search, Settings, Sun } from "lucide-react";
+import { Clock, FileText, Home, Moon, Search, Settings, Sun } from "lucide-react";
 
 import {
     Sidebar,
@@ -26,16 +26,6 @@ const items = [
         icon: Home,
     },
     {
-        title: "Search",
-        url: "#",
-        icon: Search,
-    },
-    {
-        title: "Settings",
-        url: "#",
-        icon: Settings,
-    },
-    {
         title: "Papers",
         url: "/papers",
         icon: FileText,
@@ -46,6 +36,11 @@ export interface PaperItem {
     id: string
     filename: string
     title: string
+    abstract?: string
+    authors?: string[]
+    keywords?: string[]
+    institutions?: string[]
+    summary?: string
     created_at?: string
 }
 
@@ -168,8 +163,8 @@ export function AppSidebar() {
                             </SidebarMenuItem>
                             <SidebarMenuItem>
                                 <SidebarMenuButton>
-                                    <FileText size={16} />
-                                    <span>Papers</span>
+                                    <Clock size={16} />
+                                    <span>Recent</span>
                                 </SidebarMenuButton>
                                 <SidebarMenuSub>
                                     {

@@ -1,6 +1,5 @@
 "use client";
 
-import { DataFetcher } from "@/components/DataFetcher";
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
@@ -163,13 +162,11 @@ export default function Home() {
 						Link to a PDF
 					</Button>
 				</div>
-
-				<DataFetcher />
 			</main>
 			<footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
 				<a
 					className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-					href="https://docs.annotatedpdf.com"
+					href="https://docs.annotatedpaper.com"
 					target="_blank"
 					rel="noopener noreferrer"
 				>

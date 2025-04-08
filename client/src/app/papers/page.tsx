@@ -1,6 +1,6 @@
 "use client"
 
-import { Card, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card"
 import { fetchFromApi } from "@/lib/api"
 import { useEffect, useState } from "react"
 import { PaperItem } from "@/components/AppSidebar"
@@ -10,6 +10,8 @@ import { Trash2 } from "lucide-react"
 
 export default function PapersPage() {
     const [papers, setPapers] = useState<PaperItem[]>([])
+    const [searchTerm, setSearchTerm] = useState<string>("")
+    const [filteredPapers, setFilteredPapers] = useState<PaperItem[]>([])
 
     useEffect(() => {
         const fetchPapers = async () => {
@@ -18,7 +20,8 @@ export default function PapersPage() {
                 const sortedPapers = response.papers.sort((a: PaperItem, b: PaperItem) => {
                     return new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime();
                 });
-                setPapers(sortedPapers);
+                setPapers(sortedPapers)
+                setFilteredPapers(sortedPapers)
             } catch (error) {
                 console.error("Error fetching papers:", error)
             }
@@ -44,10 +47,36 @@ export default function PapersPage() {
         }
     }
 
+    const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const term = event.target.value.toLowerCase()
+        setSearchTerm(term)
+        setFilteredPapers(
+            papers.filter((paper) =>
+                paper.title?.toLowerCase().includes(term) ||
+                paper.filename?.toLowerCase().includes(term) ||
+                paper.keywords?.some((keyword) => keyword.toLowerCase().includes(term)) ||
+                paper.abstract?.toLowerCase().includes(term) ||
+                paper.authors?.some((author) => author.toLowerCase().includes(term)) ||
+                paper.institutions?.some((institution) => institution.toLowerCase().includes(term)) ||
+                paper.summary?.toLowerCase().includes(term)
+            )
+        )
+    }
+
+
     return (
-        <div className="container mx-auto p-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {papers.map((paper) => (
+        <div className="container mx-auto w-1/2 p-8">
+            <div className="mb-4">
+                <input
+                    type="text"
+                    placeholder="Search your paper bank"
+                    value={searchTerm}
+                    onChange={handleSearch}
+                    className="w-full p-2 border border-gray-300 rounded"
+                />
+            </div>
+            <div className="grid grid-cols-1 gap-4">
+                {filteredPapers.map((paper) => (
                     <Card key={paper.id}>
                         <CardHeader>
                             <a
@@ -57,12 +86,44 @@ export default function PapersPage() {
                                 {paper.title || paper.filename}
                             </a>
                         </CardHeader>
+                        <CardContent>
+                            <CardDescription>
+                                {
+                                    paper.keywords && paper.keywords.length > 0 && (
+                                        <div className="mb-2 flex flex-wrap gap-2">
+                                            {
+                                                paper.keywords.map((keyword, index) => (
+                                                    <span
+                                                        key={index}
+                                                        className="inline-block bg-blue-200 dark:bg-blue-800 text-sm font-semibold mr-2 px-2.5 py-0.5 rounded"
+                                                    >
+                                                        {keyword}
+                                                    </span>
+                                                ))
+                                            }
+                                        </div>
+                                    )
+                                }
+                                {
+                                    paper.authors && (
+                                        <p className="text-sm text-gray-500 mb-2">
+                                            {paper.authors.join(", ")}
+                                        </p>
+                                    )
+                                }
+                            </CardDescription>
+                            {paper.abstract && (
+                                <p className="text-sm text-gray-500 line-clamp-3">
+                                    {paper.abstract}
+                                </p>
+                            )}
+                        </CardContent>
                         <CardFooter className="flex flex-row justify-between items-start">
                             <p className="text-sm text-gray-500">
                                 {new Date(paper.created_at || "").toLocaleDateString()}
                             </p>
                             <Button
-                            variant={"ghost"}
+                                variant={"ghost"}
                                 onClick={() => handleDelete(paper.id)}
                             >
                                 <Trash2 size={16} className="text-secondary-foreground" />

@@ -76,6 +76,11 @@ async def get_paper_ids(db: Session = Depends(get_db)):
                     "filename": paper.filename,
                     "title": paper.title,
                     "created_at": str(paper.created_at),
+                    "abstract": paper.abstract,
+                    "authors": paper.authors,
+                    "institutions": paper.institutions,
+                    "keywords": paper.keywords,
+                    "summary": paper.summary,
                 }
                 for paper in papers
             ]

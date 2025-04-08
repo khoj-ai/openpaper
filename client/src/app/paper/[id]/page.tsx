@@ -241,7 +241,7 @@ function PaperMetadata(props: IPaperMetadata) {
 
                     {paperData.starter_questions && paperData.starter_questions.length > 0 && (
                         <div>
-                            <ScrollArea className="h-36">
+                            <ScrollArea className="max-h-1/2">
                                 <div className="flex gap-2 flex-wrap">
                                     {paperData.starter_questions.map((question, i) => (
                                         <Button
