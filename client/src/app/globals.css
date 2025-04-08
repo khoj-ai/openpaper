@@ -121,12 +121,4 @@
 	body {
 		@apply bg-background text-foreground;
 	}
-
-	ol, ul {
-		@apply list-disc list-inside pl-4;
-	}
-
-	li {
-		@apply mb-2;
-	}
 }

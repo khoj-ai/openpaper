@@ -968,9 +968,9 @@ export default function PaperView() {
                                     messages.map((msg, index) => (
                                         <div
                                             key={index}
-                                            className={`p-3 rounded-lg ${msg.role === 'user'
+                                            className={`prose dark:prose-invert p-3 rounded-lg ${msg.role === 'user'
                                                 ? 'bg-blue-200 text-blue-800 ml-12'
-                                                : 'w-full'
+                                                : 'w-full text-primary'
                                                 }`}
                                         >
                                             <Markdown
@@ -982,7 +982,6 @@ export default function PaperView() {
                                                         {...props}
                                                         handleCitationClick={handleCitationClick}
                                                         messageIndex={index}
-                                                        className={`${msg.role !== 'user' ? 'pt-2' : ''}`}
                                                     />,
                                                     li: (props) => <CustomCitationLink
                                                         {...props}
