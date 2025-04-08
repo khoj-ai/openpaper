@@ -26,7 +26,7 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion"
 
-import { ChevronDown, ChevronUp, Highlighter, NotebookText, MessageCircle, Focus, X, Eye, Edit } from 'lucide-react';
+import { ChevronDown, ChevronUp, Highlighter, NotebookText, MessageCircle, Focus, X, Eye, Edit, Loader } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import {
     Sidebar,
@@ -1025,6 +1025,11 @@ export default function PaperView() {
                                         </div>
                                     ))
                                 )}
+                                {
+                                    isStreaming && (
+                                        <Loader className="animate-spin w-6 h-6 text-blue-500" />
+                                    )
+                                }
                                 <div ref={messagesEndRef} />
                             </div>
                             <form onSubmit={handleSubmit} className="flex flex-col gap-2">

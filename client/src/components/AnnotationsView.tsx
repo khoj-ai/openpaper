@@ -79,7 +79,7 @@ function AnnotationCard({ annotation, removeAnnotation, updateAnnotation }: Anno
 
 	if (isEditing) {
 		return (
-			<Card className='group border-0 shadow-none rounded-lg py-2'>
+			<Card className='group border-x-0 border-b-0 border-t shadow-none rounded-none py-2'>
 				<CardContent className="space-y-2 text-sm">
 					<Textarea
 						value={editedContent}
@@ -113,7 +113,7 @@ function AnnotationCard({ annotation, removeAnnotation, updateAnnotation }: Anno
 	}
 
 	return (
-		<Card className='group border-0 shadow-none rounded-lg py-2 hover:bg-secondary/50 transition-colors cursor-pointer'>
+		<Card className='group border-x-0 border-b-0 border-t shadow-none rounded-none py-2 hover:bg-secondary/50 transition-colors cursor-pointer'>
 			<CardContent className='text-sm'>
 				{annotation.content}
 			</CardContent>
