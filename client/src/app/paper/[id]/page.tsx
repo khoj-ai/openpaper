@@ -18,7 +18,7 @@ import {
     CollapsibleContent,
     CollapsibleTrigger
 } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronUp, Highlighter, NotebookText, MessageCircle, Focus, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Highlighter, NotebookText, MessageCircle, Focus, X, Eye, Edit } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import {
     Sidebar,
@@ -34,6 +34,7 @@ import { AnnotationsView } from '@/components/AnnotationsView';
 import { useHighlights } from '@/components/hooks/PdfHighlight';
 import { useAnnotations } from '@/components/hooks/PdfAnnotation';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Toggle } from "@/components/ui/toggle";
 
 interface PaperData {
     filename: string;
@@ -350,6 +351,7 @@ export default function PaperView() {
     const [lastPaperNoteSaveTime, setLastPaperNoteSaveTime] = useState<number | null>(null);
     const [userMessageReferences, setUserMessageReferences] = useState<string[]>([]);
     const [addedContentForPaperNote, setAddedContentForPaperNote] = useState<string | null>(null);
+    const [isMarkdownPreview, setIsMarkdownPreview] = useState(false);
 
     const [rightSideFunction, setRightSideFunction] = useState<string>('Chat');
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -848,23 +850,48 @@ export default function PaperView() {
                 {
                     rightSideFunction === 'Notes' && (
                         <div className='p-2 w-full h-full flex flex-col'>
-                            {/* Notes section */}
-                            <Textarea
-                                className='w-full h-full'
-                                value={paperNoteContent}
-                                onChange={(e) =>
-                                    setPaperNoteContent(e.target.value)
-                                }
-                            />
-                            <div className="text-xs text-gray-500 mt-2">
-                                Note length: {paperNoteContent?.length} characters
+                            <div className="flex justify-between items-center mb-2 flex-shrink-0">
+                                <div className="text-xs text-gray-500">
+                                    Note length: {paperNoteContent?.length} characters
+                                </div>
+                                <Toggle
+                                    aria-label="Toggle markdown preview"
+                                    onPressedChange={(pressed) => setIsMarkdownPreview(pressed)}
+                                    pressed={isMarkdownPreview}
+                                >
+                                    {isMarkdownPreview ? <Eye size={16} /> : <Edit size={16} />}
+                                </Toggle>
                             </div>
-                            {
-                                paperNoteContent && lastPaperNoteSaveTime && (
-                                    <div className="text-xs text-green-500 mt-2">
-                                        Last saved: {new Date(lastPaperNoteSaveTime).toLocaleTimeString()}
+
+                            {isMarkdownPreview ? (
+                                <div className="flex-1 min-h-0 relative">
+                                    <div className="absolute inset-0 overflow-y-auto">
+                                        <div className="prose dark:prose-invert max-w-none text-sm">
+                                            <Markdown
+                                                remarkPlugins={[remarkGfm, remarkMath]}
+                                                rehypePlugins={[rehypeKatex]}
+                                            >
+                                                {paperNoteContent || ''}
+                                            </Markdown>
+                                        </div>
                                     </div>
-                                )}
+                                </div>
+                            ) : (
+                                <Textarea
+                                    className='w-full flex-1'
+                                    value={paperNoteContent}
+                                    onChange={(e) =>
+                                        setPaperNoteContent(e.target.value)
+                                    }
+                                    placeholder="Start taking notes..."
+                                />
+                            )}
+
+                            {paperNoteContent && lastPaperNoteSaveTime && (
+                                <div className="text-xs text-green-500 mt-2 flex-shrink-0">
+                                    Last saved: {new Date(lastPaperNoteSaveTime).toLocaleTimeString()}
+                                </div>
+                            )}
                         </div>
                     )
                 }
