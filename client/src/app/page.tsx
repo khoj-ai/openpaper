@@ -2,7 +2,6 @@
 
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect } from "react";
-import Image from "next/image";
 import { fetchFromApi } from "@/lib/api";
 import {
 	Dialog,
