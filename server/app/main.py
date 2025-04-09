@@ -9,7 +9,7 @@ from app.api.document_api import document_router
 from app.api.highlight_api import highlight_router
 from app.api.message_api import message_router
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -28,13 +28,16 @@ app = FastAPI(
     version="1.0.0",
 )
 
+client_domain = os.getenv("CLIENT_DOMAIN", "http://localhost:3000")
+
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
-    allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_origins=[client_domain],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=600,  # Cache preflight requests for 10 minutes
 )
 
 # Mount the uploads directory
@@ -62,7 +65,7 @@ if __name__ == "__main__":
         "app.main:app",
         host="0.0.0.0",
         port=port,
-        reload=True,
+        # reload=True,
         log_level="debug",
         log_config=log_config,
     )
