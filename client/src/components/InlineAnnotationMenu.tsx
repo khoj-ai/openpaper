@@ -3,7 +3,7 @@ import { getSelectionOffsets } from "./utils/PdfTextUtils";
 import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { CommandShortcut } from "./ui/command";
-import { Highlighter, Minus, Plus, X } from "lucide-react";
+import { Copy, Highlighter, MessageCircle, Minus, NotebookText, X } from "lucide-react";
 
 interface InlineAnnotationMenuProps {
     selectedText: string;
@@ -68,6 +68,18 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                 setTooltipPosition(null);
                 setIsAnnotating(false);
             }
+
+            if (e.key === "h" && (e.ctrlKey || e.metaKey)) {
+                addHighlight(selectedText, offsets?.start, offsets?.end);
+                e.stopPropagation();
+            }
+
+            if (e.key === "d" && (e.ctrlKey || e.metaKey) && isHighlightInteraction && activeHighlight) {
+                removeHighlight(activeHighlight);
+                setSelectedText("");
+                setTooltipPosition(null);
+                setIsAnnotating(false);
+            }
         }
 
         window.addEventListener("keydown", handleMouseDown);
@@ -90,7 +102,7 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                 {/* Copy Button */}
                 <Button
                     variant="ghost"
-                    className="w-full justify-between text-sm font-normal h-9"
+                    className="w-full flex items-center justify-between text-sm font-normal h-9 px-2"
                     onClick={() => {
                         navigator.clipboard.writeText(selectedText);
                         setSelectedText("");
@@ -98,30 +110,41 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                         setIsAnnotating(false);
                     }}
                 >
-                    Copy
+                    <div className="flex items-center gap-2">
+                        <Copy size={14} />
+                        Copy
+                    </div>
                     <CommandShortcut className="text-muted-foreground">
                         {localizeCommandToOS('C')}
                     </CommandShortcut>
                 </Button>
 
                 {/* Highlight Button */}
-                <Button
-                    variant="default"
-                    className="w-full justify-start gap-2 text-sm h-9"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        addHighlight(selectedText, offsets?.start, offsets?.end);
-                    }}
-                >
-                    <Highlighter size={14} />
-                    Highlight
-                </Button>
-
+                {
+                    !isHighlightInteraction && (
+                        <Button
+                            variant="ghost"
+                            className="w-full flex items-center justify-between text-sm font-normal h-9 px-2"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                addHighlight(selectedText, offsets?.start, offsets?.end);
+                            }}
+                        >
+                            <div className="flex items-center gap-2">
+                                <Highlighter size={14} />
+                                Highlight
+                            </div>
+                            <CommandShortcut className="text-muted-foreground">
+                                {localizeCommandToOS('H')}
+                            </CommandShortcut>
+                        </Button>
+                    )
+                }
                 {/* Add Note Button */}
                 <Button
                     variant="ghost"
-                    className="w-full justify-start gap-2 text-sm h-9"
+                    className="w-full flex items-center justify-between text-sm font-normal h-9 px-2"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={(e) => {
                         e.stopPropagation();
@@ -131,18 +154,44 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                         setIsAnnotating(false);
                     }}
                 >
-                    <Plus size={14} />
-                    Add to Note
+                    <div className="flex items-center gap-2">
+                        <NotebookText size={14} />
+                        Add to Note
+                    </div>
                     <CommandShortcut className="text-muted-foreground">
                         {localizeCommandToOS('N')}
                     </CommandShortcut>
                 </Button>
 
+
+                {/* Add to Chat Button */}
+                <Button
+                    variant="ghost"
+                    className="w-full flex items-center justify-between text-sm font-normal h-9 px-2"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={(e) => {
+                        setUserMessageReferences(prev => Array.from(new Set([...prev, selectedText])));
+                        setSelectedText("");
+                        setTooltipPosition(null);
+                        setIsAnnotating(false);
+                        e.stopPropagation();
+                    }}
+                >
+                    <div className="flex items-center gap-2">
+                        <MessageCircle size={14} />
+                        Add to Chat
+                    </div>
+                    <CommandShortcut className="text-muted-foreground">
+                        {localizeCommandToOS('A')}
+                    </CommandShortcut>
+                </Button>
+
+
                 {/* Remove Highlight Button - Only show when interacting with highlight */}
                 {isHighlightInteraction && (
                     <Button
-                        variant="destructive"
-                        className="w-full justify-start gap-2 text-sm h-9"
+                        variant="ghost"
+                        className="w-full flex items-center justify-between text-sm font-normal h-9 px-2 text-destructive"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={(e) => {
                             e.stopPropagation();
@@ -154,37 +203,20 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                             }
                         }}
                     >
-                        <Minus size={14} />
-                        Remove Highlight
+                        <div className="flex items-center gap-2">
+                            <Minus size={14} />
+                            Delete
+                        </div>
+                        <CommandShortcut className="text-muted-foreground">
+                            {localizeCommandToOS('D')}
+                        </CommandShortcut>
                     </Button>
                 )}
-
-                {/* Add to Chat Button */}
-                <Button
-                    variant="ghost"
-                    className="w-full justify-between text-sm font-normal h-9"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={(e) => {
-                        setUserMessageReferences(prev => Array.from(new Set([...prev, selectedText])));
-                        setSelectedText("");
-                        setTooltipPosition(null);
-                        setIsAnnotating(false);
-                        e.stopPropagation();
-                    }}
-                >
-                    <div className="flex items-center gap-2">
-                        <Plus size={14} />
-                        Add to Chat
-                    </div>
-                    <CommandShortcut className="text-muted-foreground">
-                        {localizeCommandToOS('A')}
-                    </CommandShortcut>
-                </Button>
 
                 {/* Close Button */}
                 <Button
                     variant="ghost"
-                    className="w-full justify-start gap-2 text-sm h-9"
+                    className="w-full flex items-center justify-between text-sm font-normal h-9 px-2"
                     onClick={() => {
                         setSelectedText("");
                         setTooltipPosition(null);
