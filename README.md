@@ -7,7 +7,7 @@ I wanted to build something for myself that helped me address some of these issu
 
 The Annotated Paper is a place to upload your paper, highlight, leave comments, take notes, and chat all in one place. Search through your existing corpus of annotated papers.
 
-![The Annotated Paper](https://assets.khoj.dev/annotated_paper_upload.gif)
+![The Annotated Paper](./demo.gif)
 
 ## AI-powered copilot
 
