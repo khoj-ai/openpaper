@@ -1,4 +1,6 @@
-# The Annotated Paper
+# ![The Annotated Paper](https://raw.githubusercontent.com/sabaimran/annotated-paper/refs/heads/master/client/src/app/annotated_paper.svg) The Annotated Paper
+
+
 When reading lots of papers for research, it can be hard to keep track of your notes and annotations. When you need to go deeper into a specific topic or clarify something you don't understand, you may switch contexts many times to look up terms, concepts, related research.
 
 I wanted to build something for myself that helped me address some of these issues in one place.
