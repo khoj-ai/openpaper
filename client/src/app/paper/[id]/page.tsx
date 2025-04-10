@@ -550,7 +550,7 @@ export default function PaperView() {
 
     useEffect(() => {
         if (addedContentForPaperNote) {
-            const newNoteContent = paperNoteContent ? `${paperNoteContent}` + `\n` + `${addedContentForPaperNote}` : `${addedContentForPaperNote}`;
+            const newNoteContent = paperNoteContent ? `${paperNoteContent}` + `\n\n` + `> ${addedContentForPaperNote}` : `> ${addedContentForPaperNote}`;
 
             setPaperNoteContent(newNoteContent);
 
