@@ -5,11 +5,15 @@ I wanted to build something for myself that helped me address some of these issu
 
 The Annotated Paper is a place to upload your paper, highlight, leave comments, take notes, and chat all in one place. Search through your existing corpus of annotated papers.
 
+![The Annotated Paper](https://assets.khoj.dev/annotated_paper_upload.gif)
+
 ## AI-powered copilot
 
 AI is very useful at helping us elicit an understanding of new information in large, complex documents and translating between complexity <-> simplicity. This is useful in a research context, where the true meaning behind an insight, methodology, or hypothesis may not be immediately apparent. We want to build better bridges between where we are and where we need to go.
 
 As soon as you upload your PDF, you'll be taken to the page view, which shows you an AI-generated brief on the paper, and some good starter questions. You can use these to quickly ground yourself before diving in.
+
+The AI copilot uses a citations annotation protocol that pushes it to ground its responses in the context of the protocol, while making it easy for you to click and navigate to the exact location in the document where that context may have appeared. One of the challenges here was implementing it in an efficient way where the response could be grounded, but still streamed back to the user for speed. The lookup logic relies on string matching, so it currently is imperfect, but it works well enough for most cases.
 
 ## Parallel Views
 
