@@ -1,13 +1,17 @@
-# FastAPI Application
+# Server
 
-This is a basic FastAPI application with a health checkpoint endpoint.
+This server manages the backend for the Annotated Paper project, which allows users to upload, chat with, annotate, and manage research papers in one place.
+
+## Prerequisites
+- Python 3.12 or higher
+- PostgreSQL database
 
 ## Setup
 
-1. Create a virtual environment (optional but recommended):
+1. Create a virtual environment (optional but recommended). I'm using [uv](https://docs.astral.sh/uv/getting-started/installation/), but you can use any virtual environment tool you prefer:
 ```bash
 uv venv --python 3.12
-source .venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+source .venv/bin/activate
 ```
 
 2. Install dependencies:
@@ -15,24 +19,34 @@ source .venv/bin/activate  # On Windows, use `venv\Scripts\activate`
 uv pip install -r pyproject.toml
 ```
 
+3. Get an API key from [Google AI Studio](https://aistudio.google.com/apikey)
+
+4. Set up environment variables:
+```bash
+touch .env
+```
+
+Add the following environment variables to your `.env` file:
+```bash
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/annotated-paper
+GEMINI_API_KEY="your_gemini_api_key" # Replace with your actual API key from step 3
+```
+
 ## Running the Application
 
 To run the application:
 
+1. Setup the DB:
+
 ```bash
-uvicorn api:app --reload
-
-# or
-
-python3 -m app.main
+python3 app/scripts/run_migrations.py
 ```
 
-The application will start on `http://localhost:8000`
+2. Start the server:
 
-## Available Endpoints
-
-- Health Check: `GET /health`
-  - Returns the health status of the application
+```bash
+python3 -m app.main
+```
 
 ## API Documentation
 
@@ -40,11 +54,6 @@ FastAPI automatically generates API documentation. Once the application is runni
 
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
-
-# Database
-
-We're using a PostgreSQL database with SQLAlchemy ORM.
-Make sure to set the `DATABASE_URL` environment variable to your PostgreSQL connection string.
 
 # Migrations
 
