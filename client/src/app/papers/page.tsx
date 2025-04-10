@@ -108,7 +108,8 @@ export default function PapersPage() {
                                 {
                                     paper.authors && (
                                         <p className="text-sm text-gray-500 mb-2">
-                                            {paper.authors.join(", ")}
+                                            {paper.authors.slice(0,5).join(", ")}
+                                            {paper.authors.length > 5 && `, et al.`}
                                         </p>
                                     )
                                 }

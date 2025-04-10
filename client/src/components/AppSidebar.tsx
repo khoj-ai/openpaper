@@ -124,10 +124,7 @@ export function AppSidebar() {
                 const sortedPapers = response.papers.sort((a: PaperItem, b: PaperItem) => {
                     return new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime();
                 });
-                // Retain the 5 MRU papers
-                const mruPapers = sortedPapers.slice(0, 5);
-                // Set the state with the sorted papers
-                setAllPapers(mruPapers);
+                setAllPapers(sortedPapers);
             } catch (error) {
                 console.error("Error fetching papers:", error)
             }

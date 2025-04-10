@@ -10,6 +10,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 
 interface PdfUploadResponse {
@@ -22,6 +23,8 @@ export default function Home() {
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [isUploading, setIsUploading] = useState(false);
 	const [loadingMessage, setLoadingMessage] = useState("Preparing your paper...");
+	const [isDialogOpen, setIsDialogOpen] = useState(false);
+	const [pdfUrl, setPdfUrl] = useState("");
 
 	// Loading messages to cycle through
 	const loadingMessages = [
@@ -58,7 +61,6 @@ export default function Home() {
 			const response: PdfUploadResponse = await fetchFromApi('/api/paper/upload', {
 				method: 'POST',
 				body: formData,
-				// Don't set Content-Type header - browser will set it automatically with boundary
 				headers: {
 					Accept: 'application/json',
 				},
@@ -76,31 +78,20 @@ export default function Home() {
 	const handlePdfUrl = async (url: string) => {
 		setIsUploading(true);
 		try {
-			// Fetch the PDF file
 			const response = await fetch(url);
 			if (!response.ok) throw new Error('Failed to fetch PDF');
 
-			// Get the filename from the URL or Content-Disposition header
 			const contentDisposition = response.headers.get('content-disposition');
 			const randomFilename = Math.random().toString(36).substring(2, 15) + '.pdf';
 			let filename = randomFilename;
 
 			if (contentDisposition && contentDisposition.includes('attachment')) {
-				// Extract filename from Content-Disposition header
 				const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
 				const matches = filenameRegex.exec(contentDisposition);
 				if (matches != null && matches[1]) {
 					filename = matches[1].replace(/['"]/g, '');
 				}
-			}
-
-			if (contentDisposition) {
-				const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(contentDisposition);
-				if (matches != null && matches[1]) {
-					filename = matches[1].replace(/['"]/g, '');
-				}
 			} else {
-				// Try to get filename from URL
 				const urlParts = url.split('/');
 				const urlFilename = urlParts[urlParts.length - 1];
 				if (urlFilename && urlFilename.toLowerCase().endsWith('.pdf')) {
@@ -108,13 +99,9 @@ export default function Home() {
 				}
 			}
 
-			// Convert the response to a blob
 			const blob = await response.blob();
-
-			// Create a File object
 			const file = new File([blob], filename, { type: 'application/pdf' });
 
-			// Upload the file
 			await handleFileUpload(file);
 		} catch (error) {
 			console.error('Error processing PDF URL:', error);
@@ -127,15 +114,20 @@ export default function Home() {
 		fileInputRef.current?.click();
 	};
 
-	const handleLinkClick = async () => {
-		const url = prompt('Enter PDF URL:');
-		if (url) {
-			await handlePdfUrl(url);
+	const handleLinkClick = () => {
+		setIsDialogOpen(true);
+	};
+
+	const handleDialogConfirm = async () => {
+		if (pdfUrl) {
+			await handlePdfUrl(pdfUrl);
 		}
+		setIsDialogOpen(false);
+		setPdfUrl("");
 	};
 
 	return (
-		<div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
+		<div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center h-[calc(100vh-64px)] p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
 			<main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start w-full max-w-6xl">
 				<header className="text-2xl font-bold">
 					The Annotated Paper
@@ -167,6 +159,33 @@ export default function Home() {
 					Made with ❤️ in{" "} <a href="https://github.com/sabaimran/annotated-paper" target="_blank" rel="noopener noreferrer">San Francisco</a>
 				</p>
 			</footer>
+
+			{/* Dialog for PDF URL */}
+			<Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Link to a PDF</DialogTitle>
+						<DialogDescription>
+							Enter the URL of the PDF you want to upload.
+						</DialogDescription>
+					</DialogHeader>
+					<Input
+						type="url"
+						placeholder="https://example.com/document.pdf"
+						value={pdfUrl}
+						onChange={(e) => setPdfUrl(e.target.value)}
+						className="mt-4"
+					/>
+					<div className="flex justify-end gap-2 mt-4">
+						<Button variant="secondary" onClick={() => setIsDialogOpen(false)}>
+							Cancel
+						</Button>
+						<Button onClick={handleDialogConfirm}>
+							Submit
+						</Button>
+					</div>
+				</DialogContent>
+			</Dialog>
 
 			<Dialog open={isUploading} onOpenChange={(open) => !open && setIsUploading(false)}>
 				<DialogContent className="sm:max-w-md">
