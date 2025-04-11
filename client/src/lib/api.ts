@@ -16,6 +16,7 @@ export async function fetchFromApi(endpoint: string, options: RequestInit = {}) 
             ...headers,
             ...options.headers,
         },
+        credentials: 'include', // Include cookies for auth
     });
 
     if (!response.ok) {
@@ -36,6 +37,7 @@ export async function fetchStreamFromApi(
             // For SSE, we want text/event-stream instead of octet-stream
             Accept: 'text/event-stream',
         },
+        credentials: 'include', // Include cookies for auth
     });
 
     if (!response.ok) {

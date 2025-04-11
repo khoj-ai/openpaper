@@ -1,10 +1,11 @@
 "use client"
 
-import { Clock, FileText, Home, Moon, Sun } from "lucide-react";
+import { Clock, FileText, Home, LogOut, Moon, Sun, User } from "lucide-react";
 
 import {
     Sidebar,
     SidebarContent,
+    SidebarFooter,
     SidebarGroup,
     SidebarGroupContent,
     SidebarGroupLabel,
@@ -17,6 +18,15 @@ import {
 } from "@/components/ui/sidebar";
 import { useEffect, useState } from "react";
 import { fetchFromApi } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth";
+import { Avatar } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
 
 // Menu items.
 const items = [
@@ -45,6 +55,8 @@ export interface PaperItem {
 }
 
 export function AppSidebar() {
+    const router = useRouter();
+    const { user, logout } = useAuth();
     const [allPapers, setAllPapers] = useState<PaperItem[]>([])
     const [darkMode, setDarkMode] = useState<boolean>(false);
 
@@ -116,7 +128,6 @@ export function AppSidebar() {
             mediaQuery.addEventListener('change', handleChange);
         }
 
-
         // Define an async function inside useEffect
         const fetchPapers = async () => {
             try {
@@ -133,6 +144,11 @@ export function AppSidebar() {
         // Call the async function
         fetchPapers();
     }, [])
+
+    const handleLogout = async () => {
+        await logout();
+        router.push('/login');
+    }
 
     return (
         <Sidebar variant="floating">
@@ -185,6 +201,64 @@ export function AppSidebar() {
                     </SidebarGroupContent>
                 </SidebarGroup>
             </SidebarContent>
+            <SidebarFooter>
+                {/* User Profile (if logged in) */}
+                {user && (
+                    <SidebarMenuItem className="mb-2">
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <SidebarMenuButton className="flex items-center gap-2">
+                                    <Avatar className="h-6 w-6">
+                                        {user.picture ? (
+                                            <img src={user.picture} alt={user.name} />
+                                        ) : (
+                                            <User size={16} />
+                                        )}
+                                    </Avatar>
+                                    <span className="truncate">{user.name}</span>
+                                </SidebarMenuButton>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-60 p-4" align="start">
+                                <div className="flex flex-col gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <Avatar className="h-10 w-10">
+                                            {user.picture ? (
+                                                <img src={user.picture} alt={user.name} />
+                                            ) : (
+                                                <User size={24} />
+                                            )}
+                                        </Avatar>
+                                        <div>
+                                            <h3 className="font-medium">{user.name}</h3>
+                                            <p className="text-sm text-muted-foreground">{user.email}</p>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        className="w-full justify-start"
+                                        onClick={handleLogout}
+                                    >
+                                        <LogOut size={16} className="mr-2" />
+                                        Sign out
+                                    </Button>
+                                </div>
+                            </PopoverContent>
+                        </Popover>
+                    </SidebarMenuItem>
+                )}
+
+                {/* Login button (if not logged in) */}
+                {!user && (
+                    <SidebarMenuItem>
+                        <SidebarMenuButton asChild>
+                            <a href="/login">
+                                <User size={16} />
+                                <span>Sign In</span>
+                            </a>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                )}
+            </SidebarFooter>
         </Sidebar>
     )
 }
