@@ -1,4 +1,5 @@
 import uuid
+from enum import Enum
 
 from sqlalchemy import ARRAY, UUID, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
@@ -39,14 +40,14 @@ class Document(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     filename = Column(String, nullable=False)
     file_url = Column(String, nullable=False)
-    authors = Column(ARRAY(String), nullable=True)  # type: ignore
+    authors = Column(ARRAY(String), nullable=True)
     title = Column(Text, nullable=True)
     abstract = Column(Text, nullable=True)
-    institutions = Column(ARRAY(String), nullable=True)  # type: ignore
-    keywords = Column(ARRAY(String), nullable=True)  # type: ignore
+    institutions = Column(ARRAY(String), nullable=True)
+    keywords = Column(ARRAY(String), nullable=True)
     summary = Column(Text, nullable=True)
     publish_date = Column(DateTime, nullable=True)
-    starter_questions = Column(ARRAY(String), nullable=True)  # type: ignore
+    starter_questions = Column(ARRAY(String), nullable=True)
     raw_content = Column(Text, nullable=True)
 
     conversations = relationship(
@@ -131,7 +132,7 @@ class Annotation(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     highlight_id = Column(
         UUID(as_uuid=True), ForeignKey("highlights.id"), nullable=False
-    )  # type: ignore
+    )
 
     document_id = Column(
         UUID(as_uuid=True),

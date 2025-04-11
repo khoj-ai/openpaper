@@ -19,4 +19,5 @@ dependencies = [
     "types-psycopg2>=2.9.21.20250318",
     "types-requests>=2.32.0.20250306",
     "markitdown[pdf]>=0.1.0",
+    "sqlalchemy2-stubs>=0.0.2a38",
 ]

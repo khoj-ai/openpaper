@@ -98,7 +98,7 @@ class MessageCRUD(CRUDBase[Message, MessageCreate, MessageUpdate]):
         """
         messages = self.get_conversation_messages(db, conversation_id=conversation_id)
         for i, message in enumerate(messages):
-            message.sequence = (i + 1) * gap  # type: ignore
+            message.sequence = (i + 1) * gap
         db.commit()
 
 
