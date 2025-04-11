@@ -1,7 +1,17 @@
 import uuid
 from enum import Enum
 
-from sqlalchemy import ARRAY, UUID, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    ARRAY,
+    UUID,
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, relationship
 from sqlalchemy.sql import func
@@ -34,6 +44,54 @@ class Base(DeclarativeBase):
         }
 
 
+class AuthProvider(str, Enum):
+    GOOGLE = "google"
+    # Add more providers as needed
+    # GITHUB = "github"
+    # MICROSOFT = "microsoft"
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email = Column(String, unique=True, nullable=False, index=True)
+    name = Column(String, nullable=True)
+    picture = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+    is_admin = Column(Boolean, default=False)
+
+    # OAuth related fields
+    auth_provider = Column(String, nullable=False)
+    provider_user_id = Column(String, nullable=False, index=True)
+
+    # Optional profile information
+    locale = Column(String, nullable=True)
+
+    # Relationships to other models
+    documents = relationship("Document", back_populates="user")
+
+    # Session tokens for authentication
+    sessions = relationship(
+        "Session", back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class Session(Base):
+    __tablename__ = "sessions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    token = Column(String, unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    user_agent = Column(String, nullable=True)
+    ip_address = Column(String, nullable=True)
+
+    user = relationship("User", back_populates="sessions")
+
+
 class Document(Base):
     __tablename__ = "documents"
 
@@ -49,7 +107,9 @@ class Document(Base):
     publish_date = Column(DateTime, nullable=True)
     starter_questions = Column(ARRAY(String), nullable=True)
     raw_content = Column(Text, nullable=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
+    user = relationship("User", back_populates="documents")
     conversations = relationship(
         "Conversation", back_populates="document", cascade="all, delete-orphan"
     )
