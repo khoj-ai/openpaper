@@ -137,13 +137,16 @@ export function AppSidebar() {
                 });
                 setAllPapers(sortedPapers);
             } catch (error) {
-                console.error("Error fetching papers:", error)
+                console.error("Error fetching papers:", error);
+                setAllPapers([]);
             }
         }
 
+        console.log("Fetching papers...");
+
         // Call the async function
         fetchPapers();
-    }, [])
+    }, [user]);
 
     const handleLogout = async () => {
         await logout();
@@ -251,9 +254,12 @@ export function AppSidebar() {
                 {!user && (
                     <SidebarMenuItem>
                         <SidebarMenuButton asChild>
-                            <a href="/login">
+                            <a
+                                href="/login"
+                                className="w-full flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 px-3 py-2 rounded-md transition-colors"
+                            >
                                 <User size={16} />
-                                <span>Sign In</span>
+                                <span className="font-medium">Sign In</span>
                             </a>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
