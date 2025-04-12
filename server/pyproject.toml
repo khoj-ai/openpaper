@@ -20,4 +20,6 @@ dependencies = [
     "types-requests>=2.32.0.20250306",
     "markitdown[pdf]>=0.1.0",
     "sqlalchemy2-stubs>=0.0.2a38",
+    "boto3>=1.37.33",
+    "types-boto3>=1.37.33",
 ]

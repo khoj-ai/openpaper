@@ -1,4 +1,6 @@
 import logging
+import os
+import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -18,6 +20,7 @@ from app.database.crud.paper_note_crud import (
 )
 from app.database.database import get_db
 from app.database.models import Document
+from app.helpers.s3 import s3_service
 from app.llm.operations import Operations
 from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
@@ -231,6 +234,12 @@ async def get_pdf(
 
     paper_data = document.to_dict()
 
+    signed_url = s3_service.generate_presigned_url(object_key=document.s3_object_key)
+    if not signed_url:
+        return JSONResponse(status_code=404, content={"message": "File not found"})
+
+    paper_data["file_url"] = signed_url
+
     # Return the file URL
     return JSONResponse(status_code=200, content=paper_data)
 
@@ -253,6 +262,11 @@ async def delete_pdf(
 
     # Delete the document from the database
     try:
+        # Delete the file from S3 if s3_object_key exists
+        if document.s3_object_key:
+            s3_service.delete_file(document.s3_object_key)
+            logger.info(f"Deleted S3 object: {document.s3_object_key}")
+
         document_crud.remove(db, id=id, user=current_user)
         return JSONResponse(status_code=200, content={"message": "Document deleted"})
     except Exception as e:
@@ -276,29 +290,37 @@ async def upload_pdf(
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         return JSONResponse(status_code=400, content={"message": "File must be a PDF"})
 
-    # Ensure we have a valid filename
-    safe_filename = file.filename.replace(" ", "_")
-    file_path = UPLOAD_DIR / safe_filename
-
-    with open(file_path, "wb") as buffer:
+    # Create a temporary file for processing
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
         contents = await file.read()
-        buffer.write(contents)
+        temp_file.write(contents)
+        temp_file_path = temp_file.name
 
-    host_url = str(request.base_url)
-    file_upload_url = f"{host_url}uploads/{safe_filename}"
+    # Reset file pointer for S3 upload
+    await file.seek(0)
 
-    # Create a new document record in the database
+    # Upload to S3
     try:
-        document = DocumentCreate(filename=safe_filename, file_url=file_upload_url)
+        # Upload the file to S3
+        object_key, file_url = await s3_service.upload_file(file)
+
+        # Ensure we have a valid filename for the record
+        safe_filename = file.filename.replace(" ", "_")
+
+        # Create a new document record in the database with S3 details
+        document = DocumentCreate(
+            filename=safe_filename, file_url=file_url, s3_object_key=object_key
+        )
+
         created_doc: Document = document_crud.create(
             db, obj_in=document, user=current_user
         )
 
-        # TODO this can be improved by using a background task
+        # Extract metadata from the temporary file
         extract_metadata = llm_operations.extract_paper_metadata(
             paper_id=str(created_doc.id),
             user=current_user,
-            file_path=str(file_path),
+            file_path=temp_file_path,
             db=db,
         )
 
@@ -342,12 +364,18 @@ async def upload_pdf(
             db=db, db_obj=created_doc, obj_in=update_doc, user=current_user
         )
 
+        # Clean up the temporary file now that we're done with it
+        try:
+            os.unlink(temp_file_path)
+        except Exception as cleanup_error:
+            logger.warning(f"Failed to clean up temporary file: {cleanup_error}")
+
         return JSONResponse(
             status_code=200,
             content={
                 "message": "File uploaded successfully",
                 "filename": safe_filename,
-                "url": file_upload_url,
+                "url": file_url,
                 "document_id": str(updated_doc.id),
             },
         )
@@ -356,10 +384,17 @@ async def upload_pdf(
             f"Error creating document record: {str(e)}",
             exc_info=True,
         )
+
+        # Clean up temporary file in case of error
+        try:
+            os.unlink(temp_file_path)
+        except Exception:
+            pass
+
         return JSONResponse(
             status_code=500,
             content={
                 "message": f"Error creating document record: {str(e)}",
-                "filename": safe_filename,
+                "filename": file.filename if file and file.filename else "unknown",
             },
         )

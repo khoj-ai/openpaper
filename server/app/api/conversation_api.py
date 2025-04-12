@@ -23,9 +23,6 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-# Create uploads directory if it doesn't exist
-UPLOAD_DIR = Path("uploads")
-
 # Create API router with prefix
 conversation_router = APIRouter()
 

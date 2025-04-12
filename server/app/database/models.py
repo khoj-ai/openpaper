@@ -112,6 +112,9 @@ class Document(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     filename = Column(String, nullable=False)
     file_url = Column(String, nullable=False)
+    s3_object_key = Column(
+        String, nullable=True
+    )  # Store the S3 object key for deletion
     authors = Column(ARRAY(String), nullable=True)
     title = Column(Text, nullable=True)
     abstract = Column(Text, nullable=True)

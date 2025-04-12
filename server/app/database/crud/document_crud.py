@@ -6,6 +6,7 @@ import requests
 from app.database.crud.base_crud import CRUDBase
 from app.database.models import Document
 from app.helpers.parser import extract_text_from_pdf
+from app.helpers.s3 import s3_service
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -15,6 +16,7 @@ from sqlalchemy.orm import Session
 class DocumentBase(BaseModel):
     filename: Optional[str] = None
     file_url: Optional[str] = None
+    s3_object_key: Optional[str] = None
     authors: Optional[List[str]] = None
     title: Optional[str] = None
     abstract: Optional[str] = None
@@ -30,6 +32,7 @@ class DocumentCreate(DocumentBase):
     # Only mandate required fields for creation, others are optional
     filename: str
     file_url: str
+    s3_object_key: Optional[str] = None
 
 
 class DocumentUpdate(DocumentBase):
