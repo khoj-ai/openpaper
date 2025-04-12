@@ -4,6 +4,7 @@ from uuid import UUID
 
 from app.database.crud.base_crud import CRUDBase
 from app.database.models import Message
+from app.schemas.user import CurrentUser
 from pydantic import BaseModel
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
@@ -31,19 +32,24 @@ class MessageUpdate(BaseModel):
 class MessageCRUD(CRUDBase[Message, MessageCreate, MessageUpdate]):
     """CRUD operations specifically for Message model"""
 
-    def create(self, db: Session, *, obj_in: MessageCreate) -> Message:
+    def create(
+        self, db: Session, *, obj_in: MessageCreate, current_user: CurrentUser
+    ) -> Message:
         """Create a new message with auto-incrementing sequence number"""
         # Get the next sequence number for this conversation
         max_sequence = (
             db.query(func.max(Message.sequence))
-            .filter(Message.conversation_id == obj_in.conversation_id)
+            .filter(
+                Message.conversation_id == obj_in.conversation_id,
+                Message.user_id == current_user.id,
+            )
             .scalar()
         )
         next_sequence = (max_sequence or 0) + 1
 
         # Convert Pydantic model to dict and add sequence
         obj_in_data = obj_in.model_dump(exclude_unset=True)
-        db_obj = Message(**obj_in_data, sequence=next_sequence)
+        db_obj = Message(**obj_in_data, sequence=next_sequence, user_id=current_user.id)
 
         db.add(db_obj)
         db.commit()
@@ -51,7 +57,13 @@ class MessageCRUD(CRUDBase[Message, MessageCreate, MessageUpdate]):
         return db_obj
 
     def get_conversation_messages(
-        self, db: Session, *, conversation_id: UUID, page: int = 1, page_size: int = 10
+        self,
+        db: Session,
+        *,
+        conversation_id: UUID,
+        current_user: CurrentUser,
+        page: int = 1,
+        page_size: int = 10
     ) -> list[Message]:
         """
         Get messages for a conversation:
@@ -61,7 +73,10 @@ class MessageCRUD(CRUDBase[Message, MessageCreate, MessageUpdate]):
         """
         messages = (
             db.query(Message)
-            .filter(Message.conversation_id == conversation_id)
+            .filter(
+                Message.conversation_id == conversation_id,
+                Message.user_id == current_user.id,
+            )
             .order_by(desc(Message.sequence))  # newest first for pagination
             .offset((page - 1) * page_size)
             .limit(page_size)

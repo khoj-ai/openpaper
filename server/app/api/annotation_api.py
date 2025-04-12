@@ -1,6 +1,7 @@
 import logging
 import uuid
 
+from app.auth.dependencies import get_required_user
 from app.database.crud.annotation_crud import (
     AnnotationCreate,
     AnnotationUpdate,
@@ -8,6 +9,7 @@ from app.database.crud.annotation_crud import (
 )
 from app.database.database import get_db
 from app.database.models import Annotation
+from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -31,7 +33,9 @@ class UpdateAnnotationRequest(BaseModel):
 
 @annotation_router.post("")
 async def create_annotation(
-    request: CreateAnnotationRequest, db: Session = Depends(get_db)
+    request: CreateAnnotationRequest,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
 ) -> JSONResponse:
     """Create a new annotation for a highlight"""
     try:
@@ -42,6 +46,7 @@ async def create_annotation(
                 highlight_id=uuid.UUID(request.highlight_id),
                 content=request.content,
             ),
+            user=current_user,
         )
         return JSONResponse(
             status_code=201,
@@ -57,12 +62,14 @@ async def create_annotation(
 
 @annotation_router.get("/{document_id}")
 async def get_document_annotations(
-    document_id: str, db: Session = Depends(get_db)
+    document_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
 ) -> JSONResponse:
     """Get all annotations for a specific document"""
     try:
         annotations = annotation_crud.get_annotations_by_document_id(
-            db, document_id=uuid.UUID(document_id)
+            db, document_id=uuid.UUID(document_id), user=current_user
         )
         return JSONResponse(
             status_code=200,
@@ -78,11 +85,23 @@ async def get_document_annotations(
 
 @annotation_router.delete("/{annotation_id}")
 async def delete_annotation(
-    annotation_id: str, db: Session = Depends(get_db)
+    annotation_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
 ) -> JSONResponse:
     """Delete a specific annotation"""
     try:
-        annotation_crud.remove(db, id=annotation_id)
+        # First verify the annotation exists and belongs to the user
+        existing_annotation = annotation_crud.get(
+            db, id=annotation_id, user=current_user
+        )
+        if not existing_annotation:
+            return JSONResponse(
+                status_code=404,
+                content={"message": f"Annotation with ID {annotation_id} not found."},
+            )
+
+        annotation_crud.remove(db, id=annotation_id, user=current_user)
         return JSONResponse(
             status_code=200,
             content={"message": "Annotation deleted successfully"},
@@ -102,10 +121,13 @@ async def update_annotation(
     annotation_id: str,
     request: UpdateAnnotationRequest,
     db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
 ) -> JSONResponse:
     """Update an existing annotation"""
     try:
-        existing_annotation = annotation_crud.get(db, id=annotation_id)
+        existing_annotation = annotation_crud.get(
+            db, id=annotation_id, user=current_user
+        )
         if not existing_annotation:
             raise ValueError(f"Annotation with ID {annotation_id} not found.")
 
@@ -117,6 +139,7 @@ async def update_annotation(
                 highlight_id=uuid.UUID(str(existing_annotation.highlight_id)),
                 content=request.content,
             ),
+            user=current_user,
         )
         return JSONResponse(status_code=200, content=annotation.to_dict())
     except ValueError as e:

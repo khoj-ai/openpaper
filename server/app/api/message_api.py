@@ -4,13 +4,14 @@ import uuid
 from pathlib import Path
 from typing import List, Optional, Union
 
+from app.auth.dependencies import get_required_user
 from app.database.crud.message_crud import MessageCreate, message_crud
 from app.database.database import get_db
-from app.database.models import Conversation, Document
 from app.llm.operations import Operations
+from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -39,7 +40,9 @@ class ChatMessageRequest(BaseModel):
 
 @message_router.post("/chat")
 async def chat_message_stream(
-    request: ChatMessageRequest, db: Session = Depends(get_db)
+    request: ChatMessageRequest,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
 ) -> StreamingResponse:
     """
     Send a chat message and stream the response from the LLM
@@ -55,6 +58,7 @@ async def chat_message_stream(
                     paper_id=request.paper_id,
                     conversation_id=request.conversation_id,
                     question=request.user_query,
+                    current_user=current_user,
                     user_references=request.user_references,
                     db=db,
                 ):
@@ -90,6 +94,7 @@ async def chat_message_stream(
                         content=request.user_query,
                         references=formatted_references,
                     ),
+                    current_user=current_user,
                 )
 
                 # Save assistant message with both content and evidence
@@ -101,6 +106,7 @@ async def chat_message_stream(
                         content=full_content,
                         references=evidence if evidence else None,
                     ),
+                    current_user=current_user,
                 )
 
             except Exception as e:

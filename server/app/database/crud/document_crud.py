@@ -6,6 +6,7 @@ import requests
 from app.database.crud.base_crud import CRUDBase
 from app.database.models import Document
 from app.helpers.parser import extract_text_from_pdf
+from app.schemas.user import CurrentUser
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -40,13 +41,18 @@ class DocumentCRUD(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
     """CRUD operations specifically for Document model"""
 
     def read_raw_document_content(
-        self, db: Session, *, document_id: str, file_path: Optional[str] = None
+        self,
+        db: Session,
+        *,
+        document_id: str,
+        current_user: CurrentUser,
+        file_path: Optional[str] = None,
     ) -> str:
         """
         Read raw document content by ID.
         For PDF files, extract and return the text content.
         """
-        document: Document | None = self.get(db, document_id)
+        document: Document | None = self.get(db, document_id, user=current_user)
         if document is None:
             raise ValueError(f"Document with ID {document_id} not found.")
 

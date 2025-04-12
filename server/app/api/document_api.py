@@ -1,10 +1,10 @@
 import logging
-import os
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from app.auth.dependencies import get_required_user
 from app.database.crud.coversation_crud import conversation_crud
 from app.database.crud.document_crud import (
     DocumentCreate,
@@ -17,11 +17,12 @@ from app.database.crud.paper_note_crud import (
     paper_note_crud,
 )
 from app.database.database import get_db
-from app.database.models import Conversation, Document
+from app.database.models import Document
 from app.llm.operations import Operations
+from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -46,25 +47,15 @@ class UpdatePaperNoteSchema(BaseModel):
     content: str
 
 
-@document_router.get("/explain")
-async def explain_text(query: str):
-    """
-    Stream explanation of the provided text using the LLM
-    """
-
-    async def content_generator():
-        async for chunk in llm_operations.explain_text(contents=query):
-            yield chunk
-
-    return StreamingResponse(content_generator(), media_type="text/event-stream")
-
-
 @document_router.get("/all")
-async def get_paper_ids(db: Session = Depends(get_db)):
+async def get_paper_ids(
+    db: Session = Depends(get_db),
+    current_user: Optional[CurrentUser] = Depends(get_required_user),
+):
     """
     Get all paper IDs
     """
-    papers = document_crud.get_multi(db)
+    papers = document_crud.get_multi(db, user=current_user)
     if not papers:
         return JSONResponse(status_code=404, content={"message": "No papers found"})
     return JSONResponse(
@@ -89,11 +80,15 @@ async def get_paper_ids(db: Session = Depends(get_db)):
 
 
 @document_router.get("/note")
-async def get_paper_note(document_id: str, db: Session = Depends(get_db)):
+async def get_paper_note(
+    document_id: str,
+    db: Session = Depends(get_db),
+    current_user: Optional[CurrentUser] = Depends(get_required_user),
+):
     """
     Get the paper note associated with this document.
     """
-    target_paper = document_crud.get(db, id=document_id)
+    target_paper = document_crud.get(db, id=document_id, user=current_user)
 
     if not target_paper:
         raise HTTPException(
@@ -101,7 +96,7 @@ async def get_paper_note(document_id: str, db: Session = Depends(get_db)):
         )
 
     paper_note = paper_note_crud.get_paper_note_by_document_id(
-        db, document_id=document_id
+        db, document_id=document_id, user=current_user
     )
 
     if paper_note:
@@ -114,13 +109,16 @@ async def get_paper_note(document_id: str, db: Session = Depends(get_db)):
 
 @document_router.post("/note")
 async def create_paper_note(
-    document_id: str, request: CreatePaperNoteSchema, db: Session = Depends(get_db)
+    document_id: str,
+    request: CreatePaperNoteSchema,
+    db: Session = Depends(get_db),
+    current_user: Optional[CurrentUser] = Depends(get_required_user),
 ):
     """
     Create the paper note associated with this document
     """
     content = request.content
-    target_paper = document_crud.get(db, id=document_id)
+    target_paper = document_crud.get(db, id=document_id, user=current_user)
 
     if not target_paper:
         raise HTTPException(
@@ -131,20 +129,25 @@ async def create_paper_note(
         document_id=uuid.UUID(document_id), content=content
     )
 
-    paper_note = paper_note_crud.create(db, obj_in=paper_note_to_create)
+    paper_note = paper_note_crud.create(
+        db, obj_in=paper_note_to_create, user=current_user
+    )
 
-    return JSONResponse(content=paper_note.to_dict(), status_code=200)
+    return JSONResponse(content=paper_note.to_dict(), status_code=201)
 
 
 @document_router.put("/note")
 async def update_paper_note(
-    document_id: str, request: UpdatePaperNoteSchema, db: Session = Depends(get_db)
+    document_id: str,
+    request: UpdatePaperNoteSchema,
+    db: Session = Depends(get_db),
+    current_user: Optional[CurrentUser] = Depends(get_required_user),
 ):
     """
     Update the paper note associated with this document
     """
     content = request.content
-    target_paper = document_crud.get(db, id=document_id)
+    target_paper = document_crud.get(db, id=document_id, user=current_user)
 
     if not target_paper:
         raise HTTPException(
@@ -152,7 +155,7 @@ async def update_paper_note(
         )
 
     paper_note = paper_note_crud.get_paper_note_by_document_id(
-        db, document_id=document_id
+        db, document_id=document_id, user=current_user
     )
 
     if not paper_note:
@@ -164,28 +167,32 @@ async def update_paper_note(
     paper_note_to_update = PaperNoteUpdate(content=content)
 
     updated_paper_note = paper_note_crud.update(
-        db=db, db_obj=paper_note, obj_in=paper_note_to_update
+        db=db, db_obj=paper_note, obj_in=paper_note_to_update, user=current_user
     )
 
     return JSONResponse(content=updated_paper_note.to_dict(), status_code=200)
 
 
 @document_router.get("/conversation")
-async def get_mru_paper_conversation(document_id: str, db: Session = Depends(get_db)):
+async def get_mru_paper_conversation(
+    document_id: str,
+    db: Session = Depends(get_db),
+    current_user: Optional[CurrentUser] = Depends(get_required_user),
+):
     """
     Get latest conversation associated with specific document
     """
     casted_document_id = uuid.UUID(document_id)
 
     # Fetch the document from the database
-    document = document_crud.get(db, id=document_id)
+    document = document_crud.get(db, id=document_id, user=current_user)
 
     if not document:
         return JSONResponse(status_code=404, content={"message": "Document not found"})
 
     # Fetch the latest conversation associated with the document
     conversations = conversation_crud.get_document_conversations(
-        db, document_id=casted_document_id
+        db, document_id=casted_document_id, current_user=current_user
     )
 
     if not conversations or len(conversations) == 0:
@@ -207,12 +214,17 @@ async def get_mru_paper_conversation(document_id: str, db: Session = Depends(get
 
 
 @document_router.get("")
-async def get_pdf(request: Request, id: str, db: Session = Depends(get_db)):
+async def get_pdf(
+    request: Request,
+    id: str,
+    db: Session = Depends(get_db),
+    current_user: Optional[CurrentUser] = Depends(get_required_user),
+):
     """
     Get a document by ID
     """
     # Fetch the document from the database
-    document = document_crud.get(db, id=id)
+    document = document_crud.get(db, id=id, user=current_user)
 
     if not document:
         return JSONResponse(status_code=404, content={"message": "Document not found"})
@@ -224,19 +236,24 @@ async def get_pdf(request: Request, id: str, db: Session = Depends(get_db)):
 
 
 @document_router.delete("")
-async def delete_pdf(request: Request, id: str, db: Session = Depends(get_db)):
+async def delete_pdf(
+    request: Request,
+    id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
     """
     Delete a document by ID
     """
     # Fetch the document from the database
-    document = document_crud.get(db, id=id)
+    document = document_crud.get(db, id=id, user=current_user)
 
     if not document:
         return JSONResponse(status_code=404, content={"message": "Document not found"})
 
     # Delete the document from the database
     try:
-        document_crud.remove(db, id=id)
+        document_crud.remove(db, id=id, user=current_user)
         return JSONResponse(status_code=200, content={"message": "Document deleted"})
     except Exception as e:
         logger.error(f"Error deleting document: {str(e)}")
@@ -248,7 +265,10 @@ async def delete_pdf(request: Request, id: str, db: Session = Depends(get_db)):
 
 @document_router.post("/upload")
 async def upload_pdf(
-    request: Request, file: UploadFile = File(...), db: Session = Depends(get_db)
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: Optional[CurrentUser] = Depends(get_required_user),
+    db: Session = Depends(get_db),
 ):
     """
     Upload a PDF file
@@ -270,11 +290,16 @@ async def upload_pdf(
     # Create a new document record in the database
     try:
         document = DocumentCreate(filename=safe_filename, file_url=file_upload_url)
-        created_doc: Document = document_crud.create(db, obj_in=document)
+        created_doc: Document = document_crud.create(
+            db, obj_in=document, user=current_user
+        )
 
         # TODO this can be improved by using a background task
         extract_metadata = llm_operations.extract_paper_metadata(
-            paper_id=str(created_doc.id), file_path=str(file_path), db=db
+            paper_id=str(created_doc.id),
+            user=current_user,
+            file_path=str(file_path),
+            db=db,
         )
 
         # Try parse date into a valid datetime object. If four digits, then assume year
@@ -314,7 +339,7 @@ async def upload_pdf(
         )
 
         updated_doc: Document = document_crud.update(
-            db=db, db_obj=created_doc, obj_in=update_doc
+            db=db, db_obj=created_doc, obj_in=update_doc, user=current_user
         )
 
         return JSONResponse(

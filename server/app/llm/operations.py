@@ -14,6 +14,7 @@ from app.llm.prompts import (
     EXTRACT_PAPER_METADATA,
 )
 from app.llm.schemas import PaperMetadataExtraction
+from app.schemas.user import CurrentUser
 from fastapi import Depends
 from google import genai  # type: ignore
 from google.genai.types import Content  # type: ignore
@@ -165,20 +166,21 @@ class Operations:
     def extract_paper_metadata(
         self,
         paper_id: str,
+        user: CurrentUser,
         file_path: Optional[str] = None,
         db: Session = Depends(get_db),
     ) -> PaperMetadataExtraction:
         """
         Extract metadata from the paper using the specified model
         """
-        paper = document_crud.get(db, id=paper_id)
+        paper = document_crud.get(db, id=paper_id, user=user)
 
         if not paper:
             raise ValueError(f"Paper with ID {paper_id} not found.")
 
         # Load and extract raw data from the PDF
         raw_file = document_crud.read_raw_document_content(
-            db, document_id=paper_id, file_path=file_path
+            db, document_id=paper_id, current_user=user, file_path=file_path
         )
 
         if not raw_file:
@@ -211,6 +213,7 @@ class Operations:
         paper_id: str,
         conversation_id: str,
         question: str,
+        current_user: CurrentUser,
         user_references: Optional[Sequence[str]] = None,
         file_path: Optional[str] = None,
         db: Session = Depends(get_db),
@@ -275,7 +278,7 @@ class Operations:
 
         # Load and extract raw data from the PDF
         raw_file = document_crud.read_raw_document_content(
-            db, document_id=paper_id, file_path=file_path
+            db, document_id=paper_id, current_user=current_user, file_path=file_path
         )
         if not raw_file:
             raise ValueError(
@@ -285,7 +288,7 @@ class Operations:
         casted_conversation_id = uuid.UUID(conversation_id)
 
         conversation_history = message_crud.get_conversation_messages(
-            db, conversation_id=casted_conversation_id
+            db, conversation_id=casted_conversation_id, current_user=current_user
         )
 
         chat_history = self.convert_chat_history_to_api_format(conversation_history)

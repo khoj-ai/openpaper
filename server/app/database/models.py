@@ -68,12 +68,26 @@ class User(Base):
     # Optional profile information
     locale = Column(String, nullable=True)
 
-    # Relationships to other models
-    documents = relationship("Document", back_populates="user")
-
-    # Session tokens for authentication
+    documents = relationship(
+        "Document", back_populates="user", cascade="all, delete-orphan"
+    )
     sessions = relationship(
         "Session", back_populates="user", cascade="all, delete-orphan"
+    )
+    messages = relationship(
+        "Message", back_populates="user", cascade="all, delete-orphan"
+    )
+    conversations = relationship(
+        "Conversation", back_populates="user", cascade="all, delete-orphan"
+    )
+    paper_notes = relationship(
+        "PaperNote", back_populates="user", cascade="all, delete-orphan"
+    )
+    highlights = relationship(
+        "Highlight", back_populates="user", cascade="all, delete-orphan"
+    )
+    annotations = relationship(
+        "Annotation", back_populates="user", cascade="all, delete-orphan"
     )
 
 
@@ -132,6 +146,9 @@ class Message(Base):
     )  # For assistant's document snippet references
     bucket = Column(JSONB, nullable=True)  # For any additional attributes
     sequence = Column(Integer, nullable=False)  # To maintain message order
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
+    user = relationship("User", back_populates="messages")
 
     conversation = relationship("Conversation", back_populates="messages")
 
@@ -146,6 +163,9 @@ class Conversation(Base):
         nullable=False,
     )
     title = Column(String, nullable=True)  # Optional conversation title
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
+    user = relationship("User", back_populates="conversations")
 
     document = relationship("Document", back_populates="conversations")
     messages = relationship(
@@ -166,6 +186,9 @@ class PaperNote(Base):
     )
     content = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
+    user = relationship("User", back_populates="paper_notes")
 
     document = relationship("Document", back_populates="paper_notes")
 
@@ -184,6 +207,9 @@ class Highlight(Base):
     raw_text = Column(Text, nullable=False)
     start_offset = Column(Integer, nullable=False)
     end_offset = Column(Integer, nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
+    user = relationship("User", back_populates="highlights")
 
 
 class Annotation(Base):
@@ -201,3 +227,6 @@ class Annotation(Base):
     )
 
     content = Column(Text, nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
+    user = relationship("User", back_populates="annotations")

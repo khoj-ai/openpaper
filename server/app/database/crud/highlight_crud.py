@@ -3,6 +3,7 @@ from uuid import UUID
 
 from app.database.crud.base_crud import CRUDBase
 from app.database.models import Highlight
+from app.schemas.user import CurrentUser
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -25,15 +26,17 @@ class HighlightUpdate(HighlightBase):
 class HighlightCrud(CRUDBase[Highlight, HighlightCreate, HighlightUpdate]):
     """CRUD operations specifically for Highlight model"""
 
-    def get_highlights_by_document_id(self, db: Session, *, document_id: str):
+    def get_highlights_by_document_id(
+        self, db: Session, *, document_id: str, user: Optional[CurrentUser] = None
+    ):
         """Get highlights associated with document"""
+        query = db.query(Highlight).filter(Highlight.document_id == document_id)
 
-        return (
-            db.query(Highlight)
-            .filter(Highlight.document_id == document_id)
-            .order_by(Highlight.created_at)
-            .all()
-        )
+        # Add user filter if user is provided
+        if user:
+            query = query.filter(Highlight.user_id == user.id)
+
+        return query.order_by(Highlight.created_at).all()
 
 
 # Create a single instance to use throughout the application

@@ -3,6 +3,7 @@ from uuid import UUID
 
 from app.database.crud.base_crud import CRUDBase
 from app.database.models import Conversation
+from app.schemas.user import CurrentUser
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -24,12 +25,15 @@ class ConversationCRUD(CRUDBase[Conversation, ConversationCreate, ConversationUp
     """CRUD operations specifically for Conversation model"""
 
     def get_document_conversations(
-        self, db: Session, *, document_id: UUID
+        self, db: Session, *, document_id: UUID, current_user: CurrentUser
     ) -> list[Conversation]:
         """Get all conversations for a document"""
         return (
             db.query(Conversation)
-            .filter(Conversation.document_id == document_id)
+            .filter(
+                Conversation.document_id == document_id,
+                Conversation.user_id == current_user.id,
+            )
             .order_by(Conversation.created_at)
             .all()
         )

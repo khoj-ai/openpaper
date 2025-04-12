@@ -3,6 +3,7 @@ from uuid import UUID
 
 from app.database.crud.base_crud import CRUDBase
 from app.database.models import PaperNote
+from app.schemas.user import CurrentUser
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -23,12 +24,14 @@ class PaperNoteUpdate(BaseModel):
 class PaperNoteCRUD(CRUDBase[PaperNote, PaperNoteCreate, PaperNoteUpdate]):
     """CRUD operations specifically for PaperNote model"""
 
-    def get_paper_note_by_document_id(self, db: Session, *, document_id: str):
+    def get_paper_note_by_document_id(
+        self, db: Session, *, document_id: str, user: CurrentUser
+    ):
         """Get paper note associated with document"""
 
         return (
             db.query(PaperNote)
-            .filter(PaperNote.document_id == document_id)
+            .filter(PaperNote.document_id == document_id, PaperNote.user_id == user.id)
             .order_by(PaperNote.created_at)
             .first()
         )

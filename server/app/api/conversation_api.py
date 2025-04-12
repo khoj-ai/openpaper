@@ -1,7 +1,9 @@
 import logging
 import uuid
 from pathlib import Path
+from typing import Optional
 
+from app.auth.dependencies import get_current_user, get_required_user
 from app.database.crud.coversation_crud import (
     ConversationCreate,
     ConversationUpdate,
@@ -9,11 +11,12 @@ from app.database.crud.coversation_crud import (
 )
 from app.database.crud.message_crud import message_crud
 from app.database.database import get_db
-from app.database.models import Conversation, Document
+from app.database.models import Conversation
 from app.llm.operations import Operations
+from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, File, Request, UploadFile
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 load_dotenv()
@@ -35,10 +38,13 @@ async def get_conversation(
     page: int = 1,
     page_size: int = 10,
     db: Session = Depends(get_db),
+    current_user: Optional[CurrentUser] = Depends(get_current_user),
 ) -> JSONResponse:
     """Get a specific conversation by ID"""
     try:
-        conversation: Conversation | None = conversation_crud.get(db, conversation_id)
+        conversation: Conversation | None = conversation_crud.get(
+            db, conversation_id, user=current_user
+        )
         if not conversation:
             raise ValueError(f"Conversation with ID {conversation_id} not found.")
 
@@ -46,7 +52,11 @@ async def get_conversation(
         casted_conversation_id = uuid.UUID(conversation_id)
 
         messages = message_crud.get_conversation_messages(
-            db, conversation_id=casted_conversation_id, page=page, page_size=page_size
+            db,
+            conversation_id=casted_conversation_id,
+            current_user=current_user,
+            page=page,
+            page_size=page_size,
         )
         formatted_messages = message_crud.messages_to_dict(messages)
 
@@ -70,13 +80,20 @@ async def get_conversation(
 
 @conversation_router.post("/{document_id}")
 async def create_conversation(
-    document_id: str, title: str | None = None, db: Session = Depends(get_db)
+    document_id: str,
+    title: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
 ) -> JSONResponse:
     """Create a new conversation for a document"""
     try:
+        # Create a conversation with the user ID
+        conversation_data = ConversationCreate(
+            document_id=uuid.UUID(document_id), title=title
+        )
+
         conversation: Conversation | None = conversation_crud.create(
-            db,
-            obj_in=ConversationCreate(document_id=uuid.UUID(document_id), title=title),
+            db, obj_in=conversation_data, user=current_user
         )
         if not conversation:
             raise ValueError("Failed to create conversation.")
@@ -98,15 +115,23 @@ async def create_conversation(
 
 @conversation_router.patch("/{conversation_id}")
 async def update_conversation(
-    conversation_id: str, title: str, db: Session = Depends(get_db)
+    conversation_id: str,
+    title: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
 ) -> JSONResponse:
     """Update conversation title"""
     try:
-        existing_conversation = conversation_crud.get(db, conversation_id)
+        existing_conversation = conversation_crud.get(
+            db, conversation_id, user=current_user
+        )
         if not existing_conversation:
             raise ValueError(f"Conversation with ID {conversation_id} not found.")
         conversation = conversation_crud.update(
-            db, db_obj=existing_conversation, obj_in=ConversationUpdate(title=title)
+            db,
+            db_obj=existing_conversation,
+            obj_in=ConversationUpdate(title=title),
+            user=current_user,
         )
         return JSONResponse(
             status_code=200,
@@ -124,11 +149,25 @@ async def update_conversation(
 
 @conversation_router.delete("/{conversation_id}")
 async def delete_conversation(
-    conversation_id: str, db: Session = Depends(get_db)
+    conversation_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
 ) -> JSONResponse:
     """Delete an existing conversation"""
     try:
-        conversation_crud.remove(db, id=conversation_id)
+        # First verify the conversation exists and belongs to the user
+        existing_conversation = conversation_crud.get(
+            db, conversation_id, user=current_user
+        )
+        if not existing_conversation:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "message": f"Conversation with ID {conversation_id} not found."
+                },
+            )
+
+        conversation_crud.remove(db, id=conversation_id, user=current_user)
         return JSONResponse(
             status_code=200, content={"message": "Conversation deleted successfully"}
         )
