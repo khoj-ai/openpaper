@@ -26,7 +26,7 @@ export default function Home() {
 	const [loadingMessage, setLoadingMessage] = useState("Preparing your paper...");
 	const [isDialogOpen, setIsDialogOpen] = useState(false);
 	const [pdfUrl, setPdfUrl] = useState("");
-	const { user } = useAuth();
+	const { user, loading: authLoading } = useAuth();
 
 	// Loading messages to cycle through
 	const loadingMessages = [
@@ -128,7 +128,7 @@ export default function Home() {
 		setPdfUrl("");
 	};
 
-	if (!user) {
+	if (!user && !authLoading) {
 		return (
 			<div className="grid grid-rows-[1fr_auto] min-h-[calc(100vh-64px)]">
 				<main className="max-w-6xl mx-auto space-y-24 p-8">
