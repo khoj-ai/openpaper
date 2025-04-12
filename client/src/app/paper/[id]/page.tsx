@@ -924,7 +924,7 @@ export default function PaperView() {
                 }
                 {
                     rightSideFunction === 'Chat' && (
-                        <div className="flex flex-col h-[calc(100vh-64px)] px-2">
+                        <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto">
                             {/* Paper Metadata Section */}
                             {paperData && (
                                 <PaperMetadata
