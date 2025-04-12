@@ -11,7 +11,8 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Loader2 } from "lucide-react";
+import { FileText, Highlighter, Loader2, MessageSquareText, Star, Users } from "lucide-react";
+import { useAuth } from "@/lib/auth";
 
 interface PdfUploadResponse {
 	filename: string;
@@ -25,6 +26,7 @@ export default function Home() {
 	const [loadingMessage, setLoadingMessage] = useState("Preparing your paper...");
 	const [isDialogOpen, setIsDialogOpen] = useState(false);
 	const [pdfUrl, setPdfUrl] = useState("");
+	const { user } = useAuth();
 
 	// Loading messages to cycle through
 	const loadingMessages = [
@@ -125,6 +127,97 @@ export default function Home() {
 		setIsDialogOpen(false);
 		setPdfUrl("");
 	};
+
+	if (!user) {
+		return (
+			<div className="grid grid-rows-[1fr_auto] min-h-[calc(100vh-64px)]">
+				<main className="max-w-6xl mx-auto space-y-24 p-8">
+					{/* Hero Section */}
+					<div className="flex flex-col items-center text-center space-y-8">
+						<h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
+							Your Research Papers,{" "}
+							<span className="text-primary">Supercharged with AI</span>
+						</h1>
+						<p className="text-xl text-muted-foreground max-w-2xl">
+							Upload your papers to one secure place. Read, annotate, and understand them deeply with the help of AI-powered insights.
+						</p>
+						<div className="flex gap-4">
+							<Button size="lg" asChild>
+								<a href="/login">Get Started</a>
+							</Button>
+							<Button size="lg" variant="outline" asChild>
+								<a href="https://github.com/sabaimran/annotated-paper">View on GitHub</a>
+							</Button>
+						</div>
+					</div>
+
+					{/* Features Grid */}
+					<div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+						<div className="space-y-4">
+							<div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+								<FileText className="h-5 w-5 text-primary" />
+							</div>
+							<h3 className="text-xl font-semibold">Centralized Library</h3>
+							<p className="text-muted-foreground">
+								Keep all your research papers organized in one place. No more scattered PDFs across devices.
+							</p>
+						</div>
+						<div className="space-y-4">
+							<div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+								<Highlighter className="h-5 w-5 text-primary" />
+							</div>
+							<h3 className="text-xl font-semibold">Smart Annotations</h3>
+							<p className="text-muted-foreground">
+								Highlight key insights and add notes that stay in sync with your papers. Never lose track of important information again.
+							</p>
+						</div>
+						<div className="space-y-4">
+							<div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+								<MessageSquareText className="h-5 w-5 text-primary" />
+							</div>
+							<h3 className="text-xl font-semibold">AI-Powered Understanding</h3>
+							<p className="text-muted-foreground">
+								Ask questions about your papers and get intelligent responses based on the content. Go deeper while staying focused.
+							</p>
+						</div>
+					</div>
+
+					{/* Social Proof */}
+					{/* <div className="text-center space-y-8">
+						<h2 className="text-3xl font-bold">Used by researchers worldwide</h2>
+						<div className="flex flex-wrap justify-center gap-12 text-muted-foreground">
+							<div className="flex items-center gap-2">
+								<Users className="h-5 w-5" />
+								<span>1000+ Active Users</span>
+							</div>
+							<div className="flex items-center gap-2">
+								<FileText className="h-5 w-5" />
+								<span>10,000+ Papers Analyzed</span>
+							</div>
+							<div className="flex items-center gap-2">
+								<Star className="h-5 w-5" />
+								<span>4.9/5 Average Rating</span>
+							</div>
+						</div>
+					</div> */}
+				</main>
+
+				<footer className="p-8 text-center text-muted-foreground border-t">
+					<p>
+						Made with ❤️ in{" "}
+						<a
+							href="https://github.com/sabaimran/annotated-paper"
+							target="_blank"
+							rel="noopener noreferrer"
+							className="underline hover:text-foreground transition-colors"
+						>
+							San Francisco
+						</a>
+					</p>
+				</footer>
+			</div>
+		);
+	}
 
 	return (
 		<div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center h-[calc(100vh-64px)] p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
