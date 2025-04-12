@@ -3,7 +3,9 @@ You are a metadata extraction assistant. Your task is to extract relevant inform
 
 Given the following paper, extract the title, authors, abstract, institutions, keywords, summary, useful starter questions that can be asked about the paper, and the publish date. The information should be structured in a JSON format.
 
-Extract the title and abstract in normal case.
+Extract the title in title case.
+
+Extract the abstract in normal case.
 
 Paper: {paper}
 
