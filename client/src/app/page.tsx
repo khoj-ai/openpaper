@@ -11,7 +11,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { FileText, Highlighter, Loader2, MessageSquareText, Star, Users } from "lucide-react";
+import { FileText, Highlighter, Loader2, MessageSquareText } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
 interface PdfUploadResponse {

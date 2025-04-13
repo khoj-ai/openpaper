@@ -2,12 +2,13 @@
 
 import { Info, Loader2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
-export default function AuthCallback() {
+function CallbackContent() {
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const [error, setError] = useState<string | null>(null);
+
 
 	useEffect(() => {
 		// Process the OAuth callback
@@ -51,5 +52,24 @@ export default function AuthCallback() {
 				<p className="text-muted-foreground">Please wait while we finish authenticating your account.</p>
 			</div>
 		</div>
+	);
+}
+
+export default function AuthCallback() {
+	return (
+		<Suspense
+			fallback={
+				<div className="flex items-center justify-center min-h-screen">
+					<div className="text-center">
+						<div className="h-full flex flex-col items-center justify-center py-8 space-y-6">
+							<Loader2 className="h-12 w-12 animate-spin text-primary" />
+						</div>
+						<h2 className="text-xl font-medium">Loading...</h2>
+					</div>
+				</div>
+			}
+		>
+			<CallbackContent />
+		</Suspense>
 	);
 }

@@ -4,11 +4,11 @@ import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-export default function LoginPage() {
+function LoginContent() {
 	const { user, loading, error: authError, login } = useAuth();
 	const [error, setError] = useState<string | null>(null);
 	const router = useRouter();
@@ -89,4 +89,16 @@ export default function LoginPage() {
 			</Card>
 		</div>
 	);
+}
+
+export default function LoginPage() {
+	return (
+		<Suspense fallback={
+			<div className="h-full flex items-center justify-center">
+				<Loader2 className="h-12 w-12 animate-spin text-primary" />
+			</div>
+		}>
+			<LoginContent />
+		</Suspense>
+	)
 }
