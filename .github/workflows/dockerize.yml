@@ -37,7 +37,7 @@ jobs:
                   context: ./client
                   file: ./client/Dockerfile
                   push: true
-                  tags: ghcr.io/${{ github.repository_owner }}/client:latest
+                  tags: ghcr.io/${{ github.repository_owner }}/ap-client:latest
 
     build_server:
       name: Build and Push server image
@@ -62,4 +62,4 @@ jobs:
                 context: ./server
                 file: ./server/Dockerfile
                 push: true
-                tags: ghcr.io/${{ github.repository_owner }}/server:latest
+                tags: ghcr.io/${{ github.repository_owner }}/ap-server:latest
