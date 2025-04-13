@@ -9,6 +9,10 @@ on:
             - server/
     workflow_dispatch:
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
     build_client:
         name: Build and Push client image
@@ -24,7 +28,7 @@ jobs:
               uses: docker/login-action@v2
               with:
                   registry: ghcr.io
-                  username: ${{ github.actor }}
+                  username: ${{ github.repository_owner }}
                   password: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Build and push client image
@@ -49,7 +53,7 @@ jobs:
             uses: docker/login-action@v2
             with:
                 registry: ghcr.io
-                username: ${{ github.actor }}
+                username: ${{ github.repository_owner }}
                 password: ${{ secrets.GITHUB_TOKEN }}
 
           - name: Build and push server image
