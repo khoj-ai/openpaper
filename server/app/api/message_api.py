@@ -21,9 +21,6 @@ logger = logging.getLogger(__name__)
 
 logger.setLevel(logging.INFO)
 
-# Create uploads directory if it doesn't exist
-UPLOAD_DIR = Path("uploads")
-
 # Create API router with prefix
 message_router = APIRouter()
 

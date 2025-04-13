@@ -33,9 +33,6 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-# Create uploads directory if it doesn't exist
-UPLOAD_DIR = Path("uploads")
-
 # Create API router with prefix
 document_router = APIRouter()
 
@@ -342,6 +339,20 @@ async def upload_pdf(
                         f"{extract_metadata.publish_date}-01-01", "%Y-%m-%d"
                     )
                 else:
+                    # If that fails, assume yyyy-mm
+                    try:
+                        parsed_date = datetime.strptime(
+                            extract_metadata.publish_date, "%Y-%m"
+                        )
+                    except ValueError:
+                        # If that fails, we can't parse the date
+                        parsed_date = None
+            finally:
+                if parsed_date is None:
+                    # If we still can't parse, raise an error
+                    logger.error(
+                        f"Could not parse date: {extract_metadata.publish_date}"
+                    )
                     raise ValueError(
                         f"Could not parse date: {extract_metadata.publish_date}"
                     )

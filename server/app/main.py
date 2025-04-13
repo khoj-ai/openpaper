@@ -42,9 +42,6 @@ app.add_middleware(
     max_age=600,  # Cache preflight requests for 10 minutes
 )
 
-# Mount the uploads directory
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-
 # Include the router in the main app
 app.include_router(router, prefix="/api")
 app.include_router(auth_router, prefix="/api/auth")  # Auth routes

@@ -25,6 +25,7 @@ client/out/
 
 # production
 client/build
+docker-compose.yml
 
 # misc
 .DS_Store
