@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
 	title: "Annotated Paper",
-	description: "This is a sample description for the annotated paper.",
+	description: "Quickly and efficiently read, highlight, and understand all your papers.",
 };
 
 export default function RootLayout({
