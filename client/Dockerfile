@@ -14,7 +14,7 @@ COPY package.json yarn.lock ./
 RUN yarn install
 
 # Set as environment variable for build time
-ENV NEXT_PUBLIC_API_URL=http://ec2-3-80-82-197.compute-1.amazonaws.com
+ENV NEXT_PUBLIC_API_URL=https://annotatedpaper.khoj.dev
 ENV NODE_ENV=production
 
 # Copy the rest of the application code to the working directory
