@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect } from "react";
 import { fetchFromApi } from "@/lib/api";
+import { useIsMobile } from "@/lib/useMobile";;
 import {
 	Dialog,
 	DialogContent,
@@ -27,6 +28,7 @@ export default function Home() {
 	const [isDialogOpen, setIsDialogOpen] = useState(false);
 	const [pdfUrl, setPdfUrl] = useState("");
 	const { user, loading: authLoading } = useAuth();
+	const isMobile = useIsMobile();
 
 	// Loading messages to cycle through
 	const loadingMessages = [
@@ -130,8 +132,23 @@ export default function Home() {
 
 	if (!user && !authLoading) {
 		return (
+
 			<div className="grid grid-rows-[1fr_auto] min-h-[calc(100vh-64px)]">
 				<main className="max-w-6xl mx-auto space-y-24 p-8">
+					{
+						isMobile && (
+							<Dialog open={true}>
+								<DialogContent>
+									<DialogHeader>
+										<DialogTitle>The Annotated Paper</DialogTitle>
+										<DialogDescription>
+											This application is not optimized for mobile devices. Please use a desktop or tablet for the best experience.
+										</DialogDescription>
+									</DialogHeader>
+								</DialogContent>
+							</Dialog>
+						)
+					}
 					{/* Hero Section */}
 					<div className="flex flex-col items-center text-center space-y-8">
 						<h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
@@ -225,7 +242,20 @@ export default function Home() {
 				<header className="text-2xl font-bold">
 					The Annotated Paper
 				</header>
-
+				{
+					isMobile && (
+						<Dialog open={true}>
+							<DialogContent>
+								<DialogHeader>
+									<DialogTitle>The Annotated Paper</DialogTitle>
+									<DialogDescription>
+										This application is not optimized for mobile devices. Please use a desktop or tablet for the best experience.
+									</DialogDescription>
+								</DialogHeader>
+							</DialogContent>
+						</Dialog>
+					)
+				}
 				<div className="flex gap-4 items-center flex-col sm:flex-row">
 					<input
 						type="file"
