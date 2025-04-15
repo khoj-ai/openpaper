@@ -12,7 +12,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { FileText, Highlighter, Loader2, MessageSquareText } from "lucide-react";
+import { FileText, Highlighter, Loader2, LucideFileWarning, MessageSquareText } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
 interface PdfUploadResponse {
@@ -26,7 +26,10 @@ export default function Home() {
 	const [isUploading, setIsUploading] = useState(false);
 	const [loadingMessage, setLoadingMessage] = useState("Preparing your paper...");
 	const [isDialogOpen, setIsDialogOpen] = useState(false);
+
 	const [pdfUrl, setPdfUrl] = useState("");
+	const [showErrorAlert, setShowErrorAlert] = useState(false);
+
 	const { user, loading: authLoading } = useAuth();
 	const isMobile = useIsMobile();
 
@@ -82,7 +85,15 @@ export default function Home() {
 	const handlePdfUrl = async (url: string) => {
 		setIsUploading(true);
 		try {
-			const response = await fetch(url);
+			const headers = {
+				'Access-Control-Allow-Origin': '*',
+			}
+			const response = await fetch(url, {
+				method: 'GET',
+				headers,
+			});
+
+			// Check if the response is OK
 			if (!response.ok) throw new Error('Failed to fetch PDF');
 
 			const contentDisposition = response.headers.get('content-disposition');
@@ -109,7 +120,7 @@ export default function Home() {
 			await handleFileUpload(file);
 		} catch (error) {
 			console.error('Error processing PDF URL:', error);
-			alert('Failed to process PDF URL');
+			setShowErrorAlert(true);
 			setIsUploading(false);
 		}
 	};
@@ -239,6 +250,7 @@ export default function Home() {
 	return (
 		<div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center h-[calc(100vh-64px)] p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
 			<main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start w-full max-w-6xl">
+
 				<header className="text-2xl font-bold">
 					The Annotated Paper
 				</header>
@@ -282,6 +294,31 @@ export default function Home() {
 					Made with ❤️ in{" "} <a href="https://github.com/sabaimran/annotated-paper" target="_blank" rel="noopener noreferrer">San Francisco</a>
 				</p>
 			</footer>
+
+			{showErrorAlert && (
+				<Dialog open={showErrorAlert} onOpenChange={setShowErrorAlert}>
+					<DialogContent>
+						<DialogTitle>Failed to fetch PDF</DialogTitle>
+						<DialogDescription className="space-y-4 inline-flex">
+							<LucideFileWarning className="h-6 w-6 text-red-500 mr-2" />
+							We couldn't download the PDF from the provided URL. This might be due to security restrictions on the server.
+						</DialogDescription>
+						<div>
+							Try downloading the PDF to your computer first and then use the{" "}
+							<button
+								className="text-primary underline hover:text-primary/80"
+								onClick={() => {
+									setShowErrorAlert(false);
+									handleImportClick();
+								}}
+							>
+								Import PDF
+							</button>
+							{" "}button to upload it.
+						</div>
+					</DialogContent>
+				</Dialog>
+			)}
 
 			{/* Dialog for PDF URL */}
 			<Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
