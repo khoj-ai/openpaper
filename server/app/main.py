@@ -9,10 +9,10 @@ from app.api.conversation_api import conversation_router
 from app.api.document_api import document_router
 from app.api.highlight_api import highlight_router
 from app.api.message_api import message_router
+from app.database.admin import setup_admin
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 logging.basicConfig(
     level=logging.ERROR,
@@ -50,6 +50,8 @@ app.include_router(conversation_router, prefix="/api/conversation")
 app.include_router(message_router, prefix="/api/message")
 app.include_router(highlight_router, prefix="/api/highlight")
 app.include_router(annotation_router, prefix="/api/annotation")
+
+setup_admin(app)  # Setup admin interface
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))

@@ -1,10 +1,10 @@
 import os
-from datetime import datetime, timedelta, timezone
-from typing import Literal, Optional
+from datetime import datetime, timezone
+from typing import Literal
 
 from app.auth.dependencies import SESSION_COOKIE_NAME
 from dotenv import load_dotenv
-from fastapi import Response
+from fastapi import Request, Response
 
 load_dotenv()
 
