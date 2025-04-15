@@ -108,7 +108,7 @@ async def google_callback(
             provider_user_id=user_info.id,
         )
 
-        db_user = user_crud.upsert_with_provider(db=db, obj_in=user_data)
+        db_user, newly_created = user_crud.upsert_with_provider(db=db, obj_in=user_data)
 
         # Create a new session
         user_agent = request.headers.get("user-agent")
@@ -123,6 +123,10 @@ async def google_callback(
 
         # Create redirect response
         redirect_url = f"{client_domain}/auth/callback?success=true"
+
+        if newly_created:
+            redirect_url += "&welcome=true"
+
         redirect_response = RedirectResponse(
             url=redirect_url, status_code=status.HTTP_302_FOUND
         )

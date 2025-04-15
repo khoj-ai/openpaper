@@ -54,7 +54,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
 
     def upsert_with_provider(
         self, db: Session, *, obj_in: UserCreateWithProvider
-    ) -> User:
+    ) -> tuple[User, bool]:
         """
         Create or update a user from OAuth provider data.
         If user exists (by provider ID), update their info.
@@ -75,7 +75,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             db.add(db_user)
             db.commit()
             db.refresh(db_user)
-            return db_user
+            return db_user, False
 
         # If not found by provider ID, check email (might have registered with another provider)
         db_user = self.get_by_email(db, email=obj_in.email)
@@ -96,10 +96,11 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             db.add(db_user)
             db.commit()
             db.refresh(db_user)
-            return db_user
+            return db_user, False
 
         # Create new user if not found
-        return self.create_with_provider(db, obj_in=obj_in)
+        db_user = self.create_with_provider(db, obj_in=obj_in)
+        return db_user, True
 
     def create_session(
         self,

@@ -8,14 +8,19 @@ function CallbackContent() {
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const [error, setError] = useState<string | null>(null);
-
+	const [showWelcome, setShowWelcome] = useState(false);
 
 	useEffect(() => {
 		// Process the OAuth callback
 		const params = new URLSearchParams(window.location.search);
 		const success = params.get('success') === 'true';
+		const welcome = params.get('welcome') === 'true';
+		setShowWelcome(welcome);
 
-		if (success) {
+		if (welcome) {
+			return
+		}
+		else if (success) {
 			const returnTo = localStorage.getItem('returnTo') || '/';
 			localStorage.removeItem('returnTo');
 			router.push(returnTo);
@@ -42,8 +47,21 @@ function CallbackContent() {
 		);
 	}
 
+	if (showWelcome) {
+		return (
+			<div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
+				<iframe
+					src="https://airtable.com/embed/appsoVzfoZWtdO8bA/pagAX3R0B2lBJxuTS/form?backgroundColor=transparent&prefill_source=embed_form"
+					width="100%"
+					height="100%"
+					className="bg-transparent border-none"
+				></iframe>
+			</div>
+		)
+	}
+
 	return (
-		<div className="flex items-center justify-center min-h-screen">
+		<div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
 			<div className="text-center">
 				<div className="h-full flex flex-col items-center justify-center py-8 space-y-6">
 					<Loader2 className="h-12 w-12 animate-spin text-primary" />
