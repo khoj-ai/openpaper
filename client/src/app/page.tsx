@@ -301,7 +301,7 @@ export default function Home() {
 						<DialogTitle>Failed to fetch PDF</DialogTitle>
 						<DialogDescription className="space-y-4 inline-flex">
 							<LucideFileWarning className="h-6 w-6 text-red-500 mr-2" />
-							We couldn't download the PDF from the provided URL. This might be due to security restrictions on the server.
+							We were unable to download the PDF from the provided URL. This might be due to security restrictions on the server.
 						</DialogDescription>
 						<div>
 							Try downloading the PDF to your computer first and then use the{" "}
