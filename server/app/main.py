@@ -70,4 +70,6 @@ if __name__ == "__main__":
         # reload=True,
         log_level="debug",
         log_config=log_config,
+        forwarded_allow_ips="*",  # Allow all forwarded IPs
+        proxy_headers=True,  # Enable proxy headers
     )
