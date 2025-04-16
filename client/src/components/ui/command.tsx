@@ -148,6 +148,16 @@ function CommandItem({
   )
 }
 
+const localizeCommandToOS = (key: string) => {
+  // Check if the user is on macOS using userAgent
+  const isMac = /(Mac|iPhone|iPod|iPad)/i.test(navigator.userAgent);
+  if (isMac) {
+    return `⌘ ${key}`;
+  } else {
+    return `Ctrl ${key}`;
+  }
+}
+
 function CommandShortcut({
   className,
   ...props
@@ -174,4 +184,5 @@ export {
   CommandItem,
   CommandShortcut,
   CommandSeparator,
+  localizeCommandToOS,
 }

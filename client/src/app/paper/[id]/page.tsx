@@ -26,7 +26,7 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion"
 
-import { ChevronDown, ChevronUp, Highlighter, NotebookText, MessageCircle, Focus, X, Eye, Edit, Loader } from 'lucide-react';
+import { ChevronDown, ChevronUp, Highlighter, NotebookText, MessageCircle, Focus, X, Eye, Edit, Loader, HelpCircle } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import {
     Sidebar,
@@ -43,6 +43,8 @@ import { useHighlights } from '@/components/hooks/PdfHighlight';
 import { useAnnotations } from '@/components/hooks/PdfAnnotation';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Toggle } from "@/components/ui/toggle";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { CommandShortcut, localizeCommandToOS } from '@/components/ui/command';
 
 interface PaperData {
     filename: string;
@@ -404,6 +406,21 @@ export default function PaperView() {
     useEffect(() => {
         setRightSideFunction('Chat');
     }, [userMessageReferences]);
+
+    useEffect(() => {
+        // Add keybinding to toggle markdown preview
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'm') {
+                setIsMarkdownPreview(prev => !prev);
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, []);
 
     // Clear the paper note timeout on component unmount
     useEffect(() => {
@@ -863,16 +880,48 @@ export default function PaperView() {
                     rightSideFunction === 'Notes' && (
                         <div className='p-2 w-full h-full flex flex-col'>
                             <div className="flex justify-between items-center mb-2 flex-shrink-0">
-                                <div className="text-xs text-gray-500">
-                                    Note length: {paperNoteContent?.length} characters
+                                <div className="flex items-center gap-2">
+                                    <div className="text-xs text-gray">
+                                        Note length: {paperNoteContent?.length} characters
+                                    </div>
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger>
+                                                <HelpCircle className="h-4 w-4 text-gray-500" />
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>Supports Markdown formatting:</p>
+                                                <ul className="text-xs mt-1">
+                                                    <li>**bold**</li>
+                                                    <li>*italic*</li>
+                                                    <li># Heading</li>
+                                                    <li>- List items</li>
+                                                    <li>{">"} Blockquotes</li>
+                                                </ul>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
                                 </div>
-                                <Toggle
-                                    aria-label="Toggle markdown preview"
-                                    onPressedChange={(pressed) => setIsMarkdownPreview(pressed)}
-                                    pressed={isMarkdownPreview}
-                                >
-                                    {isMarkdownPreview ? <Eye size={16} /> : <Edit size={16} />}
-                                </Toggle>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger>
+
+                                            <Toggle
+                                                aria-label="Toggle markdown preview"
+                                                onPressedChange={(pressed) => setIsMarkdownPreview(pressed)}
+                                                pressed={isMarkdownPreview}
+                                            >
+                                                <CommandShortcut>
+                                                    {localizeCommandToOS('M')}
+                                                </CommandShortcut>
+                                                {isMarkdownPreview ? <Eye size={16} /> : <Edit size={16} />}
+                                            </Toggle>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>Toggle between edit and preview mode</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
                             </div>
 
                             {isMarkdownPreview ? (

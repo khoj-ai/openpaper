@@ -2,7 +2,7 @@ import { PaperHighlight } from "@/app/paper/[id]/page";
 import { getSelectionOffsets } from "./utils/PdfTextUtils";
 import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
-import { CommandShortcut } from "./ui/command";
+import { CommandShortcut, localizeCommandToOS } from "./ui/command";
 import { Copy, Highlighter, MessageCircle, Minus, NotebookText, X } from "lucide-react";
 
 interface InlineAnnotationMenuProps {
@@ -24,16 +24,6 @@ interface InlineAnnotationMenuProps {
 export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
     const { selectedText, tooltipPosition, setSelectedText, setTooltipPosition, setIsAnnotating, isHighlightInteraction, activeHighlight, addHighlight, removeHighlight, setUserMessageReferences, setAddedContentForPaperNote } = props;
 
-    const localizeCommandToOS = (key: string) => {
-        // Check if the user is on macOS using userAgent
-        const isMac = /(Mac|iPhone|iPod|iPad)/i.test(navigator.userAgent);
-        if (isMac) {
-            return `⌘ ${key}`;
-        } else {
-            return `Ctrl ${key}`;
-        }
-    }
-
     const [offsets, setOffsets] = useState<{ start: number; end: number } | null>(null);
 
 
@@ -50,36 +40,32 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                 setSelectedText("");
                 setTooltipPosition(null);
                 setIsAnnotating(false);
-            }
-
-            if (e.key === "c" && (e.ctrlKey || e.metaKey)) {
+            } else if (e.key === "c" && (e.ctrlKey || e.metaKey)) {
                 navigator.clipboard.writeText(selectedText);
-            }
-            if (e.key === "a" && (e.ctrlKey || e.metaKey)) {
+            } else if (e.key === "a" && (e.ctrlKey || e.metaKey)) {
                 setUserMessageReferences((prev: string[]) => {
                     const newReferences = [...prev, selectedText];
                     return Array.from(new Set(newReferences)); // Remove duplicates
                 });
-            }
-
-            if (e.key === "n" && (e.ctrlKey || e.metaKey)) {
+            } else if (e.key === "i" && (e.ctrlKey || e.metaKey)) {
                 setAddedContentForPaperNote(selectedText);
                 setSelectedText("");
                 setTooltipPosition(null);
                 setIsAnnotating(false);
-            }
-
-            if (e.key === "h" && (e.ctrlKey || e.metaKey)) {
+            } else if (e.key === "h" && (e.ctrlKey || e.metaKey)) {
                 addHighlight(selectedText, offsets?.start, offsets?.end);
                 e.stopPropagation();
-            }
-
-            if (e.key === "d" && (e.ctrlKey || e.metaKey) && isHighlightInteraction && activeHighlight) {
+            } else if (e.key === "d" && (e.ctrlKey || e.metaKey) && isHighlightInteraction && activeHighlight) {
                 removeHighlight(activeHighlight);
                 setSelectedText("");
                 setTooltipPosition(null);
                 setIsAnnotating(false);
+            } else {
+                return;
             }
+
+            e.preventDefault();
+            e.stopPropagation();
         }
 
         window.addEventListener("keydown", handleMouseDown);
@@ -147,6 +133,7 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                     className="w-full flex items-center justify-between text-sm font-normal h-9 px-2"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={(e) => {
+                        e.preventDefault();
                         e.stopPropagation();
                         setAddedContentForPaperNote(selectedText);
                         setSelectedText("");
@@ -159,7 +146,7 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                         Add to Note
                     </div>
                     <CommandShortcut className="text-muted-foreground">
-                        {localizeCommandToOS('N')}
+                        {localizeCommandToOS('I')}
                     </CommandShortcut>
                 </Button>
 
