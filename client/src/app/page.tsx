@@ -85,12 +85,8 @@ export default function Home() {
 	const handlePdfUrl = async (url: string) => {
 		setIsUploading(true);
 		try {
-			const headers = {
-				'Access-Control-Allow-Origin': '*',
-			}
 			const response = await fetch(url, {
 				method: 'GET',
-				headers,
 			});
 
 			// Check if the response is OK
