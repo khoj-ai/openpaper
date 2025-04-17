@@ -139,7 +139,6 @@ export function useHighlights(documentId: string) {
         );
         // Check if the highlight already exists in the local highlights
         if (isDuplicate) {
-            console.log('Duplicate highlight, not sending to server');
             return;
         }
 
@@ -157,7 +156,6 @@ export function useHighlights(documentId: string) {
                 },
                 body: JSON.stringify(payload)
             });
-            console.log('Highlight saved:', data);
             return data;
         } catch (error) {
             console.error('Error sending highlight to server:', error);
@@ -178,8 +176,6 @@ export function useHighlights(documentId: string) {
             setHighlights(updatedHighlights);
             clearHighlightsFromDOM();
             loadHighlights();
-
-            console.log('Highlight removed from server:', data);
         }
         catch (error) {
             console.error('Error removing highlight from server:', error);

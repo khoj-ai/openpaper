@@ -720,8 +720,6 @@ export default function PaperView() {
             e.preventDefault();
         }
 
-        console.log("Triggered a handle submit with message:", currentMessage);
-
         if (!currentMessage.trim() || isStreaming) return;
 
         // Add user message to chat

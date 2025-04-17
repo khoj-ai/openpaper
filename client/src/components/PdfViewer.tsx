@@ -150,8 +150,6 @@ export function PdfViewer(props: PdfViewerProps) {
 
 	useEffect(() => {
 		if (allPagesLoaded) {
-			console.log("All pages loaded, checking text layers...");
-
 			// Create a timer that repeatedly checks if text layers are ready
 			const checkInterval = setInterval(() => {
 				if (checkTextLayersReady()) {

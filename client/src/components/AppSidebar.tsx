@@ -142,8 +142,6 @@ export function AppSidebar() {
             }
         }
 
-        console.log("Fetching papers...");
-
         // Call the async function
         fetchPapers();
     }, [user]);
