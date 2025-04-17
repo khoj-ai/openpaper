@@ -26,7 +26,7 @@ from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 from sqlalchemy.orm import Session
 
 load_dotenv()
@@ -274,6 +274,65 @@ async def delete_pdf(
         )
 
 
+class UploadFromUrlSchema(BaseModel):
+    url: HttpUrl
+
+
+@document_router.post("/upload/from-url/")
+async def upload_pdf_from_url(
+    request: UploadFromUrlSchema,
+    current_user: Optional[CurrentUser] = Depends(get_required_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Upload a document from a given URL, rather than the raw file.
+    """
+
+    # Validate the URL
+    url = request.url
+    if not url or not str(url).lower().endswith(".pdf"):
+        return JSONResponse(status_code=400, content={"message": "URL must be a PDF"})
+
+    # Create a temporary file for processing
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+        temp_file_path = temp_file.name
+
+        try:
+            # Upload the file to S3
+            object_key, file_url = await s3_service.read_and_upload_file_from_url(
+                str(url), temp_file_path
+            )
+        except Exception as e:
+            logger.error(
+                f"Error uploading file from URL: {str(e)}",
+                exc_info=True,
+            )
+            # Clean up temporary file in case of error
+            try:
+                os.unlink(temp_file_path)
+            except Exception:
+                pass
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "message": f"Error uploading file from URL: {str(e)}",
+                    "filename": url,
+                },
+            )
+
+        # Ensure we have a valid filename for the record
+        safe_filename = Path(url.path).name.replace(" ", "_")
+
+        return create_and_upload_pdf(
+            safe_filename=safe_filename,
+            temp_file_path=temp_file_path,
+            object_key=object_key,
+            file_url=file_url,
+            current_user=current_user,
+            db=db,
+        )
+
+
 @document_router.post("/upload")
 async def upload_pdf(
     request: Request,
@@ -301,9 +360,50 @@ async def upload_pdf(
         # Upload the file to S3
         object_key, file_url = await s3_service.upload_file(file)
 
-        # Ensure we have a valid filename for the record
-        safe_filename = file.filename.replace(" ", "_")
+    except Exception as e:
+        logger.error(
+            f"Error uploading file: {str(e)}",
+            exc_info=True,
+        )
+        # Clean up temporary file in case of error
+        try:
+            os.unlink(temp_file_path)
+        except Exception:
+            pass
+        return JSONResponse(
+            status_code=500,
+            content={
+                "message": f"Error uploading file: {str(e)}",
+                "filename": file.filename if file and file.filename else "unknown",
+            },
+        )
 
+    # Ensure we have a valid filename for the record
+    safe_filename = file.filename.replace(" ", "_")
+
+    return create_and_upload_pdf(
+        safe_filename=safe_filename,
+        temp_file_path=temp_file_path,
+        object_key=object_key,
+        file_url=file_url,
+        current_user=current_user,
+        db=db,
+    )
+
+
+def create_and_upload_pdf(
+    safe_filename: str,
+    temp_file_path: str,
+    object_key: str,
+    file_url: str,
+    current_user: CurrentUser,
+    db: Session,
+) -> JSONResponse:
+    """
+    Create a new document record in the database and upload the PDF to S3.
+    """
+
+    try:
         # Create a new document record in the database with S3 details
         document = DocumentCreate(
             filename=safe_filename, file_url=file_url, s3_object_key=object_key
@@ -356,7 +456,6 @@ async def upload_pdf(
                     raise ValueError(
                         f"Could not parse date: {extract_metadata.publish_date}"
                     )
-
             # Format back to string in YYYY-MM-DD format
             extract_metadata.publish_date = parsed_date.strftime("%Y-%m-%d")
 
@@ -371,25 +470,25 @@ async def upload_pdf(
             starter_questions=extract_metadata.starter_questions,
         )
 
-        updated_doc: Document = document_crud.update(
-            db=db, db_obj=created_doc, obj_in=update_doc, user=current_user
+        document_crud.update(
+            db, db_obj=created_doc, obj_in=update_doc, user=current_user
         )
 
-        # Clean up the temporary file now that we're done with it
         try:
+            # Clean up the temporary file now that we're done with it
             os.unlink(temp_file_path)
         except Exception as cleanup_error:
             logger.warning(f"Failed to clean up temporary file: {cleanup_error}")
-
         return JSONResponse(
             status_code=200,
             content={
                 "message": "File uploaded successfully",
                 "filename": safe_filename,
                 "url": file_url,
-                "document_id": str(updated_doc.id),
+                "document_id": str(created_doc.id),
             },
         )
+
     except Exception as e:
         logger.error(
             f"Error creating document record: {str(e)}",
@@ -406,6 +505,6 @@ async def upload_pdf(
             status_code=500,
             content={
                 "message": f"Error creating document record: {str(e)}",
-                "filename": file.filename if file and file.filename else "unknown",
+                "filename": safe_filename,
             },
         )

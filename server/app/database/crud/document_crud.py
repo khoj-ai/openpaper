@@ -8,7 +8,8 @@ from app.database.models import Document
 from app.helpers.parser import extract_text_from_pdf
 from app.helpers.s3 import s3_service
 from app.schemas.user import CurrentUser
-from pydantic import BaseModel
+from fastapi import HTTPException
+from pydantic import BaseModel, HttpUrl
 from sqlalchemy.orm import Session
 
 
@@ -42,6 +43,50 @@ class DocumentUpdate(DocumentBase):
 # Document CRUD that inherits from the base CRUD
 class DocumentCRUD(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
     """CRUD operations specifically for Document model"""
+
+    async def create_from_url(
+        self, db: Session, *, url: HttpUrl, current_user: CurrentUser
+    ) -> Document:
+        """
+        Create a new document from a URL
+
+        Args:
+            db: Database session
+            url: URL of the PDF file
+            current_user: Current user making the request
+
+        Returns:
+            Document: Created document
+
+        Raises:
+            HTTPException: If upload fails
+        """
+        try:
+            # Upload file to S3
+            object_key, file_url = await s3_service.read_and_upload_file_from_url(
+                str(url)
+            )
+
+            # Create document
+            doc_in = DocumentCreate(
+                filename=os.path.basename(file_url),
+                file_url=file_url,
+                s3_object_key=object_key,
+            )
+
+            document = self.create(db=db, obj_in=doc_in, user=current_user)
+
+            # Extract and update content
+            raw_content = self.read_raw_document_content(
+                db, document_id=document.id, current_user=current_user
+            )
+
+            return document
+
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail="Failed to process document")
 
     def read_raw_document_content(
         self,

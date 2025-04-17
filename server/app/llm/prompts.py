@@ -51,6 +51,10 @@ Math notation, even in LaTeX syntax, MUST be in a math code block.
 
 6. Citations should always be numbered sequentially, starting from 1.
 
+7. If your response is re-using an existing citation, create a new one with the same text for this evidence block.
+
+8. If the paper is not relevant to the question, say so and provide a brief explanation.
+
 Example format:
 
 The study found that machine learning models can effectively detect spam emails [^1]. However, their performance decreases when dealing with sophisticated phishing attempts [^2].

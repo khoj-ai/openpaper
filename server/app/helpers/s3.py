@@ -2,8 +2,10 @@ import logging
 import os
 import uuid
 from typing import BinaryIO, Optional
+from urllib.parse import urlparse
 
 import boto3
+import requests
 from botocore.exceptions import ClientError
 from fastapi import UploadFile
 
@@ -28,6 +30,84 @@ class S3Service:
             region_name=AWS_REGION,
         )
         self.bucket_name = S3_BUCKET_NAME
+
+    def _validate_pdf_url(self, url: str) -> bool:
+        """
+        Validate if URL points to a PDF file
+
+        Args:
+            url: The URL to validate
+
+        Returns:
+            bool: True if valid PDF URL
+        """
+        try:
+            response = requests.head(url, allow_redirects=True)
+            content_type = response.headers.get("content-type", "")
+
+            # Check content type and URL extension
+            is_pdf = content_type == "application/pdf" or url.lower().endswith(".pdf")
+            return response.ok and is_pdf
+        except requests.RequestException:
+            return False
+
+    async def read_and_upload_file_from_url(
+        self, url: str, temp_filepath: str
+    ) -> tuple[str, str]:
+        """
+        Download file from URL and upload to S3
+
+        Args:
+            url: The URL of the file to upload
+
+        Returns:
+            tuple: S3 object key and public URL
+
+        Raises:
+            ValueError: If URL is invalid or file is not a PDF
+        """
+        if not self._validate_pdf_url(url):
+            raise ValueError("Invalid URL or not a PDF file")
+
+        try:
+            # Download file
+            response = requests.get(url, stream=True)
+            response.raise_for_status()
+
+            # Extract filename from URL or generate one
+            parsed_url = urlparse(url)
+            original_filename = os.path.basename(parsed_url.path)
+            if not original_filename:
+                original_filename = f"document-{uuid.uuid4()}.pdf"
+
+            # Generate S3 object key
+            object_key = f"uploads/{uuid.uuid4()}-{original_filename}"
+
+            # Upload to S3
+            self.s3_client.put_object(
+                Bucket=self.bucket_name,
+                Key=object_key,
+                Body=response.content,
+                ContentType="application/pdf",
+            )
+
+            # Write the file to a temporary location
+            with open(temp_filepath, "wb") as temp_file:
+                temp_file.write(response.content)
+                temp_file.flush()
+                os.fsync(temp_file.fileno())
+
+            # Generate the URL for the uploaded file
+            file_url = f"https://{self.bucket_name}.s3.amazonaws.com/{object_key}"
+
+            return object_key, file_url
+
+        except requests.RequestException as e:
+            logger.error(f"Error downloading file from URL: {e}")
+            raise ValueError("Failed to download file from URL")
+        except ClientError as e:
+            logger.error(f"Error uploading file to S3: {e}")
+            raise
 
     async def upload_file(self, file: UploadFile) -> tuple[str, str]:
         """
