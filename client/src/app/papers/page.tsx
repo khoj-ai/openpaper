@@ -7,6 +7,8 @@ import { PaperItem } from "@/components/AppSidebar"
 import { Button } from "@/components/ui/button"
 import { Trash2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 
 
 export default function PapersPage() {
@@ -36,15 +38,10 @@ export default function PapersPage() {
             await fetchFromApi(`/api/paper?id=${paperId}`, {
                 method: "DELETE",
             })
-            setPapers(papers.filter((paper) => paper.id !== paperId))
+            setPapers(papers.filter((paper) => paper.id !== paperId));
+            setFilteredPapers(filteredPapers.filter((paper) => paper.id !== paperId));
         } catch (error) {
             console.error("Error deleting paper:", error)
-        }
-    }
-
-    const handleDelete = (paperId: string) => {
-        if (confirm("Are you sure you want to delete this paper?")) {
-            deletePaper(paperId)
         }
     }
 
@@ -108,7 +105,7 @@ export default function PapersPage() {
                                 {
                                     paper.authors && (
                                         <p className="text-sm text-gray-500 mb-2">
-                                            {paper.authors.slice(0,5).join(", ")}
+                                            {paper.authors.slice(0, 5).join(", ")}
                                             {paper.authors.length > 5 && `, et al.`}
                                         </p>
                                     )
@@ -124,12 +121,30 @@ export default function PapersPage() {
                             <p className="text-sm text-gray-500">
                                 {new Date(paper.created_at || "").toLocaleDateString()}
                             </p>
-                            <Button
-                                variant={"ghost"}
-                                onClick={() => handleDelete(paper.id)}
-                            >
-                                <Trash2 size={16} className="text-secondary-foreground" />
-                            </Button>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button
+                                        variant={"ghost"}
+                                    >
+                                        <Trash2 size={16} className="text-secondary-foreground" />
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogTitle>Delete Paper</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        Are you sure you want to delete {paper.title || paper.filename}?
+                                        This action cannot be undone.
+                                    </AlertDialogDescription>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction
+                                            onClick={() => deletePaper(paper.id)}
+                                        >
+                                            Delete
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
                         </CardFooter>
                     </Card>
                 ))}
