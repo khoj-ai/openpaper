@@ -115,7 +115,7 @@ export default function Home() {
 
 			await handleFileUpload(file);
 		} catch (error) {
-			console.log('Client-side fetch failed, trying server-side fetch...');
+			console.log('Client-side fetch failed, trying server-side fetch...', error);
 
 			try {
 				// Fallback to server-side fetch

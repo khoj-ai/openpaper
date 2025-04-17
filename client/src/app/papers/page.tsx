@@ -7,7 +7,6 @@ import { PaperItem } from "@/components/AppSidebar"
 import { Button } from "@/components/ui/button"
 import { Trash2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 
 

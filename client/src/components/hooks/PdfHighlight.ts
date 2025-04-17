@@ -164,7 +164,7 @@ export function useHighlights(documentId: string) {
 
     const removeHighlightFromServer = async (highlight: PaperHighlight) => {
         try {
-            const data = await fetchFromApi(`/api/highlight/${highlight.id}`, {
+            await fetchFromApi(`/api/highlight/${highlight.id}`, {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json',
