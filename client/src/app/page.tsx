@@ -115,9 +115,27 @@ export default function Home() {
 
 			await handleFileUpload(file);
 		} catch (error) {
-			console.error('Error processing PDF URL:', error);
-			setShowErrorAlert(true);
-			setIsUploading(false);
+			console.log('Client-side fetch failed, trying server-side fetch...');
+
+			try {
+				// Fallback to server-side fetch
+				const response: PdfUploadResponse = await fetchFromApi('/api/paper/upload/from-url', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+					},
+					body: JSON.stringify({ url }),
+				});
+
+				// Use the same redirect logic as handleFileUpload
+				const redirectUrl = new URL(`/paper/${response.document_id}`, window.location.origin);
+				window.location.href = redirectUrl.toString();
+
+			} catch (serverError) {
+				console.error('Both client and server-side fetches failed:', serverError);
+				setShowErrorAlert(true);
+				setIsUploading(false);
+			}
 		}
 	};
 
