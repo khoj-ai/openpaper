@@ -4,7 +4,7 @@ import { PdfViewer } from '@/components/PdfViewer';
 import { Button } from '@/components/ui/button';
 import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
 import { useParams } from 'next/navigation';
-import { useState, useEffect, FormEvent, Fragment, Children, useRef, createElement, HTMLAttributes, ReactNode } from 'react';
+import { useState, useEffect, FormEvent, Children, useRef, createElement, HTMLAttributes, ReactNode } from 'react';
 
 // Reference to react-markdown documents: https://github.com/remarkjs/react-markdown?tab=readme-ov-file
 import Markdown from 'react-markdown';
@@ -215,9 +215,9 @@ function PaperMetadata(props: IPaperMetadata) {
             className="mb-4 border-b-2 border-secondary"
         >
             <div className="p-2">
-                <CollapsibleTrigger className="flex w-full items-center justify-between">
+                <CollapsibleTrigger className="flex flex-row w-full items-center justify-between">
                     <h2 className="text-xl font-bold">{paperData.title}</h2>
-                    <div className="text-gray-500">
+                    <div className="text-secondary-foreground text-xs flex items-center gap-2 bg-secondary p-1 rounded-md">
                         {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                     </div>
                 </CollapsibleTrigger>
@@ -250,7 +250,10 @@ function PaperMetadata(props: IPaperMetadata) {
                                             key={i}
                                             variant="outline"
                                             className="text-xs font-medium p-2 max-w-full whitespace-normal h-auto text-left justify-start break-words bg-secondary text-secondary-foreground hover:bg-secondary/50"
-                                            onClick={() => props.onClickStarterQuestion(question)}
+                                            onClick={() => {
+                                                props.onClickStarterQuestion(question);
+                                                setIsOpen(false);
+                                            }}
                                         >
                                             {question}
                                         </Button>
@@ -366,11 +369,14 @@ export default function PaperView() {
     const [userMessageReferences, setUserMessageReferences] = useState<string[]>([]);
     const [addedContentForPaperNote, setAddedContentForPaperNote] = useState<string | null>(null);
     const [isMarkdownPreview, setIsMarkdownPreview] = useState(false);
+    const [pendingStarterQuestion, setPendingStarterQuestion] = useState<string | null>(null);
 
     const [rightSideFunction, setRightSideFunction] = useState<string>('Chat');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     // Reference to track the save timeout
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const inputMessageRef = useRef<HTMLTextAreaElement>(null);
+    const chatInputFormRef = useRef<HTMLFormElement>(null);
 
 
     // Add this function to handle citation clicks
@@ -410,7 +416,7 @@ export default function PaperView() {
     useEffect(() => {
         // Add keybinding to toggle markdown preview
         const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'm') {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'm' && rightSideFunction === 'Notes') {
                 setIsMarkdownPreview(prev => !prev);
                 e.preventDefault();
                 e.stopPropagation();
@@ -584,6 +590,14 @@ export default function PaperView() {
 
     }, [addedContentForPaperNote]);
 
+    // Add useEffect to handle starter question submission
+    useEffect(() => {
+        if (pendingStarterQuestion) {
+            handleSubmit(null);
+            setPendingStarterQuestion(null);
+        }
+    }, [currentMessage]);
+
     // Handle scroll to load more messages
     const handleScroll = () => {
         if (!messagesContainerRef.current) return;
@@ -701,8 +715,12 @@ export default function PaperView() {
         }
     }
 
-    const handleSubmit = async (e: FormEvent) => {
-        e.preventDefault();
+    const handleSubmit = async (e: FormEvent | null = null) => {
+        if (e) {
+            e.preventDefault();
+        }
+
+        console.log("Triggered a handle submit with message:", currentMessage);
 
         if (!currentMessage.trim() || isStreaming) return;
 
@@ -981,6 +999,13 @@ export default function PaperView() {
                                     hasMessages={messages.length > 0}
                                     onClickStarterQuestion={(question) => {
                                         setCurrentMessage(question);
+                                        inputMessageRef.current?.focus();
+                                        chatInputFormRef.current?.scrollIntoView({
+                                            behavior: 'smooth',
+                                            block: 'nearest',
+                                            inline: 'nearest',
+                                        });
+                                        setPendingStarterQuestion(question);
                                     }}
                                 />
                             )}
@@ -1077,7 +1102,7 @@ export default function PaperView() {
                                 }
                                 <div ref={messagesEndRef} />
                             </div>
-                            <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+                            <form onSubmit={handleSubmit} className="flex flex-col gap-2" ref={chatInputFormRef}>
                                 {
                                     userMessageReferences.length > 0 && (
                                         <div className='flex flex-row gap-2'>
@@ -1115,6 +1140,7 @@ export default function PaperView() {
                                 <Textarea
                                     value={currentMessage}
                                     onChange={(e) => setCurrentMessage(e.target.value)}
+                                    ref={inputMessageRef}
                                     placeholder="Ask something about this paper..."
                                     className="flex-1 border rounded-md resize-none p-2"
                                     disabled={isStreaming}
