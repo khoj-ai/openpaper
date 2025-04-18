@@ -89,7 +89,7 @@ export default function PapersPage() {
                                     paper.keywords && paper.keywords.length > 0 && (
                                         <div className="mb-2 flex flex-wrap gap-2">
                                             {
-                                                paper.keywords.map((keyword, index) => (
+                                                paper.keywords.slice(0, 5).map((keyword, index) => (
                                                     <span
                                                         key={index}
                                                         className="inline-block bg-blue-200 dark:bg-blue-800 text-sm font-semibold mr-2 px-2.5 py-0.5 rounded"
@@ -113,6 +113,11 @@ export default function PapersPage() {
                             {paper.abstract && (
                                 <p className="text-sm text-gray-500 line-clamp-3">
                                     {paper.abstract}
+                                </p>
+                            )}
+                            {!paper.abstract && paper.summary && (
+                                <p className="text-sm text-gray-500 line-clamp-3">
+                                    {paper.summary}
                                 </p>
                             )}
                         </CardContent>
