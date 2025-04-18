@@ -46,11 +46,8 @@ export function usePdfSearch(explicitSearchTerm?: string) {
         const results = getMatchingNodesInPdf(textToSearch);
 
         if (results.length === 0) {
-            console.log("No exact matches found, trying fuzzy search...");
             const preparedSearchTerm = prepareTextForFuzzyMatch(textToSearch);
-            console.log("Prepared search term for fuzzy match:", preparedSearchTerm);
             const fuzzyResults = getFuzzyMatchingNodesInPdf(preparedSearchTerm);
-
             if (fuzzyResults.length > 0) {
                 results.push(...fuzzyResults);
             } else {
