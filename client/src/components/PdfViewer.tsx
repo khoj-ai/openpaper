@@ -68,6 +68,8 @@ export function PdfViewer(props: PdfViewerProps) {
 
 	const [currentPage, setCurrentPage] = useState<number>(1);
 
+	const [textLayerExtractionFailed, setTextLayerExtractionFailed] = useState(false);
+
 	const { numPages, allPagesLoaded, onDocumentLoadSuccess, handlePageLoadSuccess } = usePdfLoader();
 	const { scale, width, pagesRef, containerRef, goToPreviousPage, goToNextPage, zoomIn, zoomOut } = usePdfNavigation(numPages);
 
@@ -162,8 +164,13 @@ export function PdfViewer(props: PdfViewerProps) {
 
 	useEffect(() => {
 		if (allPagesLoaded) {
+			let attempts = 0;
+			const MAX_ATTEMPTS = 50; // 10 seconds total (50 * 200ms)
+
 			// Create a timer that repeatedly checks if text layers are ready
 			const checkInterval = setInterval(() => {
+				attempts++;
+
 				if (checkTextLayersReady()) {
 					console.log("Text layers are ready, applying highlights");
 					clearInterval(checkInterval);
@@ -172,7 +179,6 @@ export function PdfViewer(props: PdfViewerProps) {
 					renderAnnotations(annotations);
 
 					// Highlighting logic
-					// Apply highlights after loading
 					setTimeout(() => {
 						if (highlights.length > 0) {
 							const allMatches = findAllHighlightedPassages(highlights);
@@ -191,11 +197,22 @@ export function PdfViewer(props: PdfViewerProps) {
 						}
 					}, 100);
 				} else {
-					console.log("Text layers not ready yet, waiting...");
-				}
-			}, 200); // Check every 200ms
+					console.log(`Text layers not ready yet, attempt ${attempts}/${MAX_ATTEMPTS}`);
 
-			// Clean up the interval if component unmounts
+					// Force proceed after max attempts
+					if (attempts >= MAX_ATTEMPTS) {
+						console.warn("Text layers failed to load completely, proceeding anyway");
+						clearInterval(checkInterval);
+
+						setTextLayerExtractionFailed(true);
+
+						// Try to work with whatever text layers are available
+						loadHighlights();
+						renderAnnotations(annotations);
+					}
+				}
+			}, 200);
+
 			return () => clearInterval(checkInterval);
 		}
 	}, [allPagesLoaded]);
@@ -240,8 +257,9 @@ export function PdfViewer(props: PdfViewerProps) {
 				<div className="flex items-center gap-2 flex-grow max-w-md">
 					<Input
 						type="text"
-						placeholder="Search..."
+						placeholder={textLayerExtractionFailed ? "Search is unavailable" : "Search..."}
 						value={searchText}
+						disabled={textLayerExtractionFailed || !allPagesLoaded}
 						onChange={(e) => {
 							if (e.target.value.trim() === "") {
 								setSearchResults([]);
@@ -256,7 +274,7 @@ export function PdfViewer(props: PdfViewerProps) {
 						onKeyDown={(e) => e.key === 'Enter' && performSearch()}
 						className="h-8 text-sm"
 					/>
-					<Button onClick={() => performSearch()} size="sm" variant="ghost" className="h-8 px-2">
+					<Button onClick={() => performSearch()} size="sm" variant="ghost" className="h-8 px-2" disabled={textLayerExtractionFailed || !allPagesLoaded}>
 						<Search size={16} />
 					</Button>
 				</div>
