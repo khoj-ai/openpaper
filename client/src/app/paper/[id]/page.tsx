@@ -416,7 +416,7 @@ export default function PaperView() {
     useEffect(() => {
         // Add keybinding to toggle markdown preview
         const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'm' && rightSideFunction === 'Notes') {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'm') {
                 setIsMarkdownPreview(prev => !prev);
                 e.preventDefault();
                 e.stopPropagation();
@@ -861,7 +861,7 @@ export default function PaperView() {
             <div
                 className={`w-full h-full grid ${rightSideFunction === 'Focus' ? 'grid-cols-2' : 'grid-cols-3'} items-center justify-center gap-0`}>
 
-                <div className="border-r-2 dark:border-gray-800 border-gray-200 p-2 col-span-2">
+                <div className="border-r-2 dark:border-gray-800 border-gray-200 p-0 h-full col-span-2">
                     {/* PDF Viewer Section */}
                     {paperData.file_url && (
                         <div className="w-full h-full">
