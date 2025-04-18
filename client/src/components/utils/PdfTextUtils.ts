@@ -119,7 +119,7 @@ export const getFuzzyMatchingNodesInPdf = (searchTerm: string) => {
             // Calculate similarity between search term and found text
             const similarity = calculateSimilarity(fullSearchTermLower, textWindow);
 
-            if (similarity > 0.6) { // Threshold for accepting matches
+            if (similarity > 0.2) { // Threshold for accepting matches
                 let currentPosition = 0;
                 const matchingNodes: Element[] = [];
 
