@@ -72,7 +72,19 @@ export function PdfViewer(props: PdfViewerProps) {
 	const { scale, width, pagesRef, containerRef, goToPreviousPage, goToNextPage, zoomIn, zoomOut } = usePdfNavigation(numPages);
 
 	// Search functionality
-	const { searchText, setSearchText, searchResults, currentMatch, notFound, performSearch, goToNextMatch, goToPreviousMatch, setSearchResults, setNotFound, setCurrentMatch } = usePdfSearch(explicitSearchTerm);
+	const {
+		searchText,
+		setSearchText,
+		searchResults,
+		currentMatch,
+		notFound,
+		performSearch,
+		goToNextMatch,
+		goToPreviousMatch,
+		setSearchResults,
+		setNotFound,
+		setCurrentMatch
+	} = usePdfSearch(explicitSearchTerm);
 
 
 	// Add this new effect for handling outside clicks
