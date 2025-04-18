@@ -62,7 +62,7 @@ export default function PapersPage() {
 
 
     return (
-        <div className="container mx-auto w-1/2 p-8">
+        <div className="container mx-auto w-2/3 p-8">
             <div className="mb-4">
                 <Input
                     type="text"

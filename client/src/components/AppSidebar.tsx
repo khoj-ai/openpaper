@@ -1,6 +1,6 @@
 "use client"
 
-import { Clock, FileText, Home, LogOut, Moon, Sun, User } from "lucide-react";
+import { Clock, FileText, Home, LogOut, MessageCircleQuestion, Moon, Sun, User } from "lucide-react";
 
 import {
     Sidebar,
@@ -39,6 +39,11 @@ const items = [
         title: "Papers",
         url: "/papers",
         icon: FileText,
+    },
+    {
+        title: "Feedback",
+        url: "https://github.com/sabaimran/annotated-paper/issues",
+        icon: MessageCircleQuestion,
     }
 ]
 
@@ -168,13 +173,6 @@ export function AppSidebar() {
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                             ))}
-                            {/* Dark Mode Toggle */}
-                            <SidebarMenuItem>
-                                <SidebarMenuButton onClick={toggleDarkMode}>
-                                    {darkMode ? <Sun size={16} /> : <Moon size={16} />}
-                                    <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
                             <SidebarMenuItem>
                                 <SidebarMenuButton>
                                     <Clock size={16} />
@@ -203,6 +201,13 @@ export function AppSidebar() {
                 </SidebarGroup>
             </SidebarContent>
             <SidebarFooter>
+                {/* Dark Mode Toggle */}
+                <SidebarMenuItem>
+                    <SidebarMenuButton onClick={toggleDarkMode}>
+                        {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+                        <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
                 {/* User Profile (if logged in) */}
                 {user && (
                     <SidebarMenuItem className="mb-2">
