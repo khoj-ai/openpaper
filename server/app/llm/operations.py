@@ -11,9 +11,13 @@ from app.database.models import Document, Message
 from app.llm.prompts import (
     ANSWER_PAPER_QUESTION_SYSTEM_PROMPT,
     ANSWER_PAPER_QUESTION_USER_MESSAGE,
+    CONCISE_MODE_INSTRUCTIONS,
+    DETAILED_MODE_INSTRUCTIONS,
     EXTRACT_PAPER_METADATA,
+    NORMAL_MODE_INSTRUCTIONS,
 )
 from app.llm.schemas import PaperMetadataExtraction
+from app.schemas.message import ResponseStyle
 from app.schemas.user import CurrentUser
 from fastapi import Depends
 from google import genai  # type: ignore
@@ -216,6 +220,7 @@ class Operations:
         current_user: CurrentUser,
         user_references: Optional[Sequence[str]] = None,
         file_path: Optional[str] = None,
+        response_style: Optional[str] = "normal",
         db: Session = Depends(get_db),
     ) -> AsyncGenerator[Union[str, dict], None]:
         """
@@ -293,6 +298,15 @@ class Operations:
 
         chat_history = self.convert_chat_history_to_api_format(conversation_history)
 
+        additional_instructions = ""
+
+        if response_style == ResponseStyle.DETAILED:
+            additional_instructions = DETAILED_MODE_INSTRUCTIONS
+        elif response_style == ResponseStyle.CONCISE:
+            additional_instructions = CONCISE_MODE_INSTRUCTIONS
+        else:
+            additional_instructions = NORMAL_MODE_INSTRUCTIONS
+
         formatted_system_prompt = ANSWER_PAPER_QUESTION_SYSTEM_PROMPT.format(
             paper=raw_file
         )
@@ -306,7 +320,8 @@ class Operations:
         )
 
         formatted_prompt = ANSWER_PAPER_QUESTION_USER_MESSAGE.format(
-            question=f"{question}\n\n{user_citations}" if user_citations else question
+            question=f"{question}\n\n{user_citations}" if user_citations else question,
+            additional_instructions=additional_instructions,
         )
 
         evidence_buffer: list[str] = []

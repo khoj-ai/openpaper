@@ -72,7 +72,19 @@ Paper: {paper}
 
 ANSWER_PAPER_QUESTION_USER_MESSAGE = """
 Given the context of the paper and this conversation, answer the following question.
-
+{additional_instructions}
 Query: {question}
 Answer:
+"""
+
+CONCISE_MODE_INSTRUCTIONS = """
+You are in concise mode. Provide a brief and direct answer to the user's question. Avoid unnecessary details or elaboration.
+"""
+
+DETAILED_MODE_INSTRUCTIONS = """
+You are in detailed mode. Provide a comprehensive and thorough answer to the user's question. Include relevant details, explanations, and context to ensure clarity and understanding.
+"""
+
+NORMAL_MODE_INSTRUCTIONS = """
+You are in normal mode. Provide a balanced response to the user's question. Include the most relevant details and context, and avoid excessive elaboration or unnecessary information. Limit your response to < 5 paragraphs.
 """

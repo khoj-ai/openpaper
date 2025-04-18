@@ -1,13 +1,14 @@
 import json
 import logging
 import uuid
-from pathlib import Path
+from enum import Enum
 from typing import List, Optional, Union
 
 from app.auth.dependencies import get_required_user
 from app.database.crud.message_crud import MessageCreate, message_crud
 from app.database.database import get_db
 from app.llm.operations import Operations
+from app.schemas.message import ResponseStyle
 from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException
@@ -33,6 +34,7 @@ class ChatMessageRequest(BaseModel):
     conversation_id: str
     user_query: str
     user_references: Optional[List[str]] = None
+    style: Optional[ResponseStyle] = ResponseStyle.NORMAL
 
 
 @message_router.post("/chat")
@@ -43,6 +45,11 @@ async def chat_message_stream(
 ) -> StreamingResponse:
     """
     Send a chat message and stream the response from the LLM
+
+    The response style can be:
+    - normal: Standard balanced response
+    - concise: Short and to the point
+    - detailed: Comprehensive and thorough
     """
     try:
 
@@ -57,6 +64,7 @@ async def chat_message_stream(
                     question=request.user_query,
                     current_user=current_user,
                     user_references=request.user_references,
+                    response_style=request.style,
                     db=db,
                 ):
                     # Parse the chunk as a dictionary

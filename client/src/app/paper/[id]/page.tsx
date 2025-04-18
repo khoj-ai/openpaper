@@ -26,7 +26,7 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion"
 
-import { ChevronDown, ChevronUp, Highlighter, NotebookText, MessageCircle, Focus, X, Eye, Edit, Loader, HelpCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, Highlighter, NotebookText, MessageCircle, Focus, X, Eye, Edit, Loader, HelpCircle, ArrowUp, Feather } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import {
     Sidebar,
@@ -38,6 +38,16 @@ import {
     SidebarMenuItem,
     SidebarProvider,
 } from "@/components/ui/sidebar";
+
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+
 import { AnnotationsView } from '@/components/AnnotationsView';
 import { useHighlights } from '@/components/hooks/PdfHighlight';
 import { useAnnotations } from '@/components/hooks/PdfAnnotation';
@@ -107,6 +117,12 @@ interface IPaperMetadata {
     paperData: PaperData;
     onClickStarterQuestion: (question: string) => void;
     hasMessages: boolean;
+}
+
+enum ResponseStyle {
+    Normal = 'normal',
+    Concise = 'concise',
+    Detailed = 'detailed',
 }
 
 // Interface for the CustomCitationLink component props
@@ -358,6 +374,7 @@ export default function PaperView() {
 
     const messagesContainerRef = useRef<HTMLDivElement>(null);
     const [currentMessage, setCurrentMessage] = useState('');
+    const [responseStyle, setResponseStyle] = useState<ResponseStyle>(ResponseStyle.Normal);
     const [isStreaming, setIsStreaming] = useState(false);
     const [conversationId, setConversationId] = useState<string | null>(null);
     const [activeCitationKey, setActiveCitationKey] = useState<string | null>(null);
@@ -742,6 +759,7 @@ export default function PaperView() {
                     conversation_id: conversationId,
                     paper_id: id,
                     user_references: userMessageReferences,
+                    style: responseStyle,
                 })
             });
 
@@ -1036,8 +1054,8 @@ export default function PaperView() {
                                     messages.map((msg, index) => (
                                         <div
                                             key={index}
-                                            className={`prose dark:prose-invert p-3 rounded-lg ${msg.role === 'user'
-                                                ? 'bg-blue-200 text-blue-800 ml-12'
+                                            className={`prose dark:prose-invert p-2 rounded-lg ${msg.role === 'user'
+                                                ? 'bg-blue-200 text-blue-800 w-fit'
                                                 : 'w-full text-primary'
                                                 }`}
                                         >
@@ -1135,20 +1153,65 @@ export default function PaperView() {
                                         </div>
                                     )
                                 }
-                                <Textarea
-                                    value={currentMessage}
-                                    onChange={(e) => setCurrentMessage(e.target.value)}
-                                    ref={inputMessageRef}
-                                    placeholder="Ask something about this paper..."
-                                    className="flex-1 border rounded-md resize-none p-2"
-                                    disabled={isStreaming}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && !e.shiftKey) {
-                                            e.preventDefault();
-                                            handleSubmit(e);
-                                        }
-                                    }}
-                                />
+                                <div
+                                    className='border *:border-gray-300 dark:border-gray-700 rounded-md p-2 flex flex-col gap-2'
+                                >
+                                    {/* User message input area */}
+                                    <Textarea
+                                        value={currentMessage}
+                                        onChange={(e) => setCurrentMessage(e.target.value)}
+                                        ref={inputMessageRef}
+                                        placeholder="Ask something about this paper..."
+                                        className="flex-1 border-none rounded-md resize-none p-2"
+                                        disabled={isStreaming}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                handleSubmit(e);
+                                            }
+                                        }}
+                                    />
+                                    <div className="flex flex-row justify-between gap-2 mt-2">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    variant="ghost"
+                                                    className="w-fit text-sm"
+                                                    disabled={isStreaming}
+                                                >
+                                                    <Feather
+                                                        className="h-4 w-4 text-secondary-foreground"
+                                                    />
+                                                    {responseStyle}
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent className="w-56">
+                                                {Object.values(ResponseStyle).map((style) => (
+                                                    <DropdownMenuItem
+                                                        key={style}
+                                                        onClick={() => {
+                                                            setResponseStyle(style);
+                                                            setRightSideFunction('Chat');
+                                                        }}
+                                                    >
+                                                        {style}
+                                                    </DropdownMenuItem>
+                                                ))}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                        <Button
+                                            type="submit"
+                                            variant="default"
+                                            className="w-fit rounded-full h-fit !px-2 py-2"
+                                            disabled={isStreaming}
+                                        >
+                                            <ArrowUp
+                                                className="h-4 w-4 rounded-full"
+                                                aria-hidden="true"
+                                            />
+                                        </Button>
+                                    </div>
+                                </div>
                             </form>
                         </div>
                     )
