@@ -236,6 +236,12 @@ export default function PaperView() {
     }, [userMessageReferences]);
 
     useEffect(() => {
+        if (isAnnotating) {
+            setRightSideFunction('Annotations');
+        }
+    }, [isAnnotating]);
+
+    useEffect(() => {
         // Add keybinding to toggle markdown preview
         const handleKeyDown = (e: KeyboardEvent) => {
             if ((e.metaKey || e.ctrlKey) && e.key === 'm') {
@@ -696,7 +702,6 @@ export default function PaperView() {
                                 setTooltipPosition={setTooltipPosition}
                                 setIsAnnotating={setIsAnnotating}
                                 setIsHighlightInteraction={setIsHighlightInteraction}
-                                isAnnotating={isAnnotating}
                                 isHighlightInteraction={isHighlightInteraction}
                                 highlights={highlights}
                                 setHighlights={setHighlights}

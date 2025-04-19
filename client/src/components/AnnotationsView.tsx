@@ -42,6 +42,7 @@ export function AnnotationButton({ highlightId, addAnnotation }: AnnotationButto
 				}}
 				placeholder="Add annotation..."
 				className="text-sm w-full"
+				autoFocus
 			/>
 			{isTyping && (
 				<div className="flex justify-end gap-2">

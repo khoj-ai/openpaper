@@ -29,7 +29,6 @@ interface PdfViewerProps {
 	setSelectedText: (text: string) => void;
 	tooltipPosition: { x: number; y: number } | null;
 	setTooltipPosition: (position: { x: number; y: number } | null) => void;
-	isAnnotating: boolean;
 	setIsAnnotating: (isAnnotating: boolean) => void;
 	isHighlightInteraction: boolean;
 	setIsHighlightInteraction: (isHighlightInteraction: boolean) => void;

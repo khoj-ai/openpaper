@@ -63,6 +63,10 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                 setSelectedText("");
                 setTooltipPosition(null);
                 setIsAnnotating(false);
+            } else if (e.key === "e" && (e.ctrlKey || e.metaKey)) {
+                setIsAnnotating(true);
+                setTooltipPosition(null);
+                setSelectedText("");
             } else {
                 return;
             }
@@ -130,6 +134,32 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                         </Button>
                     )
                 }
+
+                {/* Annotate Button */}
+                {
+                    isHighlightInteraction && (
+                        <Button
+                            variant="ghost"
+                            className="w-full flex items-center justify-between text-sm font-normal h-9 px-2"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setIsAnnotating(true);
+                                setTooltipPosition(null);
+                                setSelectedText("");
+                            }}
+                        >
+                            <div className="flex items-center gap-2">
+                                <Highlighter size={14} />
+                                Annotate
+                            </div>
+                            <CommandShortcut className="text-muted-foreground">
+                                {localizeCommandToOS('E')}
+                            </CommandShortcut>
+                        </Button>
+                    )
+                }
+
                 {/* Add Note Button */}
                 <Button
                     variant="ghost"
