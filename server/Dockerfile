@@ -6,6 +6,7 @@ COPY pyproject.toml ./
 COPY app ./app
 COPY migrations .//migrations
 COPY alembic.ini ./
+COPY gunicorn.config.py ./
 COPY app/scripts/run_migrations.py ./app/scripts/run_migrations.py
 
 RUN pip install uv
