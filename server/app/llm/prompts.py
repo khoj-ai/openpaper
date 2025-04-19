@@ -55,6 +55,8 @@ Math notation, even in LaTeX syntax, MUST be in a math code block.
 
 8. If the paper is not relevant to the question, say so and provide a brief explanation.
 
+{additional_instructions}
+
 Example format:
 
 The study found that machine learning models can effectively detect spam emails [^1]. However, their performance decreases when dealing with sophisticated phishing attempts [^2].
@@ -72,13 +74,13 @@ Paper: {paper}
 
 ANSWER_PAPER_QUESTION_USER_MESSAGE = """
 Given the context of the paper and this conversation, answer the following question.
-{additional_instructions}
+
 Query: {question}
 Answer:
 """
 
 CONCISE_MODE_INSTRUCTIONS = """
-You are in concise mode. Provide a brief and direct answer to the user's question. Avoid unnecessary details or elaboration.
+You are in concise mode. Provide a brief and direct answer to the user's question.
 """
 
 DETAILED_MODE_INSTRUCTIONS = """
@@ -86,5 +88,5 @@ You are in detailed mode. Provide a comprehensive and thorough answer to the use
 """
 
 NORMAL_MODE_INSTRUCTIONS = """
-You are in normal mode. Provide a balanced response to the user's question. Include the most relevant details and context, and avoid excessive elaboration or unnecessary information. Limit your response to < 5 paragraphs.
+You are in normal mode. Provide a balanced response to the user's question. Include the most relevant details and context, but avoid excessive elaboration or unnecessary information. Limit your response to < 5 paragraphs. You must still include evidence.
 """

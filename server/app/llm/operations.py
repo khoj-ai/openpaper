@@ -308,7 +308,8 @@ class Operations:
             additional_instructions = NORMAL_MODE_INSTRUCTIONS
 
         formatted_system_prompt = ANSWER_PAPER_QUESTION_SYSTEM_PROMPT.format(
-            paper=raw_file
+            paper=raw_file,
+            additional_instructions=additional_instructions,
         )
 
         chat_session = self.client.chats.create(
@@ -321,7 +322,6 @@ class Operations:
 
         formatted_prompt = ANSWER_PAPER_QUESTION_USER_MESSAGE.format(
             question=f"{question}\n\n{user_citations}" if user_citations else question,
-            additional_instructions=additional_instructions,
         )
 
         evidence_buffer: list[str] = []
