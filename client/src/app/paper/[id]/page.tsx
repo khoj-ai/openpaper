@@ -875,9 +875,9 @@ export default function PaperView() {
     return (
         <div className="flex flex-row w-full h-[calc(100vh-64px)]">
             <div
-                className={`w-full h-full grid ${rightSideFunction === 'Focus' ? 'grid-cols-2' : 'grid-cols-3'} items-center justify-center gap-0`}>
+                className={`w-full h-full grid ${rightSideFunction === 'Focus' ? 'grid-cols-1' : 'grid-cols-5'} items-center justify-center gap-0`}>
 
-                <div className="border-r-2 dark:border-gray-800 border-gray-200 p-0 h-full col-span-2">
+                <div className="border-r-2 dark:border-gray-800 border-gray-200 p-0 h-full col-span-3">
                     {/* PDF Viewer Section */}
                     {paperData.file_url && (
                         <div className="w-full h-full">
@@ -910,7 +910,7 @@ export default function PaperView() {
                 </div>
                 {
                     rightSideFunction === 'Notes' && (
-                        <div className='p-2 w-full h-full flex flex-col'>
+                        <div className='p-2 w-full h-full flex flex-col col-span-2'>
                             <div className="flex justify-between items-center mb-2 flex-shrink-0">
                                 <div className="flex items-center gap-2">
                                     <div className="text-xs text-gray">
@@ -961,7 +961,7 @@ export default function PaperView() {
                                     <div className="absolute inset-0 overflow-y-auto">
                                         <div className="prose dark:prose-invert max-w-none text-sm">
                                             <Markdown
-                                                remarkPlugins={[remarkGfm, remarkMath]}
+                                                remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
                                                 rehypePlugins={[rehypeKatex]}
                                             >
                                                 {paperNoteContent || ''}
@@ -990,7 +990,7 @@ export default function PaperView() {
                 }
                 {
                     rightSideFunction === 'Annotations' && (
-                        <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto">
+                        <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto col-span-2">
                             <AnnotationsView
                                 annotations={annotations}
                                 highlights={highlights}
@@ -1005,7 +1005,7 @@ export default function PaperView() {
                 }
                 {
                     rightSideFunction === 'Chat' && (
-                        <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto">
+                        <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto col-span-2">
                             {/* Paper Metadata Section */}
                             {paperData && (
                                 <PaperMetadata
@@ -1058,7 +1058,7 @@ export default function PaperView() {
                                                 }`}
                                         >
                                             <Markdown
-                                                remarkPlugins={[remarkGfm, remarkMath]}
+                                                remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
                                                 rehypePlugins={[rehypeKatex]}
                                                 components={{
                                                     // Apply the custom component to text nodes
