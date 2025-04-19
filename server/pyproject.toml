@@ -24,4 +24,5 @@ dependencies = [
     "types-boto3>=1.37.33",
     "sqladmin[full]>=0.20.1",
     "itsdangerous>=2.2.0",
+    "gunicorn>=23.0.0",
 ]

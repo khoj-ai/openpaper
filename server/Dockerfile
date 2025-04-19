@@ -11,4 +11,4 @@ COPY app/scripts/run_migrations.py ./app/scripts/run_migrations.py
 RUN pip install uv
 RUN uv pip install --system -r pyproject.toml
 
-CMD ["python3", "-m", "app.main"]
+CMD ["gunicorn", "-c", "gunicorn.config.py", "app.main:app"]
