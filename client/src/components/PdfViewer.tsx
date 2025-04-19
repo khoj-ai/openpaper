@@ -14,7 +14,10 @@ import { usePdfSearch } from "./hooks/PdfSearch";
 import { usePdfNavigation } from "./hooks/PdfNavigation";
 import { usePdfLoader } from "./hooks/PdfLoader";
 import InlineAnnotationMenu from "./InlineAnnotationMenu";
-import { PaperHighlight, PaperHighlightAnnotation } from "@/app/paper/[id]/page";
+import {
+    PaperHighlight,
+	PaperHighlightAnnotation,
+} from '@/lib/schema';
 
 interface PdfViewerProps {
 	pdfUrl: string;

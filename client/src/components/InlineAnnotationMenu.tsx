@@ -1,4 +1,7 @@
-import { PaperHighlight } from "@/app/paper/[id]/page";
+import {
+    PaperHighlight,
+} from '@/lib/schema';
+
 import { getSelectionOffsets } from "./utils/PdfTextUtils";
 import { useEffect, useState } from "react";
 import { Button } from "./ui/button";

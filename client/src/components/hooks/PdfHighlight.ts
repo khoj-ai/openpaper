@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
-import { PaperHighlight } from '@/app/paper/[id]/page';
+import {
+    PaperHighlight,
+} from '@/lib/schema';
+
 import { getSelectionOffsets } from '../utils/PdfTextUtils';
 import { addHighlightToNodes, findAllHighlightedPassages } from '../utils/PdfHighlightUtils';
 import { fetchFromApi } from '@/lib/api';

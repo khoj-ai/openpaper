@@ -1,4 +1,6 @@
-import { PaperHighlight } from "@/app/paper/[id]/page";
+import {
+    PaperHighlight,
+} from '@/lib/schema';
 
 export interface HighlightHandlers {
     setIsHighlightInteraction: (value: boolean) => void;

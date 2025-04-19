@@ -1,4 +1,6 @@
-import { PaperHighlightAnnotation } from '@/app/paper/[id]/page';
+import {
+    PaperHighlightAnnotation
+} from '@/lib/schema';
 import { fetchFromApi } from '@/lib/api';
 import { useEffect, useState } from 'react';
 

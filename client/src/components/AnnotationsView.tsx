@@ -1,5 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { PaperHighlight, PaperHighlightAnnotation } from '@/app/paper/[id]/page';
+
+import {
+    PaperHighlight,
+	PaperHighlightAnnotation
+} from '@/lib/schema';
+
 import { Trash2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
