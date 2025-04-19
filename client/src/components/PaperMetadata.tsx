@@ -6,6 +6,13 @@ import {
 } from "@/components/ui/collapsible";
 
 import {
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from "@/components/ui/tabs";
+
+import {
     Accordion,
     AccordionContent,
     AccordionItem,
@@ -13,7 +20,6 @@ import {
 } from "@/components/ui/accordion"
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { PaperData } from "@/lib/schema";
 
@@ -35,6 +41,7 @@ const isDateValid = (dateString: string) => {
 function PaperMetadata(props: IPaperMetadata) {
     const { paperData } = props;
     const [isOpen, setIsOpen] = useState(!props.hasMessages);
+    const [showFullSummary, setShowFullSummary] = useState(false);
 
     const showAccordion = paperData.authors?.length > 0 || paperData.institutions?.length > 0;
 
@@ -68,18 +75,25 @@ function PaperMetadata(props: IPaperMetadata) {
                     }
                     {
                         paperData.summary && (
-                            <div className='text-sm'>
+                            <div
+                                className={`text-xs font-normal max-w-full whitespace-normal h-auto text-left justify-start break-words hover:bg-secondary/50 ${showFullSummary ? 'cursor-default' : 'cursor-pointer line-clamp-3'}`}
+                                onClick={() => {
+                                    setShowFullSummary(!showFullSummary);
+                                }}
+                            >
                                 {paperData.summary}
                             </div>
                         )
                     }
-
-
-                    {paperData.starter_questions && paperData.starter_questions.length > 0 && (
-                        <div>
-                            <ScrollArea className="max-h-1/2">
+                    <Tabs defaultValue="questions" className="w-full">
+                        <TabsList>
+                            <TabsTrigger value="questions">Suggested Questions</TabsTrigger>
+                            <TabsTrigger value="metadata">Metadata</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="questions">
+                            {paperData.starter_questions && paperData.starter_questions.length > 0 && (
                                 <div className="flex gap-2 flex-wrap">
-                                    {paperData.starter_questions.map((question, i) => (
+                                    {paperData.starter_questions.slice(0, 5).map((question, i) => (
                                         <Button
                                             key={i}
                                             variant="outline"
@@ -93,63 +107,63 @@ function PaperMetadata(props: IPaperMetadata) {
                                         </Button>
                                     ))}
                                 </div>
-                            </ScrollArea>
-                        </div>
-                    )}
-
-                    {showAccordion && (
-                        <Accordion type="single" collapsible className='text-sm'>
-                            {paperData.authors && paperData.authors.length > 0 && (
-                                <AccordionItem value="item-1">
-                                    <AccordionTrigger className="flex justify-between items-center">
-                                        Authors
-                                    </AccordionTrigger>
-                                    <AccordionContent>
-                                        <div className="flex gap-2 flex-wrap">
-                                            {paperData.authors.map((author, i) => (
-                                                <a
-                                                    key={i}
-                                                    href={googleScholarUrl(author)}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-blue-500 hover:underline mr-2"
-                                                >
-                                                    {author}
-                                                </a>
-                                            ))}
-                                        </div>
-                                    </AccordionContent>
-                                </AccordionItem>
                             )}
-                            {paperData.institutions && paperData.institutions.length > 0 && (
-                                <AccordionItem value="item-2">
-                                    <AccordionTrigger className="flex justify-between items-center">
-                                        Institutions
-                                    </AccordionTrigger>
-                                    <AccordionContent>
-                                        <div className="flex gap-2 flex-wrap">
-                                            {paperData.institutions.map((institution, i) => (
-                                                <a
-                                                    key={i}
-                                                    href={googleScholarUrl(institution)}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-blue-500 hover:underline mr-2"
-                                                >
-                                                    {institution}
-                                                </a>
-                                            ))}
-                                        </div>
-                                    </AccordionContent>
-                                </AccordionItem>
+                        </TabsContent>
+                        <TabsContent value="metadata">
+
+                            {showAccordion && (
+                                <Accordion type="single" collapsible className='text-sm'>
+                                    {paperData.authors && paperData.authors.length > 0 && (
+                                        <AccordionItem value="item-1">
+                                            <AccordionTrigger className="flex justify-between items-center">
+                                                Authors
+                                            </AccordionTrigger>
+                                            <AccordionContent>
+                                                <div className="flex gap-2 flex-wrap">
+                                                    {paperData.authors.map((author, i) => (
+                                                        <a
+                                                            key={i}
+                                                            href={googleScholarUrl(author)}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-blue-500 hover:underline mr-2"
+                                                        >
+                                                            {author}
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                    )}
+                                    {paperData.institutions && paperData.institutions.length > 0 && (
+                                        <AccordionItem value="item-2">
+                                            <AccordionTrigger className="flex justify-between items-center">
+                                                Institutions
+                                            </AccordionTrigger>
+                                            <AccordionContent>
+                                                <div className="flex gap-2 flex-wrap">
+                                                    {paperData.institutions.map((institution, i) => (
+                                                        <a
+                                                            key={i}
+                                                            href={googleScholarUrl(institution)}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-blue-500 hover:underline mr-2"
+                                                        >
+                                                            {institution}
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                    )}
+                                </Accordion>
                             )}
-                        </Accordion>
-                    )}
-
-
+                        </TabsContent>
+                    </Tabs>
                 </div>
             </CollapsibleContent>
-        </Collapsible>
+        </Collapsible >
     );
 }
 
