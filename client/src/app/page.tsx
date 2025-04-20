@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { fetchFromApi } from "@/lib/api";
 import { useIsMobile } from "@/lib/useMobile";;
 import {
@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { FileText, Highlighter, Loader2, LucideFileWarning, MessageSquareText } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { PdfDropzone } from "@/components/PdfDropzone";
 
 interface PdfUploadResponse {
 	filename: string;
@@ -22,10 +23,9 @@ interface PdfUploadResponse {
 }
 
 export default function Home() {
-	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [isUploading, setIsUploading] = useState(false);
 	const [loadingMessage, setLoadingMessage] = useState("Preparing your paper...");
-	const [isDialogOpen, setIsDialogOpen] = useState(false);
+	const [isUrlDialogOpen, setIsUrlDialogOpen] = useState(false); // Renamed for clarity
 
 	const [pdfUrl, setPdfUrl] = useState("");
 	const [showErrorAlert, setShowErrorAlert] = useState(false);
@@ -139,19 +139,15 @@ export default function Home() {
 		}
 	};
 
-	const handleImportClick = () => {
-		fileInputRef.current?.click();
-	};
-
 	const handleLinkClick = () => {
-		setIsDialogOpen(true);
+		setIsUrlDialogOpen(true);
 	};
 
 	const handleDialogConfirm = async () => {
 		if (pdfUrl) {
 			await handlePdfUrl(pdfUrl);
 		}
-		setIsDialogOpen(false);
+		setIsUrlDialogOpen(false);
 		setPdfUrl("");
 	};
 
@@ -282,26 +278,19 @@ export default function Home() {
 						</Dialog>
 					)
 				}
-				<div className="flex gap-4 items-center flex-col sm:flex-row">
-					<input
-						type="file"
-						ref={fileInputRef}
-						accept=".pdf"
-						className="hidden"
-						onChange={(e) => {
-							const file = e.target.files?.[0];
-							if (file) {
-								handleFileUpload(file);
-							}
-						}}
-					/>
-					<Button onClick={handleImportClick}>
-						Import PDF
-					</Button>
-					<Button onClick={handleLinkClick}>
-						Link to a PDF
-					</Button>
+				<div className="flex flex-col text-center space-y-8">
+					<p className="text-lg text-left text-muted-foreground max-w-2xl">
+						Upload your papers to one secure place. Read, annotate, and understand them deeply with the help of AI-powered insights.
+					</p>
 				</div>
+
+				{/* Replace buttons with PdfDropzone */}
+				<PdfDropzone
+					onFileSelect={handleFileUpload}
+					onUrlClick={handleLinkClick}
+					maxSizeMb={5} // Set your desired max size
+				/>
+
 			</main>
 			<footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
 				<p>
@@ -312,35 +301,26 @@ export default function Home() {
 			{showErrorAlert && (
 				<Dialog open={showErrorAlert} onOpenChange={setShowErrorAlert}>
 					<DialogContent>
-						<DialogTitle>Failed to fetch PDF</DialogTitle>
-						<DialogDescription className="space-y-4 inline-flex">
-							<LucideFileWarning className="h-6 w-6 text-red-500 mr-2" />
-							We were unable to download the PDF from the provided URL. This might be due to security restrictions on the server.
+						<DialogTitle>Upload Failed</DialogTitle>
+						<DialogDescription className="space-y-4 inline-flex items-center">
+							<LucideFileWarning className="h-6 w-6 text-red-500 mr-2 flex-shrink-0" />
+							{/* Generic error message (temp) */}
+							We encountered an error processing your request. Please check the file or URL and try again.
 						</DialogDescription>
-						<div>
-							Try downloading the PDF to your computer first and then use the{" "}
-							<button
-								className="text-primary underline hover:text-primary/80"
-								onClick={() => {
-									setShowErrorAlert(false);
-									handleImportClick();
-								}}
-							>
-								Import PDF
-							</button>
-							{" "}button to upload it.
+						<div className="flex justify-end mt-4">
+							<Button variant="outline" onClick={() => setShowErrorAlert(false)}>Close</Button>
 						</div>
 					</DialogContent>
 				</Dialog>
 			)}
 
 			{/* Dialog for PDF URL */}
-			<Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+			<Dialog open={isUrlDialogOpen} onOpenChange={setIsUrlDialogOpen}>
 				<DialogContent>
 					<DialogHeader>
-						<DialogTitle>Link to a PDF</DialogTitle>
+						<DialogTitle>Import PDF from URL</DialogTitle> {/* Updated Title */}
 						<DialogDescription>
-							Enter the URL of the PDF you want to upload.
+							Enter the public URL of the PDF you want to upload.
 						</DialogDescription>
 					</DialogHeader>
 					<Input
@@ -351,10 +331,11 @@ export default function Home() {
 						className="mt-4"
 					/>
 					<div className="flex justify-end gap-2 mt-4">
-						<Button variant="secondary" onClick={() => setIsDialogOpen(false)}>
+						<Button variant="secondary" onClick={() => setIsUrlDialogOpen(false)}>
 							Cancel
 						</Button>
-						<Button onClick={handleDialogConfirm}>
+						<Button onClick={handleDialogConfirm} disabled={!pdfUrl || isUploading}>
+							{isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
 							Submit
 						</Button>
 					</div>
@@ -366,7 +347,7 @@ export default function Home() {
 					<DialogHeader>
 						<DialogTitle className="text-center">Processing Your Paper</DialogTitle>
 						<DialogDescription className="text-center">
-							This will just take a moment
+							This might take a moment...
 						</DialogDescription>
 					</DialogHeader>
 					<div className="flex flex-col items-center justify-center py-8 space-y-6">
