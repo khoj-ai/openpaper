@@ -25,4 +25,5 @@ dependencies = [
     "sqladmin[full]>=0.20.1",
     "itsdangerous>=2.2.0",
     "gunicorn>=23.0.0",
+    "pymupdf4llm>=0.0.21",
 ]

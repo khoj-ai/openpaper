@@ -501,6 +501,22 @@ def create_and_upload_pdf(
         except Exception:
             pass
 
+        if created_doc:
+            # Attempt to delete the document record if it was created
+            try:
+                document_crud.remove(db, id=str(created_doc.id), user=current_user)
+            except Exception as delete_error:
+                logger.error(
+                    f"Failed to delete document record after error: {delete_error}"
+                )
+                return JSONResponse(
+                    status_code=500,
+                    content={
+                        "message": f"Error deleting document record: {str(delete_error)}",
+                        "filename": safe_filename,
+                    },
+                )
+
         return JSONResponse(
             status_code=500,
             content={
