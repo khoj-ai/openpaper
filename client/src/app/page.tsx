@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { FileText, GithubIcon, Highlighter, Loader2, LucideFileWarning, MessageSquareText, Play } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { PdfDropzone } from "@/components/PdfDropzone";
+import Link from "next/link";
 
 interface PdfUploadResponse {
 	filename: string;
@@ -246,10 +247,10 @@ export default function Home() {
 						</a>
 					</p>
 					<Button size="lg" className="w-fit" variant="outline" asChild>
-						<a href="/blog/manifesto">
+						<Link href="/blog/manifesto">
 							<FileText className="h-4 w-4 mr-2" />
 							Manifesto
-						</a>
+						</Link>
 					</Button>
 				</footer>
 			</div>
@@ -304,10 +305,10 @@ export default function Home() {
 					</a>
 				</p>
 				<Button size="lg" className="w-fit" variant="outline" asChild>
-					<a href="/blog/manifesto">
+					<Link href="/blog/manifesto">
 						<FileText className="h-4 w-4 mr-2" />
 						Manifesto
-					</a>
+					</Link>
 				</Button>
 			</footer>
 
