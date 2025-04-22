@@ -1,0 +1,70 @@
+export const metadata = {
+    title: "Manifesto",
+    description: "We are building tools that amplify researchers by helping them find existing research, understand it, and write about their own findings.",
+    date: "04-22-2025",
+}
+
+Our fundamental objective is to accelerate the pace at which people conduct research. Broadly speaking, we define research as a comprehensive investigation into a system to establish novel observations. It is a process to be less wrong regarding an open question. With more accurate research, we boost the shared wisdom of humanity.
+
+We sub-divide this process into four tasks:
+1. Find existing information relevant to your research question
+2. Understand the core methodologies, assumptions, and outcomes of prior work
+3. Conduct your own experiments
+4. Create a document that aggregates your novel insights for peer-review
+
+We want to create an AI-powered system that can help streamline tasks 1, 2, and 4.
+
+3 is currently out of scope, as it depends heavily upon the custom experimental setup of the researchers.
+
+In a crude, over-simplified way, this is what that process looks like:
+
+![research_process](/research_process.png)
+
+## Finding Prior Research
+
+Before we begin any work, it is generally useful to see what has already been done. At times, the answers to open questions can be satisfied within the abstracts of an existing reference.
+
+Existing tools for searching through research papers are fragmented or provide a limited interface. A significant bottleneck in access is also the paywalls that prevent individuals from accessing the publications in certain journals, even studies which are publicly funded.
+
+We should leverage vector search for improved question-paper matching. This will help us sift through the massive corpora of existing papers more efficiently to get closer to matching papers.
+
+The hope is to provide a clean interface combining outputs for other academic search APIs, but we may build a custom index if necessary.
+
+The knowledge bank improves personal utility. Once the researcher themselves has included a piece of work in their corpus of study, it should make it easier to retrieve from within their knowledge base.
+
+## Understanding Prior Research
+We see in some limited, early studies that AI improves learning rates in some K-12 settings. The same principles, we expect, should be applicable to adults who are learning out in the field for research purposes, particularly if confronted with new topics.
+
+A major issue with the current state of AI is the propensity for hallucinations. We see in our prior work to assess the accuracy of our internet-connected answer engine, that providing grounded information can bring AI systems up to a fairly high accuracy rate. Using that same insight, we can apply that intuition to understanding papers. In the research setting, hallucinations are fairly harmful. To mitigate that downside, we utilize a reliable citation protocol that forces the AI to justify its responses using context gathered from the paper itself.
+
+A major part of reading is also the ability to take notes, so we should surface a simple interface to jot inline citations and highlight passages.
+
+With generative AI, it should also be possible to explore methods of learning that create personalized, multimedia content that make digestion of new information easier. For example, we can output a personalized reflection of the material for you in the form of a podcast, a diagram, charts, etc.
+
+Often, this highlights, annotations, or understanding we construct of a paper also needs to be discussed with a team, so the outputs should be friendly to collaboration.
+
+## Crafting A Paper
+When the researcher is writing about the outcomes of their experimentation, the process can be non-linear. We want to establish simple primitives that help take the mundane out of the way, while offering a fresh canvas to communicate through writing.
+
+We would provide:
+- Common document templates for research papers
+- AI tools to clean grammar, clarify language, maintain voice
+- Based on existing corpus, pre-filled citations
+- Invitations to co-write or receive edits from collaborators
+
+The tooling should fall in the background and get out of the way, so you can focus on the writing. We want to avoid the pitfalls of existing tools that are too prescriptive or force you into a certain structure.
+
+# Our Hypothesis
+If we craft a tool that can accurately and reliably help people with the three above tasks, we can demonstrably increase the pace of conducting research. Advancements in generative AI should enable us to deliver on these core requirements.
+
+To approximate utility, we can track the number of searches, papers uploaded, papers drafted on the system. We especially track actions conducted by repeat users. The world should look different with this tool, because more researchers will be able to produce at a higher velocity. It will enable them to quickly rule out, investigate, and communicate hypotheses.
+
+# Our Methodology
+We plan to start with the pillar of boosting understanding, as this seems the most tractable. Researchers can bring their own papers and upload them for AI-assistive comprehension. We will start with papers, and expand to include other sources that can be used for research, including audio transcripts, webpages, etc.
+
+Once we achieve a level of sufficiency with the pillar of understanding, we will then approach finding papers, followed by writing papers.
+
+Our code is open source, because this helps boost the observability into our processes and indicate that our words match our actions. It also helps in the case of technical collaborators wanting to contribute back to improving the project.
+
+# Request
+We are seeking partners that can help us guide the roadmap of constructing this tool. Get in touch if the problem statement is of interest to you - [saba@khoj.dev](mailto:saba@khoj.dev).

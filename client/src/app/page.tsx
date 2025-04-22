@@ -12,7 +12,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { FileText, Highlighter, Loader2, LucideFileWarning, MessageSquareText } from "lucide-react";
+import { FileText, GithubIcon, Highlighter, Loader2, LucideFileWarning, MessageSquareText, Play } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { PdfDropzone } from "@/components/PdfDropzone";
 
@@ -156,20 +156,6 @@ export default function Home() {
 
 			<div className="grid grid-rows-[1fr_auto] min-h-[calc(100vh-64px)]">
 				<main className="max-w-6xl mx-auto space-y-24 p-8">
-					{
-						isMobile && (
-							<Dialog open={true}>
-								<DialogContent>
-									<DialogHeader>
-										<DialogTitle>The Annotated Paper</DialogTitle>
-										<DialogDescription>
-											This application is not optimized for mobile devices. Please use a desktop or tablet for the best experience.
-										</DialogDescription>
-									</DialogHeader>
-								</DialogContent>
-							</Dialog>
-						)
-					}
 					{/* Hero Section */}
 					<div className="flex flex-col items-center text-center space-y-8">
 						<h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
@@ -181,12 +167,20 @@ export default function Home() {
 						</p>
 						<div className="flex gap-4">
 							<Button size="lg" asChild>
-								<a href="/login">Get Started</a>
+								<a href="/login">
+									<Play className="h-4 w-4 mr-2" />
+									Get Started
+								</a>
 							</Button>
 							<Button size="lg" variant="outline" asChild>
-								<a href="https://github.com/sabaimran/annotated-paper">View on GitHub</a>
+								<a href="https://github.com/sabaimran/annotated-paper">
+									<GithubIcon className="h-4 w-4 mr-2" />
+									GitHub
+								</a>
 							</Button>
+
 						</div>
+
 					</div>
 
 					{/* Features Grid */}
@@ -239,8 +233,7 @@ export default function Home() {
 						</div>
 					</div> */}
 				</main>
-
-				<footer className="p-8 text-center text-muted-foreground border-t">
+				<footer className="p-8 text-center text-muted-foreground border-t flex gap-4 flex-col items-center justify-center">
 					<p>
 						Made with ❤️ in{" "}
 						<a
@@ -252,6 +245,12 @@ export default function Home() {
 							San Francisco
 						</a>
 					</p>
+					<Button size="lg" className="w-fit" variant="outline" asChild>
+						<a href="/blog/manifesto">
+							<FileText className="h-4 w-4 mr-2" />
+							Manifesto
+						</a>
+					</Button>
 				</footer>
 			</div>
 		);
@@ -292,10 +291,24 @@ export default function Home() {
 				/>
 
 			</main>
-			<footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
+			<footer className="row-start-3 grid gap-[24px] items-center justify-center justify-items-center">
 				<p>
-					Made with ❤️ in{" "} <a href="https://github.com/sabaimran/annotated-paper" target="_blank" rel="noopener noreferrer">San Francisco</a>
+					Made with ❤️ in{" "}
+					<a
+						href="https://github.com/sabaimran/annotated-paper"
+						target="_blank"
+						rel="noopener noreferrer"
+						className="underline hover:text-foreground transition-colors"
+					>
+						San Francisco
+					</a>
 				</p>
+				<Button size="lg" className="w-fit" variant="outline" asChild>
+					<a href="/blog/manifesto">
+						<FileText className="h-4 w-4 mr-2" />
+						Manifesto
+					</a>
+				</Button>
 			</footer>
 
 			{showErrorAlert && (
