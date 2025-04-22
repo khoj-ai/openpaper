@@ -27,6 +27,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
+import Image from "next/image";
 
 // Menu items.
 const items = [
@@ -216,7 +217,7 @@ export function AppSidebar() {
                                 <SidebarMenuButton className="flex items-center gap-2">
                                     <Avatar className="h-6 w-6">
                                         {user.picture ? (
-                                            <img src={user.picture} alt={user.name} />
+                                            <Image src={user.picture} alt={user.name} />
                                         ) : (
                                             <User size={16} />
                                         )}
@@ -229,7 +230,7 @@ export function AppSidebar() {
                                     <div className="flex items-center gap-3">
                                         <Avatar className="h-10 w-10">
                                             {user.picture ? (
-                                                <img src={user.picture} alt={user.name} />
+                                                <Image src={user.picture} alt={user.name} />
                                             ) : (
                                                 <User size={24} />
                                             )}

@@ -415,16 +415,7 @@ export default function PaperView() {
             setAddedContentForPaperNote(null);
             setRightSideFunction('Notes');
         }
-
     }, [addedContentForPaperNote]);
-
-    // Add useEffect to handle starter question submission
-    useEffect(() => {
-        if (pendingStarterQuestion) {
-            handleSubmit(null);
-            setPendingStarterQuestion(null);
-        }
-    }, [currentMessage]);
 
     // Handle scroll to load more messages
     const handleScroll = () => {
@@ -530,7 +521,7 @@ export default function PaperView() {
                 updateNote(paperNoteContent);
             }, 2000);
         }
-    }, [paperNoteContent]);
+    }, [paperNoteContent, id, updateNote]);
 
     const transformReferencesToFormat = (references: string[]) => {
         const citations = references.map((ref, index) => ({
@@ -677,6 +668,14 @@ export default function PaperView() {
         }
     };
 
+    // Add useEffect to handle starter question submission
+    useEffect(() => {
+        if (pendingStarterQuestion) {
+            handleSubmit(null);
+            setPendingStarterQuestion(null);
+        }
+    }, [currentMessage, handleSubmit, pendingStarterQuestion]);
+
     const matchesCurrentCitation = (key: string, messageIndex: number) => {
         return activeCitationKey === key.toString() && activeCitationMessageIndex === messageIndex;
     }
@@ -726,7 +725,7 @@ export default function PaperView() {
                             <div className="flex justify-between items-center mb-2 flex-shrink-0">
                                 <div className="flex items-center gap-2">
                                     <div className="text-xs text-gray">
-                                        Note length: {paperNoteContent?.length} characters
+                                        Length: {paperNoteContent?.length} characters
                                     </div>
                                     <TooltipProvider>
                                         <Tooltip>

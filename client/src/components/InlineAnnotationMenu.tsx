@@ -25,7 +25,19 @@ interface InlineAnnotationMenuProps {
 }
 
 export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
-    const { selectedText, tooltipPosition, setSelectedText, setTooltipPosition, setIsAnnotating, isHighlightInteraction, activeHighlight, addHighlight, removeHighlight, setUserMessageReferences, setAddedContentForPaperNote } = props;
+    const {
+        selectedText,
+        tooltipPosition,
+        setSelectedText,
+        setTooltipPosition,
+        setIsAnnotating,
+        isHighlightInteraction,
+        activeHighlight,
+        addHighlight,
+        removeHighlight,
+        setUserMessageReferences,
+        setAddedContentForPaperNote
+    } = props;
 
     const [offsets, setOffsets] = useState<{ start: number; end: number } | null>(null);
 

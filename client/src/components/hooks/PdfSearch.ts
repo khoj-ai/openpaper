@@ -27,13 +27,6 @@ export function usePdfSearch(explicitSearchTerm?: string) {
     const [currentMatch, setCurrentMatch] = useState(-1);
     const [notFound, setNotFound] = useState(false);
 
-    // Handle explicit search term if provided
-    useEffect(() => {
-        if (explicitSearchTerm) {
-            performSearch(explicitSearchTerm);
-        }
-    }, [explicitSearchTerm]);
-
     const performSearch = (term?: string) => {
         const textToSearch = term || searchText;
         if (!textToSearch.trim()) {
@@ -63,6 +56,13 @@ export function usePdfSearch(explicitSearchTerm?: string) {
             scrollToMatch(results[0]);
         }
     };
+
+    // Handle explicit search term if provided
+    useEffect(() => {
+        if (explicitSearchTerm) {
+            performSearch(explicitSearchTerm);
+        }
+    }, [explicitSearchTerm, performSearch]);
 
     const scrollToMatch = (match: { pageIndex: number; matchIndex: number; nodes: Element[] }) => {
         if (!match) return;
