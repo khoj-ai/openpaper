@@ -210,7 +210,6 @@ export function AppSidebar() {
                         <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
-                <OnboardingChecklist />
                 {/* User Profile (if logged in) */}
                 {user && (
                     <SidebarMenuItem className="mb-2">

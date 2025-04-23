@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { AuthProvider } from "@/lib/auth";
+import OnboardingChecklist from "@/components/OnboardingChecklist";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -38,10 +39,11 @@ export default function RootLayout({
 							<header className="flex h-8 shrink-0 items-center gap-2 border-b px-4">
 								<SidebarTrigger className="-ml-1" />
 								<Separator orientation="vertical" className="mr-2 h-4" />
-								<header>
+								<header className="flex flex-1 items-center justify-between">
 									<h1 className="text-lg font-bold">
 										The Annotated Paper
 									</h1>
+									<OnboardingChecklist />
 								</header>
 							</header>
 							{children}

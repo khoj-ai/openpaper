@@ -1,9 +1,13 @@
+"use client";
+
 import { fetchFromApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { CheckCircle2, CircleDashed, Clipboard } from "lucide-react";
 import { useEffect, useState } from "react";
-import { SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubButton } from "./ui/sidebar";
 import { Progress } from "@/components/ui/progress";
+import { Popover, PopoverTrigger } from "./ui/popover";
+import { PopoverContent } from "@radix-ui/react-popover";
+import { Button } from "./ui/button";
 
 export interface OnboardingChecklistData {
     has_documents: boolean;
@@ -16,7 +20,7 @@ export interface OnboardingChecklistData {
 
 function ChecklistItem({ completed, text }: { completed: boolean; text: string }) {
     return (
-        <SidebarMenuSubButton className={`flex h-fit text-xs items-center gap-2 ${completed ? "line-through text-gray-500" : ""}`}>
+        <div className={`flex my-1 h-fit text-xs items-center gap-2 ${completed ? "line-through text-gray-500" : ""}`}>
             {completed ? (
                 <CheckCircle2
                     className="h-4 w-4 text-green-500!"
@@ -29,7 +33,7 @@ function ChecklistItem({ completed, text }: { completed: boolean; text: string }
                 />
             )}
             {text}
-        </SidebarMenuSubButton>
+        </div>
     );
 }
 
@@ -90,14 +94,16 @@ export default function OnboardingChecklist() {
     }
 
     return (
-        <SidebarMenuItem>
-            <SidebarMenuButton className="h-fit items-center gap-2 w-full">
-                <Clipboard className="h-4 w-4" />
-                Onboarding Checklist
-                <SidebarMenuBadge>{numCompleted}/6</SidebarMenuBadge>
-            </SidebarMenuButton>
-            <SidebarMenuSub>
-                <Progress value={numCompleted * 100 / 6} className="bg-blue-500" />
+        <Popover>
+            <PopoverTrigger asChild>
+                <Button variant={"ghost"} className="flex items-center gap-2">
+                    <Clipboard className="h-4 w-4" />
+                    Onboarding Checklist
+                    <div>{numCompleted}/6</div>
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72 z-100 bg-background p-4 rounded-lg border shadow-md">
+                <Progress value={numCompleted * 100 / 6} className="bg-blue-500 my-1" />
                 <ChecklistItem
                     completed={!!user}
                     text="Create an account"
@@ -122,7 +128,7 @@ export default function OnboardingChecklist() {
                     completed={user && onboardingData?.has_messages || false}
                     text="Chat with your document"
                 />
-            </SidebarMenuSub>
-        </SidebarMenuItem>
+            </PopoverContent>
+        </Popover>
     );
 }
