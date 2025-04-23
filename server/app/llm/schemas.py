@@ -11,7 +11,7 @@ class PaperMetadataExtraction(BaseModel):
         default=[], description="List of institutions involved in the publication."
     )
     keywords: List[str] = Field(default=[], description="List of keywords")
-    summary: str = Field(..., description="Summary of the paper")
+    summary: str = Field(default="", description="Summary of the paper")
     publish_date: Optional[str] = Field(
         default=None, description="Publishing date of the paper in YYYY-MM-DD format"
     )
