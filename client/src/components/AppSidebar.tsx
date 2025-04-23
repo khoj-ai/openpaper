@@ -27,8 +27,6 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
-import OnboardingChecklist from "./OnboardingChecklist";
-import { Collapsible } from "./ui/collapsible";
 
 // Menu items.
 const items = [
