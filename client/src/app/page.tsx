@@ -362,7 +362,7 @@ export default function Home() {
 					<DialogHeader>
 						<DialogTitle className="text-center">Processing Your Paper</DialogTitle>
 						<DialogDescription className="text-center">
-							This might take a moment... Here's a game of Snake while you wait.
+							This might take a moment... Play Snake while you wait?
 						</DialogDescription>
 					</DialogHeader>
 					<div className="flex flex-col items-center justify-center py-8 space-y-6">
