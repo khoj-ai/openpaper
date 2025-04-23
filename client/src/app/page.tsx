@@ -16,6 +16,7 @@ import { FileText, GithubIcon, Highlighter, Loader2, LucideFileWarning, MessageS
 import { useAuth } from "@/lib/auth";
 import { PdfDropzone } from "@/components/PdfDropzone";
 import Link from "next/link";
+import { SnakeGame } from "@/components/SnakeGame";
 
 interface PdfUploadResponse {
 	filename: string;
@@ -361,14 +362,17 @@ export default function Home() {
 					<DialogHeader>
 						<DialogTitle className="text-center">Processing Your Paper</DialogTitle>
 						<DialogDescription className="text-center">
-							This might take a moment...
+							This might take a moment... Here's a game of Snake while you wait.
 						</DialogDescription>
 					</DialogHeader>
 					<div className="flex flex-col items-center justify-center py-8 space-y-6">
-						<Loader2 className="h-12 w-12 animate-spin text-primary" />
-						<p className="text-center text-lg transition-all duration-500 ease-in-out">
-							{loadingMessage}
-						</p>
+						<SnakeGame />
+						<div className="flex items-center gap-4 justify-center">
+							<Loader2 className="h-6 w-6 animate-spin text-primary" />
+							<p className="text-center text-lg transition-all duration-500 ease-in-out">
+								{loadingMessage}
+							</p>
+						</div>
 					</div>
 				</DialogContent>
 			</Dialog>
