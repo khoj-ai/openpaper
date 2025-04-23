@@ -27,7 +27,7 @@ loglevel = os.getenv(
 
 # Other settings (optional)
 timeout = 300  # Workers silent for more than this many seconds are killed and restarted
-keepalive = 2  # The number of seconds to wait for requests on a Keep-Alive connection
+keepalive = 30  # The number of seconds to wait for requests on a Keep-Alive connection
 worker_connections = 1000  # Max number of simultaneous clients per worker
 threads = 1  # Number of threads per worker (Uvicorn handles concurrency well, often 1 is fine)
 
