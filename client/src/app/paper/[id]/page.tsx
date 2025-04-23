@@ -521,7 +521,7 @@ export default function PaperView() {
                 updateNote(paperNoteContent);
             }, 2000);
         }
-    }, [paperNoteContent, id, updateNote]);
+    }, [paperNoteContent]);
 
     const transformReferencesToFormat = (references: string[]) => {
         const citations = references.map((ref, index) => ({
@@ -674,7 +674,7 @@ export default function PaperView() {
             handleSubmit(null);
             setPendingStarterQuestion(null);
         }
-    }, [currentMessage, handleSubmit, pendingStarterQuestion]);
+    }, [currentMessage]);
 
     const matchesCurrentCitation = (key: string, messageIndex: number) => {
         return activeCitationKey === key.toString() && activeCitationMessageIndex === messageIndex;

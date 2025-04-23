@@ -62,7 +62,7 @@ export function usePdfSearch(explicitSearchTerm?: string) {
         if (explicitSearchTerm) {
             performSearch(explicitSearchTerm);
         }
-    }, [explicitSearchTerm, performSearch]);
+    }, [explicitSearchTerm]);
 
     const scrollToMatch = (match: { pageIndex: number; matchIndex: number; nodes: Element[] }) => {
         if (!match) return;
