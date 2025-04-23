@@ -340,7 +340,7 @@ export default function Home() {
 					</DialogHeader>
 					<Input
 						type="url"
-						placeholder="https://example.com/document.pdf"
+						placeholder="https://arxiv.org/pdf/1706.03762v7"
 						value={pdfUrl}
 						onChange={(e) => setPdfUrl(e.target.value)}
 						className="mt-4"
