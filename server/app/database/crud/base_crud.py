@@ -40,7 +40,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         *,
         skip: int = 0,
         limit: int = 100,
-        user: Optional[CurrentUser] = None
+        user: Optional[CurrentUser] = None,
     ) -> List[ModelType]:
         """Get multiple records with pagination, optionally filtered by user"""
         query = db.query(self.model)
@@ -52,7 +52,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         db: Session,
         *,
         obj_in: CreateSchemaType,
-        user: Optional[CurrentUser] = None
+        user: Optional[CurrentUser] = None,
     ) -> ModelType:
         """Create a new record, optionally associating with a user"""
         obj_in_data = obj_in.model_dump()
@@ -70,7 +70,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         *,
         db_obj: ModelType,
         obj_in: Union[UpdateSchemaType, Dict[str, Any]],
-        user: Optional[CurrentUser] = None
+        user: Optional[CurrentUser] = None,
     ) -> ModelType:
         """Update a record, verifying user ownership if specified"""
         if user and hasattr(db_obj, "user_id") and db_obj.user_id != user.id:
@@ -102,3 +102,14 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             db.delete(obj)
             db.commit()
         return obj
+
+    def has_any(
+        self,
+        db: Session,
+        *,
+        user: CurrentUser,
+    ) -> bool:
+        """Check if any records exist, optionally filtered by user"""
+        query = db.query(self.model)
+        query = self._filter_by_user(query, user)
+        return query.count() > 0

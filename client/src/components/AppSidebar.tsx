@@ -27,6 +27,8 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
+import OnboardingChecklist from "./OnboardingChecklist";
+import { Collapsible } from "./ui/collapsible";
 
 // Menu items.
 const items = [
@@ -208,6 +210,7 @@ export function AppSidebar() {
                         <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
+                <OnboardingChecklist />
                 {/* User Profile (if logged in) */}
                 {user && (
                     <SidebarMenuItem className="mb-2">

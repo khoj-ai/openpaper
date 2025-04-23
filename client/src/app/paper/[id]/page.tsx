@@ -20,6 +20,7 @@ import {
     SidebarContent,
     SidebarGroup,
     SidebarGroupContent,
+    SidebarGroupLabel,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
@@ -272,7 +273,6 @@ export default function PaperView() {
                 const savedNote = localStorage.getItem(`paper-note-${id}`);
                 if (savedNote && (!paperNoteContent || savedNote !== paperNoteContent)) {
                     setPaperNoteContent(savedNote);
-                    // Optionally update the server with this content
                 }
             } catch (error) {
                 console.error('Error retrieving from local storage:', error);
@@ -473,7 +473,6 @@ export default function PaperView() {
         }
     };
 
-    // Update your existing updateNote function to include success handling
     const updateNote = async (note: string) => {
         if (!id) return;
         try {
@@ -521,7 +520,7 @@ export default function PaperView() {
                 updateNote(paperNoteContent);
             }, 2000);
         }
-    }, [paperNoteContent]);
+    }, [paperNoteContent, paperNoteData]);
 
     const transformReferencesToFormat = (references: string[]) => {
         const citations = references.map((ref, index) => ({
@@ -1032,20 +1031,30 @@ export default function PaperView() {
                     <Sidebar collapsible="none" className="hidden md:flex w-fit">
                         <SidebarContent>
                             <SidebarGroup>
+                                <SidebarGroupLabel>Tools</SidebarGroupLabel>
                                 <SidebarGroupContent>
                                     <SidebarMenu>
                                         {data.nav.map((item) => (
                                             <SidebarMenuItem key={item.name}>
-                                                <SidebarMenuButton
-                                                    asChild
-                                                    isActive={item.name === rightSideFunction}
-                                                    title={item.name}
-                                                    onClick={() => {
-                                                        setRightSideFunction(item.name);
-                                                    }}
-                                                >
-                                                    <item.icon />
-                                                </SidebarMenuButton>
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <SidebarMenuButton
+                                                                asChild
+                                                                isActive={item.name === rightSideFunction}
+                                                                title={item.name}
+                                                                onClick={() => {
+                                                                    setRightSideFunction(item.name);
+                                                                }}
+                                                            >
+                                                                <item.icon />
+                                                            </SidebarMenuButton>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent side="left">
+                                                            <p>{item.name}</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
                                             </SidebarMenuItem>
                                         ))}
                                     </SidebarMenu>

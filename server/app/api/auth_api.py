@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import secrets
@@ -6,6 +7,11 @@ from typing import Optional
 from app.auth.dependencies import get_current_user, get_required_user
 from app.auth.google import google_auth_client
 from app.auth.utils import clear_session_cookie, set_session_cookie
+from app.database.crud.annotation_crud import annotation_crud
+from app.database.crud.document_crud import document_crud
+from app.database.crud.highlight_crud import highlight_crud
+from app.database.crud.message_crud import message_crud
+from app.database.crud.paper_note_crud import paper_note_crud
 from app.database.crud.user_crud import user as user_crud
 from app.database.database import get_db
 from app.schemas.user import CurrentUser, UserCreateWithProvider
@@ -36,6 +42,44 @@ async def get_me(current_user: Optional[CurrentUser] = Depends(get_current_user)
     if not current_user:
         return AuthResponse(success=False, message="Not authenticated")
     return AuthResponse(success=True, message="User found", user=current_user)
+
+
+@auth_router.get("/onboarding")
+async def get_onboarding_status(
+    current_user: CurrentUser = Depends(get_required_user),
+    db: Session = Depends(get_db),
+):
+    # Check if the user has any documents, highlights, annotations, or messages
+    has_highlights = highlight_crud.has_any(db, user=current_user)
+    has_annotations = annotation_crud.has_any(db, user=current_user)
+    has_messages = message_crud.has_any(db, user=current_user)
+    has_documents = document_crud.has_any(db, user=current_user)
+    has_notes = paper_note_crud.has_any(db, user=current_user)
+
+    onboarding_completed = all(
+        [
+            has_highlights,
+            has_annotations,
+            has_messages,
+            has_documents,
+            has_notes,
+        ]
+    )
+
+    onboarding_status = {
+        "onboarding_completed": onboarding_completed,
+        "has_highlights": has_highlights,
+        "has_annotations": has_annotations,
+        "has_messages": has_messages,
+        "has_documents": has_documents,
+        "has_notes": has_notes,
+    }
+
+    return Response(
+        content=json.dumps(onboarding_status),
+        status_code=200,
+        media_type="application/json",
+    )
 
 
 @auth_router.get("/logout")
