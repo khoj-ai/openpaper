@@ -70,7 +70,11 @@ async def chat_message_stream(
                     # Parse the chunk as a dictionary
                     if isinstance(chunk, dict):
                         chunk_type = chunk.get("type")
-                        chunk_content = chunk.get("content", "")
+                        chunk_content = chunk.get("content", "").strip()
+
+                        if not chunk_content:
+                            logger.warning("Received empty chunk content")
+                            continue
 
                         if chunk_type == "content":
                             content_chunks.append(chunk_content)
