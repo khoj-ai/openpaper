@@ -141,6 +141,28 @@ export default function Home() {
 		}
 	};
 
+	const handleAudioUpload = async (file: File) => {
+		setIsUploading(true);
+		const formData = new FormData();
+		formData.append('file', file);
+		try {
+			const response: PdfUploadResponse = await fetchFromApi('/api/paper/audio/upload', {
+				method: 'POST',
+				body: formData,
+				headers: {
+					Accept: 'application/json',
+				},
+			});
+
+			const redirectUrl = new URL(`/audio/${response.document_id}`, window.location.origin);
+			window.location.href = redirectUrl.toString();
+		} catch (error) {
+			console.error('Error uploading file:', error);
+			alert('Failed to upload PDF');
+			setIsUploading(false);
+		}
+	}
+
 	const handleLinkClick = () => {
 		setIsUrlDialogOpen(true);
 	};
@@ -289,6 +311,7 @@ export default function Home() {
 				<PdfDropzone
 					onFileSelect={handleFileUpload}
 					onUrlClick={handleLinkClick}
+					onAudioUpload={handleAudioUpload}
 					maxSizeMb={5} // Set your desired max size
 				/>
 

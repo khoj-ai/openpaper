@@ -8,13 +8,15 @@ import { UploadCloud } from 'lucide-react';
 interface PdfDropzoneProps {
     onFileSelect: (file: File) => void;
     onUrlClick: () => void;
+    onAudioUpload: (file: File) => void;
     maxSizeMb?: number;
 }
 
-export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 5 }: PdfDropzoneProps) {
+export function PdfDropzone({ onFileSelect, onUrlClick, onAudioUpload, maxSizeMb = 5 }: PdfDropzoneProps) {
     const [isDragging, setIsDragging] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const audioFileInputRef = useRef<HTMLInputElement>(null);
     const maxSize = maxSizeMb * 1024 * 1024; // Convert MB to bytes
 
     const handleFileValidation = (file: File | null): boolean => {
@@ -46,8 +48,8 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 5 }: PdfDrop
         if (e.relatedTarget && !(e.currentTarget.contains(e.relatedTarget as Node))) {
             setIsDragging(false);
         } else if (!e.relatedTarget) {
-             // Handle leaving the browser window while dragging
-             setIsDragging(false);
+            // Handle leaving the browser window while dragging
+            setIsDragging(false);
         }
     };
 
@@ -69,7 +71,7 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 5 }: PdfDrop
             if (handleFileValidation(file)) {
                 onFileSelect(file);
             }
-             // Clear the data transfer buffer
+            // Clear the data transfer buffer
             if (e.dataTransfer) {
                 e.dataTransfer.items.clear();
             }
@@ -79,14 +81,14 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 5 }: PdfDrop
     const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (handleFileValidation(file || null)) {
-             if (file) {
+            if (file) {
                 onFileSelect(file);
-             }
+            }
         }
-         // Reset file input value to allow uploading the same file again
-         if (e.target) {
+        // Reset file input value to allow uploading the same file again
+        if (e.target) {
             e.target.value = '';
-         }
+        }
     };
 
     const handleClick = () => {
@@ -130,6 +132,24 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 5 }: PdfDrop
             </div>
             <Button variant="outline" onClick={onUrlClick}>
                 Import from URL
+            </Button>
+
+            <input
+                type="file"
+                ref={audioFileInputRef}
+                accept="audio/*"
+                className="hidden"
+                onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    onAudioUpload(file);
+                }}
+            />
+            <p className="text-sm text-muted-foreground mt-2">
+                You can also upload an audio file (e.g., MP3) for transcription.
+            </p>
+            <Button variant="outline" onClick={() => audioFileInputRef.current?.click()}>
+                Upload Audio
             </Button>
         </div>
     );

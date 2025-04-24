@@ -11,8 +11,8 @@ from app.llm.operations import Operations
 from app.schemas.message import ResponseStyle
 from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -28,7 +28,6 @@ message_router = APIRouter()
 llm_operations = Operations()
 
 
-# Add this new model for the chat request
 class ChatMessageRequest(BaseModel):
     paper_id: str
     conversation_id: str

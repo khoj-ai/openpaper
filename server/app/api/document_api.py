@@ -24,7 +24,15 @@ from app.helpers.s3 import s3_service
 from app.llm.operations import Operations
 from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+)
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, HttpUrl
 from sqlalchemy.orm import Session
@@ -331,6 +339,41 @@ async def upload_pdf_from_url(
             current_user=current_user,
             db=db,
         )
+
+
+@document_router.post("/audio/upload")
+async def audio_message_stream(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: CurrentUser = Depends(get_required_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    """
+    Receive a text message and create an audio response.
+    """
+    try:
+        # Parse file and ensure it's an audio file
+        if not file.filename or not file.filename.lower().endswith((".wav", ".mp3")):
+            return JSONResponse(
+                status_code=400, content={"message": "File must be an audio file"}
+            )
+
+        # Create a temporary file for processing
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
+            contents = await file.read()
+            temp_file.write(contents)
+
+            transcript = llm_operations.generate_transcript(
+                audio_file=temp_file.name,
+            )
+
+            logger.info(f"Transcript: {transcript}")
+            return Response(
+                content="Audio message processed successfully", status_code=200
+            )
+    except Exception as e:
+        logger.error(f"Error processing audio message: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @document_router.post("/upload")

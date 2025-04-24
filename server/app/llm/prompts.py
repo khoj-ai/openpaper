@@ -90,3 +90,7 @@ You are in detailed mode. Provide a comprehensive and thorough answer to the use
 NORMAL_MODE_INSTRUCTIONS = """
 You are in normal mode. Provide a balanced response to the user's question. Include the most relevant details and context, but avoid excessive elaboration or unnecessary information. Limit your response to < 5 paragraphs. You must still include evidence.
 """
+
+AUDIO_TRANSCRIPTION_PROMPT = """
+Generate a transcript of the speech. Add punctuation and capitalization to make it readable. The transcript should be in English. Provider speaker identification, such as "Speaker 1" and "Speaker 2", if applicable. The transcript should be in a single file, in .SRT format.
+"""

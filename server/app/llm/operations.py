@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 import uuid
@@ -11,6 +12,7 @@ from app.database.models import Document, Message
 from app.llm.prompts import (
     ANSWER_PAPER_QUESTION_SYSTEM_PROMPT,
     ANSWER_PAPER_QUESTION_USER_MESSAGE,
+    AUDIO_TRANSCRIPTION_PROMPT,
     CONCISE_MODE_INSTRUCTIONS,
     DETAILED_MODE_INSTRUCTIONS,
     EXTRACT_PAPER_METADATA,
@@ -27,6 +29,8 @@ from sqlalchemy.orm import Session
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+
+logger = logging.getLogger(__name__)
 
 
 class Operations:
@@ -166,6 +170,24 @@ class Operations:
         ):
             # Process the chunk of generated content
             yield chunk.text
+
+    def generate_transcript(
+        self,
+        audio_file: str,
+    ):
+        """
+        Generate speech from the provided message using the specified model
+        """
+
+        audio_file = self.client.files.upload(file=audio_file)
+
+        response = self.client.models.generate_content(
+            model=self.default_model, contents=[AUDIO_TRANSCRIPTION_PROMPT, audio_file]
+        )
+
+        logger.info(f"Response: {response}")
+
+        return response.text
 
     def extract_paper_metadata(
         self,
