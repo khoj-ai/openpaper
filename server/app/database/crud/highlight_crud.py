@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 
 class HighlightBase(BaseModel):
-    document_id: UUID
+    paper_id: UUID
     raw_text: Optional[str] = None
     start_offset: Optional[int] = None
     end_offset: Optional[int] = None
@@ -26,11 +26,11 @@ class HighlightUpdate(HighlightBase):
 class HighlightCrud(CRUDBase[Highlight, HighlightCreate, HighlightUpdate]):
     """CRUD operations specifically for Highlight model"""
 
-    def get_highlights_by_document_id(
-        self, db: Session, *, document_id: str, user: Optional[CurrentUser] = None
+    def get_highlights_by_paper_id(
+        self, db: Session, *, paper_id: str, user: Optional[CurrentUser] = None
     ):
         """Get highlights associated with document"""
-        query = db.query(Highlight).filter(Highlight.document_id == document_id)
+        query = db.query(Highlight).filter(Highlight.paper_id == paper_id)
 
         # Add user filter if user is provided
         if user:

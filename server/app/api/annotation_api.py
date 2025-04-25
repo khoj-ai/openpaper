@@ -22,7 +22,7 @@ annotation_router = APIRouter()
 
 
 class CreateAnnotationRequest(BaseModel):
-    document_id: str
+    paper_id: str
     highlight_id: str
     content: str
 
@@ -42,7 +42,7 @@ async def create_annotation(
         annotation = annotation_crud.create(
             db,
             obj_in=AnnotationCreate(
-                document_id=uuid.UUID(request.document_id),
+                paper_id=uuid.UUID(request.paper_id),
                 highlight_id=uuid.UUID(request.highlight_id),
                 content=request.content,
             ),
@@ -60,16 +60,16 @@ async def create_annotation(
         )
 
 
-@annotation_router.get("/{document_id}")
+@annotation_router.get("/{paper_id}")
 async def get_document_annotations(
-    document_id: str,
+    paper_id: str,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_required_user),
 ) -> JSONResponse:
     """Get all annotations for a specific document"""
     try:
-        annotations = annotation_crud.get_annotations_by_document_id(
-            db, document_id=uuid.UUID(document_id), user=current_user
+        annotations = annotation_crud.get_annotations_by_paper_id(
+            db, paper_id=uuid.UUID(paper_id), user=current_user
         )
         return JSONResponse(
             status_code=200,
@@ -135,7 +135,7 @@ async def update_annotation(
             db,
             db_obj=existing_annotation,
             obj_in=AnnotationUpdate(
-                document_id=uuid.UUID(str(existing_annotation.document_id)),
+                paper_id=uuid.UUID(str(existing_annotation.paper_id)),
                 highlight_id=uuid.UUID(str(existing_annotation.highlight_id)),
                 content=request.content,
             ),

@@ -8,9 +8,9 @@ from app.auth.dependencies import get_current_user, get_required_user
 from app.auth.google import google_auth_client
 from app.auth.utils import clear_session_cookie, set_session_cookie
 from app.database.crud.annotation_crud import annotation_crud
-from app.database.crud.document_crud import document_crud
 from app.database.crud.highlight_crud import highlight_crud
 from app.database.crud.message_crud import message_crud
+from app.database.crud.paper_crud import paper_crud
 from app.database.crud.paper_note_crud import paper_note_crud
 from app.database.crud.user_crud import user as user_crud
 from app.database.database import get_db
@@ -53,7 +53,7 @@ async def get_onboarding_status(
     has_highlights = highlight_crud.has_any(db, user=current_user)
     has_annotations = annotation_crud.has_any(db, user=current_user)
     has_messages = message_crud.has_any(db, user=current_user)
-    has_documents = document_crud.has_any(db, user=current_user)
+    has_papers = paper_crud.has_any(db, user=current_user)
     has_notes = paper_note_crud.has_any(db, user=current_user)
 
     onboarding_completed = all(
@@ -61,7 +61,7 @@ async def get_onboarding_status(
             has_highlights,
             has_annotations,
             has_messages,
-            has_documents,
+            has_papers,
             has_notes,
         ]
     )
@@ -71,7 +71,7 @@ async def get_onboarding_status(
         "has_highlights": has_highlights,
         "has_annotations": has_annotations,
         "has_messages": has_messages,
-        "has_documents": has_documents,
+        "has_papers": has_papers,
         "has_notes": has_notes,
     }
 

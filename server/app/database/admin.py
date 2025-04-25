@@ -6,9 +6,9 @@ from app.database.database import aget_db, engine
 from app.database.models import (
     Annotation,
     Conversation,
-    Document,
     Highlight,
     Message,
+    Paper,
     PaperNote,
     User,
 )
@@ -33,22 +33,22 @@ class HighlightAdmin(ModelView, model=Highlight):
     column_list = [
         Highlight.id,
         Highlight.user_id,
-        Highlight.document_id,
+        Highlight.paper_id,
         Highlight.raw_text,
     ]
     column_searchable_list = [Highlight.raw_text]
 
 
-class DocumentAdmin(ModelView, model=Document):
-    column_list = [Document.id, Document.title, Document.user_id]
-    column_searchable_list = [Document.title]
+class PaperAdmin(ModelView, model=Paper):
+    column_list = [Paper.id, Paper.title, Paper.user_id]
+    column_searchable_list = [Paper.title]
 
 
 class AnnotationAdmin(ModelView, model=Annotation):
     column_list = [
         Annotation.id,
         Annotation.user_id,
-        Annotation.document_id,
+        Annotation.paper_id,
         Annotation.content,
     ]
     column_searchable_list = [Annotation.content]
@@ -58,7 +58,7 @@ class PaperNoteAdmin(ModelView, model=PaperNote):
     column_list = [
         PaperNote.id,
         PaperNote.user_id,
-        PaperNote.document_id,
+        PaperNote.paper_id,
         PaperNote.content,
     ]
     column_searchable_list = [PaperNote.content]
@@ -68,7 +68,7 @@ class ConversationAdmin(ModelView, model=Conversation):
     column_list = [
         Conversation.id,
         Conversation.user_id,
-        Conversation.document_id,
+        Conversation.paper_id,
         Conversation.title,
     ]
     column_searchable_list = [Conversation.title]
@@ -169,7 +169,7 @@ def setup_admin(app: FastAPI):
 
     admin.add_view(UserAdmin)
     admin.add_view(HighlightAdmin)
-    admin.add_view(DocumentAdmin)
+    admin.add_view(PaperAdmin)
     admin.add_view(AnnotationAdmin)
     admin.add_view(PaperNoteAdmin)
     admin.add_view(ConversationAdmin)

@@ -75,9 +75,9 @@ async def get_conversation(
         )
 
 
-@conversation_router.post("/{document_id}")
+@conversation_router.post("/{paper_id}")
 async def create_conversation(
-    document_id: str,
+    paper_id: str,
     title: str | None = None,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_required_user),
@@ -86,7 +86,7 @@ async def create_conversation(
     try:
         # Create a conversation with the user ID
         conversation_data = ConversationCreate(
-            document_id=uuid.UUID(document_id), title=title
+            paper_id=uuid.UUID(paper_id), title=title
         )
 
         conversation: Conversation | None = conversation_crud.create(

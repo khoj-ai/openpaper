@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 
 class ConversationBase(BaseModel):
-    document_id: UUID
+    paper_id: UUID
     title: Optional[str] = None
 
 
@@ -25,13 +25,13 @@ class ConversationCRUD(CRUDBase[Conversation, ConversationCreate, ConversationUp
     """CRUD operations specifically for Conversation model"""
 
     def get_document_conversations(
-        self, db: Session, *, document_id: UUID, current_user: CurrentUser
+        self, db: Session, *, paper_id: UUID, current_user: CurrentUser
     ) -> list[Conversation]:
         """Get all conversations for a document"""
         return (
             db.query(Conversation)
             .filter(
-                Conversation.document_id == document_id,
+                Conversation.paper_id == paper_id,
                 Conversation.user_id == current_user.id,
             )
             .order_by(Conversation.created_at)

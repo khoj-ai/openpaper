@@ -4,10 +4,10 @@ import re
 import uuid
 from typing import Any, AsyncGenerator, Generator, List, Optional, Sequence, Union
 
-from app.database.crud.document_crud import document_crud
 from app.database.crud.message_crud import message_crud
+from app.database.crud.paper_crud import paper_crud
 from app.database.database import get_db
-from app.database.models import Document, Message
+from app.database.models import Message, Paper
 from app.llm.prompts import (
     ANSWER_PAPER_QUESTION_SYSTEM_PROMPT,
     ANSWER_PAPER_QUESTION_USER_MESSAGE,
@@ -177,14 +177,14 @@ class Operations:
         """
         Extract metadata from the paper using the specified model
         """
-        paper = document_crud.get(db, id=paper_id, user=user)
+        paper = paper_crud.get(db, id=paper_id, user=user)
 
         if not paper:
             raise ValueError(f"Paper with ID {paper_id} not found.")
 
         # Load and extract raw data from the PDF
-        raw_file = document_crud.read_raw_document_content(
-            db, document_id=paper_id, current_user=user, file_path=file_path
+        raw_file = paper_crud.read_raw_document_content(
+            db, paper_id=paper_id, current_user=user, file_path=file_path
         )
 
         if not raw_file:
@@ -276,14 +276,14 @@ class Operations:
             else None
         )
 
-        paper = document_crud.get(db, id=paper_id)
+        paper = paper_crud.get(db, id=paper_id)
 
         if not paper:
             raise ValueError(f"Paper with ID {paper_id} not found.")
 
         # Load and extract raw data from the PDF
-        raw_file = document_crud.read_raw_document_content(
-            db, document_id=paper_id, current_user=current_user, file_path=file_path
+        raw_file = paper_crud.read_raw_document_content(
+            db, paper_id=paper_id, current_user=current_user, file_path=file_path
         )
         if not raw_file:
             raise ValueError(

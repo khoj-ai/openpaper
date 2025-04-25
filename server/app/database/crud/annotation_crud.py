@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 
 class AnnotationBase(BaseModel):
-    document_id: UUID
+    paper_id: UUID
     highlight_id: UUID
     content: Optional[str] = None
 
@@ -25,16 +25,14 @@ class AnnotationUpdate(AnnotationBase):
 class AnnotationCrud(CRUDBase[Annotation, AnnotationCreate, AnnotationUpdate]):
     """CRUD operations specifically for Annotation model"""
 
-    def get_annotations_by_document_id(
-        self, db: Session, *, document_id: UUID, user: CurrentUser
+    def get_annotations_by_paper_id(
+        self, db: Session, *, paper_id: UUID, user: CurrentUser
     ):
         """Get annotations associated with document"""
 
         return (
             db.query(Annotation)
-            .filter(
-                Annotation.document_id == document_id, Annotation.user_id == user.id
-            )
+            .filter(Annotation.paper_id == paper_id, Annotation.user_id == user.id)
             .order_by(Annotation.created_at)
             .all()
         )

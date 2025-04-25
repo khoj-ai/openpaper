@@ -23,7 +23,7 @@ highlight_router = APIRouter()
 
 
 class CreateHighlightRequest(BaseModel):
-    document_id: str
+    paper_id: str
     raw_text: str
     start_offset: int
     end_offset: int
@@ -46,7 +46,7 @@ async def create_highlight(
         highlight = highlight_crud.create(
             db,
             obj_in=HighlightCreate(
-                document_id=uuid.UUID(request.document_id),
+                paper_id=uuid.UUID(request.paper_id),
                 raw_text=request.raw_text,
                 start_offset=request.start_offset,
                 end_offset=request.end_offset,
@@ -65,16 +65,16 @@ async def create_highlight(
         )
 
 
-@highlight_router.get("/{document_id}")
+@highlight_router.get("/{paper_id}")
 async def get_document_highlights(
-    document_id: str,
+    paper_id: str,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_required_user),
 ) -> JSONResponse:
     """Get all highlights for a specific document"""
     try:
-        highlights = highlight_crud.get_highlights_by_document_id(
-            db, document_id=document_id, user=current_user
+        highlights = highlight_crud.get_highlights_by_paper_id(
+            db, paper_id=paper_id, user=current_user
         )
         return JSONResponse(
             status_code=200,
@@ -136,7 +136,7 @@ async def update_highlight(
             db,
             db_obj=existing_highlight,
             obj_in=HighlightUpdate(
-                document_id=existing_highlight.document_id.uuid,
+                paper_id=existing_highlight.paper_id.uuid,
                 raw_text=request.raw_text,
                 start_offset=request.start_offset,
                 end_offset=request.end_offset,

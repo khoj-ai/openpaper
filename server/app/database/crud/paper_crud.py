@@ -4,7 +4,7 @@ from typing import List, Optional
 
 import requests
 from app.database.crud.base_crud import CRUDBase
-from app.database.models import Document
+from app.database.models import Paper
 from app.helpers.parser import extract_text_from_pdf
 from app.helpers.s3 import s3_service
 from app.schemas.user import CurrentUser
@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 
 # Define Pydantic models for type safety
-class DocumentBase(BaseModel):
+class PaperBase(BaseModel):
     filename: Optional[str] = None
     file_url: Optional[str] = None
     s3_object_key: Optional[str] = None
@@ -29,26 +29,26 @@ class DocumentBase(BaseModel):
     raw_content: Optional[str] = None
 
 
-class DocumentCreate(DocumentBase):
+class PaperCreate(PaperBase):
     # Only mandate required fields for creation, others are optional
     filename: str
     file_url: str
     s3_object_key: Optional[str] = None
 
 
-class DocumentUpdate(DocumentBase):
+class PaperUpdate(PaperBase):
     pass
 
 
-# Document CRUD that inherits from the base CRUD
-class DocumentCRUD(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
+# Paper CRUD that inherits from the base CRUD
+class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
     """CRUD operations specifically for Document model"""
 
     async def create_from_url(
         self, db: Session, *, url: HttpUrl, current_user: CurrentUser
-    ) -> Document:
+    ) -> Paper:
         """
-        Create a new document from a URL
+        Create a new paper from a URL
 
         Args:
             db: Database session
@@ -56,7 +56,7 @@ class DocumentCRUD(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
             current_user: Current user making the request
 
         Returns:
-            Document: Created document
+            Paper: Created paper
 
         Raises:
             HTTPException: If upload fails
@@ -67,21 +67,21 @@ class DocumentCRUD(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
                 str(url)
             )
 
-            # Create document
-            doc_in = DocumentCreate(
+            # Create paper
+            doc_in = PaperCreate(
                 filename=os.path.basename(file_url),
                 file_url=file_url,
                 s3_object_key=object_key,
             )
 
-            document = self.create(db=db, obj_in=doc_in, user=current_user)
+            paper = self.create(db=db, obj_in=doc_in, user=current_user)
 
             # Extract and update content
             raw_content = self.read_raw_document_content(
-                db, document_id=document.id, current_user=current_user
+                db, paper_id=paper.id, current_user=current_user
             )
 
-            return document
+            return paper
 
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
@@ -92,7 +92,7 @@ class DocumentCRUD(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
         self,
         db: Session,
         *,
-        document_id: str,
+        paper_id: str,
         current_user: CurrentUser,
         file_path: Optional[str] = None,
     ) -> str:
@@ -100,14 +100,14 @@ class DocumentCRUD(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
         Read raw document content by ID.
         For PDF files, extract and return the text content.
         """
-        document: Document | None = self.get(db, document_id, user=current_user)
-        if document is None:
-            raise ValueError(f"Document with ID {document_id} not found.")
+        paper: Paper | None = self.get(db, paper_id, user=current_user)
+        if paper is None:
+            raise ValueError(f"Paper with ID {paper_id} not found.")
 
-        if document.raw_content:
-            return str(document.raw_content)
+        if paper.raw_content:
+            return str(paper.raw_content)
 
-        file_url = str(document.file_url) if file_path is None else file_path
+        file_url = str(paper.file_url) if file_path is None else file_path
 
         raw_content = ""
 
@@ -148,8 +148,8 @@ class DocumentCRUD(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
 
         self.update(
             db=db,
-            db_obj=document,
-            obj_in=DocumentUpdate(
+            db_obj=paper,
+            obj_in=PaperUpdate(
                 raw_content=raw_content,
             ),
         )
@@ -157,4 +157,4 @@ class DocumentCRUD(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
 
 
 # Create a single instance to use throughout the application
-document_crud = DocumentCRUD(Document)
+paper_crud = PaperCRUD(Paper)

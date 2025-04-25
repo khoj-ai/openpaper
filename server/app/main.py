@@ -6,9 +6,9 @@ from app.api.annotation_api import annotation_router
 from app.api.api import router
 from app.api.auth_api import auth_router
 from app.api.conversation_api import conversation_router
-from app.api.document_api import document_router
 from app.api.highlight_api import highlight_router
 from app.api.message_api import message_router
+from app.api.paper_api import paper_router
 from app.database.admin import setup_admin
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -45,7 +45,7 @@ app.add_middleware(
 # Include the router in the main app
 app.include_router(router, prefix="/api")
 app.include_router(auth_router, prefix="/api/auth")  # Auth routes
-app.include_router(document_router, prefix="/api/paper")
+app.include_router(paper_router, prefix="/api/paper")
 app.include_router(conversation_router, prefix="/api/conversation")
 app.include_router(message_router, prefix="/api/message")
 app.include_router(highlight_router, prefix="/api/highlight")

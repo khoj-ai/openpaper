@@ -68,9 +68,7 @@ class User(Base):
     # Optional profile information
     locale = Column(String, nullable=True)
 
-    documents = relationship(
-        "Document", back_populates="user", cascade="all, delete-orphan"
-    )
+    papers = relationship("Paper", back_populates="user", cascade="all, delete-orphan")
     sessions = relationship(
         "Session", back_populates="user", cascade="all, delete-orphan"
     )
@@ -106,8 +104,9 @@ class Session(Base):
     user = relationship("User", back_populates="sessions")
 
 
-class Document(Base):
-    __tablename__ = "documents"
+# TODO Rename Document to Paper
+class Paper(Base):
+    __tablename__ = "papers"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     filename = Column(String, nullable=False)
@@ -126,12 +125,12 @@ class Document(Base):
     raw_content = Column(Text, nullable=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
-    user = relationship("User", back_populates="documents")
+    user = relationship("User", back_populates="papers")
     conversations = relationship(
-        "Conversation", back_populates="document", cascade="all, delete-orphan"
+        "Conversation", back_populates="paper", cascade="all, delete-orphan"
     )
     paper_notes = relationship(
-        "PaperNote", back_populates="document", cascade="all, delete-orphan"
+        "PaperNote", back_populates="paper", cascade="all, delete-orphan"
     )
 
 
@@ -146,9 +145,10 @@ class Message(Base):
     )
     role = Column(String, nullable=False)  # 'user' or 'assistant'
     content = Column(Text, nullable=False)
-    references = Column(
-        JSONB, nullable=True
-    )  # For assistant's document snippet references
+
+    # References from the paper
+    references = Column(JSONB, nullable=True)
+
     bucket = Column(JSONB, nullable=True)  # For any additional attributes
     sequence = Column(Integer, nullable=False)  # To maintain message order
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
@@ -162,9 +162,9 @@ class Conversation(Base):
     __tablename__ = "conversations"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    document_id = Column(
+    paper_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("documents.id", ondelete="CASCADE"),
+        ForeignKey("papers.id", ondelete="CASCADE"),
         nullable=False,
     )
     title = Column(String, nullable=True)  # Optional conversation title
@@ -172,7 +172,7 @@ class Conversation(Base):
 
     user = relationship("User", back_populates="conversations")
 
-    document = relationship("Document", back_populates="conversations")
+    paper = relationship("Paper", back_populates="conversations")
     messages = relationship(
         "Message", back_populates="conversation", order_by=Message.sequence
     )
@@ -183,9 +183,9 @@ class PaperNote(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     # Ensure each document has only one associated paper note
-    document_id = Column(
+    paper_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("documents.id", ondelete="CASCADE"),
+        ForeignKey("papers.id", ondelete="CASCADE"),
         nullable=False,
         unique=True,
     )
@@ -195,7 +195,7 @@ class PaperNote(Base):
 
     user = relationship("User", back_populates="paper_notes")
 
-    document = relationship("Document", back_populates="paper_notes")
+    paper = relationship("Paper", back_populates="paper_notes")
 
 
 class Highlight(Base):
@@ -203,9 +203,9 @@ class Highlight(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
-    document_id = Column(
+    paper_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("documents.id", ondelete="CASCADE"),
+        ForeignKey("papers.id", ondelete="CASCADE"),
         nullable=False,
     )
 
@@ -225,9 +225,9 @@ class Annotation(Base):
         UUID(as_uuid=True), ForeignKey("highlights.id"), nullable=False
     )
 
-    document_id = Column(
+    paper_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("documents.id", ondelete="CASCADE"),
+        ForeignKey("papers.id", ondelete="CASCADE"),
         nullable=False,
     )
 

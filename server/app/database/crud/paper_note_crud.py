@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 
 class PaperNoteBase(BaseModel):
-    document_id: UUID
+    paper_id: UUID
     content: Optional[str] = None
 
 
@@ -24,14 +24,14 @@ class PaperNoteUpdate(BaseModel):
 class PaperNoteCRUD(CRUDBase[PaperNote, PaperNoteCreate, PaperNoteUpdate]):
     """CRUD operations specifically for PaperNote model"""
 
-    def get_paper_note_by_document_id(
-        self, db: Session, *, document_id: str, user: CurrentUser
+    def get_paper_note_by_paper_id(
+        self, db: Session, *, paper_id: str, user: CurrentUser
     ):
         """Get paper note associated with document"""
 
         return (
             db.query(PaperNote)
-            .filter(PaperNote.document_id == document_id, PaperNote.user_id == user.id)
+            .filter(PaperNote.paper_id == paper_id, PaperNote.user_id == user.id)
             .order_by(PaperNote.created_at)
             .first()
         )
