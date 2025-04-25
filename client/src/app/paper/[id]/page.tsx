@@ -769,7 +769,7 @@ export default function PaperView() {
                             {isMarkdownPreview ? (
                                 <div className="flex-1 min-h-0 relative">
                                     <div className="absolute inset-0 overflow-y-auto">
-                                        <div className="prose dark:prose-invert max-w-none text-sm">
+                                        <div className="prose dark:prose-invert !max-w-full text-sm">
                                             <Markdown
                                                 remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
                                                 rehypePlugins={[rehypeKatex]}
@@ -862,7 +862,7 @@ export default function PaperView() {
                                     messages.map((msg, index) => (
                                         <div
                                             key={index}
-                                            className={`prose dark:prose-invert p-2 rounded-lg ${msg.role === 'user'
+                                            className={`prose dark:prose-invert p-2 !max-w-full rounded-lg ${msg.role === 'user'
                                                 ? 'bg-blue-200 text-blue-800 w-fit'
                                                 : 'w-full text-primary'
                                                 }`}
