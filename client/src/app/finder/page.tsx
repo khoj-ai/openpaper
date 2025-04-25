@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ExternalLink, BookOpen, Users, CalendarDays } from "lucide-react"
+import { ExternalLink, Users, CalendarDays } from "lucide-react"
 import { fetchFromApi } from "@/lib/api"
 
 interface OpenAlexResponse {
-    meta: any
+    meta: {
+        [key: string]: string | number
+    },
     results: Array<{
         id: string
         title: string
