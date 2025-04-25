@@ -313,7 +313,7 @@ export default function PaperView() {
 
         async function fetchPaperNote() {
             try {
-                const response: PaperNoteData = await fetchFromApi(`/api/paper/note?document_id=${id}`);
+                const response: PaperNoteData = await fetchFromApi(`/api/paper/note?paper_id=${id}`);
                 setPaperNoteData(response);
                 setPaperNoteContent(response.content);
             } catch (error) {
@@ -332,7 +332,7 @@ export default function PaperView() {
         async function fetchConversation() {
             let retrievedConversationId = null;
             try {
-                const response = await fetchFromApi(`/api/paper/conversation?document_id=${id}`, {
+                const response = await fetchFromApi(`/api/paper/conversation?paper_id=${id}`, {
                     method: 'GET',
                 });
 
@@ -477,14 +477,14 @@ export default function PaperView() {
         if (!id) return;
         try {
             if (!paperNoteData) {
-                const response = await fetchFromApi(`/api/paper/note?document_id=${id}`, {
+                const response = await fetchFromApi(`/api/paper/note?paper_id=${id}`, {
                     method: 'POST',
                     body: JSON.stringify({ content: note }),
                     headers: { 'Content-Type': 'application/json' }
                 });
                 setPaperNoteData(response);
             } else {
-                await fetchFromApi(`/api/paper/note?document_id=${id}`, {
+                await fetchFromApi(`/api/paper/note?paper_id=${id}`, {
                     method: 'PUT',
                     body: JSON.stringify({ content: note }),
                     headers: { 'Content-Type': 'application/json' }

@@ -10,7 +10,7 @@ import { PopoverContent } from "@radix-ui/react-popover";
 import { Button } from "./ui/button";
 
 export interface OnboardingChecklistData {
-    has_documents: boolean;
+    has_papers: boolean;
     has_annotations: boolean;
     has_highlights: boolean;
     has_messages: boolean;
@@ -62,7 +62,7 @@ export default function OnboardingChecklist() {
             setOnboardingData(response);
 
             const completedCount = [
-                response.has_documents,
+                response.has_papers,
                 response.has_annotations,
                 response.has_highlights,
                 response.has_messages,
@@ -109,7 +109,7 @@ export default function OnboardingChecklist() {
                     text="Create an account"
                 />
                 <ChecklistItem
-                    completed={user && onboardingData?.has_documents || false}
+                    completed={user && onboardingData?.has_papers || false}
                     text="Import your first paper"
                 />
                 <ChecklistItem
@@ -126,7 +126,7 @@ export default function OnboardingChecklist() {
                 />
                 <ChecklistItem
                     completed={user && onboardingData?.has_messages || false}
-                    text="Chat with your document"
+                    text="Chat with your paper"
                 />
             </PopoverContent>
         </Popover>

@@ -33,7 +33,7 @@ export interface PaperHighlight {
 export interface PaperHighlightAnnotation {
     id: string;
     highlight_id: string;
-    document_id: string;
+    paper_id: string;
     content: string;
     created_at: string;
 }

@@ -4,13 +4,13 @@ import {
 import { fetchFromApi } from '@/lib/api';
 import { useEffect, useState } from 'react';
 
-export function useAnnotations(documentId: string) {
+export function useAnnotations(paperId: string) {
     const [annotations, setAnnotations] = useState<PaperHighlightAnnotation[]>([]);
 
     const addAnnotation = async (highlightId: string, content: string) => {
         const newAnnotation: Partial<PaperHighlightAnnotation> = {
             highlight_id: highlightId,
-            document_id: documentId,
+            paper_id: paperId,
             content,
         };
 
@@ -70,7 +70,7 @@ export function useAnnotations(documentId: string) {
 
     const loadAnnotationsFromServer = async () => {
         try {
-            const loadedAnnotations: PaperHighlightAnnotation[] = await fetchFromApi(`/api/annotation/${documentId}`, {
+            const loadedAnnotations: PaperHighlightAnnotation[] = await fetchFromApi(`/api/annotation/${paperId}`, {
                 method: 'GET',
             });
 

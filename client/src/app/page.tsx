@@ -21,7 +21,7 @@ import { SnakeGame } from "@/components/SnakeGame";
 interface PdfUploadResponse {
 	filename: string;
 	url: string;
-	document_id: string;
+	paper_id: string;
 }
 
 export default function Home() {
@@ -75,7 +75,7 @@ export default function Home() {
 				},
 			});
 
-			const redirectUrl = new URL(`/paper/${response.document_id}`, window.location.origin);
+			const redirectUrl = new URL(`/paper/${response.paper_id}`, window.location.origin);
 			window.location.href = redirectUrl.toString();
 		} catch (error) {
 			console.error('Error uploading file:', error);
@@ -130,7 +130,7 @@ export default function Home() {
 				});
 
 				// Use the same redirect logic as handleFileUpload
-				const redirectUrl = new URL(`/paper/${response.document_id}`, window.location.origin);
+				const redirectUrl = new URL(`/paper/${response.paper_id}`, window.location.origin);
 				window.location.href = redirectUrl.toString();
 
 			} catch (serverError) {

@@ -7,7 +7,7 @@ import { getSelectionOffsets } from '../utils/PdfTextUtils';
 import { addHighlightToNodes, findAllHighlightedPassages } from '../utils/PdfHighlightUtils';
 import { fetchFromApi } from '@/lib/api';
 
-export function useHighlights(documentId: string) {
+export function useHighlights(paperId: string) {
     const [highlights, setHighlights] = useState<Array<PaperHighlight>>([]);
     const [selectedText, setSelectedText] = useState<string>("");
     const [tooltipPosition, setTooltipPosition] = useState<{ x: number, y: number } | null>(null);
@@ -15,7 +15,7 @@ export function useHighlights(documentId: string) {
     const [isHighlightInteraction, setIsHighlightInteraction] = useState(false);
     const [activeHighlight, setActiveHighlight] = useState<PaperHighlight | null>(null);
 
-    const highlightsStorageName = `highlights-${documentId}`;
+    const highlightsStorageName = `highlights-${paperId}`;
 
     // Apply highlights whenever they change
     useEffect(() => {
@@ -147,7 +147,7 @@ export function useHighlights(documentId: string) {
 
         const payload = {
             ...highlight,
-            document_id: documentId
+            paper_id: paperId
         }
 
         try {
@@ -187,7 +187,7 @@ export function useHighlights(documentId: string) {
 
     const loadHighlights = async () => {
         try {
-            const data: PaperHighlight[] = await fetchFromApi(`/api/highlight/${documentId}`, {
+            const data: PaperHighlight[] = await fetchFromApi(`/api/highlight/${paperId}`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
