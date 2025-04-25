@@ -9,6 +9,7 @@ from app.api.conversation_api import conversation_router
 from app.api.highlight_api import highlight_router
 from app.api.message_api import message_router
 from app.api.paper_api import paper_router
+from app.api.paper_search_api import paper_search_router
 from app.database.admin import setup_admin
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -50,6 +51,9 @@ app.include_router(conversation_router, prefix="/api/conversation")
 app.include_router(message_router, prefix="/api/message")
 app.include_router(highlight_router, prefix="/api/highlight")
 app.include_router(annotation_router, prefix="/api/annotation")
+app.include_router(
+    paper_search_router, prefix="/api/paper_search"
+)  # Paper search routes
 
 setup_admin(app)  # Setup admin interface
 

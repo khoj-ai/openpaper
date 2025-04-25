@@ -2,7 +2,7 @@ import json
 import os
 import re
 import uuid
-from typing import Any, AsyncGenerator, Generator, List, Optional, Sequence, Union
+from typing import AsyncGenerator, Optional, Sequence, Union
 
 from app.database.crud.message_crud import message_crud
 from app.database.crud.paper_crud import paper_crud
