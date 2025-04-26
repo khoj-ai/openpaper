@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 import uuid
@@ -17,6 +18,7 @@ from app.llm.prompts import (
     NORMAL_MODE_INSTRUCTIONS,
 )
 from app.llm.schemas import PaperMetadataExtraction
+from app.llm.utils import retry_llm_operation
 from app.schemas.message import ResponseStyle
 from app.schemas.user import CurrentUser
 from fastapi import Depends
@@ -27,6 +29,8 @@ from sqlalchemy.orm import Session
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+
+logger = logging.getLogger(__name__)
 
 
 class Operations:
@@ -167,6 +171,7 @@ class Operations:
             # Process the chunk of generated content
             yield chunk.text
 
+    @retry_llm_operation(max_retries=3, delay=1.0)
     def extract_paper_metadata(
         self,
         paper_id: str,
@@ -336,6 +341,8 @@ class Operations:
             message=formatted_prompt,
         ):
             text = chunk.text
+
+            logger.debug(f"Received chunk: {text}")
 
             if not text:
                 continue

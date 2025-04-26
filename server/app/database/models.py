@@ -104,7 +104,6 @@ class Session(Base):
     user = relationship("User", back_populates="sessions")
 
 
-# TODO Rename Document to Paper
 class Paper(Base):
     __tablename__ = "papers"
 
