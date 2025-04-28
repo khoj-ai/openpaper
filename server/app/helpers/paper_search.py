@@ -98,6 +98,7 @@ class OpenAlexWork(BaseOpenAlexModel):
     primary_location: Optional[PrimaryLocation]
     topics: Optional[List[Topic]]
     authorships: Optional[List[Authorship]]
+    cited_by_count: Optional[int]
 
 
 class OpenAlexResponse(BaseModel):

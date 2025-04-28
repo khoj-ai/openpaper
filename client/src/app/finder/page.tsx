@@ -36,6 +36,20 @@ interface OpenAlexResponse {
                 display_name: string
             }[]
         }>
+        topics?: Array<{
+            display_name: string
+            score?: number,
+            subfield: {
+                display_name: string
+            },
+            field: {
+                display_name: string
+            },
+            domain: {
+                display_name: string
+            }
+        }>
+        cited_by_count?: number
     }>
 }
 
@@ -116,15 +130,26 @@ export default function FinderPage() {
                                     ))}
                                 </div>
                             )}
+
+                            {
+                                paper.topics && (
+                                    <div className="flex flex-wrap gap-2">
+                                        {paper.topics.map((topic, i) => (
+                                            <Badge key={i} variant="secondary">
+                                                {topic.display_name}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                )
+                            }
                         </CardContent>
 
                         <CardFooter className="flex justify-between items-center">
-                            {paper.open_access && (
-                                <Badge variant={paper.open_access.is_oa ? "default" : "secondary"}>
-                                    {paper.open_access.oa_status}
+                            {paper.cited_by_count && (
+                                <Badge variant={"default"}>
+                                    {paper.cited_by_count} citations
                                 </Badge>
                             )}
-
                             {paper.doi && (
                                 <Button variant="ghost" size="sm" asChild>
                                     <a
@@ -134,7 +159,7 @@ export default function FinderPage() {
                                         className="flex items-center gap-2"
                                     >
                                         <ExternalLink className="h-4 w-4" />
-                                        View Paper
+                                        DOI
                                     </a>
                                 </Button>
                             )}
@@ -148,9 +173,16 @@ export default function FinderPage() {
                                             className="flex items-center gap-2"
                                         >
                                             <ExternalLink className="h-4 w-4" />
-                                            Open Access
+                                            Open PDF
                                         </a>
                                     </Button>
+                                )
+                            }
+                            {
+                                paper.open_access && !paper.open_access.is_oa && (
+                                    <Badge variant={"secondary"}>
+                                        {paper.open_access.oa_status}
+                                    </Badge>
                                 )
                             }
                         </CardFooter>
