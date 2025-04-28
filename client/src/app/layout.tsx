@@ -6,6 +6,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { Separator } from "@/components/ui/separator";
 import { AuthProvider } from "@/lib/auth";
 import OnboardingChecklist from "@/components/OnboardingChecklist";
+import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -50,6 +51,7 @@ export default function RootLayout({
 						</SidebarInset>
 					</SidebarProvider>
 				</AuthProvider>
+				<Toaster />
 			</body>
 		</html>
 	);
