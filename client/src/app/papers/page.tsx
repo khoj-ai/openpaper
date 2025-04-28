@@ -345,7 +345,7 @@ export default function PapersPage() {
                                         <DialogHeader>
                                             <DialogTitle>Cite Paper</DialogTitle>
                                             <DialogDescription>
-                                                Copy the citation format you need for "{paper.title || paper.filename}".
+                                                Copy the citation format you need for <b>{paper.title || paper.filename}</b>.
                                             </DialogDescription>
                                         </DialogHeader>
                                         <ScrollArea className="h-[300px] w-full rounded-md border p-4">
