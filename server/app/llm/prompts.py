@@ -71,8 +71,6 @@ The study found that machine learning models can effectively detect spam emails 
 @cite[2]
 "The false negative rate increased to 23% when testing against advanced social engineering attacks"
 ---END-EVIDENCE---
-
-Paper: {paper}
 """
 
 

@@ -5,10 +5,12 @@ import re
 import uuid
 from typing import AsyncGenerator, Optional, Sequence, Union
 
+import httpx
 from app.database.crud.message_crud import message_crud
 from app.database.crud.paper_crud import paper_crud
 from app.database.database import get_db
 from app.database.models import Message, Paper
+from app.helpers.s3 import s3_service
 from app.llm.prompts import (
     ANSWER_PAPER_QUESTION_SYSTEM_PROMPT,
     ANSWER_PAPER_QUESTION_USER_MESSAGE,
@@ -23,7 +25,7 @@ from app.schemas.message import ResponseStyle
 from app.schemas.user import CurrentUser
 from fastapi import Depends
 from google import genai  # type: ignore
-from google.genai.types import Content  # type: ignore
+from google.genai.types import Content, Part  # type: ignore
 from sqlalchemy.orm import Session
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -281,19 +283,10 @@ class Operations:
             else None
         )
 
-        paper = paper_crud.get(db, id=paper_id)
+        paper: Paper = paper_crud.get(db, id=paper_id)
 
         if not paper:
             raise ValueError(f"Paper with ID {paper_id} not found.")
-
-        # Load and extract raw data from the PDF
-        raw_file = paper_crud.read_raw_document_content(
-            db, paper_id=paper_id, current_user=current_user, file_path=file_path
-        )
-        if not raw_file:
-            raise ValueError(
-                f"Raw file content for paper ID {paper_id} could not be retrieved."
-            )
 
         casted_conversation_id = uuid.UUID(conversation_id)
 
@@ -313,7 +306,6 @@ class Operations:
             additional_instructions = NORMAL_MODE_INSTRUCTIONS
 
         formatted_system_prompt = ANSWER_PAPER_QUESTION_SYSTEM_PROMPT.format(
-            paper=raw_file,
             additional_instructions=additional_instructions,
         )
 
@@ -336,9 +328,22 @@ class Operations:
         START_DELIMITER = "---EVIDENCE---"
         END_DELIMITER = "---END-EVIDENCE---"
 
+        signed_url = s3_service.generate_presigned_url(object_key=paper.s3_object_key)
+
+        # Retrieve and encode the PDF byte
+        pdf_bytes = httpx.get(signed_url).content
+
+        message_content = [
+            Part.from_bytes(
+                data=pdf_bytes,
+                mime_type="application/pdf",
+            ),
+            formatted_prompt,
+        ]
+
         # Extract metadata using the LLM
         for chunk in chat_session.send_message_stream(
-            message=formatted_prompt,
+            message=message_content,
         ):
             text = chunk.text
 
