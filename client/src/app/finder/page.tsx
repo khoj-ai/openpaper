@@ -61,7 +61,8 @@ export default function FinderPage() {
     const handleSearch = async () => {
         if (!query.trim()) return
 
-        setLoading(true)
+        setResults(null);
+        setLoading(true);
         try {
             const response: OpenAlexResponse = await fetchFromApi(`/api/paper_search/search?query=${encodeURIComponent(query)}`)
             setResults(response)
