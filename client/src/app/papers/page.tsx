@@ -62,7 +62,7 @@ const formatAuthors = (authors: string[] | undefined, style: 'MLA' | 'APA' | 'Ha
     else if (style === 'AAA' && authors.length > 3) { maxAuthorsToShow = 1; useEtAl = true; } // Show first 1, et al.
 
 
-    let formattedNames = authors.slice(0, maxAuthorsToShow).map((name, index) => formatSingleName(name, index, authors.length, style));
+    const formattedNames = authors.slice(0, maxAuthorsToShow).map((name, index) => formatSingleName(name, index, authors.length, style));
 
     // Handle APA's specific ellipsis for >20 authors
     if (style === 'APA' && useEtAl) {
