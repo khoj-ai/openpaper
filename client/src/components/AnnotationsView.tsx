@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 
 import {
-    PaperHighlight,
+	PaperHighlight,
 	PaperHighlightAnnotation
 } from '@/lib/schema';
 
@@ -85,6 +85,7 @@ function AnnotationCard({ annotation, removeAnnotation, updateAnnotation }: Anno
 
 	if (isEditing) {
 		return (
+			// Add transition for smoother appearance if needed, though focus is on the non-edit state
 			<Card className='group border-x-0 border-b-0 border-t shadow-none rounded-none py-2'>
 				<CardContent className="space-y-2 text-sm">
 					<Textarea
@@ -119,15 +120,19 @@ function AnnotationCard({ annotation, removeAnnotation, updateAnnotation }: Anno
 	}
 
 	return (
-		<Card className='group border-x-0 border-b-0 border-t shadow-none rounded-none py-2 hover:bg-secondary/50 transition-colors cursor-pointer'>
-			<CardContent className='text-sm'>
+		// Added transition-all, duration, easing, hover:shadow-sm, hover:border-l-primary, hover:border-l-2, pl-2 on hover
+		<Card className='group border-x-0 border-b-0 border-t border-l-2 border-transparent shadow-none rounded-none py-2 hover:bg-secondary/50 hover:shadow-sm hover:border-l-primary transition-all duration-200 ease-in-out cursor-pointer'>
+			{/* Added pl-2 to CardContent to account for the hover border */}
+			<CardContent className='text-sm pl-2'>
 				{annotation.content}
 			</CardContent>
-			<CardFooter className="flex justify-between items-center">
-				<p className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+			{/* Added pl-2 to CardFooter */}
+			<CardFooter className="flex justify-between items-center pl-2">
+				<p className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-in-out">
 					{new Date(annotation.created_at).toLocaleDateString()}
 				</p>
-				<div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+				{/* Ensured smooth transition for the icon container */}
+				<div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-in-out flex gap-2">
 					<Button
 						variant="ghost"
 						className="h-6 w-6 p-0"
