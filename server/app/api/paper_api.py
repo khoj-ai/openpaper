@@ -231,6 +231,88 @@ async def get_pdf(
     return JSONResponse(status_code=200, content=paper_data)
 
 
+@paper_router.post("/share")
+async def share_pdf(
+    request: Request,
+    id: str,
+    db: Session = Depends(get_db),
+    current_user: Optional[CurrentUser] = Depends(get_required_user),
+):
+    """
+    Share a document by ID
+    """
+    # Fetch the document from the database
+    paper = paper_crud.get(db, id=id, user=current_user)
+
+    paper_crud.make_public(db, id=id, user=current_user)
+    if not paper:
+        return JSONResponse(status_code=404, content={"message": "Document not found"})
+    # Return the generated share id
+    return JSONResponse(
+        status_code=200,
+        content={
+            "message": "Document shared successfully",
+            "share_id": paper.share_id,
+        },
+    )
+
+
+@paper_router.post("/unshare")
+async def unshare_pdf(
+    request: Request,
+    id: str,
+    db: Session = Depends(get_db),
+    current_user: Optional[CurrentUser] = Depends(get_required_user),
+):
+    """
+    Unshare a document by ID
+    """
+    # Fetch the document from the database
+    paper = paper_crud.get(db, id=id, user=current_user)
+
+    if not paper:
+        return JSONResponse(status_code=404, content={"message": "Document not found"})
+
+    paper_crud.make_private(db, id=id, user=current_user)
+
+    # Return the generated share id
+    return JSONResponse(
+        status_code=200,
+        content={
+            "message": "Document unshared successfully",
+        },
+    )
+
+
+paper_router.get("/share")
+
+
+async def get_shared_pdf(
+    request: Request,
+    id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Get a shared document by ID
+    """
+    # Fetch the document from the database
+    paper = paper_crud.get_public_paper(db, share_id=id)
+
+    if not paper:
+        return JSONResponse(status_code=404, content={"message": "Document not found"})
+
+    paper_data = paper.to_dict()
+
+    signed_url = s3_service.generate_presigned_url(object_key=paper.s3_object_key)
+    if not signed_url:
+        return JSONResponse(status_code=404, content={"message": "File not found"})
+
+    paper_data["file_url"] = signed_url
+
+    # Return the file URL
+    return JSONResponse(status_code=200, content=paper_data)
+
+
 @paper_router.delete("")
 async def delete_pdf(
     request: Request,

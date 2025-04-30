@@ -1,5 +1,6 @@
 import os
 import tempfile
+import uuid
 from typing import List, Optional
 
 import requests
@@ -154,6 +155,39 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
             ),
         )
         return raw_content
+
+    def make_public(
+        self, db: Session, *, paper_id: str, user: CurrentUser
+    ) -> Optional[Paper]:
+        """Make a paper publicly accessible via share link"""
+        paper = self.get(db, id=paper_id, user=user)
+        if paper:
+            # Generate a unique share ID if not already present
+            if not paper.share_id:
+                paper.share_id = str(uuid.uuid4())
+            paper.is_public = True
+            db.commit()
+            db.refresh(paper)
+        return paper
+
+    def make_private(
+        self, db: Session, *, paper_id: str, user: CurrentUser
+    ) -> Optional[Paper]:
+        """Make a paper private (not publicly accessible)"""
+        paper = self.get(db, id=paper_id, user=user)
+        if paper:
+            paper.is_public = False
+            db.commit()
+            db.refresh(paper)
+        return paper
+
+    def get_public_paper(self, db: Session, *, share_id: str) -> Optional[Paper]:
+        """Get a paper by its share_id if it's public"""
+        return (
+            db.query(Paper)
+            .filter(Paper.share_id == share_id, Paper.is_public == True)
+            .first()
+        )
 
 
 # Create a single instance to use throughout the application

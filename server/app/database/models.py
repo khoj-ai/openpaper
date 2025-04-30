@@ -124,6 +124,10 @@ class Paper(Base):
     raw_content = Column(Text, nullable=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
+    # Optional fields for sharing
+    is_public = Column(Boolean, default=False)
+    share_id = Column(String, unique=True, nullable=True, index=True)
+
     user = relationship("User", back_populates="papers")
     conversations = relationship(
         "Conversation", back_populates="paper", cascade="all, delete-orphan"
