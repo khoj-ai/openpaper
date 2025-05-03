@@ -7,7 +7,9 @@ from pathlib import Path
 from typing import Optional
 
 from app.auth.dependencies import get_required_user
+from app.database.crud.annotation_crud import annotation_crud
 from app.database.crud.coversation_crud import conversation_crud
+from app.database.crud.highlight_crud import highlight_crud
 from app.database.crud.paper_crud import PaperCreate, PaperUpdate, paper_crud
 from app.database.crud.paper_note_crud import (
     PaperNoteCreate,
@@ -33,6 +35,12 @@ logger = logging.getLogger(__name__)
 paper_router = APIRouter()
 
 llm_operations = Operations()
+
+
+class SharePaperSchemaResponse(BaseModel):
+    paper_data: dict
+    highlight_data: dict
+    annotations_data: dict
 
 
 class CreatePaperNoteSchema(BaseModel):
@@ -244,7 +252,7 @@ async def share_pdf(
     # Fetch the document from the database
     paper = paper_crud.get(db, id=id, user=current_user)
 
-    paper_crud.make_public(db, id=id, user=current_user)
+    paper_crud.make_public(db, paper_id=id, user=current_user)
     if not paper:
         return JSONResponse(status_code=404, content={"message": "Document not found"})
     # Return the generated share id
@@ -273,7 +281,7 @@ async def unshare_pdf(
     if not paper:
         return JSONResponse(status_code=404, content={"message": "Document not found"})
 
-    paper_crud.make_private(db, id=id, user=current_user)
+    paper_crud.make_private(db, paper_id=id, user=current_user)
 
     # Return the generated share id
     return JSONResponse(
@@ -284,9 +292,7 @@ async def unshare_pdf(
     )
 
 
-paper_router.get("/share")
-
-
+@paper_router.get("/share")
 async def get_shared_pdf(
     request: Request,
     id: str,
@@ -296,6 +302,8 @@ async def get_shared_pdf(
     Get a shared document by ID
     """
     # Fetch the document from the database
+    response = {}
+
     paper = paper_crud.get_public_paper(db, share_id=id)
 
     if not paper:
@@ -307,10 +315,20 @@ async def get_shared_pdf(
     if not signed_url:
         return JSONResponse(status_code=404, content={"message": "File not found"})
 
+    annotations = annotation_crud.get_public_annotations_data_by_paper_id(
+        db, share_id=id
+    )
+
+    highlights = highlight_crud.get_public_highlights_data_by_paper_id(db, share_id=id)
+
     paper_data["file_url"] = signed_url
 
+    response["paper"] = paper_data
+    response["highlights"] = [highlight.to_dict() for highlight in highlights]
+    response["annotations"] = [annotation.to_dict() for annotation in annotations]
+
     # Return the file URL
-    return JSONResponse(status_code=200, content=paper_data)
+    return JSONResponse(status_code=200, content=response)
 
 
 @paper_router.delete("")

@@ -2,7 +2,7 @@ from typing import Optional
 from uuid import UUID
 
 from app.database.crud.base_crud import CRUDBase
-from app.database.models import Highlight
+from app.database.models import Highlight, Paper
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -37,6 +37,16 @@ class HighlightCrud(CRUDBase[Highlight, HighlightCreate, HighlightUpdate]):
             query = query.filter(Highlight.user_id == user.id)
 
         return query.order_by(Highlight.created_at).all()
+
+    def get_public_highlights_data_by_paper_id(self, db: Session, *, share_id: str):
+        """Get public highlights associated with document"""
+        return (
+            db.query(Highlight)
+            .join(Paper, Highlight.paper_id == Paper.id)
+            .filter(Paper.share_id == share_id, Paper.is_public == True)
+            .order_by(Highlight.created_at)
+            .all()
+        )
 
 
 # Create a single instance to use throughout the application

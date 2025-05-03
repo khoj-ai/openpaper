@@ -1,5 +1,6 @@
 import uuid
 from enum import Enum
+from types import NoneType
 
 from sqlalchemy import (
     ARRAY,
@@ -36,6 +37,10 @@ class Base(DeclarativeBase):
                 return [str(item) for item in value]
             elif isinstance(value, dict):
                 return {key: str(val) for key, val in value.items()}
+            elif isinstance(value, (int, float, bool)):
+                return value
+            elif isinstance(value, NoneType):
+                return None
             return str(value)
 
         return {
