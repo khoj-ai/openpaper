@@ -167,12 +167,16 @@ interface AnnotationsViewProps {
 	activeHighlight?: PaperHighlight | null;
 	removeAnnotation: (annotationId: string) => void;
 	updateAnnotation: (annotationId: string, content: string) => void;
+	readonly?: boolean;
 }
 
-export function AnnotationsView({ highlights, annotations, onHighlightClick, addAnnotation, activeHighlight, removeAnnotation, updateAnnotation }: AnnotationsViewProps) {
+export function AnnotationsView({ highlights, annotations, onHighlightClick, addAnnotation, activeHighlight, removeAnnotation, updateAnnotation, readonly = false }: AnnotationsViewProps) {
 	const [sortedHighlights, setSortedHighlights] = React.useState<PaperHighlight[]>([]);
 	const [highlightAnnotationMap, setHighlightAnnotationMap] = React.useState<Map<string, PaperHighlightAnnotation[] | null>>(new Map());
 	const highlightRefs = useRef(new Map<string, React.RefObject<HTMLDivElement | null>>());
+
+	console.log("AnnotationsView highlights", highlights);
+	console.log("AnnotationsView annotations", annotations);
 
 	useEffect(() => {
 		if (activeHighlight?.id) {
@@ -255,7 +259,7 @@ export function AnnotationsView({ highlights, annotations, onHighlightClick, add
 										)
 									}
 									{
-										highlight.id && activeHighlight?.id === highlight.id && (
+										highlight.id && activeHighlight?.id === highlight.id && !readonly && (
 											<div className="flex justify-between items-center">
 												<AnnotationButton
 													highlightId={highlight.id}

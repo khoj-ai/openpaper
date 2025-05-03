@@ -10,6 +10,8 @@ export interface PaperData {
     institutions: string[];
     keywords: string[];
     starter_questions: string[];
+    is_public: boolean;
+    share_id: string;
 }
 
 export interface PaperNoteData {

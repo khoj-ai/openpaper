@@ -13,7 +13,7 @@ import rehypeKatex from 'rehype-katex';
 import remarkMath from 'remark-math';
 import 'katex/dist/katex.min.css' // `rehype-katex` does not import the CSS for you
 
-import { Highlighter, NotebookText, MessageCircle, Focus, X, Eye, Edit, Loader, HelpCircle, ArrowUp, Feather } from 'lucide-react';
+import { Highlighter, NotebookText, MessageCircle, Focus, X, Eye, Edit, Loader, HelpCircle, ArrowUp, Feather, Share, Share2Icon, LockIcon } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import {
     Sidebar,
@@ -32,7 +32,8 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 
 import { AnnotationsView } from '@/components/AnnotationsView';
 import { useHighlights } from '@/components/hooks/PdfHighlight';
@@ -50,6 +51,7 @@ import {
     Reference,
     ResponseStyle,
 } from '@/lib/schema';
+import { Input } from '@/components/ui/input';
 
 
 // Interface for the CustomCitationLink component props
@@ -137,7 +139,8 @@ const data = {
         { name: "Chat", icon: MessageCircle },
         { name: "Notes", icon: NotebookText },
         { name: "Annotations", icon: Highlighter },
-        { name: "Focus", icon: Focus }
+        { name: "Share", icon: Share },
+        { name: "Focus", icon: Focus },
     ],
 }
 
@@ -193,6 +196,7 @@ export default function PaperView() {
     const [addedContentForPaperNote, setAddedContentForPaperNote] = useState<string | null>(null);
     const [isMarkdownPreview, setIsMarkdownPreview] = useState(false);
     const [pendingStarterQuestion, setPendingStarterQuestion] = useState<string | null>(null);
+    const [isSharing, setIsSharing] = useState(false);
 
     const [rightSideFunction, setRightSideFunction] = useState<string>('Chat');
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -679,6 +683,42 @@ export default function PaperView() {
         return activeCitationKey === key.toString() && activeCitationMessageIndex === messageIndex;
     }
 
+    const handleShare = async () => {
+        if (!id || !paperData || isSharing) return;
+        setIsSharing(true);
+        try {
+            const response = await fetchFromApi(`/api/paper/share?id=${id}`, {
+                method: 'POST',
+            });
+            setPaperData(prev => prev ? { ...prev, share_id: response.share_id } : null);
+            const shareUrl = `${window.location.origin}/paper/share/${response.share_id}`;
+            await navigator.clipboard.writeText(shareUrl);
+            toast.success("Sharing link copied to clipboard!");
+        } catch (error) {
+            console.error('Error sharing paper:', error);
+            toast.error("Failed to share paper.");
+        } finally {
+            setIsSharing(false);
+        }
+    };
+
+    const handleUnshare = async () => {
+        if (!id || !paperData || !paperData.share_id || isSharing) return;
+        setIsSharing(true);
+        try {
+            await fetchFromApi(`/api/paper/unshare?id=${id}`, {
+                method: 'POST',
+            });
+            setPaperData(prev => prev ? { ...prev, share_id: "" } : null);
+            toast.success("Paper is now private.");
+        } catch (error) {
+            console.error('Error unsharing paper:', error);
+            toast.error("Failed to make paper private.");
+        } finally {
+            setIsSharing(false);
+        }
+    };
+
     if (loading) return <div>Loading paper data...</div>;
 
     if (!paperData) return <div>Paper not found</div>;
@@ -810,6 +850,56 @@ export default function PaperView() {
                                 updateAnnotation={updateAnnotation}
                                 removeAnnotation={removeAnnotation}
                             />
+                        </div>
+                    )
+                }
+                {
+                    rightSideFunction === 'Share' && paperData && (
+                        <div className="flex flex-col h-[calc(100vh-64px)] p-4 space-y-4 col-span-2">
+                            <h3 className="text-lg font-semibold">Share Paper</h3>
+                            {paperData.share_id ? (
+                                <div className="space-y-3">
+                                    <p className="text-sm text-muted-foreground">This paper is currently public. Anyone with the link can view it.</p>
+                                    <div className="flex items-center space-x-2">
+                                        <Input
+                                            readOnly
+                                            value={`${window.location.origin}/paper/share/${paperData.share_id}`}
+                                            className="flex-1"
+                                        />
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={async () => {
+                                                await navigator.clipboard.writeText(`${window.location.origin}/paper/share/${paperData.share_id}`);
+                                                toast.success("Link copied!");
+                                            }}
+                                        >
+                                            Copy Link
+                                        </Button>
+                                    </div>
+                                    <Button
+                                        variant="destructive"
+                                        onClick={handleUnshare}
+                                        disabled={isSharing}
+                                        className="w-fit"
+                                    >
+                                        {isSharing ? <Loader className="animate-spin mr-2 h-4 w-4" /> : null}
+                                        <LockIcon /> Make Private
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    <p className="text-sm text-muted-foreground">Make this paper public to share it with others via a unique link. All of your highlights and annotations will be visible to anyone with the link. Your chat and notes remain private.</p>
+                                    <Button
+                                        onClick={handleShare}
+                                        disabled={isSharing}
+                                        className="w-fit"
+                                    >
+                                        {isSharing ? <Loader className="animate-spin mr-2 h-4 w-4" /> : null}
+                                        <Share2Icon /> Share
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     )
                 }

@@ -7,7 +7,7 @@ import { getSelectionOffsets } from '../utils/PdfTextUtils';
 import { addHighlightToNodes, findAllHighlightedPassages } from '../utils/PdfHighlightUtils';
 import { fetchFromApi } from '@/lib/api';
 
-export function useHighlights(paperId: string) {
+export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHighlight> = []) {
     const [highlights, setHighlights] = useState<Array<PaperHighlight>>([]);
     const [selectedText, setSelectedText] = useState<string>("");
     const [tooltipPosition, setTooltipPosition] = useState<{ x: number, y: number } | null>(null);
@@ -47,7 +47,12 @@ export function useHighlights(paperId: string) {
     }, [selectedText]);
 
     useEffect(() => {
-        loadHighlights();
+        if (readOnlyHighlights.length > 0) {
+            setHighlights(readOnlyHighlights);
+        }
+        else {
+            loadHighlights();
+        }
     }, []);
 
     useEffect(() => {

@@ -21,6 +21,7 @@ import { useEffect, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PaperData } from "@/lib/schema";
+import { isDateValid } from "@/lib/utils";
 
 interface IPaperMetadata {
     paperData: PaperData;
@@ -31,11 +32,6 @@ interface IPaperMetadata {
 const googleScholarUrl = (searchTerm: string) => {
     return `https://scholar.google.com/scholar?q=${encodeURIComponent(searchTerm)}`;
 }
-
-const isDateValid = (dateString: string) => {
-    const date = new Date(dateString);
-    return !isNaN(date.getTime());
-};
 
 function PaperMetadata(props: IPaperMetadata) {
     const { paperData } = props;
