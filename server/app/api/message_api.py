@@ -56,6 +56,7 @@ async def chat_message_stream(
         async def response_generator():
             try:
                 content_chunks = []
+                pending_newlines = ""  # Buffer to accumulate newlines
                 evidence: dict[str, list[dict[str, Union[str, int]]]] | None = None  # type: ignore
 
                 async for chunk in llm_operations.chat_with_paper(
@@ -72,23 +73,37 @@ async def chat_message_stream(
                         chunk_type = chunk.get("type")
                         chunk_content = chunk.get("content", "")
 
+                        # Only strip whitespace at the beginning and end, not internal newlines
                         if type(chunk_content) is str:
-                            chunk_content = chunk_content.strip()
-
-                        if not chunk_content:
-                            logger.warning("Received empty chunk content")
-                            continue
+                            chunk_content = chunk_content.strip(
+                                "\t "
+                            )  # Strip tabs and spaces but keep newlines
 
                         if chunk_type == "content":
-                            content_chunks.append(chunk_content)
-                            # Stream content chunks immediately
-                            yield f"{json.dumps({'type': 'content', 'content': chunk_content})}"
+                            if chunk_content == "\n" or chunk_content == "":
+                                # If it's just a newline or empty, add to pending buffer
+                                pending_newlines += chunk_content
+                                continue
+
+                            # We have real content now - include any pending newlines
+                            if pending_newlines:
+                                combined_content = pending_newlines + chunk_content
+                                pending_newlines = ""  # Clear the buffer
+                                content_chunks.append(combined_content)
+                                yield f"{json.dumps({'type': 'content', 'content': combined_content})}"
+                            else:
+                                # No pending newlines, just send the content
+                                content_chunks.append(chunk_content)
+                                yield f"{json.dumps({'type': 'content', 'content': chunk_content})}"
+
                         elif chunk_type == "references":
                             evidence = chunk_content
                             # Stream evidence when received
                             yield f"{json.dumps({'type': 'references', 'content': evidence})}"
                     else:
                         logger.warning(f"Received unexpected chunk format: {chunk}")
+
+                # At the end, if there are any pending newlines, we can skip them
 
                 # Save the complete message to the database
                 full_content = "".join(content_chunks)
