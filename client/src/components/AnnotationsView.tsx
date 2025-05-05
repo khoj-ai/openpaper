@@ -12,7 +12,8 @@ import { Card, CardContent, CardFooter } from './ui/card';
 
 export interface AnnotationButtonProps {
 	highlightId: string;
-	addAnnotation: (highlightId: string, content: string) => Promise<PaperHighlightAnnotation>;
+	// Make addAnnotation optional as it might not be needed in readonly
+	addAnnotation?: (highlightId: string, content: string) => Promise<PaperHighlightAnnotation>;
 }
 
 export function AnnotationButton({ highlightId, addAnnotation }: AnnotationButtonProps) {
@@ -20,7 +21,7 @@ export function AnnotationButton({ highlightId, addAnnotation }: AnnotationButto
 	const [isTyping, setIsTyping] = useState(false);
 
 	const handleSave = async () => {
-		if (content.trim()) {
+		if (content.trim() && addAnnotation) { // Check if addAnnotation exists
 			await addAnnotation(highlightId, content);
 			setContent("");
 			setIsTyping(false);
@@ -31,6 +32,9 @@ export function AnnotationButton({ highlightId, addAnnotation }: AnnotationButto
 		setContent("");
 		setIsTyping(false);
 	};
+
+	// Don't render if addAnnotation is not provided
+	if (!addAnnotation) return null;
 
 	return (
 		<div className="space-y-2 w-full">
@@ -67,25 +71,27 @@ export function AnnotationButton({ highlightId, addAnnotation }: AnnotationButto
 
 interface AnnotationCardProps {
 	annotation: PaperHighlightAnnotation;
-	removeAnnotation: (annotationId: string) => void;
-	updateAnnotation: (annotationId: string, content: string) => void;
+	removeAnnotation?: (annotationId: string) => void;
+	updateAnnotation?: (annotationId: string, content: string) => void;
+	readonly?: boolean;
 }
 
-function AnnotationCard({ annotation, removeAnnotation, updateAnnotation }: AnnotationCardProps) {
+function AnnotationCard({ annotation, removeAnnotation, updateAnnotation, readonly = false }: AnnotationCardProps) {
 	const [isEditing, setIsEditing] = useState(false);
 	const [editedContent, setEditedContent] = useState(annotation.content);
 
 	const handleSave = async (e: React.MouseEvent) => {
 		e.stopPropagation();
-		if (editedContent.trim() !== annotation.content) {
+		// Check if updateAnnotation exists before calling
+		if (editedContent.trim() !== annotation.content && updateAnnotation) {
 			await updateAnnotation(annotation.id, editedContent);
 		}
 		setIsEditing(false);
 	};
 
-	if (isEditing) {
+	// Prevent entering edit mode if readonly
+	if (isEditing && !readonly) {
 		return (
-			// Add transition for smoother appearance if needed, though focus is on the non-edit state
 			<Card className='group border-x-0 border-b-0 border-t shadow-none rounded-none py-2'>
 				<CardContent className="space-y-2 text-sm">
 					<Textarea
@@ -119,41 +125,46 @@ function AnnotationCard({ annotation, removeAnnotation, updateAnnotation }: Anno
 		);
 	}
 
+	// Base classes
+	const cardClasses = 'group border-x-0 border-b-0 border-t border-l-2 border-transparent shadow-none rounded-none py-2';
+	// Conditional classes for interactive mode
+	const interactiveClasses = !readonly ? 'hover:bg-secondary/50 hover:shadow-sm hover:border-l-primary transition-all duration-200 ease-in-out cursor-pointer' : 'cursor-default';
+
 	return (
-		// Added transition-all, duration, easing, hover:shadow-sm, hover:border-l-primary, hover:border-l-2, pl-2 on hover
-		<Card className='group border-x-0 border-b-0 border-t border-l-2 border-transparent shadow-none rounded-none py-2 hover:bg-secondary/50 hover:shadow-sm hover:border-l-primary transition-all duration-200 ease-in-out cursor-pointer'>
-			{/* Added pl-2 to CardContent to account for the hover border */}
+		<Card className={`${cardClasses} ${interactiveClasses}`}>
 			<CardContent className='text-sm pl-2'>
 				{annotation.content}
 			</CardContent>
-			{/* Added pl-2 to CardFooter */}
-			<CardFooter className="flex justify-between items-center pl-2">
-				<p className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-in-out">
+			<CardFooter className="flex justify-between items-center pl-2 min-h-[28px]"> {/* Added min-height */}
+				{/* Always show date in readonly mode, otherwise show on hover */}
+				<p className={`text-xs text-muted-foreground transition-opacity duration-200 ease-in-out opacity-0 group-hover:opacity-100`}>
 					{new Date(annotation.created_at).toLocaleDateString()}
 				</p>
-				{/* Ensured smooth transition for the icon container */}
-				<div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-in-out flex gap-2">
-					<Button
-						variant="ghost"
-						className="h-6 w-6 p-0"
-						onClick={(e) => {
-							e.stopPropagation();
-							removeAnnotation(annotation.id);
-						}}
-					>
-						<Trash2 size={14} className="text-muted-foreground hover:text-destructive transition-colors" />
-					</Button>
-					<Button
-						variant="ghost"
-						className="h-6 w-6 p-0"
-						onClick={(e) => {
-							e.stopPropagation();
-							setIsEditing(true);
-						}}
-					>
-						<Pencil size={14} className="text-muted-foreground hover:text-primary transition-colors" />
-					</Button>
-				</div>
+				{/* Only show buttons if not readonly and functions are provided */}
+				{!readonly && removeAnnotation && updateAnnotation && (
+					<div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-in-out flex gap-2">
+						<Button
+							variant="ghost"
+							className="h-6 w-6 p-0"
+							onClick={(e) => {
+								e.stopPropagation();
+								removeAnnotation(annotation.id);
+							}}
+						>
+							<Trash2 size={14} className="text-muted-foreground hover:text-destructive transition-colors" />
+						</Button>
+						<Button
+							variant="ghost"
+							className="h-6 w-6 p-0"
+							onClick={(e) => {
+								e.stopPropagation();
+								setIsEditing(true);
+							}}
+						>
+							<Pencil size={14} className="text-muted-foreground hover:text-primary transition-colors" />
+						</Button>
+					</div>
+				)}
 			</CardFooter>
 		</Card>
 	);
@@ -162,22 +173,22 @@ function AnnotationCard({ annotation, removeAnnotation, updateAnnotation }: Anno
 interface AnnotationsViewProps {
 	highlights: PaperHighlight[];
 	annotations: PaperHighlightAnnotation[];
-	addAnnotation: (highlightId: string, content: string) => Promise<PaperHighlightAnnotation>;
 	onHighlightClick: (highlight: PaperHighlight) => void;
 	activeHighlight?: PaperHighlight | null;
-	removeAnnotation: (annotationId: string) => void;
-	updateAnnotation: (annotationId: string, content: string) => void;
-	readonly?: boolean;
+	// Make action functions optional
+	addAnnotation?: (highlightId: string, content: string) => Promise<PaperHighlightAnnotation>;
+	removeAnnotation?: (annotationId: string) => void;
+	updateAnnotation?: (annotationId: string, content: string) => void;
+	readonly?: boolean; // Keep readonly prop
 }
 
+// Default readonly to false if not provided
 export function AnnotationsView({ highlights, annotations, onHighlightClick, addAnnotation, activeHighlight, removeAnnotation, updateAnnotation, readonly = false }: AnnotationsViewProps) {
 	const [sortedHighlights, setSortedHighlights] = React.useState<PaperHighlight[]>([]);
 	const [highlightAnnotationMap, setHighlightAnnotationMap] = React.useState<Map<string, PaperHighlightAnnotation[] | null>>(new Map());
 	const highlightRefs = useRef(new Map<string, React.RefObject<HTMLDivElement | null>>());
 
-	console.log("AnnotationsView highlights", highlights);
-	console.log("AnnotationsView annotations", annotations);
-
+	// ... (useEffect hooks remain the same) ...
 	useEffect(() => {
 		if (activeHighlight?.id) {
 			const ref = highlightRefs.current.get(activeHighlight.id);
@@ -211,11 +222,12 @@ export function AnnotationsView({ highlights, annotations, onHighlightClick, add
 		setHighlightAnnotationMap(annotationMap);
 	}, [highlights, annotations]);
 
+
 	return (
 		<div className="flex flex-col gap-4 p-4">
 			{highlights.length === 0 ? (
 				<p className="text-secondary-foreground text-sm">
-					No annotations yet. Highlight some text to get started.
+					{readonly ? "No annotations for this paper." : "No annotations yet. Highlight some text to get started."}
 				</p>
 			) : (
 				<div className="space-y-4">
@@ -226,15 +238,19 @@ export function AnnotationsView({ highlights, annotations, onHighlightClick, add
 								highlightRefs.current.set(highlight.id, ref);
 							}
 						}
+						// Conditional classes for the main highlight card
+						const cardBaseClasses = "border rounded-lg p-4 transition-colors px-0";
+						const cardInteractiveClasses = "hover:bg-secondary/50 cursor-pointer";
+						const cardActiveClasses = activeHighlight?.id === highlight.id ? "bg-secondary/80" : "";
+
 						return (
 							<Card
 								key={highlight.id}
 								ref={highlight.id ? highlightRefs.current.get(highlight.id) : undefined}
-								className="border rounded-lg p-4 hover:bg-secondary/50 transition-colors cursor-pointer px-0"
+								className={`${cardBaseClasses} ${cardInteractiveClasses} ${cardActiveClasses}`}
 								onClick={() => onHighlightClick(highlight)}
 							>
 								<CardContent>
-
 									<p className="text-sm font-normal mb-2">
 										&ldquo;{highlight.raw_text}&rdquo;
 									</p>
@@ -247,8 +263,10 @@ export function AnnotationsView({ highlights, annotations, onHighlightClick, add
 														<AnnotationCard
 															key={annotation.id}
 															annotation={annotation}
+															// Pass down optional functions and readonly status
 															removeAnnotation={removeAnnotation}
 															updateAnnotation={updateAnnotation}
+															readonly={readonly}
 														/>
 													))
 												}
@@ -258,9 +276,10 @@ export function AnnotationsView({ highlights, annotations, onHighlightClick, add
 											</>
 										)
 									}
+									{/* Only show AnnotationButton if not readonly, highlight is active, and addAnnotation is provided */}
 									{
-										highlight.id && activeHighlight?.id === highlight.id && !readonly && (
-											<div className="flex justify-between items-center">
+										highlight.id && activeHighlight?.id === highlight.id && !readonly && addAnnotation && (
+											<div className="flex justify-between items-center mt-2 pt-2 border-t"> {/* Added margin/padding/border */}
 												<AnnotationButton
 													highlightId={highlight.id}
 													addAnnotation={addAnnotation}
