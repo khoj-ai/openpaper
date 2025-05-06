@@ -367,9 +367,15 @@ class Operations:
                 text_buffer = ""
                 continue
 
-            if in_evidence_section and END_DELIMITER in text_buffer:
+            reconstructed_buffer = "".join(evidence_buffer + [text_buffer]).strip()
+
+            if in_evidence_section and END_DELIMITER in reconstructed_buffer:
                 # Split at delimiter
-                evidence_part, remaining = text_buffer.split(END_DELIMITER)
+                evidence_part, remaining = (
+                    text_buffer.split(END_DELIMITER)
+                    if END_DELIMITER in text_buffer
+                    else ("", "")
+                )
                 evidence_buffer.append(evidence_part)
 
                 # Parse the complete evidence block
