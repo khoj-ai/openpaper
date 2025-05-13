@@ -17,6 +17,7 @@ import { useAuth } from "@/lib/auth";
 import { PdfDropzone } from "@/components/PdfDropzone";
 import Link from "next/link";
 import { SnakeGame } from "@/components/SnakeGame";
+import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience";
 
 interface PdfUploadResponse {
 	filename: string;
@@ -26,6 +27,7 @@ interface PdfUploadResponse {
 
 export default function Home() {
 	const [isUploading, setIsUploading] = useState(false);
+	const [isUploading, setIsUploading] = useState(true);
 	const [loadingMessage, setLoadingMessage] = useState("Preparing your paper...");
 	const [isUrlDialogOpen, setIsUrlDialogOpen] = useState(false); // Renamed for clarity
 
@@ -362,11 +364,11 @@ export default function Home() {
 					<DialogHeader>
 						<DialogTitle className="text-center">Processing Your Paper</DialogTitle>
 						<DialogDescription className="text-center">
-							This might take a moment... Play Snake while you wait?
+							This might take a moment...
 						</DialogDescription>
 					</DialogHeader>
 					<div className="flex flex-col items-center justify-center py-8 space-y-6">
-						<SnakeGame />
+						<EnigmaticLoadingExperience />
 						<div className="flex items-center gap-4 justify-center">
 							<Loader2 className="h-6 w-6 animate-spin text-primary" />
 							<p className="text-center text-lg transition-all duration-500 ease-in-out">
