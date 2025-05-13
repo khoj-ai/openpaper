@@ -16,7 +16,6 @@ import { FileText, GithubIcon, Highlighter, Loader2, LucideFileWarning, MessageS
 import { useAuth } from "@/lib/auth";
 import { PdfDropzone } from "@/components/PdfDropzone";
 import Link from "next/link";
-import { SnakeGame } from "@/components/SnakeGame";
 import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience";
 
 interface PdfUploadResponse {
