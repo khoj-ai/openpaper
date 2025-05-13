@@ -1,6 +1,6 @@
 "use client"
 
-import { Clock, FileText, Home, LogOut, MessageCircleQuestion, Moon, Sun, User } from "lucide-react";
+import { Clock, FileText, Globe2, Home, LogOut, MessageCircleQuestion, Moon, Sun, User } from "lucide-react";
 
 import {
     Sidebar,
@@ -36,9 +36,14 @@ const items = [
         icon: Home,
     },
     {
-        title: "Papers",
+        title: "My Papers",
         url: "/papers",
         icon: FileText,
+    },
+    {
+        title: "Find Papers",
+        url: "/finder",
+        icon: Globe2,
     },
     {
         title: "Feedback",
