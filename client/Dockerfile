@@ -17,6 +17,10 @@ RUN yarn install
 ENV NEXT_PUBLIC_API_URL=https://annotatedpaper.khoj.dev
 ENV NODE_ENV=production
 
+# Womp womp set client-side Posthog environment variables
+ENV NEXT_PUBLIC_POSTHOG_KEY=phc_i84JqfidoQncsSmusoeZF9oshYHV2SebGZkKMVtF8AG
+ENV NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
+
 # Copy the rest of the application code to the working directory
 COPY . .
 
