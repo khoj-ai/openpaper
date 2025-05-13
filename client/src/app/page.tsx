@@ -27,7 +27,6 @@ interface PdfUploadResponse {
 
 export default function Home() {
 	const [isUploading, setIsUploading] = useState(false);
-	const [isUploading, setIsUploading] = useState(true);
 	const [loadingMessage, setLoadingMessage] = useState("Preparing your paper...");
 	const [isUrlDialogOpen, setIsUrlDialogOpen] = useState(false); // Renamed for clarity
 
