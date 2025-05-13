@@ -20,8 +20,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-	title: "Annotated Paper",
-	description: "Quickly and efficiently read, highlight, and understand all your papers.",
+	title: "Open Paper",
+	description: "The fastest way to annotate, understand, and share your papers.",
 };
 
 export default function RootLayout({
@@ -59,7 +59,7 @@ export default function RootLayout({
 										<Separator orientation="vertical" className="mr-2 h-4" />
 										<header className="flex flex-1 items-center justify-between">
 											<h1 className="text-lg font-bold">
-												The Annotated Paper
+												Open Paper
 											</h1>
 											<OnboardingChecklist />
 										</header>

@@ -59,7 +59,7 @@ function LoginContent() {
 		<div className="flex items-center justify-center h-full p-4">
 			<Card className="w-full max-w-md">
 				<CardHeader>
-					<CardTitle className="text-2xl">Sign in to The Annotated Paper</CardTitle>
+					<CardTitle className="text-2xl">Sign in to Open Paper</CardTitle>
 					<CardDescription>
 						Connect with your Google account to access your papers and annotations.
 					</CardDescription>

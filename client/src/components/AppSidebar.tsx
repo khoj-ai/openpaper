@@ -99,7 +99,7 @@ export function AppSidebar() {
         <Sidebar variant="floating">
             <SidebarContent>
                 <SidebarGroup>
-                    <SidebarGroupLabel>The Annotated Paper</SidebarGroupLabel>
+                    <SidebarGroupLabel>Open Paper</SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu>
                             {items.map((item) => (

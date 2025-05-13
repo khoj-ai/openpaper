@@ -1,4 +1,3 @@
-// filepath: /Users/si/projects/annotated-paper/client/src/components/PdfDropzone.tsx
 "use client";
 
 import React, { useState, useRef, useCallback } from 'react';

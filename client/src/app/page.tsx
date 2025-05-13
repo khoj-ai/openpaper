@@ -263,14 +263,14 @@ export default function Home() {
 			<main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start w-full max-w-6xl">
 
 				<header className="text-2xl font-bold">
-					The Annotated Paper
+					Open Paper
 				</header>
 				{
 					isMobile && (
 						<Dialog open={true}>
 							<DialogContent>
 								<DialogHeader>
-									<DialogTitle>The Annotated Paper</DialogTitle>
+									<DialogTitle>Open Paper</DialogTitle>
 									<DialogDescription>
 										This application is not optimized for mobile devices. Please use a desktop or tablet for the best experience.
 									</DialogDescription>

@@ -1,6 +1,6 @@
 # Client
 
-This server manages the frontend for the Annotated Paper project, which allows users to upload, chat with, annotate, and manage research papers in one place.
+This server manages the frontend for the Open Paper project, which allows users to upload, chat with, annotate, and manage research papers in one place.
 
 First, ensure you've started the backend server. See `/server` for details.
 
