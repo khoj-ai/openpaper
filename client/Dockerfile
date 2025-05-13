@@ -14,7 +14,7 @@ COPY package.json yarn.lock ./
 RUN yarn install
 
 # Set as environment variable for build time
-ENV NEXT_PUBLIC_API_URL=https://annotatedpaper.khoj.dev
+ENV NEXT_PUBLIC_API_URL=https://openpaper.ai
 ENV NODE_ENV=production
 
 # Womp womp set client-side Posthog environment variables
