@@ -27,6 +27,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
+import { useIsDarkMode } from "@/hooks/useDarkMode";
 
 // Menu items.
 const items = [
@@ -68,76 +69,9 @@ export function AppSidebar() {
     const router = useRouter();
     const { user, logout } = useAuth();
     const [allPapers, setAllPapers] = useState<PaperItem[]>([])
-    const [darkMode, setDarkMode] = useState<boolean>(false);
-
-    // Function to toggle dark mode
-    const toggleDarkMode = () => {
-        const newDarkMode = !darkMode;
-        setDarkMode(newDarkMode);
-
-        // Update document class
-        if (newDarkMode) {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
-
-        // Save preference to localStorage
-        localStorage.setItem('darkMode', newDarkMode ? 'dark' : 'light');
-    };
+    const { darkMode, toggleDarkMode} = useIsDarkMode();
 
     useEffect(() => {
-        // First check if there's a stored preference in localStorage
-        const storedPreference = localStorage.getItem('darkMode');
-
-        if (storedPreference) {
-            // If user has explicitly set a preference, use that
-            const isDarkMode = storedPreference === 'dark';
-            setDarkMode(isDarkMode);
-
-            if (isDarkMode) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-        } else {
-            // If no stored preference, check system preference
-            const prefersDark = window.matchMedia &&
-                window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-            setDarkMode(prefersDark);
-
-            if (prefersDark) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-
-            // Save system preference as initial setting
-            localStorage.setItem('darkMode', prefersDark ? 'dark' : 'light');
-        }
-
-        // Listen for changes in system preference
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-        const handleChange = (e: MediaQueryListEvent) => {
-            // Only update if user hasn't set an explicit preference
-            if (!localStorage.getItem('darkMode')) {
-                const newDarkMode = e.matches;
-                setDarkMode(newDarkMode);
-
-                if (newDarkMode) {
-                    document.documentElement.classList.add('dark');
-                } else {
-                    document.documentElement.classList.remove('dark');
-                }
-            }
-        };
-
-        // Add listener for system preference changes
-        if (mediaQuery?.addEventListener) {
-            mediaQuery.addEventListener('change', handleChange);
-        }
-
         // Define an async function inside useEffect
         const fetchPapers = async () => {
             try {

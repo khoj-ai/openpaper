@@ -7,6 +7,7 @@ import { usePostHog } from 'posthog-js/react'
 
 import posthog from 'posthog-js'
 import { PostHogProvider as PHProvider } from 'posthog-js/react'
+import { useIsDarkMode } from "@/hooks/useDarkMode"
 
 // Note: This provider does not work wherever adblock is enabled.
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
@@ -55,4 +56,10 @@ function SuspendedPostHogPageView() {
             <PostHogPageView />
         </Suspense>
     )
+}
+
+
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+    const { } = useIsDarkMode();
+    return <>{children}</>;
 }
