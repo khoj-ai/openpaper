@@ -43,6 +43,7 @@ class Operations:
     def __init__(self):
         self.client = genai.Client(api_key=GEMINI_API_KEY)
         self.default_model = "gemini-2.5-pro-preview-03-25"
+        self.fast_model = "gemini-2.5-flash-preview-04-17"
 
     def validate_and_extract_json(self, json_data: str) -> dict:
         """
@@ -205,7 +206,7 @@ class Operations:
 
         # Extract metadata using the LLM
         response = self.client.models.generate_content(
-            model=self.default_model,
+            model=self.fast_model,
             contents=formatted_prompt,
         )
 
