@@ -22,6 +22,25 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
 	title: "Open Paper",
 	description: "The fastest way to annotate, understand, and share your papers.",
+	openGraph: {
+		title: "Open Paper",
+		description: "The fastest way to annotate, understand, and share your papers.",
+		images: [
+			{
+				url: "https://assets.khoj.dev/openpaper_meta.png",
+				width: 1280,
+				height: 640,
+				alt: "Open Paper",
+			}
+		],
+		type: "website",
+	},
+	twitter: {
+		card: "summary_large_image",
+		title: "Open Paper",
+		description: "The fastest way to annotate, understand, and share your papers.",
+		images: ["https://assets.khoj.dev/openpaper_meta.png"],
+	},
 };
 
 export default function RootLayout({
@@ -32,9 +51,9 @@ export default function RootLayout({
 	return (
 		<html lang="en">
 			<head>
-                <script
-                    dangerouslySetInnerHTML={{
-                        __html: `
+				<script
+					dangerouslySetInnerHTML={{
+						__html: `
                             try {
                                 if (localStorage.getItem('darkMode') === 'dark' ||
                                     (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -42,9 +61,9 @@ export default function RootLayout({
                                 }
                             } catch (e) {}
                         `,
-                    }}
-                />
-            </head>
+					}}
+				/>
+			</head>
 			<body
 				className={`${geistSans.variable} ${geistMono.variable} antialiased`}
 			>
