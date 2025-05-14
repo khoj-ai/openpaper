@@ -93,7 +93,7 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 5 }: PdfDrop
     };
 
     return (
-        <div className="flex flex-col items-center space-y-6 w-full max-w-lg">
+        <div className="flex flex-col items-center space-y-6 w-full max-w-lg mx-auto">
             <div
                 onClick={handleClick}
                 onDrop={handleDrop}

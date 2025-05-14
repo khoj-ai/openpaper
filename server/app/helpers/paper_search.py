@@ -4,7 +4,7 @@ from typing import List, Optional, Union
 from urllib.parse import quote
 
 import requests
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 logger = logging.getLogger(__name__)
 
@@ -105,16 +105,25 @@ class OpenAlexResponse(BaseModel):
     meta: dict
     results: List[OpenAlexWork]
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        self.results = [OpenAlexWork(**item) for item in data.get("results", [])]
-        self.meta = data.get("meta", {})
+    @model_validator(mode="before")
+    @classmethod
+    def validate_results(cls, data):
+        if "results" in data:
+            valid_results = []
+            for item in data["results"]:
+                try:
+                    valid_results.append(OpenAlexWork(**item))
+                except Exception as e:
+                    logger.warning(f"Skipping invalid OpenAlex work entry: {e}")
+
+            data["results"] = valid_results
+        return data
 
 
 # Utility functions for searching the OpenAlex API
 # For documentation, see https://docs.openalex.org/api-entities/works/search-works
 def search_open_alex(
-    search_term: str, filter: Optional[str] = None
+    search_term: str, filter: Optional[str] = None, page: int = 1
 ) -> OpenAlexResponse:
     """
     Search the OpenAlex API for papers based on a search term and optional filter.
@@ -129,13 +138,16 @@ def search_open_alex(
     # Construct the search URL
     base_url = "https://api.openalex.org/works"
 
-    params = {"search": quote(search_term)}
+    params = {"search": quote(search_term), "page": page}
     if filter:
         params["filter"] = quote(filter)
 
-    constructed_url = f"{base_url}?search={quote(search_term)}"
-    if filter:
-        constructed_url += f"&filter={quote(filter)}"
+    constructed_url = f"{base_url}?"
+    for key, value in params.items():
+        constructed_url += f"{key}={value}&"
+
+    constructed_url = constructed_url.rstrip("&")  # Remove trailing '&'
+
     logger.debug(f"Constructed URL: {constructed_url}")
 
     # Add a timeout to the request

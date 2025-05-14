@@ -161,11 +161,11 @@ export default function Home() {
 					{/* Hero Section */}
 					<div className="flex flex-col items-center text-center space-y-8">
 						<h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
-							Your Research Papers,{" "}
+							Read Research Papers,{" "}
 							<span className="text-primary">Supercharged with AI</span>
 						</h1>
 						<p className="text-xl text-muted-foreground max-w-2xl">
-							Upload your papers to one secure place. Read, annotate, and understand them deeply with the help of AI-powered insights.
+							Read, annotate, and understand papers deeply with the help of AI-powered insights.
 						</p>
 						<div className="flex gap-4">
 							<Button size="lg" asChild>
@@ -191,16 +191,16 @@ export default function Home() {
 							<div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
 								<FileText className="h-5 w-5 text-primary" />
 							</div>
-							<h3 className="text-xl font-semibold">Centralized Library</h3>
+							<h3 className="text-xl font-semibold">Stay Focused</h3>
 							<p className="text-muted-foreground">
-								Keep all your research papers organized in one place. No more scattered PDFs across devices.
+								Read your papers side by side with your notes. Effortlessly chat, annotate, and understand your paper in flow.
 							</p>
 						</div>
 						<div className="space-y-4">
 							<div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
 								<Highlighter className="h-5 w-5 text-primary" />
 							</div>
-							<h3 className="text-xl font-semibold">Smart Annotations</h3>
+							<h3 className="text-xl font-semibold">Annotate</h3>
 							<p className="text-muted-foreground">
 								Highlight key insights and add notes that stay in sync with your papers. Never lose track of important information again.
 							</p>
@@ -209,9 +209,9 @@ export default function Home() {
 							<div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
 								<MessageSquareText className="h-5 w-5 text-primary" />
 							</div>
-							<h3 className="text-xl font-semibold">AI-Powered Understanding</h3>
+							<h3 className="text-xl font-semibold">Grounded AI Insights</h3>
 							<p className="text-muted-foreground">
-								Ask questions about your papers and get intelligent responses based on the content. Go deeper while staying focused.
+								Ask questions about your papers and get grounded responses with citations linked back to the paper. Go deeper, stay focused.
 							</p>
 						</div>
 					</div>
@@ -262,7 +262,7 @@ export default function Home() {
 		<div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center h-[calc(100vh-64px)] p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
 			<main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start w-full max-w-6xl">
 
-				<header className="text-2xl font-bold">
+				<header className="text-2xl font-bold mx-auto">
 					Open Paper
 				</header>
 				{
@@ -279,9 +279,9 @@ export default function Home() {
 						</Dialog>
 					)
 				}
-				<div className="flex flex-col text-center space-y-8">
+				<div className="flex flex-col text-center space-y-8 mx-auto">
 					<p className="text-lg text-left text-muted-foreground max-w-2xl">
-						Upload your papers to one secure place. Read, annotate, and understand them deeply with the help of AI-powered insights.
+						Upload a paper to get started.
 					</p>
 				</div>
 

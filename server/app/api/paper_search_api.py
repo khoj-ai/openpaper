@@ -16,6 +16,7 @@ paper_search_router = APIRouter()
 @paper_search_router.get("/search")
 async def search_papers(
     query: str,
+    page: int = 1,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_required_user),
 ) -> dict:
@@ -24,7 +25,7 @@ async def search_papers(
     """
     try:
         # Perform the search operation
-        results = search_open_alex(query)
+        results = search_open_alex(query, page=page)
         return Response(
             content=results.model_dump_json(), media_type="application/json"
         )
