@@ -35,23 +35,28 @@ const items = [
         title: "Home",
         url: "/",
         icon: Home,
-    },
-    {
-        title: "My Papers",
-        url: "/papers",
-        icon: FileText,
+        requiresAuth: false,
     },
     {
         title: "Find Papers",
         url: "/finder",
         icon: Globe2,
+        requiresAuth: true,
+    },
+    {
+        title: "My Papers",
+        url: "/papers",
+        icon: FileText,
+        requiresAuth: true,
     },
     {
         title: "Feedback",
         url: "https://github.com/sabaimran/openpaper/issues",
         icon: MessageCircleQuestion,
+        requiresAuth: false,
     }
 ]
+
 
 export interface PaperItem {
     id: string
@@ -69,7 +74,7 @@ export function AppSidebar() {
     const router = useRouter();
     const { user, logout } = useAuth();
     const [allPapers, setAllPapers] = useState<PaperItem[]>([])
-    const { darkMode, toggleDarkMode} = useIsDarkMode();
+    const { darkMode, toggleDarkMode } = useIsDarkMode();
 
     useEffect(() => {
         // Define an async function inside useEffect
@@ -104,12 +109,14 @@ export function AppSidebar() {
                         <SidebarMenu>
                             {items.map((item) => (
                                 <SidebarMenuItem key={item.title}>
-                                    <SidebarMenuButton asChild>
-                                        <a href={item.url}>
-                                            <item.icon />
-                                            <span>{item.title}</span>
-                                        </a>
-                                    </SidebarMenuButton>
+                                    <SidebarMenuItem key={item.title}>
+                                        <SidebarMenuButton asChild>
+                                            <a href={item.requiresAuth && !user ? "/login" : item.url}>
+                                                <item.icon />
+                                                <span>{item.title}</span>
+                                            </a>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
                                 </SidebarMenuItem>
                             ))}
                             <SidebarMenuItem>
