@@ -1,4 +1,4 @@
-# ![Open Paper](https://raw.githubusercontent.com/sabaimran/openpaper/refs/heads/master/client/src/app/annotated_paper.svg) Open Paper
+# ![Open Paper](https://raw.githubusercontent.com/sabaimran/openpaper/refs/heads/master/client/src/app/openpaper.svg) Open Paper
 
 
 When reading lots of papers for research, it can be hard to keep track of your notes and annotations. When you need to go deeper into a specific topic or clarify something you don't understand, you may switch contexts many times to look up terms, concepts, related research.
