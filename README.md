@@ -1,13 +1,13 @@
-# ![The Annotated Paper](https://raw.githubusercontent.com/sabaimran/annotated-paper/refs/heads/master/client/src/app/annotated_paper.svg) The Annotated Paper
+# ![Open Paper](https://raw.githubusercontent.com/sabaimran/openpaper/refs/heads/master/client/src/app/annotated_paper.svg) Open Paper
 
 
 When reading lots of papers for research, it can be hard to keep track of your notes and annotations. When you need to go deeper into a specific topic or clarify something you don't understand, you may switch contexts many times to look up terms, concepts, related research.
 
 I wanted to build something for myself that helped me address some of these issues in one place.
 
-The Annotated Paper is a place to upload your paper, highlight, leave comments, take notes, and chat all in one place. Search through your existing corpus of annotated papers.
+The Open Paper is a place to upload your paper, highlight, leave comments, take notes, and chat all in one place. Search through your existing corpus of annotated papers.
 
-![The Annotated Paper](./demo.gif)
+![The Open Paper](./demo.gif)
 
 ## AI-powered copilot
 
@@ -46,7 +46,7 @@ Takes notes directly in context with your paper. You can use the toggle at the t
 This project uses a separate server & client to run the web application
 
 ```bash
-git clone git@github.com:sabaimran/annotated-paper.git
+git clone git@github.com:sabaimran/openpaper.git
 ```
 
 To start the server, see instructions in `/server`. To start the client, see instructions in `/client`.

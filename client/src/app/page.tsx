@@ -175,7 +175,7 @@ export default function Home() {
 								</a>
 							</Button>
 							<Button size="lg" variant="outline" asChild>
-								<a href="https://github.com/sabaimran/annotated-paper">
+								<a href="https://github.com/sabaimran/openpaper">
 									<GithubIcon className="h-4 w-4 mr-2" />
 									GitHub
 								</a>
@@ -239,7 +239,7 @@ export default function Home() {
 					<p>
 						Made with ❤️ in{" "}
 						<a
-							href="https://github.com/sabaimran/annotated-paper"
+							href="https://github.com/sabaimran/openpaper"
 							target="_blank"
 							rel="noopener noreferrer"
 							className="underline hover:text-foreground transition-colors"
@@ -297,7 +297,7 @@ export default function Home() {
 				<p>
 					Made with ❤️ in{" "}
 					<a
-						href="https://github.com/sabaimran/annotated-paper"
+						href="https://github.com/sabaimran/openpaper"
 						target="_blank"
 						rel="noopener noreferrer"
 						className="underline hover:text-foreground transition-colors"

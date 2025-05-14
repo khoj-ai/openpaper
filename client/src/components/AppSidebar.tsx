@@ -48,7 +48,7 @@ const items = [
     },
     {
         title: "Feedback",
-        url: "https://github.com/sabaimran/annotated-paper/issues",
+        url: "https://github.com/sabaimran/openpaper/issues",
         icon: MessageCircleQuestion,
     }
 ]

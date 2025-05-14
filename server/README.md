@@ -1,6 +1,6 @@
 # Server
 
-This server manages the backend for the Annotated Paper project, which allows users to upload, chat with, annotate, and manage research papers in one place.
+This server manages the backend for the Open Paper project, which allows users to upload, chat with, annotate, and manage research papers in one place.
 
 ## Prerequisites
 - Python 3.12 or higher
