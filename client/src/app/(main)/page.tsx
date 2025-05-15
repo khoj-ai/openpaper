@@ -17,6 +17,7 @@ import { useAuth } from "@/lib/auth";
 import { PdfDropzone } from "@/components/PdfDropzone";
 import Link from "next/link";
 import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience";
+import Image from "next/image";
 
 interface PdfUploadResponse {
 	filename: string;
@@ -165,15 +166,28 @@ export default function Home() {
 				<main className="max-w-6xl mx-auto space-y-24 p-8">
 					{/* Hero Section */}
 					<div className="flex flex-col items-center text-center space-y-8">
-						<h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
+						<h1 className="text-6xl sm:text-6xl font-bold tracking-tight *:text-primary flex items-center gap-2">
+							<Image
+								src="/openpaper.svg"
+								width={48}
+								height={48}
+								alt="Open Paper Logo"
+							/>
+							Open Paper
+						</h1>
+						<h2 className="text-4xl sm:text-4xl font-bold tracking-tight">
 							Read Research Papers,{" "}
 							<span className="text-primary">Supercharged with AI</span>
-						</h1>
+						</h2>
 						<p className="text-xl text-muted-foreground max-w-2xl">
-							Read, annotate, and understand papers deeply with the help of AI-powered insights.
+							Read, annotate, and understand papers. Use an AI assistant with contextual citations for responses you can trust.
 						</p>
 						<div className="flex gap-4">
-							<Button size="lg" asChild>
+							<Button
+								className="bg-blue-500"
+								size="lg"
+								asChild
+							>
 								<a href="/login">
 									<Play className="h-4 w-4 mr-2" />
 									Get Started
