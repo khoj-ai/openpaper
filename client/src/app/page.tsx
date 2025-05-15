@@ -153,6 +153,11 @@ export default function Home() {
 		setPdfUrl("");
 	};
 
+	if (authLoading) {
+		// Maybe show a loading spinner or skeleton
+		return null;
+	}
+
 	if (!user && !authLoading) {
 		return (
 

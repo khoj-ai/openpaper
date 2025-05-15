@@ -1,7 +1,15 @@
 import { useEffect, useState } from "react";
 
 export function useIsDarkMode() {
-    const [darkMode, setDarkMode] = useState(false);
+
+    // Start with the class that was added by the script
+    const [darkMode, setDarkMode] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return document.documentElement.classList.contains('dark');
+        }
+        return false;
+    });
+
     const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
@@ -23,11 +31,12 @@ export function useIsDarkMode() {
     }, []);
 
     useEffect(() => {
-        // Update the class on the document element based on darkMode state
+        // Only update the class if mounted and if the value actually changed from the script
         if (isMounted) {
-            if (darkMode) {
+            const isDark = document.documentElement.classList.contains('dark');
+            if (darkMode && !isDark) {
                 document.documentElement.classList.add('dark');
-            } else {
+            } else if (!darkMode && isDark) {
                 document.documentElement.classList.remove('dark');
             }
         }
