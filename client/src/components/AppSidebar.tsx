@@ -28,6 +28,7 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 import { useIsDarkMode } from "@/hooks/useDarkMode";
+import Image from "next/image";
 
 // Menu items.
 const items = [
@@ -104,7 +105,15 @@ export function AppSidebar() {
         <Sidebar variant="floating">
             <SidebarContent>
                 <SidebarGroup>
-                    <SidebarGroupLabel>Open Paper</SidebarGroupLabel>
+                    <SidebarGroupLabel className="flex items-center gap-2">
+                        <Image
+                            src="/openpaper.svg"
+                            width={24}
+                            height={24}
+                            alt="Open Paper Logo"
+                        />
+                        <span className="text-sm font-semibold">Open Paper</span>
+                    </SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu>
                             {items.map((item) => (
@@ -119,29 +128,32 @@ export function AppSidebar() {
                                     </SidebarMenuItem>
                                 </SidebarMenuItem>
                             ))}
-                            <SidebarMenuItem>
-                                <SidebarMenuButton>
-                                    <Clock size={16} />
-                                    <span>Recent</span>
-                                </SidebarMenuButton>
-                                <SidebarMenuSub>
-                                    {
-                                        allPapers && allPapers.length > 0 &&
-                                        allPapers.map((paper) => (
-                                            <SidebarMenuSubItem key={paper.id}>
-                                                <SidebarMenuSubButton asChild>
-                                                    <a
-                                                        href={`/paper/${paper.id}`}
-                                                        className="text-xs font-medium w-full h-fit my-1"
-                                                    >
-                                                        {paper.title || paper.filename}
-                                                    </a>
-                                                </SidebarMenuSubButton>
-                                            </SidebarMenuSubItem>
-                                        ))
-                                    }
-                                </SidebarMenuSub>
-                            </SidebarMenuItem>
+                            {
+                                allPapers && allPapers.length > 0 && (
+                                    <SidebarMenuItem>
+                                        <SidebarMenuButton>
+                                            <Clock size={16} />
+                                            <span>Recent</span>
+                                        </SidebarMenuButton>
+                                        <SidebarMenuSub>
+                                            {
+                                                allPapers.map((paper) => (
+                                                    <SidebarMenuSubItem key={paper.id}>
+                                                        <SidebarMenuSubButton asChild>
+                                                            <a
+                                                                href={`/paper/${paper.id}`}
+                                                                className="text-xs font-medium w-full h-fit my-1"
+                                                            >
+                                                                {paper.title || paper.filename}
+                                                            </a>
+                                                        </SidebarMenuSubButton>
+                                                    </SidebarMenuSubItem>
+                                                ))
+                                            }
+                                        </SidebarMenuSub>
+                                    </SidebarMenuItem>
+                                )
+                            }
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>

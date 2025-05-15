@@ -214,9 +214,9 @@ export default function Home() {
 							<div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
 								<MessageSquareText className="h-5 w-5 text-primary" />
 							</div>
-							<h3 className="text-xl font-semibold">Grounded AI Insights</h3>
+							<h3 className="text-xl font-semibold">Trust AI Insights</h3>
 							<p className="text-muted-foreground">
-								Ask questions about your papers and get grounded responses with citations linked back to the paper. Go deeper, stay focused.
+								Ask questions about your papers and get trusted responses with citations linked back to the paper. Go deeper with confidence.
 							</p>
 						</div>
 					</div>

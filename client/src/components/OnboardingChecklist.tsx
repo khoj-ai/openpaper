@@ -110,7 +110,7 @@ export default function OnboardingChecklist() {
                 />
                 <ChecklistItem
                     completed={user && onboardingData?.has_papers || false}
-                    text="Import your first paper"
+                    text="Upload your first paper"
                 />
                 <ChecklistItem
                     completed={user && onboardingData?.has_highlights || false}

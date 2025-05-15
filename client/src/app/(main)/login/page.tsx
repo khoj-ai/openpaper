@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import Link from "next/link";
 
 function LoginContent() {
 	const { user, loading, error: authError, login } = useAuth();
@@ -83,8 +84,13 @@ function LoginContent() {
 						</Button>
 					</div>
 				</CardContent>
-				<CardFooter className="flex justify-center text-sm text-muted-foreground">
-					By signing in, you agree to our Terms of Service and Privacy Policy.
+				<CardFooter className="text-sm text-muted-foreground text-start">
+					<div className="flex flex-wrap gap-1 justify-start">
+						<span>By signing in, you agree to our</span>
+						<Link href="/tos" className="text-primary hover:underline">Terms of Service</Link>
+						<span>and</span>
+						<Link href="/privacy" className="text-primary hover:underline">Privacy Policy</Link>
+					</div>
 				</CardFooter>
 			</Card>
 		</div>
