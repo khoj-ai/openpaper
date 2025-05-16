@@ -13,7 +13,7 @@ import rehypeKatex from 'rehype-katex';
 import remarkMath from 'remark-math';
 import 'katex/dist/katex.min.css' // `rehype-katex` does not import the CSS for you
 
-import { Highlighter, NotebookText, MessageCircle, Focus, X, Eye, Edit, Loader, HelpCircle, ArrowUp, Feather, Share, Share2Icon, LockIcon, Lightbulb } from 'lucide-react';
+import { Highlighter, NotebookText, MessageCircle, Focus, X, Eye, Edit, Loader, HelpCircle, ArrowUp, Feather, Share, Share2Icon, LockIcon, Lightbulb, Sparkle } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import {
     Sidebar,
@@ -247,6 +247,12 @@ export default function PaperView() {
             setRightSideFunction('Annotations');
         }
     }, [isAnnotating]);
+
+    useEffect(() => {
+        if (rightSideFunction === 'Chat') {
+            inputMessageRef.current?.focus();
+        }
+    }, [rightSideFunction]);
 
     useEffect(() => {
         // Add keybinding to toggle markdown preview
@@ -907,7 +913,7 @@ export default function PaperView() {
                 }
                 {
                     rightSideFunction === 'Overview' && paperData.summary && (
-                        <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto col-span-2 m-2">
+                        <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto col-span-2 m-2 relative">
                             {/* Paper Metadata Section */}
                             <div className="prose dark:prose-invert !max-w-full text-sm">
                                 {paperData.title && (
@@ -919,15 +925,18 @@ export default function PaperView() {
                                 >
                                     {paperData.summary}
                                 </Markdown>
-                                <Button
-                                    variant="default"
-                                    className='mt-4 w-fit bg-blue-500 hover:bg-blue-400 dark:hover:bg-blue-600 cursor-pointer float-end'
-                                    onClick={() => {
-                                        setRightSideFunction('Chat');
-                                    }}
-                                >
-                                    Ask a Question
-                                </Button>
+                                <div className="sticky bottom-4 right-4 flex justify-end">
+                                    <Button
+                                        variant="default"
+                                        className="w-fit bg-blue-500 hover:bg-blue-400 dark:hover:bg-blue-600 cursor-pointer z-10"
+                                        onClick={() => {
+                                            setRightSideFunction('Chat');
+                                        }}
+                                    >
+                                        <Sparkle className="mr-1" />
+                                        Ask a Question
+                                    </Button>
+                                </div>
                             </div>
                         </div>
                     )
