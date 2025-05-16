@@ -41,16 +41,6 @@ function PaperMetadata({ paperData, onClickStarterQuestion, hasMessages, readonl
 
     const showAccordion = paperData.authors?.length > 0 || paperData.institutions?.length > 0;
 
-    useEffect(() => {
-        // Only collapse automatically if not in readonly mode and messages exist
-        if (!readonly) {
-            setIsOpen(!hasMessages);
-        } else {
-            // In readonly mode, default to open unless explicitly closed by user
-            setIsOpen(true);
-        }
-    }, [hasMessages, readonly]);
-
     // Function to render metadata content (used in both modes)
     const renderMetadataContent = () => (
         showAccordion ? (

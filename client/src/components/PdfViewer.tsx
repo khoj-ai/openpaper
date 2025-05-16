@@ -15,9 +15,10 @@ import { usePdfNavigation } from "./hooks/PdfNavigation";
 import { usePdfLoader } from "./hooks/PdfLoader";
 import InlineAnnotationMenu from "./InlineAnnotationMenu";
 import {
-    PaperHighlight,
+	PaperHighlight,
 	PaperHighlightAnnotation,
 } from '@/lib/schema';
+import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience";
 
 interface PdfViewerProps {
 	pdfUrl: string;
@@ -74,6 +75,8 @@ export function PdfViewer(props: PdfViewerProps) {
 
 	const { numPages, allPagesLoaded, onDocumentLoadSuccess, handlePageLoadSuccess } = usePdfLoader();
 	const { scale, width, pagesRef, containerRef, goToPreviousPage, goToNextPage, zoomIn, zoomOut } = usePdfNavigation(numPages);
+
+	const [isDocumentLoading, setIsDocumentLoading] = useState(true);
 
 	// Search functionality
 	const {
@@ -354,9 +357,13 @@ export function PdfViewer(props: PdfViewerProps) {
 					</Button>
 				</div>
 			</div>
+
 			<Document
 				file={pdfUrl}
-				onLoadSuccess={onDocumentLoadSuccess}
+				onLoadSuccess={(pdf) => {
+					onDocumentLoadSuccess(pdf);
+					setIsDocumentLoading(false);
+				}}
 				onLoadProgress={({ loaded, total }) => {
 					// Handle loading progress if needed
 					console.log(`Loading PDF: ${Math.round((loaded / total) * 100)}%`);
@@ -364,6 +371,7 @@ export function PdfViewer(props: PdfViewerProps) {
 				onMouseUp={handleTextSelection}
 				onLoadError={(error) => console.error("Error loading PDF:", error)}
 				onContextMenu={handleTextSelection}
+				loading={<EnigmaticLoadingExperience />}
 			>
 				{/* <Outline
 					onItemClick={(item) => {
@@ -389,6 +397,7 @@ export function PdfViewer(props: PdfViewerProps) {
 							onLoadSuccess={() => handlePageLoadSuccess(index)}
 							renderAnnotationLayer={false}
 							scale={scale}
+							loading={<EnigmaticLoadingExperience />}
 							width={width > 0 ? width : undefined}
 						/>
 					</div>
