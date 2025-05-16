@@ -13,7 +13,7 @@ import rehypeKatex from 'rehype-katex';
 import remarkMath from 'remark-math';
 import 'katex/dist/katex.min.css' // `rehype-katex` does not import the CSS for you
 
-import { Highlighter, NotebookText, MessageCircle, Focus, X, Eye, Edit, Loader, HelpCircle, ArrowUp, Feather, Share, Share2Icon, LockIcon } from 'lucide-react';
+import { Highlighter, NotebookText, MessageCircle, Focus, X, Eye, Edit, Loader, HelpCircle, ArrowUp, Feather, Share, Share2Icon, LockIcon, Lightbulb } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import {
     Sidebar,
@@ -134,8 +134,9 @@ const CustomCitationLink = ({ children, handleCitationClick, messageIndex, class
     );
 };
 
-const data = {
+const PaperToolset = {
     nav: [
+        { name: "Overview", icon: Lightbulb },
         { name: "Chat", icon: MessageCircle },
         { name: "Notes", icon: NotebookText },
         { name: "Annotations", icon: Highlighter },
@@ -198,7 +199,7 @@ export default function PaperView() {
     const [pendingStarterQuestion, setPendingStarterQuestion] = useState<string | null>(null);
     const [isSharing, setIsSharing] = useState(false);
 
-    const [rightSideFunction, setRightSideFunction] = useState<string>('Chat');
+    const [rightSideFunction, setRightSideFunction] = useState<string>('Overview');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     // Reference to track the save timeout
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -237,6 +238,7 @@ export default function PaperView() {
     };
 
     useEffect(() => {
+        if (userMessageReferences.length == 0) return;
         setRightSideFunction('Chat');
     }, [userMessageReferences]);
 
@@ -904,6 +906,33 @@ export default function PaperView() {
                     )
                 }
                 {
+                    rightSideFunction === 'Overview' && paperData.summary && (
+                        <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto col-span-2 m-2">
+                            {/* Paper Metadata Section */}
+                            <div className="prose dark:prose-invert !max-w-full text-sm">
+                                {paperData.title && (
+                                    <h1 className="text-2xl font-bold">{paperData.title}</h1>
+                                )}
+                                <Markdown
+                                    remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
+                                    rehypePlugins={[rehypeKatex]}
+                                >
+                                    {paperData.summary}
+                                </Markdown>
+                                <Button
+                                    variant="default"
+                                    className='mt-4 w-fit bg-blue-500 hover:bg-blue-400 dark:hover:bg-blue-600 cursor-pointer float-end'
+                                    onClick={() => {
+                                        setRightSideFunction('Chat');
+                                    }}
+                                >
+                                    Ask a Question
+                                </Button>
+                            </div>
+                        </div>
+                    )
+                }
+                {
                     rightSideFunction === 'Chat' && (
                         <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto col-span-2">
                             {/* Paper Metadata Section */}
@@ -947,6 +976,29 @@ export default function PaperView() {
                                 {messages.length === 0 ? (
                                     <div className="text-center text-gray-500 my-4">
                                         What do you want to understand about this paper?
+                                        <div className='grid grid-cols-2 gap-2 mt-2'>
+                                            {paperData.starter_questions && paperData.starter_questions.length > 0 ? (
+                                                paperData.starter_questions.slice(0, 5).map((question, i) => (
+                                                    <Button
+                                                        key={i}
+                                                        variant="outline"
+                                                        className="text-sm font-medium p-2 max-w-full whitespace-normal h-auto text-left justify-start break-words bg-secondary text-secondary-foreground hover:bg-secondary/50"
+                                                        onClick={() => {
+                                                            setCurrentMessage(question);
+                                                            inputMessageRef.current?.focus();
+                                                            chatInputFormRef.current?.scrollIntoView({
+                                                                behavior: 'smooth',
+                                                                block: 'nearest',
+                                                                inline: 'nearest',
+                                                            });
+                                                            setPendingStarterQuestion(question);
+                                                        }}
+                                                    >
+                                                        {question}
+                                                    </Button>
+                                                ))
+                                            ) : null}
+                                        </div>
                                     </div>
                                 ) : (
                                     messages.map((msg, index) => (
@@ -1124,7 +1176,7 @@ export default function PaperView() {
                                 <SidebarGroupLabel>Tools</SidebarGroupLabel>
                                 <SidebarGroupContent>
                                     <SidebarMenu>
-                                        {data.nav.map((item) => (
+                                        {PaperToolset.nav.map((item) => (
                                             <SidebarMenuItem key={item.name}>
                                                 <TooltipProvider>
                                                     <Tooltip>

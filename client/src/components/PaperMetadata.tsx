@@ -37,8 +37,7 @@ const googleScholarUrl = (searchTerm: string) => {
 
 // Set default for readonly to false
 function PaperMetadata({ paperData, onClickStarterQuestion, hasMessages, readonly = false }: IPaperMetadata) {
-    const [isOpen, setIsOpen] = useState(!hasMessages);
-    const [showFullSummary, setShowFullSummary] = useState(false);
+    const [isOpen, setIsOpen] = useState(false);
 
     const showAccordion = paperData.authors?.length > 0 || paperData.institutions?.length > 0;
 
@@ -128,19 +127,6 @@ function PaperMetadata({ paperData, onClickStarterQuestion, hasMessages, readonl
                             </div>
                         )
                     }
-                    {
-                        paperData.summary && (
-                            <div
-                                className={`text-xs font-normal max-w-full whitespace-normal h-auto text-left justify-start break-words hover:bg-secondary/50 ${showFullSummary ? 'cursor-default' : 'cursor-pointer line-clamp-3'}`}
-                                onClick={() => {
-                                    setShowFullSummary(!showFullSummary);
-                                }}
-                            >
-                                {paperData.summary}
-                            </div>
-                        )
-                    }
-
                     {/* Conditional rendering for Tabs vs direct Metadata */}
                     {readonly ? (
                         // Readonly mode: Only show metadata section
@@ -149,10 +135,11 @@ function PaperMetadata({ paperData, onClickStarterQuestion, hasMessages, readonl
                         </div>
                     ) : (
                         // Normal mode: Show Tabs
-                        <Tabs defaultValue="questions" className="w-full">
+                        <Tabs defaultValue={hasMessages ? 'questions' : 'abstract'} className="w-full">
                             <TabsList>
-                                <TabsTrigger value="questions">Suggested Questions</TabsTrigger>
+                                <TabsTrigger value="abstract">Abstract</TabsTrigger>
                                 <TabsTrigger value="metadata">Metadata</TabsTrigger>
+                                <TabsTrigger value="questions">Suggested Questions</TabsTrigger>
                             </TabsList>
                             <TabsContent value="questions">
                                 {paperData.starter_questions && paperData.starter_questions.length > 0 ? (
@@ -176,6 +163,13 @@ function PaperMetadata({ paperData, onClickStarterQuestion, hasMessages, readonl
                             </TabsContent>
                             <TabsContent value="metadata">
                                 {renderMetadataContent()}
+                            </TabsContent>
+                            <TabsContent value="abstract">
+                                {paperData.abstract ? (
+                                    <div className="prose dark:prose-invert !max-w-full text-sm">
+                                        {paperData.abstract}
+                                    </div>
+                                ) : <p className="text-sm text-muted-foreground">No abstract available.</p>}
                             </TabsContent>
                         </Tabs>
                     )}
