@@ -541,11 +541,11 @@ def create_and_upload_pdf(
                     logger.error(
                         f"Could not parse date: {extract_metadata.publish_date}"
                     )
-                    raise ValueError(
-                        f"Could not parse date: {extract_metadata.publish_date}"
-                    )
+                    extract_metadata.publish_date = None
+
             # Format back to string in YYYY-MM-DD format
-            extract_metadata.publish_date = parsed_date.strftime("%Y-%m-%d")
+            if parsed_date:
+                extract_metadata.publish_date = parsed_date.strftime("%Y-%m-%d")
 
         update_doc = PaperUpdate(
             authors=extract_metadata.authors,
