@@ -76,8 +76,6 @@ export function PdfViewer(props: PdfViewerProps) {
 	const { numPages, allPagesLoaded, onDocumentLoadSuccess, handlePageLoadSuccess } = usePdfLoader();
 	const { scale, width, pagesRef, containerRef, goToPreviousPage, goToNextPage, zoomIn, zoomOut } = usePdfNavigation(numPages);
 
-	const [isDocumentLoading, setIsDocumentLoading] = useState(true);
-
 	// Search functionality
 	const {
 		searchText,
@@ -362,7 +360,6 @@ export function PdfViewer(props: PdfViewerProps) {
 				file={pdfUrl}
 				onLoadSuccess={(pdf) => {
 					onDocumentLoadSuccess(pdf);
-					setIsDocumentLoading(false);
 				}}
 				onLoadProgress={({ loaded, total }) => {
 					// Handle loading progress if needed
