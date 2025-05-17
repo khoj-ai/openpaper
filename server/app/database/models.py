@@ -162,7 +162,6 @@ class Message(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
     user = relationship("User", back_populates="messages")
-
     conversation = relationship("Conversation", back_populates="messages")
 
 
@@ -182,7 +181,10 @@ class Conversation(Base):
 
     paper = relationship("Paper", back_populates="conversations")
     messages = relationship(
-        "Message", back_populates="conversation", order_by=Message.sequence
+        "Message",
+        back_populates="conversation",
+        order_by=Message.sequence,
+        cascade="all, delete-orphan",
     )
 
 
