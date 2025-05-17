@@ -71,7 +71,6 @@ class Operations:
             pass
 
         # Case 2: Check for code block format (```json ... ```)
-        json_match = None
         if "```" in json_data:
             # Find content between triple backticks
             import re
@@ -212,7 +211,8 @@ class Operations:
 
         # Check if the response is valid JSON
         try:
-            response_json = self.validate_and_extract_json(response.text)
+            if response and response.text:
+                response_json = self.validate_and_extract_json(response.text)
         except ValueError as e:
             raise ValueError(f"Invalid JSON response from LLM: {str(e)}")
 
