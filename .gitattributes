@@ -1,1 +1,2 @@
 client/public/pdf.worker.mjs linguist-vendored
+*.png filter=lfs diff=lfs merge=lfs -text
