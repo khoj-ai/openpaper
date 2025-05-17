@@ -63,7 +63,7 @@ export default async function Page({
 }
 
 export function generateStaticParams() {
-    return [{ slug: 'manifesto' }]
+    return [{ slug: 'manifesto' }, { slug: 'introducing'}]
 }
 
 export const dynamicParams = false
