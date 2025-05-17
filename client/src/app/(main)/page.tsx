@@ -204,6 +204,20 @@ export default function Home() {
 
 					</div>
 
+					{/* Video Demo Section */}
+					<div className="w-full max-w-3xl mx-auto">
+						<div className="aspect-video relative rounded-lg overflow-hidden shadow-lg">
+							<iframe
+								className="absolute top-0 left-0 w-full h-full"
+								src="https://www.youtube.com/embed/fwXzXgmhy08?si=BFasAO--Qr4MRSVG"
+								title="Open Paper Demo"
+								allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+								referrerPolicy="strict-origin-when-cross-origin"
+								allowFullScreen
+							></iframe>
+						</div>
+					</div>
+
 					{/* Features Grid */}
 					<div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
 						<div className="space-y-4">
