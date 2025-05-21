@@ -34,5 +34,10 @@ The summary should be accessible to readers with basic domain knowledge while ma
         default=None, description="Publishing date of the paper in YYYY-MM-DD format"
     )
     starter_questions: List[str] = Field(
-        default=[], description="List of starter questions for discussion."
+        default=[],
+        description="""
+        List of starter questions for discussion.
+        These should be open-ended questions that can guide further exploration of the paper's content and implications.
+        They should help elicit a better understanding of the paper's findings, methodology, and potential applications.
+        """,
     )
