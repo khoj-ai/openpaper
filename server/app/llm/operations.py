@@ -227,7 +227,6 @@ class Operations:
         question: str,
         current_user: CurrentUser,
         user_references: Optional[Sequence[str]] = None,
-        file_path: Optional[str] = None,
         response_style: Optional[str] = "normal",
         db: Session = Depends(get_db),
     ) -> AsyncGenerator[Union[str, dict], None]:
