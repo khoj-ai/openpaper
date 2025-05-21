@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
 
 from app.database.database import Base
@@ -9,6 +10,8 @@ from sqlalchemy.orm import Session
 ModelType = TypeVar("ModelType", bound="Base")  # type: ignore
 CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
 UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
+
+logger = logging.getLogger(__name__)
 
 
 # Generic CRUD base class with type safety
@@ -29,9 +32,16 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         self, db: Session, id: Any, *, user: Optional[CurrentUser] = None
     ) -> Optional[ModelType]:
         """Get a single record by ID, optionally filtered by user"""
-        query = db.query(self.model).filter(self.model.id == id)
-        query = self._filter_by_user(query, user)
-        return query.first()
+        try:
+            query = db.query(self.model).filter(self.model.id == id)
+            query = self._filter_by_user(query, user)
+            return query.first()
+        except Exception as e:
+            logger.error(
+                f"Error retrieving {self.model.__name__} with ID {id}: {str(e)}",
+                exc_info=True,
+            )
+            return None
 
     def get_multi(
         self,
@@ -42,9 +52,16 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         user: Optional[CurrentUser] = None,
     ) -> List[ModelType]:
         """Get multiple records with pagination, optionally filtered by user"""
-        query = db.query(self.model)
-        query = self._filter_by_user(query, user)
-        return query.offset(skip).limit(limit).all()
+        try:
+            query = db.query(self.model)
+            query = self._filter_by_user(query, user)
+            return query.offset(skip).limit(limit).all()
+        except Exception as e:
+            logger.error(
+                f"Error retrieving multiple {self.model.__name__} objects: {str(e)}",
+                exc_info=True,
+            )
+            return []
 
     def create(
         self,
@@ -52,16 +69,23 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         *,
         obj_in: CreateSchemaType,
         user: Optional[CurrentUser] = None,
-    ) -> ModelType:
+    ) -> Optional[ModelType]:
         """Create a new record, optionally associating with a user"""
-        obj_in_data = obj_in.model_dump()
-        if user and hasattr(self.model, "user_id"):
-            obj_in_data["user_id"] = user.id
-        db_obj = self.model(**obj_in_data)
-        db.add(db_obj)
-        db.commit()
-        db.refresh(db_obj)
-        return db_obj
+        try:
+            obj_in_data = obj_in.model_dump()
+            if user and hasattr(self.model, "user_id"):
+                obj_in_data["user_id"] = user.id
+            db_obj = self.model(**obj_in_data)
+            db.add(db_obj)
+            db.commit()
+            db.refresh(db_obj)
+            return db_obj
+        except Exception as e:
+            db.rollback()
+            logger.error(
+                f"Error creating {self.model.__name__}: {str(e)}", exc_info=True
+            )
+            return None
 
     def update(
         self,
@@ -70,37 +94,56 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         db_obj: ModelType,
         obj_in: Union[UpdateSchemaType, Dict[str, Any]],
         user: Optional[CurrentUser] = None,
-    ) -> ModelType:
+    ) -> Optional[ModelType]:
         """Update a record, verifying user ownership if specified"""
         if user and hasattr(db_obj, "user_id") and db_obj.user_id != user.id:
-            return None  # Or raise an exception if you prefer
+            logger.warning(
+                f"User {user.id} attempted to update {self.model.__name__} owned by another user"
+            )
+            return None
 
-        # ...existing update logic...
-        if isinstance(obj_in, dict):
-            update_data = obj_in
-        else:
-            update_data = obj_in.model_dump(exclude_unset=True)
+        try:
+            if isinstance(obj_in, dict):
+                update_data = obj_in
+            else:
+                update_data = obj_in.model_dump(exclude_unset=True)
 
-        for field in update_data:
-            if hasattr(db_obj, field):
-                setattr(db_obj, field, update_data[field])
+            for field in update_data:
+                if hasattr(db_obj, field):
+                    setattr(db_obj, field, update_data[field])
 
-        db.add(db_obj)
-        db.commit()
-        db.refresh(db_obj)
-        return db_obj
+            db.add(db_obj)
+            db.commit()
+            db.refresh(db_obj)
+            return db_obj
+        except Exception as e:
+            db.rollback()
+            logger.error(
+                f"Error updating {self.model.__name__} with ID {db_obj.id}: {str(e)}",
+                exc_info=True,
+            )
+            return None
 
     def remove(
         self, db: Session, *, id: Any, user: Optional[CurrentUser] = None
     ) -> Optional[ModelType]:
         """Delete a record, optionally verifying user ownership"""
-        query = db.query(self.model).filter(self.model.id == id)
-        query = self._filter_by_user(query, user)
-        obj = query.first()
-        if obj:
-            db.delete(obj)
-            db.commit()
-        return obj
+        try:
+            query = db.query(self.model).filter(self.model.id == id)
+            query = self._filter_by_user(query, user)
+            obj = query.first()
+            if obj:
+                db.delete(obj)
+                db.commit()
+                return obj
+            return None
+        except Exception as e:
+            db.rollback()
+            logger.error(
+                f"Error removing {self.model.__name__} with ID {id}: {str(e)}",
+                exc_info=True,
+            )
+            return None
 
     def has_any(
         self,
@@ -109,6 +152,13 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         user: CurrentUser,
     ) -> bool:
         """Check if any records exist, optionally filtered by user"""
-        query = db.query(self.model)
-        query = self._filter_by_user(query, user)
-        return query.count() > 0
+        try:
+            query = db.query(self.model)
+            query = self._filter_by_user(query, user)
+            return query.count() > 0
+        except Exception as e:
+            logger.error(
+                f"Error checking if any {self.model.__name__} objects exist: {str(e)}",
+                exc_info=True,
+            )
+            return False
