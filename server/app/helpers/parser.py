@@ -4,6 +4,17 @@ from markitdown import MarkItDown
 md = MarkItDown()
 
 
+def sanitize_string(text: str) -> str:
+    """
+    Remove NULL bytes and other problematic characters from strings before saving to database
+    """
+    if text is None:
+        return None
+
+    # Remove NULL bytes
+    return text.replace("\x00", "")
+
+
 def extract_text_from_pdf(file_path: str) -> str:
     """
     Extract text content from a PDF file.
@@ -22,6 +33,7 @@ def extract_text_from_pdf(file_path: str) -> str:
 
     try:
         md_text = md.convert(file_path).text_content
+        md_text = sanitize_string(md_text)
         if not is_valid_text(md_text):
             # Fallback to pymupdf4llm if MarkItDown fails
             md_text = pymupdf4llm.to_markdown(file_path)
