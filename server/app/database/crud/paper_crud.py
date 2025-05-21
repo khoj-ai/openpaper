@@ -45,50 +45,6 @@ class PaperUpdate(PaperBase):
 class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
     """CRUD operations specifically for Document model"""
 
-    async def create_from_url(
-        self, db: Session, *, url: HttpUrl, current_user: CurrentUser
-    ) -> Paper:
-        """
-        Create a new paper from a URL
-
-        Args:
-            db: Database session
-            url: URL of the PDF file
-            current_user: Current user making the request
-
-        Returns:
-            Paper: Created paper
-
-        Raises:
-            HTTPException: If upload fails
-        """
-        try:
-            # Upload file to S3
-            object_key, file_url = await s3_service.read_and_upload_file_from_url(
-                str(url)
-            )
-
-            # Create paper
-            doc_in = PaperCreate(
-                filename=os.path.basename(file_url),
-                file_url=file_url,
-                s3_object_key=object_key,
-            )
-
-            paper = self.create(db=db, obj_in=doc_in, user=current_user)
-
-            # Extract and update content
-            raw_content = self.read_raw_document_content(
-                db, paper_id=paper.id, current_user=current_user
-            )
-
-            return paper
-
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        except Exception as e:
-            raise HTTPException(status_code=500, detail="Failed to process document")
-
     def read_raw_document_content(
         self,
         db: Session,
