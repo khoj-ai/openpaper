@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 import tempfile
 import uuid
 from datetime import datetime
@@ -481,6 +482,18 @@ async def upload_pdf(
     )
 
 
+class PaperUploadError(Exception):
+    """Custom exception for paper upload errors with context"""
+
+    def __init__(
+        self, message: str, status_code: int = 500, cleanup_needed: bool = True
+    ):
+        self.message = message
+        self.status_code = status_code
+        self.cleanup_needed = cleanup_needed
+        super().__init__(self.message)
+
+
 def create_and_upload_pdf(
     safe_filename: str,
     temp_file_path: str,
@@ -492,6 +505,7 @@ def create_and_upload_pdf(
     """
     Create a new document record in the database and upload the PDF to S3.
     """
+    created_doc = None
 
     try:
         # Create a new document record in the database with S3 details
@@ -499,54 +513,59 @@ def create_and_upload_pdf(
             filename=safe_filename, file_url=file_url, s3_object_key=object_key
         )
 
-        created_doc: Paper = paper_crud.create(db, obj_in=document, user=current_user)
+        created_doc = paper_crud.create(db, obj_in=document, user=current_user)
+        if not created_doc:
+            logger.error(
+                f"Failed to create document record for {safe_filename}", exc_info=True
+            )
+            raise PaperUploadError(
+                f"Failed to create document record for {safe_filename}"
+            )
 
         # Extract metadata from the temporary file
-        extract_metadata = llm_operations.extract_paper_metadata(
-            paper_id=str(created_doc.id),
-            user=current_user,
-            file_path=temp_file_path,
-            db=db,
-        )
+        try:
+            extract_metadata = llm_operations.extract_paper_metadata(
+                paper_id=str(created_doc.id),
+                user=current_user,
+                file_path=temp_file_path,
+                db=db,
+            )
+        except Exception as e:
+            logger.error(
+                f"Error extracting metadata: {str(e)}",
+                exc_info=True,
+            )
+            raise PaperUploadError(f"Error extracting metadata: {str(e)}")
 
-        # Try parse date into a valid datetime object. If four digits, then assume year
+        # Process the publication date
         if extract_metadata.publish_date:
-            # Try full date format first (YYYY-MM-DD)
-            try:
-                parsed_date = datetime.strptime(
-                    extract_metadata.publish_date, "%Y-%m-%d"
-                )
-            except ValueError:
-                # If that fails, try just the year
-                if (
-                    extract_metadata.publish_date.isdigit()
-                    and len(extract_metadata.publish_date) == 4
-                ):
-                    # Convert year to a full date (assume January 1st)
-                    parsed_date = datetime.strptime(
-                        f"{extract_metadata.publish_date}-01-01", "%Y-%m-%d"
-                    )
-                else:
-                    # If that fails, assume yyyy-mm
-                    try:
-                        parsed_date = datetime.strptime(
-                            extract_metadata.publish_date, "%Y-%m"
-                        )
-                    except ValueError:
-                        # If that fails, we can't parse the date
-                        parsed_date = None
-            finally:
-                if parsed_date is None:
-                    # If we still can't parse, raise an error
-                    logger.error(
-                        f"Could not parse date: {extract_metadata.publish_date}"
-                    )
-                    extract_metadata.publish_date = None
+            parsed_date = None
+            # Try different date formats
+            for date_format in [
+                ("%Y-%m-%d", lambda x: x),  # Full date
+                (
+                    "%Y",
+                    lambda x: f"{x}-01-01" if x.isdigit() and len(x) == 4 else None,
+                ),  # Year only
+                ("%Y-%m", lambda x: x),  # Year and month
+            ]:
+                format_str, transformer = date_format
+                try:
+                    date_str = transformer(extract_metadata.publish_date)
+                    if date_str:
+                        parsed_date = datetime.strptime(date_str, format_str)
+                        break
+                except ValueError:
+                    continue
 
-            # Format back to string in YYYY-MM-DD format
+            # Set the parsed date or None if parsing failed
             if parsed_date:
                 extract_metadata.publish_date = parsed_date.strftime("%Y-%m-%d")
+            else:
+                logger.warning(f"Could not parse date: {extract_metadata.publish_date}")
+                extract_metadata.publish_date = None
 
+        # Update the document with extracted metadata
         update_doc = PaperUpdate(
             authors=extract_metadata.authors,
             title=extract_metadata.title,
@@ -558,13 +577,19 @@ def create_and_upload_pdf(
             starter_questions=extract_metadata.starter_questions,
         )
 
-        paper_crud.update(db, db_obj=created_doc, obj_in=update_doc, user=current_user)
+        updated_doc = paper_crud.update(
+            db, db_obj=created_doc, obj_in=update_doc, user=current_user
+        )
+        if not updated_doc:
+            logger.error(
+                f"Failed to update document with metadata for {safe_filename}",
+                exc_info=True,
+            )
+            raise PaperUploadError(
+                f"Failed to update document with metadata for {safe_filename}"
+            )
 
-        try:
-            # Clean up the temporary file now that we're done with it
-            os.unlink(temp_file_path)
-        except Exception as cleanup_error:
-            logger.warning(f"Failed to clean up temporary file: {cleanup_error}")
+        # Success case
         return JSONResponse(
             status_code=200,
             content={
@@ -575,38 +600,51 @@ def create_and_upload_pdf(
             },
         )
 
-    except Exception as e:
-        logger.error(
-            f"Error creating document record: {str(e)}",
-            exc_info=True,
-        )
-
-        # Clean up temporary file in case of error
-        try:
-            os.unlink(temp_file_path)
-        except Exception:
-            pass
-
-        if created_doc:
-            # Attempt to delete the document record if it was created
-            try:
-                paper_crud.remove(db, id=str(created_doc.id), user=current_user)
-            except Exception as delete_error:
-                logger.error(
-                    f"Failed to delete document record after error: {delete_error}"
-                )
-                return JSONResponse(
-                    status_code=500,
-                    content={
-                        "message": f"Error deleting document record: {str(delete_error)}",
-                        "filename": safe_filename,
-                    },
-                )
-
+    except PaperUploadError as upload_error:
+        # Handle our custom exception with context
+        logger.error(f"Paper upload error: {upload_error.message}")
         return JSONResponse(
-            status_code=500,
+            status_code=upload_error.status_code,
             content={
-                "message": f"Error creating document record: {str(e)}",
+                "message": upload_error.message,
                 "filename": safe_filename,
             },
         )
+
+    except Exception as e:
+        # Handle unexpected exceptions
+        logger.error(f"Unexpected error processing PDF upload: {str(e)}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "message": f"Error processing document: {str(e)}",
+                "filename": safe_filename,
+            },
+        )
+
+    finally:
+        # Always clean up the temporary file
+        try:
+            if os.path.exists(temp_file_path):
+                os.unlink(temp_file_path)
+        except Exception as cleanup_error:
+            logger.warning(f"Failed to clean up temporary file: {str(cleanup_error)}")
+
+        # If we have an error and created a document, clean up
+        if sys.exc_info()[0] is not None and created_doc:
+            # An exception occurred - clean up any resources
+            try:
+                # Delete the document from the database
+                paper_crud.remove(db, id=str(created_doc.id), user=current_user)
+            except Exception as db_error:
+                logger.error(
+                    f"Failed to delete document record: {str(db_error)}", exc_info=True
+                )
+
+            try:
+                # Delete the file from S3
+                s3_service.delete_file(object_key)
+            except Exception as s3_error:
+                logger.error(
+                    f"Failed to delete S3 object: {str(s3_error)}", exc_info=True
+                )
