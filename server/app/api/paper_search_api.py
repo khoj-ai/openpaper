@@ -19,7 +19,7 @@ async def search_papers(
     page: int = 1,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_required_user),
-) -> dict:
+):
     """
     Search for papers based on the provided query.
     """
