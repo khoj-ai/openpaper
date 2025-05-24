@@ -88,7 +88,7 @@ async def get_paper_ids(
 async def get_paper_note(
     paper_id: str,
     db: Session = Depends(get_db),
-    current_user: Optional[CurrentUser] = Depends(get_required_user),
+    current_user: CurrentUser = Depends(get_required_user),
 ):
     """
     Get the paper note associated with this document.
@@ -134,6 +134,12 @@ async def create_paper_note(
         db, obj_in=paper_note_to_create, user=current_user
     )
 
+    if not paper_note:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create paper note for document ID {paper_id}",
+        )
+
     return JSONResponse(content=paper_note.to_dict(), status_code=201)
 
 
@@ -142,7 +148,7 @@ async def update_paper_note(
     paper_id: str,
     request: UpdatePaperNoteSchema,
     db: Session = Depends(get_db),
-    current_user: Optional[CurrentUser] = Depends(get_required_user),
+    current_user: CurrentUser = Depends(get_required_user),
 ):
     """
     Update the paper note associated with this document
@@ -169,6 +175,12 @@ async def update_paper_note(
         db=db, db_obj=paper_note, obj_in=paper_note_to_update, user=current_user
     )
 
+    if not updated_paper_note:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update paper note for document ID {paper_id}",
+        )
+
     return JSONResponse(content=updated_paper_note.to_dict(), status_code=200)
 
 
@@ -176,7 +188,7 @@ async def update_paper_note(
 async def get_mru_paper_conversation(
     paper_id: str,
     db: Session = Depends(get_db),
-    current_user: Optional[CurrentUser] = Depends(get_required_user),
+    current_user: CurrentUser = Depends(get_required_user),
 ):
     """
     Get latest conversation associated with specific document
@@ -230,7 +242,7 @@ async def get_pdf(
 
     paper_data = paper.to_dict()
 
-    signed_url = s3_service.generate_presigned_url(object_key=paper.s3_object_key)
+    signed_url = s3_service.generate_presigned_url(object_key=str(paper.s3_object_key))
     if not signed_url:
         return JSONResponse(status_code=404, content={"message": "File not found"})
 
@@ -245,7 +257,7 @@ async def share_pdf(
     request: Request,
     id: str,
     db: Session = Depends(get_db),
-    current_user: Optional[CurrentUser] = Depends(get_required_user),
+    current_user: CurrentUser = Depends(get_required_user),
 ):
     """
     Share a document by ID
@@ -271,7 +283,7 @@ async def unshare_pdf(
     request: Request,
     id: str,
     db: Session = Depends(get_db),
-    current_user: Optional[CurrentUser] = Depends(get_required_user),
+    current_user: CurrentUser = Depends(get_required_user),
 ):
     """
     Unshare a document by ID
@@ -312,12 +324,12 @@ async def get_shared_pdf(
 
     paper_data = paper.to_dict()
 
-    signed_url = s3_service.generate_presigned_url(object_key=paper.s3_object_key)
+    signed_url = s3_service.generate_presigned_url(object_key=str(paper.s3_object_key))
     if not signed_url:
         return JSONResponse(status_code=404, content={"message": "File not found"})
 
     annotations = annotation_crud.get_public_annotations_data_by_paper_id(
-        db, share_id=id
+        db, share_id=uuid.UUID(id)
     )
 
     highlights = highlight_crud.get_public_highlights_data_by_paper_id(db, share_id=id)
@@ -352,7 +364,7 @@ async def delete_pdf(
     try:
         # Delete the file from S3 if s3_object_key exists
         if paper.s3_object_key:
-            s3_service.delete_file(paper.s3_object_key)
+            s3_service.delete_file(str(paper.s3_object_key))
             logger.info(f"Deleted S3 object: {paper.s3_object_key}")
 
         paper_crud.remove(db, id=id, user=current_user)
@@ -372,7 +384,7 @@ class UploadFromUrlSchema(BaseModel):
 @paper_router.post("/upload/from-url/")
 async def upload_pdf_from_url(
     request: UploadFromUrlSchema,
-    current_user: Optional[CurrentUser] = Depends(get_required_user),
+    current_user: CurrentUser = Depends(get_required_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -412,7 +424,7 @@ async def upload_pdf_from_url(
             )
 
         # Ensure we have a valid filename for the record
-        safe_filename = Path(url.path).name.replace(" ", "_")
+        safe_filename = Path(str(url.path)).name.replace(" ", "_")
 
         return create_and_upload_pdf(
             safe_filename=safe_filename,
@@ -428,7 +440,7 @@ async def upload_pdf_from_url(
 async def upload_pdf(
     request: Request,
     file: UploadFile = File(...),
-    current_user: Optional[CurrentUser] = Depends(get_required_user),
+    current_user: CurrentUser = Depends(get_required_user),
     db: Session = Depends(get_db),
 ):
     """
