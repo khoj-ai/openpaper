@@ -156,18 +156,16 @@ class Operations:
             api_format.append(
                 Content(
                     role="user" if message.role == "user" else "model",
-                    parts=[{"text": f_message}],
+                    parts=[{"text": f_message}],  # type: ignore
                 )
             )
         return api_format
 
-    async def explain_text(
-        self, contents: str, model: Optional[str] = "gemini-2.0-flash"
-    ):
+    async def explain_text(self, contents: str, model: str = "gemini-2.0-flash"):
         """
         Explain the provided text using the specified model
         """
-        async for chunk in self.client.models.generate_content_stream(
+        async for chunk in self.client.models.generate_content_stream(  # type: ignore
             model=model, contents=contents
         ):
             # Process the chunk of generated content
@@ -328,7 +326,14 @@ class Operations:
         START_DELIMITER = "---EVIDENCE---"
         END_DELIMITER = "---END-EVIDENCE---"
 
-        signed_url = s3_service.generate_presigned_url(object_key=paper.s3_object_key)
+        signed_url = s3_service.generate_presigned_url(
+            object_key=str(paper.s3_object_key)
+        )
+
+        if not signed_url:
+            raise ValueError(
+                f"Could not generate presigned URL for paper with ID {paper_id}."
+            )
 
         # Retrieve and encode the PDF byte
         pdf_bytes = httpx.get(signed_url).content
