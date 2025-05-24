@@ -21,7 +21,7 @@ def retry_llm_operation(max_retries: int = 3, delay: float = 1.0):
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            last_exception = None
+            last_exception: BaseException | None = None
 
             for attempt in range(max_retries + 1):
                 try:
@@ -43,12 +43,16 @@ def retry_llm_operation(max_retries: int = 3, delay: float = 1.0):
                         )
 
             # If we reach here, all retries failed
-            raise last_exception
+            if last_exception is not None:
+                logger.error(
+                    f"Final failure after {max_retries} retries for {func.__name__}: {str(last_exception)}"
+                )
+                raise last_exception
 
         # Create async version for async functions
         @functools.wraps(func)
         async def async_wrapper(*args, **kwargs):
-            last_exception = None
+            last_exception: BaseException | None = None
 
             for attempt in range(max_retries + 1):
                 try:
@@ -70,7 +74,11 @@ def retry_llm_operation(max_retries: int = 3, delay: float = 1.0):
                         )
 
             # If we reach here, all retries failed
-            raise last_exception
+            if last_exception is not None:
+                logger.error(
+                    f"Final failure after {max_retries} retries for {func.__name__}: {str(last_exception)}"
+                )
+                raise last_exception
 
         # Return appropriate wrapper based on if the function is async or not
         if asyncio.iscoroutinefunction(func):
