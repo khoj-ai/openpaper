@@ -7,6 +7,7 @@ from typing import List, Optional, Union
 from app.auth.dependencies import get_required_user
 from app.database.crud.message_crud import MessageCreate, message_crud
 from app.database.database import get_db
+from app.llm.citation_handler import CitationHandler
 from app.llm.operations import Operations
 from app.schemas.message import ResponseStyle
 from app.schemas.user import CurrentUser
@@ -87,8 +88,12 @@ async def chat_message_stream(
                 # Save the complete message to the database
                 full_content = "".join(content_chunks)
 
-                formatted_references = llm_operations.convert_references_to_dict(
-                    references=request.user_references
+                formatted_references = (
+                    CitationHandler.convert_references_to_dict(
+                        references=request.user_references
+                    )
+                    if request.user_references
+                    else None
                 )
 
                 # Save user message
