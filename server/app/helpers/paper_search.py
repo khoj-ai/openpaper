@@ -166,12 +166,16 @@ def build_abstract_from_inverted_index(inverted_index: dict) -> str:
     Build an abstract from the inverted index of a paper.
 
     Args:
-        inverted_index (dict): The inverted index of the paper.
+        inverted_index (dict): The inverted index of the paper. Keys are terms, and values are the list of word indexes at which they appear.
 
     Returns:
         str: The constructed abstract.
     """
-    abstract = []
+    min_index = min(min(value) for value in inverted_index.values() if value)
+    max_index = max(max(value) for value in inverted_index.values() if value)
+    abstract = [""] * (max_index - min_index + 1)
     for key, value in inverted_index.items():
-        abstract.append(f"{key}: {value}")
-    return "\n".join(abstract)
+        for index in value:
+            if min_index <= index <= max_index:
+                abstract[index - min_index] = key
+    return " ".join(abstract).strip() if abstract else ""

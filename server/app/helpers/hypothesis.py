@@ -11,7 +11,6 @@ from app.llm.operations import Operations
 from app.llm.schemas import (
     HypothesisFanOut,
     HypothesisResearchResults,
-    HypothesisStep,
     HypothesisStepResearchResult,
     MinimalPaperData,
     PapersForReference,
@@ -59,11 +58,10 @@ def process_question(
                 continue
 
             # Package the results into a minimal paper data structure
-            minimal_papers.extend(
-                [
-                    MinimalPaperData(
+            for paper in results.results:
+                if paper.id not in seen_paper_ids:
+                    minimal_paper = MinimalPaperData(
                         id=paper.id,
-                        idx=len(minimal_papers) + paper_reference_idx,
                         title=paper.title,
                         abstract=(
                             build_abstract_from_inverted_index(
@@ -81,13 +79,9 @@ def process_question(
                         doi=paper.doi,
                         cited_by_count=paper.cited_by_count,
                     )
-                    for paper in results.results
-                    if paper.id not in seen_paper_ids
-                ]
-            )
 
-            # Add the paper IDs to avoid duplicates
-            seen_paper_ids.update(paper.id for paper in results.results)
+                    minimal_papers.append(minimal_paper)
+                    seen_paper_ids.add(paper.id)
 
             if not minimal_papers:
                 logger.warning(f"No valid papers found for search term: {search_term}")
@@ -154,6 +148,14 @@ def process_question(
             paper for paper in papers_to_scrape if paper.contextual_summary
         ]
 
+        for p in filtered_papers:
+            p.idx = paper_reference_idx
+            paper_reference_idx += 1
+
+        logger.info(
+            f"Filtered papers with summaries: {len(filtered_papers)} for step: {step.question}"
+        )
+
         if len(filtered_papers) == 0:
             logger.warning(f"No papers with summaries found for step: {step.question}")
             continue
@@ -166,7 +168,7 @@ def process_question(
                 contextual_summary=paper.contextual_summary,
             )
             for paper in filtered_papers
-            if paper.contextual_summary
+            if paper.contextual_summary and paper.idx
         ]
 
         findings = llm_operations.collate_findings(

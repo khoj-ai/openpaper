@@ -117,7 +117,7 @@ Response Schema: {schema}
 """
 
 PICK_PAPERS_TO_READ = """
-Assist the research assistant in selecting up to 1 papers to read based on the following hypothesis, question, and motivation, and candidate papers. Provide a list of the paper ids that are most relevant to the hypothesis and steps.
+Assist the research assistant in selecting up to 7 papers to read based on the following hypothesis, question, and motivation, and candidate papers. Provide a list of the paper ids that are most relevant to the hypothesis and steps.
 
 Hypothesis: {hypothesis}
 Question: {question}
@@ -150,7 +150,7 @@ You are thoughtful, analytical, and detail-oriented. Your task is to extract rel
 
 In your findings, ensure you:
 1. Clearly state the summary of the findings, clearly linking them to the hypothesis and sub-question.
-2. Use evidence from the paper summaries to support your findings. Include citations in the format [^1], [^2], etc., where each citation corresponds to a specific paper ID.
+2. Use evidence from the paper summaries to support your findings. Include citations in the format [^33], [^12], etc., where each citation corresponds to a specific paper idx. Always use the idx property of the paper in the citation, not the id.
 3. Maintain a clear and logical structure in your response.
 
 Return just the findings, and nothing else.

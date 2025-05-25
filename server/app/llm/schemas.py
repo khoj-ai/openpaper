@@ -60,7 +60,7 @@ class HypothesisFanOut(BaseModel):
         description="The target hypothesis to be explored, which will be broken down into sub-questions."
     )
     steps: List[HypothesisStep] = Field(
-        description="List of sub-steps derived from the hypothesis for further exploration. Limit to 3 steps per hypothesis to ensure focused exploration.",
+        description="List of sub-steps derived from the hypothesis for further exploration. Limit to a maximum of 5 steps per hypothesis to ensure focused exploration.",
     )
 
 
@@ -70,8 +70,9 @@ class MinimalPaperData(BaseModel):
     """
 
     id: str = Field(description="Unique identifier for the paper")
-    idx: int = Field(
-        description="Index of the paper in the list, used for referencing purposes. Use this index to refer to the paper in discussions or findings."
+    idx: Optional[int] = Field(
+        default=None,
+        description="Index of the paper in the list, used for referencing purposes. Use this index to refer to the paper in discussions or findings.",
     )
     title: str = Field(description="Title of the paper")
     doi: Optional[str] = Field(default=None, description="DOI of the paper")
@@ -141,7 +142,7 @@ class HypothesisResearchResponse(BaseModel):
         description="The motivation behind the hypothesis research, explaining why this hypothesis is important and worth exploring. This should be a concise statement that captures the essence of the research motivation, ideally in 1-2 sentences."
     )
     methodology: str = Field(
-        description="The methodology used to explore the hypothesis, including the steps taken and the rationale behind them in Markdown format. This should provide a clear and structured overview of how the research was conducted, including any specific approaches or techniques used to analyze the papers."
+        description="The methodology used to explore the hypothesis, including the steps taken and the rationale behind them in Markdown format. This should be full sentences that provide a clear and structured overview of how the research was conducted, including any specific approaches or techniques used to analyze the papers."
     )
     findings: str = Field(
         description="The final findings from the hypothesis research, summarizing the key insights and conclusions drawn from the research steps. This should should be in Markdown format."
