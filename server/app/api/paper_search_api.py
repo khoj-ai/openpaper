@@ -1,6 +1,7 @@
 import logging
 
 from app.auth.dependencies import get_db, get_required_user
+from app.helpers.hypothesis import process_question
 from app.helpers.paper_search import search_open_alex
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -31,4 +32,24 @@ async def search_papers(
         )
     except Exception as e:
         logger.error(f"Error searching papers: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@paper_search_router.get("/hypothesize")
+async def hypothesize(
+    question: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """
+    Generate a hypothesis based on the provided question.
+    This endpoint will break down the question into sub-questions and search for relevant papers.
+    """
+    try:
+        results = process_question(question)
+        return Response(
+            content=results.model_dump_json(), media_type="application/json"
+        )
+    except Exception as e:
+        logger.error(f"Error processing hypothesis: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

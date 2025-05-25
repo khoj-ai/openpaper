@@ -99,6 +99,7 @@ class OpenAlexWork(BaseOpenAlexModel):
     topics: Optional[List[Topic]]
     authorships: Optional[List[Authorship]]
     cited_by_count: Optional[int]
+    abstract_inverted_index: Optional[dict]
 
 
 class OpenAlexResponse(BaseModel):
@@ -158,3 +159,19 @@ def search_open_alex(
     logger.debug(f"Response JSON: {response.json()}")
 
     return OpenAlexResponse(**response.json())
+
+
+def build_abstract_from_inverted_index(inverted_index: dict) -> str:
+    """
+    Build an abstract from the inverted index of a paper.
+
+    Args:
+        inverted_index (dict): The inverted index of the paper.
+
+    Returns:
+        str: The constructed abstract.
+    """
+    abstract = []
+    for key, value in inverted_index.items():
+        abstract.append(f"{key}: {value}")
+    return "\n".join(abstract)

@@ -26,4 +26,5 @@ dependencies = [
     "itsdangerous>=2.2.0",
     "gunicorn>=23.0.0",
     "pymupdf4llm>=0.0.21",
+    "firecrawl-py>=2.7.0",
 ]
