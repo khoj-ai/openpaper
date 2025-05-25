@@ -122,7 +122,11 @@ class S3Service:
         try:
             # Generate a unique key for the S3 object
             # Use a UUID prefix to avoid naming conflicts
-            original_filename = file.filename.replace(" ", "_")
+            original_filename = (
+                file.filename.replace(" ", "_")
+                if file.filename
+                else f"document-{uuid.uuid4()}.pdf"
+            )
             file_extension = original_filename.split(".")[-1].lower()
             object_key = f"uploads/{uuid.uuid4()}-{original_filename}"
 
