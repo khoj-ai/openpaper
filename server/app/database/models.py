@@ -2,9 +2,9 @@ import uuid
 from enum import Enum
 from types import NoneType
 
+from sqlalchemy import UUID  # type: ignore
 from sqlalchemy import (
     ARRAY,
-    UUID,
     Boolean,
     Column,
     DateTime,
@@ -14,7 +14,7 @@ from sqlalchemy import (
     Text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import DeclarativeBase, relationship
+from sqlalchemy.orm import DeclarativeBase, relationship  # type: ignore
 from sqlalchemy.sql import func
 
 
@@ -91,6 +91,9 @@ class User(Base):
     )
     annotations = relationship(
         "Annotation", back_populates="user", cascade="all, delete-orphan"
+    )
+    hypothesis_jobs = relationship(
+        "HypothesisJob", back_populates="user", cascade="all, delete-orphan"
     )
 
 
@@ -245,3 +248,150 @@ class Annotation(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
     user = relationship("User", back_populates="annotations")
+
+
+class JobStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class JobType(str, Enum):
+    HYPOTHESIS_RESEARCH = "hypothesis_research"
+    # Add other job types as needed
+
+
+class HypothesisJob(Base):
+    __tablename__ = "hypothesis_jobs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+
+    # Job metadata
+    job_type = Column(String, nullable=False, default=JobType.HYPOTHESIS_RESEARCH)
+    status = Column(String, nullable=False, default=JobStatus.PENDING)
+
+    # Input data
+    original_question = Column(Text, nullable=False)
+    generated_hypothesis = Column(Text, nullable=True)
+
+    # Progress tracking
+    total_steps = Column(Integer, nullable=True)
+    completed_steps = Column(Integer, default=0)
+
+    # Error handling
+    error_message = Column(Text, nullable=True)
+    error_traceback = Column(Text, nullable=True)
+
+    # Timing
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    user = relationship("User", back_populates="hypothesis_jobs")
+    steps = relationship(
+        "HypothesisStep", back_populates="job", cascade="all, delete-orphan"
+    )
+    research_result = relationship(
+        "HypothesisResearchResult", back_populates="job", cascade="all, delete-orphan"
+    )
+
+
+class HypothesisStep(Base):
+    __tablename__ = "hypothesis_steps"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    job_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("hypothesis_jobs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    # Step data from LLM
+    question = Column(Text, nullable=False)
+    motivation = Column(Text, nullable=False)
+    search_terms = Column(ARRAY(String), nullable=False)
+
+    # Step execution
+    status = Column(String, nullable=False, default=JobStatus.PENDING)
+    step_order = Column(Integer, nullable=False)
+
+    # Results
+    findings = Column(Text, nullable=True)
+
+    # Error handling
+    error_message = Column(Text, nullable=True)
+
+    # Timing
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    job = relationship("HypothesisJob", back_populates="steps")
+    papers = relationship(
+        "HypothesisStepPaper", back_populates="step", cascade="all, delete-orphan"
+    )
+
+
+class HypothesisStepPaper(Base):
+    __tablename__ = "hypothesis_step_papers"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    step_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("hypothesis_steps.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    # Paper metadata from OpenAlex
+    external_id = Column(String, nullable=False)  # OpenAlex ID
+    title = Column(Text, nullable=False)
+    abstract = Column(Text, nullable=True)
+    publication_year = Column(Integer, nullable=True)
+    pdf_url = Column(String, nullable=True)
+    doi = Column(String, nullable=True)
+    cited_by_count = Column(Integer, nullable=True)
+
+    # Processing data
+    was_selected_for_scraping = Column(Boolean, default=False)
+    scraping_attempted = Column(Boolean, default=False)
+    scraping_successful = Column(Boolean, default=False)
+    scraping_error = Column(Text, nullable=True)
+
+    # Content
+    raw_text = Column(Text, nullable=True)
+    contextual_summary = Column(Text, nullable=True)
+
+    # Reference tracking
+    reference_idx = Column(Integer, nullable=True)
+
+    # Timing
+    scraped_at = Column(DateTime(timezone=True), nullable=True)
+    summarized_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    step = relationship("HypothesisStep", back_populates="papers")
+
+
+class HypothesisResearchResult(Base):
+    __tablename__ = "hypothesis_research_results"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    job_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("hypothesis_jobs.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+
+    # Research response fields
+    motivation = Column(Text, nullable=False)
+    methodology = Column(Text, nullable=False)
+    findings = Column(Text, nullable=False)
+    limitations = Column(ARRAY(String), nullable=True, default=[])
+    future_research = Column(ARRAY(String), nullable=True, default=[])
+
+    # Relationships
+    job = relationship("HypothesisJob", back_populates="research_result")
