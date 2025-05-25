@@ -59,7 +59,7 @@ setup_admin(app)  # Setup admin interface
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
-    log_config = uvicorn.config.LOGGING_CONFIG
+    log_config = uvicorn.config.LOGGING_CONFIG  # type: ignore
     log_config["formatters"]["access"][
         "fmt"
     ] = "%(asctime)s - %(levelname)s - %(message)s"

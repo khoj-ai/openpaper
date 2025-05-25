@@ -92,3 +92,92 @@ You are in detailed mode. Provide a comprehensive and thorough answer to the use
 NORMAL_MODE_INSTRUCTIONS = """
 You are in normal mode. Provide a balanced response to the user's question. Include the most relevant details and context, but avoid excessive elaboration or unnecessary information. Limit your response to < 5 paragraphs. You must still include evidence.
 """
+
+IMPROVE_QUESTION_TO_HYPOTHESIS = """
+Augment the following question by converting it into a testable hypothesis. Add more detail to make it suitable for handing off to a research assistant, but keep it under 200 characters.
+
+Consider adding specific variables, conditions, or contexts that can be tested through research. The hypothesis should be clear, concise, and focused on a specific aspect of the question.
+
+Response with just the updated hypothesis in plain text, without any additional text or explanation or formatting or special syntax.
+
+Example:
+Question: How does climate change affect biodiversity?
+Hypothesis: Climate change leads to a significant decline in biodiversity, particularly in tropical ecosystems, due to habitat loss and altered species interactions.
+
+Question: {question}
+Hypothesis:
+"""
+
+HYPOTHESIS_STEPS = """
+What are some questions you would ask if you could consult an expert in the field to test the following hypothesis?
+
+Hypothesis: {hypothesis}
+
+Response Schema: {schema}
+"""
+
+PICK_PAPERS_TO_READ = """
+Assist the research assistant in selecting up to 7 papers to read based on the following hypothesis, question, and motivation, and candidate papers. Provide a list of the paper ids that are most relevant to the hypothesis and steps.
+
+Hypothesis: {hypothesis}
+Question: {question}
+Motivation: {motivation}
+Candidate Papers:
+
+{minimal_papers}
+
+Response Schema: {schema}
+"""
+
+# Could we also use this extract step to gather relevant follow-up research questions?
+
+EXTRACT_RELEVANT_CONTEXT_FROM_PAPER = """
+You are an expert in extracting relevant context from academic papers. Given the following paper, extract the most relevant context that answers the user's question. The context should be concise and directly related to the question. Focus on the key findings, methodologies, and conclusions that are pertinent to the question. Limit your findings to 4000 characters. Include data or statistics if they are directly relevant to the presenting your findings in context of the question. Focus on explaining the cause and effect relationships, methodologies, and conclusions that are pertinent to the question.
+
+If there is no relevant context in the paper or if there is insufficient information, ONLY return the exact text 'Skip'. This indicates that the paper does not provide useful information for the question.
+
+Hypothesis: {hypothesis}
+Question: {question}
+Motivation: {motivation}
+
+Paper:
+
+{paper}
+"""
+
+EXTRACT_RELEVANT_FINDINGS_FROM_PAPER_SUMMARIES = """
+You are thoughtful, analytical, and detail-oriented. Your task is to extract relevant findings from the provided paper summaries that directly address the target hypothesis and sub-question. Focus on the key insights, methodologies, and conclusions that are pertinent to the question.
+
+In your findings, ensure you:
+1. Clearly state the summary of the findings, clearly linking them to the hypothesis and sub-question.
+2. Use evidence from the paper summaries to support your findings. Include citations in the format [^33], [^12], etc., where each citation corresponds to a specific paper idx. Always use the idx property of the paper in the citation, not the id.
+3. Maintain a clear and logical structure in your response.
+
+Return just the findings, and nothing else.
+
+Hypothesis: {hypothesis}
+Question: {question}
+Motivation: {motivation}
+Paper Summaries:
+{paper_summaries}
+
+Findings:
+"""
+
+FINALIZE_HYPOTHESIS_RESEARCH = """
+This is the final step in the hypothesis research program. You will be strictly evaluated based on the quality of your findings and how well they address the hypothesis and sub-questions.
+
+As a final step, you will collate all the findings from the previous steps and provide a comprehensive summary of the research conducted. This summary should include:
+1. A clear statement of the hypothesis being tested.
+2. A detailed summary of the findings from each sub-question, including key insights and conclusions drawn from the papers, including citations to the relevant papers. This is the methodology used to answer the hypothesis.
+3. A synthesis of the overall research findings, highlighting how they contribute to understanding the hypothesis.
+4. Any limitations or gaps in the research that were identified during the process.
+5. Suggestions for future research or unanswered questions that emerged from the findings.
+
+Ensure that your response is well-structured, concise, and directly addresses the hypothesis and sub-questions in the schema format. Use clear and precise language to convey your findings. For any citations, ensure they are formatted as [^5], [^7], etc., where each number corresponds to the idx of the paper.
+
+Hypothesis: {hypothesis}
+Research Results:
+{steps_results}
+Response Schema: {schema}
+"""
