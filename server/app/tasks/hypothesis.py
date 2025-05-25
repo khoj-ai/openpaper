@@ -1,4 +1,6 @@
 import logging
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from uuid import UUID
 
 from app.database.crud.hypothesis_crud import hypothesis_crud
@@ -63,10 +65,11 @@ def process_hypothesis(job_id: UUID, user_id: UUID) -> None:
 
         logger.info(f"Generated {len(research_steps.steps)} research steps")
 
-        completed_steps = 0
+        completed_steps_count = 0
+        completed_steps_lock = threading.Lock()
 
-        # Process each research step
-        for step_order, step in enumerate(research_steps.steps):
+        def process_step_with_progress(step_order, step):
+            nonlocal completed_steps_count
             success = process_hypothesis_step(
                 job_id=job_id,
                 step=step,
@@ -79,15 +82,44 @@ def process_hypothesis(job_id: UUID, user_id: UUID) -> None:
                     f"Failed to process step {step_order + 1} for job {job_id}"
                 )
 
-            completed_steps += 1
+            # Thread-safe progress update
+            with completed_steps_lock:
+                completed_steps_count += 1
+                current_completed = completed_steps_count
 
             # Update job progress
             hypothesis_crud.update_job_status(
                 db=db,
                 job_id=job_id,
                 status=JobStatus.RUNNING,
-                completed_steps=completed_steps,
+                completed_steps=current_completed,
             )
+
+            return success
+
+        # Use ThreadPoolExecutor to run steps in parallel
+        with ThreadPoolExecutor(
+            max_workers=5
+        ) as executor:  # Adjust max_workers as needed
+            # Submit all tasks
+            future_to_step = {
+                executor.submit(process_step_with_progress, step_order, step): (
+                    step_order,
+                    step,
+                )
+                for step_order, step in enumerate(research_steps.steps)
+            }
+
+            # Wait for all tasks to complete
+            for future in as_completed(future_to_step):
+                step_order, step = future_to_step[future]
+                try:
+                    success = future.result()
+                    logger.info(
+                        f"Completed step {step_order + 1} with success: {success}"
+                    )
+                except Exception as exc:
+                    logger.error(f"Step {step_order + 1} generated an exception: {exc}")
 
         # Generate final findings
         logger.info("Generating final findings")
@@ -101,7 +133,7 @@ def process_hypothesis(job_id: UUID, user_id: UUID) -> None:
             logger.error(f"Job {job_id} not found after processing steps")
             return
 
-        completed_steps = (
+        completed_step_records = (
             db.query(HypothesisStepDB)
             .filter(
                 HypothesisStepDB.job_id == job_id,
@@ -121,7 +153,7 @@ def process_hypothesis(job_id: UUID, user_id: UUID) -> None:
                 ),
                 "findings": step.findings,
             }
-            for step in completed_steps
+            for step in completed_step_records
         ]
 
         if steps_results:
