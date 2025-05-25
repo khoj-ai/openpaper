@@ -24,19 +24,20 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 llm_operations = Operations()
 
+DEFAULT_NUM_PAPERS_TO_COLLATE = 5  # Default number of papers to scrape per step
+
 
 def process_hypothesis_step(
     job_id: UUID,
     step: HypothesisStep,
     step_order: int,
     hypothesis: str,
-    paper_reference_idx: int,
-) -> tuple[bool, int]:
+) -> bool:
     """
     Process a single hypothesis research step.
 
     Returns:
-        tuple[bool, int]: (success, updated_paper_reference_idx)
+        bool: (success)
     """
     db = SessionLocal()
     logger.info(f"Processing hypothesis step {step_order + 1}: {step.question}")
@@ -127,7 +128,7 @@ def process_hypothesis_step(
                 findings="No papers found for this research step.",
                 completed_at=func.now(),
             )
-            return True, paper_reference_idx
+            return True
 
         logger.info(f"Found {len(minimal_papers)} papers for step")
 
@@ -163,11 +164,10 @@ def process_hypothesis_step(
                 findings="No papers were selected for detailed analysis.",
                 completed_at=func.now(),
             )
-            return True, paper_reference_idx
+            return True
 
         # Scrape and summarize papers
         filtered_papers: List[MinimalPaperData] = []
-        current_reference_idx = paper_reference_idx
 
         for paper in papers_to_scrape:
             logger.info(f"Scraping paper: {paper.title}")
@@ -192,10 +192,12 @@ def process_hypothesis_step(
                 )
 
                 if paper_summary:
+                    # Get next available reference index from database
+                    reference_idx = hypothesis_crud.get_next_reference_idx(db, job_id)
+
                     paper.raw_text = paper_content
                     paper.contextual_summary = paper_summary
-                    paper.idx = current_reference_idx
-                    current_reference_idx += 1
+                    paper.idx = reference_idx
 
                     filtered_papers.append(paper)
 
@@ -231,13 +233,26 @@ def process_hypothesis_step(
                 f"No papers successfully summarized for step: {step.question}"
             )
 
-            # Retrieve the top 5 papers and pass their abstracts as the contextual summary if no summaries were generated
-            top_papers = minimal_papers[:5]
+            # Retrieve the top papers and pass their abstracts as the contextual summary if no summaries were generated
+            top_papers = minimal_papers[:DEFAULT_NUM_PAPERS_TO_COLLATE]
             for paper in top_papers:
                 if paper.abstract:
+                    reference_idx = hypothesis_crud.get_next_reference_idx(db, job_id)
+
                     paper.contextual_summary = paper.abstract or "No abstract available"
-                    paper.idx = current_reference_idx
-                    current_reference_idx += 1
+                    paper.idx = reference_idx
+
+                    hypothesis_crud.update_paper_scraping(
+                        db=db,
+                        step_id=db_step_id,
+                        external_id=paper.id,
+                        scraping_successful=True,
+                        contextual_summary=paper.contextual_summary,
+                        reference_idx=paper.idx,
+                        scraped_at=func.now(),
+                        summarized_at=func.now(),
+                    )
+
             filtered_papers = [
                 paper for paper in top_papers if paper.contextual_summary
             ]
@@ -255,7 +270,7 @@ def process_hypothesis_step(
                     findings="Papers were found but could not be successfully processed.",
                     completed_at=func.now(),
                 )
-                return True, paper_reference_idx
+                return True
 
         # Generate findings for this step
         papers_for_summary = [
@@ -282,7 +297,7 @@ def process_hypothesis_step(
         )
 
         logger.info(f"Completed step {step_order + 1}: {step.question}")
-        return True, current_reference_idx
+        return True
 
     except Exception as e:
         logger.error(f"Error processing step {step.question}: {e}")
@@ -293,4 +308,4 @@ def process_hypothesis_step(
             error_message=str(e),
             completed_at=func.now(),
         )
-        return False, paper_reference_idx
+        return False

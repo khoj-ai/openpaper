@@ -63,18 +63,21 @@ def process_hypothesis(job_id: UUID, user_id: UUID) -> None:
 
         logger.info(f"Generated {len(research_steps.steps)} research steps")
 
-        paper_reference_idx = 1
         completed_steps = 0
 
         # Process each research step
         for step_order, step in enumerate(research_steps.steps):
-            success, paper_reference_idx = process_hypothesis_step(
+            success = process_hypothesis_step(
                 job_id=job_id,
                 step=step,
                 step_order=step_order,
                 hypothesis=research_steps.hypothesis,
-                paper_reference_idx=paper_reference_idx,
             )
+
+            if not success:
+                logger.error(
+                    f"Failed to process step {step_order + 1} for job {job_id}"
+                )
 
             completed_steps += 1
 

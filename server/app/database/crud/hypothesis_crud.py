@@ -8,6 +8,7 @@ from app.database.models import (
     HypothesisStepPaper,
     JobStatus,
 )
+from sqlalchemy import text
 from sqlalchemy.orm import Session, joinedload
 
 
@@ -133,6 +134,21 @@ class HypothesisCRUD:
         db.commit()
         db.refresh(result)
         return result
+
+    def get_next_reference_idx(self, db: Session, job_id: UUID) -> int:
+        """Get the next available reference index for papers in this job."""
+        result = db.execute(
+            text(
+                """
+            SELECT COALESCE(MAX(reference_idx), 0) + 1
+            FROM hypothesis_step_papers hsp
+            JOIN hypothesis_steps hs ON hsp.step_id = hs.id
+            WHERE hs.job_id = :job_id
+            """
+            ),
+            {"job_id": str(job_id)},
+        ).scalar()
+        return result or 1
 
 
 hypothesis_crud = HypothesisCRUD()
