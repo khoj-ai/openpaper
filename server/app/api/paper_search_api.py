@@ -105,6 +105,11 @@ async def get_hypothesis_job_status(
             },
             "started_at": job.started_at,
             "completed_at": job.completed_at,
+            "total_time": (
+                job.completed_at - job.started_at
+                if job.completed_at and job.started_at
+                else None
+            ),
         }
 
         if job.status == JobStatus.FAILED:

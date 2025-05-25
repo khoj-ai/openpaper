@@ -174,7 +174,7 @@ As a final step, you will collate all the findings from the previous steps and p
 4. Any limitations or gaps in the research that were identified during the process.
 5. Suggestions for future research or unanswered questions that emerged from the findings.
 
-Ensure that your response is well-structured, concise, and directly addresses the hypothesis and sub-questions in the schema format. Use clear and precise language to convey your findings.
+Ensure that your response is well-structured, concise, and directly addresses the hypothesis and sub-questions in the schema format. Use clear and precise language to convey your findings. For any citations, ensure they are formatted as [^5], [^7], etc., where each number corresponds to the idx of the paper.
 
 Hypothesis: {hypothesis}
 Research Results:
