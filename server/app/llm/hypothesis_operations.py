@@ -1,7 +1,7 @@
 import logging
 from typing import Sequence
 
-from app.llm.base import BaseLLMClient
+from app.llm.base import BaseLLMClient, ModelType
 from app.llm.json_parser import JSONParser
 from app.llm.prompts import (
     EXTRACT_RELEVANT_CONTEXT_FROM_PAPER,
@@ -33,7 +33,7 @@ class HypothesisOperations(BaseLLMClient):
         formatted_prompt = IMPROVE_QUESTION_TO_HYPOTHESIS.format(question=question)
 
         augmented_hypothesis = self.generate_content(
-            model=self.fast_model,
+            model_type=ModelType.FAST,
             contents=formatted_prompt,
         )
 
@@ -51,7 +51,7 @@ class HypothesisOperations(BaseLLMClient):
         )
 
         response = self.generate_content(
-            model=self.fast_model,
+            model_type=ModelType.FAST,
             contents=formatted_prompt,
         )
 
@@ -82,7 +82,7 @@ class HypothesisOperations(BaseLLMClient):
         )
 
         response = self.generate_content(
-            model=self.fast_model,
+            model_type=ModelType.FAST,
             contents=formatted_prompt,
         )
         # Check if the response is valid JSON
@@ -116,7 +116,7 @@ class HypothesisOperations(BaseLLMClient):
         )
 
         response = self.generate_content(
-            model=self.fast_model,
+            model_type=ModelType.FAST,
             contents=formatted_prompt,
         )
 
@@ -150,7 +150,7 @@ class HypothesisOperations(BaseLLMClient):
         )
 
         response = self.generate_content(
-            model=self.fast_model,
+            model_type=ModelType.FAST,
             contents=formatted_prompt,
         )
 
@@ -175,7 +175,6 @@ class HypothesisOperations(BaseLLMClient):
         )
 
         response = self.generate_content(
-            model=self.default_model,
             contents=formatted_prompt,
         )
 

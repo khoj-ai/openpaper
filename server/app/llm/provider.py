@@ -16,7 +16,6 @@ from openai.types.chat import (
     ChatCompletionSystemMessageParam,
     ChatCompletionUserMessageParam,
 )
-from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 

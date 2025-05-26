@@ -17,7 +17,7 @@ from app.llm.prompts import (
     EXTRACT_PAPER_METADATA,
     NORMAL_MODE_INSTRUCTIONS,
 )
-from app.llm.provider import FileContent, TextContent
+from app.llm.provider import FileContent, LLMProvider, TextContent
 from app.llm.schemas import PaperMetadataExtraction
 from app.llm.utils import retry_llm_operation
 from app.schemas.message import ResponseStyle
@@ -174,7 +174,6 @@ class PaperOperations(BaseLLMClient):
         )
 
         chat_session = self.create_chat_session(
-            model=self.default_model,
             history=conversation_history,
             config={
                 "system_instruction": formatted_system_prompt,
