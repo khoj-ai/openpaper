@@ -2,18 +2,21 @@ import base64
 import logging
 import os
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Iterator
+from typing import Any, Dict, Iterator, List, Literal, Optional, Union
 
 import openai
+from app.database.models import Message
 from google import genai
-from google.genai.types import GenerateContentConfig
+from google.genai.types import Content, GenerateContentConfig
 from openai.types.chat import (
     ChatCompletionAssistantMessageParam,
     ChatCompletionMessageParam,
     ChatCompletionSystemMessageParam,
     ChatCompletionUserMessageParam,
 )
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +62,25 @@ class ChatSession:
         )
 
 
+@dataclass
+class TextContent:
+    text: str
+    type: Literal["text"] = "text"
+
+
+@dataclass
+class FileContent:
+    data: bytes
+    mime_type: str
+    filename: Optional[str] = None
+    type: Literal["file"] = "file"
+
+
+# Union type for all content types
+MessageContent = Union[TextContent, FileContent]
+MessageParam = Union[str, List[MessageContent]]
+
+
 class BaseLLMProvider(ABC):
     """Abstract base class for LLM providers"""
 
@@ -69,7 +91,7 @@ class BaseLLMProvider(ABC):
         pass
 
     @abstractmethod
-    def generate_content(self, model: str, contents: Any, **kwargs) -> LLMResponse:
+    def generate_content(self, model: str, contents: str, **kwargs) -> LLMResponse:
         """Generate content using the provider's API"""
         pass
 
@@ -97,6 +119,11 @@ class BaseLLMProvider(ABC):
         """Get the fast model for this provider"""
         pass
 
+    @abstractmethod
+    def _convert_message_content(self, content: MessageParam) -> Any:
+        """Convert generic message content to provider-specific format"""
+        pass
+
 
 class GeminiProvider(BaseLLMProvider):
     """Gemini LLM provider implementation"""
@@ -114,7 +141,7 @@ class GeminiProvider(BaseLLMProvider):
     def client(self) -> genai.Client:
         return self._client
 
-    def generate_content(self, model: str, contents: Any, **kwargs) -> LLMResponse:
+    def generate_content(self, model: str, contents: str, **kwargs) -> LLMResponse:
         response = self.client.models.generate_content(
             model=model, contents=contents, **kwargs
         )
@@ -125,21 +152,23 @@ class GeminiProvider(BaseLLMProvider):
         return LLMResponse(text=response.text, model=model, provider=LLMProvider.GEMINI)
 
     def create_chat_session(
-        self, model: str, history: Any, config: GenerateContentConfig
+        self, model: str, history: List[Message], config: GenerateContentConfig
     ) -> ChatSession:
         """Create Gemini chat session"""
         session = self.client.chats.create(
             model=model,
-            history=history,
+            history=self._convert_chat_history_to_api_format(history),
             config=config,
         )
         return ChatSession(self, session, model)
 
     def send_message_stream(
-        self, session: Any, model: str, message: Any, **kwargs
+        self, session: Any, model: str, message: MessageParam, **kwargs
     ) -> Iterator[StreamChunk]:
         """Send streaming message to Gemini"""
-        for chunk in session.send_message_stream(message=message, **kwargs):
+        converted_message = self._convert_message_content(message)
+
+        for chunk in session.send_message_stream(message=converted_message, **kwargs):
             yield StreamChunk(
                 text=chunk.text if chunk.text else "",
                 model=model,
@@ -153,29 +182,90 @@ class GeminiProvider(BaseLLMProvider):
     def get_fast_model(self) -> str:
         return self._fast_model
 
+    def _convert_chat_history_to_api_format(
+        self,
+        messages: List[Message],
+    ) -> list[Content]:
+        """
+        Convert chat history to Chat API format
+        """
+        api_format = []
+        for message in messages:
+            references = CitationHandler.format_citations(message.references["citations"]) if message.references else None  # type: ignore
+
+            f_message = (
+                f"{message.content}\n\n{references}" if references else message.content
+            )
+
+            api_format.append(
+                Content(
+                    role="user" if message.role == "user" else "model",
+                    parts=[{"text": f_message}],  # type: ignore
+                )
+            )
+
+        return api_format
+
+    def _convert_message_content(self, content: MessageParam) -> Any:
+        """Convert generic message content to Gemini Part format"""
+        from google.genai.types import Part
+
+        if isinstance(content, str):
+            return content
+
+        if isinstance(content, list):
+            parts = []
+            for item in content:
+                if isinstance(item, TextContent):
+                    parts.append(Part.from_text(text=item.text))
+                elif isinstance(item, FileContent):
+                    parts.append(
+                        Part.from_bytes(data=item.data, mime_type=item.mime_type)
+                    )
+
+            # If we have multiple parts, we need to return them as proper Parts
+            # If only one part, return it directly
+            if len(parts) == 1:
+                return parts[0]
+            else:
+                return parts
+
+        return content
+
 
 class OpenAIProvider(BaseLLMProvider):
     """OpenAI LLM provider implementation"""
 
     def __init__(self):
+
         self.api_key = os.getenv("OPENAI_API_KEY")
+        # self.api_key = os.getenv("AZURE_OPENAI_API_KEY")
+        endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+        version = os.getenv("AZURE_OPENAI_VERSION", "2025-04-01-preview")
+
         if not self.api_key:
             raise ValueError("OPENAI_API_KEY environment variable is required")
+        if not endpoint:
+            raise ValueError("AZURE_OPENAI_ENDPOINT environment variable is required")
 
+        # self._client = openai.AzureOpenAI(api_key=self.api_key, azure_endpoint=endpoint, api_version=version)
         self._client = openai.OpenAI(api_key=self.api_key)
-        self._default_model = "gpt-4o"
-        self._fast_model = "gpt-4o-mini"
+        self._default_model = "gpt-4.1"
+        self._fast_model = "gpt-4.1"
 
     @property
     def client(self) -> openai.OpenAI:
         return self._client
 
-    def generate_content(self, model: str, contents: Any, **kwargs) -> LLMResponse:
+    def generate_content(self, model: str, contents: str, **kwargs) -> LLMResponse:
         # Convert Gemini-style contents to OpenAI format if needed
-        messages = self._convert_contents_to_messages(contents)
+        user_msg: ChatCompletionUserMessageParam = {
+            "role": "user",
+            "content": contents,
+        }
 
         response = self.client.chat.completions.create(
-            model=model, messages=messages, **kwargs
+            model=model, messages=[user_msg], **kwargs
         )
 
         if not response.choices or not response.choices[0].message.content:
@@ -188,7 +278,7 @@ class OpenAIProvider(BaseLLMProvider):
         )
 
     def create_chat_session(
-        self, model: str, history: Any, config: Dict[str, Any]
+        self, model: str, history: List[Message], config: Dict[str, Any]
     ) -> ChatSession:
         """Create OpenAI chat session (stores history and config for later use)"""
         session_data = {"history": history, "config": config, "model": model}
@@ -224,8 +314,35 @@ class OpenAIProvider(BaseLLMProvider):
                     is_done=chunk.choices[0].finish_reason is not None,
                 )
 
+    def _convert_message_content(self, content: MessageParam) -> Any:
+        """Convert generic message content to OpenAI format"""
+        if isinstance(content, str):
+            return content
+
+        if isinstance(content, list):
+            content_parts = []
+            for item in content:
+                if isinstance(item, TextContent):
+                    content_parts.append({"type": "text", "text": item.text})
+                elif isinstance(item, FileContent):
+                    base64_data = base64.b64encode(item.data).decode("utf-8")
+                    if item.mime_type == "application/pdf":
+                        # OpenAI file handling - matches reference format
+                        content_parts.append(
+                            {
+                                "type": "file",
+                                "file": {
+                                    "filename": item.filename or "file.pdf",
+                                    "file_data": f"data:application/pdf;base64,{base64_data}",
+                                },
+                            }
+                        )
+            return content_parts
+
+        return content
+
     def _prepare_openai_messages(
-        self, session: Any, new_message: Any
+        self, session: Any, new_message: MessageParam
     ) -> list[ChatCompletionMessageParam]:
         """Prepare OpenAI messages format including history and new message"""
         messages: list[ChatCompletionMessageParam] = []
@@ -233,101 +350,27 @@ class OpenAIProvider(BaseLLMProvider):
         # Add history
         if session.get("history"):
             for hist_msg in session["history"]:
-                if hasattr(hist_msg, "role") and hasattr(hist_msg, "parts"):
-                    # Convert from Gemini format
-                    role = hist_msg.role
-                    content = hist_msg.parts[0]["text"] if hist_msg.parts else ""
-
-                    if role == "user":
-                        user_msg: ChatCompletionUserMessageParam = {
-                            "role": "user",
-                            "content": content,
-                        }
-                        messages.append(user_msg)
-                    else:  # assistant/model role
-                        assistant_msg: ChatCompletionAssistantMessageParam = {
-                            "role": "assistant",
-                            "content": content,
-                        }
-                        messages.append(assistant_msg)
-
-        # Handle new message - could be text or multimodal
-        if isinstance(new_message, str):
-            user_msg: ChatCompletionUserMessageParam = {
-                "role": "user",
-                "content": new_message,
-            }
-            messages.append(user_msg)
-        elif isinstance(new_message, list):
-            # Handle multimodal content (text + files)
-            content_parts = []
-            for part in new_message:
-                if isinstance(part, str):
-                    content_parts.append({"type": "text", "text": part})
-                elif hasattr(part, "mime_type") and part.mime_type == "application/pdf":
-                    # Handle file content (e.g., PDF)
-                    file_data = part.data  # Assuming part.data contains the file bytes
-                    generic_file_name = "file.pdf"  # Default name, can be customized
-                    # OpenAI accepts files as attachments. Encode the data in base64 format
-                    content_parts.append(
-                        {
-                            "type": "file",
-                            "file": {
-                                "filename": generic_file_name,
-                                "file_data": base64.b64encode(file_data).decode(
-                                    "utf-8"
-                                ),
-                            },
-                        }
-                    )
-
-            if content_parts:
-                user_msg: ChatCompletionUserMessageParam = {
-                    "role": "user",
-                    "content": content_parts,
-                }
-                messages.append(user_msg)
-
-        return messages
-
-    def _convert_contents_to_messages(
-        self, contents: Any
-    ) -> list[ChatCompletionMessageParam]:
-        """Convert Gemini-style contents to OpenAI messages format"""
-        messages: list[ChatCompletionMessageParam] = []
-
-        if isinstance(contents, list) and all(hasattr(c, "role") for c in contents):
-            # Already in message format (from chat history)
-            for content in contents:
-                role = content.role
-                text_content = content.parts[0]["text"] if content.parts else ""
-
-                if role == "user":
+                if hist_msg.role == "user":
                     user_msg: ChatCompletionUserMessageParam = {
                         "role": "user",
-                        "content": text_content,
+                        "content": hist_msg.content,
                     }
                     messages.append(user_msg)
-                else:  # assistant/model role
+                elif hist_msg.role == "assistant":
                     assistant_msg: ChatCompletionAssistantMessageParam = {
                         "role": "assistant",
-                        "content": text_content,
+                        "content": hist_msg.content,
                     }
                     messages.append(assistant_msg)
-        elif isinstance(contents, str):
-            # Simple string prompt
-            user_msg: ChatCompletionUserMessageParam = {
-                "role": "user",
-                "content": contents,
-            }
-            messages.append(user_msg)
-        else:
-            # Handle other formats as needed
-            user_msg: ChatCompletionUserMessageParam = {
-                "role": "user",
-                "content": str(contents),
-            }
-            messages.append(user_msg)
+
+        # Handle new message using the generic converter
+        converted_content = self._convert_message_content(new_message)
+
+        user_msg: ChatCompletionUserMessageParam = {
+            "role": "user",
+            "content": converted_content,
+        }
+        messages.append(user_msg)
 
         return messages
 

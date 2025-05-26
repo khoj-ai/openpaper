@@ -17,6 +17,7 @@ from app.llm.prompts import (
     EXTRACT_PAPER_METADATA,
     NORMAL_MODE_INSTRUCTIONS,
 )
+from app.llm.provider import FileContent, TextContent
 from app.llm.schemas import PaperMetadataExtraction
 from app.llm.utils import retry_llm_operation
 from app.schemas.message import ResponseStyle
@@ -159,8 +160,6 @@ class PaperOperations(BaseLLMClient):
             db, conversation_id=casted_conversation_id, current_user=current_user
         )
 
-        chat_history = self.convert_chat_history_to_api_format(conversation_history)
-
         additional_instructions = ""
 
         if response_style == ResponseStyle.DETAILED:
@@ -174,9 +173,9 @@ class PaperOperations(BaseLLMClient):
             additional_instructions=additional_instructions,
         )
 
-        chat_session = self.client.chats.create(
+        chat_session = self.create_chat_session(
             model=self.default_model,
-            history=chat_history,
+            history=conversation_history,
             config={
                 "system_instruction": formatted_system_prompt,
             },
@@ -206,14 +205,15 @@ class PaperOperations(BaseLLMClient):
         pdf_bytes = httpx.get(signed_url).content
 
         message_content = [
-            Part.from_bytes(
+            FileContent(
                 data=pdf_bytes,
                 mime_type="application/pdf",
+                filename=f"{paper.title or 'paper'}.pdf",
             ),
-            formatted_prompt,
+            TextContent(text=formatted_prompt),
         ]
 
-        # Extract metadata using the LLM
+        # Chat with the paper using the LLM
         for chunk in chat_session.send_message_stream(
             message=message_content,
         ):
