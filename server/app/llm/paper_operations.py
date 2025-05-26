@@ -242,17 +242,13 @@ class PaperOperations(BaseLLMClient):
             reconstructed_buffer = "".join(evidence_buffer + [text_buffer]).strip()
 
             if in_evidence_section and END_DELIMITER in reconstructed_buffer:
-                # Split at delimiter
-                evidence_part, remaining = (
-                    text_buffer.split(END_DELIMITER)
-                    if END_DELIMITER in text_buffer
-                    else ("", "")
-                )
-                evidence_buffer.append(evidence_part)
+                # Find the position of the delimiter in the reconstructed buffer
+                delimiter_pos = reconstructed_buffer.find(END_DELIMITER)
+                evidence_part = reconstructed_buffer[:delimiter_pos]
+                remaining = reconstructed_buffer[delimiter_pos + len(END_DELIMITER) :]
 
                 # Parse the complete evidence block
-                raw_evidence = "".join(evidence_buffer).strip()
-                structured_evidence = parse_evidence_block(raw_evidence)
+                structured_evidence = parse_evidence_block(evidence_part)
 
                 # Yield both raw and structured evidence
                 yield {
