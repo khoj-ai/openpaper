@@ -66,7 +66,7 @@ class PaperOperations(BaseLLMClient):
         )
 
         # Extract metadata using the LLM
-        response = self.client.models.generate_content(
+        response = self.generate_content(
             model=self.fast_model,
             contents=formatted_prompt,
         )

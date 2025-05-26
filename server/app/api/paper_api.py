@@ -5,7 +5,7 @@ import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from app.auth.dependencies import get_required_user
 from app.database.crud.annotation_crud import annotation_crud
@@ -60,7 +60,7 @@ async def get_paper_ids(
     """
     Get all paper IDs
     """
-    papers = paper_crud.get_multi(db, user=current_user)
+    papers: List[Paper] = paper_crud.get_multi(db, user=current_user)
     if not papers:
         return JSONResponse(status_code=404, content={"message": "No papers found"})
     return JSONResponse(

@@ -27,4 +27,5 @@ dependencies = [
     "gunicorn>=23.0.0",
     "pymupdf4llm>=0.0.21",
     "firecrawl-py>=2.7.0",
+    "openai>=1.82.0",
 ]

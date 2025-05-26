@@ -32,7 +32,7 @@ class HypothesisOperations(BaseLLMClient):
         """Augment the provided hypothesis using the specified model"""
         formatted_prompt = IMPROVE_QUESTION_TO_HYPOTHESIS.format(question=question)
 
-        augmented_hypothesis = self.client.models.generate_content(
+        augmented_hypothesis = self.generate_content(
             model=self.fast_model,
             contents=formatted_prompt,
         )
@@ -50,7 +50,7 @@ class HypothesisOperations(BaseLLMClient):
             schema=schema,
         )
 
-        response = self.client.models.generate_content(
+        response = self.generate_content(
             model=self.fast_model,
             contents=formatted_prompt,
         )
@@ -81,7 +81,7 @@ class HypothesisOperations(BaseLLMClient):
             schema=schema,
         )
 
-        response = self.client.models.generate_content(
+        response = self.generate_content(
             model=self.fast_model,
             contents=formatted_prompt,
         )
@@ -115,7 +115,7 @@ class HypothesisOperations(BaseLLMClient):
             paper=paper,
         )
 
-        response = self.client.models.generate_content(
+        response = self.generate_content(
             model=self.fast_model,
             contents=formatted_prompt,
         )
@@ -149,7 +149,7 @@ class HypothesisOperations(BaseLLMClient):
             paper_summaries=[paper.model_dump_json() for paper in papers],
         )
 
-        response = self.client.models.generate_content(
+        response = self.generate_content(
             model=self.fast_model,
             contents=formatted_prompt,
         )
@@ -174,7 +174,7 @@ class HypothesisOperations(BaseLLMClient):
             schema=HypothesisResearchResponse.model_json_schema(),
         )
 
-        response = self.client.models.generate_content(
+        response = self.generate_content(
             model=self.default_model,
             contents=formatted_prompt,
         )
