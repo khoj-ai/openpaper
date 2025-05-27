@@ -95,6 +95,9 @@ class User(Base):
     hypothesis_jobs = relationship(
         "HypothesisJob", back_populates="user", cascade="all, delete-orphan"
     )
+    audio_overview_jobs = relationship(
+        "AudioOverviewJob", back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class Session(Base):
@@ -142,6 +145,12 @@ class Paper(Base):
     )
     paper_notes = relationship(
         "PaperNote", back_populates="paper", cascade="all, delete-orphan"
+    )
+    audio_overviews = relationship(
+        "AudioOverview", back_populates="paper", cascade="all, delete-orphan"
+    )
+    audio_overview_jobs = relationship(
+        "AudioOverviewJob", back_populates="paper", cascade="all, delete-orphan"
     )
 
 
@@ -395,3 +404,47 @@ class HypothesisResearchResult(Base):
 
     # Relationships
     job = relationship("HypothesisJob", back_populates="research_result")
+
+
+class AudioOverviewJob(Base):
+    __tablename__ = "audio_overview_jobs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    paper_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("papers.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    status = Column(String, nullable=False, default=JobStatus.PENDING)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    user = relationship("User", back_populates="audio_overview_jobs")
+    paper = relationship("Paper", back_populates="audio_overview_jobs")
+
+
+class AudioOverview(Base):
+    __tablename__ = "audio_overviews"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+
+    paper_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("papers.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    s3_object_key = Column(
+        String, nullable=False
+    )  # Store the S3 object key of the wav file
+
+    transcript = Column(Text, nullable=True)
+
+    paper = relationship("Paper", back_populates="audio_overviews")

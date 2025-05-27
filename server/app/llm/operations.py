@@ -22,3 +22,5 @@ __all__ = [
     "CitationHandler",
     "JSONParser",
 ]
+
+operations = Operations()

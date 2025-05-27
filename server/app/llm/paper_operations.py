@@ -15,6 +15,7 @@ from app.llm.prompts import (
     CONCISE_MODE_INSTRUCTIONS,
     DETAILED_MODE_INSTRUCTIONS,
     EXTRACT_PAPER_METADATA,
+    GENERATE_NARRATIVE_SUMMARY,
     NORMAL_MODE_INSTRUCTIONS,
 )
 from app.llm.provider import FileContent, LLMProvider, TextContent
@@ -68,7 +69,6 @@ class PaperOperations(BaseLLMClient):
 
         # Extract metadata using the LLM
         response = self.generate_content(
-            model=self.fast_model,
             contents=formatted_prompt,
         )
 
@@ -85,6 +85,61 @@ class PaperOperations(BaseLLMClient):
         # Parse the response and return the metadata
         metadata = PaperMetadataExtraction.model_validate(response_json)
         return metadata
+
+    @retry_llm_operation(max_retries=3, delay=1.0)
+    def create_narrative_summary(
+        self,
+        paper_id: str,
+        user: CurrentUser,
+        additional_instructions: Optional[str] = None,
+        db: Session = Depends(get_db),
+    ) -> str:
+        """
+        Create a narrative summary of the paper using the specified model
+        """
+        paper = paper_crud.get(db, id=paper_id, user=user)
+
+        if not paper:
+            raise ValueError(f"Paper with ID {paper_id} not found.")
+
+        formatted_prompt = GENERATE_NARRATIVE_SUMMARY.format(
+            additional_instructions=additional_instructions,
+        )
+
+        signed_url = s3_service.generate_presigned_url(
+            object_key=str(paper.s3_object_key)
+        )
+
+        if not signed_url:
+            raise ValueError(
+                f"Could not generate presigned URL for paper with ID {paper_id}."
+            )
+
+        # Retrieve and encode the PDF byte
+        pdf_bytes = httpx.get(signed_url).content
+
+        message_content = [
+            FileContent(
+                data=pdf_bytes,
+                mime_type="application/pdf",
+                filename=f"{paper.title or 'paper'}.pdf",
+            ),
+            TextContent(text=formatted_prompt),
+        ]
+
+        # Generate narrative summary using the LLM
+        response = self.generate_content(
+            contents=message_content,
+        )
+
+        try:
+            if response and response.text:
+                return response.text.strip()
+            else:
+                raise ValueError("Empty response from LLM.")
+        except ValueError as e:
+            logger.error(f"Error parsing LLM response: {e}", exc_info=True)
+            raise ValueError(f"Invalid response from LLM: {str(e)}")
 
     async def chat_with_paper(
         self,

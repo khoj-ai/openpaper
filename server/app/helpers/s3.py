@@ -109,6 +109,45 @@ class S3Service:
             logger.error(f"Error uploading file to S3: {e}")
             raise
 
+    def upload_any_file(
+        self, file_path: str, original_filename: str, content_type: str
+    ) -> tuple[str, str]:
+        """
+        Upload any file to S3
+        Args:
+            file_path: The path to the file to upload
+            original_filename: The original name of the file
+            content_type: The MIME type of the file
+        Returns:
+            tuple: S3 object key and public URL
+        """
+
+        try:
+            # Generate a unique key for the S3 object
+            # Use a UUID prefix to avoid naming conflicts
+            object_key = f"uploads/{uuid.uuid4()}-{original_filename}"
+
+            # Upload to S3
+            with open(file_path, "rb") as file_obj:
+                self.s3_client.put_object(
+                    Bucket=self.bucket_name,
+                    Key=object_key,
+                    Body=file_obj,
+                    ContentType=content_type,
+                )
+
+            # Generate the URL for the uploaded file
+            file_url = f"https://{self.bucket_name}.s3.amazonaws.com/{object_key}"
+
+            return object_key, file_url
+
+        except ClientError as e:
+            logger.error(f"Error uploading file to S3: {e}")
+            raise
+        except FileNotFoundError as e:
+            logger.error(f"File not found: {file_path}")
+            raise ValueError(f"File not found: {file_path}")
+
     async def upload_file(self, file: UploadFile) -> tuple[str, str]:
         """
         Upload a file to S3

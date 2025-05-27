@@ -15,6 +15,20 @@ Please format the information in a JSON object as follows:
 Schema: {schema}
 """
 
+GENERATE_NARRATIVE_SUMMARY = """
+You are on an important mission to generate a narrative summary of the provided paper. Your task is to create a concise and informative summary that captures the essence of the paper, including its key findings, methodologies, and conclusions.
+
+Your summary should be structured in a way that is easy to understand and provides a clear overview of the paper's contributions to its field. Focus on the most significant aspects of the research, avoiding unnecessary details or jargon.
+
+If you encounter any difficult or complex concepts, explain them in simple terms to ensure clarity for a broad audience.
+
+Your summary should be no more than 4000 characters long, and it should be written in a narrative style that flows logically from one point to the next without abrupt transitions or special headings or formatting. The summary should be written in a way that is engaging and informative, suitable for readers who may not be experts in the field.
+
+Write the summary in plain text, without any special formatting or syntax. Do not include any citations or references to specific sections of the paper. It should read like a cohesive brief that could be read on a podcast or in a blog post.
+
+{additional_instructions}
+"""
+
 # See note about Github Flavored Markdown and footnotes: https://github.blog/changelog/2021-09-30-footnotes-now-supported-in-markdown-fields/
 
 ANSWER_PAPER_QUESTION_SYSTEM_PROMPT = """
