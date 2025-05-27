@@ -8,6 +8,7 @@ from typing import Any, Dict, Iterator, List, Literal, Optional, Union
 
 import openai
 from app.database.models import Message
+from app.llm.citation_handler import CitationHandler
 from google import genai
 from google.genai.types import Content, GenerateContentConfig
 from openai.types.chat import (
