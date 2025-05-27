@@ -211,7 +211,7 @@ export function AudioOverview({ paper_id }: AudioOverviewProps) {
             {/* No audio overview exists */}
             {!audioOverview && !jobStatus && (
                 <div className="text-center py-8">
-                    <p className="text-gray-600 mb-4">
+                    <p className="text-secondary-foreground mb-4">
                         Generate an audio overview of this paper to listen to a summary.
                     </p>
                     <button
