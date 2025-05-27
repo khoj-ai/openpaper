@@ -4,7 +4,7 @@ import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Iterator, List, Literal, Optional, Union
+from typing import Any, Dict, Iterator, List, Literal, Optional, Sequence, Union
 
 import openai
 from app.database.models import Message
@@ -47,21 +47,6 @@ class StreamChunk:
         self.is_done = is_done
 
 
-class ChatSession:
-    """Abstract chat session wrapper"""
-
-    def __init__(self, provider: "BaseLLMProvider", session: Any, model: str):
-        self.provider = provider
-        self.session = session
-        self.model = model
-
-    def send_message_stream(self, message: Any, **kwargs) -> Iterator[StreamChunk]:
-        """Send a message and get streaming response"""
-        return self.provider.send_message_stream(
-            self.session, self.model, message, **kwargs
-        )
-
-
 @dataclass
 class TextContent:
     text: str
@@ -78,7 +63,7 @@ class FileContent:
 
 # Union type for all content types
 MessageContent = Union[TextContent, FileContent]
-MessageParam = Union[str, List[MessageContent]]
+MessageParam = Union[str, Sequence[MessageContent]]
 
 
 class BaseLLMProvider(ABC):
@@ -98,15 +83,14 @@ class BaseLLMProvider(ABC):
         pass
 
     @abstractmethod
-    def create_chat_session(
-        self, model: str, history: Any, config: Dict[str, Any]
-    ) -> ChatSession:
-        """Create a chat session for streaming"""
-        pass
-
-    @abstractmethod
     def send_message_stream(
-        self, session: Any, model: str, message: Any, **kwargs
+        self,
+        model: str,
+        message: MessageParam,
+        history: List[Message],
+        system_prompt: str,
+        file: FileContent | None = None,
+        **kwargs,
     ) -> Iterator[StreamChunk]:
         """Send a streaming message"""
         pass
@@ -155,30 +139,51 @@ class GeminiProvider(BaseLLMProvider):
 
         return LLMResponse(text=response.text, model=model, provider=LLMProvider.GEMINI)
 
-    def create_chat_session(
-        self, model: str, history: List[Message], config: GenerateContentConfig
-    ) -> ChatSession:
-        """Create Gemini chat session"""
-        session = self.client.chats.create(
-            model=model,
-            history=self._convert_chat_history_to_api_format(history),
-            config=config,
-        )
-        return ChatSession(self, session, model)
-
     def send_message_stream(
-        self, session: Any, model: str, message: MessageParam, **kwargs
+        self,
+        model: str,
+        message: MessageParam,
+        history: List[Message],
+        system_prompt: str,
+        file: FileContent | None = None,
+        **kwargs,
     ) -> Iterator[StreamChunk]:
         """Send streaming message to Gemini"""
-        converted_message = self._convert_message_content(message)
 
-        for chunk in session.send_message_stream(message=converted_message, **kwargs):
+        config = GenerateContentConfig(
+            system_instruction=system_prompt,
+        )
+
+        # Start with file content for caching if present
+        contents = []
+        if file:
+            formatted_file = self._convert_message_content([file])
+            contents.append(formatted_file)
+
+        # Add history after file
+        formatted_history = self._convert_chat_history_to_api_format(history)
+        contents.extend(formatted_history)
+
+        # Add the new message last
+        converted_message = self._convert_message_content(message)
+        contents.append(converted_message)
+
+        response_stream = self.client.models.generate_content_stream(
+            model=model,
+            contents=contents,
+            config=config,
+            **kwargs,
+        )
+
+        for chunk in response_stream:
             yield StreamChunk(
                 text=chunk.text if chunk.text else "",
                 model=model,
                 provider=LLMProvider.GEMINI,
                 is_done=False,
             )
+            if chunk.usage_metadata:
+                logger.debug(f"Gemini usage stats: {chunk.usage_metadata}")
 
     def get_default_model(self) -> str:
         return self._default_model
@@ -289,32 +294,23 @@ class OpenAIProvider(BaseLLMProvider):
             provider=LLMProvider.OPENAI,
         )
 
-    def create_chat_session(
-        self, model: str, history: List[Message], config: Dict[str, Any]
-    ) -> ChatSession:
-        """Create OpenAI chat session (stores history and config for later use)"""
-        session_data = {"history": history, "config": config, "model": model}
-        return ChatSession(self, session_data, model)
-
     def send_message_stream(
-        self, session: Any, model: str, message: MessageParam, **kwargs
+        self,
+        model: str,
+        message: MessageParam,
+        history: List[Message],
+        system_prompt: str,
+        file: FileContent | None = None,
+        **kwargs,
     ) -> Iterator[StreamChunk]:
         """Send streaming message to OpenAI"""
-        # Convert message format and merge with history
-        messages = self._prepare_openai_messages(session, message)
-
-        # Extract system instruction from config if present
-        openai_kwargs = kwargs.copy()
-        if session.get("config", {}).get("system_instruction"):
-            # Add system message to the beginning
-            system_msg: ChatCompletionSystemMessageParam = {
-                "role": "system",
-                "content": session["config"]["system_instruction"],
-            }
-            messages = [system_msg] + messages
-
+        messages = self._prepare_openai_messages(history, message, system_prompt, file)
         stream = self.client.chat.completions.create(
-            model=model, messages=messages, stream=True, **openai_kwargs
+            model=model,
+            messages=messages,
+            stream=True,
+            stream_options={"include_usage": True},
+            **kwargs,
         )
 
         for chunk in stream:
@@ -325,6 +321,8 @@ class OpenAIProvider(BaseLLMProvider):
                     provider=LLMProvider.OPENAI,
                     is_done=chunk.choices[0].finish_reason is not None,
                 )
+            elif chunk.usage:
+                logger.debug(f"OpenAI usage stats: {chunk.usage}")
 
     def _convert_message_content(self, content: MessageParam) -> Any:
         """Convert generic message content to OpenAI format"""
@@ -354,26 +352,46 @@ class OpenAIProvider(BaseLLMProvider):
         return content
 
     def _prepare_openai_messages(
-        self, session: Any, new_message: MessageParam
+        self,
+        history: List[Message],
+        new_message: MessageParam,
+        system_prompt: str = "",
+        file: FileContent | None = None,
     ) -> list[ChatCompletionMessageParam]:
-        """Prepare OpenAI messages format including history and new message"""
+        """Prepare OpenAI messages format including history and new message with front-loading for caching"""
         messages: list[ChatCompletionMessageParam] = []
 
+        # Follow with system prompt for caching
+        if system_prompt:
+            system_msg: ChatCompletionSystemMessageParam = {
+                "role": "system",
+                "content": system_prompt,
+            }
+            messages.append(system_msg)
+
+        # Add file content early for caching if present
+        if file:
+            file_content = self._convert_message_content([file])
+            file_msg: ChatCompletionUserMessageParam = {
+                "role": "user",
+                "content": file_content,
+            }
+            messages.append(file_msg)
+
         # Add history
-        if session.get("history"):
-            for hist_msg in session["history"]:
-                if hist_msg.role == "user":
-                    user_msg: ChatCompletionUserMessageParam = {
-                        "role": "user",
-                        "content": hist_msg.content,
-                    }
-                    messages.append(user_msg)
-                elif hist_msg.role == "assistant":
-                    assistant_msg: ChatCompletionAssistantMessageParam = {
-                        "role": "assistant",
-                        "content": hist_msg.content,
-                    }
-                    messages.append(assistant_msg)
+        for hist_msg in history:
+            if hist_msg.role == "user":
+                user_msg: ChatCompletionUserMessageParam = {
+                    "role": "user",
+                    "content": str(hist_msg.content),
+                }
+                messages.append(user_msg)
+            elif hist_msg.role == "assistant":
+                assistant_msg: ChatCompletionAssistantMessageParam = {
+                    "role": "assistant",
+                    "content": str(hist_msg.content),
+                }
+                messages.append(assistant_msg)
 
         # Handle new message using the generic converter
         converted_content = self._convert_message_content(new_message)

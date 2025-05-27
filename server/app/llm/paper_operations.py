@@ -229,14 +229,6 @@ class PaperOperations(BaseLLMClient):
             additional_instructions=additional_instructions,
         )
 
-        chat_session = self.create_chat_session(
-            history=conversation_history,
-            config={
-                "system_instruction": formatted_system_prompt,
-            },
-            provider=llm_provider,
-        )
-
         formatted_prompt = ANSWER_PAPER_QUESTION_USER_MESSAGE.format(
             question=f"{question}\n\n{user_citations}" if user_citations else question,
         )
@@ -261,17 +253,20 @@ class PaperOperations(BaseLLMClient):
         pdf_bytes = httpx.get(signed_url).content
 
         message_content = [
-            FileContent(
-                data=pdf_bytes,
-                mime_type="application/pdf",
-                filename=f"{paper.title or 'paper'}.pdf",
-            ),
             TextContent(text=formatted_prompt),
         ]
 
         # Chat with the paper using the LLM
-        for chunk in chat_session.send_message_stream(
+        for chunk in self.send_message_stream(
             message=message_content,
+            file=FileContent(
+                data=pdf_bytes,
+                mime_type="application/pdf",
+                filename=f"{paper.title or 'paper'}.pdf",
+            ),
+            system_prompt=formatted_system_prompt,
+            history=conversation_history,
+            provider=llm_provider,
         ):
             text = chunk.text
 

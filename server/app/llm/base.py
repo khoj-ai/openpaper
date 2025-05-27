@@ -1,15 +1,17 @@
 import logging
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 from app.database.models import Message
 from app.llm.provider import (
     BaseLLMProvider,
-    ChatSession,
+    FileContent,
     GeminiProvider,
     LLMProvider,
     LLMResponse,
+    MessageParam,
     OpenAIProvider,
+    StreamChunk,
 )
 
 logger = logging.getLogger(__name__)
@@ -90,16 +92,21 @@ class BaseLLMClient:
         model = self._get_model_for_type(model_type, provider)
         return self._get_provider(provider).generate_content(model, contents, **kwargs)
 
-    def create_chat_session(
+    def send_message_stream(
         self,
-        history: list[Message],
-        config: Dict[str, Any],
+        message: MessageParam,
+        history: List[Message],
+        system_prompt: str,
+        file: FileContent | None = None,
         model_type: ModelType = ModelType.DEFAULT,
         provider: Optional[LLMProvider] = None,
-    ) -> ChatSession:
-        """Create a chat session for streaming with the specified provider and model type"""
+        **kwargs,
+    ) -> Iterator[StreamChunk]:
+        """Send a message and stream the response"""
         model = self._get_model_for_type(model_type, provider)
-        return self._get_provider(provider).create_chat_session(model, history, config)
+        return self._get_provider(provider).send_message_stream(
+            model, message, history, system_prompt, file, **kwargs
+        )
 
     # Convenience properties for backward compatibility
     @property
