@@ -7,10 +7,8 @@ import requests
 from app.database.crud.base_crud import CRUDBase
 from app.database.models import Paper
 from app.helpers.parser import extract_text_from_pdf
-from app.helpers.s3 import s3_service
 from app.schemas.user import CurrentUser
-from fastapi import HTTPException
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 
