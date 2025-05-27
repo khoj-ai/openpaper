@@ -11,7 +11,7 @@ from app.helpers.paper_search import (
     search_open_alex,
 )
 from app.helpers.scrape import scrape_web_page
-from app.llm.operations import Operations
+from app.llm.operations import operations
 from app.llm.schemas import (
     HypothesisStep,
     MinimalPaperData,
@@ -22,7 +22,6 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
-llm_operations = Operations()
 
 DEFAULT_NUM_PAPERS_TO_COLLATE = 5  # Default number of papers to scrape per step
 
@@ -133,7 +132,7 @@ def process_hypothesis_step(
         logger.info(f"Found {len(minimal_papers)} papers for step")
 
         # Select papers to scrape
-        shortlisted_papers: WhatToScrape = llm_operations.select_papers_to_read(
+        shortlisted_papers: WhatToScrape = operations.select_papers_to_read(
             hypothesis=hypothesis,
             question=step.question,
             motivation=step.motivation,
@@ -184,7 +183,7 @@ def process_hypothesis_step(
                 )
 
                 # Generate summary
-                paper_summary = llm_operations.summarize_paper(
+                paper_summary = operations.summarize_paper(
                     hypothesis=hypothesis,
                     question=step.question,
                     motivation=step.motivation,
@@ -283,7 +282,7 @@ def process_hypothesis_step(
             if paper.contextual_summary and paper.idx
         ]
 
-        findings = llm_operations.collate_findings(
+        findings = operations.collate_findings(
             hypothesis=hypothesis, step=step, papers=papers_for_summary
         )
 

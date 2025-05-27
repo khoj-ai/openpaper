@@ -7,13 +7,12 @@ from app.database.crud.hypothesis_crud import hypothesis_crud
 from app.database.database import SessionLocal
 from app.database.models import HypothesisStep as HypothesisStepDB
 from app.database.models import JobStatus
-from app.llm.operations import Operations
+from app.llm.operations import operations
 from app.llm.schemas import HypothesisFanOut, HypothesisResearchResponse, HypothesisStep
 from app.tasks.hypothesis_step import process_hypothesis_step
 from sqlalchemy import func
 
 logger = logging.getLogger(__name__)
-llm_operations = Operations()
 
 
 def process_hypothesis(job_id: UUID, user_id: UUID) -> None:
@@ -38,7 +37,7 @@ def process_hypothesis(job_id: UUID, user_id: UUID) -> None:
 
         # Step 1: Generate hypothesis
         logger.info(f"Generating hypothesis for question: {job.original_question}")
-        hypothesis = llm_operations.augment_hypothesis(job.original_question)
+        hypothesis = operations.augment_hypothesis(job.original_question)
 
         # Update job with generated hypothesis
         hypothesis_crud.update_job_status(
@@ -51,7 +50,7 @@ def process_hypothesis(job_id: UUID, user_id: UUID) -> None:
         logger.info(f"Generated hypothesis: {hypothesis}")
 
         # Step 2: Generate research steps
-        research_steps: HypothesisFanOut = llm_operations.generate_steps(
+        research_steps: HypothesisFanOut = operations.generate_steps(
             hypothesis=hypothesis
         )
 
@@ -158,7 +157,7 @@ def process_hypothesis(job_id: UUID, user_id: UUID) -> None:
 
         if steps_results:
             final_findings_response: HypothesisResearchResponse = (
-                llm_operations.finalize_hypothesis_research(
+                operations.finalize_hypothesis_research(
                     hypothesis=hypothesis, steps=steps_results
                 )
             )

@@ -91,7 +91,9 @@ class BaseLLMProvider(ABC):
         pass
 
     @abstractmethod
-    def generate_content(self, model: str, contents: str, **kwargs) -> LLMResponse:
+    def generate_content(
+        self, model: str, contents: Union[str, MessageParam], **kwargs
+    ) -> LLMResponse:
         """Generate content using the provider's API"""
         pass
 
@@ -141,9 +143,11 @@ class GeminiProvider(BaseLLMProvider):
     def client(self) -> genai.Client:
         return self._client
 
-    def generate_content(self, model: str, contents: str, **kwargs) -> LLMResponse:
+    def generate_content(
+        self, model: str, contents: Union[str, MessageParam], **kwargs
+    ) -> LLMResponse:
         response = self.client.models.generate_content(
-            model=model, contents=contents, **kwargs
+            model=model, contents=self._convert_message_content(contents), **kwargs
         )
 
         if not response or not response.text:
@@ -239,6 +243,7 @@ class OpenAIProvider(BaseLLMProvider):
     def __init__(self):
 
         self.api_key = os.getenv("OPENAI_API_KEY")
+        # the azure openai endpoint isn't accepting the `file` type in the content list, so disable it for now
         # self.api_key = os.getenv("AZURE_OPENAI_API_KEY")
         endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
         version = os.getenv("AZURE_OPENAI_VERSION", "2025-04-01-preview")
@@ -257,11 +262,18 @@ class OpenAIProvider(BaseLLMProvider):
     def client(self) -> openai.OpenAI:
         return self._client
 
-    def generate_content(self, model: str, contents: str, **kwargs) -> LLMResponse:
-        # Convert Gemini-style contents to OpenAI format if needed
+    def generate_content(
+        self, model: str, contents: Union[str, MessageParam], **kwargs
+    ) -> LLMResponse:
+        # Convert to OpenAI format
+        if isinstance(contents, str):
+            content = contents
+        else:
+            content = self._convert_message_content(contents)
+
         user_msg: ChatCompletionUserMessageParam = {
             "role": "user",
-            "content": contents,
+            "content": content,
         }
 
         response = self.client.chat.completions.create(
@@ -285,7 +297,7 @@ class OpenAIProvider(BaseLLMProvider):
         return ChatSession(self, session_data, model)
 
     def send_message_stream(
-        self, session: Any, model: str, message: Any, **kwargs
+        self, session: Any, model: str, message: MessageParam, **kwargs
     ) -> Iterator[StreamChunk]:
         """Send streaming message to OpenAI"""
         # Convert message format and merge with history

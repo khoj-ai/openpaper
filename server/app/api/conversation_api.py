@@ -12,7 +12,7 @@ from app.database.crud.coversation_crud import (
 from app.database.crud.message_crud import message_crud
 from app.database.database import get_db
 from app.database.models import Conversation
-from app.llm.operations import Operations
+from app.llm.operations import operations
 from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends
@@ -26,8 +26,6 @@ logger = logging.getLogger(__name__)
 # Create API router with prefix
 conversation_router = APIRouter()
 
-llm_operations = Operations()
-
 
 @conversation_router.get("/{conversation_id}")
 async def get_conversation(
@@ -35,7 +33,7 @@ async def get_conversation(
     page: int = 1,
     page_size: int = 10,
     db: Session = Depends(get_db),
-    current_user: Optional[CurrentUser] = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_required_user),
 ) -> JSONResponse:
     """Get a specific conversation by ID"""
     try:
@@ -130,6 +128,10 @@ async def update_conversation(
             obj_in=ConversationUpdate(title=title),
             user=current_user,
         )
+
+        if not conversation:
+            raise ValueError("Failed to update conversation.")
+
         return JSONResponse(
             status_code=200,
             content={"id": str(conversation.id), "title": conversation.title},

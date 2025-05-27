@@ -20,7 +20,7 @@ from app.database.crud.paper_note_crud import (
 from app.database.database import get_db
 from app.database.models import Paper
 from app.helpers.s3 import s3_service
-from app.llm.operations import Operations
+from app.llm.operations import operations
 from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
@@ -34,8 +34,6 @@ logger = logging.getLogger(__name__)
 
 # Create API router with prefix
 paper_router = APIRouter()
-
-llm_operations = Operations()
 
 
 class SharePaperSchemaResponse(BaseModel):
@@ -536,7 +534,7 @@ def create_and_upload_pdf(
 
         # Extract metadata from the temporary file
         try:
-            extract_metadata = llm_operations.extract_paper_metadata(
+            extract_metadata = operations.extract_paper_metadata(
                 paper_id=str(created_doc.id),
                 user=current_user,
                 file_path=temp_file_path,

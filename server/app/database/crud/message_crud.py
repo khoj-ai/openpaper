@@ -105,15 +105,22 @@ class MessageCRUD(CRUDBase[Message, MessageCreate, MessageUpdate]):
         return formatted_messages
 
     def resequence_messages(
-        self, db: Session, *, conversation_id: UUID, gap: int = 10
+        self,
+        db: Session,
+        *,
+        conversation_id: UUID,
+        current_user: CurrentUser,
+        gap: int = 10
     ) -> None:
         """
         Resequence all messages in a conversation with specified gaps
         Useful when needing to insert messages between existing ones
         """
-        messages = self.get_conversation_messages(db, conversation_id=conversation_id)
+        messages = self.get_conversation_messages(
+            db, conversation_id=conversation_id, current_user=current_user
+        )
         for i, message in enumerate(messages):
-            message.sequence = (i + 1) * gap
+            message.sequence = (i + 1) * gap  # type: ignore
         db.commit()
 
 

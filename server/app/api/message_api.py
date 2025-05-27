@@ -9,7 +9,7 @@ from app.database.crud.message_crud import MessageCreate, message_crud
 from app.database.database import get_db
 from app.llm.base import LLMProvider
 from app.llm.citation_handler import CitationHandler
-from app.llm.operations import Operations
+from app.llm.operations import operations
 from app.schemas.message import ResponseStyle
 from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
@@ -27,12 +27,10 @@ logger.setLevel(logging.INFO)
 # Create API router with prefix
 message_router = APIRouter()
 
-llm_operations = Operations()
-
 
 @message_router.get("/models")
 async def get_available_models() -> dict:
-    return {"models": llm_operations.get_chat_model_options()}
+    return {"models": operations.get_chat_model_options()}
 
 
 # Add this new model for the chat request
@@ -66,7 +64,7 @@ async def chat_message_stream(
                 content_chunks = []
                 evidence: dict[str, list[dict[str, Union[str, int]]]] | None = None  # type: ignore
 
-                async for chunk in llm_operations.chat_with_paper(
+                async for chunk in operations.chat_with_paper(
                     paper_id=request.paper_id,
                     conversation_id=request.conversation_id,
                     question=request.user_query,
@@ -84,12 +82,12 @@ async def chat_message_stream(
                         if chunk_type == "content":
                             # Send the content as-is
                             content_chunks.append(chunk_content)
-                            yield f"{json.dumps({'type': 'content', 'content': chunk_content})}"
+                            yield f"{json.dumps({'type': 'content', 'content': chunk_content})}\n\n\n"
 
                         elif chunk_type == "references":
                             evidence = chunk_content
                             # Stream evidence when received
-                            yield f"{json.dumps({'type': 'references', 'content': evidence})}"
+                            yield f"{json.dumps({'type': 'references', 'content': evidence})}\n\n\n"
                     else:
                         logger.warning(f"Received unexpected chunk format: {chunk}")
 
@@ -130,7 +128,7 @@ async def chat_message_stream(
 
             except Exception as e:
                 logger.error(f"Error in streaming response: {e}", exc_info=True)
-                yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+                yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n\n"
 
         return StreamingResponse(response_generator(), media_type="text/event-stream")
 
