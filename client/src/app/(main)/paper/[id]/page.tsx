@@ -13,7 +13,7 @@ import rehypeKatex from 'rehype-katex';
 import remarkMath from 'remark-math';
 import 'katex/dist/katex.min.css' // `rehype-katex` does not import the CSS for you
 
-import { Highlighter, NotebookText, MessageCircle, Focus, X, Eye, Edit, Loader, HelpCircle, ArrowUp, Feather, Share, Share2Icon, LockIcon, Lightbulb, Sparkle, Check, Sparkles } from 'lucide-react';
+import { Highlighter, NotebookText, MessageCircle, Focus, X, Eye, Edit, Loader, HelpCircle, ArrowUp, Feather, Share, Share2Icon, LockIcon, Lightbulb, Sparkle, Check, Sparkles, AudioLines } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import {
     Sidebar,
@@ -52,6 +52,7 @@ import {
     ResponseStyle,
 } from '@/lib/schema';
 import { Input } from '@/components/ui/input';
+import { AudioOverview } from '@/components/AudioOverview';
 
 
 // Interface for the CustomCitationLink component props
@@ -150,6 +151,7 @@ const PaperToolset = {
         { name: "Notes", icon: NotebookText },
         { name: "Annotations", icon: Highlighter },
         { name: "Share", icon: Share },
+        { name: "Audio", icon: AudioLines },
         { name: "Focus", icon: Focus },
     ],
 }
@@ -629,66 +631,71 @@ export default function PaperView() {
 
                 // Decode the chunk
                 const chunk = decoder.decode(value);
+                const events = chunk.split('\n\n\n').filter(event => event.trim());
                 chunkCount++;
                 console.log(`Processing chunk #${chunkCount}:`, chunk);
 
-                try {
-                    // Parse the JSON chunk
-                    const parsedChunk = JSON.parse(chunk);
-                    const chunkType = parsedChunk.type;
-                    const chunkContent = parsedChunk.content;
+                for (const event of events) {
+                    if (!event.trim()) continue;
 
-                    if (chunkType === 'content') {
-                        contentChunks++;
-                        console.log(`Processing content chunk #${contentChunks}:`, chunkContent);
+                    try {
+                        // Parse the JSON chunk
+                        const parsedChunk = JSON.parse(event);
+                        const chunkType = parsedChunk.type;
+                        const chunkContent = parsedChunk.content;
 
-                        // Add this content to our accumulated content
-                        accumulatedContent += chunkContent;
+                        if (chunkType === 'content') {
+                            contentChunks++;
+                            console.log(`Processing content chunk #${contentChunks}:`, chunkContent);
 
-                        // Update the message with the new content
+                            // Add this content to our accumulated content
+                            accumulatedContent += chunkContent;
+
+                            // Update the message with the new content
+                            setMessages(prev => {
+                                const updatedMessages = [...prev];
+                                updatedMessages[updatedMessages.length - 1] = {
+                                    ...updatedMessages[updatedMessages.length - 1],
+                                    content: accumulatedContent,
+                                    references
+                                };
+                                return updatedMessages;
+                            });
+                        }
+                        else if (chunkType === 'references') {
+                            referenceChunks++;
+                            console.log(`Processing references chunk #${referenceChunks}:`, chunkContent);
+
+                            // Store the references
+                            references = chunkContent;
+
+                            // Update the message with the references
+                            setMessages(prev => {
+                                const updatedMessages = [...prev];
+                                updatedMessages[updatedMessages.length - 1] = {
+                                    ...updatedMessages[updatedMessages.length - 1],
+                                    content: accumulatedContent,
+                                    references
+                                };
+                                return updatedMessages;
+                            });
+                        }
+                        else {
+                            console.warn(`Unknown chunk type: ${chunkType}`);
+                        }
+                    } catch (error) {
+                        console.error('Error processing chunk:', error, 'Raw chunk:', chunk);
+                        // Handle the error gracefully
                         setMessages(prev => {
                             const updatedMessages = [...prev];
                             updatedMessages[updatedMessages.length - 1] = {
                                 ...updatedMessages[updatedMessages.length - 1],
-                                content: accumulatedContent,
-                                references
+                                content: "An error occurred while processing the response. Can you try again?",
                             };
                             return updatedMessages;
                         });
+                        break;
                     }
-                    else if (chunkType === 'references') {
-                        referenceChunks++;
-                        console.log(`Processing references chunk #${referenceChunks}:`, chunkContent);
-
-                        // Store the references
-                        references = chunkContent;
-
-                        // Update the message with the references
-                        setMessages(prev => {
-                            const updatedMessages = [...prev];
-                            updatedMessages[updatedMessages.length - 1] = {
-                                ...updatedMessages[updatedMessages.length - 1],
-                                content: accumulatedContent,
-                                references
-                            };
-                            return updatedMessages;
-                        });
-                    }
-                    else {
-                        console.warn(`Unknown chunk type: ${chunkType}`);
-                    }
-                } catch (error) {
-                    console.error('Error processing chunk:', error, 'Raw chunk:', chunk);
-                    // Handle the error gracefully
-                    setMessages(prev => {
-                        const updatedMessages = [...prev];
-                        updatedMessages[updatedMessages.length - 1] = {
-                            ...updatedMessages[updatedMessages.length - 1],
-                            content: "An error occurred while processing the response. Can you try again?",
-                        };
-                        return updatedMessages;
-                    });
-                    break;
                 }
             }
 
@@ -960,7 +967,7 @@ export default function PaperView() {
                                 <div className="sticky bottom-4 right-4 flex justify-end">
                                     <Button
                                         variant="default"
-                                        className="w-fit bg-blue-500 hover:bg-blue-400 dark:hover:bg-blue-600 cursor-pointer z-10"
+                                        className="w-fit bg-blue-500 hover:bg-blue-400 dark:hover:bg-blue-600 cursor-pointer z-10 shadow-md"
                                         onClick={() => {
                                             setRightSideFunction('Chat');
                                         }}
@@ -970,6 +977,13 @@ export default function PaperView() {
                                     </Button>
                                 </div>
                             </div>
+                        </div>
+                    )
+                }
+                {
+                    rightSideFunction === 'Audio' && (
+                        <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto col-span-2">
+                            <AudioOverview paper_id={id} />
                         </div>
                     )
                 }
@@ -1226,7 +1240,7 @@ export default function PaperView() {
                                         <Button
                                             type="submit"
                                             variant="default"
-                                            className="w-fit rounded-full h-fit !px-2 py-2"
+                                            className="w-fit rounded-full h-fit !px-2 py-2 bg-blue-500 hover:bg-blue-400"
                                             disabled={isStreaming}
                                         >
                                             <ArrowUp
