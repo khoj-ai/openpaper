@@ -1,6 +1,8 @@
 import { fetchFromApi } from '@/lib/api';
 import { Pause, Play } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
+import EnigmaticLoadingExperience from './EnigmaticLoadingExperience';
+import { Badge } from '@/components/ui/badge';
 
 interface AudioOverviewProps {
     paper_id: string;
@@ -24,16 +26,28 @@ interface JobStatus {
     paper_id: string;
 }
 
+// TODO: Add buttons to customize voice and additional instructions in the UI
 interface AudioOverviewCreateRequestBody {
     additional_instructions?: string;
     voice?: string;
 }
+
+const audioOverviewLoadingText = [
+    'Generating audio overview...',
+    'Creating your audio summary...',
+    'Summarizing the paper for you...',
+    'Crafting your audio overview...',
+    'Creating a sublime audio experience...',
+    'Transforming text to audio...',
+    'Converting paper to audio...',
+]
 
 export function AudioOverview({ paper_id }: AudioOverviewProps) {
     const [audioOverviewJobId, setAudioOverviewJobId] = useState<string | null>(null);
     const [audioOverview, setAudioOverview] = useState<AudioOverview | null>(null);
     const [jobStatus, setJobStatus] = useState<JobStatus | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [loadingText, setLoadingText] = useState<string>(audioOverviewLoadingText[Math.floor(Math.random() * audioOverviewLoadingText.length)]);
     const [error, setError] = useState<string | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
 
@@ -49,6 +63,8 @@ export function AudioOverview({ paper_id }: AudioOverviewProps) {
         if (jobStatus && (jobStatus.status === 'pending' || jobStatus.status === 'running')) {
             interval = setInterval(() => {
                 pollJobStatus();
+                // Randomize loading text for each poll
+                setLoadingText(audioOverviewLoadingText[Math.floor(Math.random() * audioOverviewLoadingText.length)]);
             }, 2000); // Poll every 2 seconds
         }
 
@@ -213,15 +229,22 @@ export function AudioOverview({ paper_id }: AudioOverviewProps) {
                 <div className="text-center py-8">
                     <div className="inline-flex items-center space-x-2 mb-4">
                         {(jobStatus.status === 'pending' || jobStatus.status === 'running') && (
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                            <EnigmaticLoadingExperience />
                         )}
+                    </div>
+                    <div className="text-lg font-semibold mb-2">
                         <span className={`font-medium ${getStatusColor(jobStatus.status)}`}>
-                            Status: {jobStatus.status.charAt(0).toUpperCase() + jobStatus.status.slice(1)}
+                            Status: <Badge
+                                variant="outline"
+                                className={`text-xs ${getStatusColor(jobStatus.status)}`}
+                            >
+                                {jobStatus.status.charAt(0).toUpperCase() + jobStatus.status.slice(1)}
+                            </Badge>
                         </span>
                     </div>
                     <p className="text-gray-600">
                         {jobStatus.status === 'pending' && 'Your audio overview is queued for processing...'}
-                        {jobStatus.status === 'running' && 'Generating your audio overview...'}
+                        {jobStatus.status === 'running' && loadingText}
                         {jobStatus.status === 'failed' && 'Audio overview generation failed. Please try again.'}
                     </p>
                     {jobStatus.status === 'failed' && (
