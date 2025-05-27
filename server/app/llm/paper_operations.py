@@ -92,6 +92,7 @@ class PaperOperations(BaseLLMClient):
         conversation_id: str,
         question: str,
         current_user: CurrentUser,
+        llm_provider: Optional[LLMProvider] = None,
         user_references: Optional[Sequence[str]] = None,
         response_style: Optional[str] = "normal",
         db: Session = Depends(get_db),
@@ -178,6 +179,7 @@ class PaperOperations(BaseLLMClient):
             config={
                 "system_instruction": formatted_system_prompt,
             },
+            provider=llm_provider,
         )
 
         formatted_prompt = ANSWER_PAPER_QUESTION_USER_MESSAGE.format(

@@ -13,7 +13,7 @@ import rehypeKatex from 'rehype-katex';
 import remarkMath from 'remark-math';
 import 'katex/dist/katex.min.css' // `rehype-katex` does not import the CSS for you
 
-import { Highlighter, NotebookText, MessageCircle, Focus, X, Eye, Edit, Loader, HelpCircle, ArrowUp, Feather, Share, Share2Icon, LockIcon, Lightbulb, Sparkle } from 'lucide-react';
+import { Highlighter, NotebookText, MessageCircle, Focus, X, Eye, Edit, Loader, HelpCircle, ArrowUp, Feather, Share, Share2Icon, LockIcon, Lightbulb, Sparkle, Check, Sparkles } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import {
     Sidebar,
@@ -65,6 +65,15 @@ interface CustomCitationLinkProps extends HTMLAttributes<HTMLElement> {
         properties?: Record<string, any>;
     };
     className?: string;
+}
+
+interface ChatRequestBody {
+    user_query: string;
+    conversation_id: string | null;
+    paper_id: string;
+    user_references: string[];
+    style?: ResponseStyle;
+    llm_provider?: string;
 }
 
 const CustomCitationLink = ({ children, handleCitationClick, messageIndex, className, ...props }: CustomCitationLinkProps) => {
@@ -184,7 +193,7 @@ export default function PaperView() {
 
     const messagesContainerRef = useRef<HTMLDivElement>(null);
     const [currentMessage, setCurrentMessage] = useState('');
-    const [responseStyle, setResponseStyle] = useState<ResponseStyle>(ResponseStyle.Normal);
+    const [responseStyle, setResponseStyle] = useState<ResponseStyle | null>(null);
     const [isStreaming, setIsStreaming] = useState(false);
     const [conversationId, setConversationId] = useState<string | null>(null);
     const [activeCitationKey, setActiveCitationKey] = useState<string | null>(null);
@@ -198,6 +207,8 @@ export default function PaperView() {
     const [isMarkdownPreview, setIsMarkdownPreview] = useState(false);
     const [pendingStarterQuestion, setPendingStarterQuestion] = useState<string | null>(null);
     const [isSharing, setIsSharing] = useState(false);
+    const [availableModels, setAvailableModels] = useState<Record<string, string>>({});
+    const [selectedModel, setSelectedModel] = useState<string>('');
 
     const [rightSideFunction, setRightSideFunction] = useState<string>('Overview');
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -323,6 +334,17 @@ export default function PaperView() {
             }
         }
 
+        async function fetchAvailableModels() {
+            try {
+                const response = await fetchFromApi(`/api/message/models`);
+                if (response.models && Object.keys(response.models).length > 0) {
+                    setAvailableModels(response.models);
+                }
+            } catch (error) {
+                console.error('Error fetching available models:', error);
+            }
+        }
+
         async function fetchPaperNote() {
             try {
                 const response: PaperNoteData = await fetchFromApi(`/api/paper/note?paper_id=${id}`);
@@ -334,6 +356,7 @@ export default function PaperView() {
         }
 
         fetchPaperNote();
+        fetchAvailableModels();
         fetchPaper();
     }, [id]);
 
@@ -563,17 +586,26 @@ export default function PaperView() {
         setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
         setIsStreaming(true);
 
+        const requestBody: ChatRequestBody = {
+            user_query: userMessage.content,
+            conversation_id: conversationId,
+            paper_id: id,
+            user_references: userMessageReferences,
+        };
+
+        if (selectedModel) {
+            requestBody.llm_provider = selectedModel;
+        }
+
+        if (responseStyle) {
+            requestBody.style = responseStyle;
+        }
+
         try {
             const stream = await fetchStreamFromApi('/api/message/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    user_query: userMessage.content,
-                    conversation_id: conversationId,
-                    paper_id: id,
-                    user_references: userMessageReferences,
-                    style: responseStyle,
-                })
+                body: JSON.stringify(requestBody),
             });
 
             setUserMessageReferences([]);
@@ -1131,33 +1163,66 @@ export default function PaperView() {
                                         }}
                                     />
                                     <div className="flex flex-row justify-between gap-2 mt-2">
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button
-                                                    variant="ghost"
-                                                    className="w-fit text-sm"
-                                                    disabled={isStreaming}
-                                                >
-                                                    <Feather
-                                                        className="h-4 w-4 text-secondary-foreground"
-                                                    />
-                                                    {responseStyle}
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent className="w-56">
-                                                {Object.values(ResponseStyle).map((style) => (
-                                                    <DropdownMenuItem
-                                                        key={style}
-                                                        onClick={() => {
-                                                            setResponseStyle(style);
-                                                            setRightSideFunction('Chat');
-                                                        }}
+                                        <div className="flex flex-row gap-2">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button
+                                                        variant="ghost"
+                                                        className="w-fit text-sm"
+                                                        title='Model - Select the model to use for responses'
+                                                        disabled={isStreaming}
                                                     >
-                                                        {style}
-                                                    </DropdownMenuItem>
-                                                ))}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                                        <Sparkles
+                                                            className="h-4 w-4 text-secondary-foreground"
+                                                        />
+                                                        {selectedModel ? availableModels[selectedModel] : Object.keys(availableModels)[0]}
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent className="w-56">
+                                                    {Object.entries(availableModels).map(([key, value]) => (
+                                                        <DropdownMenuItem
+                                                            key={key}
+                                                            onClick={() => setSelectedModel(key)} // Store the provider key
+                                                        >
+                                                            {value} {/* Display the human-readable name */}
+                                                        </DropdownMenuItem>
+                                                    ))}
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button
+                                                        aria-label="Response Style"
+                                                        title='Response Style - Select how detailed the response should be'
+                                                        variant="ghost"
+                                                        className={`w-fit text-sm ${responseStyle ? 'bg-secondary text-secondary-foreground' : ''}`}
+                                                        disabled={isStreaming}
+                                                    >
+                                                        <Feather
+                                                            className="h-4 w-4 text-secondary-foreground"
+                                                        />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent className="w-56">
+                                                    {Object.values(ResponseStyle).map((style) => (
+                                                        <DropdownMenuItem
+                                                            key={style}
+                                                            onClick={() => {
+                                                                setResponseStyle(style);
+                                                                setRightSideFunction('Chat');
+                                                            }}
+                                                        >
+                                                            {style}
+                                                            {
+                                                                style === responseStyle ? (
+                                                                    <Check className="h-4 w-4 text-green-500 mr-2" />
+                                                                ) : null
+                                                            }
+                                                        </DropdownMenuItem>
+                                                    ))}
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </div>
                                         <Button
                                             type="submit"
                                             variant="default"

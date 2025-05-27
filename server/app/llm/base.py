@@ -1,6 +1,6 @@
 import logging
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from app.database.models import Message
 from app.llm.provider import (
@@ -27,16 +27,23 @@ class BaseLLMClient:
         self.default_provider = default_provider
         self._providers: Dict[LLMProvider, BaseLLMProvider] = {}
 
-        # Initialize providers lazily to avoid unnecessary API key requirements
-        self._initialize_provider(default_provider)
+        # Initialize all providers to ensure they are ready for use
+        for provider in LLMProvider:
+            self._initialize_provider(provider)
 
-    def get_model_options(self) -> Dict[LLMProvider, Dict[str, str]]:
+    def get_chat_model_options(self) -> Dict[LLMProvider, str]:
+        def _get_display_name(model_name: str) -> str:
+            """Format model name for display"""
+            split_by_dash = model_name.split("-")
+            if len(split_by_dash) > 1:
+                return "-".join([part.lower() for part in split_by_dash[:2]])
+            return model_name.lower()
+
         """Get available models for each provider"""
         return {
-            provider: {
-                "default": self._get_model_for_type(ModelType.DEFAULT, provider),
-                "fast": self._get_model_for_type(ModelType.FAST, provider),
-            }
+            provider: _get_display_name(
+                self._get_model_for_type(ModelType.DEFAULT, provider)
+            )
             for provider in self._providers.keys()
         }
 

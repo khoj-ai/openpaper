@@ -7,6 +7,7 @@ from typing import List, Optional, Union
 from app.auth.dependencies import get_required_user
 from app.database.crud.message_crud import MessageCreate, message_crud
 from app.database.database import get_db
+from app.llm.base import LLMProvider
 from app.llm.citation_handler import CitationHandler
 from app.llm.operations import Operations
 from app.schemas.message import ResponseStyle
@@ -29,6 +30,11 @@ message_router = APIRouter()
 llm_operations = Operations()
 
 
+@message_router.get("/models")
+async def get_available_models() -> dict:
+    return {"models": llm_operations.get_chat_model_options()}
+
+
 # Add this new model for the chat request
 class ChatMessageRequest(BaseModel):
     paper_id: str
@@ -36,6 +42,7 @@ class ChatMessageRequest(BaseModel):
     user_query: str
     user_references: Optional[List[str]] = None
     style: Optional[ResponseStyle] = ResponseStyle.NORMAL
+    llm_provider: Optional[LLMProvider] = None
 
 
 @message_router.post("/chat")
@@ -64,6 +71,7 @@ async def chat_message_stream(
                     conversation_id=request.conversation_id,
                     question=request.user_query,
                     current_user=current_user,
+                    llm_provider=request.llm_provider,
                     user_references=request.user_references,
                     response_style=request.style,
                     db=db,
