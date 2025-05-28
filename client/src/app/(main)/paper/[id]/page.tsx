@@ -305,13 +305,30 @@ export default function PaperView() {
         }
     }, [id]);
 
-    // Add this effect to scroll to bottom when messages change or streaming is active
     useEffect(() => {
-        // Only auto-scroll when messages are being added at the bottom (during streaming)
+        // When streaming starts, scroll to show the latest message at the top
         if (isStreaming) {
-            scrollToBottom();
+            setTimeout(() => {
+                scrollToLatestMessage();
+            }, 100);
         }
-    }, [messages, isStreaming]);
+    }, [isStreaming]);
+
+    const scrollToLatestMessage = () => {
+        // TODO: Should this be scroll to second to last message / user message instead of latest message? Used for loading from history and loading new message.
+        if (messagesContainerRef.current && messages.length > 0) {
+            // Find the last message element in the DOM
+            const messageElements = messagesContainerRef.current.querySelectorAll('[data-message-index]');
+            const lastMessageElement = messageElements[messageElements.length - 1];
+
+            if (lastMessageElement) {
+                lastMessageElement.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start' // This positions the element at the top of the viewport
+                });
+            }
+        }
+    };
 
     const scrollToBottom = () => {
         if (messagesEndRef.current) {
@@ -425,6 +442,11 @@ export default function PaperView() {
 
                 if (messages.length === 0) {
                     scrollToBottom();
+                } else {
+                    // Add a 1/2 second delay before scrolling to the latest message
+                    setTimeout(() => {
+                        scrollToLatestMessage();
+                    }, 500);
                 }
 
                 setMessages(prev => [...fetchedMessages, ...prev]);
@@ -583,6 +605,9 @@ export default function PaperView() {
 
         // Clear input field
         setCurrentMessage('');
+
+        // Clear user message references
+        setUserMessageReferences([]);
 
         // Create placeholder for assistant response
         setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
@@ -1009,7 +1034,7 @@ export default function PaperView() {
                             )}
 
                             <div
-                                className="flex-1 overflow-y-auto mb-4 space-y-4"
+                                className={`flex-1 overflow-y-auto mb-4 space-y-4 transition-all duration-300 ease-in-out ${isStreaming ? 'pb-24' : ''}`}
                                 ref={messagesContainerRef}
                                 onScroll={handleScroll}
                             >
@@ -1059,6 +1084,7 @@ export default function PaperView() {
                                     messages.map((msg, index) => (
                                         <div
                                             key={index}
+                                            data-message-index={index}
                                             className={`prose dark:prose-invert p-2 !max-w-full rounded-lg ${msg.role === 'user'
                                                 ? 'bg-blue-200 text-blue-800 w-fit'
                                                 : 'w-full text-primary'
