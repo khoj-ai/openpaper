@@ -44,4 +44,13 @@ def extract_text_from_pdf(file_path: str) -> str:
 
         return md_text
     except Exception as e:
-        raise ValueError(f"Failed to extract text from PDF: {str(e)}")
+        try:
+            # Attempt to extract text using pymupdf4llm
+            md_text = pymupdf4llm.to_markdown(file_path)
+            md_text = sanitize_string(md_text)
+            if not is_valid_text(md_text):
+                raise ValueError("No text found in the PDF file.")
+            return md_text
+        except Exception as e:
+            # If both methods fail, raise an error
+            raise ValueError(f"Failed to extract text from PDF: {str(e)}")

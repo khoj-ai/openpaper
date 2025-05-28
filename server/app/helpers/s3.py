@@ -20,6 +20,7 @@ AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME")
+CLOUDFLARE_BUCKET_NAME = os.environ.get("CLOUDFLARE_BUCKET_NAME")
 
 
 class S3Service:
@@ -34,6 +35,7 @@ class S3Service:
             region_name=AWS_REGION,
         )
         self.bucket_name = S3_BUCKET_NAME
+        self.cloudflare_bucket_name = CLOUDFLARE_BUCKET_NAME
 
     def _validate_pdf_url(self, url: str) -> bool:
         """
@@ -102,7 +104,7 @@ class S3Service:
                 os.fsync(temp_file.fileno())
 
             # Generate the URL for the uploaded file
-            file_url = f"https://{self.bucket_name}.s3.amazonaws.com/{object_key}"
+            file_url = f"https://{self.cloudflare_bucket_name}/{object_key}"
 
             return object_key, file_url
 
@@ -141,7 +143,7 @@ class S3Service:
                 )
 
             # Generate the URL for the uploaded file
-            file_url = f"https://{self.bucket_name}.s3.amazonaws.com/{object_key}"
+            file_url = f"https://{self.cloudflare_bucket_name}/{object_key}"
 
             return object_key, file_url
 
@@ -185,7 +187,7 @@ class S3Service:
             )
 
             # Generate the URL for the uploaded file
-            file_url = f"https://{self.bucket_name}.s3.amazonaws.com/{object_key}"
+            file_url = f"https://{self.cloudflare_bucket_name}/{object_key}"
 
             # Rewind the file so it can be read again if needed
             await file.seek(0)
@@ -232,6 +234,28 @@ class S3Service:
                 Params={"Bucket": self.bucket_name, "Key": object_key},
                 ExpiresIn=expiration,
             )
+
+            # Replace the S3 URL with Cloudflare URL
+            if url.startswith(f"https://{self.bucket_name}.s3.amazonaws.com/"):
+                url = url.replace(
+                    f"https://{self.bucket_name}.s3.amazonaws.com/",
+                    f"https://{self.cloudflare_bucket_name}/",
+                )
+            elif url.startswith(
+                f"https://{self.bucket_name}.s3.us-east-1.amazonaws.com/"
+            ):
+                url = url.replace(
+                    f"https://{self.bucket_name}.s3.us-east-1.amazonaws.com/",
+                    f"https://{self.cloudflare_bucket_name}/",
+                )
+            elif url.startswith(
+                f"https://{self.bucket_name}.s3.{AWS_REGION}.amazonaws.com/"
+            ):
+                url = url.replace(
+                    f"https://{self.bucket_name}.s3.{AWS_REGION}.amazonaws.com/",
+                    f"https://{self.cloudflare_bucket_name}/",
+                )
+
             return url
         except ClientError as e:
             logger.error(f"Error generating presigned URL: {e}")
