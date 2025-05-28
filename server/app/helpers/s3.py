@@ -1,13 +1,17 @@
 import logging
 import os
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import BinaryIO, Optional
 from urllib.parse import urlparse
 
 import boto3
 import requests
+from app.database.crud.paper_crud import paper_crud
+from app.schemas.user import CurrentUser
 from botocore.exceptions import ClientError
 from fastapi import UploadFile
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -231,6 +235,153 @@ class S3Service:
             return url
         except ClientError as e:
             logger.error(f"Error generating presigned URL: {e}")
+            return None
+
+    def get_cached_presigned_url(
+        self,
+        db: Session,
+        paper_id: str,
+        object_key: str,
+        expiration: int = 28800,
+        current_user: Optional[CurrentUser] = None,
+    ) -> Optional[str]:
+        """
+        Get a cached presigned URL or generate a new one if expired/missing
+
+        Args:
+            db: Database session
+            paper_id: The paper ID to cache the URL for
+            object_key: The S3 object key
+            expiration: URL expiration time in seconds (default: 8 hours)
+            current_user: Current user for ownership verification
+
+        Returns:
+            str: Presigned URL or None if error
+        """
+        from app.database.crud.paper_crud import PaperUpdate, paper_crud
+
+        try:
+            # Get the paper using CRUD
+            paper = paper_crud.get(db, id=paper_id, user=current_user)
+            if not paper:
+                return None
+
+            # Check if we have a valid cached URL
+            now = datetime.now(timezone.utc)
+            if (
+                paper.cached_presigned_url
+                and paper.presigned_url_expires_at
+                and paper.presigned_url_expires_at > now
+            ):
+                logger.debug(f"Using cached presigned URL for paper {paper_id}")
+                return str(paper.cached_presigned_url)
+
+            # Generate new presigned URL
+            url = self.generate_presigned_url(object_key, expiration)
+            if not url:
+                return None
+
+            # Cache the URL with expiration (subtract 5 minutes for safety buffer)
+            expires_at = now + timedelta(seconds=expiration - 300)
+
+            # Update using CRUD
+            updated_paper = paper_crud.update(
+                db=db,
+                db_obj=paper,
+                obj_in=PaperUpdate(
+                    cached_presigned_url=url, presigned_url_expires_at=expires_at
+                ),
+                user=current_user,
+            )
+
+            if not updated_paper:
+                logger.error(f"Failed to update cached URL for paper {paper_id}")
+                return None
+
+            logger.debug(f"Generated and cached new presigned URL for paper {paper_id}")
+            return url
+
+        except Exception as e:
+            logger.error(f"Error getting cached presigned URL: {e}")
+            return None
+
+    def invalidate_cached_url(
+        self, db: Session, paper_id: str, current_user: Optional[CurrentUser] = None
+    ) -> bool:
+        """
+        Invalidate the cached presigned URL for a paper
+
+        Args:
+            db: Database session
+            paper_id: The paper ID to invalidate
+            current_user: Current user for ownership verification
+
+        Returns:
+            bool: True if invalidated successfully
+        """
+        from app.database.crud.paper_crud import PaperUpdate, paper_crud
+
+        try:
+            paper = paper_crud.get(db, id=paper_id, user=current_user)
+            if not paper:
+                return False
+
+            # Update using CRUD to clear cached URL
+            updated_paper = paper_crud.update(
+                db=db,
+                db_obj=paper,
+                obj_in=PaperUpdate(
+                    cached_presigned_url=None, presigned_url_expires_at=None
+                ),
+                user=current_user,
+            )
+
+            return updated_paper is not None
+
+        except Exception as e:
+            logger.error(f"Error invalidating cached URL: {e}")
+            return False
+
+    def get_cached_presigned_url_by_owner(
+        self,
+        db: Session,
+        paper_id: str,
+        object_key: str,
+        owner_id: str,
+        expiration: int = 28800,
+    ) -> Optional[str]:
+        """
+        Get a cached presigned URL for a paper owned by a specific user (used for shared papers)
+        """
+        from app.database.crud.paper_crud import PaperUpdate, paper_crud
+        from app.database.models import User
+
+        try:
+            # Get the owner user object
+            owner = db.query(User).filter(User.id == owner_id).first()
+            if not owner:
+                return None
+
+            # Convert to CurrentUser
+            current_user = CurrentUser(
+                id=owner.id,
+                email=owner.email,
+                name=owner.name,
+                picture=owner.picture,
+                is_admin=owner.is_admin,
+            )
+
+            # Use the existing method
+            return self.get_cached_presigned_url(
+                db=db,
+                paper_id=paper_id,
+                object_key=object_key,
+                current_user=current_user,
+                expiration=expiration,
+            )
+
+        except Exception as e:
+            logger.error(f"Error getting cached presigned URL by owner: {e}")
             return None
 
 

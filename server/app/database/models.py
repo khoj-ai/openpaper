@@ -135,6 +135,10 @@ class Paper(Base):
     raw_content = Column(Text, nullable=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
+    # Cached presigned URL fields
+    cached_presigned_url = Column(String, nullable=True)
+    presigned_url_expires_at = Column(DateTime(timezone=True), nullable=True)
+
     # Optional fields for sharing
     is_public = Column(Boolean, default=False)
     share_id = Column(String, unique=True, nullable=True, index=True)

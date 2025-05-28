@@ -163,8 +163,11 @@ async def get_audio_overview_file(
         )
 
     # Generate a presigned URL for the audio file
-    signed_url = s3_service.generate_presigned_url(
-        object_key=str(audio_overview.s3_object_key)
+    signed_url = s3_service.get_cached_presigned_url(
+        db,
+        paper_id=str(audio_overview.paper_id),
+        object_key=str(audio_overview.s3_object_key),
+        current_user=current_user,
     )
 
     if not signed_url:

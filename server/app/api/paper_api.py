@@ -240,7 +240,12 @@ async def get_pdf(
 
     paper_data = paper.to_dict()
 
-    signed_url = s3_service.generate_presigned_url(object_key=str(paper.s3_object_key))
+    signed_url = s3_service.get_cached_presigned_url(
+        db,
+        paper_id=str(paper.id),
+        object_key=str(paper.s3_object_key),
+        current_user=current_user,
+    )
     if not signed_url:
         return JSONResponse(status_code=404, content={"message": "File not found"})
 
@@ -322,7 +327,12 @@ async def get_shared_pdf(
 
     paper_data = paper.to_dict()
 
-    signed_url = s3_service.generate_presigned_url(object_key=str(paper.s3_object_key))
+    signed_url = s3_service.get_cached_presigned_url_by_owner(
+        db,
+        paper_id=str(paper.id),
+        object_key=str(paper.s3_object_key),
+        owner_id=str(paper.user_id),
+    )
     if not signed_url:
         return JSONResponse(status_code=404, content={"message": "File not found"})
 

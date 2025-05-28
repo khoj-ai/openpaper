@@ -106,8 +106,11 @@ class PaperOperations(BaseLLMClient):
             additional_instructions=additional_instructions,
         )
 
-        signed_url = s3_service.generate_presigned_url(
-            object_key=str(paper.s3_object_key)
+        signed_url = s3_service.get_cached_presigned_url(
+            db,
+            paper_id=str(paper.id),
+            object_key=str(paper.s3_object_key),
+            current_user=user,
         )
 
         if not signed_url:
@@ -240,8 +243,11 @@ class PaperOperations(BaseLLMClient):
         START_DELIMITER = "---EVIDENCE---"
         END_DELIMITER = "---END-EVIDENCE---"
 
-        signed_url = s3_service.generate_presigned_url(
-            object_key=str(paper.s3_object_key)
+        signed_url = s3_service.get_cached_presigned_url(
+            db,
+            paper_id=str(paper.id),
+            object_key=str(paper.s3_object_key),
+            current_user=current_user,
         )
 
         if not signed_url:

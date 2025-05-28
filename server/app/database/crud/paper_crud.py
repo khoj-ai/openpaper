@@ -1,6 +1,7 @@
 import os
 import tempfile
 import uuid
+from datetime import datetime
 from typing import List, Optional
 
 import requests
@@ -36,7 +37,8 @@ class PaperCreate(PaperBase):
 
 
 class PaperUpdate(PaperBase):
-    pass
+    cached_presigned_url: Optional[str] = None
+    presigned_url_expires_at: Optional[datetime] = None
 
 
 # Paper CRUD that inherits from the base CRUD
