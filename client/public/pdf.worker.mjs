@@ -43941,7 +43941,8 @@ class Fill extends XFAObject {
       propName = "background-color";
       altPropName = "background";
       if (ggrandpa instanceof Ui) {
-        style.backgroundColor = "white";
+        // Don't default to white background
+        // style.backgroundColor = "white";
       }
     }
     if (parent instanceof Rectangle || parent instanceof Arc) {
