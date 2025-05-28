@@ -12,7 +12,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { FileText, GithubIcon, Highlighter, Loader2, LucideFileWarning, MessageSquareText, Play } from "lucide-react";
+import { FileText, GithubIcon, Highlighter, Loader2, LucideFileWarning, MessageSquareText, Upload } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { PdfDropzone } from "@/components/PdfDropzone";
 import Link from "next/link";
@@ -189,17 +189,10 @@ export default function Home() {
 								asChild
 							>
 								<a href="/login">
-									<Play className="h-4 w-4 mr-2" />
-									Get Started
+									<Upload className="h-4 w-4 mr-2" />
+									Upload
 								</a>
 							</Button>
-							<Button size="lg" variant="outline" asChild>
-								<a href="https://github.com/sabaimran/openpaper">
-									<GithubIcon className="h-4 w-4 mr-2" />
-									GitHub
-								</a>
-							</Button>
-
 						</div>
 
 					</div>
@@ -280,12 +273,20 @@ export default function Home() {
 							San Francisco
 						</a>
 					</p>
-					<Button size="lg" className="w-fit" variant="outline" asChild>
-						<Link href="/blog/manifesto">
-							<FileText className="h-4 w-4 mr-2" />
-							Manifesto
-						</Link>
-					</Button>
+					<div className="flex gap-4">
+						<Button size="lg" className="w-fit" variant="outline" asChild>
+							<Link href="/blog/manifesto">
+								<FileText className="h-4 w-4 mr-2" />
+								Manifesto
+							</Link>
+						</Button>
+						<Button size="lg" variant="outline" asChild>
+							<a href="https://github.com/sabaimran/openpaper">
+								<GithubIcon className="h-4 w-4 mr-2" />
+								GitHub
+							</a>
+						</Button>
+					</div>
 				</footer>
 			</div>
 		);
