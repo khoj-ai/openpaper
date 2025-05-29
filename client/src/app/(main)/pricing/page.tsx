@@ -208,7 +208,7 @@ export default function PricingPage() {
                                 <DialogHeader>
                                     <DialogTitle>Free for 1 Month</DialogTitle>
                                     <DialogDescription>
-                                        While we are in open beta, you can upgrade to the Researcher plan for 1 month free.
+                                        While we are in open beta, everyone has access to the Researcher plan until July 1st, 2025. Check back then to start your subscription!
                                     </DialogDescription>
                                 </DialogHeader>
                                 <div className="mt-4">
@@ -222,9 +222,11 @@ export default function PricingPage() {
                                             Cancel
                                         </Button>
                                     </DialogClose>
-                                    <Button className="w-auto bg-blue-600 dark:bg-blue-400" onClick={() => { window.location.href = '/upgrade' }}>
-                                        Upgrade Now
-                                    </Button>
+                                    <DialogClose asChild>
+                                        <Button variant="outline"  className="w-auto bg-blue-600 dark:bg-blue-400 text-primary-foreground">
+                                            Got it
+                                        </Button>
+                                    </DialogClose>
                                 </div>
                             </DialogContent>
                         </Dialog>
