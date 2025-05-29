@@ -1,6 +1,6 @@
 "use client"
 
-import { Clock, FileText, Globe2, Home, LogOut, MessageCircleQuestion, Moon, Sun, User } from "lucide-react";
+import { Clock, FileText, Globe2, Home, LogOut, MessageCircleQuestion, Moon, Route, Sun, User } from "lucide-react";
 
 import {
     Sidebar,
@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/popover";
 import { useIsDarkMode } from "@/hooks/useDarkMode";
 import Image from "next/image";
+import Link from "next/link";
 
 // Menu items.
 const items = [
@@ -197,6 +198,15 @@ export function AppSidebar() {
                                             <p className="text-sm text-muted-foreground">{user.email}</p>
                                         </div>
                                     </div>
+                                    <Link href="/pricing" className="w-full">
+                                        <Button
+                                            variant="outline"
+                                            className="w-full justify-start"
+                                        >
+                                            <Route size={16} className="mr-2" />
+                                            Plans
+                                        </Button>
+                                    </Link>
                                     <Button
                                         variant="outline"
                                         className="w-full justify-start"

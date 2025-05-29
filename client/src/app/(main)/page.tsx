@@ -12,7 +12,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { FileText, GithubIcon, Highlighter, Loader2, LucideFileWarning, MessageSquareText, Upload } from "lucide-react";
+import { FileText, GithubIcon, HandCoins, Highlighter, Loader2, LucideFileWarning, MessageSquareText, Play, Upload } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { PdfDropzone } from "@/components/PdfDropzone";
 import Link from "next/link";
@@ -219,7 +219,7 @@ export default function Home() {
 							</div>
 							<h3 className="text-xl font-semibold">Stay Focused</h3>
 							<p className="text-muted-foreground">
-								Read your papers side by side with your notes. Effortlessly chat, annotate, and understand your paper in flow.
+								Read your papers side by side with your notes. Effortlessly chat with, annotate, and understand your paper in flow.
 							</p>
 						</div>
 						<div className="space-y-4">
@@ -240,6 +240,33 @@ export default function Home() {
 								Ask questions about your papers and get trusted responses with citations linked back to the paper. Go deeper with confidence.
 							</p>
 						</div>
+					</div>
+
+					<div className="flex flex-col items-center text-center space-y-8">
+						<div className="flex gap-2">
+							<Button
+								className="bg-blue-500"
+								size="lg"
+								asChild>
+								<a href="/login">
+									<Play className="h-4 w-4" />
+									Get Started
+								</a>
+							</Button>
+							<Button
+								variant={"outline"}
+								size="lg"
+								asChild>
+								<a href="/pricing">
+									<HandCoins className="h-4 w-4" />
+									Pricing
+								</a>
+							</Button>
+						</div>
+						<h2 className="text-3xl font-bold">Ready to Supercharge Your Research?</h2>
+						<p className="text-lg text-muted-foreground">
+							Join a community of researchers using Open Paper to read, annotate, and understand papers.
+						</p>
 					</div>
 
 					{/* Social Proof */}
