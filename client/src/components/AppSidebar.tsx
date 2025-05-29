@@ -42,7 +42,7 @@ const items = [
         title: "Find Papers",
         url: "/finder",
         icon: Globe2,
-        requiresAuth: true,
+        requiresAuth: false,
     },
     {
         title: "My Papers",
