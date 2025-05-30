@@ -1008,7 +1008,7 @@ export default function PaperView() {
                 {
                     rightSideFunction === 'Audio' && (
                         <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto col-span-2">
-                            <AudioOverview paper_id={id} />
+                            <AudioOverview paper_id={id} paper_title={paperData.title} />
                         </div>
                     )
                 }
