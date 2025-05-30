@@ -6,6 +6,7 @@ from typing import AsyncGenerator, Optional, Sequence, Union
 import httpx
 from app.database.crud.paper_crud import paper_crud
 from app.database.models import Paper
+from app.database.telemetry import track_event
 from app.llm.base import BaseLLMClient
 from app.llm.citation_handler import CitationHandler
 from app.llm.json_parser import JSONParser
@@ -84,6 +85,22 @@ class PaperOperations(BaseLLMClient):
 
         # Parse the response and return the metadata
         metadata = PaperMetadataExtraction.model_validate(response_json)
+
+        # Track metadata extraction event
+        track_event(
+            "extracted_metadata",
+            properties={
+                "has_title": bool(metadata.title),
+                "has_authors": bool(metadata.authors),
+                "has_abstract": bool(metadata.abstract),
+                "has_summary": bool(metadata.summary),
+                "num_starter_questions": (
+                    len(metadata.starter_questions) if metadata.starter_questions else 0
+                ),
+            },
+            user_id=str(user.id),
+        )
+
         return metadata
 
     @retry_llm_operation(max_retries=3, delay=1.0)

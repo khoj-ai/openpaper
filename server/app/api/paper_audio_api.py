@@ -11,6 +11,7 @@ from app.database.crud.audio_overview_crud import (
 from app.database.crud.paper_crud import paper_crud
 from app.database.database import get_db
 from app.database.models import Paper
+from app.database.telemetry import track_event
 from app.helpers.s3 import s3_service
 from app.schemas.user import CurrentUser
 from app.tasks.audio_overview import generate_audio_overview_async
@@ -92,6 +93,15 @@ async def create_audio_overview(
         additional_instructions=audio_request.additional_instructions,
         voice=audio_request.voice or "nova",
         db=db,
+    )
+
+    track_event(
+        "audio_overview_requested",
+        properties={
+            "voice": audio_request.voice or "nova",
+            "job_id": str(job_id_as_uuid),
+        },
+        user_id=str(current_user.id),
     )
 
     # Return the job ID immediately so the client can track progress

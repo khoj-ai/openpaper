@@ -1,12 +1,14 @@
 import json
 import logging
 import uuid
+from datetime import datetime, timezone
 from enum import Enum
 from typing import List, Optional, Union
 
 from app.auth.dependencies import get_required_user
 from app.database.crud.message_crud import MessageCreate, message_crud
 from app.database.database import get_db
+from app.database.telemetry import track_event
 from app.llm.base import LLMProvider
 from app.llm.citation_handler import CitationHandler
 from app.llm.operations import operations
@@ -62,6 +64,7 @@ async def chat_message_stream(
         async def response_generator():
             try:
                 content_chunks = []
+                start_time = datetime.now(timezone.utc)
                 evidence: dict[str, list[dict[str, Union[str, int]]]] | None = None  # type: ignore
 
                 async for chunk in operations.chat_with_paper(
@@ -126,7 +129,41 @@ async def chat_message_stream(
                     current_user=current_user,
                 )
 
+                # Track chat message event
+                track_event(
+                    "did_chat_message",
+                    properties={
+                        "response_style": (
+                            request.style.value if request.style else "normal"
+                        ),
+                        "has_user_references": bool(request.user_references),
+                        "has_evidence": bool(evidence),
+                        "llm_provider": (
+                            request.llm_provider.value
+                            if request.llm_provider
+                            else "default"
+                        ),
+                        "time_taken": (
+                            datetime.now(timezone.utc) - start_time
+                        ).total_seconds(),
+                        "paper_id": str(request.paper_id),
+                    },
+                    user_id=str(current_user.id),
+                )
+
             except Exception as e:
+
+                # Track error event
+                track_event(
+                    "chat_message_error",
+                    properties={
+                        "error": str(e),
+                        "paper_id": str(request.paper_id),
+                        "conversation_id": str(request.conversation_id),
+                    },
+                    user_id=str(current_user.id),
+                )
+
                 logger.error(f"Error in streaming response: {e}", exc_info=True)
                 yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n\n"
 

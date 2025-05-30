@@ -1,10 +1,11 @@
 import logging
 import uuid
-from typing import cast
+from typing import Optional, cast
 
-from app.auth.dependencies import get_db, get_required_user
+from app.auth.dependencies import get_current_user, get_db, get_required_user
 from app.database.crud.hypothesis_crud import hypothesis_crud
 from app.database.models import JobStatus
+from app.database.telemetry import track_event
 from app.helpers.paper_search import search_open_alex
 from app.schemas.user import CurrentUser
 from app.tasks.hypothesis import process_hypothesis
@@ -23,7 +24,7 @@ async def search_papers(
     query: str,
     page: int = 1,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_required_user),
+    current_user: Optional[CurrentUser] = Depends(get_current_user),
 ):
     """
     Search for papers based on the provided query.
@@ -31,6 +32,15 @@ async def search_papers(
     try:
         # Perform the search operation
         results = search_open_alex(query, page=page)
+        track_event(
+            "paper_search",
+            user_id=current_user.id if current_user else None,
+            properties={
+                "query": query,
+                "page": page,
+                "results_count": len(results.results),
+            },
+        )
         return Response(
             content=results.model_dump_json(), media_type="application/json"
         )

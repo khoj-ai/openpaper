@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-from app.auth.dependencies import get_required_user
+from app.auth.dependencies import get_current_user, get_required_user
 from app.database.crud.annotation_crud import annotation_crud
 from app.database.crud.coversation_crud import conversation_crud
 from app.database.crud.highlight_crud import highlight_crud
@@ -19,6 +19,7 @@ from app.database.crud.paper_note_crud import (
 )
 from app.database.database import get_db
 from app.database.models import Paper
+from app.database.telemetry import track_event
 from app.helpers.s3 import s3_service
 from app.llm.operations import operations
 from app.schemas.user import CurrentUser
@@ -271,6 +272,16 @@ async def share_pdf(
     paper_crud.make_public(db, paper_id=id, user=current_user)
     if not paper:
         return JSONResponse(status_code=404, content={"message": "Document not found"})
+
+    track_event(
+        "paper_share",
+        properties={
+            "paper_id": str(paper.id),
+            "share_id": paper.share_id,
+        },
+        user_id=str(current_user.id),
+    )
+
     # Return the generated share id
     return JSONResponse(
         status_code=200,
@@ -313,6 +324,7 @@ async def get_shared_pdf(
     request: Request,
     id: str,
     db: Session = Depends(get_db),
+    current_user: Optional[CurrentUser] = Depends(get_current_user),
 ):
     """
     Get a shared document by ID
@@ -347,6 +359,15 @@ async def get_shared_pdf(
     response["paper"] = paper_data
     response["highlights"] = [highlight.to_dict() for highlight in highlights]
     response["annotations"] = [annotation.to_dict() for annotation in annotations]
+
+    track_event(
+        "paper_shared_view",
+        properties={
+            "paper_id": str(paper.id),
+            "share_id": paper.share_id,
+        },
+        user_id=str(current_user.id) if current_user else None,
+    )
 
     # Return the file URL
     return JSONResponse(status_code=200, content=response)
@@ -608,6 +629,16 @@ def create_and_upload_pdf(
             raise PaperUploadError(
                 f"Failed to update document with metadata for {safe_filename}"
             )
+
+        # Track paper upload event
+        track_event(
+            "paper_upload",
+            properties={
+                "filename": safe_filename,
+                "has_metadata": bool(extract_metadata),
+            },
+            user_id=str(current_user.id),
+        )
 
         # Success case
         return JSONResponse(

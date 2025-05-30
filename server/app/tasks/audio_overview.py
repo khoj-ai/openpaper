@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 from typing import Literal, Optional
 from uuid import UUID
 
@@ -10,8 +11,8 @@ from app.database.crud.audio_overview_crud import (
 from app.database.crud.paper_crud import paper_crud
 from app.database.database import get_db
 from app.database.models import JobStatus
+from app.database.telemetry import track_event
 from app.llm.operations import operations
-from app.llm.paper_operations import PaperOperations
 from app.llm.speech import speaker
 from app.schemas.user import CurrentUser
 from fastapi import Depends
@@ -54,6 +55,8 @@ def generate_audio_overview(
     """
 
     try:
+        start_time = datetime.now(timezone.utc)
+
         # Update job status to running
         audio_overview_job_crud.update_status(
             db,
@@ -127,6 +130,16 @@ def generate_audio_overview(
             f"Successfully completed audio overview generation for paper {paper_id}"
         )
 
+        track_event(
+            "audio_overview_completed",
+            properties={
+                "success": True,
+                "job_id": str(audio_overview_job_id),
+                "time_taken": (datetime.now(timezone.utc) - start_time).total_seconds(),
+            },
+            user_id=str(user.id),
+        )
+
     except Exception as e:
         logger.error(
             f"Error generating audio overview for paper {paper_id}: {str(e)}",
@@ -141,6 +154,18 @@ def generate_audio_overview(
                 status=JobStatus.FAILED,
                 current_user=user,
             )
+            track_event(
+                "audio_overview_failed",
+                properties={
+                    "success": False,
+                    "job_id": str(audio_overview_job_id),
+                    "time_taken": (
+                        datetime.now(timezone.utc) - start_time
+                    ).total_seconds(),
+                },
+                user_id=str(user.id),
+            )
+
         except Exception as update_error:
             logger.error(f"Failed to update job status to failed: {str(update_error)}")
 
