@@ -12,7 +12,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { FileText, GithubIcon, HandCoins, Highlighter, Loader2, LucideFileWarning, MessageSquareText, Play, Upload } from "lucide-react";
+import { FileText, GithubIcon, Globe2, HandCoins, Highlighter, Loader2, LucideFileWarning, MessageSquareText, Mic2, Play, Search, Upload } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { PdfDropzone } from "@/components/PdfDropzone";
 import Link from "next/link";
@@ -212,34 +212,128 @@ export default function Home() {
 					</div>
 
 					{/* Features Grid */}
-					<div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
-						<div className="space-y-4">
-							<div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-								<FileText className="h-5 w-5 text-primary" />
+					<div className="grid grid-cols-1 gap-8">
+						<div className="space-y-4 flex flex-row items-center text-center rounded-lg">
+							<div className="rounded-lg flex items-center justify-center p-6">
+								<Image
+									src="https://assets.khoj.dev/openpaper/read_paper_deeply.png"
+									width={1280}
+									height={640}
+									className="rounded-lg"
+									alt="Read Papers Deeply"
+								/>
 							</div>
-							<h3 className="text-xl font-semibold">Stay Focused</h3>
-							<p className="text-muted-foreground">
-								Read your papers side by side with your notes. Effortlessly chat with, annotate, and understand your paper in flow.
-							</p>
-						</div>
-						<div className="space-y-4">
-							<div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-								<Highlighter className="h-5 w-5 text-primary" />
+							<div className="w-full rounded-lg flex flex-col items-start p-6 space-y-4">
+								<div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+									<FileText className="h-5 w-5 text-primary" />
+								</div>
+								<h3 className="text-xl font-semibold">Stay Focused</h3>
+								<p className="text-muted-foreground text-left">
+									Read your papers side by side with your notes. Effortlessly chat with, annotate, and understand your paper in flow.
+								</p>
 							</div>
-							<h3 className="text-xl font-semibold">Annotate</h3>
-							<p className="text-muted-foreground">
-								Highlight key insights and add notes that stay in sync with your papers. Never lose track of important information again.
-							</p>
 						</div>
-						<div className="space-y-4">
-							<div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-								<MessageSquareText className="h-5 w-5 text-primary" />
+						<div className="space-y-4 flex flex-row items-center text-center">
+							<div className="rounded-lg flex items-center justify-center p-6">
+								<Image
+									src="https://assets.khoj.dev/openpaper/inline_annotations.png"
+									width={1280}
+									height={640}
+									alt="Annotate Papers"
+									className="rounded-lg"
+								/>
 							</div>
-							<h3 className="text-xl font-semibold">Trust AI Insights</h3>
-							<p className="text-muted-foreground">
-								Ask questions about your papers and get trusted responses with citations linked back to the paper. Go deeper with confidence.
-							</p>
+							<div className="w-full rounded-lg flex flex-col items-start p-6 space-y-4">
+								<div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+									<Highlighter className="h-5 w-5 text-primary" />
+								</div>
+								<h3 className="text-xl font-semibold">Annotate</h3>
+								<p className="text-muted-foreground text-left">
+									Highlight key insights and add notes that stay in sync with your papers. Never lose track of important information again.
+								</p>
+							</div>
 						</div>
+						<div className="space-y-4 flex flex-row items-center text-center">
+							<div className="rounded-lg flex items-center justify-center p-6">
+								<Image
+									src="https://assets.khoj.dev/openpaper/grounded_citations.png"
+									width={1280}
+									height={640}
+									alt="Grounded Citations"
+									className="rounded-lg"
+								/>
+							</div>
+							<div className="w-full rounded-lg flex flex-col items-start p-6 space-y-4">
+								<div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+									<MessageSquareText className="h-5 w-5 text-primary" />
+								</div>
+								<h3 className="text-xl font-semibold">Get Grounded Insights</h3>
+								<p className="text-muted-foreground text-left">
+									Ask questions about your papers and get trusted responses with citations linked back to the paper. Go deeper with confidence.
+								</p>
+							</div>
+						</div>
+						<div className="space-y-4 flex flex-row items-center text-center">
+							<div className="rounded-lg flex items-center justify-center p-6">
+								<Image
+									src="https://assets.khoj.dev/openpaper/paper_to_podcast.png"
+									width={1280}
+									height={640}
+									alt="Paper to Podcast"
+									className="rounded-lg"
+								/>
+							</div>
+							<div className="w-full rounded-lg flex flex-col items-start p-6 space-y-4">
+								<div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+									<Mic2 className="h-5 w-5 text-primary" />
+								</div>
+								<h3 className="text-xl font-semibold">Listen to Your Paper</h3>
+								<p className="text-muted-foreground text-left">
+									Get an audio summary that helps you quickly grasp the key points of your paper. Perfect for when you want to catch up on research on your afternoon walk.
+								</p>
+							</div>
+						</div>
+						<div className="space-y-4 flex flex-row items-center text-center">
+							<div className="rounded-lg flex items-center justify-center p-6">
+								<Image
+									src="https://assets.khoj.dev/openpaper/find_related_papers.png"
+									width={1280}
+									height={640}
+									alt="Find Related Research"
+									className="rounded-lg"
+								/>
+							</div>
+							<div className="w-full rounded-lg flex flex-col items-start p-6 space-y-4">
+								<div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+									<Search className="h-5 w-5 text-primary" />
+								</div>
+								<h3 className="text-xl font-semibold">Find Related Research</h3>
+								<p className="text-muted-foreground text-left">
+									Quickly discover papers related to your current research, and dig into Open Access content to expand your understanding.
+								</p>
+							</div>
+						</div>
+						<div className="space-y-4 flex flex-row items-center text-center">
+							<div className="rounded-lg flex items-center justify-center p-6">
+								<Image
+									src="https://assets.khoj.dev/openpaper/share_with_colleagues.png"
+									width={1280}
+									height={640}
+									alt="Find Related Research"
+									className="rounded-lg"
+								/>
+							</div>
+							<div className="w-full rounded-lg flex flex-col items-start p-6 space-y-4">
+								<div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+									<Globe2 className="h-5 w-5 text-primary" />
+								</div>
+								<h3 className="text-xl font-semibold">Share Your Annotations</h3>
+								<p className="text-muted-foreground text-left">
+									Efficiently share your annotations and insights with colleagues or the community. Collaborate on research without losing context.
+								</p>
+							</div>
+						</div>
+
 					</div>
 
 					<div className="flex flex-col items-center text-center space-y-8">

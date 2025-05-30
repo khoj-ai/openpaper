@@ -21,13 +21,13 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
 	title: "Open Paper",
-	description: "The fastest way to annotate, understand, and share your papers.",
+	description: "The fastest way to annotate and deeply understand research papers.",
 	openGraph: {
 		title: "Open Paper",
-		description: "The fastest way to annotate, understand, and share your papers.",
+		description: "The fastest way to annotate and deeply understand research papers.",
 		images: [
 			{
-				url: "https://assets.khoj.dev/openpaper_meta.png",
+				url: "https://assets.khoj.dev/openpaper/hero_open_paper2.png",
 				width: 1280,
 				height: 640,
 				alt: "Open Paper",
@@ -38,8 +38,8 @@ export const metadata: Metadata = {
 	twitter: {
 		card: "summary_large_image",
 		title: "Open Paper",
-		description: "The fastest way to annotate, understand, and share your papers.",
-		images: ["https://assets.khoj.dev/openpaper_meta.png"],
+		description: "The fastest way to annotate and deeply understand your research papers.",
+		images: ["https://assets.khoj.dev/openpaper/hero_open_paper2.png"],
 	},
 };
 
