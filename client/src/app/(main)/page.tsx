@@ -221,6 +221,7 @@ export default function Home() {
 									height={640}
 									className="rounded-lg"
 									alt="Read Papers Deeply"
+									unoptimized
 								/>
 							</div>
 							<div className="w-full rounded-lg flex flex-col items-start p-6 space-y-4">
@@ -241,6 +242,7 @@ export default function Home() {
 									height={640}
 									alt="Annotate Papers"
 									className="rounded-lg"
+									unoptimized
 								/>
 							</div>
 							<div className="w-full rounded-lg flex flex-col items-start p-6 space-y-4">
@@ -261,6 +263,7 @@ export default function Home() {
 									height={640}
 									alt="Grounded Citations"
 									className="rounded-lg"
+									unoptimized
 								/>
 							</div>
 							<div className="w-full rounded-lg flex flex-col items-start p-6 space-y-4">
@@ -281,6 +284,7 @@ export default function Home() {
 									height={640}
 									alt="Paper to Podcast"
 									className="rounded-lg"
+									unoptimized
 								/>
 							</div>
 							<div className="w-full rounded-lg flex flex-col items-start p-6 space-y-4">
@@ -301,6 +305,7 @@ export default function Home() {
 									height={640}
 									alt="Find Related Research"
 									className="rounded-lg"
+									unoptimized
 								/>
 							</div>
 							<div className="w-full rounded-lg flex flex-col items-start p-6 space-y-4">
@@ -321,6 +326,7 @@ export default function Home() {
 									height={640}
 									alt="Find Related Research"
 									className="rounded-lg"
+									unoptimized
 								/>
 							</div>
 							<div className="w-full rounded-lg flex flex-col items-start p-6 space-y-4">
