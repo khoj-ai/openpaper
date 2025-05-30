@@ -69,6 +69,7 @@ export default function RootLayout({
     `,
 					}}
 				/>
+				<script defer data-domain="openpaper.ai" src="https://plausible.io/js/script.js"></script>
 			</head>
 			<body
 				className={`${geistSans.variable} ${geistMono.variable} antialiased`}
