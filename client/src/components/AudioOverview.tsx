@@ -286,15 +286,15 @@ export function AudioOverview({ paper_id, paper_title }: AudioOverviewProps) {
             {/* No audio overview exists */}
             {!audioOverview && !jobStatus && (
                 <div className="text-center py-8">
-                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-8 border border-blue-100">
+                    <div className="bg-blue-50 dark:bg-blue-950 rounded-xl p-8">
                         <FileAudio className="w-12 h-12 text-blue-500 mx-auto mb-4" />
-                        <p className="text-gray-700 mb-6 text-lg">
+                        <p className="text-primary mb-6 text-lg">
                             Transform this paper into an audio summary
                         </p>
                         <button
                             onClick={createAudioOverview}
                             disabled={isLoading}
-                            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-blue-400 disabled:to-indigo-400 text-white px-8 py-3 rounded-lg font-medium text-lg shadow-lg hover:shadow-xl transition-all duration-200"
+                            className="bg-blue-400 dark:bg-blue-600 disabled:from-blue-400 disabled:to-indigo-400 text-white px-8 py-3 rounded-lg font-medium text-lg shadow-lg hover:shadow-xl transition-all duration-200"
                         >
                             {isLoading ? 'Creating...' : 'Generate Audio Overview'}
                         </button>
@@ -305,7 +305,7 @@ export function AudioOverview({ paper_id, paper_title }: AudioOverviewProps) {
             {/* Job in progress */}
             {jobStatus && !audioOverview && (
                 <div className="text-center py-8">
-                    <div className="bg-gradient-to-br from-blue-50 to-teal-50 rounded-xl p-8">
+                    <div className="bg-blue-50 dark:bg-blue-950 rounded-xl p-8">
                         <div className="inline-flex items-center space-x-2 mb-6">
                             {(jobStatus.status === 'pending' || jobStatus.status === 'running') && (
                                 <EnigmaticLoadingExperience />
@@ -319,7 +319,7 @@ export function AudioOverview({ paper_id, paper_title }: AudioOverviewProps) {
                                 {jobStatus.status.charAt(0).toUpperCase() + jobStatus.status.slice(1)}
                             </Badge>
                         </div>
-                        <p className="text-gray-700 text-lg">
+                        <p className="text-primary text-lg">
                             {jobStatus.status === 'pending' && 'Your audio overview is queued for processing...'}
                             {jobStatus.status === 'running' && loadingText}
                             {jobStatus.status === 'failed' && 'Audio overview generation failed. Please try again.'}
