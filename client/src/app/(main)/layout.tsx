@@ -22,6 +22,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
 	title: "Open Paper",
 	description: "The fastest way to annotate and deeply understand research papers.",
+	icons: {
+		icon: "/icon.svg"
+	},
 	openGraph: {
 		title: "Open Paper",
 		description: "The fastest way to annotate and deeply understand research papers.",
