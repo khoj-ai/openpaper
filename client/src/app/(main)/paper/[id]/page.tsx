@@ -1125,12 +1125,18 @@ export default function PaperView() {
                                                                     id={`citation-${value.key}-${index}`}
                                                                     onClick={() => handleCitationClick(value.key, index)}
                                                                 >
-                                                                    <div className="text-xs text-secondary-foreground">
+                                                                    <div className={`text-xs ${msg.role === 'user'
+                                                                        ? 'bg-blue-200 text-blue-800'
+                                                                        : 'text-secondary-foreground'
+                                                                        }`}>
                                                                         <a href={`#citation-ref-${value.key}`}>{value.key}</a>
                                                                     </div>
                                                                     <div
                                                                         id={`citation-ref-${value.key}-${index}`}
-                                                                        className="text-xs text-secondary-foreground"
+                                                                        className={`text-xs ${msg.role === 'user'
+                                                                            ? 'bg-blue-200 text-blue-800'
+                                                                            : 'text-secondary-foreground'
+                                                                            }`}
                                                                     >
                                                                         {value.reference}
                                                                     </div>
