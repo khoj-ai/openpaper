@@ -44,7 +44,7 @@ async def get_me(current_user: Optional[CurrentUser] = Depends(get_current_user)
         return AuthResponse(success=False, message="Not authenticated")
 
     # Track the event of fetching user details
-    track_event("user_details_fetched", user_id=str(current_user.id), properties={""})
+    track_event("user_details_fetched", user_id=str(current_user.id))
     return AuthResponse(success=True, message="User found", user=current_user)
 
 
