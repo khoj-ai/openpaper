@@ -213,7 +213,7 @@ export default function Home() {
 
 					{/* Features Grid */}
 					<div className="grid grid-cols-1 gap-8">
-						<div className="space-y-4 flex flex-row items-center text-center rounded-lg">
+						<div className="space-y-4 flex flex-col lg:flex-row items-center text-center rounded-lg">
 							<div className="rounded-lg flex items-center justify-center p-6">
 								<Image
 									src="https://assets.khoj.dev/openpaper/read_paper_deeply.png"
@@ -234,7 +234,7 @@ export default function Home() {
 								</p>
 							</div>
 						</div>
-						<div className="space-y-4 flex flex-row items-center text-center">
+						<div className="space-y-4 flex flex-col lg:flex-row items-center text-center">
 							<div className="rounded-lg flex items-center justify-center p-6">
 								<Image
 									src="https://assets.khoj.dev/openpaper/inline_annotations.png"
@@ -255,7 +255,7 @@ export default function Home() {
 								</p>
 							</div>
 						</div>
-						<div className="space-y-4 flex flex-row items-center text-center">
+						<div className="space-y-4 flex flex-col lg:flex-row items-center text-center">
 							<div className="rounded-lg flex items-center justify-center p-6">
 								<Image
 									src="https://assets.khoj.dev/openpaper/grounded_citations.png"
@@ -276,7 +276,7 @@ export default function Home() {
 								</p>
 							</div>
 						</div>
-						<div className="space-y-4 flex flex-row items-center text-center">
+						<div className="space-y-4 flex flex-col lg:flex-row items-center text-center">
 							<div className="rounded-lg flex items-center justify-center p-6">
 								<Image
 									src="https://assets.khoj.dev/openpaper/paper_to_podcast.png"
@@ -297,7 +297,7 @@ export default function Home() {
 								</p>
 							</div>
 						</div>
-						<div className="space-y-4 flex flex-row items-center text-center">
+						<div className="space-y-4 flex flex-col lg:flex-row items-center text-center">
 							<div className="rounded-lg flex items-center justify-center p-6">
 								<Image
 									src="https://assets.khoj.dev/openpaper/find_related_papers.png"
@@ -318,7 +318,7 @@ export default function Home() {
 								</p>
 							</div>
 						</div>
-						<div className="space-y-4 flex flex-row items-center text-center">
+						<div className="space-y-4 flex flex-col lg:flex-row items-center text-center">
 							<div className="rounded-lg flex items-center justify-center p-6">
 								<Image
 									src="https://assets.khoj.dev/openpaper/share_with_colleagues.png"
@@ -339,7 +339,6 @@ export default function Home() {
 								</p>
 							</div>
 						</div>
-
 					</div>
 
 					<div className="flex flex-col items-center text-center space-y-8">
