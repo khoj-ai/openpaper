@@ -115,10 +115,18 @@ class Session(Base):
     user = relationship("User", back_populates="sessions")
 
 
+class PaperStatus(str, Enum):
+    todo = "todo"
+    reading = "reading"
+    finished = "finished"
+
+
 class Paper(Base):
     __tablename__ = "papers"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # we can change the default to TODO once we have some kind of bulk paper upload? for now, every upload automatically converts to reading
+    status = Column(String, nullable=False, default=PaperStatus.reading)
     filename = Column(String, nullable=False)
     file_url = Column(String, nullable=False)
     s3_object_key = Column(

@@ -18,7 +18,7 @@ from app.database.crud.paper_note_crud import (
     paper_note_crud,
 )
 from app.database.database import get_db
-from app.database.models import Paper
+from app.database.models import Paper, PaperStatus
 from app.database.telemetry import track_event
 from app.helpers.s3 import s3_service
 from app.llm.operations import operations
@@ -76,6 +76,7 @@ async def get_paper_ids(
                     "institutions": paper.institutions,
                     "keywords": paper.keywords,
                     "summary": paper.summary,
+                    "status": paper.status,
                 }
                 for paper in papers
             ]
@@ -140,6 +141,35 @@ async def create_paper_note(
         )
 
     return JSONResponse(content=paper_note.to_dict(), status_code=201)
+
+
+@paper_router.post("/status")
+async def set_paper_status(
+    paper_id: str,
+    status: PaperStatus,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """
+    Set the status of a paper
+    """
+    target_paper = paper_crud.get(db, id=paper_id, user=current_user)
+
+    if not target_paper:
+        raise HTTPException(status_code=404, detail=f"No document with id {paper_id}")
+
+    paper_update = PaperUpdate(status=status)
+    updated_paper = paper_crud.update(
+        db=db, db_obj=target_paper, obj_in=paper_update, user=current_user
+    )
+
+    if not updated_paper:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update paper status for document ID {paper_id}",
+        )
+
+    return JSONResponse(content=updated_paper.to_dict(), status_code=200)
 
 
 @paper_router.put("/note")

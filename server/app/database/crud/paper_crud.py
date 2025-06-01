@@ -6,7 +6,7 @@ from typing import List, Optional
 
 import requests
 from app.database.crud.base_crud import CRUDBase
-from app.database.models import Paper
+from app.database.models import Paper, PaperStatus
 from app.helpers.parser import extract_text_from_pdf
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
@@ -37,6 +37,7 @@ class PaperCreate(PaperBase):
 
 
 class PaperUpdate(PaperBase):
+    status: Optional[PaperStatus] = PaperStatus.todo
     cached_presigned_url: Optional[str] = None
     presigned_url_expires_at: Optional[datetime] = None
 
