@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ExternalLink, Users, CalendarDays, Search } from "lucide-react"
+import { ExternalLink, Users, CalendarDays, Search, Building2 } from "lucide-react"
 import { fetchFromApi } from "@/lib/api"
 import {
     Pagination,
@@ -42,10 +42,15 @@ interface OpenAlexResponse {
         }>
         authorships?: Array<{
             author?: {
+                id: string
+                orcid?: string
                 display_name?: string
             }
             institutions?: {
+                id: string
+                type: string
                 display_name: string
+                ror?: string
             }[]
         }>
         topics?: Array<{
@@ -71,6 +76,17 @@ interface PaperResultCardProps {
 }
 
 function PaperResultCard({ paper }: PaperResultCardProps) {
+
+    // Get unique institutions from authorships
+    // Note: This assumes institutions are unique by their ID. Might have duplicates if multiple authors share the same institution.
+    const institutions = paper.authorships?.flatMap(a => a.institutions || []).filter(Boolean).filter((inst, index, self) =>
+        index === self.findIndex(i => i.id === inst.id)
+    ) || [];
+
+    const hasInstitutions = institutions.length > 0;
+    const hasAuthors = paper.authorships?.some(a => a.author?.display_name) || false;
+    const numAuthors = paper.authorships?.length || 0;
+
     return (
         <Card key={paper.id} className="flex flex-col">
             <CardHeader>
@@ -82,18 +98,65 @@ function PaperResultCard({ paper }: PaperResultCardProps) {
             </CardHeader>
 
             <CardContent className="flex-grow space-y-4">
-                {paper.authorships && (
+                {hasAuthors && (
                     <div className="flex items-center gap-2">
                         <Users className="h-4 w-4" />
                         <span className="text-sm text-muted-foreground">
-                            {paper.authorships.map(a => a.author?.display_name).filter(Boolean).join(", ")}
+                            {
+                                paper.authorships?.slice(0, 3).map(
+                                    a => a.author?.orcid ? (
+                                        <a
+                                            key={a.author.id}
+                                            href={`${a.author.orcid}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-accent-foreground hover:underline mx-2"
+                                        >
+                                            {a.author.display_name}
+                                        </a>
+                                    ) : (
+                                        <span
+                                            key={a.author?.id || a.author?.display_name}
+                                            className="text-muted-foreground mx-2"
+                                        >
+                                            {a.author?.display_name || "Unknown Author"}
+                                        </span>
+                                    )
+                                )
+                            }
+                            {numAuthors > 3 && (
+                                <span className="text-muted-foreground">
+                                    and {numAuthors - 3} more
+                                </span>
+                            )}
+                        </span>
+                    </div>
+                )}
+
+                {hasInstitutions && (
+                    <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4" />
+                        <span className="text-sm text-muted-foreground">
+                            {
+                                institutions.slice(0, 3).map(institution => (
+                                    <a
+                                        key={institution.id}
+                                        href={`${institution.ror}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-accent-foreground hover:underline mx-2"
+                                    >
+                                        {institution.display_name}
+                                    </a>
+                                ))
+                            }
                         </span>
                     </div>
                 )}
 
                 {paper.keywords && (
                     <div className="flex flex-wrap gap-2">
-                        {paper.keywords.map((keyword, i) => (
+                        {paper.keywords.slice(0, 3).map((keyword, i) => (
                             <Badge key={i} variant="secondary">
                                 {keyword.display_name}
                             </Badge>
@@ -103,7 +166,7 @@ function PaperResultCard({ paper }: PaperResultCardProps) {
                 {
                     paper.topics && (
                         <div className="flex flex-wrap gap-2">
-                            {paper.topics.map((topic, i) => (
+                            {paper.topics.slice(0, 1).map((topic, i) => (
                                 <Badge key={i} variant="secondary">
                                     {topic.display_name}
                                 </Badge>
