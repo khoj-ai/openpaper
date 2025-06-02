@@ -810,6 +810,7 @@ export default function PaperView() {
                 )
             }
         } catch (error) {
+            console.error('Error updating paper status:', error);
             toast.error("Failed to update paper status.");
         }
     };

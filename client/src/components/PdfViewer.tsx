@@ -8,7 +8,7 @@ import "react-pdf/dist/esm/Page/TextLayer.css";
 import "../app/globals.css";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, ArrowLeft, ArrowRight, X, Minus, Plus, CircleDashed, CheckCircle, Circle } from "lucide-react";
+import { Search, ArrowLeft, ArrowRight, X, Minus, Plus } from "lucide-react";
 import { addHighlightToNodes, findAllHighlightedPassages } from "./utils/PdfHighlightUtils";
 import { usePdfSearch } from "./hooks/PdfSearch";
 import { usePdfNavigation } from "./hooks/PdfNavigation";
