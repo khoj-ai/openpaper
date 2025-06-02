@@ -60,8 +60,8 @@ async def get_onboarding_status(
     has_messages = message_crud.has_any(db, user=current_user)
     has_papers = paper_crud.has_any(db, user=current_user)
     has_notes = paper_note_crud.has_any(db, user=current_user)
-    has_completed_paper = paper_crud.get_by(
-        db, user=current_user, status=PaperStatus.completed
+    has_completed_paper = bool(
+        paper_crud.get_by(db, user=current_user, status=PaperStatus.completed)
     )
 
     onboarding_completed = all(
