@@ -14,6 +14,7 @@ from app.database.crud.paper_crud import paper_crud
 from app.database.crud.paper_note_crud import paper_note_crud
 from app.database.crud.user_crud import user as user_crud
 from app.database.database import get_db
+from app.database.models import PaperStatus
 from app.database.telemetry import track_event
 from app.schemas.user import CurrentUser, UserCreateWithProvider
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -59,6 +60,9 @@ async def get_onboarding_status(
     has_messages = message_crud.has_any(db, user=current_user)
     has_papers = paper_crud.has_any(db, user=current_user)
     has_notes = paper_note_crud.has_any(db, user=current_user)
+    has_completed_paper = paper_crud.get_by(
+        db, user=current_user, status=PaperStatus.completed
+    )
 
     onboarding_completed = all(
         [
@@ -67,6 +71,7 @@ async def get_onboarding_status(
             has_messages,
             has_papers,
             has_notes,
+            has_completed_paper,
         ]
     )
 
@@ -77,6 +82,7 @@ async def get_onboarding_status(
         "has_messages": has_messages,
         "has_papers": has_papers,
         "has_notes": has_notes,
+        "has_completed_paper": has_completed_paper,
     }
 
     return Response(

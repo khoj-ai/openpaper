@@ -31,8 +31,8 @@ class PaperBase(BaseModel):
 
 class PaperCreate(PaperBase):
     # Only mandate required fields for creation, others are optional
-    filename: str
-    file_url: str
+    filename: str  # type: ignore
+    file_url: str  # type: ignore
     s3_object_key: Optional[str] = None
 
 
@@ -121,8 +121,8 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
         if paper:
             # Generate a unique share ID if not already present
             if not paper.share_id:
-                paper.share_id = str(uuid.uuid4())
-            paper.is_public = True
+                paper.share_id = str(uuid.uuid4())  # type: ignore
+            paper.is_public = True  # type: ignore
             db.commit()
             db.refresh(paper)
         return paper
@@ -133,7 +133,7 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
         """Make a paper private (not publicly accessible)"""
         paper = self.get(db, id=paper_id, user=user)
         if paper:
-            paper.is_public = False
+            paper.is_public = False  # type: ignore
             db.commit()
             db.refresh(paper)
         return paper

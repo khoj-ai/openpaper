@@ -63,6 +63,54 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             )
             return []
 
+    def get_by(
+        self, db: Session, *, user: Optional[CurrentUser] = None, **filters
+    ) -> Optional[ModelType]:
+        """Get a single record by arbitrary filters"""
+        try:
+            query = db.query(self.model)
+            query = self._filter_by_user(query, user)
+
+            # Apply filters
+            for field, value in filters.items():
+                if hasattr(self.model, field):
+                    query = query.filter(getattr(self.model, field) == value)
+
+            return query.first()
+        except Exception as e:
+            logger.error(
+                f"Error retrieving {self.model.__name__} with filters {filters}: {str(e)}",
+                exc_info=True,
+            )
+            return None
+
+    def get_multi_by(
+        self,
+        db: Session,
+        *,
+        skip: int = 0,
+        limit: int = 100,
+        user: Optional[CurrentUser] = None,
+        **filters,
+    ) -> List[ModelType]:
+        """Get multiple records by arbitrary filters"""
+        try:
+            query = db.query(self.model)
+            query = self._filter_by_user(query, user)
+
+            # Apply filters
+            for field, value in filters.items():
+                if hasattr(self.model, field):
+                    query = query.filter(getattr(self.model, field) == value)
+
+            return query.offset(skip).limit(limit).all()
+        except Exception as e:
+            logger.error(
+                f"Error retrieving multiple {self.model.__name__} objects with filters {filters}: {str(e)}",
+                exc_info=True,
+            )
+            return []
+
     def create(
         self,
         db: Session,

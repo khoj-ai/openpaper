@@ -118,7 +118,7 @@ class Session(Base):
 class PaperStatus(str, Enum):
     todo = "todo"
     reading = "reading"
-    finished = "finished"
+    completed = "completed"
 
 
 class Paper(Base):

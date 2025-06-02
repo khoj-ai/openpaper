@@ -84,6 +84,43 @@ async def get_paper_ids(
     )
 
 
+@paper_router.get("/active")
+async def get_active_paper_ids(
+    db: Session = Depends(get_db),
+    current_user: Optional[CurrentUser] = Depends(get_required_user),
+):
+    """
+    Get all active paper IDs
+    """
+    papers: List[Paper] = paper_crud.get_multi_by(
+        db, user=current_user, status=PaperStatus.reading
+    )
+    if not papers:
+        return JSONResponse(
+            status_code=404, content={"message": "No active papers found"}
+        )
+    return JSONResponse(
+        status_code=200,
+        content={
+            "papers": [
+                {
+                    "id": str(paper.id),
+                    "filename": paper.filename,
+                    "title": paper.title,
+                    "created_at": str(paper.created_at),
+                    "abstract": paper.abstract,
+                    "authors": paper.authors,
+                    "institutions": paper.institutions,
+                    "keywords": paper.keywords,
+                    "summary": paper.summary,
+                    "status": paper.status,
+                }
+                for paper in papers
+            ]
+        },
+    )
+
+
 @paper_router.get("/note")
 async def get_paper_note(
     paper_id: str,
