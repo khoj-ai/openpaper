@@ -8,7 +8,7 @@ import "react-pdf/dist/esm/Page/TextLayer.css";
 import "../app/globals.css";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, ArrowLeft, ArrowRight, X, Minus, Plus } from "lucide-react";
+import { Search, ArrowLeft, ArrowRight, X, Minus, Plus, CircleDashed, CheckCircle, Circle } from "lucide-react";
 import { addHighlightToNodes, findAllHighlightedPassages } from "./utils/PdfHighlightUtils";
 import { usePdfSearch } from "./hooks/PdfSearch";
 import { usePdfNavigation } from "./hooks/PdfNavigation";
@@ -19,6 +19,8 @@ import {
 	PaperHighlightAnnotation,
 } from '@/lib/schema';
 import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
+import { getStatusIcon, PaperStatus } from "./utils/PdfStatus";
 
 interface PdfViewerProps {
 	pdfUrl: string;
@@ -42,6 +44,8 @@ interface PdfViewerProps {
 	renderAnnotations: (highlights: PaperHighlightAnnotation[]) => void;
 	annotations: PaperHighlightAnnotation[];
 	setAddedContentForPaperNote: (content: string) => void;
+	handleStatusChange?: (status: PaperStatus) => void;
+	paperStatus?: PaperStatus;
 }
 
 export function PdfViewer(props: PdfViewerProps) {
@@ -67,6 +71,8 @@ export function PdfViewer(props: PdfViewerProps) {
 		renderAnnotations,
 		annotations,
 		setAddedContentForPaperNote,
+		paperStatus,
+		handleStatusChange = () => { },
 	} = props;
 
 	const [currentPage, setCurrentPage] = useState<number>(1);
@@ -256,7 +262,7 @@ export function PdfViewer(props: PdfViewerProps) {
 	return (
 		<div ref={containerRef} className="flex flex-col items-center gap-4 w-full h-[calc(100vh-100px)] overflow-y-auto" id="pdf-container">
 			{/* Toolbar */}
-			<div className="sticky top-0 z-10 flex items-center justify-between bg-white/80 dark:bg-white/10 backdrop-blur-sm p-2 rounded-none w-full border-b border-gray-300">
+			<div className="sticky top-0 z-10 flex items-center justify-between bg-white/80 dark:bg-black/80 backdrop-blur-sm p-2 rounded-none w-full border-b border-gray-300">
 				<div className="flex items-center gap-2 flex-grow max-w-md">
 					<Input
 						type="text"
@@ -354,6 +360,40 @@ export function PdfViewer(props: PdfViewerProps) {
 						<Plus size={16} />
 					</Button>
 				</div>
+
+				{/* Metadata Toolbar */}
+				{
+					paperStatus && (
+						<div className="flex items-center gap-2">
+							<DropdownMenu>
+								<DropdownMenuTrigger asChild>
+									<Button size="sm" variant="outline" className="h-8 px-2">
+										{paperStatus && (
+											<span className="ml-1 text-xs text-muted-foreground flex items-center gap-1">
+												{getStatusIcon(paperStatus)}
+												{paperStatus}
+											</span>
+										)}
+									</Button>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent align="end">
+									<DropdownMenuItem onClick={() => handleStatusChange("todo")}>
+										{getStatusIcon("todo")}
+										Todo
+									</DropdownMenuItem>
+									<DropdownMenuItem onClick={() => handleStatusChange("reading")}>
+										{getStatusIcon("reading")}
+										Reading
+									</DropdownMenuItem>
+									<DropdownMenuItem onClick={() => handleStatusChange("completed")}>
+										{getStatusIcon("completed")}
+										Completed
+									</DropdownMenuItem>
+								</DropdownMenuContent>
+							</DropdownMenu>
+						</div>
+					)
+				}
 			</div>
 
 			<Document

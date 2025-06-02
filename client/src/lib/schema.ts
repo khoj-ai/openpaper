@@ -1,3 +1,4 @@
+import { PaperStatus } from "@/components/utils/PdfStatus";
 
 export interface PaperData {
     filename: string;
@@ -12,6 +13,7 @@ export interface PaperData {
     starter_questions: string[];
     is_public: boolean;
     share_id: string;
+    status: PaperStatus;
 }
 
 export interface PaperNoteData {

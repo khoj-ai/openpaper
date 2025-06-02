@@ -82,7 +82,7 @@ export function AppSidebar() {
         // Define an async function inside useEffect
         const fetchPapers = async () => {
             try {
-                const response = await fetchFromApi("/api/paper/all");
+                const response = await fetchFromApi("/api/paper/active");
                 const sortedPapers = response.papers.sort((a: PaperItem, b: PaperItem) => {
                     return new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime();
                 });
@@ -134,7 +134,7 @@ export function AppSidebar() {
                                     <SidebarMenuItem>
                                         <SidebarMenuButton>
                                             <Clock size={16} />
-                                            <span>Recent</span>
+                                            <span>Queue</span>
                                         </SidebarMenuButton>
                                         <SidebarMenuSub>
                                             {

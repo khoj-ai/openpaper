@@ -93,7 +93,11 @@ export default function RootLayout({
 						</PostHogProvider>
 					</AuthProvider>
 				</ThemeProvider>
-				<Toaster />
+				<Toaster
+					position="top-right"
+					richColors
+					duration={3000}
+				/>
 			</body>
 		</html>
 	);

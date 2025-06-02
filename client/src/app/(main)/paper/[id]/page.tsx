@@ -53,6 +53,7 @@ import {
 } from '@/lib/schema';
 import { Input } from '@/components/ui/input';
 import { AudioOverview } from '@/components/AudioOverview';
+import { PaperStatus, PaperStatusEnum } from '@/components/utils/PdfStatus';
 
 
 // Interface for the CustomCitationLink component props
@@ -791,6 +792,28 @@ export default function PaperView() {
         }
     };
 
+    const handleStatusChange = (status: PaperStatus) => {
+        try {
+            const url = `/api/paper/status?status=${status}&paper_id=${id}`;
+            fetchFromApi(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            setPaperData(prev => prev ? { ...prev, status: status } : null);
+            if (status === PaperStatusEnum.COMPLETED) {
+                toast.success(
+                    "Completed reading! 🎉",
+                    {
+                        description: `Congrats on finishing ${paperData?.title}!`,
+                        duration: 5000,
+                    }
+                )
+            }
+        } catch (error) {
+            toast.error("Failed to update paper status.");
+        }
+    };
+
     if (loading) return <div>Loading paper data...</div>;
 
     if (!paperData) return <div>Paper not found</div>;
@@ -826,6 +849,8 @@ export default function PaperView() {
                                 renderAnnotations={renderAnnotations}
                                 annotations={annotations}
                                 setAddedContentForPaperNote={setAddedContentForPaperNote}
+                                handleStatusChange={handleStatusChange}
+                                paperStatus={paperData.status}
                             />
                         </div>
                     )}

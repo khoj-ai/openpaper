@@ -15,6 +15,7 @@ export interface OnboardingChecklistData {
     has_highlights: boolean;
     has_messages: boolean;
     has_notes: boolean;
+    has_completed_paper: boolean;
     onboarding_completed: boolean;
 }
 
@@ -43,6 +44,8 @@ export default function OnboardingChecklist() {
     const [numCompleted, setNumCompleted] = useState(0);
     const { user, loading: userLoading } = useAuth();
 
+    const itemCount = 7; // Total items in the checklist
+
     const fetchOnboardingData = async () => {
         if (userLoading) {
             setLoadingOnboardingData(true);
@@ -66,7 +69,8 @@ export default function OnboardingChecklist() {
                 response.has_annotations,
                 response.has_highlights,
                 response.has_messages,
-                response.has_notes
+                response.has_notes,
+                response.has_completed_paper
             ].filter(Boolean).length;
 
             setNumCompleted(completedCount + 1); // +1 for account creation
@@ -99,11 +103,11 @@ export default function OnboardingChecklist() {
                 <Button variant={"ghost"} className="flex items-center gap-2">
                     <Clipboard className="h-4 w-4" />
                     Onboarding Checklist
-                    <div>{numCompleted}/6</div>
+                    <div>{numCompleted}/{itemCount}</div>
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-72 z-100 bg-background p-4 rounded-lg border shadow-md">
-                <Progress value={numCompleted * 100 / 6} className="bg-blue-500 my-1" />
+                <Progress value={numCompleted * 100 / itemCount} className="bg-blue-500 my-1" />
                 <ChecklistItem
                     completed={!!user}
                     text="Create an account"
@@ -127,6 +131,10 @@ export default function OnboardingChecklist() {
                 <ChecklistItem
                     completed={user && onboardingData?.has_messages || false}
                     text="Chat with your paper"
+                />
+                <ChecklistItem
+                    completed={user && onboardingData?.has_completed_paper || false}
+                    text="Finish reading your first paper"
                 />
             </PopoverContent>
         </Popover>
