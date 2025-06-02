@@ -100,6 +100,7 @@ class OpenAlexWork(BaseOpenAlexModel):
     authorships: Optional[List[Authorship]]
     cited_by_count: Optional[int]
     abstract_inverted_index: Optional[dict]
+    abstract: Optional[str]
 
 
 class OpenAlexResponse(BaseModel):
@@ -113,6 +114,10 @@ class OpenAlexResponse(BaseModel):
             valid_results = []
             for item in data["results"]:
                 try:
+                    if item.get("abstract_inverted_index"):
+                        item["abstract"] = build_abstract_from_inverted_index(
+                            item["abstract_inverted_index"]
+                        )
                     valid_results.append(OpenAlexWork(**item))
                 except Exception as e:
                     logger.warning(f"Skipping invalid OpenAlex work entry: {e}")

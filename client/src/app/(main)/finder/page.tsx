@@ -62,7 +62,110 @@ interface OpenAlexResponse {
             }
         }>
         cited_by_count?: number
+        abstract?: string
     }>
+}
+
+interface PaperResultCardProps {
+    paper: OpenAlexResponse["results"][number]
+}
+
+function PaperResultCard({ paper }: PaperResultCardProps) {
+    return (
+        <Card key={paper.id} className="flex flex-col">
+            <CardHeader>
+                <CardTitle className="text-lg">{paper.title}</CardTitle>
+                <CardDescription className="flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4" />
+                    {paper.publication_date}
+                </CardDescription>
+            </CardHeader>
+
+            <CardContent className="flex-grow space-y-4">
+                {paper.authorships && (
+                    <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        <span className="text-sm text-muted-foreground">
+                            {paper.authorships.map(a => a.author?.display_name).filter(Boolean).join(", ")}
+                        </span>
+                    </div>
+                )}
+
+                {paper.keywords && (
+                    <div className="flex flex-wrap gap-2">
+                        {paper.keywords.map((keyword, i) => (
+                            <Badge key={i} variant="secondary">
+                                {keyword.display_name}
+                            </Badge>
+                        ))}
+                    </div>
+                )}
+                {
+                    paper.topics && (
+                        <div className="flex flex-wrap gap-2">
+                            {paper.topics.map((topic, i) => (
+                                <Badge key={i} variant="secondary">
+                                    {topic.display_name}
+                                </Badge>
+                            ))}
+                        </div>
+                    )
+                }
+                {
+                    paper.abstract && (
+                        <p className="text-sm text-muted-foreground">
+                            {paper.abstract.length > 200
+                                ? paper.abstract.slice(0, 200) + "..."
+                                : paper.abstract}
+                        </p>
+                    )
+                }
+            </CardContent>
+
+            <CardFooter className="flex justify-between items-center">
+                {paper.cited_by_count && (
+                    <Badge variant={"default"}>
+                        {paper.cited_by_count} citations
+                    </Badge>
+                )}
+                {paper.doi && (
+                    <Button variant="ghost" size="sm" asChild>
+                        <a
+                            href={`https://doi.org/${paper.doi}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2"
+                        >
+                            <ExternalLink className="h-4 w-4" />
+                            DOI
+                        </a>
+                    </Button>
+                )}
+                {
+                    paper.open_access?.oa_url && (
+                        <Button variant="ghost" size="sm" asChild>
+                            <a
+                                href={paper.open_access.oa_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2"
+                            >
+                                <ExternalLink className="h-4 w-4" />
+                                Open PDF
+                            </a>
+                        </Button>
+                    )
+                }
+                {
+                    paper.open_access && !paper.open_access.is_oa && (
+                        <Badge variant={"secondary"}>
+                            {paper.open_access.oa_status}
+                        </Badge>
+                    )
+                }
+            </CardFooter>
+        </Card>
+    )
 }
 
 export default function FinderPage() {
@@ -206,91 +309,7 @@ export default function FinderPage() {
                 ))}
 
                 {results?.results.map((paper) => (
-                    <Card key={paper.id} className="flex flex-col">
-                        <CardHeader>
-                            <CardTitle className="text-lg">{paper.title}</CardTitle>
-                            <CardDescription className="flex items-center gap-2">
-                                <CalendarDays className="h-4 w-4" />
-                                {paper.publication_date}
-                            </CardDescription>
-                        </CardHeader>
-
-                        <CardContent className="flex-grow space-y-4">
-                            {paper.authorships && (
-                                <div className="flex items-center gap-2">
-                                    <Users className="h-4 w-4" />
-                                    <span className="text-sm text-muted-foreground">
-                                        {paper.authorships.map(a => a.author?.display_name).filter(Boolean).join(", ")}
-                                    </span>
-                                </div>
-                            )}
-
-                            {paper.keywords && (
-                                <div className="flex flex-wrap gap-2">
-                                    {paper.keywords.map((keyword, i) => (
-                                        <Badge key={i} variant="secondary">
-                                            {keyword.display_name}
-                                        </Badge>
-                                    ))}
-                                </div>
-                            )}
-
-                            {
-                                paper.topics && (
-                                    <div className="flex flex-wrap gap-2">
-                                        {paper.topics.map((topic, i) => (
-                                            <Badge key={i} variant="secondary">
-                                                {topic.display_name}
-                                            </Badge>
-                                        ))}
-                                    </div>
-                                )
-                            }
-                        </CardContent>
-
-                        <CardFooter className="flex justify-between items-center">
-                            {paper.cited_by_count && (
-                                <Badge variant={"default"}>
-                                    {paper.cited_by_count} citations
-                                </Badge>
-                            )}
-                            {paper.doi && (
-                                <Button variant="ghost" size="sm" asChild>
-                                    <a
-                                        href={`https://doi.org/${paper.doi}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center gap-2"
-                                    >
-                                        <ExternalLink className="h-4 w-4" />
-                                        DOI
-                                    </a>
-                                </Button>
-                            )}
-                            {
-                                paper.open_access?.oa_url && (
-                                    <Button variant="ghost" size="sm" asChild>
-                                        <a
-                                            href={paper.open_access.oa_url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex items-center gap-2"
-                                        >
-                                            <ExternalLink className="h-4 w-4" />
-                                            Open PDF
-                                        </a>
-                                    </Button>
-                                )
-                            }
-                            {
-                                paper.open_access && !paper.open_access.is_oa && (
-                                    <Badge variant={"secondary"}>
-                                        {paper.open_access.oa_status}
-                                    </Badge>
-                                )
-                            }
-                        </CardFooter>
-                    </Card>
+                    <PaperResultCard key={paper.id} paper={paper} />
                 ))}
             </div>
 
