@@ -30,6 +30,7 @@ import {
 import { useIsDarkMode } from "@/hooks/useDarkMode";
 import Image from "next/image";
 import Link from "next/link";
+import { PaperStatus } from "@/components/utils/PdfStatus";
 
 // Menu items.
 const items = [
@@ -70,6 +71,7 @@ export interface PaperItem {
     institutions?: string[]
     summary?: string
     created_at?: string
+    status?: PaperStatus
 }
 
 export function AppSidebar() {

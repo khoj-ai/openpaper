@@ -6,11 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Copy, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { getStatusIcon, PaperStatus, PaperStatusEnum } from "@/components/utils/PdfStatus";
+import { fetchFromApi } from "@/lib/api";
 
 
 interface PaperCardProps {
     paper: PaperItem;
     handleDelete: (paperId: string) => void;
+    setPaper(paperId: string, paper: PaperItem): void;
 }
 
 // Helper function to format author names based on citation style rules
@@ -195,7 +199,7 @@ const citationStyles = [
 ];
 
 
-export default function PaperCard({ paper, handleDelete }: PaperCardProps) {
+export default function PaperCard({ paper, handleDelete, setPaper }: PaperCardProps) {
 
     // Function to copy text to clipboard
     const copyToClipboard = (text: string, styleName: string) => {
@@ -215,15 +219,75 @@ export default function PaperCard({ paper, handleDelete }: PaperCardProps) {
         });
     };
 
+    const handleStatusChange = async (status: PaperStatus) => {
+        try {
+            const url = `/api/paper/status?status=${status}&paper_id=${paper?.id}`;
+            const response: PaperItem = await fetchFromApi(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (status === PaperStatusEnum.COMPLETED) {
+                toast.success(
+                    "Completed reading! 🎉",
+                    {
+                        description: `Congrats on finishing ${paper?.title}!`,
+                        duration: 5000,
+                    }
+                )
+            } else {
+                toast.info(
+                    `Marked as ${status}. Keep going!`,
+                    {
+                        description: `You have marked ${paper?.title} as ${status}.`,
+                        duration: 3000,
+                    }
+                );
+            }
+            setPaper(paper.id, response); // Update the paper state with the new status
+        } catch (error) {
+            console.error('Error updating paper status:', error);
+            toast.error("Failed to update paper status.");
+        }
+    };
+
     return (
         <Card key={paper.id}>
             <CardHeader>
-                <a
-                    href={`/paper/${paper.id}`}
-                    className="hover:underline"
-                >
-                    {paper.title || paper.filename}
-                </a>
+                <div className="flex justify-between items-start">
+                    <a
+                        href={`/paper/${paper.id}`}
+                        className="hover:underline flex-1"
+                    >
+                        {paper.title || paper.filename}
+                    </a>
+                    {paper.status && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="outline" className="h-8 px-2 ml-2">
+                                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                        {getStatusIcon(paper.status)}
+                                        {paper.status}
+                                    </span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleStatusChange(PaperStatusEnum.TODO)}>
+                                    {getStatusIcon("todo")}
+                                    Todo
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleStatusChange(PaperStatusEnum.READING)}>
+                                    {getStatusIcon("reading")}
+                                    Reading
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleStatusChange(PaperStatusEnum.COMPLETED)}>
+                                    {getStatusIcon("completed")}
+                                    Completed
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    )}
+                </div>
             </CardHeader>
             <CardContent>
                 <CardDescription>

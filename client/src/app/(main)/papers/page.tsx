@@ -1,10 +1,10 @@
 "use client"
 
-import { fetchFromApi } from "@/lib/api"
-import { useEffect, useState } from "react"
-import { PaperItem } from "@/components/AppSidebar"
-import { Input } from "@/components/ui/input"
-import PaperCard from "@/components/PaperCard"
+import { fetchFromApi } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { PaperItem } from "@/components/AppSidebar";
+import { Input } from "@/components/ui/input";
+import PaperCard from "@/components/PaperCard";
 
 // TODO: We could add a search look-up for the paper journal name to avoid placeholders
 
@@ -58,6 +58,15 @@ export default function PapersPage() {
         )
     }
 
+    const handlePaperSet = (paperId: string, paper: PaperItem) => {
+        setPapers((prevPapers) =>
+            prevPapers.map((p) => (p.id === paperId ? { ...p, ...paper } : p))
+        )
+        setFilteredPapers((prevFiltered) =>
+            prevFiltered.map((p) => (p.id === paperId ? { ...p, ...paper } : p))
+        )
+    }
+
 
     return (
         <div className="container mx-auto w-2/3 p-8">
@@ -72,7 +81,7 @@ export default function PapersPage() {
             </div>
             <div className="grid grid-cols-1 gap-4">
                 {filteredPapers.map((paper) => (
-                    <PaperCard key={paper.id} paper={paper} handleDelete={deletePaper} />
+                    <PaperCard key={paper.id} paper={paper} handleDelete={deletePaper} setPaper={handlePaperSet} />
                 ))}
             </div>
         </div>
