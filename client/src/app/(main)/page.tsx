@@ -18,6 +18,8 @@ import { PdfDropzone } from "@/components/PdfDropzone";
 import Link from "next/link";
 import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience";
 import Image from "next/image";
+import { PaperItem } from "@/components/AppSidebar";
+import PaperCard from "@/components/PaperCard";
 
 interface PdfUploadResponse {
 	filename: string;
@@ -31,6 +33,7 @@ export default function Home() {
 	const [isUrlDialogOpen, setIsUrlDialogOpen] = useState(false); // Renamed for clarity
 
 	const [pdfUrl, setPdfUrl] = useState("");
+	const [relevantPapers, setRelevantPapers] = useState<PaperItem[]>([]);
 	const [showErrorAlert, setShowErrorAlert] = useState(false);
 
 	const { user, loading: authLoading } = useAuth();
@@ -61,6 +64,27 @@ export default function Home() {
 
 		return () => clearInterval(interval);
 	}, [isUploading]);
+
+	useEffect(() => {
+		if (!user) return;
+
+		// Define an async function inside useEffect
+		const fetchPapers = async () => {
+			try {
+				const response = await fetchFromApi("/api/paper/relevant");
+				const sortedPapers = response.papers.sort((a: PaperItem, b: PaperItem) => {
+					return new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime();
+				});
+				setRelevantPapers(sortedPapers);
+			} catch (error) {
+				console.error("Error fetching papers:", error);
+				setRelevantPapers([]);
+			}
+		}
+
+		// Call the async function
+		fetchPapers();
+	}, [user]);
 
 	const handleFileUpload = async (file: File) => {
 		setIsUploading(true);
@@ -452,6 +476,21 @@ export default function Home() {
 					maxSizeMb={5} // Set your desired max size
 				/>
 
+				{
+					relevantPapers.length > 0 && relevantPapers.map((paper) => (
+						<PaperCard
+							key={paper.id}
+							paper={paper}
+							setPaper={(paperId: string, updatedPaper: PaperItem) => {
+								// Handle paper update logic here if needed
+								setRelevantPapers((prev) =>
+									prev.map((p) => (p.id === paperId ? { ...p, ...updatedPaper } : p))
+								);
+							}}
+						/>
+					))
+				}
+
 			</main>
 			<footer className="row-start-3 grid gap-[24px] items-center justify-center justify-items-center">
 				<p>
@@ -522,7 +561,7 @@ export default function Home() {
 					<DialogHeader>
 						<DialogTitle className="text-center">Processing Your Paper</DialogTitle>
 						<DialogDescription className="text-center">
-							This might take a moment...
+							This might take up to two minutes...
 						</DialogDescription>
 					</DialogHeader>
 					<div className="flex flex-col items-center justify-center py-8 space-y-6">
