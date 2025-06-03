@@ -22,10 +22,13 @@ import { getOpenAlexTypeAheadAuthors, getOpenAlexTypeAheadInstitutions, OpenAlex
 import { OpenAlexResponse } from "@/lib/schema";
 import PaperResultCard from "./PaperResultCard";
 import HelperCard from "./HelperCard";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 interface SearchPaperRequest {
     authors?: string[];
     institutions?: string[];
+    only_oa?: boolean;
 }
 
 export default function FinderPage() {
@@ -38,6 +41,7 @@ export default function FinderPage() {
     const [error, setError] = useState<string | null>(null);
     const [authors, setAuthors] = useState<OpenAlexTypeAheadAuthor[]>([]);
     const [institutions, setInstitutions] = useState<OpenAlexTypeAheadInstitution[]>([]);
+    const [onlyOpenAccess, setOnlyOpenAccess] = useState(false);
 
     // Autocomplete states
     const [authorSuggestions, setAuthorSuggestions] = useState<OpenAlexTypeAheadAuthor[]>([]);
@@ -137,9 +141,10 @@ export default function FinderPage() {
             const filter: SearchPaperRequest = {
                 authors: authors.map(author => author.id),
                 institutions: institutions.map(institution => institution.id),
+                only_oa: onlyOpenAccess,
             };
 
-            const hasFilters = (filter.authors?.length ?? 0 > 0) || (filter.institutions?.length ?? 0 > 0);
+            const hasFilters = (filter.authors?.length ?? 0 > 0) || (filter.institutions?.length ?? 0 > 0) || filter.only_oa;
 
             const response: OpenAlexResponse = await fetchFromApi(
                 `/api/paper_search/search?query=${encodeURIComponent(query)}&page=${pageNumber}&per_page=${perPage}`,
@@ -327,9 +332,40 @@ export default function FinderPage() {
                     </Button>
                 </div>
 
+                <div className="flex items-center gap-2">
+                    <Switch
+                        id="only-open-access"
+                        checked={onlyOpenAccess}
+                        onCheckedChange={setOnlyOpenAccess}
+                    />
+                    <Label htmlFor="only-open-access" className="text-sm whitespace-nowrap">
+                        Open Access Only
+                    </Label>
+                </div>
+
                 {/* Selected filters */}
                 {(authors.length > 0 || institutions.length > 0) && (
                     <div className="space-y-2">
+                        {/* Show Open Access filter if enabled */}
+                        {onlyOpenAccess && (
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                                    <Search className="h-3 w-3" />
+                                    Filters
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    <Badge variant="secondary" className="gap-2">
+                                        Open Access Only
+                                        <button
+                                            onClick={() => setOnlyOpenAccess(false)}
+                                            className="hover:bg-destructive/20 rounded-full p-0.5 transition-colors"
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </button>
+                                    </Badge>
+                                </div>
+                            </div>
+                        )}
                         {authors.length > 0 && (
                             <div className="space-y-1">
                                 <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
