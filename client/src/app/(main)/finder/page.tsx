@@ -510,17 +510,6 @@ function PaperResultCard({ paper }: PaperResultCardProps) {
                             </SheetClose>
                         </SheetFooter>
                     </div>
-                    {/* The iframe for PDF is commented out, because it's not yet reliable */}
-                    {/* <iframe
-                        src={`${paper.open_access?.oa_url || paper.doi ? `https://doi.org/${paper.doi}` : ''}`} // Simplified logic slightly
-                        className="w-full h-96 mt-4 border rounded-lg"
-                        title="Paper PDF"
-                        loading="lazy"
-                        onError={(e) => {
-                            (e.target as HTMLIFrameElement).style.display = 'none';
-                            console.error("Failed to load PDF for paper:", paper.id);
-                        }}
-                    ></iframe> */}
                 </SheetContent>
             </Sheet >
         </>
@@ -626,25 +615,37 @@ export default function FinderPage() {
             </div>
 
             {!results && !loading && (
-                <Card className="bg-muted/50">
-                    <CardContent className="pt-6">
-                        <div className="flex gap-4 items-start">
-                            <div className="bg-primary/10 p-3 rounded-full">
-                                <Search className="h-6 w-6 text-primary" />
+                <Card className="bg-card">
+                    <CardContent className="p-6">
+                        <div className="flex flex-col sm:flex-row gap-6 items-start">
+                            <div className="bg-primary/10 p-3.5 rounded-xl flex-shrink-0 self-start sm:self-center mt-1 sm:mt-0">
+                                <Search className="h-7 w-7 text-primary" />
                             </div>
-                            <div className="space-y-2">
-                                <h3 className="text-lg font-medium">Paper Finder</h3>
-                                <p className="text-muted-foreground">
-                                    Search for academic papers by paper title or research topic.
-                                    We search a public database to find relevant papers in your area of interest.
+                            <div className="space-y-2 flex-grow">
+                                <h3 className="text-xl font-semibold text-primary">
+                                    Paper Finder
+                                </h3>
+                                <p className="text-sm text-muted-foreground leading-relaxed">
+                                    Discover academic papers by title or research topic. We tap into a vast public database to bring you relevant research in your field of interest.
                                 </p>
-                                <p className="text-muted-foreground">
-                                    Some papers will be available as open access, while others may require institutional access.
-                                    For all papers, we provide DOIs (Digital Object Identifiers) that link to the original source.
+                                <p className="text-sm text-muted-foreground leading-relaxed">
+                                    You'll find many papers available via open access. For others, a DOI is provided to link you directly to the source, which may require institutional credentials.
                                 </p>
-                                <div className="pt-2">
-                                    <Badge variant="outline" className="mr-2">Example: Attention is All You Need</Badge>
-                                    <Badge variant="outline" className="mr-2">Example: natural language processing</Badge>
+                                <div className="pt-3"> {/* Added a bit more space before examples */}
+                                    <p className="text-xs text-muted-foreground mb-2 font-medium">
+                                        For example, try searching for:
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                        <Badge variant="secondary" className="font-normal text-xs py-1 px-2.5"> {/* Softer badge, explicit sizing */}
+                                            Attention is All You Need
+                                        </Badge>
+                                        <Badge variant="secondary" className="font-normal text-xs py-1 px-2.5">
+                                            large language models
+                                        </Badge>
+                                        <Badge variant="secondary" className="font-normal text-xs py-1 px-2.5">
+                                            climate change impact
+                                        </Badge>
+                                    </div>
                                 </div>
                             </div>
                         </div>
