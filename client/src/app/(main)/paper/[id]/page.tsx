@@ -54,6 +54,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { AudioOverview } from '@/components/AudioOverview';
 import { PaperStatus, PaperStatusEnum } from '@/components/utils/PdfStatus';
+import { useAuth } from '@/lib/auth';
 
 
 // Interface for the CustomCitationLink component props
@@ -160,6 +161,7 @@ const PaperToolset = {
 export default function PaperView() {
     const params = useParams();
     const id = params.id as string;
+    const { user, loading: authLoading } = useAuth();
     const [paperData, setPaperData] = useState<PaperData | null>(null);
     const [loading, setLoading] = useState(true);
     const [paperNoteData, setPaperNoteData] = useState<PaperNoteData | null>(null);
@@ -261,6 +263,14 @@ export default function PaperView() {
             setRightSideFunction('Annotations');
         }
     }, [isAnnotating]);
+
+    useEffect(() => {
+        if (!authLoading && !user) {
+            // Redirect to login if user is not authenticated
+            window.location.href = `/login`;
+        }
+    }, [authLoading, user]);
+
 
     useEffect(() => {
         if (rightSideFunction === 'Chat') {

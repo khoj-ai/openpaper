@@ -5,13 +5,18 @@ import { useEffect, useState } from "react";
 import { PaperItem } from "@/components/AppSidebar";
 import { Input } from "@/components/ui/input";
 import PaperCard from "@/components/PaperCard";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/lib/auth";
 
 // TODO: We could add a search look-up for the paper journal name to avoid placeholders
 
 export default function PapersPage() {
-    const [papers, setPapers] = useState<PaperItem[]>([])
-    const [searchTerm, setSearchTerm] = useState<string>("")
-    const [filteredPapers, setFilteredPapers] = useState<PaperItem[]>([])
+    const [papers, setPapers] = useState<PaperItem[]>([]);
+    const [searchTerm, setSearchTerm] = useState<string>("");
+    const [filteredPapers, setFilteredPapers] = useState<PaperItem[]>([]);
+    const [loading, setLoading] = useState<boolean>(true);
+    const { user, loading: authLoading } = useAuth();
+
 
     useEffect(() => {
         const fetchPapers = async () => {
@@ -24,11 +29,21 @@ export default function PapersPage() {
                 setFilteredPapers(sortedPapers)
             } catch (error) {
                 console.error("Error fetching papers:", error)
+            } finally {
+                setLoading(false);
             }
         }
 
         fetchPapers()
     }, [])
+
+    useEffect(() => {
+        if (!authLoading && !user) {
+            // Redirect to login if user is not authenticated
+            window.location.href = `/login`;
+        }
+    }, [authLoading, user]);
+
 
     const deletePaper = async (paperId: string) => {
         try {
@@ -67,9 +82,22 @@ export default function PapersPage() {
         )
     }
 
+    if (loading) {
+        return (
+            <div className="container mx-auto sm:w-2/3 p-8">
+                <Skeleton className="h-10 w-full mb-4" />
+                <div className="grid grid-cols-1 gap-4">
+                    {Array.from({ length: 6 }).map((_, index) => (
+                        <Skeleton key={index} className="h-24 w-full" />
+                    ))}
+                </div>
+            </div>
+        )
+    }
+
 
     return (
-        <div className="container mx-auto w-2/3 p-8">
+        <div className="container mx-auto sm:w-2/3 p-8">
             <div className="mb-4">
                 <Input
                     type="text"
@@ -81,7 +109,12 @@ export default function PapersPage() {
             </div>
             <div className="grid grid-cols-1 gap-4">
                 {filteredPapers.map((paper) => (
-                    <PaperCard key={paper.id} paper={paper} handleDelete={deletePaper} setPaper={handlePaperSet} />
+                    <PaperCard
+                        key={paper.id}
+                        paper={paper}
+                        handleDelete={deletePaper}
+                        setPaper={handlePaperSet}
+                    />
                 ))}
             </div>
         </div>
