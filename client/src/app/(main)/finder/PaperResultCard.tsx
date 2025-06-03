@@ -33,7 +33,7 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
     return (
         <>
             <Card
-                className="group flex flex-col transition-all duration-200 ease-in-out hover:shadow-md hover:border-blue-500/30 cursor-pointer bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                className="group flex flex-col transition-all duration-200 ease-in-out hover:shadow-md hover:border-blue-500/30 cursor-pointer border-slate-200 dark:border-slate-800 bg-secondary/10 hover:bg-secondary/20 dark:bg-primary/10 dark:hover:bg-primary/20"
                 onClick={() => setIsSheetOpen(true)}
             >
                 <CardHeader className="relative">
