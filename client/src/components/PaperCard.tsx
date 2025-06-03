@@ -3,17 +3,18 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/co
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Copy, Trash2 } from "lucide-react";
+import { ArrowRight, Book, Copy, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getStatusIcon, PaperStatus, PaperStatusEnum } from "@/components/utils/PdfStatus";
 import { fetchFromApi } from "@/lib/api";
+import Link from "next/link";
 
 
 interface PaperCardProps {
     paper: PaperItem;
-    handleDelete: (paperId: string) => void;
+    handleDelete?: (paperId: string) => void;
     setPaper(paperId: string, paper: PaperItem): void;
 }
 
@@ -252,166 +253,174 @@ export default function PaperCard({ paper, handleDelete, setPaper }: PaperCardPr
     };
 
     return (
-        <Card key={paper.id}>
-            <CardHeader>
-                <div className="flex justify-between items-start">
-                    <a
-                        href={`/paper/${paper.id}`}
-                        className="hover:underline flex-1"
-                    >
-                        {paper.title || paper.filename}
-                    </a>
-                    {paper.status && (
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button size="sm" variant="outline" className="h-8 px-2 ml-2">
-                                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                        {getStatusIcon(paper.status)}
-                                        {paper.status}
-                                    </span>
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleStatusChange(PaperStatusEnum.TODO)}>
-                                    {getStatusIcon("todo")}
-                                    Todo
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleStatusChange(PaperStatusEnum.READING)}>
-                                    {getStatusIcon("reading")}
-                                    Reading
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleStatusChange(PaperStatusEnum.COMPLETED)}>
-                                    {getStatusIcon("completed")}
-                                    Completed
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    )}
-                </div>
-            </CardHeader>
-            <CardContent>
-                <CardDescription>
-                    {
-                        paper.keywords && paper.keywords.length > 0 && (
-                            <div className="mb-2 flex flex-wrap gap-2">
+        <Card key={paper.id} className="overflow-hidden hover:shadow-md transition-shadow pt-2 pb-0">
+            <div className="flex h-fit flex-col md:flex-row">
+                {/* Metadata Section */}
+                <div className="md:w-3/5 p-4 flex flex-col justify-between">
+                    {/* Header with status */}
+                    <div>
+                        <div className="flex items-start justify-between mb-3">
+                            {paper.status && (
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button size="sm" variant="outline" className="h-6 px-2 text-xs">
+                                            <span className="flex items-center gap-1">
+                                                {getStatusIcon(paper.status)}
+                                                {paper.status}
+                                            </span>
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => handleStatusChange(PaperStatusEnum.TODO)}>
+                                            {getStatusIcon("todo")}
+                                            Todo
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleStatusChange(PaperStatusEnum.READING)}>
+                                            {getStatusIcon("reading")}
+                                            Reading
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleStatusChange(PaperStatusEnum.COMPLETED)}>
+                                            {getStatusIcon("completed")}
+                                            Completed
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            )}
+
+                            {/* Action buttons in top right */}
+                            <div className="flex gap-1">
+                                <Dialog>
+                                    <DialogTrigger asChild>
+                                        <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                                            Cite
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="sm:max-w-[625px]">
+                                        <DialogHeader>
+                                            <DialogTitle>Cite Paper</DialogTitle>
+                                            <DialogDescription>
+                                                Copy the citation format you need for <b>{paper.title || paper.filename}</b>.
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <ScrollArea className="h-[300px] w-full rounded-md border p-4">
+                                            <div className="grid gap-4 py-4">
+                                                {citationStyles.map((style) => {
+                                                    const citationText = style.generator(paper);
+                                                    return (
+                                                        <div key={style.name} className="flex items-start justify-between gap-2">
+                                                            <div className="flex-grow">
+                                                                <h4 className="font-semibold mb-1">{style.name}</h4>
+                                                                <p className="text-sm bg-muted p-2 rounded break-words">{citationText}</p>
+                                                            </div>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="mt-5 h-8 w-8 flex-shrink-0"
+                                                                onClick={() => copyToClipboard(citationText, style.name)}
+                                                                aria-label={`Copy ${style.name} citation`}
+                                                            >
+                                                                <Copy className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </ScrollArea>
+                                        <DialogFooter>
+                                            <DialogClose asChild>
+                                                <Button type="button" variant="secondary">
+                                                    Close
+                                                </Button>
+                                            </DialogClose>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
                                 {
-                                    paper.keywords.slice(0, 5).map((keyword, index) => (
-                                        <span
-                                            key={index}
-                                            className="inline-block bg-blue-200 dark:bg-blue-800 text-sm font-semibold mr-2 px-2.5 py-0.5 rounded"
-                                        >
-                                            {keyword}
-                                        </span>
-                                    ))
+                                    handleDelete && (
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                                    <Trash2 size={14} className="text-muted-foreground" />
+                                                </Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogTitle>Delete Paper</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    Are you sure you want to delete {paper.title || paper.filename}?
+                                                    This action cannot be undone.
+                                                </AlertDialogDescription>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleDelete(paper.id)}>
+                                                        Delete
+                                                    </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    )
                                 }
                             </div>
-                        )
-                    }
-                    {
-                        paper.authors && (
-                            <p className="text-sm text-gray-500 mb-2">
-                                {paper.authors.slice(0, 5).join(", ")}
-                                {paper.authors.length > 5 && `, et al.`}
+                        </div>
+
+                        <a href={`/paper/${paper.id}`} className="block group">
+                            <h3 className="font-semibold text-gray-900 dark:text-gray-100 line-clamp-2 mb-3 text-sm leading-tight group-hover:underline">
+                                {paper.title || paper.filename}
+                            </h3>
+                        </a>
+
+                        {/* Authors */}
+                        {paper.authors && paper.authors.length > 0 && (
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                                {paper.authors.slice(0, 2).join(", ")}
+                                {paper.authors.length > 2 && ", et al."}
                             </p>
-                        )
-                    }
-                </CardDescription>
-                {paper.abstract && (
-                    <p className="text-sm text-gray-500 line-clamp-3">
-                        {paper.abstract}
-                    </p>
-                )}
-                {!paper.abstract && paper.summary && (
-                    <p className="text-sm text-gray-500 line-clamp-3">
-                        {paper.summary}
-                    </p>
-                )}
-                {
-                    paper.institutions && (
-                        <p className="text-sm text-gray-500 mt-2">
-                            {paper.institutions.slice(0, 5).join(", ")}
-                            {paper.institutions.length > 5 && `, et al.`}
+                        )}
+
+                        {/* Keywords */}
+                        {paper.keywords && paper.keywords.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-3">
+                                {paper.keywords.slice(0, 3).map((keyword, index) => (
+                                    <span
+                                        key={index}
+                                        className="inline-block bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs px-2 py-0.5 rounded"
+                                    >
+                                        {keyword}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Institutions */}
+                        {paper.institutions && paper.institutions.length > 0 && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {paper.institutions.slice(0, 2).join(", ")}
+                                {paper.institutions.length > 2 && ", et al."}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Footer */}
+                    <div className="flex items-center justify-between">
+                        <p className="text-xs text-gray-400 dark:text-gray-500">
+                            {new Date(paper.created_at || "").toLocaleDateString()}
                         </p>
-                    )
-                }
-            </CardContent>
-            <CardFooter className="flex flex-row justify-between items-start">
-                <p className="text-sm text-gray-500">
-                    {new Date(paper.created_at || "").toLocaleDateString()}
-                </p>
-                <div className="flex gap-2"> {/* Added a div to group buttons */}
-                    <Dialog>
-                        <DialogTrigger asChild>
-                            <Button variant={"outline"} size={"sm"}>Cite</Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[625px]">
-                            <DialogHeader>
-                                <DialogTitle>Cite Paper</DialogTitle>
-                                <DialogDescription>
-                                    Copy the citation format you need for <b>{paper.title || paper.filename}</b>.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <ScrollArea className="h-[300px] w-full rounded-md border p-4">
-                                <div className="grid gap-4 py-4">
-                                    {citationStyles.map((style) => {
-                                        const citationText = style.generator(paper);
-                                        return (
-                                            <div key={style.name} className="flex items-start justify-between gap-2">
-                                                <div className="flex-grow">
-                                                    <h4 className="font-semibold mb-1">{style.name}</h4>
-                                                    <p className="text-sm bg-muted p-2 rounded break-words">{citationText}</p>
-                                                </div>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="mt-5 h-8 w-8 flex-shrink-0" // Adjust margin-top if needed
-                                                    onClick={() => copyToClipboard(citationText, style.name)}
-                                                    aria-label={`Copy ${style.name} citation`}
-                                                >
-                                                    <Copy className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </ScrollArea>
-                            <DialogFooter>
-                                <DialogClose asChild>
-                                    <Button type="button" variant="secondary">
-                                        Close
-                                    </Button>
-                                </DialogClose>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
-                    <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                            <Button
-                                variant={"ghost"}
-                                size={"icon"} // Make delete button icon-sized
-                                className="h-9 w-9" // Adjust size if needed
-                            >
-                                <Trash2 size={16} className="text-secondary-foreground" />
-                            </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                            <AlertDialogTitle>Delete Paper</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                Are you sure you want to delete {paper.title || paper.filename}?
-                                This action cannot be undone.
-                            </AlertDialogDescription>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                    onClick={() => handleDelete(paper.id)}
-                                >
-                                    Delete
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
+                        <Link href={`/paper/${paper.id}`} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
+                            Read
+                            <Book className="inline ml-1 h-3 w-3" />
+                        </Link>
+                    </div>
                 </div>
-            </CardFooter>
+
+                {/* Paper Preview Section */}
+                <div className="md:w-2/5 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 p-4 flex flex-col justify-between border-r border-gray-200 dark:border-gray-700 rounded-t-2xl rounded-b-none">
+                    {/* Abstract/Summary text overlay */}
+                    <div className="mt-2">
+                        <p className="text-xs text-gray-600 dark:text-gray-300 line-clamp-6">
+                            {paper.abstract || paper.summary || "This paper explores innovative approaches and methodologies in research..."}
+                        </p>
+                    </div>
+                </div>
+            </div>
         </Card>
     )
 }
