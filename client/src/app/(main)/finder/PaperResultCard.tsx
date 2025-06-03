@@ -19,7 +19,7 @@ interface PaperResultCardProps {
 }
 
 export default function PaperResultCard({ paper }: PaperResultCardProps) {
-    const [isSheetOpen, setIsSheetOpen] = useState(false); // Renamed from isDialogOpen
+    const [isSheetOpen, setIsSheetOpen] = useState(false);
 
     // Get unique institutions from authorships
     const institutions = paper.authorships?.flatMap(a => a.institutions || []).filter(Boolean).filter((inst, index, self) =>
@@ -33,18 +33,18 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
     return (
         <>
             <Card
-                className="group flex flex-col transition-all duration-300 ease-in-out hover:shadow-lg hover:shadow-blue-500/10 hover:border-blue-200 cursor-pointer bg-secondary/10 dark:bg-secondary/80"
-                onClick={() => setIsSheetOpen(true)} // Changed to setIsSheetOpen
+                className="group flex flex-col transition-all duration-200 ease-in-out hover:shadow-md hover:border-blue-500/30 cursor-pointer bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                onClick={() => setIsSheetOpen(true)}
             >
                 <CardHeader className="relative">
-                    <CardTitle className="text-lg leading-tight group-hover:text-blue-700 group-hover:dark:text-blue-300 transition-colors duration-200 pr-8">
+                    <CardTitle className="text-lg leading-tight group-hover:text-blue-600 transition-colors duration-200 pr-8 font-medium">
                         {paper.title}
                     </CardTitle>
-                    <CardDescription className="flex items-center gap-2 text-accent-foreground">
-                        <CalendarDays className="h-4 w-4 text-blue-500" />
+                    <CardDescription className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+                        <CalendarDays className="h-4 w-4 text-secondary-foreground" />
                         {paper.publication_date}
                         {paper.publication_year && (
-                            <Badge variant="outline" className="ml-2 text-xs">
+                            <Badge variant="outline" className="ml-2 text-xs text-secondary-foreground bg-secondary">
                                 {paper.publication_year}
                             </Badge>
                         )}
@@ -54,8 +54,8 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                 <CardContent className="flex-grow space-y-4">
                     {hasAuthors && (
                         <div className="flex items-start gap-2">
-                            <Users className="h-4 w-4 mt-0.5 text-emerald-500 flex-shrink-0" />
-                            <div className="text-sm text-accent-foreground leading-relaxed">
+                            <Users className="h-4 w-4 mt-0.5 text-secondary-foreground flex-shrink-0" />
+                            <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
                                 {paper.authorships?.slice(0, 3).map((a, index) => (
                                     <span key={a.author?.id || index}>
                                         {index > 0 && ", "}
@@ -64,20 +64,20 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                                                 href={`${a.author.orcid}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="text-emerald-600 dark:text-green-200 hover:text-emerald-700 hover:underline transition-colors"
+                                                className="text-blue-600 dark:text-blue-400 hover:text-blue-700 hover:underline transition-colors"
                                                 onClick={(e) => e.stopPropagation()}
                                             >
                                                 {a.author.display_name}
                                             </a>
                                         ) : (
-                                            <span className="text-accent-foreground">
+                                            <span className="text-slate-700 dark:text-slate-300">
                                                 {a.author?.display_name || "Unknown Author"}
                                             </span>
                                         )}
                                     </span>
                                 ))}
                                 {numAuthors > 3 && (
-                                    <span className="italic">
+                                    <span className="italic text-slate-500">
                                         {" "}and {numAuthors - 3} more
                                     </span>
                                 )}
@@ -87,7 +87,7 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
 
                     {hasInstitutions && (
                         <div className="flex items-start gap-2">
-                            <Building2 className="h-4 w-4 mt-0.5 text-purple-500 flex-shrink-0" />
+                            <Building2 className="h-4 w-4 mt-0.5 text-secondary-foreground flex-shrink-0" />
                             <div className="text-sm leading-relaxed">
                                 {institutions.slice(0, 2).map((institution, index) => (
                                     <span key={institution.id}>
@@ -96,7 +96,7 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                                             href={`${institution.ror}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="text-purple-600 dark:text-purple-200 hover:underline transition-colors"
+                                            className="text-slate-700 dark:text-slate-300 hover:text-blue-600 hover:underline transition-colors"
                                             onClick={(e) => e.stopPropagation()}
                                         >
                                             {institution.display_name}
@@ -114,15 +114,13 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
 
                     {(paper.keywords || paper.topics) && (
                         <div className="flex flex-wrap gap-2">
-                            {paper.keywords?.slice(0, 2).map((keyword, i) => (
-                                <Badge key={`keyword-${i}`} variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 transition-colors">
-                                    <Tag className="h-3 w-3 mr-1" />
+                            {paper.keywords?.slice(0, 3).map((keyword, i) => (
+                                <Badge key={`keyword-${i}`} variant="secondary" className="bg-slate-100 text-slate-700 hover:bg-slate-100 border-slate-200 text-xs">
                                     {keyword.display_name}
                                 </Badge>
                             ))}
                             {paper.topics?.slice(0, 1).map((topic, i) => (
-                                <Badge key={`topic-${i}`} variant="secondary" className="bg-amber-100 text-amber-700 hover:bg-amber-100 transition-colors">
-                                    <Globe className="h-3 w-3 mr-1" />
+                                <Badge key={`topic-${i}`} variant="secondary" className="bg-slate-100 text-slate-700 hover:bg-slate-100 border-slate-200 text-xs">
                                     {topic.display_name}
                                 </Badge>
                             ))}
@@ -130,8 +128,8 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                     )}
 
                     {paper.abstract && (
-                        <div className="bg-secondary p-3 border-l-4 border-slate-300">
-                            <p className="text-sm text-secondary-foreground leading-relaxed">
+                        <div className="bg-slate-50 dark:bg-slate-900 p-3 border-l-2 border-slate-300 dark:border-slate-700">
+                            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
                                 {paper.abstract.length > 150
                                     ? paper.abstract.slice(0, 150) + "..."
                                     : paper.abstract}
@@ -140,16 +138,16 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                     )}
                 </CardContent>
 
-                <CardFooter className="flex flex-col md:flex-row md:justify-between items-start md:items-center pt-4 border-t border-slate-100">
+                <CardFooter className="flex flex-col md:flex-row md:justify-between items-start md:items-center pt-4 border-t border-slate-200 dark:border-slate-800">
                     <div className="flex items-center gap-2">
                         {paper.cited_by_count !== undefined && (
-                            <Badge variant="default" className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition-colors">
+                            <Badge variant="outline" className="text-secondary-foreground bg-secondary text-xs">
                                 <Quote className="h-3 w-3 mr-1" />
                                 {paper.cited_by_count} citations
                             </Badge>
                         )}
                         {paper.open_access?.is_oa && (
-                            <Badge className="bg-green-100 text-green-700">
+                            <Badge className="bg-blue-500 text-white text-xs">
                                 Open Access
                             </Badge>
                         )}
@@ -160,7 +158,7 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                                 variant="ghost"
                                 size="sm"
                                 asChild
-                                className="hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                                className="hover:bg-slate-100 dark:hover:bg-slate-100 hover:text-slate-900 text-primary transition-colors"
                             >
                                 <a
                                     href={`https://doi.org/${paper.doi}`}
@@ -179,7 +177,7 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                                 variant="ghost"
                                 size="sm"
                                 asChild
-                                className="hover:bg-green-50 hover:text-green-700 transition-colors"
+                                className="hover:bg-blue-50 dark:hover:bg-blue-800 hover:text-blue-700 transition-colors text-blue-600 dark:text-blue-100"
                             >
                                 <a
                                     href={paper.open_access.oa_url}
@@ -197,34 +195,31 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                 </CardFooter>
             </Card>
 
-            {/* ==== Sheet Implementation ==== */}
+            {/* Sheet Implementation */}
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                 <SheetContent
-                    side="right" // Or "left", "top", "bottom"
-                    className="w-full md:w-3/4 lg:w-1/2 xl:max-w-2xl p-6 h-full overflow-y-auto"
+                    side="right"
+                    className="w-full md:w-3/4 lg:w-1/2 xl:max-w-2xl p-6 h-full overflow-y-auto bg-white dark:bg-slate-950"
                 >
                     <SheetHeader className="mb-6">
-                        <SheetTitle className="text-xl leading-tight pr-8">
+                        <SheetTitle className="text-xl leading-tight pr-8 font-medium">
                             {paper.title}
                         </SheetTitle>
                         <SheetDescription className="flex items-start flex-col gap-4 text-base pt-2">
                             <div className="flex items-center gap-2">
-                                <span className="flex items-center gap-2">
+                                <span className="flex items-center gap-2 text-secondary-foreground">
                                     <CalendarDays className="h-4 w-4" />
                                     {paper.publication_date}
                                 </span>
                                 {paper.publication_year && (
-                                    <Badge variant="outline">
+                                    <Badge variant="outline" className="border-slate-300 text-secondary-foreground bg-secondary text-xs">
                                         {paper.publication_year}
                                     </Badge>
                                 )}
                             </div>
-                            {/* Links */}
                             <div className="flex flex-col sm:flex-row gap-3">
                                 {paper.doi && (
-                                    <Button
-                                        variant={"outline"}
-                                        asChild>
+                                    <Button variant="outline" asChild className="border-slate-300">
                                         <a
                                             href={`https://doi.org/${paper.doi}`}
                                             target="_blank"
@@ -237,7 +232,7 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                                     </Button>
                                 )}
                                 {paper.open_access?.oa_url && (
-                                    <Button variant="default" asChild>
+                                    <Button variant="default" asChild className="bg-blue-500 hover:bg-blue-600">
                                         <a
                                             href={paper.open_access.oa_url}
                                             target="_blank"
@@ -257,8 +252,8 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                         {/* Abstract */}
                         {paper.abstract && (
                             <div>
-                                <h3 className="font-semibold text-lg mb-3">Abstract</h3>
-                                <div className="bg-slate-50 dark:bg-slate-950 p-4 border-l-4 border-slate-300">
+                                <h3 className="font-semibold text-lg mb-3 text-slate-900 dark:text-slate-100">Abstract</h3>
+                                <div className="bg-slate-50 dark:bg-slate-900 p-4 border-l-2 border-slate-300 dark:border-slate-700">
                                     <p className="text-slate-700 dark:text-slate-300 leading-relaxed">
                                         {paper.abstract}
                                     </p>
@@ -269,30 +264,30 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                         {/* Authors Section */}
                         {hasAuthors && (
                             <div>
-                                <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
-                                    <Users className="h-5 w-5 text-emerald-500" />
+                                <h3 className="font-semibold text-lg mb-3 flex items-center gap-2 text-slate-900 dark:text-slate-100">
+                                    <Users className="h-5 w-5 text-slate-500" />
                                     Authors ({numAuthors})
                                 </h3>
                                 <div className="grid gap-2">
                                     {paper.authorships?.map((authorship, index) => (
-                                        <div key={index} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                                        <div key={index} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
                                             <div>
                                                 {authorship.author?.orcid ? (
                                                     <a
                                                         href={authorship.author.orcid}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
+                                                        className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
                                                     >
                                                         {authorship.author.display_name}
                                                     </a>
                                                 ) : (
-                                                    <span className="font-medium">
+                                                    <span className="font-medium text-slate-900 dark:text-slate-100">
                                                         {authorship.author?.display_name || "Unknown Author"}
                                                     </span>
                                                 )}
                                                 {authorship.institutions && authorship.institutions.length > 0 && (
-                                                    <div className="text-sm text-slate-600 mt-1">
+                                                    <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                                                         {authorship.institutions.map((inst, i) => (
                                                             <span key={inst.id}>
                                                                 {i > 0 && ", "}
@@ -311,22 +306,22 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                         {/* Institutions Section */}
                         {hasInstitutions && (
                             <div>
-                                <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
-                                    <Building2 className="h-5 w-5 text-purple-500" />
+                                <h3 className="font-semibold text-lg mb-3 flex items-center gap-2 text-slate-900 dark:text-slate-100">
+                                    <Building2 className="h-5 w-5 text-slate-500" />
                                     Institutions ({institutions.length})
                                 </h3>
                                 <div className="grid gap-2">
                                     {institutions.map(institution => (
-                                        <div key={institution.id} className="p-2 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                                        <div key={institution.id} className="p-3 bg-slate-50 dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
                                             <a
                                                 href={institution.ror}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="font-medium text-purple-600 dark:text-purple-400 hover:underline"
+                                                className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
                                             >
                                                 {institution.display_name}
                                             </a>
-                                            <div className="text-sm text-slate-600 mt-1">
+                                            <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                                                 Type: {institution.type}
                                             </div>
                                         </div>
@@ -338,17 +333,17 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                         {/* Keywords and Topics */}
                         {(paper.keywords || paper.topics) && (
                             <div>
-                                <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
-                                    <Tag className="h-5 w-5 text-blue-500" />
+                                <h3 className="font-semibold text-lg mb-3 flex items-center gap-2 text-slate-900 dark:text-slate-100">
+                                    <Tag className="h-5 w-5 text-slate-500" />
                                     Keywords & Topics
                                 </h3>
-                                <div className="space-y-3">
+                                <div className="space-y-4">
                                     {paper.keywords && paper.keywords.length > 0 && (
                                         <div>
                                             <h4 className="font-medium text-sm text-slate-600 dark:text-slate-400 mb-2">Keywords:</h4>
                                             <div className="flex flex-wrap gap-2">
                                                 {paper.keywords.map((keyword, i) => (
-                                                    <Badge key={i} variant="secondary" className="bg-blue-50 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                                                    <Badge key={i} variant="secondary" className="bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">
                                                         {keyword.display_name}
                                                         {keyword.score && (
                                                             <span className="ml-1 text-xs opacity-70">
@@ -365,16 +360,16 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                                             <h4 className="font-medium text-sm text-slate-600 dark:text-slate-400 mb-2 mt-3">Topics:</h4>
                                             <div className="space-y-2">
                                                 {paper.topics.map((topic, i) => (
-                                                    <div key={i} className="p-2 bg-slate-50 rounded-lg dark:bg-slate-900">
-                                                        <div className="font-medium text-amber-600 dark:text-amber-400">
+                                                    <div key={i} className="p-3 bg-slate-50 rounded border border-slate-200 dark:bg-slate-900 dark:border-slate-800">
+                                                        <div className="font-medium text-slate-900 dark:text-slate-100">
                                                             {topic.display_name}
                                                             {topic.score && (
-                                                                <span className="ml-2 text-xs opacity-70">
+                                                                <span className="ml-2 text-xs opacity-70 text-slate-600">
                                                                     Score: {topic.score.toFixed(2)}
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <div className="text-sm text-amber-700 mt-1 dark:text-amber-300">
+                                                        <div className="text-sm text-slate-600 mt-1 dark:text-slate-400">
                                                             {topic.domain.display_name} → {topic.field.display_name} → {topic.subfield.display_name}
                                                         </div>
                                                     </div>
@@ -388,65 +383,63 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
 
                         {/* Metadata */}
                         <div>
-                            <h3 className="font-semibold text-lg mb-3">Publication Details</h3>
+                            <h3 className="font-semibold text-lg mb-3 text-slate-900 dark:text-slate-100">Publication Details</h3>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {paper.cited_by_count !== undefined && (
-                                    <div className="bg-slate-50 p-3 rounded-lg dark:bg-slate-900">
-                                        <div className="font-medium text-slate-600 dark:text-slate-300">Citations</div>
-                                        <div className="text-lg font-semibold text-indigo-600 dark:text-indigo-400">
+                                    <div className="bg-slate-50 p-4 rounded border border-slate-200 dark:bg-slate-900 dark:border-slate-800">
+                                        <div className="font-medium text-slate-600 dark:text-slate-400">Citations</div>
+                                        <div className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
                                             {paper.cited_by_count}
                                         </div>
                                     </div>
                                 )}
                                 {paper.open_access && (
-                                    <div className="bg-slate-50 p-3 rounded-lg dark:bg-slate-900">
-                                        <div className="font-medium text-slate-600 dark:text-slate-300">Open Access Status</div>
-                                        <Badge className={`mt-1 ${paper.open_access.is_oa ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-700'}`}>
+                                    <div className="bg-slate-50 p-4 rounded border border-slate-200 dark:bg-slate-900 dark:border-slate-800">
+                                        <div className="font-medium text-slate-600 dark:text-slate-400">Open Access Status</div>
+                                        <Badge className={`mt-2 ${paper.open_access.is_oa ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-700'}`}>
                                             {paper.open_access.oa_status}
                                         </Badge>
                                     </div>
                                 )}
                             </div>
                         </div>
-                        <SheetFooter className="mt-6">
-                            {/* Links again */}
-                            <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t mt-4">
-                                {paper.doi && (
-                                    <Button
-                                        variant={"outline"}
-                                        asChild>
-                                        <a
-                                            href={`https://doi.org/${paper.doi}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex items-center gap-2 w-full sm:w-auto justify-center"
-                                        >
-                                            <ExternalLink className="h-4 w-4" />
-                                            View Publication
-                                        </a>
-                                    </Button>
-                                )}
-                                {paper.open_access?.oa_url && (
-                                    <Button variant="default" asChild>
-                                        <a
-                                            href={paper.open_access.oa_url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex items-center gap-2 w-full sm:w-auto justify-center"
-                                        >
-                                            <BookOpen className="h-4 w-4" />
-                                            Open Access PDF
-                                        </a>
-                                    </Button>
-                                )}
-                            </div>
-                            <SheetClose asChild>
-                                <Button variant="outline" className="w-fit">Close</Button>
-                            </SheetClose>
-                        </SheetFooter>
                     </div>
+
+                    <SheetFooter className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-800">
+                        <div className="flex flex-col sm:flex-row gap-3 w-full">
+                            {paper.doi && (
+                                <Button variant="outline" asChild className="border-slate-300">
+                                    <a
+                                        href={`https://doi.org/${paper.doi}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 w-full sm:w-auto justify-center"
+                                    >
+                                        <ExternalLink className="h-4 w-4" />
+                                        View Publication
+                                    </a>
+                                </Button>
+                            )}
+                            {paper.open_access?.oa_url && (
+                                <Button variant="default" asChild className="bg-blue-500 hover:bg-blue-600">
+                                    <a
+                                        href={paper.open_access.oa_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 w-full sm:w-auto justify-center"
+                                    >
+                                        <BookOpen className="h-4 w-4" />
+                                        Open Access PDF
+                                    </a>
+                                </Button>
+                            )}
+                            <SheetClose asChild>
+                                <Button variant="outline" className="border-slate-300">Close</Button>
+                            </SheetClose>
+                        </div>
+                    </SheetFooter>
                 </SheetContent>
-            </Sheet >
+            </Sheet>
         </>
     );
 }
