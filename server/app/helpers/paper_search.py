@@ -129,6 +129,7 @@ class OpenAlexResponse(BaseModel):
 class OpenAlexFilter(BaseModel):
     authors: Optional[List[str]] = None
     institutions: Optional[List[str]] = None
+    only_oa: bool = False
 
 
 def construct_open_alex_filter_url(filter: OpenAlexFilter) -> str:
@@ -146,8 +147,10 @@ def construct_open_alex_filter_url(filter: OpenAlexFilter) -> str:
         filters.append(f"authorships.author.id:{'|'.join(filter.authors)}")
     if filter.institutions:
         filters.append(f"institutions.id:{'|'.join(filter.institutions)}")
+    if filter.only_oa:
+        filters.append("open_access.is_oa:true")
 
-    return "|".join(filters) if filters else ""
+    return ",".join(filters) if filters else ""
 
 
 # Utility functions for searching the OpenAlex API
