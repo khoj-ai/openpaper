@@ -9,7 +9,7 @@ import {
     SheetFooter,
     SheetClose,
 } from '@/components/ui/sheet';
-import { ExternalLink, Users, CalendarDays, Building2, BookOpen, Quote, Tag, Globe } from "lucide-react";
+import { ExternalLink, Users, CalendarDays, Building2, BookOpen, Quote, Tag } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -199,7 +199,7 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                 <SheetContent
                     side="right"
-                    className="w-full md:w-3/4 lg:w-1/2 xl:max-w-2xl p-6 h-full overflow-y-auto bg-white dark:bg-slate-950"
+                    className="w-full md:w-3/4 lg:w-1/2 xl:max-w-2xl p-6 h-full overflow-y-auto bg-secondary text-slate-900 dark:text-slate-100"
                 >
                     <SheetHeader className="mb-6">
                         <SheetTitle className="text-xl leading-tight pr-8 font-medium">
@@ -364,7 +364,7 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                                                         <div className="font-medium text-slate-900 dark:text-slate-100">
                                                             {topic.display_name}
                                                             {topic.score && (
-                                                                <span className="ml-2 text-xs opacity-70 text-slate-600">
+                                                                <span className="ml-2 text-xs opacity-70 text-accent-foreground">
                                                                     Score: {topic.score.toFixed(2)}
                                                                 </span>
                                                             )}
