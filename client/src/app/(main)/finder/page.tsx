@@ -235,7 +235,7 @@ function PaperResultCard({ paper }: PaperResultCardProps) {
                                     onClick={(e) => e.stopPropagation()}
                                 >
                                     <ExternalLink className="h-4 w-4" />
-                                    DOI
+                                    View
                                 </a>
                             </Button>
                         )}
