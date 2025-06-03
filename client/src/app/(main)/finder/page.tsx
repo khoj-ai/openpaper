@@ -629,7 +629,7 @@ export default function FinderPage() {
                                     Discover academic papers by title or research topic. We tap into a vast public database to bring you relevant research in your field of interest.
                                 </p>
                                 <p className="text-sm text-muted-foreground leading-relaxed">
-                                    You'll find many papers available via open access. For others, a DOI is provided to link you directly to the source, which may require institutional credentials.
+                                    You will find many papers available via open access. For others, a DOI is provided to link you directly to the source, which may require institutional credentials.
                                 </p>
                                 <div className="pt-3"> {/* Added a bit more space before examples */}
                                     <p className="text-xs text-muted-foreground mb-2 font-medium">
