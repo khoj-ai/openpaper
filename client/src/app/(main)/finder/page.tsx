@@ -297,7 +297,7 @@ function PaperResultCard({ paper }: PaperResultCardProps) {
                                             className="flex items-center gap-2 w-full sm:w-auto justify-center"
                                         >
                                             <ExternalLink className="h-4 w-4" />
-                                            View DOI
+                                            View Publication
                                         </a>
                                     </Button>
                                 )}
@@ -487,7 +487,7 @@ function PaperResultCard({ paper }: PaperResultCardProps) {
                                             className="flex items-center gap-2 w-full sm:w-auto justify-center"
                                         >
                                             <ExternalLink className="h-4 w-4" />
-                                            View DOI
+                                            View Publication
                                         </a>
                                     </Button>
                                 )}
