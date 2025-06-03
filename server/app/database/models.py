@@ -17,6 +17,17 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, relationship  # type: ignore
 from sqlalchemy.sql import func
 
+# Special notes:
+# - All models inherit from the `Base` class, which provides common fields and methods.
+# - The `last_accessed_at` field is automatically updated to the current timestamp
+#   whenever the record is accessed. It is only present in selected models
+#   (e.g., `Paper` to track when a user last interacted with a paper.)
+# - This can be useful for tracking user activity and engagement with papers.
+# - The `created_at` and `updated_at` fields are automatically managed by SQLAlchemy
+#   to record when the record was created and last updated, respectively.
+# - The `to_dict` method converts the model instance to a dictionary, making it easier
+#   to serialize the model for APIs or other uses.
+
 
 class Base(DeclarativeBase):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -142,6 +153,9 @@ class Paper(Base):
     starter_questions = Column(ARRAY(String), nullable=True)
     raw_content = Column(Text, nullable=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    last_accessed_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
 
     # Cached presigned URL fields
     cached_presigned_url = Column(String, nullable=True)

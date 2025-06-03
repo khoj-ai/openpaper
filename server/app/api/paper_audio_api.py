@@ -61,7 +61,9 @@ async def create_audio_overview(
     Create audio overview by ID
     """
     # Fetch the document from the database
-    paper: Paper | None = paper_crud.get(db, id=id, user=current_user)
+    paper: Paper | None = paper_crud.get(
+        db, id=id, user=current_user, update_last_accessed=True
+    )
 
     if not paper:
         return JSONResponse(status_code=404, content={"message": "Document not found"})

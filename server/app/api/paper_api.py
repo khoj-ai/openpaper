@@ -130,7 +130,9 @@ async def get_paper_note(
     """
     Get the paper note associated with this document.
     """
-    target_paper = paper_crud.get(db, id=paper_id, user=current_user)
+    target_paper = paper_crud.get(
+        db, id=paper_id, user=current_user, update_last_accessed=True
+    )
 
     if not target_paper:
         raise HTTPException(status_code=404, detail=f"No document with id {paper_id}")
@@ -158,7 +160,9 @@ async def create_paper_note(
     Create the paper note associated with this document
     """
     content = request.content
-    target_paper = paper_crud.get(db, id=paper_id, user=current_user)
+    target_paper = paper_crud.get(
+        db, id=paper_id, user=current_user, update_last_accessed=True
+    )
 
     if not target_paper:
         raise HTTPException(status_code=404, detail=f"No document with id {paper_id}")
@@ -209,6 +213,42 @@ async def set_paper_status(
     return JSONResponse(content=updated_paper.to_dict(), status_code=200)
 
 
+@paper_router.get("/relevant")
+async def get_relevant_papers(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """
+    Get the most relevant papers uploaded by the user
+    """
+    papers: List[Paper] = paper_crud.get_top_relevant_papers(db, user=current_user)
+    if not papers:
+        return JSONResponse(
+            status_code=404, content={"message": "No relevant papers found"}
+        )
+
+    return JSONResponse(
+        status_code=200,
+        content={
+            "papers": [
+                {
+                    "id": str(paper.id),
+                    "filename": paper.filename,
+                    "title": paper.title,
+                    "created_at": str(paper.created_at),
+                    "abstract": paper.abstract,
+                    "authors": paper.authors,
+                    "institutions": paper.institutions,
+                    "keywords": paper.keywords,
+                    "summary": paper.summary,
+                    "status": paper.status,
+                }
+                for paper in papers
+            ]
+        },
+    )
+
+
 @paper_router.put("/note")
 async def update_paper_note(
     paper_id: str,
@@ -220,7 +260,9 @@ async def update_paper_note(
     Update the paper note associated with this document
     """
     content = request.content
-    target_paper = paper_crud.get(db, id=paper_id, user=current_user)
+    target_paper = paper_crud.get(
+        db, id=paper_id, user=current_user, update_last_accessed=True
+    )
 
     if not target_paper:
         raise HTTPException(status_code=404, detail=f"No document with id {paper_id}")
@@ -262,7 +304,9 @@ async def get_mru_paper_conversation(
     casted_paper_id = uuid.UUID(paper_id)
 
     # Fetch the document from the database
-    document = paper_crud.get(db, id=paper_id, user=current_user)
+    document = paper_crud.get(
+        db, id=paper_id, user=current_user, update_last_accessed=True
+    )
 
     if not document:
         return JSONResponse(status_code=404, content={"message": "Document not found"})
@@ -301,7 +345,7 @@ async def get_pdf(
     Get a document by ID
     """
     # Fetch the document from the database
-    paper = paper_crud.get(db, id=id, user=current_user)
+    paper = paper_crud.get(db, id=id, user=current_user, update_last_accessed=True)
 
     if not paper:
         return JSONResponse(status_code=404, content={"message": "Document not found"})

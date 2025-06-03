@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
 
 from app.database.database import Base
@@ -29,12 +30,24 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         return query
 
     def get(
-        self, db: Session, id: Any, *, user: Optional[CurrentUser] = None
+        self,
+        db: Session,
+        id: Any,
+        *,
+        user: Optional[CurrentUser] = None,
+        update_last_accessed: bool = False,
     ) -> Optional[ModelType]:
         """Get a single record by ID, optionally filtered by user"""
         try:
             query = db.query(self.model).filter(self.model.id == id)
             query = self._filter_by_user(query, user)
+            if update_last_accessed and hasattr(self.model, "last_accessed_at"):
+                # Update last accessed timestamp if applicable
+                query.update(
+                    {self.model.last_accessed_at: datetime.now(timezone.utc)},
+                    synchronize_session=False,
+                )
+                db.commit()
             return query.first()
         except Exception as e:
             logger.error(

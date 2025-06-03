@@ -113,6 +113,44 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
         )
         return raw_content
 
+    def get_top_relevant_papers(
+        self, db: Session, *, user: CurrentUser, limit: int = 3
+    ) -> List[Paper]:
+        """
+        Get recent papers with priority logic:
+        1. Order by most recently uploaded
+        2. First get papers with 'reading' status
+        3. If under limit, fill with 'todo' status papers
+        4. Return up to limit papers
+        """
+        # First, get reading papers
+        reading_papers = (
+            db.query(Paper)
+            .filter(Paper.user_id == user.id, Paper.status == PaperStatus.reading)
+            .order_by(Paper.last_accessed_at.desc())
+            .limit(limit)
+            .all()
+        )
+
+        # If we have enough reading papers, return them
+        if len(reading_papers) >= limit:
+            return reading_papers[:limit]
+
+        # Calculate how many more papers we need
+        remaining_limit = limit - len(reading_papers)
+
+        # Get todo papers to fill the remaining slots
+        todo_papers = (
+            db.query(Paper)
+            .filter(Paper.owner_id == user.id, Paper.status == PaperStatus.todo)
+            .order_by(Paper.last_accessed_at.desc())
+            .limit(remaining_limit)
+            .all()
+        )
+
+        # Combine and return
+        return reading_papers + todo_papers
+
     def make_public(
         self, db: Session, *, paper_id: str, user: CurrentUser
     ) -> Optional[Paper]:
