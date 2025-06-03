@@ -126,17 +126,41 @@ class OpenAlexResponse(BaseModel):
         return data
 
 
+class OpenAlexFilter(BaseModel):
+    authors: Optional[List[str]] = None
+    institutions: Optional[List[str]] = None
+
+
+def construct_open_alex_filter_url(filter: OpenAlexFilter) -> str:
+    """
+    Construct a filter URL for OpenAlex API based on provided filters.
+
+    Args:
+        filter (OpenAlexFilter): The filter object containing authors and institutions.
+
+    Returns:
+        str: The constructed filter URL.
+    """
+    filters = []
+    if filter.authors:
+        filters.append(f"authorships.author.id:{'|'.join(filter.authors)}")
+    if filter.institutions:
+        filters.append(f"institutions.id:{'|'.join(filter.institutions)}")
+
+    return "|".join(filters) if filters else ""
+
+
 # Utility functions for searching the OpenAlex API
 # For documentation, see https://docs.openalex.org/api-entities/works/search-works
 def search_open_alex(
-    search_term: str, filter: Optional[str] = None, page: int = 1
+    search_term: str, filter: Optional[OpenAlexFilter] = None, page: int = 1
 ) -> OpenAlexResponse:
     """
     Search the OpenAlex API for papers based on a search term and optional filter.
 
     Args:
         search_term (str): The term to search for.
-        filter (Optional[str]): Optional filter for the search.
+        filter (Optional[OpenAlexFilter]): Optional filter for the search.
 
     Returns:
         dict: The response from the OpenAlex API.
@@ -146,7 +170,7 @@ def search_open_alex(
 
     params = {"search": quote(search_term), "page": page}
     if filter:
-        params["filter"] = quote(filter)
+        params["filter"] = quote(construct_open_alex_filter_url(filter))
 
     constructed_url = f"{base_url}?"
     for key, value in params.items():

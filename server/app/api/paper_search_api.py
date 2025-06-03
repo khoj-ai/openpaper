@@ -6,7 +6,7 @@ from app.auth.dependencies import get_current_user, get_db, get_required_user
 from app.database.crud.hypothesis_crud import hypothesis_crud
 from app.database.models import JobStatus
 from app.database.telemetry import track_event
-from app.helpers.paper_search import search_open_alex
+from app.helpers.paper_search import OpenAlexFilter, search_open_alex
 from app.schemas.user import CurrentUser
 from app.tasks.hypothesis import process_hypothesis
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
@@ -19,10 +19,12 @@ logger = logging.getLogger(__name__)
 paper_search_router = APIRouter()
 
 
-@paper_search_router.get("/search")
+@paper_search_router.post("/search")
 async def search_papers(
     query: str,
     page: int = 1,
+    # Accept filter in the body for more complex queries
+    filter: Optional[OpenAlexFilter] = None,
     db: Session = Depends(get_db),
     current_user: Optional[CurrentUser] = Depends(get_current_user),
 ):
@@ -31,7 +33,7 @@ async def search_papers(
     """
     try:
         # Perform the search operation
-        results = search_open_alex(query, page=page)
+        results = search_open_alex(query, filter=filter, page=page)
         track_event(
             "paper_search",
             user_id=current_user.id if current_user else None,
