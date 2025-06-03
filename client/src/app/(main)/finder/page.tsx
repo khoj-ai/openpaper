@@ -15,7 +15,7 @@ import {
     SheetFooter,
     SheetClose,
 } from '@/components/ui/sheet';
-import { ExternalLink, Users, CalendarDays, Search, Building2, BookOpen, Quote, Tag, Globe, X } from "lucide-react"
+import { ExternalLink, Users, CalendarDays, Search, Building2, BookOpen, Quote, Tag, Globe } from "lucide-react"
 import { fetchFromApi } from "@/lib/api";
 import {
     Pagination,
