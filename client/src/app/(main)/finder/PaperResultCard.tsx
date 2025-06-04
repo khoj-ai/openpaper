@@ -9,7 +9,7 @@ import {
     SheetFooter,
     SheetClose,
 } from '@/components/ui/sheet';
-import { ExternalLink, Users, CalendarDays, Building2, BookOpen, Quote, Tag } from "lucide-react";
+import { ExternalLink, Users, CalendarDays, Building2, BookOpen, Quote, Tag, PlusCircle } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -251,7 +251,8 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                                         <Dialog>
                                             <DialogTrigger asChild>
                                                 <Button variant="outline" className="border-slate-300">
-                                                    Import to Library
+                                                    <PlusCircle className="h-4 w-4 mr-2" />
+                                                    Add to Queue
                                                 </Button>
                                             </DialogTrigger>
                                             <DialogContent>
@@ -262,8 +263,8 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                                                         <ol className="list-decimal list-inside">
                                                             <li>Visit this <a href={paper.open_access.oa_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">Open Access</a> link.</li>
                                                             <li>Download the paper to your device.</li>
-                                                            <li>Go back to the <a href="/" className="text-blue-600 dark:text-blue-400 hover:underline">Open Paper home page</a>.</li>
-                                                            <li>Upload the paper file.</li>
+                                                            <li>Open the <a href="/" className="text-blue-600 dark:text-blue-400 hover:underline">Open Paper home page</a>.</li>
+                                                            <li>Upload the PDF.</li>
                                                         </ol>
                                                         <Collapsible className="mt-4">
                                                             <CollapsibleTrigger className="text-blue-600 dark:text-blue-400 hover:underline">
