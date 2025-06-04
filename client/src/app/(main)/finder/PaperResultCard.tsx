@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import Link from "next/link";
 
 interface PaperResultCardProps {
     paper: OpenAlexResponse["results"][number]
@@ -262,7 +263,7 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                                                         <ol className="list-decimal list-inside">
                                                             <li>Visit this <a href={paper.open_access.oa_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">Open Access</a> link.</li>
                                                             <li>Download the paper to your device.</li>
-                                                            <li>Open the <a href="/" className="text-blue-600 dark:text-blue-400 hover:underline">Open Paper home page</a>.</li>
+                                                            <li>Open the <Link href="/" className="text-blue-600 dark:text-blue-400 hover:underline">Open Paper home page</Link>.</li>
                                                             <li>Upload the PDF.</li>
                                                         </ol>
                                                         <Collapsible className="mt-4">
