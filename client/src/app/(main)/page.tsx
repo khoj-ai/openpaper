@@ -476,20 +476,45 @@ export default function Home() {
 					maxSizeMb={5} // Set your desired max size
 				/>
 
-				{
-					relevantPapers.length > 0 && relevantPapers.map((paper) => (
-						<PaperCard
-							key={paper.id}
-							paper={paper}
-							setPaper={(paperId: string, updatedPaper: PaperItem) => {
-								// Handle paper update logic here if needed
-								setRelevantPapers((prev) =>
-									prev.map((p) => (p.id === paperId ? { ...p, ...updatedPaper } : p))
-								);
-							}}
-						/>
-					))
-				}
+				{/* Section break and header for relevant papers */}
+				{relevantPapers.length > 0 && (
+					<>
+						{/* Visual separator */}
+						<div className="w-full border-t border-border/40 my-8"></div>
+
+						{/* Jump back in section */}
+						<div className="w-full flex items-center justify-between">
+							<div className="flex flex-col gap-2">
+								<h2 className="text-xl font-semibold">Jump back in</h2>
+								<p className="text-sm text-muted-foreground">
+									Continue reading your recent papers
+								</p>
+							</div>
+							<Button variant="ghost" size="sm" asChild>
+								<Link href="/papers" className="flex items-center gap-2">
+									<FileText className="h-4 w-4" />
+									View all papers
+								</Link>
+							</Button>
+						</div>
+
+						{/* Papers grid */}
+						<div className="w-full space-y-4">
+							{relevantPapers.map((paper) => (
+								<PaperCard
+									key={paper.id}
+									paper={paper}
+									setPaper={(paperId: string, updatedPaper: PaperItem) => {
+										// Handle paper update logic here if needed
+										setRelevantPapers((prev) =>
+											prev.map((p) => (p.id === paperId ? { ...p, ...updatedPaper } : p))
+										);
+									}}
+								/>
+							))}
+						</div>
+					</>
+				)}
 
 			</main>
 			<footer className="row-start-3 grid gap-[24px] items-center justify-center justify-items-center">
