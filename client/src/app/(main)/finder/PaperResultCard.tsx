@@ -13,6 +13,9 @@ import { ExternalLink, Users, CalendarDays, Building2, BookOpen, Quote, Tag } fr
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Alert } from "@/components/ui/alert";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface PaperResultCardProps {
     paper: OpenAlexResponse["results"][number]
@@ -232,17 +235,49 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                                     </Button>
                                 )}
                                 {paper.open_access?.oa_url && (
-                                    <Button variant="default" asChild className="bg-blue-500 hover:bg-blue-600">
-                                        <a
-                                            href={paper.open_access.oa_url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex items-center gap-2 w-full sm:w-auto justify-center"
-                                        >
-                                            <BookOpen className="h-4 w-4" />
-                                            Open Access PDF
-                                        </a>
-                                    </Button>
+                                    <>
+                                        <Button variant="default" asChild className="bg-blue-500 hover:bg-blue-600">
+                                            <a
+                                                href={paper.open_access.oa_url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex items-center gap-2 w-full sm:w-auto justify-center"
+                                            >
+                                                <BookOpen className="h-4 w-4" />
+                                                Open Access PDF
+                                            </a>
+                                        </Button>
+                                        {/* Dialog for importing into library. When clicked, shows user instructions for navigating to the Open Access PDF link, retrieving the paper, and then uploading to Open Paper via the home page `/` */}
+                                        <Dialog>
+                                            <DialogTrigger asChild>
+                                                <Button variant="outline" className="border-slate-300">
+                                                    Import to Library
+                                                </Button>
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>Import Paper</DialogTitle>
+                                                    <DialogDescription>
+                                                        To import this paper into your library, follow these steps:
+                                                        <ol className="list-decimal list-inside">
+                                                            <li>Visit this <a href={paper.open_access.oa_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">Open Access</a> link.</li>
+                                                            <li>Download the paper to your device.</li>
+                                                            <li>Go back to the <a href="/" className="text-blue-600 dark:text-blue-400 hover:underline">Open Paper home page</a>.</li>
+                                                            <li>Upload the paper file.</li>
+                                                        </ol>
+                                                        <Collapsible className="mt-4">
+                                                            <CollapsibleTrigger className="text-blue-600 dark:text-blue-400 hover:underline">
+                                                                Why do I need to do this?
+                                                            </CollapsibleTrigger>
+                                                            <CollapsibleContent className="mt-2 text-sm text-slate-700 dark:text-slate-300">
+                                                                Open Access URLs can vary widely in how they are structured and hosted. By downloading the paper directly, you ensure that you have the correct file to upload to your library.
+                                                            </CollapsibleContent>
+                                                        </Collapsible>
+                                                    </DialogDescription>
+                                                </DialogHeader>
+                                            </DialogContent>
+                                        </Dialog>
+                                    </>
                                 )}
                             </div>
                         </SheetDescription>
