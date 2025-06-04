@@ -135,5 +135,5 @@
 }
 
 .animate-glow-3x {
-	animation: glow-limited 2s ease-in-out 3;
+	animation: glow-limited 2s ease-in-out 1;
 }
