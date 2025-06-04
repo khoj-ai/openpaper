@@ -1,5 +1,5 @@
 import React from "react";
-import { Circle, CircleDashed, CheckCircle } from "lucide-react";
+import { CircleDashed, CheckCircle, CircleDot } from "lucide-react";
 
 // Enum for Paper statuses
 export type PaperStatus = "todo" | "reading" | "completed";
@@ -13,10 +13,10 @@ export const PaperStatusEnum = {
 
 export const getStatusIcon = (status: PaperStatus) => {
     if (status === PaperStatusEnum.TODO) {
-        return <CircleDashed size={ 16 } className = "text-blue-500" />;
+        return <CircleDashed size={ 16 } className = "text-yellow-500" />;
     }
     if (status === PaperStatusEnum.READING) {
-        return <Circle size={ 16 } className = "text-yellow-500" />;
+        return <CircleDot size={ 16 } className = "text-blue-500" />;
     }
     if (status === PaperStatusEnum.COMPLETED) {
         return <CheckCircle size={ 16 } className = "text-green-500" />;
