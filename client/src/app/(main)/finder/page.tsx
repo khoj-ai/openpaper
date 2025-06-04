@@ -24,6 +24,12 @@ import PaperResultCard from "./PaperResultCard";
 import HelperCard from "./HelperCard";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Filter, ChevronDown } from "lucide-react";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface SearchPaperRequest {
     authors?: string[];
@@ -46,78 +52,11 @@ export default function FinderPage() {
     // Autocomplete states
     const [authorSuggestions, setAuthorSuggestions] = useState<OpenAlexTypeAheadAuthor[]>([]);
     const [institutionSuggestions, setInstitutionSuggestions] = useState<OpenAlexTypeAheadInstitution[]>([]);
-    const [showSuggestions, setShowSuggestions] = useState(false);
     const [loadingAutocomplete, setLoadingAutocomplete] = useState(false);
+    const [filterQuery, setFilterQuery] = useState("");
+    const filterInputRef = useRef<HTMLInputElement>(null);
+
     const inputRef = useRef<HTMLInputElement>(null);
-    const suggestionsRef = useRef<HTMLDivElement>(null);
-
-    // Debounce autocomplete queries
-    useEffect(() => {
-        if (!query.trim()) {
-            setAuthorSuggestions([]);
-            setInstitutionSuggestions([]);
-            setShowSuggestions(false);
-            return;
-        }
-
-        const timeoutId = setTimeout(async () => {
-            if (query.trim().length >= 2) {
-                if (!inputRef.current || document.activeElement !== inputRef.current) {
-                    setShowSuggestions(false); // Hide suggestions if input is not focused
-                    return;
-                }
-                if (loading) return; // Prevent showing an autocomplete result while a search is in progress
-                setLoadingAutocomplete(true);
-                try {
-                    const [authorsData, institutionsData] = await Promise.all([
-                        getOpenAlexTypeAheadAuthors(query.trim()),
-                        getOpenAlexTypeAheadInstitutions(query.trim())
-                    ]);
-
-                    setAuthorSuggestions(authorsData);
-                    setInstitutionSuggestions(institutionsData);
-                    setShowSuggestions(true);
-                } catch (error) {
-                    console.error("Autocomplete failed:", error);
-                } finally {
-                    setLoadingAutocomplete(false);
-                }
-            }
-        }, 300);
-
-        return () => clearTimeout(timeoutId);
-    }, [query, loading]);
-
-    // Close suggestions when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (
-                inputRef.current &&
-                !inputRef.current.contains(event.target as Node) &&
-                suggestionsRef.current &&
-                !suggestionsRef.current.contains(event.target as Node)
-            ) {
-                setShowSuggestions(false);
-            }
-        };
-
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    const handleAuthorSelect = (author: OpenAlexTypeAheadAuthor) => {
-        if (!authors.find(a => a.id === author.id)) {
-            setAuthors(prev => [...prev, author]);
-        }
-        setShowSuggestions(false);
-    };
-
-    const handleInstitutionSelect = (institution: OpenAlexTypeAheadInstitution) => {
-        if (!institutions.find(i => i.id === institution.id)) {
-            setInstitutions(prev => [...prev, institution]);
-        }
-        setShowSuggestions(false);
-    };
 
     const removeAuthor = (authorId: string) => {
         setAuthors(prev => prev.filter(a => a.id !== authorId));
@@ -134,8 +73,6 @@ export default function FinderPage() {
         setLoading(true);
         inputRef.current?.blur(); // Remove focus from input
         setError(null); // Clear any previous errors
-        suggestionsRef.current?.scrollTo(0, 0); // Reset scroll position of suggestions
-        setShowSuggestions(false);
 
         try {
             const filter: SearchPaperRequest = {
@@ -220,199 +157,262 @@ export default function FinderPage() {
         return pages
     }
 
+    // Debounce filter autocomplete
+    useEffect(() => {
+        if (!filterQuery.trim()) {
+            setAuthorSuggestions([]);
+            setInstitutionSuggestions([]);
+            return;
+        }
+
+        const timeoutId = setTimeout(async () => {
+            if (filterQuery.trim().length >= 2) {
+                setLoadingAutocomplete(true);
+                try {
+                    const [authorsData, institutionsData] = await Promise.all([
+                        getOpenAlexTypeAheadAuthors(filterQuery.trim()),
+                        getOpenAlexTypeAheadInstitutions(filterQuery.trim())
+                    ]);
+
+                    setAuthorSuggestions(authorsData);
+                    setInstitutionSuggestions(institutionsData);
+                } catch (error) {
+                    console.error("Filter autocomplete failed:", error);
+                } finally {
+                    setLoadingAutocomplete(false);
+                }
+            }
+        }, 300);
+
+        return () => clearTimeout(timeoutId);
+    }, [filterQuery]);
+
+    const handleFilterAuthorSelect = (author: OpenAlexTypeAheadAuthor) => {
+        if (!authors.find(a => a.id === author.id)) {
+            setAuthors(prev => [...prev, author]);
+        }
+        setFilterQuery("");
+        setAuthorSuggestions([]);
+        setInstitutionSuggestions([]);
+    };
+
+    const handleFilterInstitutionSelect = (institution: OpenAlexTypeAheadInstitution) => {
+        if (!institutions.find(i => i.id === institution.id)) {
+            setInstitutions(prev => [...prev, institution]);
+        }
+        setFilterQuery("");
+        setAuthorSuggestions([]);
+        setInstitutionSuggestions([]);
+    };
+
+    const activeFilterCount = authors.length + institutions.length + (onlyOpenAccess ? 1 : 0);
+
+
     return (
         <div className="container mx-auto p-6 space-y-6">
             <div className="space-y-4">
-                <div className="relative flex gap-4">
+                {/* Main search bar */}
+                <div className="flex gap-4">
                     <div className="relative flex-1 max-w-2xl">
                         <Input
                             ref={inputRef}
-                            placeholder="Search by topic, title, or select authors/institutions below..."
+                            placeholder="Search by topic, title, keywords..."
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                            onFocus={() => query.trim().length >= 2 && setShowSuggestions(true)}
                         />
-
-                        {!showSuggestions && query.trim().length > 0 && (
+                        {query.trim().length > 0 && (
                             <div className="text-xs text-muted-foreground mt-1">
-                                Press Enter to search for &quot;{query}&quot; or select filters below
-                            </div>
-                        )}
-
-                        {showSuggestions && (query.trim().length >= 2) && (
-                            <div
-                                ref={suggestionsRef}
-                                className="absolute top-full left-0 right-0 z-50 mt-1 bg-popover border rounded-md shadow-lg max-h-80 overflow-auto"
-                            >
-                                {loadingAutocomplete ? (
-                                    <div className="p-3">
-                                        <div className="flex items-center gap-2">
-                                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                                            <span className="text-sm text-muted-foreground">Loading suggestions...</span>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <>
-                                        {/* Add a "search as-is" option at the top */}
-                                        <div className="p-2 border-b">
-                                            <button
-                                                onClick={() => {
-                                                    setShowSuggestions(false);
-                                                    handleSearch(1);
-                                                }}
-                                                className="w-full px-2 py-2 text-left hover:bg-accent rounded-sm transition-colors flex items-center gap-2"
-                                            >
-                                                <Search className="h-3 w-3 text-primary" />
-                                                <div>
-                                                    <div className="font-medium text-sm">Search for &quot;{query}&quot;</div>
-                                                    <div className="text-xs text-muted-foreground">Search by topic or keywords</div>
-                                                </div>
-                                            </button>
-                                        </div>
-
-                                        {authorSuggestions.length > 0 && (
-                                            <div className="p-2">
-                                                <div className="flex items-center gap-2 px-2 py-1 text-xs font-medium text-muted-foreground">
-                                                    <User className="h-3 w-3" />
-                                                    Filter by Authors
-                                                </div>
-                                                {authorSuggestions.slice(0, 5).map((author) => (
-                                                    <button
-                                                        key={author.id}
-                                                        onClick={() => handleAuthorSelect(author)}
-                                                        className="w-full px-2 py-2 text-left hover:bg-accent rounded-sm transition-colors"
-                                                        disabled={authors.some(a => a.id === author.id)}
-                                                    >
-                                                        <div className="font-medium text-sm">{author.display_name}</div>
-                                                        {author.hint && (
-                                                            <div className="text-xs text-muted-foreground">{author.hint}</div>
-                                                        )}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
-
-                                        {institutionSuggestions.length > 0 && (
-                                            <div className="p-2 border-t">
-                                                <div className="flex items-center gap-2 px-2 py-1 text-xs font-medium text-muted-foreground">
-                                                    <Building2 className="h-3 w-3" />
-                                                    Filter by Institutions
-                                                </div>
-                                                {institutionSuggestions.slice(0, 5).map((institution) => (
-                                                    <button
-                                                        key={institution.id}
-                                                        onClick={() => handleInstitutionSelect(institution)}
-                                                        className="w-full px-2 py-2 text-left hover:bg-accent rounded-sm transition-colors"
-                                                        disabled={institutions.some(i => i.id === institution.id)}
-                                                    >
-                                                        <div className="font-medium text-sm">{institution.display_name}</div>
-                                                        {institution.hint && (
-                                                            <div className="text-xs text-muted-foreground">{institution.hint}</div>
-                                                        )}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
-
-                                        {authorSuggestions.length === 0 && institutionSuggestions.length === 0 && (
-                                            <>
-                                                <div className="p-3 text-center text-sm text-muted-foreground">
-                                                    No author or institution suggestions found
-                                                </div>
-                                            </>
-                                        )}
-                                    </>
-                                )}
+                                Press Enter to search for &quot;{query}&quot;
                             </div>
                         )}
                     </div>
+
+                    {/* Filter button */}
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" className="flex items-center gap-2">
+                                <Filter className="h-4 w-4" />
+                                Filters
+                                {activeFilterCount > 0 && (
+                                    <Badge variant="secondary" className="ml-1 px-1 py-0 text-xs">
+                                        {activeFilterCount}
+                                    </Badge>
+                                )}
+                                <ChevronDown className="h-3 w-3" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-96 p-4" align="end">
+                            <div className="space-y-4">
+                                <h3 className="font-medium text-sm">Search Filters</h3>
+
+                                {/* Open Access Toggle */}
+                                <div className="flex items-center gap-2">
+                                    <Switch
+                                        id="filter-open-access"
+                                        checked={onlyOpenAccess}
+                                        onCheckedChange={setOnlyOpenAccess}
+                                    />
+                                    <Label htmlFor="filter-open-access" className="text-sm">
+                                        Open Access Only
+                                    </Label>
+                                </div>
+
+                                {/* Author/Institution Search */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="filter-search" className="text-sm font-medium">
+                                        Authors & Institutions
+                                    </Label>
+                                    <div className="relative">
+                                        <Input
+                                            id="filter-search"
+                                            ref={filterInputRef}
+                                            placeholder="Search authors or institutions..."
+                                            value={filterQuery}
+                                            onChange={(e) => setFilterQuery(e.target.value)}
+                                        />
+
+                                        {/* Filter suggestions dropdown */}
+                                        {(authorSuggestions.length > 0 || institutionSuggestions.length > 0 || loadingAutocomplete) && filterQuery.trim().length >= 2 && (
+                                            <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
+                                                {loadingAutocomplete ? (
+                                                    <div className="p-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                                                            <span className="text-sm text-muted-foreground">Loading...</span>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        {authorSuggestions.length > 0 && (
+                                                            <div className="p-2">
+                                                                <div className="flex items-center gap-2 px-2 py-1 text-xs font-medium text-muted-foreground">
+                                                                    <User className="h-3 w-3" />
+                                                                    Authors
+                                                                </div>
+                                                                {authorSuggestions.slice(0, 5).map((author) => (
+                                                                    <button
+                                                                        key={author.id}
+                                                                        onClick={() => handleFilterAuthorSelect(author)}
+                                                                        className="w-full px-2 py-2 text-left hover:bg-accent rounded-sm transition-colors"
+                                                                        disabled={authors.some(a => a.id === author.id)}
+                                                                    >
+                                                                        <div className="font-medium text-sm">{author.display_name}</div>
+                                                                        {
+                                                                            author.hint && (
+                                                                                <div className="text-xs text-muted-foreground">{author.hint}</div>
+                                                                            )
+                                                                        }
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        )}
+
+                                                        {institutionSuggestions.length > 0 && (
+                                                            <div className="p-2 border-t">
+                                                                <div className="flex items-center gap-2 px-2 py-1 text-xs font-medium text-muted-foreground">
+                                                                    <Building2 className="h-3 w-3" />
+                                                                    Institutions
+                                                                </div>
+                                                                {institutionSuggestions.slice(0, 5).map((institution) => (
+                                                                    <button
+                                                                        key={institution.id}
+                                                                        onClick={() => handleFilterInstitutionSelect(institution)}
+                                                                        className="w-full px-2 py-2 text-left hover:bg-accent rounded-sm transition-colors"
+                                                                        disabled={institutions.some(i => i.id === institution.id)}
+                                                                    >
+                                                                        <div className="font-medium text-sm">{institution.display_name}</div>
+                                                                        {institution.hint && (
+                                                                            <div className="text-xs text-muted-foreground">{institution.hint}</div>
+                                                                        )}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+
                     <Button onClick={() => handleSearch(1)} disabled={loading}>
                         Search
                     </Button>
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <Switch
-                        id="only-open-access"
-                        checked={onlyOpenAccess}
-                        onCheckedChange={setOnlyOpenAccess}
-                    />
-                    <Label htmlFor="only-open-access" className="text-sm whitespace-nowrap">
-                        Open Access Only
-                    </Label>
-                </div>
-
-                {/* Selected filters */}
-                {(authors.length > 0 || institutions.length > 0) && (
+                {/* Active filters display */}
+                {activeFilterCount > 0 && (
                     <div className="space-y-2">
-                        {/* Show Open Access filter if enabled */}
-                        {onlyOpenAccess && (
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                                    <Search className="h-3 w-3" />
-                                    Filters
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                    <Badge variant="secondary" className="gap-2">
-                                        Open Access Only
-                                        <button
-                                            onClick={() => setOnlyOpenAccess(false)}
-                                            className="hover:bg-destructive/20 rounded-full p-0.5 transition-colors"
-                                        >
-                                            <X className="h-3 w-3" />
-                                        </button>
-                                    </Badge>
-                                </div>
-                            </div>
-                        )}
-                        {authors.length > 0 && (
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                                    <User className="h-3 w-3" />
-                                    Selected Authors
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                    {authors.map((author) => (
-                                        <Badge key={author.id} variant="secondary" className="gap-2">
-                                            {author.display_name}
-                                            <button
-                                                onClick={() => removeAuthor(author.id)}
-                                                className="hover:bg-destructive/20 rounded-full p-0.5 transition-colors"
-                                            >
-                                                <X className="h-3 w-3" />
-                                            </button>
-                                        </Badge>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                        {/* Header row with label and clear button */}
+                        <div className="flex items-center flex-row gap-2">
+                            <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                                <Search className="h-3 w-3" />
+                                Active filters ({activeFilterCount}):
+                            </span>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    setAuthors([]);
+                                    setInstitutions([]);
+                                    setOnlyOpenAccess(false);
+                                    setFilterQuery("");
+                                }}
+                                className="h-6 px-3 text-xs"
+                            >
+                                Clear all
+                            </Button>
+                        </div>
 
-                        {institutions.length > 0 && (
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                                    <Building2 className="h-3 w-3" />
-                                    Selected Institutions
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                    {institutions.map((institution) => (
-                                        <Badge key={institution.id} variant="secondary" className="gap-2">
-                                            {institution.display_name}
-                                            <button
-                                                onClick={() => removeInstitution(institution.id)}
-                                                className="hover:bg-destructive/20 rounded-full p-0.5 transition-colors"
-                                            >
-                                                <X className="h-3 w-3" />
-                                            </button>
-                                        </Badge>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                        {/* Filter badges row */}
+                        <div className="flex flex-wrap gap-2">
+                            {onlyOpenAccess && (
+                                <Badge variant="secondary" className="gap-1 text-xs">
+                                    Open Access
+                                    <button
+                                        onClick={() => setOnlyOpenAccess(false)}
+                                        className="hover:bg-destructive/20 rounded-full p-0.5 transition-colors"
+                                    >
+                                        <X className="h-2.5 w-2.5" />
+                                    </button>
+                                </Badge>
+                            )}
+
+                            {authors.map((author) => (
+                                <Badge key={author.id} variant="outline" className="gap-1 text-xs">
+                                    <User className="h-2.5 w-2.5" />
+                                    {author.display_name}
+                                    <button
+                                        onClick={() => removeAuthor(author.id)}
+                                        className="hover:bg-destructive/20 rounded-full p-0.5 transition-colors"
+                                    >
+                                        <X className="h-2.5 w-2.5" />
+                                    </button>
+                                </Badge>
+                            ))}
+
+                            {institutions.map((institution) => (
+                                <Badge key={institution.id} variant="outline" className="gap-1 text-xs">
+                                    <Building2 className="h-2.5 w-2.5" />
+                                    {institution.display_name}
+                                    <button
+                                        onClick={() => removeInstitution(institution.id)}
+                                        className="hover:bg-destructive/20 rounded-full p-0.5 transition-colors"
+                                    >
+                                        <X className="h-2.5 w-2.5" />
+                                    </button>
+                                </Badge>
+                            ))}
+                        </div>
                     </div>
                 )}
             </div>
 
+            {/* Rest of your component remains the same */}
             {!results && !loading && (
                 <HelperCard onExampleClick={(query) => {
                     setQuery(query);
