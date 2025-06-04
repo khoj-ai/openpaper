@@ -122,3 +122,18 @@
 		@apply bg-background text-foreground;
 	}
 }
+@keyframes glow-limited {
+
+	0%,
+	100% {
+		box-shadow: 0 0 5px rgba(59, 130, 246, 0.3);
+	}
+
+	50% {
+		box-shadow: 0 0 20px rgba(59, 130, 246, 0.6), 0 0 30px rgba(59, 130, 246, 0.4);
+	}
+}
+
+.animate-glow-3x {
+	animation: glow-limited 2s ease-in-out 3;
+}

@@ -100,7 +100,10 @@ export default function OnboardingChecklist() {
     return (
         <Popover>
             <PopoverTrigger asChild>
-                <Button variant={"ghost"} className="flex items-center gap-2">
+                <Button
+                    variant={"ghost"}
+                    className="flex items-center gap-2 animate-glow-3x hover:animate-none"
+                >
                     <Clipboard className="h-4 w-4" />
                     Onboarding Checklist
                     <div>{numCompleted}/{itemCount}</div>
@@ -118,11 +121,11 @@ export default function OnboardingChecklist() {
                 />
                 <ChecklistItem
                     completed={user && onboardingData?.has_highlights || false}
-                    text="Highlight a snippet"
+                    text="Highlight a snippet in any paper"
                 />
                 <ChecklistItem
                     completed={user && onboardingData?.has_annotations || false}
-                    text="Annotate a highlight"
+                    text="Annotate a highlight with a comment"
                 />
                 <ChecklistItem
                     completed={user && onboardingData?.has_notes || false}
