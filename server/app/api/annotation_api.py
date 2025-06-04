@@ -8,9 +8,9 @@ from app.database.crud.annotation_crud import (
     annotation_crud,
 )
 from app.database.database import get_db
-from app.database.models import Annotation
+from app.database.telemetry import track_event
 from app.schemas.user import CurrentUser
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -48,6 +48,16 @@ async def create_annotation(
             ),
             user=current_user,
         )
+        if not annotation:
+            raise ValueError(
+                "Failed to create annotation, please check the input data."
+            )
+
+        track_event(
+            "annotation_created",
+            user_id=str(current_user.id),
+        )
+
         return JSONResponse(
             status_code=201,
             content=annotation.to_dict(),
@@ -141,6 +151,16 @@ async def update_annotation(
             ),
             user=current_user,
         )
+        if not annotation:
+            raise ValueError(
+                "Failed to update annotation, please check the input data."
+            )
+
+        track_event(
+            "annotation_updated",
+            user_id=str(current_user.id),
+        )
+
         return JSONResponse(status_code=200, content=annotation.to_dict())
     except ValueError as e:
         return JSONResponse(status_code=404, content={"message": str(e)})

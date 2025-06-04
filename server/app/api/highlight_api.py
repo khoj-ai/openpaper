@@ -9,9 +9,9 @@ from app.database.crud.highlight_crud import (
     highlight_crud,
 )
 from app.database.database import get_db
-from app.database.models import Highlight
+from app.database.telemetry import track_event
 from app.schemas.user import CurrentUser
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -53,6 +53,12 @@ async def create_highlight(
             ),
             user=current_user,
         )
+
+        if not highlight:
+            raise ValueError("Failed to create highlight, please check the input data.")
+
+        track_event("highlight_created", user_id=str(current_user.id))
+
         return JSONResponse(
             status_code=201,
             content=highlight.to_dict(),
@@ -142,8 +148,16 @@ async def update_highlight(
                 end_offset=request.end_offset,
             ),
         )
+
+        if not highlight:
+            raise ValueError("Failed to update highlight, please check the input data.")
+
+        track_event("highlight_updated", user_id=str(current_user.id))
+
         return JSONResponse(status_code=200, content=highlight.to_dict())
     except ValueError as e:
+
+        logger.error(f"Highlight not found or invalid data: {e}")
         return JSONResponse(status_code=404, content={"message": str(e)})
     except Exception as e:
         logger.error(f"Error updating highlight: {e}")
