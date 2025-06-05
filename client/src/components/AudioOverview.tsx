@@ -1,10 +1,20 @@
 import { fetchFromApi } from '@/lib/api';
-import { Pause, Play, RotateCcw, Volume2, Download, Clock, FileAudio, History, ChevronDown, Plus } from 'lucide-react';
+import { Pause, Play, RotateCcw, Volume2, Download, Clock, FileAudio, History, ChevronDown, Plus, Mic } from 'lucide-react';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import React, { useState, useEffect, useRef } from 'react';
 import EnigmaticLoadingExperience from './EnigmaticLoadingExperience';
 import { Badge } from '@/components/ui/badge';
 import Markdown from 'react-markdown';
 import CustomCitationLink from '@/components/utils/CustomCitationLink';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 
 interface AudioOverviewProps {
     paper_id: string;
@@ -60,12 +70,12 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
     const [audioOverview, setAudioOverview] = useState<AudioOverview | null>(null);
     const [allAudioOverviews, setAllAudioOverviews] = useState<AudioOverview[]>([]);
     const [selectedAudioId, setSelectedAudioId] = useState<string | null>(null);
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [jobStatus, setJobStatus] = useState<JobStatus | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [loadingText, setLoadingText] = useState<string>(audioOverviewLoadingText[Math.floor(Math.random() * audioOverviewLoadingText.length)]);
     const [error, setError] = useState<string | null>(null);
     const [showGenerationForm, setShowGenerationForm] = useState(false);
+    const [selectedFocus, setSelectedFocus] = useState<string | null>(null);
 
     const [additionalInstructions, setAdditionalInstructions] = useState(DEFAULT_INSTRUCTIONS);
 
@@ -199,7 +209,6 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
             setCurrentTime(0);
             setIsLoaded(false);
         }
-        setIsDropdownOpen(false);
     };
 
 
@@ -230,10 +239,14 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
             if (response) {
                 setAudioOverview(response);
                 setJobStatus(null); // Clear job status since we have the overview now
+                // Update allAudioOverviews by adding in the new overview to the list
+                setAllAudioOverviews((prev) => [...prev, response]);
             } else {
+                setShowGenerationForm(true);
                 throw new Error('Failed to fetch audio overview');
             }
         } catch (err) {
+            setShowGenerationForm(true);
             console.error('Error fetching audio overview:', err);
             setError('Failed to fetch audio overview');
         }
@@ -341,6 +354,10 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
         }
     };
 
+    console.log('audio overview:', audioOverview);
+    console.log('job status:', jobStatus);
+    console.log('show generation form:', showGenerationForm);
+
     return (
         <div className="rounded-lg p-6 h-full w-full">
             <div className="flex items-center justify-between mb-4">
@@ -351,68 +368,52 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
 
                 {/* Previous Audio Overviews Dropdown */}
                 {allAudioOverviews.length > 1 && (
-                    <div className="relative">
-                        <button
-                            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                            className="flex items-center gap-2 px-3 py-2 text-sm text-secondary-foreground hover:text-primary border border-border rounded-lg hover:bg-accent transition-colors"
-                        >
-                            <History className="w-4 h-4" />
-                            Previous ({allAudioOverviews.length - 1})
-                            <ChevronDown className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                        </button>
-
-                        {isDropdownOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-80 bg-background border border-border rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
-                                <div className="p-2">
-                                    <div className="text-xs text-muted-foreground mb-2 px-2">
-                                        Select an audio overview to play
-                                    </div>
-                                    {allAudioOverviews
-                                        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                                        .map((overview) => (
-                                            <button
-                                                key={overview.id}
-                                                onClick={() => handleAudioOverviewSelect(overview.id)}
-                                                className={`w-full text-left p-3 rounded-lg hover:bg-accent transition-colors ${selectedAudioId === overview.id ? 'bg-accent border border-border' : ''
-                                                    }`}
-                                            >
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="text-sm font-medium text-foreground truncate">
-                                                            {overview.title || 'Audio Overview'}
-                                                        </div>
-                                                        <div className="text-xs text-muted-foreground mt-1">
-                                                            {new Date(overview.created_at).toLocaleDateString('en-US', {
-                                                                month: 'short',
-                                                                day: 'numeric',
-                                                                hour: '2-digit',
-                                                                minute: '2-digit',
-                                                            })}
-                                                        </div>
-                                                    </div>
-                                                    {selectedAudioId === overview.id && (
-                                                        <div className="ml-2">
-                                                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                                        </div>
-                                                    )}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" className="flex items-center gap-2">
+                                <History className="w-4 h-4" />
+                                Previous ({allAudioOverviews.length - 1})
+                                <ChevronDown className="w-4 h-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-80">
+                            <DropdownMenuLabel>Select an audio overview to play</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {allAudioOverviews
+                                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                                .map((overview) => (
+                                    <DropdownMenuItem
+                                        key={overview.id}
+                                        onClick={() => handleAudioOverviewSelect(overview.id)}
+                                        className={`p-3 cursor-pointer ${selectedAudioId === overview.id ? 'bg-accent' : ''}`}
+                                    >
+                                        <div className="flex items-center justify-between w-full">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-sm font-medium truncate">
+                                                    {overview.title || 'Audio Overview'}
                                                 </div>
-                                            </button>
-                                        ))
-                                    }
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                                                <div className="text-xs text-muted-foreground mt-1">
+                                                    {new Date(overview.created_at).toLocaleDateString('en-US', {
+                                                        month: 'short',
+                                                        day: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit',
+                                                    })}
+                                                </div>
+                                            </div>
+                                            {selectedAudioId === overview.id && (
+                                                <div className="ml-2">
+                                                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </DropdownMenuItem>
+                                ))
+                            }
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 )}
             </div>
-
-            {/* Close dropdown when clicking outside */}
-            {isDropdownOpen && (
-                <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setIsDropdownOpen(false)}
-                />
-            )}
 
             {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
@@ -421,30 +422,80 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
             )}
 
             {/* No audio overview exists or showing generation form */}
-            {(!audioOverview && !jobStatus) || showGenerationForm && (
+            {((!audioOverview && !jobStatus) || showGenerationForm) && (
                 <div className="text-center py-8">
-                    <div className="bg-blue-50 dark:bg-blue-950 rounded-xl p-8">
-                        <FileAudio className="w-12 h-12 text-blue-500 mx-auto mb-4" />
-                        <p className="text-primary mb-6 text-lg">
-                            Transform this paper into an audio summary
+                    <div className="bg-blue-50 dark:bg-blue-950 rounded-xl p-8 max-w-lg mx-auto">
+                        <Mic className="w-16 h-16 text-blue-500 mx-auto mb-4" />
+                        <h3 className="text-xl font-semibold text-foreground mb-2">
+                            Audio Overview
+                        </h3>
+                        <p className="text-muted-foreground mb-8">
+                            Generate a spoken summary of this paper
                         </p>
 
-                        {/* Additional Instructions Input */}
-                        <div className="mb-6 text-left max-w-md mx-auto">
-                            <label className="block text-sm font-medium text-foreground mb-2">
-                                Additional Instructions (Optional)
-                            </label>
+                        {/* Summary Focus Options */}
+                        <div className="mb-6 text-left">
+                            <Label className="block text-sm font-medium text-foreground mb-3">
+                                Summary Focus
+                            </Label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button
+                                    variant={'outline'}
+                                    onClick={() => {
+                                        setAdditionalInstructions(`${DEFAULT_INSTRUCTIONS} Focus on the key results and findings of this paper.`);
+                                        setSelectedFocus('key-results');
+                                    }}
+                                    className={`px-4 py-3 text-sm border rounded-lg font-medium transition-colors ${selectedFocus === 'key-results' ? 'border-blue-300 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800' : 'border-border hover:bg-accent'}`}
+                                >
+                                    Key Results
+                                </Button>
+                                <Button
+                                    variant={'outline'}
+                                    onClick={() => {
+                                        setAdditionalInstructions(`${DEFAULT_INSTRUCTIONS} Focus on the methodology and approach used in this paper.`);
+                                        setSelectedFocus('methodology');
+                                    }}
+                                    className={`px-4 py-3 text-sm border rounded-lg font-medium transition-colors ${selectedFocus === 'methodology' ? 'border-blue-300 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800' : 'border-border hover:bg-accent'}`}
+                                >
+                                    Methodology
+                                </Button>
+                                <Button
+                                    variant={'outline'}
+                                    onClick={() => {
+                                        setAdditionalInstructions(`${DEFAULT_INSTRUCTIONS} Provide a comprehensive summary of the entire paper.`);
+                                        setSelectedFocus('full-paper');
+                                    }}
+                                    className={`px-4 py-3 text-sm border rounded-lg font-medium transition-colors ${selectedFocus === 'full-paper' ? 'border-blue-300 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800' : 'border-border hover:bg-accent'}`}
+                                >
+                                    Full Paper
+                                </Button>
+                                <Button
+                                    variant={'outline'}
+                                    onClick={() => {
+                                        setAdditionalInstructions(`${DEFAULT_INSTRUCTIONS} Focus only on the abstract and main conclusions.`);
+                                        setSelectedFocus('abstract-only');
+                                    }}
+                                    className={`px-4 py-3 text-sm border rounded-lg font-medium transition-colors ${selectedFocus === 'abstract-only' ? 'border-blue-300 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800' : 'border-border hover:bg-accent'}`}
+                                >
+                                    Abstract Only
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Custom Instructions - Collapsible */}
+                        <details className="mb-6 text-left">
+                            <summary className="cursor-pointer text-sm font-medium text-foreground mb-3 flex items-center justify-between">
+                                Custom Instructions
+                                <ChevronDown className="w-4 h-4" />
+                            </summary>
                             <textarea
                                 value={additionalInstructions}
                                 onChange={(e) => setAdditionalInstructions(e.target.value)}
-                                placeholder="e.g., Focus on methodology, make it more conversational, include key statistics..."
-                                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                                rows={3}
+                                placeholder="Add specific guidance for your audio overview (optional)"
+                                className="w-full px-3 py-3 text-sm border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none mt-2"
+                                rows={4}
                             />
-                            <p className="text-xs text-muted-foreground mt-1">
-                                Provide specific guidance on tone, focus areas, or style preferences for your audio overview.
-                            </p>
-                        </div>
+                        </details>
 
                         <div className="flex gap-3 justify-center">
                             {showGenerationForm && audioOverview && (
@@ -464,9 +515,10 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                                     setShowGenerationForm(false);
                                 }}
                                 disabled={isLoading}
-                                className="bg-blue-400 dark:bg-blue-600 disabled:from-blue-400 disabled:to-indigo-400 text-white px-8 py-3 rounded-lg font-medium text-lg shadow-lg hover:shadow-xl transition-all duration-200"
+                                className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-400 text-white px-8 py-3 rounded-lg font-medium text-base shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
                             >
-                                {isLoading ? 'Creating...' : 'Generate Audio Overview'}
+                                <Play className="w-4 h-4" />
+                                {isLoading ? 'Generating...' : 'Generate Audio Overview'}
                             </button>
                         </div>
                     </div>
@@ -534,7 +586,6 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                                 onClick={() => {
                                     setShowGenerationForm(true);
                                     setAdditionalInstructions(DEFAULT_INSTRUCTIONS);
-                                    setIsDropdownOpen(false);
                                 }}
                                 disabled={isLoading}
                                 className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-500 text-sm font-medium flex items-center gap-1"
