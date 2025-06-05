@@ -70,6 +70,7 @@ class AudioOverviewJobCRUD(
                 AudioOverviewJob.paper_id == paper_id,
                 AudioOverviewJob.user_id == current_user.id,
             )
+            .order_by(AudioOverviewJob.created_at.desc())
             .first()
         )
 

@@ -162,9 +162,8 @@ async def get_audio_overviews_by_paper_id(
     )
 
     if not audio_overviews:
-        return JSONResponse(
-            status_code=404, content={"message": "No audio overviews found"}
-        )
+        # If no audio overviews are found, return an empty list
+        return JSONResponse(status_code=200, content=[])
 
     # Convert the audio overviews to a list of dictionaries
     audio_overview_list = [
