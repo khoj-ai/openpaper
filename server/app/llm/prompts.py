@@ -26,7 +26,7 @@ Your summary should be no more than 4000 characters long, and it should be writt
 
 Write the summary in plain text, with minimal syntax formatting for citations.
 
-Include any citations or references to specific sections of the paper. It should read like a cohesive brief that could be read on a podcast or in a blog post.
+Include any citations or references to specific sections of the paper, reproducing the raw text. It should read like a cohesive brief that could be read on a podcast or in a blog post.
 
 Citations should be formatted as [^1], [^2], etc., where each number corresponds to the idx of the list of citations you will provide at the end of the summary.
 

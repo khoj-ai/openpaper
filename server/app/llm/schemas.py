@@ -50,7 +50,7 @@ class AudioOverviewCitation(BaseModel):
     """
 
     text: str = Field(
-        description="The raw text of the citation as it appears in the paper."
+        description="The raw text of the citation as it appears in the paper. Ensure that this is a direct quote or paraphrase from the paper."
     )
     index: int = Field(
         description="The index of the citation in the paper's reference list. This is used to identify the citation in discussions or findings."
@@ -63,7 +63,7 @@ class AudioOverviewForLLM(BaseModel):
     )
     citations: List[AudioOverviewCitation] = Field(
         default=[],
-        description="List of the raw text citations from the paper that are relevant to the summary. These should be direct quotes or paraphrases from the paper that support the summary provided. Remember to include the citation index (e.g., [^1], [^2]) in the summary.",
+        description="List of the raw text citations from the paper that are relevant to the summary. These should be direct quotes or paraphrases from the paper that support the summary provided. These should not be extracted references from the references of the paper. Rather, they are references relevant to your summary. Remember to include the citation index (e.g., [^1], [^2]) in the summary.",
     )
     title: str = Field(description="The title of the narrative overview.")
 
