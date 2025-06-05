@@ -1,5 +1,5 @@
 import { fetchFromApi } from '@/lib/api';
-import { Pause, Play, RotateCcw, Volume2, Download, Clock, FileAudio, History, ChevronDown } from 'lucide-react';
+import { Pause, Play, RotateCcw, Volume2, Download, Clock, FileAudio, History, ChevronDown, Plus } from 'lucide-react';
 import React, { useState, useEffect, useRef } from 'react';
 import EnigmaticLoadingExperience from './EnigmaticLoadingExperience';
 import { Badge } from '@/components/ui/badge';
@@ -52,6 +52,8 @@ const audioOverviewLoadingText = [
     'Converting paper to audio...',
 ]
 
+const DEFAULT_INSTRUCTIONS = 'Please summarize the key points of this paper, focusing on the methodology and results. Make it concise and easy to understand.';
+
 export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: AudioOverviewProps) {
     const audioRef = useRef<HTMLAudioElement>(null);
     const [audioOverviewJobId, setAudioOverviewJobId] = useState<string | null>(null);
@@ -63,6 +65,9 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
     const [isLoading, setIsLoading] = useState(false);
     const [loadingText, setLoadingText] = useState<string>(audioOverviewLoadingText[Math.floor(Math.random() * audioOverviewLoadingText.length)]);
     const [error, setError] = useState<string | null>(null);
+    const [showGenerationForm, setShowGenerationForm] = useState(false);
+
+    const [additionalInstructions, setAdditionalInstructions] = useState(DEFAULT_INSTRUCTIONS);
 
     // Enhanced audio states
     const [isPlaying, setIsPlaying] = useState(false);
@@ -152,12 +157,12 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
         setAllAudioOverviews(overviews);
     };
 
-    const createAudioOverview = async () => {
+    const createAudioOverview = async (additionalInstructions: string) => {
         setIsLoading(true);
         setError(null);
 
         const body: AudioOverviewCreateRequestBody = {
-            additional_instructions: 'Please summarize the key points of this paper.',
+            additional_instructions: additionalInstructions,
             voice: undefined
         }
 
@@ -415,21 +420,55 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                 </div>
             )}
 
-            {/* No audio overview exists */}
-            {!audioOverview && !jobStatus && (
+            {/* No audio overview exists or showing generation form */}
+            {(!audioOverview && !jobStatus) || showGenerationForm && (
                 <div className="text-center py-8">
                     <div className="bg-blue-50 dark:bg-blue-950 rounded-xl p-8">
                         <FileAudio className="w-12 h-12 text-blue-500 mx-auto mb-4" />
                         <p className="text-primary mb-6 text-lg">
                             Transform this paper into an audio summary
                         </p>
-                        <button
-                            onClick={createAudioOverview}
-                            disabled={isLoading}
-                            className="bg-blue-400 dark:bg-blue-600 disabled:from-blue-400 disabled:to-indigo-400 text-white px-8 py-3 rounded-lg font-medium text-lg shadow-lg hover:shadow-xl transition-all duration-200"
-                        >
-                            {isLoading ? 'Creating...' : 'Generate Audio Overview'}
-                        </button>
+
+                        {/* Additional Instructions Input */}
+                        <div className="mb-6 text-left max-w-md mx-auto">
+                            <label className="block text-sm font-medium text-foreground mb-2">
+                                Additional Instructions (Optional)
+                            </label>
+                            <textarea
+                                value={additionalInstructions}
+                                onChange={(e) => setAdditionalInstructions(e.target.value)}
+                                placeholder="e.g., Focus on methodology, make it more conversational, include key statistics..."
+                                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                                rows={3}
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Provide specific guidance on tone, focus areas, or style preferences for your audio overview.
+                            </p>
+                        </div>
+
+                        <div className="flex gap-3 justify-center">
+                            {showGenerationForm && audioOverview && (
+                                <button
+                                    onClick={() => {
+                                        setShowGenerationForm(false);
+                                        setAdditionalInstructions(DEFAULT_INSTRUCTIONS);
+                                    }}
+                                    className="px-6 py-3 text-secondary-foreground border border-border rounded-lg font-medium hover:bg-accent transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            )}
+                            <button
+                                onClick={() => {
+                                    createAudioOverview(additionalInstructions);
+                                    setShowGenerationForm(false);
+                                }}
+                                disabled={isLoading}
+                                className="bg-blue-400 dark:bg-blue-600 disabled:from-blue-400 disabled:to-indigo-400 text-white px-8 py-3 rounded-lg font-medium text-lg shadow-lg hover:shadow-xl transition-all duration-200"
+                            >
+                                {isLoading ? 'Creating...' : 'Generate Audio Overview'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -458,7 +497,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                         </p>
                         {jobStatus.status === 'failed' && (
                             <button
-                                onClick={createAudioOverview}
+                                onClick={() => setShowGenerationForm(true)}
                                 className="mt-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-2 rounded-lg font-medium"
                             >
                                 Try Again
@@ -469,7 +508,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
             )}
 
             {/* Enhanced Audio Player */}
-            {audioOverview && (
+            {audioOverview && !showGenerationForm && (
                 <div className="space-y-6">
                     <div className="flex items-center justify-between">
                         <div className="text-sm text-secondary-foreground flex items-center gap-2">
@@ -493,14 +532,15 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                             </a>
                             <button
                                 onClick={() => {
-                                    createAudioOverview();
+                                    setShowGenerationForm(true);
+                                    setAdditionalInstructions(DEFAULT_INSTRUCTIONS);
                                     setIsDropdownOpen(false);
                                 }}
                                 disabled={isLoading}
                                 className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-500 text-sm font-medium flex items-center gap-1"
                             >
-                                <RotateCcw className="w-4 h-4" />
-                                Regenerate
+                                <Plus className="w-4 h-4 mr-1" />
+                                New
                             </button>
                         </div>
                     </div>
