@@ -8,7 +8,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import EnigmaticLoadingExperience from './EnigmaticLoadingExperience';
 import { Badge } from '@/components/ui/badge';
 import Markdown from 'react-markdown';
@@ -211,15 +211,39 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
         }
     };
 
+    const fetchAudioOverview = useCallback(async () => {
+        try {
+            const response: AudioOverview = await fetchFromApi(`/api/paper/audio/${paper_id}/file`);
+            if (response) {
+                setAudioOverview(response);
+                setJobStatus(null); // Clear job status since we have the overview now
 
-    const pollJobStatus = async () => {
+                // Use functional update to get the latest value
+                setAllAudioOverviews((prevOverviews) => {
+                    // Check if overview already exists using the latest state
+                    if (!prevOverviews.some(overview => overview.id === response.id)) {
+                        console.log('Adding new audio overview to allAudioOverviews:', response.id);
+                        return [...prevOverviews, response];
+                    }
+                    return prevOverviews; // Return unchanged if already exists
+                });
+            } else {
+                setShowGenerationForm(true);
+                throw new Error('Failed to fetch audio overview');
+            }
+        } catch (err) {
+            setShowGenerationForm(true);
+            console.error('Error fetching audio overview:', err);
+            setError('Failed to fetch audio overview');
+        }
+    }, [paper_id, allAudioOverviews]);
+
+    const pollJobStatus = useCallback(async () => {
         try {
             const response: JobStatus = await fetchFromApi(`/api/paper/audio/${paper_id}/status`);
-
             if (response.job_id && response.status) {
                 console.log('Polling job status:', audioOverviewJobId);
                 setJobStatus(response);
-
                 // If the job is completed, fetch the audio overview
                 if (response.status === 'completed') {
                     await fetchAudioOverview();
@@ -231,26 +255,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
             console.error('Error polling job status:', err);
             setError('Failed to get job status');
         }
-    };
-
-    const fetchAudioOverview = async () => {
-        try {
-            const response: AudioOverview = await fetchFromApi(`/api/paper/audio/${paper_id}/file`);
-            if (response) {
-                setAudioOverview(response);
-                setJobStatus(null); // Clear job status since we have the overview now
-                // Update allAudioOverviews by adding in the new overview to the list
-                setAllAudioOverviews((prev) => [...prev, response]);
-            } else {
-                setShowGenerationForm(true);
-                throw new Error('Failed to fetch audio overview');
-            }
-        } catch (err) {
-            setShowGenerationForm(true);
-            console.error('Error fetching audio overview:', err);
-            setError('Failed to fetch audio overview');
-        }
-    };
+    }, [paper_id, fetchAudioOverview]);
 
     const handleCitationClick = (citationKey: string, messageIndex: number) => {
         console.log('Citation clicked:', citationKey, messageIndex);
