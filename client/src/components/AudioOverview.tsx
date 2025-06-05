@@ -1,5 +1,5 @@
 import { fetchFromApi } from '@/lib/api';
-import { Pause, Play, RotateCcw, Volume2, Download, Clock, FileAudio } from 'lucide-react';
+import { Pause, Play, RotateCcw, Volume2, Download, Clock, FileAudio, History, ChevronDown } from 'lucide-react';
 import React, { useState, useEffect, useRef } from 'react';
 import EnigmaticLoadingExperience from './EnigmaticLoadingExperience';
 import { Badge } from '@/components/ui/badge';
@@ -56,6 +56,9 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
     const audioRef = useRef<HTMLAudioElement>(null);
     const [audioOverviewJobId, setAudioOverviewJobId] = useState<string | null>(null);
     const [audioOverview, setAudioOverview] = useState<AudioOverview | null>(null);
+    const [allAudioOverviews, setAllAudioOverviews] = useState<AudioOverview[]>([]);
+    const [selectedAudioId, setSelectedAudioId] = useState<string | null>(null);
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [jobStatus, setJobStatus] = useState<JobStatus | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [loadingText, setLoadingText] = useState<string>(audioOverviewLoadingText[Math.floor(Math.random() * audioOverviewLoadingText.length)]);
@@ -72,6 +75,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
     // Check for existing audio overview on component mount
     useEffect(() => {
         checkExistingAudioOverview();
+        loadAllAudioOverviews();
     }, [paper_id]);
 
     // Poll job status when a job is in progress
@@ -133,12 +137,19 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
             const response: AudioOverview | null = await fetchFromApi(`/api/paper/audio/${paper_id}/file`);
             if (response) {
                 setAudioOverview(response);
+                setSelectedAudioId(response.id);
             } else {
                 setAudioOverview(null);
+                setSelectedAudioId(null);
             }
         } catch (err) {
             console.error('Error checking existing audio overview:', err);
         }
+    };
+
+    const loadAllAudioOverviews = async () => {
+        const overviews = await fetchAllAudioOverviews();
+        setAllAudioOverviews(overviews);
     };
 
     const createAudioOverview = async () => {
@@ -170,6 +181,22 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
             setIsLoading(false);
         }
     };
+
+    const handleAudioOverviewSelect = async (audioId: string) => {
+        if (audioId === selectedAudioId) return;
+
+        const selectedOverview = await fetchAudioOverviewById(audioId);
+        if (selectedOverview) {
+            setAudioOverview(selectedOverview);
+            setSelectedAudioId(audioId);
+            // Reset audio states
+            setIsPlaying(false);
+            setCurrentTime(0);
+            setIsLoaded(false);
+        }
+        setIsDropdownOpen(false);
+    };
+
 
     const pollJobStatus = async () => {
         try {
@@ -311,10 +338,76 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
 
     return (
         <div className="rounded-lg p-6 h-full w-full">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <FileAudio className="w-5 h-5" />
-                Audio Overview
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <FileAudio className="w-5 h-5" />
+                    Audio Overview
+                </h3>
+
+                {/* Previous Audio Overviews Dropdown */}
+                {allAudioOverviews.length > 1 && (
+                    <div className="relative">
+                        <button
+                            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                            className="flex items-center gap-2 px-3 py-2 text-sm text-secondary-foreground hover:text-primary border border-border rounded-lg hover:bg-accent transition-colors"
+                        >
+                            <History className="w-4 h-4" />
+                            Previous ({allAudioOverviews.length - 1})
+                            <ChevronDown className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {isDropdownOpen && (
+                            <div className="absolute right-0 top-full mt-2 w-80 bg-background border border-border rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
+                                <div className="p-2">
+                                    <div className="text-xs text-muted-foreground mb-2 px-2">
+                                        Select an audio overview to play
+                                    </div>
+                                    {allAudioOverviews
+                                        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                                        .map((overview) => (
+                                            <button
+                                                key={overview.id}
+                                                onClick={() => handleAudioOverviewSelect(overview.id)}
+                                                className={`w-full text-left p-3 rounded-lg hover:bg-accent transition-colors ${selectedAudioId === overview.id ? 'bg-accent border border-border' : ''
+                                                    }`}
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-sm font-medium text-foreground truncate">
+                                                            {overview.title || 'Audio Overview'}
+                                                        </div>
+                                                        <div className="text-xs text-muted-foreground mt-1">
+                                                            {new Date(overview.created_at).toLocaleDateString('en-US', {
+                                                                month: 'short',
+                                                                day: 'numeric',
+                                                                hour: '2-digit',
+                                                                minute: '2-digit',
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                    {selectedAudioId === overview.id && (
+                                                        <div className="ml-2">
+                                                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </button>
+                                        ))
+                                    }
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* Close dropdown when clicking outside */}
+            {isDropdownOpen && (
+                <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setIsDropdownOpen(false)}
+                />
+            )}
 
             {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
@@ -399,7 +492,10 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                                 Download
                             </a>
                             <button
-                                onClick={createAudioOverview}
+                                onClick={() => {
+                                    createAudioOverview();
+                                    setIsDropdownOpen(false);
+                                }}
                                 disabled={isLoading}
                                 className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-500 text-sm font-medium flex items-center gap-1"
                             >
@@ -433,7 +529,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
 
                             <div className="flex-1">
                                 <div className="text-lg font-semibold text-secondary-foreground mb-1">
-                                    {paper_title || 'Audio Overview'}
+                                    {audioOverview.title || paper_title || 'Audio Overview'}
                                 </div>
                                 <div className="text-sm text-secondary-foreground">
                                     {formatTime(currentTime)} / {formatTime(duration)}
@@ -510,32 +606,30 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                     </div>
 
                     {/* Transcript */}
-                    {
-                        audioOverview.transcript && (
-                            <Markdown
-                                components={{
-                                    // Apply the custom component to text nodes
-                                    p: (props) => <CustomCitationLink
-                                        {...props}
-                                        handleCitationClick={handleCitationClick}
-                                        messageIndex={0}
-                                    />,
-                                    li: (props) => <CustomCitationLink
-                                        {...props}
-                                        handleCitationClick={handleCitationClick}
-                                        messageIndex={0}
-                                    />,
-                                    div: (props) => <CustomCitationLink
-                                        {...props}
-                                        handleCitationClick={handleCitationClick}
-                                        messageIndex={0}
-                                    />,
-                                }}
-                            >
-                                {audioOverview.transcript}
-                            </Markdown>
-                        )
-                    }
+                    {audioOverview.transcript && (
+                        <Markdown
+                            components={{
+                                // Apply the custom component to text nodes
+                                p: (props) => <CustomCitationLink
+                                    {...props}
+                                    handleCitationClick={handleCitationClick}
+                                    messageIndex={0}
+                                />,
+                                li: (props) => <CustomCitationLink
+                                    {...props}
+                                    handleCitationClick={handleCitationClick}
+                                    messageIndex={0}
+                                />,
+                                div: (props) => <CustomCitationLink
+                                    {...props}
+                                    handleCitationClick={handleCitationClick}
+                                    messageIndex={0}
+                                />,
+                            }}
+                        >
+                            {audioOverview.transcript}
+                        </Markdown>
+                    )}
 
                     {/* Citations */}
                     {audioOverview.citations && audioOverview.citations.length > 0 && (
