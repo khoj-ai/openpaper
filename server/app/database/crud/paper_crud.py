@@ -142,7 +142,7 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
         # Get todo papers to fill the remaining slots
         todo_papers = (
             db.query(Paper)
-            .filter(Paper.owner_id == user.id, Paper.status == PaperStatus.todo)
+            .filter(Paper.user_id == user.id, Paper.status == PaperStatus.todo)
             .order_by(Paper.last_accessed_at.desc())
             .limit(remaining_limit)
             .all()
