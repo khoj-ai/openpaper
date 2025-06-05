@@ -4,7 +4,7 @@ import { PdfViewer } from '@/components/PdfViewer';
 import { Button } from '@/components/ui/button';
 import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
 import { useParams } from 'next/navigation';
-import { useState, useEffect, FormEvent, Children, useRef, createElement, HTMLAttributes, ReactNode } from 'react';
+import { useState, useEffect, FormEvent, useRef } from 'react';
 
 // Reference to react-markdown documents: https://github.com/remarkjs/react-markdown?tab=readme-ov-file
 import Markdown from 'react-markdown';
@@ -55,20 +55,7 @@ import { Input } from '@/components/ui/input';
 import { AudioOverview } from '@/components/AudioOverview';
 import { PaperStatus, PaperStatusEnum } from '@/components/utils/PdfStatus';
 import { useAuth } from '@/lib/auth';
-
-
-// Interface for the CustomCitationLink component props
-interface CustomCitationLinkProps extends HTMLAttributes<HTMLElement> {
-    children?: ReactNode;
-    handleCitationClick: (key: string, messageIndex: number) => void;
-    messageIndex: number;
-    node?: {
-        tagName?: string;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        properties?: Record<string, any>;
-    };
-    className?: string;
-}
+import CustomCitationLink from '@/components/utils/CustomCitationLink';
 
 interface ChatRequestBody {
     user_query: string;
@@ -78,73 +65,6 @@ interface ChatRequestBody {
     style?: ResponseStyle;
     llm_provider?: string;
 }
-
-const CustomCitationLink = ({ children, handleCitationClick, messageIndex, className, ...props }: CustomCitationLinkProps) => {
-    // Create a clone of props to avoid mutating the original
-    const elementProps = {
-        ...props,
-        className: `${className || ''}`
-    };
-
-    return createElement(
-        // Use the original component type from props
-        props.node?.tagName || 'span',
-        elementProps,
-        Children.map(children, (child) => {
-            // If the child is a string, process it for citations
-            if (typeof child === 'string') {
-                const citationRegex = /\[\^(\d+|[a-zA-Z]+)\]/g;
-
-                if (citationRegex.test(child)) {
-                    // Reset regex state
-                    citationRegex.lastIndex = 0;
-
-                    // Create a React element array from the string with replaced citations
-                    const parts: React.ReactNode[] = [];
-                    let lastIndex = 0;
-                    let match;
-
-                    while ((match = citationRegex.exec(child)) !== null) {
-                        // Add text before the citation
-                        if (match.index > lastIndex) {
-                            parts.push(child.substring(lastIndex, match.index));
-                        }
-
-                        // Add the citation link
-                        const citationKey = match[1];
-
-                        parts.push(
-                            <a
-                                key={`citation-${citationKey}-${match.index}`}
-                                href={`#citation-${citationKey}`}
-                                className="text-slate-600 font-medium hover:underline text-sm bg-slate-200 rounded-xl px-1 py-0.5"
-                                id={`citation-ref-${citationKey}`}
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    handleCitationClick(citationKey, messageIndex);
-                                }}
-                            >
-                                {match[1]}
-                            </a>
-                        );
-
-                        // Update lastIndex to continue after current match
-                        lastIndex = match.index + match[0].length;
-                    }
-
-                    // Add remaining text
-                    if (lastIndex < child.length) {
-                        parts.push(child.substring(lastIndex));
-                    }
-
-                    return <>{parts}</>;
-                }
-                return child;
-            }
-            return child;
-        })
-    );
-};
 
 const PaperToolset = {
     nav: [
@@ -1044,7 +964,10 @@ export default function PaperView() {
                 {
                     rightSideFunction === 'Audio' && (
                         <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto col-span-2">
-                            <AudioOverview paper_id={id} paper_title={paperData.title} />
+                            <AudioOverview
+                                paper_id={id}
+                                paper_title={paperData.title}
+                                setExplicitSearchTerm={setExplicitSearchTerm} />
                         </div>
                     )
                 }

@@ -3,10 +3,17 @@ import { Pause, Play, RotateCcw, Volume2, Download, Clock, FileAudio } from 'luc
 import React, { useState, useEffect, useRef } from 'react';
 import EnigmaticLoadingExperience from './EnigmaticLoadingExperience';
 import { Badge } from '@/components/ui/badge';
+import Markdown from 'react-markdown';
+import CustomCitationLink from '@/components/utils/CustomCitationLink';
 
 interface AudioOverviewProps {
     paper_id: string;
     paper_title?: string;
+    setExplicitSearchTerm: (term: string) => void;
+}
+interface AudioOverviewCitation {
+    index: number;
+    text: string;
 }
 
 interface AudioOverview {
@@ -14,6 +21,8 @@ interface AudioOverview {
     paper_id: string;
     audio_url: string;
     transcript: string;
+    title: string;
+    citations: AudioOverviewCitation[];
     created_at: string;
     updated_at: string;
     job_id: string;
@@ -43,7 +52,7 @@ const audioOverviewLoadingText = [
     'Converting paper to audio...',
 ]
 
-export function AudioOverview({ paper_id, paper_title }: AudioOverviewProps) {
+export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: AudioOverviewProps) {
     const audioRef = useRef<HTMLAudioElement>(null);
     const [audioOverviewJobId, setAudioOverviewJobId] = useState<string | null>(null);
     const [audioOverview, setAudioOverview] = useState<AudioOverview | null>(null);
@@ -195,6 +204,36 @@ export function AudioOverview({ paper_id, paper_title }: AudioOverviewProps) {
         } catch (err) {
             console.error('Error fetching audio overview:', err);
             setError('Failed to fetch audio overview');
+        }
+    };
+
+    const handleCitationClick = (citationKey: string, messageIndex: number) => {
+        console.log('Citation clicked:', citationKey, messageIndex);
+        const citationIndex = parseInt(citationKey);
+        // Look up the citations terms from the citationKey
+        const citationMatch = audioOverview?.citations.find(c => c.index === citationIndex);
+        setExplicitSearchTerm(citationMatch ? citationMatch.text : citationKey);
+    };
+
+    const fetchAllAudioOverviews = async () => {
+        try {
+            const response: AudioOverview[] = await fetchFromApi(`/api/paper/audio/all/${paper_id}`);
+            return response;
+        } catch (err) {
+            console.error('Error fetching all audio overviews:', err);
+            setError('Failed to fetch audio overviews');
+            return [];
+        }
+    };
+
+    const fetchAudioOverviewById = async (audioId: string) => {
+        try {
+            const response: AudioOverview = await fetchFromApi(`/api/paper/audio/file/${audioId}`);
+            return response;
+        } catch (err) {
+            console.error('Error fetching audio overview by ID:', err);
+            setError('Failed to fetch audio overview');
+            return null;
         }
     };
 
@@ -471,13 +510,50 @@ export function AudioOverview({ paper_id, paper_title }: AudioOverviewProps) {
                     </div>
 
                     {/* Transcript */}
-                    {audioOverview.transcript && (
-                        <div className="space-y-3">
-                            <h4 className="font-semibold text-secondary-foreground text-lg">Transcript</h4>
-                            <div className="bg-secondary rounded-xl p-6 shadow-sm">
-                                <p className="text-secondary-foreground leading-relaxed whitespace-pre-wrap">
-                                    {audioOverview.transcript}
-                                </p>
+                    {
+                        audioOverview.transcript && (
+                            <Markdown
+                                components={{
+                                    // Apply the custom component to text nodes
+                                    p: (props) => <CustomCitationLink
+                                        {...props}
+                                        handleCitationClick={handleCitationClick}
+                                        messageIndex={0}
+                                    />,
+                                    li: (props) => <CustomCitationLink
+                                        {...props}
+                                        handleCitationClick={handleCitationClick}
+                                        messageIndex={0}
+                                    />,
+                                    div: (props) => <CustomCitationLink
+                                        {...props}
+                                        handleCitationClick={handleCitationClick}
+                                        messageIndex={0}
+                                    />,
+                                }}
+                            >
+                                {audioOverview.transcript}
+                            </Markdown>
+                        )
+                    }
+
+                    {/* Citations */}
+                    {audioOverview.citations && audioOverview.citations.length > 0 && (
+                        <div className="mt-6">
+                            <h4 className="text-md font-semibold mb-2">Citations</h4>
+                            <div className="space-y-1">
+                                {audioOverview.citations.map((citation) => (
+                                    <div key={citation.index} className="flex items-center gap-1">
+                                        <span className="text-muted-foreground text-xs cursor-pointer"
+                                            onClick={() => handleCitationClick(citation.text, 0)}
+                                        >
+                                            {citation.text}
+                                        </span>
+                                        <span className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-500">
+                                            [{citation.index}]
+                                        </span>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     )}
