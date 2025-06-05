@@ -1,9 +1,10 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from app.database.crud.base_crud import CRUDBase
 from app.database.models import AudioOverview, AudioOverviewJob, JobStatus
+from app.llm.schemas import AudioOverviewCitation
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -27,6 +28,8 @@ class AudioOverviewBase(BaseModel):
     paper_id: UUID
     s3_object_key: str
     transcript: Optional[str] = None
+    citations: Optional[List[AudioOverviewCitation]] = None
+    title: Optional[str] = None
 
 
 class AudioOverviewCreate(AudioOverviewBase):
@@ -36,6 +39,8 @@ class AudioOverviewCreate(AudioOverviewBase):
 class AudioOverviewUpdate(BaseModel):
     s3_object_key: Optional[str] = None
     transcript: Optional[str] = None
+    citations: Optional[List[AudioOverviewCitation]] = None
+    title: Optional[str] = None
 
 
 class AudioOverviewJobCRUD(
@@ -101,10 +106,10 @@ class AudioOverviewJobCRUD(
 
         # Set timestamps based on status
         if status == JobStatus.RUNNING and not job.started_at:
-            job.started_at = datetime.utcnow()
+            job.started_at = datetime.now(timezone.utc)
         elif status in [JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED]:
             if not job.completed_at:
-                job.completed_at = datetime.utcnow()
+                job.completed_at = datetime.now(timezone.utc)
 
         db.commit()
         db.refresh(job)
@@ -142,8 +147,22 @@ class AudioOverviewCRUD(
 
     def get_by_paper_and_user(
         self, db: Session, *, paper_id: UUID, current_user: CurrentUser
-    ) -> Optional[AudioOverview]:
+    ) -> Optional[List[AudioOverview]]:
         """Get audio overview by paper ID and user"""
+        return (
+            db.query(AudioOverview)
+            .filter(
+                AudioOverview.paper_id == paper_id,
+                AudioOverview.user_id == current_user.id,
+            )
+            .order_by(AudioOverview.created_at.desc())
+            .all()
+        )
+
+    def get_mrc_by_paper_and_user(
+        self, db: Session, *, paper_id: UUID, current_user: CurrentUser
+    ) -> Optional[AudioOverview]:
+        """Get the most recent audio overview by paper ID and user"""
         return (
             db.query(AudioOverview)
             .filter(
@@ -204,6 +223,11 @@ class AudioOverviewCRUD(
             "updated_at": (
                 overview.updated_at.isoformat() if overview.updated_at else None
             ),
+            "title": overview.title,
+            "citations": [
+                AudioOverviewCitation.model_validate(citation).model_dump()
+                for citation in overview.citations or []
+            ],
         }
 
 

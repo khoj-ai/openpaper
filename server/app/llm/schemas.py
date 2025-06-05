@@ -43,6 +43,31 @@ The summary should be accessible to readers with basic domain knowledge while ma
     )
 
 
+class AudioOverviewCitation(BaseModel):
+    """
+    Schema for a citation in the paper.
+    This is used to represent a single citation with its text and context.
+    """
+
+    text: str = Field(
+        description="The raw text of the citation as it appears in the paper."
+    )
+    index: int = Field(
+        description="The index of the citation in the paper's reference list. This is used to identify the citation in discussions or findings."
+    )
+
+
+class AudioOverviewForLLM(BaseModel):
+    summary: str = Field(
+        description="The helpful summary of the research. This should include key findings, contributions, and implications of the paper."
+    )
+    citations: List[AudioOverviewCitation] = Field(
+        default=[],
+        description="List of the raw text citations from the paper that are relevant to the summary. These should be direct quotes or paraphrases from the paper that support the summary provided. Remember to include the citation index (e.g., [^1], [^2]) in the summary.",
+    )
+    title: str = Field(description="The title of the narrative overview.")
+
+
 class HypothesisStep(BaseModel):
     question: str = Field(
         description="The sub-question to ask about the hypothesis, which will be used to retrieve relevant papers. Limit to 1 sentence per question to ensure clarity and focus."

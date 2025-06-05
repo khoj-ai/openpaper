@@ -473,4 +473,10 @@ class AudioOverview(Base):
 
     transcript = Column(Text, nullable=True)
 
+    citations = Column(
+        JSONB, nullable=True
+    )  # Store citations in a JSONB format for flexibility. Typically, it would be a list of dicts with keys like `index` and `text`. See `AudioOverviewCitation` schema for more details.
+
+    title = Column(String, nullable=True)
+
     paper = relationship("Paper", back_populates="audio_overviews")

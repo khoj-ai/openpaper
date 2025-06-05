@@ -146,8 +146,68 @@ async def get_audio_overview_job_status(
     )
 
 
+@paper_audio_router.get("/all/{id}")
+async def get_audio_overviews_by_paper_id(
+    request: Request,
+    id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """
+    Get all audio overviews for a specific paper by ID
+    """
+    # Fetch the audio overviews from the database
+    audio_overviews = audio_overview_crud.get_by_paper_and_user(
+        db, paper_id=uuid.UUID(id), current_user=current_user
+    )
+
+    if not audio_overviews:
+        return JSONResponse(
+            status_code=404, content={"message": "No audio overviews found"}
+        )
+
+    # Convert the audio overviews to a list of dictionaries
+    audio_overview_list = [
+        audio_overview_crud.overview_to_dict(overview) for overview in audio_overviews
+    ]
+
+    return JSONResponse(
+        status_code=200,
+        content=audio_overview_list,
+    )
+
+
+@paper_audio_router.get("/file/{audio_overview_id}")
+async def get_audio_overview_by_id(
+    request: Request,
+    audio_overview_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """
+    Get a specific audio overview by ID
+    """
+    # Fetch the audio overview from the database
+    audio_overview = audio_overview_crud.get(
+        db, id=audio_overview_id, user=current_user
+    )
+
+    if not audio_overview:
+        return JSONResponse(
+            status_code=404, content={"message": "Audio overview not found"}
+        )
+
+    # Convert the audio overview to a dictionary
+    audio_overview_dict = audio_overview_crud.overview_to_dict(audio_overview)
+
+    return JSONResponse(
+        status_code=200,
+        content=audio_overview_dict,
+    )
+
+
 @paper_audio_router.get("/{id}/file")
-async def get_audio_overview_file(
+async def get_mrc_audio_overview_file(
     request: Request,
     id: str,
     db: Session = Depends(get_db),
@@ -165,7 +225,7 @@ async def get_audio_overview_file(
         return JSONResponse(status_code=404, content={"message": "Job not found"})
 
     # Fetch the audio overview from the database
-    audio_overview = audio_overview_crud.get_by_paper_and_user(
+    audio_overview = audio_overview_crud.get_mrc_by_paper_and_user(
         db, paper_id=uuid.UUID(id), current_user=current_user
     )
 

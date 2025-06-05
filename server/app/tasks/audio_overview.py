@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Literal, Optional
 from uuid import UUID
@@ -13,6 +14,7 @@ from app.database.database import get_db
 from app.database.models import JobStatus
 from app.database.telemetry import track_event
 from app.llm.operations import operations
+from app.llm.schemas import AudioOverviewForLLM
 from app.llm.speech import speaker
 from app.schemas.user import CurrentUser
 from fastapi import Depends
@@ -72,29 +74,46 @@ def generate_audio_overview(
         if not paper:
             raise ValueError(f"Paper with ID {paper_id} not found")
 
-        paper_title = paper.title or "Untitled Paper"
+        paper_title = str(paper.title) or "Untitled Paper"
 
         # Step 1: Generate narrative summary
         logger.info(f"Generating narrative summary for paper {paper_id}")
-        narrative_summary = operations.create_narrative_summary(
+        narrative_summary: AudioOverviewForLLM = operations.create_narrative_summary(
             paper_id=str(paper_id),
             user=user,
             additional_instructions=additional_instructions,
             db=db,
         )
 
-        if not narrative_summary:
+        if not narrative_summary or not narrative_summary.summary:
             raise ValueError("Failed to generate narrative summary")
 
         logger.info(
-            f"Generated narrative summary ({len(narrative_summary)} characters)"
+            f"Generated narrative summary ({len(narrative_summary.summary)} characters)"
         )
+
+        # Track event creation of narrative summary
+        track_event(
+            "narrative_summary_generated",
+            properties={
+                "paper_id": paper_id,
+                "summary_length": len(narrative_summary.summary),
+                "job_id": str(audio_overview_job_id),
+                "num_citations": len(narrative_summary.citations),
+            },
+            user_id=str(user.id),
+        )
+
+        # Strip any citation syntax from the summary before passing it to the TTS using a regex
+        cleaned_narration = re.sub(
+            r"\s*\[\^[\d]+(?:,\s*\^[\d]+)*\]", "", narrative_summary.summary
+        ).strip()
 
         # Step 2: Convert summary to speech
         logger.info(f"Converting summary to speech with voice: {voice}")
         object_key, file_url = speaker.generate_speech_from_text(
-            title=paper_title,  # type: ignore[call-arg]
-            text=narrative_summary,
+            title=paper_title,
+            text=cleaned_narration,
             voice=voice,
         )
 
@@ -107,7 +126,9 @@ def generate_audio_overview(
         audio_overview_data = AudioOverviewCreate(
             paper_id=paper_id,
             s3_object_key=object_key,
-            transcript=narrative_summary,
+            transcript=narrative_summary.summary,
+            citations=narrative_summary.citations,
+            title=narrative_summary.title or paper_title,
         )
 
         audio_overview = audio_overview_crud.create(

@@ -20,7 +20,7 @@ from app.llm.prompts import (
     NORMAL_MODE_INSTRUCTIONS,
 )
 from app.llm.provider import FileContent, LLMProvider, TextContent
-from app.llm.schemas import PaperMetadataExtraction
+from app.llm.schemas import AudioOverviewForLLM, PaperMetadataExtraction
 from app.llm.utils import retry_llm_operation
 from app.schemas.message import ResponseStyle
 from app.schemas.user import CurrentUser
@@ -110,7 +110,7 @@ class PaperOperations(BaseLLMClient):
         user: CurrentUser,
         additional_instructions: Optional[str] = None,
         db: Session = Depends(get_db),
-    ) -> str:
+    ) -> AudioOverviewForLLM:
         """
         Create a narrative summary of the paper using the specified model
         """
@@ -119,8 +119,11 @@ class PaperOperations(BaseLLMClient):
         if not paper:
             raise ValueError(f"Paper with ID {paper_id} not found.")
 
+        audio_overview_schema = AudioOverviewForLLM.model_json_schema()
+
         formatted_prompt = GENERATE_NARRATIVE_SUMMARY.format(
             additional_instructions=additional_instructions,
+            schema=audio_overview_schema,
         )
 
         signed_url = s3_service.get_cached_presigned_url(
@@ -154,7 +157,11 @@ class PaperOperations(BaseLLMClient):
 
         try:
             if response and response.text:
-                return response.text.strip()
+                # Parse the response text as JSON
+                response_json = JSONParser.validate_and_extract_json(response.text)
+                # Validate against the AudioOverview schema
+                audio_overview = AudioOverviewForLLM.model_validate(response_json)
+                return audio_overview
             else:
                 raise ValueError("Empty response from LLM.")
         except ValueError as e:
