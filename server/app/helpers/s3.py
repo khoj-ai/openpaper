@@ -156,7 +156,7 @@ class S3Service:
 
     async def upload_file(self, file: UploadFile) -> tuple[str, str]:
         """
-        Upload a file to S3
+        Upload a file to S3 using streaming
 
         Args:
             file: The file to upload
@@ -166,7 +166,6 @@ class S3Service:
         """
         try:
             # Generate a unique key for the S3 object
-            # Use a UUID prefix to avoid naming conflicts
             original_filename = (
                 file.filename.replace(" ", "_")
                 if file.filename
@@ -175,28 +174,24 @@ class S3Service:
             file_extension = original_filename.split(".")[-1].lower()
             object_key = f"uploads/{uuid.uuid4()}-{original_filename}"
 
-            # Read file content
-            contents = await file.read()
-
-            # Upload to S3
-            self.s3_client.put_object(
-                Bucket=self.bucket_name,
-                Key=object_key,
-                Body=contents,
-                ContentType=f"application/{file_extension}",
+            # Stream upload directly from file object
+            self.s3_client.upload_fileobj(
+                file.file,  # Stream directly from the file object
+                self.bucket_name,
+                object_key,
+                ExtraArgs={
+                    "ContentType": f"application/{file_extension}",
+                },
             )
 
             # Generate the URL for the uploaded file
             file_url = f"https://{self.cloudflare_bucket_name}/{object_key}"
 
-            # Rewind the file so it can be read again if needed
-            await file.seek(0)
-
             return object_key, file_url
 
         except ClientError as e:
             logger.error(f"Error uploading file to S3: {e}")
-            raise
+            raise ValueError("Failed to upload file to S3")
 
     def delete_file(self, object_key: str) -> bool:
         """
