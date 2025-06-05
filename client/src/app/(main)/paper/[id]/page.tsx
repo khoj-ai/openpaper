@@ -142,6 +142,8 @@ export default function PaperView() {
     const inputMessageRef = useRef<HTMLTextAreaElement>(null);
     const chatInputFormRef = useRef<HTMLFormElement>(null);
 
+    const END_DELIMITER = "END_OF_STREAM"
+
 
     // Add this function to handle citation clicks
     const handleCitationClick = (key: string, messageIndex: number) => {
@@ -587,7 +589,7 @@ export default function PaperView() {
 
                 // Decode the chunk
                 const chunk = decoder.decode(value);
-                const events = chunk.split('\n\n\n').filter(event => event.trim());
+                const events = chunk.split(END_DELIMITER).filter(event => event.trim());
                 chunkCount++;
                 console.log(`Processing chunk #${chunkCount}:`, chunk);
 

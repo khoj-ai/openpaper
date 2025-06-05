@@ -61,6 +61,8 @@ async def chat_message_stream(
     """
     try:
 
+        END_DELIMITER = "END_OF_STREAM"
+
         async def response_generator():
             try:
                 content_chunks = []
@@ -85,12 +87,39 @@ async def chat_message_stream(
                         if chunk_type == "content":
                             # Send the content as-is
                             content_chunks.append(chunk_content)
-                            yield f"{json.dumps({'type': 'content', 'content': chunk_content})}\n\n\n"
+                            try:
+                                json_response = json.dumps(
+                                    {"type": "content", "content": chunk_content}
+                                )
+                                yield f"{json_response}{END_DELIMITER}"
+                            except (TypeError, ValueError) as json_error:
+                                logger.warning(
+                                    f"Failed to serialize chunk content: {json_error}"
+                                )
+                                # Send a safe fallback
+                                safe_content = (
+                                    str(chunk_content)
+                                    .encode("utf-8", errors="replace")
+                                    .decode("utf-8")
+                                )
+                                json_response = json.dumps(
+                                    {"type": "content", "content": safe_content}
+                                )
+                                yield f"{json_response}{END_DELIMITER}"
 
                         elif chunk_type == "references":
                             evidence = chunk_content
                             # Stream evidence when received
-                            yield f"{json.dumps({'type': 'references', 'content': evidence})}\n\n\n"
+                            try:
+                                json_response = json.dumps(
+                                    {"type": "references", "content": evidence}
+                                )
+                                yield f"{json_response}{END_DELIMITER}"
+                            except (TypeError, ValueError) as json_error:
+                                logger.warning(
+                                    f"Failed to serialize references: {json_error}"
+                                )
+                                yield f"{json.dumps({'type': 'error', 'content': 'Failed to serialize references'})}{END_DELIMITER}"
                     else:
                         logger.warning(f"Received unexpected chunk format: {chunk}")
 
@@ -165,7 +194,7 @@ async def chat_message_stream(
                 )
 
                 logger.error(f"Error in streaming response: {e}", exc_info=True)
-                yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n\n"
+                yield f"{json.dumps({'type': 'error', 'content': str(e)})}{END_DELIMITER}"
 
         return StreamingResponse(response_generator(), media_type="text/event-stream")
 
