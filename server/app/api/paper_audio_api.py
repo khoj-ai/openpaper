@@ -197,8 +197,18 @@ async def get_audio_overview_by_id(
             status_code=404, content={"message": "Audio overview not found"}
         )
 
+    # Generate a presigned URL for the audio file
+    signed_url = s3_service.generate_presigned_url(
+        object_key=str(audio_overview.s3_object_key),
+    )
+
+    if not signed_url:
+        return JSONResponse(status_code=404, content={"message": "File not found"})
+
     # Convert the audio overview to a dictionary
     audio_overview_dict = audio_overview_crud.overview_to_dict(audio_overview)
+
+    audio_overview_dict["audio_url"] = signed_url
 
     return JSONResponse(
         status_code=200,
