@@ -38,6 +38,8 @@ jobs:
                   file: ./client/Dockerfile
                   push: true
                   tags: ghcr.io/${{ github.repository_owner }}/ap-client:latest
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
 
     build_server:
       name: Build and Push server image
