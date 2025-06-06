@@ -524,7 +524,6 @@ export default function PaperView() {
             "citations": citations,
         }
     }
-
     const handleSubmit = async (e: FormEvent | null = null) => {
         if (e) {
             e.preventDefault();
@@ -574,6 +573,7 @@ export default function PaperView() {
             const decoder = new TextDecoder();
             let accumulatedContent = '';
             let references: Reference | undefined = undefined;
+            let buffer = ''; // Buffer to accumulate partial chunks
 
             // Debug counters
             let chunkCount = 0;
@@ -584,21 +584,32 @@ export default function PaperView() {
                 const { done, value } = await reader.read();
 
                 if (done) {
+                    // Process any remaining buffer content
+                    if (buffer.trim()) {
+                        console.warn('Unprocessed buffer at end of stream:', buffer);
+                    }
                     break;
                 }
 
-                // Decode the chunk
-                const chunk = decoder.decode(value);
-                const events = chunk.split(END_DELIMITER).filter(event => event.trim());
+                // Decode the chunk and add to buffer
+                const chunk = decoder.decode(value, { stream: true });
+                buffer += chunk;
                 chunkCount++;
                 console.log(`Processing chunk #${chunkCount}:`, chunk);
 
-                for (const event of events) {
+                // Split buffer by delimiter and process complete events
+                const parts = buffer.split(END_DELIMITER);
+
+                // Keep the last part (potentially incomplete) in the buffer
+                buffer = parts.pop() || '';
+
+                // Process all complete parts
+                for (const event of parts) {
                     if (!event.trim()) continue;
 
                     try {
                         // Parse the JSON chunk
-                        const parsedChunk = JSON.parse(event);
+                        const parsedChunk = JSON.parse(event.trim());
                         const chunkType = parsedChunk.type;
                         const chunkContent = parsedChunk.content;
 
@@ -642,17 +653,9 @@ export default function PaperView() {
                             console.warn(`Unknown chunk type: ${chunkType}`);
                         }
                     } catch (error) {
-                        console.error('Error processing chunk:', error, 'Raw chunk:', chunk);
-                        // Handle the error gracefully
-                        setMessages(prev => {
-                            const updatedMessages = [...prev];
-                            updatedMessages[updatedMessages.length - 1] = {
-                                ...updatedMessages[updatedMessages.length - 1],
-                                content: "An error occurred while processing the response. Can you try again?",
-                            };
-                            return updatedMessages;
-                        });
-                        break;
+                        console.error('Error processing event:', error, 'Raw event:', event);
+                        // Continue processing other events rather than breaking
+                        continue;
                     }
                 }
             }
