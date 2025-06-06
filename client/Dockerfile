@@ -6,26 +6,36 @@ FROM node:23.11.0-slim as base
 WORKDIR /app
 
 
+# Set as environment variable for build time
+# These are set early as they might be needed by package scripts during install
+ENV NEXT_PUBLIC_API_URL=https://openpaper.ai
+ENV NODE_ENV=production
+
+# womp womp add posthog env vars
+ENV NEXT_PUBLIC_POSTHOG_KEY=phc_i84JqfidoQncsSmusoeZF9oshYHV2SebGZkKMVtF8AG
+ENV NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
+
+
 # Copy package.json and yarn.lock to the working directory
+# This is done separately to leverage Docker cache.
+# If these files haven't changed, Docker will use the cached layer for yarn install.
 COPY package.json yarn.lock ./
 
 
 # Install dependencies using yarn
-RUN yarn install
+# Only run this if package.json or yarn.lock changed
+# Using --frozen-lockfile for reproducible and potentially faster installs
+RUN yarn install --frozen-lockfile
 
-# Set as environment variable for build time
-ENV NEXT_PUBLIC_API_URL=https://openpaper.ai
-ENV NODE_ENV=production
-
-# Womp womp set client-side Posthog environment variables
-ENV NEXT_PUBLIC_POSTHOG_KEY=phc_i84JqfidoQncsSmusoeZF9oshYHV2SebGZkKMVtF8AG
-ENV NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
 
 # Copy the rest of the application code to the working directory
+# This layer will only be rebuilt if the application code changes.
+# Ensure .dockerignore is properly configured to exclude unnecessary files.
 COPY . .
 
 
 # Build the Next.js application
+# This will only run if the code (above) or dependencies (further above) changed.
 RUN yarn build
 
 
@@ -37,14 +47,24 @@ FROM node:23.11.0-slim as production
 WORKDIR /app
 
 
+# Set production environment variables
+ENV NODE_ENV=production
+# Ensure NEXT_PUBLIC_API_URL is also available in the production stage if needed by the start command or runtime
+ENV NEXT_PUBLIC_API_URL=https://openpaper.ai
+ENV NEXT_PUBLIC_POSTHOG_KEY=phc_i84JqfidoQncsSmusoeZF9oshYHV2SebGZkKMVtF8AG
+ENV NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
+
+
 # Copy the built application from the base image
 COPY --from=base /app/.next ./.next
 COPY --from=base /app/public ./public
-COPY --from=base /app/package.json ./package.json
+COPY --from=base /app/package.json ./
+COPY --from=base /app/yarn.lock ./
 
 
 # Install only the production dependencies
-RUN yarn install --production
+# This ensures a smaller final image by not including devDependencies
+RUN yarn install --production --frozen-lockfile
 
 
 # Expose port 3000 to the outside world
