@@ -1,22 +1,6 @@
 import { useEffect, useState } from "react";
 import { getFuzzyMatchingNodesInPdf, getMatchingNodesInPdf } from "../utils/PdfTextUtils";
 
-function prepareTextForFuzzyMatch(text: string): string {
-    return text
-        // Remove quotes and apostrophes
-        .replace(/['"''"]/g, '')
-        // Remove currency symbols and numbers with units
-        .replace(/[$€£¥]?\d+([.,]\d+)?%?/g, '')
-        // Remove special characters including dashes, slashes, and other symbols
-        .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()\\[\]]/g, ' ')
-        // Replace multiple spaces with single space
-        .replace(/\s+/g, ' ')
-        // Convert to lowercase
-        .toLowerCase()
-        // Trim leading/trailing whitespace
-        .trim();
-}
-
 export function usePdfSearch(explicitSearchTerm?: string) {
     const [searchText, setSearchText] = useState("");
     const [searchResults, setSearchResults] = useState<Array<{
@@ -39,8 +23,7 @@ export function usePdfSearch(explicitSearchTerm?: string) {
         const results = getMatchingNodesInPdf(textToSearch);
 
         if (results.length === 0) {
-            const preparedSearchTerm = prepareTextForFuzzyMatch(textToSearch);
-            const fuzzyResults = getFuzzyMatchingNodesInPdf(preparedSearchTerm);
+            const fuzzyResults = getFuzzyMatchingNodesInPdf(textToSearch);
             if (fuzzyResults.length > 0) {
                 results.push(...fuzzyResults);
             } else {

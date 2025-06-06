@@ -82,7 +82,21 @@ function calculateSimilarity(str1: string, str2: string): number {
     return 1 - (matrix[str1.length][str2.length] / Math.max(str1.length, str2.length));
 }
 
-export const getFuzzyMatchingNodesInPdf = (searchTerm: string) => {
+function prepareTextForFuzzyMatch(text: string): string {
+    return text
+        // Remove quotes and apostrophes but keep numbers
+        .replace(/['"''"]/g, '')
+        // Remove special characters but keep numbers and basic punctuation
+        .replace(/[,\/#!$%\^&\*;:{}=\-_`~()\\[\]]/g, ' ')
+        // Replace multiple spaces with single space
+        .replace(/\s+/g, ' ')
+        // Convert to lowercase
+        .toLowerCase()
+        // Trim leading/trailing whitespace
+        .trim();
+}
+
+export const getFuzzyMatchingNodesInPdf = (originalTerm: string) => {
     const results: Array<{
         pageIndex: number;
         matchIndex: number;
@@ -90,11 +104,18 @@ export const getFuzzyMatchingNodesInPdf = (searchTerm: string) => {
         similarity: number;
     }> = [];
 
-    // Take first 10 characters of search term as seed
-    const searchSeed = searchTerm.slice(0, 10).toLowerCase();
-    const fullSearchTermLower = searchTerm.toLowerCase();
+    // Prepare the search term for fuzzy matching
+    const fuzzySearchTerm = prepareTextForFuzzyMatch(originalTerm);
+
+    // Use a longer seed (first 15-20 chars) to be more specific
+    const searchSeed = fuzzySearchTerm.slice(0, 15).toLowerCase();
+    const fullSearchTermLower = fuzzySearchTerm.toLowerCase();
 
     const textLayers = document.querySelectorAll('.react-pdf__Page__textContent');
+
+    console.log("original search term:", originalTerm);
+    console.log("search seed:", searchSeed);
+    console.log("fuzzy search term:", fuzzySearchTerm);
 
     textLayers.forEach((layer, pageIndex) => {
         const textNodes = Array.from(layer.querySelectorAll('span'));
@@ -102,24 +123,33 @@ export const getFuzzyMatchingNodesInPdf = (searchTerm: string) => {
 
         const filteredTextNodes = textNodes.filter(node => node.textContent && node.textContent.trim() !== '');
         const fullPageText = filteredTextNodes.map(node => node.textContent || '').join(' ');
-        const fullPageTextLower = fullPageText.toLowerCase();
+
+        // Prepare the page text for comparison
+        const preparedPageText = prepareTextForFuzzyMatch(fullPageText);
 
         let startIndex = 0;
         let matchIndex = 0;
 
-        while (startIndex < fullPageTextLower.length) {
-            const foundIndex = fullPageTextLower.indexOf(searchSeed, startIndex);
+        while (startIndex < preparedPageText.length) {
+            const foundIndex = preparedPageText.indexOf(searchSeed, startIndex);
             if (foundIndex === -1) break;
 
-            // Extract a window of text around the found index for similarity comparison
-            const windowStart = Math.max(0, foundIndex - searchTerm.length);
-            const windowEnd = Math.min(fullPageTextLower.length, foundIndex + searchTerm.length * 2);
-            const textWindow = fullPageTextLower.slice(windowStart, windowEnd);
+            // Create a window around the found match for similarity comparison
+            const searchTermLength = fullSearchTermLower.length;
+            const windowStart = Math.max(0, foundIndex - Math.floor(searchTermLength * 0.2));
+            const windowEnd = Math.min(preparedPageText.length, foundIndex + Math.floor(searchTermLength * 1.5));
+            const textWindow = preparedPageText.slice(windowStart, windowEnd);
+
+            console.log("Found text window:", textWindow);
 
             // Calculate similarity between search term and found text
             const similarity = calculateSimilarity(fullSearchTermLower, textWindow);
 
-            if (similarity > 0.2) { // Threshold for accepting matches
+            console.log("Similarity score:", similarity);
+
+            if (similarity > 0.5) { // Higher threshold for better matches
+                // Map back to original text positions to find the correct nodes
+
                 let currentPosition = 0;
                 const matchingNodes: Element[] = [];
 
@@ -152,7 +182,7 @@ export const getFuzzyMatchingNodesInPdf = (searchTerm: string) => {
                 }
             }
 
-            startIndex = foundIndex + 1;
+            startIndex = foundIndex + searchSeed.length; // Move past current match
         }
     });
 
