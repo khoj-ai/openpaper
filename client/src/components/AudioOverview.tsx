@@ -265,6 +265,14 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
         setExplicitSearchTerm(citationMatch ? citationMatch.text : citationKey);
     };
 
+    const handleCitationClickFromTranscript = (citationKey: string, messageIndex: number) => {
+        console.log('Citation clicked from transcript:', citationKey, messageIndex);
+        const citationIndex = parseInt(citationKey);
+        // Look up the citations terms from the citationKey
+        const citationMatch = audioOverview?.citations.find(c => c.index === citationIndex);
+        setExplicitSearchTerm(citationMatch ? citationMatch.text : citationKey);
+    };
+
     const fetchAllAudioOverviews = async () => {
         try {
             const response: AudioOverview[] = await fetchFromApi(`/api/paper/audio/all/${paper_id}`);
@@ -708,17 +716,17 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                                 // Apply the custom component to text nodes
                                 p: (props) => <CustomCitationLink
                                     {...props}
-                                    handleCitationClick={handleCitationClick}
+                                    handleCitationClick={handleCitationClickFromTranscript}
                                     messageIndex={0}
                                 />,
                                 li: (props) => <CustomCitationLink
                                     {...props}
-                                    handleCitationClick={handleCitationClick}
+                                    handleCitationClick={handleCitationClickFromTranscript}
                                     messageIndex={0}
                                 />,
                                 div: (props) => <CustomCitationLink
                                     {...props}
-                                    handleCitationClick={handleCitationClick}
+                                    handleCitationClick={handleCitationClickFromTranscript}
                                     messageIndex={0}
                                 />,
                             }}
