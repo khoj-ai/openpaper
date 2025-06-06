@@ -2,6 +2,7 @@ import logging
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
+from io import BytesIO
 from typing import BinaryIO, Optional
 from urllib.parse import urlparse
 
@@ -154,29 +155,26 @@ class S3Service:
             logger.error(f"File not found: {file_path}")
             raise ValueError(f"File not found: {file_path}")
 
-    async def upload_file(self, file: UploadFile) -> tuple[str, str]:
+    async def upload_file(self, file: BytesIO, filename: str) -> tuple[str, str]:
         """
-        Upload a file to S3 using streaming
+        Upload a BytesIO file to S3 using streaming
 
         Args:
-            file: The file to upload
+            file: The BytesIO object to upload
+            filename: The filename for the uploaded file
 
         Returns:
             tuple: S3 object key and public URL
         """
         try:
-            # Generate a unique key for the S3 object
-            original_filename = (
-                file.filename.replace(" ", "_")
-                if file.filename
-                else f"document-{uuid.uuid4()}.pdf"
-            )
+            # Sanitize filename
+            original_filename = filename.replace(" ", "_")
             file_extension = original_filename.split(".")[-1].lower()
             object_key = f"uploads/{uuid.uuid4()}-{original_filename}"
 
-            # Stream upload directly from file object
+            # Stream upload directly from BytesIO object
             self.s3_client.upload_fileobj(
-                file.file,  # Stream directly from the file object
+                file,  # BytesIO object
                 self.bucket_name,
                 object_key,
                 ExtraArgs={

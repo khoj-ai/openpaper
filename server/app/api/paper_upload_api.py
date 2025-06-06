@@ -138,6 +138,16 @@ async def upload_pdf(
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         return JSONResponse(status_code=400, content={"message": "File must be a PDF"})
 
+    # Read the file contents BEFORE adding to background task. We need this because the UploadFile object becomes inaccessible after the request is processed.
+    try:
+        file_contents = await file.read()
+        filename = file.filename
+    except Exception as e:
+        logger.error(f"Error reading uploaded file: {str(e)}", exc_info=True)
+        return JSONResponse(
+            status_code=400, content={"message": "Error reading uploaded file"}
+        )
+
     # Create the paper upload job
     paper_upload_job_obj = PaperUploadJobCreate(
         started_at=datetime.now(timezone.utc),
@@ -155,9 +165,11 @@ async def upload_pdf(
             content={"message": "Failed to create paper upload job"},
         )
 
+    # Pass file contents and filename instead of the UploadFile object
     background_tasks.add_task(
         upload_raw_file,
-        file=file,
+        file_contents=file_contents,
+        filename=filename,
         paper_upload_job=paper_upload_job,
         current_user=current_user,
         db=db,
@@ -226,7 +238,8 @@ async def upload_file_from_url(
 
 
 async def upload_raw_file(
-    file: UploadFile,
+    file_contents: bytes,
+    filename: str,
     paper_upload_job: PaperUploadJob,
     current_user: CurrentUser,
     db: Session,
@@ -235,13 +248,13 @@ async def upload_raw_file(
     Helper function to upload a raw file.
     """
 
-    if not file or not file.filename or not file.filename.lower().endswith(".pdf"):
+    if not filename or not filename.lower().endswith(".pdf"):
         paper_upload_job_crud.mark_as_failed(
             db=db,
             job_id=str(paper_upload_job.id),
             user=current_user,
         )
-        return  # Add missing return
+        return
 
     paper_upload_job_crud.mark_as_running(
         db=db,
@@ -254,18 +267,20 @@ async def upload_raw_file(
     try:
         # Create a temporary file for processing
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
-            contents = await file.read()
-            temp_file.write(contents)
+            temp_file.write(file_contents)
             temp_file_path = temp_file.name
 
-        # Reset file pointer for S3 upload
-        await file.seek(0)
+        # Create a BytesIO object for S3 upload
+        from io import BytesIO
 
-        # Upload to S3
-        object_key, file_url = await s3_service.upload_file(file)
+        file_like = BytesIO(file_contents)
+        file_like.name = filename  # Set the filename attribute for S3 service
 
         # Ensure we have a valid filename for the record
-        safe_filename = file.filename.replace(" ", "_")  # type: ignore
+        safe_filename = filename.replace(" ", "_")
+
+        # Upload to S3
+        object_key, file_url = await s3_service.upload_file(file_like, safe_filename)
 
         create_and_upload_pdf(
             paper_upload_job=paper_upload_job,
@@ -324,7 +339,10 @@ def create_and_upload_pdf(
     try:
         # Create a new document record in the database with S3 details
         document = PaperCreate(
-            filename=safe_filename, file_url=file_url, s3_object_key=object_key
+            filename=safe_filename,
+            file_url=file_url,
+            s3_object_key=object_key,
+            upload_job_id=str(paper_upload_job.id),
         )
 
         created_doc = paper_crud.create(db, obj_in=document, user=current_user)
