@@ -50,6 +50,8 @@ async def get_upload_status(
     if not paper_upload_job:
         return JSONResponse(status_code=404, content={"message": "Job not found"})
 
+    paper = None
+
     if paper_upload_job.status == "completed":
         # Retrieve the associated paper
         paper = paper_crud.get_by_upload_job_id(
