@@ -1,0 +1,465 @@
+import logging
+import os
+import sys
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Union
+
+from app.auth.dependencies import get_required_user
+from app.database.crud.paper_crud import PaperCreate, PaperUpdate, paper_crud
+from app.database.crud.paper_upload_crud import (
+    PaperUploadJobCreate,
+    paper_upload_job_crud,
+)
+from app.database.database import get_db
+from app.database.models import Paper, PaperUploadJob
+from app.database.telemetry import track_event
+from app.helpers.s3 import s3_service
+from app.llm.operations import operations
+from app.schemas.user import CurrentUser
+from dotenv import load_dotenv
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Request, UploadFile
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, HttpUrl
+from sqlalchemy.orm import Session
+
+load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+# Create API router with prefix
+paper_upload_router = APIRouter()
+
+
+class UploadFromUrlSchema(BaseModel):
+    url: HttpUrl
+
+
+@paper_upload_router.get("/status/{job_id}")
+async def get_upload_status(
+    job_id: str,
+    current_user: CurrentUser = Depends(get_required_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get the status of a paper upload job.
+    """
+    paper_upload_job = paper_upload_job_crud.get(db=db, id=job_id, user=current_user)
+
+    if not paper_upload_job:
+        return JSONResponse(status_code=404, content={"message": "Job not found"})
+
+    if paper_upload_job.status == "completed":
+        # Retrieve the associated paper
+        paper = paper_crud.get_by_upload_job_id(
+            db=db, upload_job_id=str(paper_upload_job.id), user=current_user
+        )
+        if not paper:
+            return JSONResponse(status_code=404, content={"message": "Paper not found"})
+
+    return JSONResponse(
+        status_code=200,
+        content={
+            "job_id": str(paper_upload_job.id),
+            "status": paper_upload_job.status,
+            "started_at": paper_upload_job.started_at.isoformat(),
+            "completed_at": (
+                paper_upload_job.completed_at.isoformat()
+                if paper_upload_job.completed_at
+                else None
+            ),
+            "paper_id": str(paper.id) if paper else None,
+        },
+    )
+
+
+@paper_upload_router.post("/from-url/")
+async def upload_pdf_from_url(
+    request: UploadFromUrlSchema,
+    background_tasks: BackgroundTasks,
+    current_user: CurrentUser = Depends(get_required_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Upload a document from a given URL, rather than the raw file.
+    """
+
+    # Validate the URL
+    url = request.url
+    if not url or not str(url).lower().endswith(".pdf"):
+        return JSONResponse(status_code=400, content={"message": "URL must be a PDF"})
+
+    # Create the paper upload job
+    paper_upload_job_obj = PaperUploadJobCreate(
+        started_at=datetime.now(timezone.utc),
+    )
+
+    paper_upload_job: PaperUploadJob = paper_upload_job_crud.create(
+        db=db,
+        obj_in=paper_upload_job_obj,
+        user=current_user,
+    )
+
+    if not paper_upload_job:
+        return JSONResponse(
+            status_code=500,
+            content={"message": "Failed to create paper upload job"},
+        )
+
+    background_tasks.add_task(
+        upload_file_from_url,
+        url=url,
+        paper_upload_job=paper_upload_job,
+        current_user=current_user,
+        db=db,
+    )
+
+    return JSONResponse(
+        status_code=202,
+        content={
+            "message": "File upload started",
+            "job_id": str(paper_upload_job.id),
+        },
+    )
+
+
+async def upload_file_from_url(
+    url: HttpUrl,
+    paper_upload_job: PaperUploadJob,
+    current_user: CurrentUser,
+    db: Session,
+) -> None:
+    """
+    Helper function to upload a file from a URL.
+    """
+
+    paper_upload_job_crud.mark_as_running(
+        db=db,
+        job_id=str(paper_upload_job.id),
+        user=current_user,
+    )
+
+    # Create a temporary file for processing
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+        temp_file_path = temp_file.name
+
+        try:
+            # Upload the file to S3
+            object_key, file_url = await s3_service.read_and_upload_file_from_url(
+                str(url), temp_file_path
+            )
+        except Exception as e:
+            logger.error(f"Error uploading file from URL: {str(e)}", exc_info=True)
+            # Clean up temporary file in case of error
+            try:
+                os.unlink(temp_file_path)
+            except Exception:
+                pass
+            paper_upload_job_crud.mark_as_failed(
+                db=db,
+                job_id=str(paper_upload_job.id),
+                user=current_user,
+            )
+
+        # Ensure we have a valid filename for the record
+        safe_filename = Path(str(url.path)).name.replace(" ", "_")
+
+        create_and_upload_pdf(
+            paper_upload_job=paper_upload_job,
+            safe_filename=safe_filename,
+            temp_file_path=temp_file_path,
+            object_key=object_key,
+            file_url=file_url,
+            current_user=current_user,
+            db=db,
+        )
+
+
+@paper_upload_router.post("/")
+async def upload_pdf(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    current_user: CurrentUser = Depends(get_required_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Upload a PDF file
+    """
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        return JSONResponse(status_code=400, content={"message": "File must be a PDF"})
+
+    # Create the paper upload job
+    paper_upload_job_obj = PaperUploadJobCreate(
+        started_at=datetime.now(timezone.utc),
+    )
+
+    paper_upload_job: PaperUploadJob = paper_upload_job_crud.create(
+        db=db,
+        obj_in=paper_upload_job_obj,
+        user=current_user,
+    )
+
+    if not paper_upload_job:
+        return JSONResponse(
+            status_code=500,
+            content={"message": "Failed to create paper upload job"},
+        )
+
+    background_tasks.add_task(
+        upload_raw_file,
+        file=file,
+        paper_upload_job=paper_upload_job,
+        current_user=current_user,
+        db=db,
+    )
+
+    return JSONResponse(
+        status_code=202,
+        content={
+            "message": "File upload started",
+            "job_id": str(paper_upload_job.id),
+        },
+    )
+
+
+async def upload_raw_file(
+    file: UploadFile,
+    paper_upload_job: PaperUploadJob,
+    current_user: CurrentUser,
+    db: Session,
+) -> None:
+    """
+    Helper function to upload a raw file.
+    """
+
+    if not file or not file.filename or not file.filename.lower().endswith(".pdf"):
+        paper_upload_job_crud.mark_as_failed(
+            db=db,
+            job_id=str(paper_upload_job.id),
+            user=current_user,
+        )
+
+    paper_upload_job_crud.mark_as_running(
+        db=db,
+        job_id=str(paper_upload_job.id),
+        user=current_user,
+    )
+
+    # Create a temporary file for processing
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+        contents = await file.read()
+        temp_file.write(contents)
+        temp_file_path = temp_file.name
+
+    # Reset file pointer for S3 upload
+    await file.seek(0)
+
+    # Upload to S3
+    try:
+        # Upload the file to S3
+        object_key, file_url = await s3_service.upload_file(file)
+
+    except Exception as e:
+        logger.error(f"Error uploading file: {str(e)}", exc_info=True)
+        # Clean up temporary file in case of error
+        try:
+            os.unlink(temp_file_path)
+        except Exception:
+            pass
+        paper_upload_job_crud.mark_as_failed(
+            db=db,
+            job_id=str(paper_upload_job.id),
+            user=current_user,
+        )
+
+    # Ensure we have a valid filename for the record
+    safe_filename = file.filename.replace(" ", "_")  # type: ignore
+
+    create_and_upload_pdf(
+        paper_upload_job=paper_upload_job,
+        safe_filename=safe_filename,
+        temp_file_path=temp_file_path,
+        object_key=object_key,
+        file_url=file_url,
+        current_user=current_user,
+        db=db,
+    )
+
+
+class PaperUploadError(Exception):
+    """Custom exception for paper upload errors with context"""
+
+    def __init__(
+        self, message: str, status_code: int = 500, cleanup_needed: bool = True
+    ):
+        self.message = message
+        self.status_code = status_code
+        self.cleanup_needed = cleanup_needed
+        super().__init__(self.message)
+
+
+def create_and_upload_pdf(
+    paper_upload_job: PaperUploadJob,
+    safe_filename: str,
+    temp_file_path: str,
+    object_key: str,
+    file_url: str,
+    current_user: CurrentUser,
+    db: Session,
+) -> None:
+    """
+    Create a new document record in the database and upload the PDF to S3.
+    """
+    created_doc: Union[Paper, None] = None
+
+    try:
+        # Create a new document record in the database with S3 details
+        document = PaperCreate(
+            filename=safe_filename, file_url=file_url, s3_object_key=object_key
+        )
+
+        created_doc = paper_crud.create(db, obj_in=document, user=current_user)
+        if not created_doc:
+            logger.error(
+                f"Failed to create document record for {safe_filename}", exc_info=True
+            )
+            raise PaperUploadError(
+                f"Failed to create document record for {safe_filename}"
+            )
+
+        # Extract metadata from the temporary file
+        try:
+            extract_metadata = operations.extract_paper_metadata(
+                paper_id=str(created_doc.id),
+                user=current_user,
+                file_path=temp_file_path,
+                db=db,
+            )
+        except Exception as e:
+            logger.error(
+                f"Error extracting metadata: {str(e)}",
+                exc_info=True,
+            )
+            raise PaperUploadError(f"Error extracting metadata: {str(e)}")
+
+        # Process the publication date
+        if extract_metadata.publish_date:
+            parsed_date = None
+            # Try different date formats
+            for date_format in [
+                ("%Y-%m-%d", lambda x: x),  # Full date
+                (
+                    "%Y",
+                    lambda x: f"{x}-01-01" if x.isdigit() and len(x) == 4 else None,
+                ),  # Year only
+                ("%Y-%m", lambda x: x),  # Year and month
+            ]:
+                format_str, transformer = date_format
+                try:
+                    date_str = transformer(extract_metadata.publish_date)
+                    if date_str:
+                        parsed_date = datetime.strptime(date_str, format_str)
+                        break
+                except ValueError:
+                    continue
+
+            # Set the parsed date or None if parsing failed
+            if parsed_date:
+                extract_metadata.publish_date = parsed_date.strftime("%Y-%m-%d")
+            else:
+                logger.warning(f"Could not parse date: {extract_metadata.publish_date}")
+                extract_metadata.publish_date = None
+
+        # Update the document with extracted metadata
+        update_doc = PaperUpdate(
+            authors=extract_metadata.authors,
+            title=extract_metadata.title,
+            abstract=extract_metadata.abstract,
+            institutions=extract_metadata.institutions,
+            keywords=extract_metadata.keywords,
+            summary=extract_metadata.summary,
+            publish_date=extract_metadata.publish_date,
+            starter_questions=extract_metadata.starter_questions,
+        )
+
+        updated_doc = paper_crud.update(
+            db, db_obj=created_doc, obj_in=update_doc, user=current_user
+        )
+        if not updated_doc:
+            logger.error(
+                f"Failed to update document with metadata for {safe_filename}",
+                exc_info=True,
+            )
+            raise PaperUploadError(
+                f"Failed to update document with metadata for {safe_filename}"
+            )
+
+        # Track paper upload event
+        track_event(
+            "paper_upload",
+            properties={
+                "filename": safe_filename,
+                "has_metadata": bool(extract_metadata),
+            },
+            user_id=str(current_user.id),
+        )
+
+        # Success case
+        paper_upload_job_crud.mark_as_completed(
+            db=db,
+            job_id=str(paper_upload_job.id),
+            user=current_user,
+        )
+
+    except PaperUploadError as upload_error:
+        # Handle our custom exception with context
+        logger.error(f"Paper upload error: {upload_error.message}")
+        paper_upload_job_crud.mark_as_failed(
+            db=db,
+            job_id=str(paper_upload_job.id),
+            user=current_user,
+        )
+
+    except Exception as e:
+        # Handle unexpected exceptions
+        logger.error(f"Unexpected error processing PDF upload: {str(e)}", exc_info=True)
+        paper_upload_job_crud.mark_as_failed(
+            db=db,
+            job_id=str(paper_upload_job.id),
+            user=current_user,
+        )
+
+    finally:
+        # Always clean up the temporary file
+        try:
+            if os.path.exists(temp_file_path):
+                os.unlink(temp_file_path)
+        except Exception as cleanup_error:
+            logger.warning(f"Failed to clean up temporary file: {str(cleanup_error)}")
+
+        # If we have an error and created a document, clean up
+        if sys.exc_info()[0] is not None and created_doc:
+            # An exception occurred - clean up any resources
+            try:
+                # Delete the document from the database
+                paper_upload_job_crud.mark_as_failed(
+                    db=db,
+                    job_id=str(paper_upload_job.id),
+                    user=current_user,
+                )
+                paper_crud.remove(db, id=str(created_doc.id), user=current_user)
+
+            except Exception as db_error:
+                logger.error(
+                    f"Failed to delete document record: {str(db_error)}", exc_info=True
+                )
+
+            try:
+                # Delete the file from S3
+                s3_service.delete_file(object_key)
+            except Exception as s3_error:
+                logger.error(
+                    f"Failed to delete S3 object: {str(s3_error)}", exc_info=True
+                )

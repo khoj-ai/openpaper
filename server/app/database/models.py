@@ -109,6 +109,9 @@ class User(Base):
     audio_overview_jobs = relationship(
         "AudioOverviewJob", back_populates="user", cascade="all, delete-orphan"
     )
+    paper_upload_jobs = relationship(
+        "PaperUploadJob", back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class Session(Base):
@@ -124,6 +127,28 @@ class Session(Base):
     ip_address = Column(String, nullable=True)
 
     user = relationship("User", back_populates="sessions")
+
+
+class JobStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class PaperUploadJob(Base):
+    __tablename__ = "paper_upload_jobs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    status = Column(String, nullable=False, default=JobStatus.PENDING)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    user = relationship("User", back_populates="paper_upload_jobs")
 
 
 class PaperStatus(str, Enum):
@@ -155,6 +180,11 @@ class Paper(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     last_accessed_at = Column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    upload_job_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("paper_upload_jobs.id", ondelete="SET NULL"),
+        nullable=True,
     )
 
     # Cached presigned URL fields
@@ -285,19 +315,6 @@ class Annotation(Base):
     user = relationship("User", back_populates="annotations")
 
 
-class JobStatus(str, Enum):
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-
-
-class JobType(str, Enum):
-    HYPOTHESIS_RESEARCH = "hypothesis_research"
-    # Add other job types as needed
-
-
 class HypothesisJob(Base):
     __tablename__ = "hypothesis_jobs"
 
@@ -305,7 +322,6 @@ class HypothesisJob(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
 
     # Job metadata
-    job_type = Column(String, nullable=False, default=JobType.HYPOTHESIS_RESEARCH)
     status = Column(String, nullable=False, default=JobStatus.PENDING)
 
     # Input data

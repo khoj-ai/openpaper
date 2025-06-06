@@ -27,6 +27,7 @@ class PaperBase(BaseModel):
     starter_questions: Optional[List[str]] = None
     publish_date: Optional[str] = None
     raw_content: Optional[str] = None
+    upload_job_id: Optional[str] = None
 
 
 class PaperCreate(PaperBase):
@@ -34,6 +35,7 @@ class PaperCreate(PaperBase):
     filename: str  # type: ignore
     file_url: str  # type: ignore
     s3_object_key: Optional[str] = None
+    upload_job_id: Optional[str] = None
 
 
 class PaperUpdate(PaperBase):
@@ -181,6 +183,16 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
         return (
             db.query(Paper)
             .filter(Paper.share_id == share_id, Paper.is_public == True)
+            .first()
+        )
+
+    def get_by_upload_job_id(
+        self, db: Session, *, upload_job_id: str, user: CurrentUser
+    ) -> Optional[Paper]:
+        """Get a paper by its upload job ID"""
+        return (
+            db.query(Paper)
+            .filter(Paper.upload_job_id == upload_job_id, Paper.user_id == user.id)
             .first()
         )
 
