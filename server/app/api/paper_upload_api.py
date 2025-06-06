@@ -124,58 +124,6 @@ async def upload_pdf_from_url(
     )
 
 
-async def upload_file_from_url(
-    url: HttpUrl,
-    paper_upload_job: PaperUploadJob,
-    current_user: CurrentUser,
-    db: Session,
-) -> None:
-    """
-    Helper function to upload a file from a URL.
-    """
-
-    paper_upload_job_crud.mark_as_running(
-        db=db,
-        job_id=str(paper_upload_job.id),
-        user=current_user,
-    )
-
-    # Create a temporary file for processing
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
-        temp_file_path = temp_file.name
-
-        try:
-            # Upload the file to S3
-            object_key, file_url = await s3_service.read_and_upload_file_from_url(
-                str(url), temp_file_path
-            )
-        except Exception as e:
-            logger.error(f"Error uploading file from URL: {str(e)}", exc_info=True)
-            # Clean up temporary file in case of error
-            try:
-                os.unlink(temp_file_path)
-            except Exception:
-                pass
-            paper_upload_job_crud.mark_as_failed(
-                db=db,
-                job_id=str(paper_upload_job.id),
-                user=current_user,
-            )
-
-        # Ensure we have a valid filename for the record
-        safe_filename = Path(str(url.path)).name.replace(" ", "_")
-
-        create_and_upload_pdf(
-            paper_upload_job=paper_upload_job,
-            safe_filename=safe_filename,
-            temp_file_path=temp_file_path,
-            object_key=object_key,
-            file_url=file_url,
-            current_user=current_user,
-            db=db,
-        )
-
-
 @paper_upload_router.post("/")
 async def upload_pdf(
     request: Request,
@@ -224,6 +172,59 @@ async def upload_pdf(
     )
 
 
+async def upload_file_from_url(
+    url: HttpUrl,
+    paper_upload_job: PaperUploadJob,
+    current_user: CurrentUser,
+    db: Session,
+) -> None:
+    """
+    Helper function to upload a file from a URL.
+    """
+
+    paper_upload_job_crud.mark_as_running(
+        db=db,
+        job_id=str(paper_upload_job.id),
+        user=current_user,
+    )
+
+    # Create a temporary file for processing
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+        temp_file_path = temp_file.name
+
+        try:
+            # Upload the file to S3
+            object_key, file_url = await s3_service.read_and_upload_file_from_url(
+                str(url), temp_file_path
+            )
+        except Exception as e:
+            logger.error(f"Error uploading file from URL: {str(e)}", exc_info=True)
+            # Clean up temporary file in case of error
+            try:
+                os.unlink(temp_file_path)
+            except Exception:
+                pass
+            paper_upload_job_crud.mark_as_failed(
+                db=db,
+                job_id=str(paper_upload_job.id),
+                user=current_user,
+            )
+            return  # Add missing return
+
+        # Ensure we have a valid filename for the record
+        safe_filename = Path(str(url.path)).name.replace(" ", "_")
+
+        create_and_upload_pdf(
+            paper_upload_job=paper_upload_job,
+            safe_filename=safe_filename,
+            temp_file_path=temp_file_path,
+            object_key=object_key,
+            file_url=file_url,
+            current_user=current_user,
+            db=db,
+        )
+
+
 async def upload_raw_file(
     file: UploadFile,
     paper_upload_job: PaperUploadJob,
@@ -240,6 +241,7 @@ async def upload_raw_file(
             job_id=str(paper_upload_job.id),
             user=current_user,
         )
+        return  # Add missing return
 
     paper_upload_job_crud.mark_as_running(
         db=db,
@@ -247,56 +249,60 @@ async def upload_raw_file(
         user=current_user,
     )
 
-    # Create a temporary file for processing
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
-        contents = await file.read()
-        temp_file.write(contents)
-        temp_file_path = temp_file.name
+    temp_file_path = None  # Initialize to track cleanup
 
-    # Reset file pointer for S3 upload
-    await file.seek(0)
-
-    # Upload to S3
     try:
-        # Upload the file to S3
+        # Create a temporary file for processing
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+            contents = await file.read()
+            temp_file.write(contents)
+            temp_file_path = temp_file.name
+
+        # Reset file pointer for S3 upload
+        await file.seek(0)
+
+        # Upload to S3
         object_key, file_url = await s3_service.upload_file(file)
+
+        # Ensure we have a valid filename for the record
+        safe_filename = file.filename.replace(" ", "_")  # type: ignore
+
+        create_and_upload_pdf(
+            paper_upload_job=paper_upload_job,
+            safe_filename=safe_filename,
+            temp_file_path=temp_file_path,
+            object_key=object_key,
+            file_url=file_url,
+            current_user=current_user,
+            db=db,
+        )
 
     except Exception as e:
         logger.error(f"Error uploading file: {str(e)}", exc_info=True)
-        # Clean up temporary file in case of error
-        try:
-            os.unlink(temp_file_path)
-        except Exception:
-            pass
         paper_upload_job_crud.mark_as_failed(
             db=db,
             job_id=str(paper_upload_job.id),
             user=current_user,
         )
-
-    # Ensure we have a valid filename for the record
-    safe_filename = file.filename.replace(" ", "_")  # type: ignore
-
-    create_and_upload_pdf(
-        paper_upload_job=paper_upload_job,
-        safe_filename=safe_filename,
-        temp_file_path=temp_file_path,
-        object_key=object_key,
-        file_url=file_url,
-        current_user=current_user,
-        db=db,
-    )
+    finally:
+        # Clean up temporary file
+        if temp_file_path and os.path.exists(temp_file_path):
+            try:
+                os.unlink(temp_file_path)
+            except Exception as cleanup_error:
+                logger.warning(
+                    f"Failed to clean up temporary file: {str(cleanup_error)}"
+                )
 
 
 class PaperUploadError(Exception):
     """Custom exception for paper upload errors with context"""
 
     def __init__(
-        self, message: str, status_code: int = 500, cleanup_needed: bool = True
+        self,
+        message: str,
     ):
         self.message = message
-        self.status_code = status_code
-        self.cleanup_needed = cleanup_needed
         super().__init__(self.message)
 
 
@@ -313,6 +319,7 @@ def create_and_upload_pdf(
     Create a new document record in the database and upload the PDF to S3.
     """
     created_doc: Union[Paper, None] = None
+    job_already_marked_failed = False
 
     try:
         # Create a new document record in the database with S3 details
@@ -421,6 +428,7 @@ def create_and_upload_pdf(
             job_id=str(paper_upload_job.id),
             user=current_user,
         )
+        job_already_marked_failed = True
 
     except Exception as e:
         # Handle unexpected exceptions
@@ -430,6 +438,7 @@ def create_and_upload_pdf(
             job_id=str(paper_upload_job.id),
             user=current_user,
         )
+        job_already_marked_failed = True
 
     finally:
         # Always clean up the temporary file
@@ -439,16 +448,17 @@ def create_and_upload_pdf(
         except Exception as cleanup_error:
             logger.warning(f"Failed to clean up temporary file: {str(cleanup_error)}")
 
-        # If we have an error and created a document, clean up
+        # If we have an error and created a document, clean up database and S3
         if sys.exc_info()[0] is not None and created_doc:
             # An exception occurred - clean up any resources
             try:
-                # Delete the document from the database
-                paper_upload_job_crud.mark_as_failed(
-                    db=db,
-                    job_id=str(paper_upload_job.id),
-                    user=current_user,
-                )
+                # Only mark as failed if not already done
+                if not job_already_marked_failed:
+                    paper_upload_job_crud.mark_as_failed(
+                        db=db,
+                        job_id=str(paper_upload_job.id),
+                        user=current_user,
+                    )
                 paper_crud.remove(db, id=str(created_doc.id), user=current_user)
 
             except Exception as db_error:
