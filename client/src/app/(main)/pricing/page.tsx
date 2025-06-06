@@ -139,6 +139,22 @@ export default function PricingPage() {
                     Choose the plan fit for your research needs. All plans include unlimited annotations and notes.
                 </p>
 
+                {/* Beta Banner */}
+                <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 max-w-4xl mx-auto mt-6">
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                        <strong>We are in Free, Open Beta for the month of June!</strong> That means you get unlimited usage while we evaluate our roadmap. Help us shape the future of research!{" "}
+                        <a
+                            href="https://github.com/sabaimran/openpaper/issues"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline hover:no-underline font-medium"
+                        >
+                            Submit feedback here
+                        </a>
+                        .
+                    </p>
+                </div>
+
                 {/* Billing Toggle */}
                 <div className="flex items-center justify-center gap-4 mt-8">
                     <span className={cn("text-sm", !isAnnual && "font-semibold")}>Monthly</span>
@@ -223,7 +239,7 @@ export default function PricingPage() {
                                         </Button>
                                     </DialogClose>
                                     <DialogClose asChild>
-                                        <Button variant="outline"  className="w-auto bg-blue-600 dark:bg-blue-400 text-primary-foreground">
+                                        <Button variant="outline" className="w-auto bg-blue-600 dark:bg-blue-400 text-primary-foreground">
                                             Got it
                                         </Button>
                                     </DialogClose>
