@@ -106,8 +106,6 @@ export const getFuzzyMatchingNodesInPdf = (originalTerm: string) => {
 
     // Prepare the search term for fuzzy matching
     const fuzzySearchTerm = prepareTextForFuzzyMatch(originalTerm);
-
-    // Use a longer seed (first 15-20 chars) to be more specific
     const searchSeed = fuzzySearchTerm.slice(0, 15).toLowerCase();
     const fullSearchTermLower = fuzzySearchTerm.toLowerCase();
 
@@ -124,7 +122,8 @@ export const getFuzzyMatchingNodesInPdf = (originalTerm: string) => {
         const filteredTextNodes = textNodes.filter(node => node.textContent && node.textContent.trim() !== '');
         const fullPageText = filteredTextNodes.map(node => node.textContent || '').join(' ');
 
-        // Prepare the page text for comparison
+        // Create mapping between original and prepared text positions
+        const charMapping = createCharacterMapping(fullPageText);
         const preparedPageText = prepareTextForFuzzyMatch(fullPageText);
 
         let startIndex = 0;
@@ -134,41 +133,49 @@ export const getFuzzyMatchingNodesInPdf = (originalTerm: string) => {
             const foundIndex = preparedPageText.indexOf(searchSeed, startIndex);
             if (foundIndex === -1) break;
 
-            // Create a window around the found match for similarity comparison
+            // Create a more precise window for the full search term
             const searchTermLength = fullSearchTermLower.length;
-            const windowStart = Math.max(0, foundIndex - Math.floor(searchTermLength * 0.2));
-            const windowEnd = Math.min(preparedPageText.length, foundIndex + Math.floor(searchTermLength * 1.5));
-            const textWindow = preparedPageText.slice(windowStart, windowEnd);
+            const seedLength = searchSeed.length;
 
-            console.log("Found text window:", textWindow);
+            // Start from where we found the seed
+            const windowStart = foundIndex;
+            // Extend the window to accommodate the full search term length, plus a small buffer
+            const windowEnd = Math.min(
+                preparedPageText.length,
+                foundIndex + Math.max(searchTermLength, seedLength * 2)
+            );
+            const textWindow = preparedPageText.slice(windowStart, windowEnd);
 
             // Calculate similarity between search term and found text
             const similarity = calculateSimilarity(fullSearchTermLower, textWindow);
 
-            console.log("Similarity score:", similarity);
+            if (similarity > 0.5) {
+                // Map back to original text positions using character mapping
+                const originalWindowStart = mapPreparedToOriginal(windowStart, charMapping);
+                const originalWindowEnd = mapPreparedToOriginal(windowEnd, charMapping);
 
-            if (similarity > 0.5) { // Higher threshold for better matches
-                // Map back to original text positions to find the correct nodes
-
+                // Find nodes that intersect with the original text window
                 let currentPosition = 0;
                 const matchingNodes: Element[] = [];
 
                 for (const node of filteredTextNodes) {
                     const nodeText = node.textContent || '';
-                    const nodeLength = nodeText.length + 1;
+                    const nodeLength = nodeText.length + 1; // +1 for the added space
 
                     const nodeStart = currentPosition;
                     const nodeEnd = currentPosition + nodeLength;
 
+                    // Check if this node intersects with our match window
                     if (
-                        (foundIndex >= nodeStart && foundIndex < nodeEnd) ||
-                        (windowEnd > nodeStart && windowEnd <= nodeEnd) ||
-                        (foundIndex <= nodeStart && windowEnd >= nodeEnd)
+                        (originalWindowStart < nodeEnd && originalWindowEnd > nodeStart)
                     ) {
                         matchingNodes.push(node);
                     }
 
                     currentPosition += nodeLength;
+
+                    // Stop if we've passed the end of our window
+                    if (nodeStart > originalWindowEnd) break;
                 }
 
                 if (matchingNodes.length > 0) {
@@ -182,13 +189,84 @@ export const getFuzzyMatchingNodesInPdf = (originalTerm: string) => {
                 }
             }
 
-            startIndex = foundIndex + searchSeed.length; // Move past current match
+            startIndex = foundIndex + searchSeed.length;
         }
     });
 
-    // Sort by similarity score and return the best matches
     return results.sort((a, b) => b.similarity - a.similarity);
 };
+
+// Helper function to create mapping between original and prepared text positions
+function createCharacterMapping(originalText: string): { preparedToOriginal: number[], originalToPrepared: number[] } {
+    const preparedToOriginal: number[] = [];
+    const originalToPrepared: number[] = new Array(originalText.length).fill(-1);
+
+    let preparedIndex = 0;
+    let lastWasSpace = true; // Start as true to handle leading spaces
+
+    for (let originalIndex = 0; originalIndex < originalText.length; originalIndex++) {
+        const char = originalText[originalIndex];
+
+        // Skip quotes and apostrophes entirely
+        if (/['"''"]/g.test(char)) {
+            continue;
+        }
+
+        let outputChar = '';
+
+        // Convert special characters to space
+        if (/[,\/#!$%\^&\*;:{}=\-_`~()\\[\]]/g.test(char)) {
+            outputChar = ' ';
+        }
+        // Keep whitespace as space
+        else if (/\s/.test(char)) {
+            outputChar = ' ';
+        }
+        // Keep regular characters, convert to lowercase
+        else {
+            outputChar = char.toLowerCase();
+        }
+
+        // Handle space normalization - skip consecutive spaces
+        if (outputChar === ' ') {
+            if (lastWasSpace) {
+                continue; // Skip this space
+            }
+            lastWasSpace = true;
+        } else {
+            lastWasSpace = false;
+        }
+
+        // Create the mapping
+        preparedToOriginal[preparedIndex] = originalIndex;
+        originalToPrepared[originalIndex] = preparedIndex;
+        preparedIndex++;
+    }
+
+    // Handle trailing space removal (trim)
+    if (preparedToOriginal.length > 0 && preparedIndex > 0) {
+        // Remove trailing spaces from mapping
+        while (preparedToOriginal.length > 0) {
+            const lastOriginalIndex = preparedToOriginal[preparedToOriginal.length - 1];
+            if (originalText[lastOriginalIndex] && /\s/.test(originalText[lastOriginalIndex])) {
+                preparedToOriginal.pop();
+                originalToPrepared[lastOriginalIndex] = -1;
+            } else {
+                break;
+            }
+        }
+    }
+
+    return { preparedToOriginal, originalToPrepared };
+}
+
+// Helper function to map prepared text position back to original text position
+function mapPreparedToOriginal(preparedIndex: number, mapping: { preparedToOriginal: number[], originalToPrepared: number[] }): number {
+    if (preparedIndex >= mapping.preparedToOriginal.length) {
+        return mapping.preparedToOriginal[mapping.preparedToOriginal.length - 1] || 0;
+    }
+    return mapping.preparedToOriginal[preparedIndex] || 0;
+}
 
 export function getSelectionOffsets(): { start: number, end: number } | null {
     const selection = window.getSelection();
