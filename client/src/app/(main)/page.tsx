@@ -20,17 +20,27 @@ import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience"
 import Image from "next/image";
 import { PaperItem } from "@/components/AppSidebar";
 import PaperCard from "@/components/PaperCard";
+import { JobStatusType } from "@/lib/schema";
+import { Badge } from "@/components/ui/badge";
 
 interface PdfUploadResponse {
-	filename: string;
-	url: string;
-	paper_id: string;
+	message: string;
+	job_id: string;
+}
+
+interface JobStatusResponse {
+	job_id: string;
+	status: JobStatusType;
+	started_at: string;
+	completed_at: string | null;
+	paper_id: string | null;
 }
 
 export default function Home() {
 	const [isUploading, setIsUploading] = useState(false);
 	const [loadingMessage, setLoadingMessage] = useState("Preparing your paper...");
-	const [isUrlDialogOpen, setIsUrlDialogOpen] = useState(false); // Renamed for clarity
+	const [isUrlDialogOpen, setIsUrlDialogOpen] = useState(false);
+	const [jobUploadStatus, setJobUploadStatus] = useState<JobStatusType | null>(null);
 
 	const [pdfUrl, setPdfUrl] = useState("");
 	const [relevantPapers, setRelevantPapers] = useState<PaperItem[]>([]);
@@ -38,6 +48,32 @@ export default function Home() {
 
 	const { user, loading: authLoading } = useAuth();
 	const isMobile = useIsMobile();
+
+	// Poll job status
+	const pollJobStatus = async (jobId: string) => {
+		try {
+			const response: JobStatusResponse = await fetchFromApi(`/api/paper/upload/status/${jobId}`);
+			setJobUploadStatus(response.status);
+
+			if (response.status === 'completed' && response.paper_id) {
+				// Success - redirect to paper
+				const redirectUrl = new URL(`/paper/${response.paper_id}`, window.location.origin);
+				window.location.href = redirectUrl.toString();
+			} else if (response.status === 'failed') {
+				// Failed - show error
+				console.error('Upload job failed');
+				setShowErrorAlert(true);
+				setIsUploading(false);
+			} else {
+				// Still processing - poll again
+				setTimeout(() => pollJobStatus(jobId), 2000);
+			}
+		} catch (error) {
+			console.error('Error polling job status:', error);
+			setShowErrorAlert(true);
+			setIsUploading(false);
+		}
+	};
 
 	// Loading messages to cycle through
 	const loadingMessages = [
@@ -86,6 +122,7 @@ export default function Home() {
 		fetchPapers();
 	}, [user]);
 
+
 	const handleFileUpload = async (file: File) => {
 		setIsUploading(true);
 		const formData = new FormData();
@@ -100,11 +137,11 @@ export default function Home() {
 				},
 			});
 
-			const redirectUrl = new URL(`/paper/${response.paper_id}`, window.location.origin);
-			window.location.href = redirectUrl.toString();
+			// Start polling job status
+			pollJobStatus(response.job_id);
 		} catch (error) {
 			console.error('Error uploading file:', error);
-			alert('Failed to upload PDF');
+			setShowErrorAlert(true);
 			setIsUploading(false);
 		}
 	};
@@ -154,9 +191,8 @@ export default function Home() {
 					body: JSON.stringify({ url }),
 				});
 
-				// Use the same redirect logic as handleFileUpload
-				const redirectUrl = new URL(`/paper/${response.paper_id}`, window.location.origin);
-				window.location.href = redirectUrl.toString();
+				// Start polling job status
+				pollJobStatus(response.job_id);
 
 			} catch (serverError) {
 				console.error('Both client and server-side fetches failed:', serverError);
@@ -596,6 +632,11 @@ export default function Home() {
 							<p className="text-center text-lg transition-all duration-500 ease-in-out">
 								{loadingMessage}
 							</p>
+						</div>
+						<div className="flex items-center gap-2">
+							<Badge className="text-sm bg-secondary text-secondary-foreground">
+								{jobUploadStatus ? jobUploadStatus : "Processing..."}
+							</Badge>
 						</div>
 					</div>
 				</DialogContent>

@@ -15,6 +15,7 @@ import Markdown from 'react-markdown';
 import CustomCitationLink from '@/components/utils/CustomCitationLink';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { JobStatusType } from '@/lib/schema';
 
 interface AudioOverviewProps {
     paper_id: string;
@@ -37,8 +38,6 @@ interface AudioOverview {
     updated_at: string;
     job_id: string;
 }
-
-type JobStatusType = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
 
 interface JobStatus {
     job_id: string;

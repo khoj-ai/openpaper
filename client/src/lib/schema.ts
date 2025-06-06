@@ -109,3 +109,5 @@ export interface OpenAlexResponse {
         abstract?: string
     }>
 }
+
+export type JobStatusType = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
