@@ -13,12 +13,73 @@ import { ExternalLink, Users, CalendarDays, Building2, BookOpen, Quote, Tag, Plu
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import Link from "next/link";
 
 interface PaperResultCardProps {
     paper: OpenAlexResponse["results"][number]
+}
+
+const makeSciHubUrl = (doi: string) => {
+    const baseUrl = "https://sci-hub.se/";
+    return `${baseUrl}${doi}`;
+}
+
+function SciHubCard({ doiLink }: { doiLink: string | undefined }) {
+    if (!doiLink) return null;
+    return (
+        <Dialog>
+            <DialogTrigger asChild>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="hover:bg-slate-100 dark:hover:bg-slate-100 hover:text-slate-900 text-primary transition-colors"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <BookOpen className="h-4 w-4" />
+                    PDF
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Alternative PDF Access</DialogTitle>
+                    <DialogDescription asChild>
+                        <div className="space-y-3">
+                            <p className="text-sm text-slate-700 dark:text-slate-300">
+                                You will be redirected to Sci-Hub, a third-party platform that provides access to academic papers. Please note that availability of the requested article is not guaranteed.
+                            </p>
+                            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                                <p className="text-xs text-amber-800 dark:text-amber-200">
+                                    <strong>Disclaimer:</strong> Sci-Hub operates independently and may not comply with all copyright laws. Users should verify the legal status of accessing content through third-party platforms in their jurisdiction. We recommend prioritizing official publisher channels and institutional access when available.
+                                </p>
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                                <Button
+                                    variant="outline"
+                                    asChild
+                                    className="flex-1"
+                                >
+                                    <a
+                                        href={makeSciHubUrl(doiLink)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center justify-center gap-2"
+                                    >
+                                        <ExternalLink className="h-4 w-4" />
+                                        Continue to Sci-Hub
+                                    </a>
+                                </Button>
+                                <DialogClose asChild>
+                                    <Button variant="secondary">Cancel</Button>
+                                </DialogClose>
+                            </div>
+                        </div>
+                    </DialogDescription>
+                </DialogHeader>
+            </DialogContent>
+        </Dialog>
+    );
 }
 
 export default function PaperResultCard({ paper }: PaperResultCardProps) {
@@ -175,7 +236,7 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                                 </a>
                             </Button>
                         )}
-                        {paper.open_access?.oa_url && (
+                        {paper.open_access?.oa_url ? (
                             <Button
                                 variant="ghost"
                                 size="sm"
@@ -193,6 +254,8 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                                     PDF
                                 </a>
                             </Button>
+                        ) : (
+                            <SciHubCard doiLink={paper.doi} />
                         )}
                     </div>
                 </CardFooter>
@@ -456,18 +519,26 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                                     </a>
                                 </Button>
                             )}
-                            {paper.open_access?.oa_url && (
-                                <Button variant="default" asChild className="bg-blue-500 hover:bg-blue-600">
+                            {paper.open_access?.oa_url ? (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    asChild
+                                    className="hover:bg-blue-50 dark:hover:bg-blue-800 hover:text-blue-700 transition-colors text-blue-600 dark:text-blue-100"
+                                >
                                     <a
                                         href={paper.open_access.oa_url}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="flex items-center gap-2 w-full sm:w-auto justify-center"
+                                        className="flex items-center gap-2"
+                                        onClick={(e) => e.stopPropagation()}
                                     >
                                         <BookOpen className="h-4 w-4" />
-                                        Open Access PDF
+                                        PDF
                                     </a>
                                 </Button>
+                            ) : (
+                                <SciHubCard doiLink={paper.doi} />
                             )}
                             <SheetClose asChild>
                                 <Button variant="outline" className="border-slate-300">Close</Button>
