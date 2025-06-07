@@ -555,7 +555,6 @@ def generate_pdf_preview(pdf_path: str, filename: str) -> tuple[str, str]:
             img_buffer.getvalue(),
             preview_filename,
             content_type="image/png",
-            public=True,
         )
 
         doc.close()

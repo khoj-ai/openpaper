@@ -121,7 +121,6 @@ class S3Service:
         file_bytes: bytes,
         original_filename: str,
         content_type: str,
-        public: bool = False,
     ):
         """Upload a file from bytes to S3
 
@@ -139,7 +138,6 @@ class S3Service:
             Key=object_key,
             Body=file_bytes,
             ContentType=content_type,
-            ACL="public-read" if public else "private",
         )
         file_url = f"https://{self.cloudflare_bucket_name}/{object_key}"
         return object_key, file_url
