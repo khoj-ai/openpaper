@@ -221,11 +221,6 @@ export default function FinderPage() {
                             onChange={(e) => setQuery(e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                         />
-                        {query.trim().length > 0 && (
-                            <div className="text-xs text-muted-foreground mt-1">
-                                Press Enter to search for &quot;{query}&quot;
-                            </div>
-                        )}
                     </div>
 
                     {/* Filter button */}
