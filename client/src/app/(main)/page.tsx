@@ -64,6 +64,7 @@ export default function Home() {
 				console.error('Upload job failed');
 				setShowErrorAlert(true);
 				setIsUploading(false);
+				setJobUploadStatus(null);
 			} else {
 				// Still processing - poll again
 				setTimeout(() => pollJobStatus(jobId), 2000);
