@@ -17,11 +17,16 @@ export default async function BlogIndexPage() {
             })
     )
 
+    // Sort after resolving all promises
+    const sortedPosts = posts.sort(
+        (a, b) => new Date(b.metadata.date || 0).getTime() - new Date(a.metadata.date || 0).getTime()
+    )
+
     return (
         <div>
             <h1>Posts</h1>
             <ul>
-                {posts.map(post => (
+                {sortedPosts.map(post => (
                     <li key={post.slug}>
                         <Link href={`/blog/${post.slug}`}>
                             {post.metadata.title || post.slug}
