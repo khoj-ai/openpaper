@@ -72,6 +72,7 @@ export interface PaperItem {
     summary?: string
     created_at?: string
     status?: PaperStatus
+    preview_url?: string
 }
 
 export function AppSidebar() {

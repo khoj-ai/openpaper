@@ -256,7 +256,7 @@ export default function PaperCard({ paper, handleDelete, setPaper }: PaperCardPr
         <Card key={paper.id} className="overflow-hidden hover:shadow-md transition-shadow pt-2 pb-0">
             <div className="flex h-fit flex-col md:flex-row">
                 {/* Metadata Section */}
-                <div className="md:w-3/5 p-4 flex flex-col justify-between">
+                <div className="md:w-4/5 p-4 flex flex-col justify-between">
                     {/* Header with status */}
                     <div>
                         <div className="flex items-start justify-between mb-3">
@@ -412,14 +412,27 @@ export default function PaperCard({ paper, handleDelete, setPaper }: PaperCardPr
                 </div>
 
                 {/* Paper Preview Section */}
-                <div className="md:w-2/5 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 p-4 flex flex-col justify-between border-r border-gray-200 dark:border-gray-700 rounded-t-2xl rounded-b-none">
-                    {/* Abstract/Summary text overlay */}
-                    <div className="mt-2">
-                        <p className="text-xs text-gray-600 dark:text-gray-300 line-clamp-6">
-                            {paper.abstract || paper.summary || "This paper explores innovative approaches and methodologies in research..."}
-                        </p>
-                    </div>
-                </div>
+                {
+                    paper.preview_url ? (
+                        <div className="md:w-1/5 bg-gray-100 dark:bg-gray-800 p-4 pb-0 flex items-center justify-center border-b border-gray-200 dark:border-gray-700 rounded-t-2xl rounded-b-none">
+                            <img
+                                src={paper.preview_url}
+                                title={paper.title || paper.filename}
+                                alt={paper.title || paper.filename}
+                                className="max-h-48 w-full object-cover object-top rounded-t-lg shadow-sm"
+                            />
+                        </div>
+                    ) : (
+                        <div className="md:w-1/5 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 p-4 flex flex-col justify-between border-r border-gray-200 dark:border-gray-700 rounded-t-2xl rounded-b-none">
+                            {/* Abstract/Summary text overlay */}
+                            <div className="mt-2">
+                                <p className="text-xs text-gray-600 dark:text-gray-300 line-clamp-9">
+                                    {paper.abstract || paper.summary || "This paper explores innovative approaches and methodologies in research..."}
+                                </p>
+                            </div>
+                        </div>
+                    )
+                }
             </div>
         </Card>
     )
