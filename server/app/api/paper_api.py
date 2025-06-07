@@ -90,6 +90,7 @@ async def get_paper_ids(
                     "keywords": paper.keywords,
                     "summary": paper.summary,
                     "status": paper.status,
+                    "preview_url": paper.preview_url,
                 }
                 for paper in papers
             ]
@@ -255,6 +256,7 @@ async def get_relevant_papers(
                     "keywords": paper.keywords,
                     "summary": paper.summary,
                     "status": paper.status,
+                    "preview_url": paper.preview_url,
                 }
                 for paper in papers
             ]

@@ -116,6 +116,34 @@ class S3Service:
             logger.error(f"Error uploading file to S3: {e}")
             raise
 
+    def upload_any_file_from_bytes(
+        self,
+        file_bytes: bytes,
+        original_filename: str,
+        content_type: str,
+        public: bool = False,
+    ):
+        """Upload a file from bytes to S3
+
+        Args:
+            file_bytes (bytes): The file content as bytes
+            original_filename (str): The original filename
+            content_type (str): The MIME type of the file
+
+        Returns:
+            tuple[str, str]: The S3 object key and public URL
+        """
+        object_key = f"uploads/{uuid.uuid4()}-{original_filename}"
+        self.s3_client.put_object(
+            Bucket=self.bucket_name,
+            Key=object_key,
+            Body=file_bytes,
+            ContentType=content_type,
+            ACL="public-read" if public else "private",
+        )
+        file_url = f"https://{self.cloudflare_bucket_name}/{object_key}"
+        return object_key, file_url
+
     def upload_any_file(
         self, file_path: str, original_filename: str, content_type: str
     ) -> tuple[str, str]:

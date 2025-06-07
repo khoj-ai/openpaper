@@ -3,9 +3,11 @@ import os
 import sys
 import tempfile
 from datetime import datetime, timezone
+from io import BytesIO
 from pathlib import Path
 from typing import Union
 
+import fitz  # PyMuPDF
 from app.auth.dependencies import get_required_user
 from app.database.crud.paper_crud import PaperCreate, PaperUpdate, paper_crud
 from app.database.crud.paper_upload_crud import (
@@ -21,6 +23,7 @@ from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Request, UploadFile
 from fastapi.responses import JSONResponse
+from PIL import Image
 from pydantic import BaseModel, HttpUrl
 from sqlalchemy.orm import Session
 
@@ -272,9 +275,6 @@ async def upload_raw_file(
             temp_file.write(file_contents)
             temp_file_path = temp_file.name
 
-        # Create a BytesIO object for S3 upload
-        from io import BytesIO
-
         file_like = BytesIO(file_contents)
         file_like.name = filename  # Set the filename attribute for S3 service
 
@@ -339,12 +339,24 @@ def create_and_upload_pdf(
     job_already_marked_failed = False
 
     try:
+        # Generate preview image from first page
+        preview_url = None
+        try:
+            preview_object_key, preview_url = generate_pdf_preview(
+                temp_file_path, safe_filename
+            )
+            logger.info(f"Generated preview for {safe_filename}: {preview_url}")
+        except Exception as e:
+            logger.warning(f"Failed to generate preview for {safe_filename}: {str(e)}")
+            # Continue without preview - this is not a critical failure
+
         # Create a new document record in the database with S3 details
         document = PaperCreate(
             filename=safe_filename,
             file_url=file_url,
             s3_object_key=object_key,
             upload_job_id=str(paper_upload_job.id),
+            preview_url=preview_url,
         )
 
         created_doc = paper_crud.create(db, obj_in=document, user=current_user)
@@ -489,7 +501,66 @@ def create_and_upload_pdf(
             try:
                 # Delete the file from S3
                 s3_service.delete_file(object_key)
+                # Also delete preview if it was created
+                if preview_object_key:
+                    s3_service.delete_file(preview_object_key)
             except Exception as s3_error:
                 logger.error(
                     f"Failed to delete S3 object: {str(s3_error)}", exc_info=True
                 )
+
+
+def generate_pdf_preview(pdf_path: str, filename: str) -> tuple[str, str]:
+    """
+    Generate a preview image from the first page of a PDF.
+    Returns tuple of (s3_object_key, preview_url)
+    """
+    try:
+        # Open the PDF
+        doc = fitz.open(pdf_path)
+
+        if len(doc) == 0:
+            raise Exception("PDF has no pages")
+
+        # Get the first page
+        page = doc[0]
+
+        # Render page to a pixmap (image)
+        # You can adjust the matrix for different resolution/quality
+        mat = fitz.Matrix(2.0, 2.0)  # 2x zoom for better quality
+        pix = page.get_pixmap(matrix=mat)  # type: ignore
+
+        # Convert to PIL Image for easier handling
+        img_data = pix.tobytes("png")
+        img = Image.open(BytesIO(img_data))
+
+        # Optionally resize to a standard preview size
+        # This helps keep file sizes reasonable
+        max_width = 800
+        if img.width > max_width:
+            ratio = max_width / img.width
+            new_height = int(img.height * ratio)
+            img = img.resize((max_width, new_height), Image.Resampling.LANCZOS)
+
+        # Convert back to bytes
+        img_buffer = BytesIO()
+        img.save(img_buffer, format="PNG", optimize=True)
+        img_buffer.seek(0)
+
+        # Create filename for preview
+        preview_filename = f"preview_{filename.rsplit('.', 1)[0]}.png"
+
+        # Upload to S3
+        preview_object_key, preview_url = s3_service.upload_any_file_from_bytes(
+            img_buffer.getvalue(),
+            preview_filename,
+            content_type="image/png",
+            public=True,
+        )
+
+        doc.close()
+        return preview_object_key, preview_url
+
+    except Exception as e:
+        logger.error(f"Error generating PDF preview: {str(e)}", exc_info=True)
+        raise

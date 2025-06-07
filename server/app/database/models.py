@@ -165,6 +165,7 @@ class Paper(Base):
     status = Column(String, nullable=False, default=PaperStatus.reading)
     filename = Column(String, nullable=False)
     file_url = Column(String, nullable=False)
+    preview_url = Column(String, nullable=True)
     s3_object_key = Column(
         String, nullable=True
     )  # Store the S3 object key for deletion

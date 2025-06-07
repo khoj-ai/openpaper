@@ -28,6 +28,7 @@ class PaperBase(BaseModel):
     publish_date: Optional[str] = None
     raw_content: Optional[str] = None
     upload_job_id: Optional[str] = None
+    preview_url: Optional[str] = None
 
 
 class PaperCreate(PaperBase):
@@ -36,6 +37,7 @@ class PaperCreate(PaperBase):
     file_url: str  # type: ignore
     s3_object_key: Optional[str] = None
     upload_job_id: Optional[str] = None
+    preview_url: Optional[str] = None
 
 
 class PaperUpdate(PaperBase):
