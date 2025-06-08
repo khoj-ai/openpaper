@@ -6,7 +6,7 @@ from typing import List, Optional
 
 import requests
 from app.database.crud.base_crud import CRUDBase
-from app.database.models import Paper, PaperStatus
+from app.database.models import JobStatus, Paper, PaperStatus, PaperUploadJob
 from app.helpers.parser import extract_text_from_pdf
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
@@ -196,6 +196,38 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
             db.query(Paper)
             .filter(Paper.upload_job_id == upload_job_id, Paper.user_id == user.id)
             .first()
+        )
+
+    def get_multi_uploads_completed(
+        self,
+        db: Session,
+        *,
+        user: CurrentUser,
+        skip: int = 0,
+        limit: int = 100,
+        status: Optional[PaperStatus] = None,
+    ) -> List[Paper]:
+        """
+        Get multiple papers that have completed uploads
+        Completed uploads are those either with a null upload_job_id OR an upload_job with status 'completed'.
+        """
+        return (
+            db.query(Paper)
+            .outerjoin(PaperUploadJob, Paper.upload_job_id == PaperUploadJob.id)
+            .filter(
+                Paper.user_id == user.id,
+                (
+                    Paper.upload_job_id.is_(None)  # No upload job (direct uploads)
+                    | (
+                        PaperUploadJob.status == JobStatus.COMPLETED
+                    )  # Or job is completed
+                ),
+                (Paper.status == status if status else True),
+            )
+            .order_by(Paper.updated_at.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
         )
 
 

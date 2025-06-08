@@ -3,15 +3,13 @@ import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
-from typing import BinaryIO, Optional
+from typing import Optional
 from urllib.parse import urlparse
 
 import boto3
 import requests
-from app.database.crud.paper_crud import paper_crud
 from app.schemas.user import CurrentUser
 from botocore.exceptions import ClientError
-from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)

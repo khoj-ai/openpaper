@@ -1,43 +1,24 @@
 import logging
-import os
-import sys
-import tempfile
 import uuid
-from datetime import datetime, timezone
-from pathlib import Path
 from typing import List, Optional
 
 from app.auth.dependencies import get_current_user, get_required_user
 from app.database.crud.annotation_crud import annotation_crud
 from app.database.crud.coversation_crud import conversation_crud
 from app.database.crud.highlight_crud import highlight_crud
-from app.database.crud.paper_crud import PaperCreate, PaperUpdate, paper_crud
+from app.database.crud.paper_crud import PaperUpdate, paper_crud
 from app.database.crud.paper_note_crud import (
     PaperNoteCreate,
     PaperNoteUpdate,
     paper_note_crud,
 )
-from app.database.crud.paper_upload_crud import (
-    PaperUploadJobCreate,
-    PaperUploadJobUpdate,
-    paper_upload_job_crud,
-)
 from app.database.database import get_db
-from app.database.models import Paper, PaperStatus, PaperUploadJob
+from app.database.models import Paper, PaperStatus
 from app.database.telemetry import track_event
 from app.helpers.s3 import s3_service
-from app.llm.operations import operations
 from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
-from fastapi import (
-    APIRouter,
-    BackgroundTasks,
-    Depends,
-    File,
-    HTTPException,
-    Request,
-    UploadFile,
-)
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, HttpUrl
 from sqlalchemy.orm import Session
@@ -67,12 +48,12 @@ class UpdatePaperNoteSchema(BaseModel):
 @paper_router.get("/all")
 async def get_paper_ids(
     db: Session = Depends(get_db),
-    current_user: Optional[CurrentUser] = Depends(get_required_user),
+    current_user: CurrentUser = Depends(get_required_user),
 ):
     """
     Get all paper IDs
     """
-    papers: List[Paper] = paper_crud.get_multi(db, user=current_user)
+    papers: List[Paper] = paper_crud.get_multi_uploads_completed(db, user=current_user)
     if not papers:
         return JSONResponse(status_code=404, content={"message": "No papers found"})
     return JSONResponse(
@@ -101,12 +82,12 @@ async def get_paper_ids(
 @paper_router.get("/active")
 async def get_active_paper_ids(
     db: Session = Depends(get_db),
-    current_user: Optional[CurrentUser] = Depends(get_required_user),
+    current_user: CurrentUser = Depends(get_required_user),
 ):
     """
     Get all active paper IDs
     """
-    papers: List[Paper] = paper_crud.get_multi_by(
+    papers: List[Paper] = paper_crud.get_multi_uploads_completed(
         db, user=current_user, status=PaperStatus.reading
     )
     if not papers:
