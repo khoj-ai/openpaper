@@ -55,6 +55,7 @@ export default function FinderPage() {
     const [loadingAutocomplete, setLoadingAutocomplete] = useState(false);
     const [filterQuery, setFilterQuery] = useState("");
     const filterInputRef = useRef<HTMLInputElement>(null);
+    const filterButtonRef = useRef<HTMLButtonElement>(null);
 
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -226,7 +227,7 @@ export default function FinderPage() {
                     {/* Filter button */}
                     <Popover>
                         <PopoverTrigger asChild>
-                            <Button variant="outline" className="flex items-center gap-2">
+                            <Button variant="outline" className="flex items-center gap-2" ref={filterButtonRef} >
                                 <Filter className="h-4 w-4" />
                                 Filters
                                 {activeFilterCount > 0 && (
@@ -409,10 +410,17 @@ export default function FinderPage() {
 
             {/* Rest of your component remains the same */}
             {!results && !loading && (
-                <HelperCard onExampleClick={(query) => {
-                    setQuery(query);
-                    inputRef.current?.focus();
-                }} />
+                <HelperCard
+                    onExampleClick={(query) => {
+                        setQuery(query);
+                        inputRef.current?.focus();
+                    }}
+                    onExampleFilterClick={(filter) => {
+                        filterButtonRef.current?.click();
+                        filterInputRef.current?.focus();
+                        setFilterQuery(filter);
+                    }}
+                    />
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -24,9 +24,10 @@ function ExampleBadge({ children, onClick }: ExampleBadgeProps) {
 
 interface HelperCardProps {
     onExampleClick: (example: string) => void
+    onExampleFilterClick: (filter: string) => void
 }
 
-export default function HelperCard({ onExampleClick }: HelperCardProps) {
+export default function HelperCard({ onExampleClick, onExampleFilterClick }: HelperCardProps) {
     return (
         <Card className="bg-gradient-to-br from-card to-card/50 border-border/50 shadow-sm hover:shadow-md transition-shadow">
             <CardHeader className="pb-4">
@@ -74,7 +75,7 @@ export default function HelperCard({ onExampleClick }: HelperCardProps) {
                     <ExampleBadge onClick={() => onExampleClick("climate change impact")}>
                         climate change impact
                     </ExampleBadge>
-                    <ExampleBadge onClick={() => onExampleClick("University of Illinois")}>
+                    <ExampleBadge onClick={() => onExampleFilterClick("University of Illinois")}>
                         University of Illinois
                     </ExampleBadge>
                 </div>
