@@ -136,6 +136,9 @@ export default function PaperView() {
     const [selectedModel, setSelectedModel] = useState<string>('');
 
     const [rightSideFunction, setRightSideFunction] = useState<string>('Overview');
+    const [leftPanelWidth, setLeftPanelWidth] = useState(60); // percentage
+    const [isDragging, setIsDragging] = useState(false);
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
     // Reference to track the save timeout
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -199,6 +202,37 @@ export default function PaperView() {
             inputMessageRef.current?.focus();
         }
     }, [rightSideFunction]);
+
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!isDragging) return;
+
+            const containerWidth = window.innerWidth;
+            const newLeftWidth = (e.clientX / containerWidth) * 100;
+
+            // Constrain between 30% and 80%
+            const constrainedWidth = Math.min(Math.max(newLeftWidth, 30), 80);
+            setLeftPanelWidth(constrainedWidth);
+        };
+
+        const handleMouseUp = () => {
+            setIsDragging(false);
+            document.body.style.cursor = 'default';
+            document.body.style.userSelect = 'auto';
+        };
+
+        if (isDragging) {
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+        }
+
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isDragging]);
 
     useEffect(() => {
         // Add keybinding to toggle markdown preview
@@ -756,11 +790,14 @@ export default function PaperView() {
 
     return (
         <div className="flex flex-row w-full h-[calc(100vh-64px)]">
-            <div
-                className={`w-full h-full grid ${rightSideFunction === 'Focus' ? 'grid-cols-1' : 'grid-cols-5'} items-center justify-center gap-0`}>
-
-                <div className="border-r-2 dark:border-gray-800 border-gray-200 p-0 h-full col-span-3">
-                    {/* PDF Viewer Section */}
+            <div className="w-full h-full flex items-center justify-center gap-0">
+                {/* PDF Viewer Section */}
+                <div
+                    className="border-r-2 dark:border-gray-800 border-gray-200 p-0 h-full"
+                    style={{
+                        width: rightSideFunction === 'Focus' ? '100%' : `${leftPanelWidth}%`
+                    }}
+                >
                     {paperData.file_url && (
                         <div className="w-full h-full">
                             <PdfViewer
@@ -791,342 +828,361 @@ export default function PaperView() {
                         </div>
                     )}
                 </div>
-                {
-                    rightSideFunction === 'Notes' && (
-                        <div className='p-2 w-full h-full flex flex-col col-span-2'>
-                            <div className="flex justify-between items-center mb-2 flex-shrink-0">
-                                <div className="flex items-center gap-2">
-                                    <div className="text-xs text-gray">
-                                        Length: {paperNoteContent?.length} characters
-                                    </div>
-                                    <TooltipProvider>
-                                        <Tooltip>
-                                            <TooltipTrigger>
-                                                <HelpCircle className="h-4 w-4 text-gray-500" />
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                <p>Supports Markdown formatting:</p>
-                                                <ul className="text-xs mt-1">
-                                                    <li>**bold**</li>
-                                                    <li>*italic*</li>
-                                                    <li># Heading</li>
-                                                    <li>- List items</li>
-                                                    <li>{">"} Blockquotes</li>
-                                                </ul>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </TooltipProvider>
-                                </div>
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger>
 
-                                            <Toggle
-                                                aria-label="Toggle markdown preview"
-                                                onPressedChange={(pressed) => setIsMarkdownPreview(pressed)}
-                                                pressed={isMarkdownPreview}
-                                            >
-                                                <CommandShortcut>
-                                                    {localizeCommandToOS('M')}
-                                                </CommandShortcut>
-                                                {isMarkdownPreview ? <Eye size={16} /> : <Edit size={16} />}
-                                            </Toggle>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            <p>Toggle between edit and preview mode</p>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
-                            </div>
+                {/* Resizable Divider */}
+                {rightSideFunction !== 'Focus' && (
+                    <div
+                        className="w-2 bg-background hover:bg-blue-100 dark:hover:bg-blue-400 cursor-col-resize transition-colors duration-200 flex-shrink-0 h-full rounded-2xl"
+                        onMouseDown={(e) => {
+                            e.preventDefault();
+                            setIsDragging(true);
+                        }}
+                    />
+                )}
 
-                            {isMarkdownPreview ? (
-                                <div className="flex-1 min-h-0 relative">
-                                    <div className="absolute inset-0 overflow-y-auto">
-                                        <div className="prose dark:prose-invert !max-w-full text-sm">
-                                            <Markdown
-                                                remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
-                                                rehypePlugins={[rehypeKatex]}
-                                            >
-                                                {paperNoteContent || ''}
-                                            </Markdown>
+                {/* Right Side Panel */}
+                {rightSideFunction !== 'Focus' && (
+                    <div
+                        className="h-full overflow-hidden"
+                        style={{ width: `${100 - leftPanelWidth}%` }}
+                    >
+
+                        {
+                            rightSideFunction === 'Notes' && (
+                                <div className='p-2 w-full h-full flex flex-col col-span-2'>
+                                    <div className="flex justify-between items-center mb-2 flex-shrink-0">
+                                        <div className="flex items-center gap-2">
+                                            <div className="text-xs text-gray">
+                                                Length: {paperNoteContent?.length} characters
+                                            </div>
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger>
+                                                        <HelpCircle className="h-4 w-4 text-gray-500" />
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p>Supports Markdown formatting:</p>
+                                                        <ul className="text-xs mt-1">
+                                                            <li>**bold**</li>
+                                                            <li>*italic*</li>
+                                                            <li># Heading</li>
+                                                            <li>- List items</li>
+                                                            <li>{">"} Blockquotes</li>
+                                                        </ul>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
                                         </div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <Textarea
-                                    className='w-full flex-1'
-                                    value={paperNoteContent}
-                                    onChange={(e) =>
-                                        setPaperNoteContent(e.target.value)
-                                    }
-                                    placeholder="Start taking notes..."
-                                />
-                            )}
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger>
 
-                            {paperNoteContent && lastPaperNoteSaveTime && (
-                                <div className="text-xs text-green-500 mt-2 flex-shrink-0">
-                                    Last saved: {new Date(lastPaperNoteSaveTime).toLocaleTimeString()}
-                                </div>
-                            )}
-                        </div>
-                    )
-                }
-                {
-                    rightSideFunction === 'Annotations' && (
-                        <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto col-span-2">
-                            <AnnotationsView
-                                annotations={annotations}
-                                highlights={highlights}
-                                onHighlightClick={handleHighlightClick}
-                                addAnnotation={addAnnotation}
-                                activeHighlight={activeHighlight}
-                                updateAnnotation={updateAnnotation}
-                                removeAnnotation={removeAnnotation}
-                            />
-                        </div>
-                    )
-                }
-                {
-                    rightSideFunction === 'Share' && paperData && (
-                        <div className="flex flex-col h-[calc(100vh-64px)] p-4 space-y-4 col-span-2">
-                            <h3 className="text-lg font-semibold">Share Paper</h3>
-                            {paperData.share_id ? (
-                                <div className="space-y-3">
-                                    <p className="text-sm text-muted-foreground">This paper is currently public. Anyone with the link can view it.</p>
-                                    <div className="flex items-center space-x-2">
-                                        <Input
-                                            readOnly
-                                            value={`${window.location.origin}/paper/share/${paperData.share_id}`}
-                                            className="flex-1"
-                                        />
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={async () => {
-                                                await navigator.clipboard.writeText(`${window.location.origin}/paper/share/${paperData.share_id}`);
-                                                toast.success("Link copied!");
-                                            }}
-                                        >
-                                            Copy Link
-                                        </Button>
-                                    </div>
-                                    <Button
-                                        variant="destructive"
-                                        onClick={handleUnshare}
-                                        disabled={isSharing}
-                                        className="w-fit"
-                                    >
-                                        {isSharing ? <Loader className="animate-spin mr-2 h-4 w-4" /> : null}
-                                        <LockIcon /> Make Private
-                                    </Button>
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    <p className="text-sm text-muted-foreground">Make this paper public to share it with others via a unique link. All of your highlights and annotations will be visible to anyone with the link. Your chat and notes remain private.</p>
-                                    <Button
-                                        onClick={handleShare}
-                                        disabled={isSharing}
-                                        className="w-fit"
-                                    >
-                                        {isSharing ? <Loader className="animate-spin mr-2 h-4 w-4" /> : null}
-                                        <Share2Icon /> Share
-                                    </Button>
-                                </div>
-                            )}
-                        </div>
-                    )
-                }
-                {
-                    rightSideFunction === 'Overview' && paperData.summary && (
-                        <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto col-span-2 m-2 relative">
-                            {/* Paper Metadata Section */}
-                            <div className="prose dark:prose-invert !max-w-full text-sm">
-                                {paperData.title && (
-                                    <h1 className="text-2xl font-bold">{paperData.title}</h1>
-                                )}
-                                <Markdown
-                                    remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
-                                    rehypePlugins={[rehypeKatex]}
-                                >
-                                    {paperData.summary}
-                                </Markdown>
-                                <div className="sticky bottom-4 right-4 flex justify-end">
-                                    <Button
-                                        variant="default"
-                                        className="w-fit bg-blue-500 hover:bg-blue-400 dark:hover:bg-blue-600 cursor-pointer z-10 shadow-md"
-                                        onClick={() => {
-                                            setRightSideFunction('Chat');
-                                        }}
-                                    >
-                                        <Sparkle className="mr-1" />
-                                        Ask a Question
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    )
-                }
-                {
-                    rightSideFunction === 'Audio' && (
-                        <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto col-span-2">
-                            <AudioOverview
-                                paper_id={id}
-                                paper_title={paperData.title}
-                                setExplicitSearchTerm={setExplicitSearchTerm} />
-                        </div>
-                    )
-                }
-                {
-                    rightSideFunction === 'Chat' && (
-                        <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto col-span-2">
-                            {/* Paper Metadata Section */}
-                            {paperData && (
-                                <PaperMetadata
-                                    paperData={paperData}
-                                    hasMessages={messages.length > 0}
-                                    onClickStarterQuestion={(question) => {
-                                        setCurrentMessage(question);
-                                        inputMessageRef.current?.focus();
-                                        chatInputFormRef.current?.scrollIntoView({
-                                            behavior: 'smooth',
-                                            block: 'nearest',
-                                            inline: 'nearest',
-                                        });
-                                        setPendingStarterQuestion(question);
-                                    }}
-                                />
-                            )}
-
-                            <div
-                                className={`flex-1 overflow-y-auto mb-4 space-y-4 transition-all duration-300 ease-in-out ${isStreaming ? 'pb-24' : ''}`}
-                                ref={messagesContainerRef}
-                                onScroll={handleScroll}
-                            >
-                                {hasMoreMessages && messages.length > 0 && (
-                                    <div className="text-center py-2">
-                                        {isLoadingMoreMessages ? (
-                                            <div className="text-sm text-gray-500">Loading messages...</div>
-                                        ) : (
-                                            <button
-                                                className="text-sm text-blue-500 hover:text-blue-700"
-                                                onClick={fetchMoreMessages}
-                                            >
-                                                Load earlier messages
-                                            </button>
-                                        )}
-                                    </div>
-                                )}
-
-                                {messages.length === 0 ? (
-                                    <div className="text-center text-gray-500 my-4">
-                                        What do you want to understand about this paper?
-                                        <div className='grid grid-cols-2 gap-2 mt-2'>
-                                            {paperData.starter_questions && paperData.starter_questions.length > 0 ? (
-                                                paperData.starter_questions.slice(0, 5).map((question, i) => (
-                                                    <Button
-                                                        key={i}
-                                                        variant="outline"
-                                                        className="text-sm font-medium p-2 max-w-full whitespace-normal h-auto text-left justify-start break-words bg-secondary text-secondary-foreground hover:bg-secondary/50"
-                                                        onClick={() => {
-                                                            setCurrentMessage(question);
-                                                            inputMessageRef.current?.focus();
-                                                            chatInputFormRef.current?.scrollIntoView({
-                                                                behavior: 'smooth',
-                                                                block: 'nearest',
-                                                                inline: 'nearest',
-                                                            });
-                                                            setPendingStarterQuestion(question);
-                                                        }}
+                                                    <Toggle
+                                                        aria-label="Toggle markdown preview"
+                                                        onPressedChange={(pressed) => setIsMarkdownPreview(pressed)}
+                                                        pressed={isMarkdownPreview}
                                                     >
-                                                        {question}
-                                                    </Button>
-                                                ))
-                                            ) : null}
-                                        </div>
+                                                        <CommandShortcut>
+                                                            {localizeCommandToOS('M')}
+                                                        </CommandShortcut>
+                                                        {isMarkdownPreview ? <Eye size={16} /> : <Edit size={16} />}
+                                                    </Toggle>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <p>Toggle between edit and preview mode</p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
                                     </div>
-                                ) : (
-                                    messages.map((msg, index) => (
-                                        <div
-                                            key={index}
-                                            data-message-index={index}
-                                            className={`prose dark:prose-invert p-2 !max-w-full rounded-lg ${msg.role === 'user'
-                                                ? 'bg-blue-200 text-blue-800 w-fit'
-                                                : 'w-full text-primary'
-                                                }`}
+
+                                    {isMarkdownPreview ? (
+                                        <div className="flex-1 min-h-0 relative">
+                                            <div className="absolute inset-0 overflow-y-auto">
+                                                <div className="prose dark:prose-invert !max-w-full text-sm">
+                                                    <Markdown
+                                                        remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
+                                                        rehypePlugins={[rehypeKatex]}
+                                                    >
+                                                        {paperNoteContent || ''}
+                                                    </Markdown>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <Textarea
+                                            className='w-full flex-1'
+                                            value={paperNoteContent}
+                                            onChange={(e) =>
+                                                setPaperNoteContent(e.target.value)
+                                            }
+                                            placeholder="Start taking notes..."
+                                        />
+                                    )}
+
+                                    {paperNoteContent && lastPaperNoteSaveTime && (
+                                        <div className="text-xs text-green-500 mt-2 flex-shrink-0">
+                                            Last saved: {new Date(lastPaperNoteSaveTime).toLocaleTimeString()}
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        }
+                        {
+                            rightSideFunction === 'Annotations' && (
+                                <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto col-span-2">
+                                    <AnnotationsView
+                                        annotations={annotations}
+                                        highlights={highlights}
+                                        onHighlightClick={handleHighlightClick}
+                                        addAnnotation={addAnnotation}
+                                        activeHighlight={activeHighlight}
+                                        updateAnnotation={updateAnnotation}
+                                        removeAnnotation={removeAnnotation}
+                                    />
+                                </div>
+                            )
+                        }
+                        {
+                            rightSideFunction === 'Share' && paperData && (
+                                <div className="flex flex-col h-[calc(100vh-64px)] p-4 space-y-4 col-span-2">
+                                    <h3 className="text-lg font-semibold">Share Paper</h3>
+                                    {paperData.share_id ? (
+                                        <div className="space-y-3">
+                                            <p className="text-sm text-muted-foreground">This paper is currently public. Anyone with the link can view it.</p>
+                                            <div className="flex items-center space-x-2">
+                                                <Input
+                                                    readOnly
+                                                    value={`${window.location.origin}/paper/share/${paperData.share_id}`}
+                                                    className="flex-1"
+                                                />
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={async () => {
+                                                        await navigator.clipboard.writeText(`${window.location.origin}/paper/share/${paperData.share_id}`);
+                                                        toast.success("Link copied!");
+                                                    }}
+                                                >
+                                                    Copy Link
+                                                </Button>
+                                            </div>
+                                            <Button
+                                                variant="destructive"
+                                                onClick={handleUnshare}
+                                                disabled={isSharing}
+                                                className="w-fit"
+                                            >
+                                                {isSharing ? <Loader className="animate-spin mr-2 h-4 w-4" /> : null}
+                                                <LockIcon /> Make Private
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            <p className="text-sm text-muted-foreground">Make this paper public to share it with others via a unique link. All of your highlights and annotations will be visible to anyone with the link. Your chat and notes remain private.</p>
+                                            <Button
+                                                onClick={handleShare}
+                                                disabled={isSharing}
+                                                className="w-fit"
+                                            >
+                                                {isSharing ? <Loader className="animate-spin mr-2 h-4 w-4" /> : null}
+                                                <Share2Icon /> Share
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        }
+                        {
+                            rightSideFunction === 'Overview' && paperData.summary && (
+                                <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto col-span-2 m-2 relative">
+                                    {/* Paper Metadata Section */}
+                                    <div className="prose dark:prose-invert !max-w-full text-sm">
+                                        {paperData.title && (
+                                            <h1 className="text-2xl font-bold">{paperData.title}</h1>
+                                        )}
+                                        <Markdown
+                                            remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
+                                            rehypePlugins={[rehypeKatex]}
                                         >
-                                            <Markdown
-                                                remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
-                                                rehypePlugins={[rehypeKatex]}
-                                                components={{
-                                                    // Apply the custom component to text nodes
-                                                    p: (props) => <CustomCitationLink
-                                                        {...props}
-                                                        handleCitationClick={handleCitationClick}
-                                                        messageIndex={index}
-                                                    />,
-                                                    li: (props) => <CustomCitationLink
-                                                        {...props}
-                                                        handleCitationClick={handleCitationClick}
-                                                        messageIndex={index}
-                                                    />,
-                                                    div: (props) => <CustomCitationLink
-                                                        {...props}
-                                                        handleCitationClick={handleCitationClick}
-                                                        messageIndex={index}
-                                                    />,
+                                            {paperData.summary}
+                                        </Markdown>
+                                        <div className="sticky bottom-4 right-4 flex justify-end">
+                                            <Button
+                                                variant="default"
+                                                className="w-fit bg-blue-500 hover:bg-blue-400 dark:hover:bg-blue-600 cursor-pointer z-10 shadow-md"
+                                                onClick={() => {
+                                                    setRightSideFunction('Chat');
                                                 }}
                                             >
-                                                {msg.content}
-                                            </Markdown>
-                                            {
-                                                msg.references && msg.references['citations']?.length > 0 && (
-                                                    <div className="mt-2" id="references-section">
-                                                        <ul className="list-none p-0">
-                                                            {Object.entries(msg.references['citations']).map(([refIndex, value]) => (
-                                                                <div
-                                                                    key={refIndex}
-                                                                    className={`flex flex-row gap-2 ${matchesCurrentCitation(value.key, index) ? 'bg-blue-100 dark:bg-blue-900 rounded p-1 transition-colors duration-300' : ''}`}
-                                                                    id={`citation-${value.key}-${index}`}
-                                                                    onClick={() => handleCitationClick(value.key, index)}
-                                                                >
-                                                                    <div className={`text-xs ${msg.role === 'user'
-                                                                        ? 'bg-blue-200 text-blue-800'
-                                                                        : 'text-secondary-foreground'
-                                                                        }`}>
-                                                                        <a href={`#citation-ref-${value.key}`}>{value.key}</a>
-                                                                    </div>
-                                                                    <div
-                                                                        id={`citation-ref-${value.key}-${index}`}
-                                                                        className={`text-xs ${msg.role === 'user'
-                                                                            ? 'bg-blue-200 text-blue-800'
-                                                                            : 'text-secondary-foreground'
-                                                                            }`}
-                                                                    >
-                                                                        {value.reference}
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                        </ul>
-                                                    </div>
-                                                )}
+                                                <Sparkle className="mr-1" />
+                                                Ask a Question
+                                            </Button>
                                         </div>
-                                    ))
-                                )}
-                                {
-                                    isStreaming && (
-                                        <Loader className="animate-spin w-6 h-6 text-blue-500" />
-                                    )
-                                }
-                                <div ref={messagesEndRef} />
-                            </div>
-                            <form onSubmit={handleSubmit} className="flex flex-col gap-2" ref={chatInputFormRef}>
-                                {
-                                    userMessageReferences.length > 0 && (
-                                        <div className='flex flex-row gap-2'>
-                                            {userMessageReferences.map((ref, index) => (
-                                                <div key={index} className="text-xs text-secondary-foreground flex bg-secondary p-2 rounded-lg">
-                                                    <p
-                                                        className='
+                                    </div>
+                                </div>
+                            )
+                        }
+                        {
+                            rightSideFunction === 'Audio' && (
+                                <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto col-span-2">
+                                    <AudioOverview
+                                        paper_id={id}
+                                        paper_title={paperData.title}
+                                        setExplicitSearchTerm={setExplicitSearchTerm} />
+                                </div>
+                            )
+                        }
+                        {
+                            rightSideFunction === 'Chat' && (
+                                <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto col-span-2">
+                                    {/* Paper Metadata Section */}
+                                    {paperData && (
+                                        <PaperMetadata
+                                            paperData={paperData}
+                                            hasMessages={messages.length > 0}
+                                            onClickStarterQuestion={(question) => {
+                                                setCurrentMessage(question);
+                                                inputMessageRef.current?.focus();
+                                                chatInputFormRef.current?.scrollIntoView({
+                                                    behavior: 'smooth',
+                                                    block: 'nearest',
+                                                    inline: 'nearest',
+                                                });
+                                                setPendingStarterQuestion(question);
+                                            }}
+                                        />
+                                    )}
+
+                                    <div
+                                        className={`flex-1 overflow-y-auto mb-4 space-y-4 transition-all duration-300 ease-in-out ${isStreaming ? 'pb-24' : ''}`}
+                                        ref={messagesContainerRef}
+                                        onScroll={handleScroll}
+                                    >
+                                        {hasMoreMessages && messages.length > 0 && (
+                                            <div className="text-center py-2">
+                                                {isLoadingMoreMessages ? (
+                                                    <div className="text-sm text-gray-500">Loading messages...</div>
+                                                ) : (
+                                                    <button
+                                                        className="text-sm text-blue-500 hover:text-blue-700"
+                                                        onClick={fetchMoreMessages}
+                                                    >
+                                                        Load earlier messages
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {messages.length === 0 ? (
+                                            <div className="text-center text-gray-500 my-4">
+                                                What do you want to understand about this paper?
+                                                <div className='grid grid-cols-2 gap-2 mt-2'>
+                                                    {paperData.starter_questions && paperData.starter_questions.length > 0 ? (
+                                                        paperData.starter_questions.slice(0, 5).map((question, i) => (
+                                                            <Button
+                                                                key={i}
+                                                                variant="outline"
+                                                                className="text-sm font-medium p-2 max-w-full whitespace-normal h-auto text-left justify-start break-words bg-secondary text-secondary-foreground hover:bg-secondary/50"
+                                                                onClick={() => {
+                                                                    setCurrentMessage(question);
+                                                                    inputMessageRef.current?.focus();
+                                                                    chatInputFormRef.current?.scrollIntoView({
+                                                                        behavior: 'smooth',
+                                                                        block: 'nearest',
+                                                                        inline: 'nearest',
+                                                                    });
+                                                                    setPendingStarterQuestion(question);
+                                                                }}
+                                                            >
+                                                                {question}
+                                                            </Button>
+                                                        ))
+                                                    ) : null}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            messages.map((msg, index) => (
+                                                <div
+                                                    key={index}
+                                                    data-message-index={index}
+                                                    className={`prose dark:prose-invert p-2 !max-w-full rounded-lg ${msg.role === 'user'
+                                                        ? 'bg-blue-200 text-blue-800 w-fit'
+                                                        : 'w-full text-primary'
+                                                        }`}
+                                                >
+                                                    <Markdown
+                                                        remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
+                                                        rehypePlugins={[rehypeKatex]}
+                                                        components={{
+                                                            // Apply the custom component to text nodes
+                                                            p: (props) => <CustomCitationLink
+                                                                {...props}
+                                                                handleCitationClick={handleCitationClick}
+                                                                messageIndex={index}
+                                                            />,
+                                                            li: (props) => <CustomCitationLink
+                                                                {...props}
+                                                                handleCitationClick={handleCitationClick}
+                                                                messageIndex={index}
+                                                            />,
+                                                            div: (props) => <CustomCitationLink
+                                                                {...props}
+                                                                handleCitationClick={handleCitationClick}
+                                                                messageIndex={index}
+                                                            />,
+                                                        }}
+                                                    >
+                                                        {msg.content}
+                                                    </Markdown>
+                                                    {
+                                                        msg.references && msg.references['citations']?.length > 0 && (
+                                                            <div className="mt-2" id="references-section">
+                                                                <ul className="list-none p-0">
+                                                                    {Object.entries(msg.references['citations']).map(([refIndex, value]) => (
+                                                                        <div
+                                                                            key={refIndex}
+                                                                            className={`flex flex-row gap-2 ${matchesCurrentCitation(value.key, index) ? 'bg-blue-100 dark:bg-blue-900 rounded p-1 transition-colors duration-300' : ''}`}
+                                                                            id={`citation-${value.key}-${index}`}
+                                                                            onClick={() => handleCitationClick(value.key, index)}
+                                                                        >
+                                                                            <div className={`text-xs ${msg.role === 'user'
+                                                                                ? 'bg-blue-200 text-blue-800'
+                                                                                : 'text-secondary-foreground'
+                                                                                }`}>
+                                                                                <a href={`#citation-ref-${value.key}`}>{value.key}</a>
+                                                                            </div>
+                                                                            <div
+                                                                                id={`citation-ref-${value.key}-${index}`}
+                                                                                className={`text-xs ${msg.role === 'user'
+                                                                                    ? 'bg-blue-200 text-blue-800'
+                                                                                    : 'text-secondary-foreground'
+                                                                                    }`}
+                                                                            >
+                                                                                {value.reference}
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                </ul>
+                                                            </div>
+                                                        )}
+                                                </div>
+                                            ))
+                                        )}
+                                        {
+                                            isStreaming && (
+                                                <Loader className="animate-spin w-6 h-6 text-blue-500" />
+                                            )
+                                        }
+                                        <div ref={messagesEndRef} />
+                                    </div>
+                                    <form onSubmit={handleSubmit} className="flex flex-col gap-2" ref={chatInputFormRef}>
+                                        {
+                                            userMessageReferences.length > 0 && (
+                                                <div className='flex flex-row gap-2'>
+                                                    {userMessageReferences.map((ref, index) => (
+                                                        <div key={index} className="text-xs text-secondary-foreground flex bg-secondary p-2 rounded-lg">
+                                                            <p
+                                                                className='
                                                         overflow-hidden
                                                         text-ellipsis
                                                         whitespace-normal
@@ -1134,123 +1190,124 @@ export default function PaperView() {
                                                         text-secondary-foreground
                                                         line-clamp-2
                                                         '
-                                                        onClick={() =>
-                                                            setExplicitSearchTerm(ref)
-                                                        }
-                                                    >
-                                                        {ref}
-                                                    </p>
-                                                    <Button
-                                                        variant='ghost'
-                                                        className='h-auto w-fit p-0 !px-0'
-                                                        onClick={() =>
-                                                            setUserMessageReferences(prev => prev.filter((_, i) => i !== index))
-                                                        }
-                                                    >
-                                                        <X size={2} />
-                                                    </Button>
+                                                                onClick={() =>
+                                                                    setExplicitSearchTerm(ref)
+                                                                }
+                                                            >
+                                                                {ref}
+                                                            </p>
+                                                            <Button
+                                                                variant='ghost'
+                                                                className='h-auto w-fit p-0 !px-0'
+                                                                onClick={() =>
+                                                                    setUserMessageReferences(prev => prev.filter((_, i) => i !== index))
+                                                                }
+                                                            >
+                                                                <X size={2} />
+                                                            </Button>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                            ))}
-                                        </div>
-                                    )
-                                }
-                                <div
-                                    className='border *:border-gray-300 dark:border-gray-700 rounded-md p-2 flex flex-col gap-2'
-                                >
-                                    {/* User message input area */}
-                                    <Textarea
-                                        value={currentMessage}
-                                        onChange={(e) => setCurrentMessage(e.target.value)}
-                                        ref={inputMessageRef}
-                                        placeholder="Ask something about this paper..."
-                                        className="flex-1 border-none rounded-md resize-none p-2"
-                                        disabled={isStreaming}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && !e.shiftKey) {
-                                                e.preventDefault();
-                                                handleSubmit(e);
-                                            }
-                                        }}
-                                    />
-                                    <div className="flex flex-row justify-between gap-2 mt-2">
-                                        <div className="flex flex-row gap-2">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button
-                                                        variant="ghost"
-                                                        className="w-fit text-sm"
-                                                        title='Model - Select the model to use for responses'
-                                                        disabled={isStreaming}
-                                                    >
-                                                        <Sparkles
-                                                            className="h-4 w-4 text-secondary-foreground"
-                                                        />
-                                                        {selectedModel ? availableModels[selectedModel] : Object.keys(availableModels)[0]}
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent className="w-56">
-                                                    {Object.entries(availableModels).map(([key, value]) => (
-                                                        <DropdownMenuItem
-                                                            key={key}
-                                                            onClick={() => setSelectedModel(key)} // Store the provider key
-                                                        >
-                                                            {value} {/* Display the human-readable name */}
-                                                        </DropdownMenuItem>
-                                                    ))}
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button
-                                                        aria-label="Response Style"
-                                                        title='Response Style - Select how detailed the response should be'
-                                                        variant="ghost"
-                                                        className={`w-fit text-sm ${responseStyle ? 'bg-secondary text-secondary-foreground' : ''}`}
-                                                        disabled={isStreaming}
-                                                    >
-                                                        <Feather
-                                                            className="h-4 w-4 text-secondary-foreground"
-                                                        />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent className="w-56">
-                                                    {Object.values(ResponseStyle).map((style) => (
-                                                        <DropdownMenuItem
-                                                            key={style}
-                                                            onClick={() => {
-                                                                setResponseStyle(style);
-                                                                setRightSideFunction('Chat');
-                                                            }}
-                                                        >
-                                                            {style}
-                                                            {
-                                                                style === responseStyle ? (
-                                                                    <Check className="h-4 w-4 text-green-500 mr-2" />
-                                                                ) : null
-                                                            }
-                                                        </DropdownMenuItem>
-                                                    ))}
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </div>
-                                        <Button
-                                            type="submit"
-                                            variant="default"
-                                            className="w-fit rounded-full h-fit !px-2 py-2 bg-blue-500 hover:bg-blue-400"
-                                            disabled={isStreaming}
+                                            )
+                                        }
+                                        <div
+                                            className='border *:border-gray-300 dark:border-gray-700 rounded-md p-2 flex flex-col gap-2'
                                         >
-                                            <ArrowUp
-                                                className="h-4 w-4 rounded-full"
-                                                aria-hidden="true"
+                                            {/* User message input area */}
+                                            <Textarea
+                                                value={currentMessage}
+                                                onChange={(e) => setCurrentMessage(e.target.value)}
+                                                ref={inputMessageRef}
+                                                placeholder="Ask something about this paper..."
+                                                className="flex-1 border-none rounded-md resize-none p-2"
+                                                disabled={isStreaming}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                                        e.preventDefault();
+                                                        handleSubmit(e);
+                                                    }
+                                                }}
                                             />
-                                        </Button>
-                                    </div>
+                                            <div className="flex flex-row justify-between gap-2 mt-2">
+                                                <div className="flex flex-row gap-2">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button
+                                                                variant="ghost"
+                                                                className="w-fit text-sm"
+                                                                title='Model - Select the model to use for responses'
+                                                                disabled={isStreaming}
+                                                            >
+                                                                <Sparkles
+                                                                    className="h-4 w-4 text-secondary-foreground"
+                                                                />
+                                                                {selectedModel ? availableModels[selectedModel] : Object.keys(availableModels)[0]}
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent className="w-56">
+                                                            {Object.entries(availableModels).map(([key, value]) => (
+                                                                <DropdownMenuItem
+                                                                    key={key}
+                                                                    onClick={() => setSelectedModel(key)} // Store the provider key
+                                                                >
+                                                                    {value} {/* Display the human-readable name */}
+                                                                </DropdownMenuItem>
+                                                            ))}
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button
+                                                                aria-label="Response Style"
+                                                                title='Response Style - Select how detailed the response should be'
+                                                                variant="ghost"
+                                                                className={`w-fit text-sm ${responseStyle ? 'bg-secondary text-secondary-foreground' : ''}`}
+                                                                disabled={isStreaming}
+                                                            >
+                                                                <Feather
+                                                                    className="h-4 w-4 text-secondary-foreground"
+                                                                />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent className="w-56">
+                                                            {Object.values(ResponseStyle).map((style) => (
+                                                                <DropdownMenuItem
+                                                                    key={style}
+                                                                    onClick={() => {
+                                                                        setResponseStyle(style);
+                                                                        setRightSideFunction('Chat');
+                                                                    }}
+                                                                >
+                                                                    {style}
+                                                                    {
+                                                                        style === responseStyle ? (
+                                                                            <Check className="h-4 w-4 text-green-500 mr-2" />
+                                                                        ) : null
+                                                                    }
+                                                                </DropdownMenuItem>
+                                                            ))}
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </div>
+                                                <Button
+                                                    type="submit"
+                                                    variant="default"
+                                                    className="w-fit rounded-full h-fit !px-2 py-2 bg-blue-500 hover:bg-blue-400"
+                                                    disabled={isStreaming}
+                                                >
+                                                    <ArrowUp
+                                                        className="h-4 w-4 rounded-full"
+                                                        aria-hidden="true"
+                                                    />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </form>
                                 </div>
-                            </form>
-                        </div>
-                    )
-                }
-
+                            )
+                        }
+                    </div>
+                )}
             </div>
             <div className="hidden md:flex flex-col w-fit h-[calc(100vh-64px)]">
                 <SidebarProvider className="items-start h-[calc(100vh-64px)] min-h-fit w-fit">
