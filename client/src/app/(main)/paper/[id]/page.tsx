@@ -13,7 +13,28 @@ import rehypeKatex from 'rehype-katex';
 import remarkMath from 'remark-math';
 import 'katex/dist/katex.min.css' // `rehype-katex` does not import the CSS for you
 
-import { Highlighter, NotebookText, MessageCircle, Focus, X, Eye, Edit, Loader, HelpCircle, ArrowUp, Feather, Share, Share2Icon, LockIcon, Lightbulb, Sparkle, Check, Sparkles, AudioLines } from 'lucide-react';
+import {
+    Highlighter,
+    NotebookText,
+    MessageCircle,
+    Focus,
+    X,
+    Eye,
+    Edit,
+    Loader,
+    HelpCircle,
+    ArrowUp,
+    Feather,
+    Share,
+    Share2Icon,
+    LockIcon,
+    Lightbulb,
+    Sparkle,
+    Check,
+    AudioLines,
+    Route
+} from 'lucide-react';
+
 import { Textarea } from '@/components/ui/textarea';
 import {
     Sidebar,
@@ -32,7 +53,11 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
+    DropdownMenuSub,
+    DropdownMenuSubTrigger,
+    DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
+
 import { toast } from "sonner";
 
 import { AnnotationsView } from '@/components/AnnotationsView';
@@ -849,7 +874,7 @@ export default function PaperView() {
 
                         {
                             rightSideFunction === 'Notes' && (
-                                <div className='p-2 w-full h-full flex flex-col col-span-2'>
+                                <div className='p-2 w-full h-full flex flex-col'>
                                     <div className="flex justify-between items-center mb-2 flex-shrink-0">
                                         <div className="flex items-center gap-2">
                                             <div className="text-xs text-gray">
@@ -929,7 +954,7 @@ export default function PaperView() {
                         }
                         {
                             rightSideFunction === 'Annotations' && (
-                                <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto col-span-2">
+                                <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto">
                                     <AnnotationsView
                                         annotations={annotations}
                                         highlights={highlights}
@@ -944,7 +969,7 @@ export default function PaperView() {
                         }
                         {
                             rightSideFunction === 'Share' && paperData && (
-                                <div className="flex flex-col h-[calc(100vh-64px)] p-4 space-y-4 col-span-2">
+                                <div className="flex flex-col h-[calc(100vh-64px)] p-4 space-y-4">
                                     <h3 className="text-lg font-semibold">Share Paper</h3>
                                     {paperData.share_id ? (
                                         <div className="space-y-3">
@@ -994,7 +1019,7 @@ export default function PaperView() {
                         }
                         {
                             rightSideFunction === 'Overview' && paperData.summary && (
-                                <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto col-span-2 m-2 relative">
+                                <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto m-2 relative">
                                     {/* Paper Metadata Section */}
                                     <div className="prose dark:prose-invert !max-w-full text-sm">
                                         {paperData.title && (
@@ -1024,7 +1049,7 @@ export default function PaperView() {
                         }
                         {
                             rightSideFunction === 'Audio' && (
-                                <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto col-span-2">
+                                <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto">
                                     <AudioOverview
                                         paper_id={id}
                                         paper_title={paperData.title}
@@ -1034,7 +1059,7 @@ export default function PaperView() {
                         }
                         {
                             rightSideFunction === 'Chat' && (
-                                <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto col-span-2">
+                                <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto">
                                     {/* Paper Metadata Section */}
                                     {paperData && (
                                         <PaperMetadata
@@ -1054,7 +1079,7 @@ export default function PaperView() {
                                     )}
 
                                     <div
-                                        className={`flex-1 overflow-y-auto mb-4 space-y-4 transition-all duration-300 ease-in-out ${isStreaming ? 'pb-24' : ''}`}
+                                        className={`flex-1 overflow-y-auto space-y-2 transition-all duration-300 ease-in-out ${isStreaming ? 'pb-24' : ''}`}
                                         ref={messagesContainerRef}
                                         onScroll={handleScroll}
                                     >
@@ -1211,15 +1236,15 @@ export default function PaperView() {
                                             )
                                         }
                                         <div
-                                            className='border *:border-gray-300 dark:border-gray-700 rounded-md p-2 flex flex-col gap-2'
+                                            className='rounded-md p-0.5 flex flex-col gap-2 bg-secondary'
                                         >
                                             {/* User message input area */}
                                             <Textarea
                                                 value={currentMessage}
                                                 onChange={(e) => setCurrentMessage(e.target.value)}
                                                 ref={inputMessageRef}
-                                                placeholder="Ask something about this paper..."
-                                                className="flex-1 border-none rounded-md resize-none p-2"
+                                                placeholder="Ask something about this paper."
+                                                className="border-none bg-secondary dark:bg-secondary rounded-md resize-none hover:resize-y p-2 focus-visible:outline-none focus-visible:ring-0 shadow-none min-h-[2rem] max-h-32"
                                                 disabled={isStreaming}
                                                 onKeyDown={(e) => {
                                                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -1228,69 +1253,77 @@ export default function PaperView() {
                                                     }
                                                 }}
                                             />
-                                            <div className="flex flex-row justify-between gap-2 mt-2">
+                                            <div className="flex flex-row justify-between gap-2">
                                                 <div className="flex flex-row gap-2">
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>
                                                             <Button
                                                                 variant="ghost"
                                                                 className="w-fit text-sm"
-                                                                title='Model - Select the model to use for responses'
+                                                                title='Settings - Configure model and response style'
                                                                 disabled={isStreaming}
                                                             >
-                                                                <Sparkles
-                                                                    className="h-4 w-4 text-secondary-foreground"
-                                                                />
-                                                                {selectedModel ? availableModels[selectedModel] : Object.keys(availableModels)[0]}
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent className="w-56">
-                                                            {Object.entries(availableModels).map(([key, value]) => (
-                                                                <DropdownMenuItem
-                                                                    key={key}
-                                                                    onClick={() => setSelectedModel(key)} // Store the provider key
-                                                                >
-                                                                    {value} {/* Display the human-readable name */}
-                                                                </DropdownMenuItem>
-                                                            ))}
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button
-                                                                aria-label="Response Style"
-                                                                title='Response Style - Select how detailed the response should be'
-                                                                variant="ghost"
-                                                                className={`w-fit text-sm ${responseStyle ? 'bg-secondary text-secondary-foreground' : ''}`}
-                                                                disabled={isStreaming}
-                                                            >
-                                                                <Feather
+                                                                <Route
                                                                     className="h-4 w-4 text-secondary-foreground"
                                                                 />
                                                             </Button>
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent className="w-56">
-                                                            {Object.values(ResponseStyle).map((style) => (
-                                                                <DropdownMenuItem
-                                                                    key={style}
-                                                                    onClick={() => {
-                                                                        setResponseStyle(style);
-                                                                        setRightSideFunction('Chat');
-                                                                    }}
-                                                                >
-                                                                    {style}
-                                                                    {
-                                                                        style === responseStyle ? (
-                                                                            <Check className="h-4 w-4 text-green-500 mr-2" />
-                                                                        ) : null
-                                                                    }
-                                                                </DropdownMenuItem>
-                                                            ))}
+                                                            <DropdownMenuSub>
+                                                                <DropdownMenuSubTrigger className="flex items-center">
+                                                                    <Sparkle className="mr-2 h-4 w-4" />
+                                                                    <span>Model {selectedModel ? `(${availableModels[selectedModel]})` : ''}</span>
+                                                                </DropdownMenuSubTrigger>
+                                                                <DropdownMenuSubContent>
+                                                                    {Object.entries(availableModels).map(([key, value]) => (
+                                                                        <DropdownMenuItem
+                                                                            key={key}
+                                                                            onClick={() => setSelectedModel(key)}
+                                                                            className="flex items-center justify-between"
+                                                                        >
+                                                                            <span>{value}</span>
+                                                                            {selectedModel === key && (
+                                                                                <Check className="h-4 w-4 text-green-500" />
+                                                                            )}
+                                                                        </DropdownMenuItem>
+                                                                    ))}
+                                                                </DropdownMenuSubContent>
+                                                            </DropdownMenuSub>
+
+                                                            <DropdownMenuSub>
+                                                                <DropdownMenuSubTrigger className="flex items-center">
+                                                                    <Feather className="mr-2 h-4 w-4" />
+                                                                    <span>Response Style {responseStyle ? `(${responseStyle})` : ''}</span>
+                                                                </DropdownMenuSubTrigger>
+                                                                <DropdownMenuSubContent>
+                                                                    {Object.values(ResponseStyle).map((style) => (
+                                                                        <DropdownMenuItem
+                                                                            key={style}
+                                                                            onClick={() => {
+                                                                                setResponseStyle(style);
+                                                                                setRightSideFunction('Chat');
+                                                                            }}
+                                                                            className="flex items-center justify-between"
+                                                                        >
+                                                                            <span>{style}</span>
+                                                                            {style === responseStyle && (
+                                                                                <Check className="h-4 w-4 text-green-500" />
+                                                                            )}
+                                                                        </DropdownMenuItem>
+                                                                    ))}
+                                                                </DropdownMenuSubContent>
+                                                            </DropdownMenuSub>
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>
                                                 </div>
                                                 <Button
                                                     type="submit"
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                                            e.preventDefault();
+                                                            handleSubmit(e);
+                                                        }
+                                                    }}
                                                     variant="default"
                                                     className="w-fit rounded-full h-fit !px-2 py-2 bg-blue-500 hover:bg-blue-400"
                                                     disabled={isStreaming}
@@ -1307,8 +1340,9 @@ export default function PaperView() {
                             )
                         }
                     </div>
-                )}
-            </div>
+                )
+                }
+            </div >
             <div className="hidden md:flex flex-col w-fit h-[calc(100vh-64px)]">
                 <SidebarProvider className="items-start h-[calc(100vh-64px)] min-h-fit w-fit">
                     <Sidebar collapsible="none" className="hidden md:flex w-fit">
@@ -1347,7 +1381,7 @@ export default function PaperView() {
                     </Sidebar>
                 </SidebarProvider>
             </div>
-        </div>
+        </div >
 
     );
 }
