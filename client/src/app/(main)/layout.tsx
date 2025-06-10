@@ -8,6 +8,7 @@ import { AuthProvider } from "@/lib/auth";
 import OnboardingChecklist from "@/components/OnboardingChecklist";
 import { Toaster } from "@/components/ui/sonner";
 import { PostHogProvider, ThemeProvider } from "@/lib/providers";
+import { SidebarController } from "@/components/utils/SidebarAutoCollapse";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -87,7 +88,9 @@ export default function RootLayout({
 											<OnboardingChecklist />
 										</header>
 									</header>
-									{children}
+									<SidebarController>
+										{children}
+									</SidebarController>
 								</SidebarInset>
 							</SidebarProvider>
 						</PostHogProvider>
