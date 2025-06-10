@@ -1179,7 +1179,7 @@ export default function PaperView() {
                                                                             <div
                                                                                 id={`citation-ref-${value.key}-${index}`}
                                                                                 className={`text-xs ${msg.role === 'user'
-                                                                                    ? 'bg-blue-200 text-blue-800'
+                                                                                    ? 'bg-blue-200 text-blue-800 line-clamp-1'
                                                                                     : 'text-secondary-foreground'
                                                                                     }`}
                                                                             >
