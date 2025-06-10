@@ -7,14 +7,17 @@ import { useSidebar } from "@/components/ui/sidebar";
 export function SidebarController({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const { setOpenMobile, setOpen } = useSidebar();
-    const hasAutoCollapsed = useRef(false);
+    const hasInitialized = useRef(false);
 
     useEffect(() => {
-        // Auto-collapse sidebar only on first load when on paper pages
-        if (pathname.includes('/paper/') && !hasAutoCollapsed.current) {
-            setOpen(false);
-            setOpenMobile(false);
-            hasAutoCollapsed.current = true;
+        // Set initial state on first render for paper pages
+        if (!hasInitialized.current) {
+            if (pathname.includes('/paper/')) {
+                // Set initial state without triggering transition
+                setOpen(false);
+                setOpenMobile(false);
+            }
+            hasInitialized.current = true;
         }
     }, [pathname, setOpen, setOpenMobile]);
 
