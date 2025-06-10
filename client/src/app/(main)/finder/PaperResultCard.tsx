@@ -116,6 +116,11 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                 </CardHeader>
 
                 <CardContent className="flex-grow space-y-4">
+                    {paper.open_access?.is_oa && (
+                        <Badge className="bg-blue-300 dark:bg-blue-700 text-white text-xs">
+                            Open Access
+                        </Badge>
+                    )}
                     {hasAuthors && (
                         <div className="flex items-start gap-2">
                             <Users className="h-4 w-4 mt-0.5 text-secondary-foreground flex-shrink-0" />
@@ -208,11 +213,6 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                             <Badge variant="outline" className="text-secondary-foreground bg-secondary text-xs">
                                 <Quote className="h-3 w-3 mr-1" />
                                 {paper.cited_by_count} citations
-                            </Badge>
-                        )}
-                        {paper.open_access?.is_oa && (
-                            <Badge className="bg-blue-500 text-white text-xs">
-                                Open Access
                             </Badge>
                         )}
                     </div>
