@@ -32,7 +32,8 @@ import {
     Sparkle,
     Check,
     AudioLines,
-    Route
+    Route,
+    User
 } from 'lucide-react';
 
 import { Textarea } from '@/components/ui/textarea';
@@ -81,6 +82,7 @@ import { AudioOverview } from '@/components/AudioOverview';
 import { PaperStatus, PaperStatusEnum } from '@/components/utils/PdfStatus';
 import { useAuth } from '@/lib/auth';
 import CustomCitationLink from '@/components/utils/CustomCitationLink';
+import { Avatar } from '@/components/ui/avatar';
 
 interface ChatRequestBody {
     user_query: string;
@@ -1128,70 +1130,86 @@ export default function PaperView() {
                                         ) : (
                                             messages.map((msg, index) => (
                                                 <div
-                                                    key={index}
-                                                    data-message-index={index}
-                                                    className={`prose dark:prose-invert p-2 !max-w-full rounded-lg ${msg.role === 'user'
-                                                        ? 'bg-blue-200 text-blue-800 w-fit'
-                                                        : 'w-full text-primary'
-                                                        }`}
+                                                    className='flex flex-row gap-2 items-end'
                                                 >
-                                                    <Markdown
-                                                        remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
-                                                        rehypePlugins={[rehypeKatex]}
-                                                        components={{
-                                                            // Apply the custom component to text nodes
-                                                            p: (props) => <CustomCitationLink
-                                                                {...props}
-                                                                handleCitationClick={handleCitationClick}
-                                                                messageIndex={index}
-                                                            />,
-                                                            li: (props) => <CustomCitationLink
-                                                                {...props}
-                                                                handleCitationClick={handleCitationClick}
-                                                                messageIndex={index}
-                                                            />,
-                                                            div: (props) => <CustomCitationLink
-                                                                {...props}
-                                                                handleCitationClick={handleCitationClick}
-                                                                messageIndex={index}
-                                                            />,
-                                                        }}
-                                                    >
-                                                        {msg.content}
-                                                    </Markdown>
                                                     {
-                                                        msg.references && msg.references['citations']?.length > 0 && (
-                                                            <div className="mt-2" id="references-section">
-                                                                <ul className="list-none p-0">
-                                                                    {Object.entries(msg.references['citations']).map(([refIndex, value]) => (
-                                                                        <div
-                                                                            key={refIndex}
-                                                                            className={`flex flex-row gap-2 ${matchesCurrentCitation(value.key, index) ? 'bg-blue-100 dark:bg-blue-900 rounded p-1 transition-colors duration-300' : ''}`}
-                                                                            id={`citation-${value.key}-${index}`}
-                                                                            onClick={() => handleCitationClick(value.key, index)}
-                                                                        >
-                                                                            <div className={`text-xs ${msg.role === 'user'
-                                                                                ? 'bg-blue-200 text-blue-800'
-                                                                                : 'text-secondary-foreground'
-                                                                                }`}>
-                                                                                <a href={`#citation-ref-${value.key}`}>{value.key}</a>
-                                                                            </div>
+                                                        msg.role === 'user' && user && (
+                                                            <Avatar className="h-6 w-6">
+                                                                {user.picture ? (
+                                                                    <img src={user.picture} alt={user.name} />
+                                                                ) : (
+                                                                    <User size={16} />
+                                                                )}
+                                                            </Avatar>
+                                                        )
+                                                    }
+                                                    <div
+                                                        key={index}
+                                                        data-message-index={index}
+                                                        className={`prose dark:prose-invert p-2 !max-w-full rounded-lg ${msg.role === 'user'
+                                                            ? 'bg-blue-200 text-blue-800 w-fit'
+                                                            : 'w-full text-primary'
+                                                            }`}
+                                                    >
+                                                        <Markdown
+                                                            remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
+                                                            rehypePlugins={[rehypeKatex]}
+                                                            components={{
+                                                                // Apply the custom component to text nodes
+                                                                p: (props) => <CustomCitationLink
+                                                                    {...props}
+                                                                    handleCitationClick={handleCitationClick}
+                                                                    messageIndex={index}
+                                                                />,
+                                                                li: (props) => <CustomCitationLink
+                                                                    {...props}
+                                                                    handleCitationClick={handleCitationClick}
+                                                                    messageIndex={index}
+                                                                />,
+                                                                div: (props) => <CustomCitationLink
+                                                                    {...props}
+                                                                    handleCitationClick={handleCitationClick}
+                                                                    messageIndex={index}
+                                                                />,
+                                                            }}
+                                                        >
+                                                            {msg.content}
+                                                        </Markdown>
+                                                        {
+                                                            msg.references && msg.references['citations']?.length > 0 && (
+                                                                <div className="mt-2" id="references-section">
+                                                                    <ul className="list-none p-0">
+                                                                        {Object.entries(msg.references['citations']).map(([refIndex, value]) => (
                                                                             <div
-                                                                                id={`citation-ref-${value.key}-${index}`}
-                                                                                className={`text-xs ${msg.role === 'user'
-                                                                                    ? 'bg-blue-200 text-blue-800 line-clamp-1'
-                                                                                    : 'text-secondary-foreground'
-                                                                                    }`}
+                                                                                key={refIndex}
+                                                                                className={`flex flex-row gap-2 ${matchesCurrentCitation(value.key, index) ? 'bg-blue-100 dark:bg-blue-900 rounded p-1 transition-colors duration-300' : ''}`}
+                                                                                id={`citation-${value.key}-${index}`}
+                                                                                onClick={() => handleCitationClick(value.key, index)}
                                                                             >
-                                                                                {value.reference}
+                                                                                <div className={`text-xs ${msg.role === 'user'
+                                                                                    ? 'bg-blue-200 text-blue-800'
+                                                                                    : 'text-secondary-foreground'
+                                                                                    }`}>
+                                                                                    <a href={`#citation-ref-${value.key}`}>{value.key}</a>
+                                                                                </div>
+                                                                                <div
+                                                                                    id={`citation-ref-${value.key}-${index}`}
+                                                                                    className={`text-xs ${msg.role === 'user'
+                                                                                        ? 'bg-blue-200 text-blue-800 line-clamp-1'
+                                                                                        : 'text-secondary-foreground'
+                                                                                        }`}
+                                                                                >
+                                                                                    {value.reference}
+                                                                                </div>
                                                                             </div>
-                                                                        </div>
-                                                                    ))}
-                                                                </ul>
-                                                            </div>
-                                                        )}
+                                                                        ))}
+                                                                    </ul>
+                                                                </div>
+                                                            )}
+                                                    </div>
                                                 </div>
                                             ))
+
                                         )}
                                         {
                                             isStreaming && (
