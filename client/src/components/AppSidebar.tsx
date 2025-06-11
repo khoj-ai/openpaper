@@ -177,11 +177,8 @@ export function AppSidebar() {
                             <PopoverTrigger asChild>
                                 <SidebarMenuButton className="flex items-center gap-2">
                                     <Avatar className="h-6 w-6">
-                                        {user.picture ? (
-                                            <img src={user.picture} alt={user.name} />
-                                        ) : (
-                                            <User size={16} />
-                                        )}
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        {user.picture ? (<img src={user.picture} alt={user.name} /> ) : ( <User size={16} /> )}
                                     </Avatar>
                                     <span className="truncate">{user.name}</span>
                                 </SidebarMenuButton>
@@ -190,11 +187,8 @@ export function AppSidebar() {
                                 <div className="flex flex-col gap-4">
                                     <div className="flex items-center gap-3">
                                         <Avatar className="h-10 w-10">
-                                            {user.picture ? (
-                                                <img src={user.picture} alt={user.name} />
-                                            ) : (
-                                                <User size={24} />
-                                            )}
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            {user.picture ? ( <img src={user.picture} alt={user.name} /> ) : ( <User size={24} />)}
                                         </Avatar>
                                         <div>
                                             <h3 className="font-medium">{user.name}</h3>

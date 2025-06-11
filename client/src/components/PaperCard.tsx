@@ -415,6 +415,7 @@ export default function PaperCard({ paper, handleDelete, setPaper }: PaperCardPr
                 {
                     paper.preview_url ? (
                         <div className="md:w-1/5 bg-gray-100 dark:bg-gray-800 p-4 pb-0 flex items-center justify-center border-b border-gray-200 dark:border-gray-700 rounded-t-2xl rounded-b-none">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                                 src={paper.preview_url}
                                 title={paper.title || paper.filename}

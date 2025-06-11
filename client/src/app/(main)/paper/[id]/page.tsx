@@ -1139,11 +1139,8 @@ export default function PaperView() {
                                                     {
                                                         msg.role === 'user' && user && (
                                                             <Avatar className="h-6 w-6">
-                                                                {user.picture ? (
-                                                                    <img src={user.picture} alt={user.name} />
-                                                                ) : (
-                                                                    <User size={16} />
-                                                                )}
+                                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                {user.picture ? ( <img src={user.picture} alt={user.name} /> ) : ( <User size={16} /> )}
                                                             </Avatar>
                                                         )
                                                     }

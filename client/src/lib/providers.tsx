@@ -61,12 +61,7 @@ function SuspendedPostHogPageView() {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
     // Actually use the hook - this ensures React is aware of the dark mode state
-    const { darkMode } = useIsDarkMode();
-
-    // Create a context value to provide the current theme if needed
-    const theme = darkMode ? 'dark' : 'light';
-
-    console.log("ThemeProvider: ", theme);
+    const {  } = useIsDarkMode();
 
     return <>{children}</>;
 }
