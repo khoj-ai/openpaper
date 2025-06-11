@@ -1130,6 +1130,7 @@ export default function PaperView() {
                                         ) : (
                                             messages.map((msg, index) => (
                                                 <div
+                                                    key={index}
                                                     className='flex flex-row gap-2 items-end'
                                                 >
                                                     {
@@ -1144,7 +1145,6 @@ export default function PaperView() {
                                                         )
                                                     }
                                                     <div
-                                                        key={index}
                                                         data-message-index={index}
                                                         className={`prose dark:prose-invert p-2 !max-w-full rounded-lg ${msg.role === 'user'
                                                             ? 'bg-blue-200 text-blue-800 w-fit'
