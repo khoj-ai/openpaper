@@ -371,7 +371,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
     console.log('show generation form:', showGenerationForm);
 
     return (
-        <div className="rounded-lg p-6 h-full w-full">
+        <div className="rounded-lg py-2 h-full w-full">
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
                     <FileAudio className="w-5 h-5" />
