@@ -58,56 +58,63 @@ export enum ResponseStyle {
     Detailed = 'detailed',
 }
 
+export interface OpenAlexPaper {
+    id: string
+    title: string
+    doi?: string
+    publication_year: number
+    publication_date: string
+    open_access?: {
+        is_oa: boolean
+        oa_status: string
+        oa_url?: string
+    }
+    keywords?: Array<{
+        display_name: string
+        score?: number
+    }>
+    authorships?: Array<{
+        author?: {
+            id: string
+            orcid?: string
+            display_name?: string
+        }
+        institutions?: {
+            id: string
+            type: string
+            display_name: string
+            ror?: string
+        }[]
+    }>
+    topics?: Array<{
+        display_name: string
+        score?: number,
+        subfield: {
+            display_name: string
+        },
+        field: {
+            display_name: string
+        },
+        domain: {
+            display_name: string
+        }
+    }>
+    cited_by_count?: number
+    abstract?: string
+}
+
 export interface OpenAlexResponse {
     meta: {
         count: number
         page: number | null
         per_page: number
     },
-    results: Array<{
-        id: string
-        title: string
-        doi?: string
-        publication_year: number
-        publication_date: string
-        open_access?: {
-            is_oa: boolean
-            oa_status: string
-            oa_url?: string
-        }
-        keywords?: Array<{
-            display_name: string
-            score?: number
-        }>
-        authorships?: Array<{
-            author?: {
-                id: string
-                orcid?: string
-                display_name?: string
-            }
-            institutions?: {
-                id: string
-                type: string
-                display_name: string
-                ror?: string
-            }[]
-        }>
-        topics?: Array<{
-            display_name: string
-            score?: number,
-            subfield: {
-                display_name: string
-            },
-            field: {
-                display_name: string
-            },
-            domain: {
-                display_name: string
-            }
-        }>
-        cited_by_count?: number
-        abstract?: string
-    }>
+    results: Array<OpenAlexPaper>
+}
+
+export interface OpenAlexMatchResponse {
+    cites: OpenAlexResponse;
+    cited_by: OpenAlexResponse;
 }
 
 export type JobStatusType = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';

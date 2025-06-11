@@ -6,7 +6,11 @@ from app.auth.dependencies import get_current_user, get_db, get_required_user
 from app.database.crud.hypothesis_crud import hypothesis_crud
 from app.database.models import JobStatus
 from app.database.telemetry import track_event
-from app.helpers.paper_search import OpenAlexFilter, search_open_alex
+from app.helpers.paper_search import (
+    OpenAlexFilter,
+    construct_citation_graph,
+    search_open_alex,
+)
 from app.schemas.user import CurrentUser
 from app.tasks.hypothesis import process_hypothesis
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
@@ -48,6 +52,23 @@ async def search_papers(
         )
     except Exception as e:
         logger.error(f"Error searching papers: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@paper_search_router.post("/match")
+async def get_paper_graph(
+    open_alex_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """
+    Get the citation graph for a paper.
+    """
+    try:
+        graph = construct_citation_graph(open_alex_id)
+        return Response(content=graph.model_dump_json(), media_type="application/json")
+    except Exception as e:
+        logger.error(f"Error retrieving paper graph: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

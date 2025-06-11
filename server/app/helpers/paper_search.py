@@ -126,6 +126,20 @@ class OpenAlexResponse(BaseModel):
         return data
 
 
+class OpenAlexCitationGraph(BaseModel):
+    cites: OpenAlexResponse
+    cited_by: OpenAlexResponse
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_citation_graph(cls, data):
+        if "cites" in data:
+            data["cites"] = OpenAlexResponse(**data["cites"])
+        if "cited_by" in data:
+            data["cited_by"] = OpenAlexResponse(**data["cited_by"])
+        return data
+
+
 class OpenAlexFilter(BaseModel):
     authors: Optional[List[str]] = None
     institutions: Optional[List[str]] = None
@@ -211,3 +225,27 @@ def build_abstract_from_inverted_index(inverted_index: dict) -> str:
             if min_index <= index <= max_index:
                 abstract[index - min_index] = key
     return " ".join(abstract).strip() if abstract else ""
+
+
+def construct_citation_graph(open_alex_id: str) -> OpenAlexCitationGraph:
+    """
+    Construct a citation graph for a given OpenAlex ID, including both citations and cited-by relationships. Use a depth of 1 to include direct citations and works that cite the original work.
+
+    Args:
+        open_alex_id (str): The OpenAlex ID of the work.
+
+    Returns:
+        dict: A dictionary representing the citation graph.
+    """
+    cites_url = f"https://api.openalex.org/works?filter=cites:{quote(open_alex_id)}&page=1&per_page=20"
+    cites_response = requests.get(cites_url, timeout=10)
+    cites_response.raise_for_status()
+
+    cited_by_url = f"https://api.openalex.org/works?filter=cited_by:{quote(open_alex_id)}&page=1&per_page=20"
+    cited_by_response = requests.get(cited_by_url, timeout=10)
+    cited_by_response.raise_for_status()
+
+    cites_data = cites_response.json()
+    cited_by_data = cited_by_response.json()
+
+    return OpenAlexCitationGraph(cites=cites_data, cited_by=cited_by_data)
