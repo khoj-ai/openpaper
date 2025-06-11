@@ -10,11 +10,10 @@ import LoadingIndicator from './utils/Loading';
 import { toast } from "sonner";
 
 interface GraphOverviewProps {
-    paper_id: string;
     paper_title?: string;
 }
 
-export default function GraphOverview({ paper_id, paper_title }: GraphOverviewProps) {
+export default function GraphOverview({ paper_title }: GraphOverviewProps) {
     const [perPage, setPerPage] = useState(25);
     const [results, setResults] = useState<OpenAlexResponse | null>(null);
     const [loading, setLoading] = useState(false);
@@ -125,7 +124,7 @@ export default function GraphOverview({ paper_id, paper_title }: GraphOverviewPr
                         </div>
                         <ol className="text-sm text-blue-700 dark:text-blue-300 items-start list-inside text-start">
                             <li className='list-decimal ml-5'>Review the potential matches below and select the correct match.</li>
-                            <li className='list-decimal ml-5'>Use the ✓ button to confirm a match or ✗ to dismiss papers that don't match.</li>
+                            <li className='list-decimal ml-5'>Use the ✓ button to confirm a match or ✗ to dismiss papers that don&apos;t match.</li>
                             <li className='list-decimal ml-5'>Get a graph view of citations once you select a paper.</li>
                         </ol>
                     </div>
@@ -303,7 +302,7 @@ export default function GraphOverview({ paper_id, paper_title }: GraphOverviewPr
                     {filteredResults.length === 0 && results.results.length > 0 && (
                         <div className="text-center p-8 bg-gray-50 dark:bg-gray-800 rounded-lg">
                             <p className="text-gray-600 dark:text-gray-400 mb-4">
-                                You've dismissed all search results.
+                                You&apos;ve dismissed all search results.
                             </p>
                             <Button
                                 variant="outline"

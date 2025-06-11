@@ -1364,7 +1364,6 @@ export default function PaperView() {
                             rightSideFunction === 'Graph' && (
                                 <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto">
                                     <GraphOverview
-                                        paper_id={id}
                                         paper_title={paperData?.title} />
                                 </div>
                             )
