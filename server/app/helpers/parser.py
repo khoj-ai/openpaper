@@ -32,7 +32,7 @@ def extract_text_from_pdf(file_path: str) -> str:
         )
 
     try:
-        md_text = md.convert(file_path).text_content
+        md_text = md.convert(file_path).markdown
         md_text = sanitize_string(md_text)
         if not is_valid_text(md_text):
             # Fallback to pymupdf4llm if MarkItDown fails
