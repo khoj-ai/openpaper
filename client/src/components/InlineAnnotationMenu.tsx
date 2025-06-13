@@ -1,4 +1,5 @@
 import {
+    AIPaperHighlight,
     PaperHighlight,
 } from '@/lib/schema';
 
@@ -18,6 +19,7 @@ interface InlineAnnotationMenuProps {
     setHighlights: (highlights: Array<PaperHighlight>) => void;
     isHighlightInteraction: boolean;
     activeHighlight: PaperHighlight | null;
+    activeAIHighlight?: AIPaperHighlight | null;
     addHighlight: (selectedText: string, startOffset?: number, endOffset?: number) => void;
     removeHighlight: (highlight: PaperHighlight) => void;
     setUserMessageReferences: React.Dispatch<React.SetStateAction<string[]>>;
@@ -33,6 +35,7 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
         setIsAnnotating,
         isHighlightInteraction,
         activeHighlight,
+        activeAIHighlight,
         addHighlight,
         removeHighlight,
         setUserMessageReferences,
@@ -220,7 +223,7 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
 
 
                 {/* Remove Highlight Button - Only show when interacting with highlight */}
-                {isHighlightInteraction && (
+                {isHighlightInteraction && activeHighlight && (
                     <Button
                         variant="ghost"
                         className="w-full flex items-center justify-between text-sm font-normal h-9 px-2 text-destructive"

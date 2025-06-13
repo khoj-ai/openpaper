@@ -1,6 +1,8 @@
 import {
+    AIPaperHighlight,
     PaperHighlight,
 } from '@/lib/schema';
+import { getFuzzyMatchingNodesInPdf, tryDirectOffsetMatch } from './PdfTextUtils';
 
 export interface HighlightHandlers {
     setIsHighlightInteraction: (value: boolean) => void;
@@ -80,6 +82,84 @@ export function findAllHighlightedPassages(highlights: PaperHighlight[]) {
     }
 
     return matches;
+}
+
+export function addAIHighlightToNodes(
+    sourceHighlight: AIPaperHighlight,
+    handlers: {
+        setIsHighlightInteraction: (value: boolean) => void;
+        setSelectedText: (text: string) => void;
+        setTooltipPosition: (position: { x: number; y: number } | null) => void;
+        setIsAnnotating: (value: boolean) => void;
+        setActiveAIHighlight: (highlight: AIPaperHighlight | null) => void;
+    }
+) {
+    // First, try to use the offset hints for direct matching (like regular highlights)
+    const directMatch = tryDirectOffsetMatch(sourceHighlight);
+    if (directMatch.length > 0) {
+        console.log(`Direct offset match found for AI highlight with ${directMatch.length} nodes`);
+        for (const node of directMatch) {
+            applyAIHighlightToNode(node, sourceHighlight, handlers);
+        }
+        if (sourceHighlight.id) {
+            directMatch[0].setAttribute('data-ai-highlight-id', sourceHighlight.id);
+        }
+        return;
+    }
+
+    // Fallback to fuzzy matching, but constrain to the specific page
+    const fuzzyMatches = getFuzzyMatchingNodesInPdf(
+        sourceHighlight.raw_text,
+    );
+
+    if (fuzzyMatches.length === 0) {
+        console.warn(`No matches found for AI highlight: "${sourceHighlight.raw_text.substring(0, 30)}..." on page ${sourceHighlight.page_number}`);
+        return;
+    }
+
+    // Take the best match
+    const bestMatch = fuzzyMatches[0];
+    const matchingNodes = bestMatch.nodes;
+
+    console.log(`Found ${matchingNodes.length} nodes for AI highlight with ${(bestMatch.similarity * 100).toFixed(1)}% similarity on page ${sourceHighlight.page_number}`);
+
+    for (const node of matchingNodes) {
+        applyAIHighlightToNode(node, sourceHighlight, handlers);
+    }
+
+    if (matchingNodes.length > 0 && sourceHighlight.id) {
+        matchingNodes[0].setAttribute('data-ai-highlight-id', sourceHighlight.id);
+    }
+}
+
+function applyAIHighlightToNode(
+    node: Element,
+    sourceHighlight: AIPaperHighlight,
+    handlers: {
+        setIsHighlightInteraction: (value: boolean) => void;
+        setSelectedText: (text: string) => void;
+        setTooltipPosition: (position: { x: number; y: number } | null) => void;
+        setIsAnnotating: (value: boolean) => void;
+        setActiveAIHighlight: (highlight: AIPaperHighlight | null) => void;
+    }
+) {
+    // Add AI-specific highlighting (different styling from regular highlights)
+    node.classList.add('border-2', 'border-purple-500', 'bg-purple-100', 'rounded', 'opacity-30');
+
+    // Add a visual indicator that this is an AI highlight
+    node.setAttribute('data-ai-highlight', 'true');
+    node.setAttribute('title', 'AI-generated highlight');
+
+    // Add click event to show highlight options
+    node.addEventListener('click', (e: Event) => {
+        console.log(`Clicked AI highlight: ${sourceHighlight.id}`);
+        const mouseEvent = e as MouseEvent;
+        mouseEvent.stopPropagation();
+        handlers.setIsHighlightInteraction(true);
+        handlers.setSelectedText(sourceHighlight.raw_text);
+        handlers.setTooltipPosition({ x: mouseEvent.clientX, y: mouseEvent.clientY });
+        handlers.setActiveAIHighlight(sourceHighlight);
+    });
 }
 
 export function addHighlightToNodes(

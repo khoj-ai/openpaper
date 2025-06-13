@@ -9,12 +9,13 @@ import "../app/globals.css";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, ArrowLeft, ArrowRight, X, Minus, Plus } from "lucide-react";
-import { addHighlightToNodes, findAllHighlightedPassages } from "./utils/PdfHighlightUtils";
+import { addAIHighlightToNodes, addHighlightToNodes, findAllHighlightedPassages } from "./utils/PdfHighlightUtils";
 import { usePdfSearch } from "./hooks/PdfSearch";
 import { usePdfNavigation } from "./hooks/PdfNavigation";
 import { usePdfLoader } from "./hooks/PdfLoader";
 import InlineAnnotationMenu from "./InlineAnnotationMenu";
 import {
+	AIPaperHighlight,
 	PaperHighlight,
 	PaperHighlightAnnotation,
 } from '@/lib/schema';
@@ -27,6 +28,7 @@ interface PdfViewerProps {
 	explicitSearchTerm?: string;
 	setUserMessageReferences: React.Dispatch<React.SetStateAction<string[]>>;
 	highlights: PaperHighlight[];
+	aiHighlights?: AIPaperHighlight[];
 	setHighlights: (highlights: PaperHighlight[]) => void;
 	selectedText: string;
 	setSelectedText: (text: string) => void;
@@ -37,6 +39,8 @@ interface PdfViewerProps {
 	setIsHighlightInteraction: (isHighlightInteraction: boolean) => void;
 	activeHighlight: PaperHighlight | null;
 	setActiveHighlight: (highlight: PaperHighlight | null) => void;
+	activeAIHighlight: AIPaperHighlight | null;
+	setActiveAIHighlight: (highlight: AIPaperHighlight | null) => void;
 	addHighlight: (selectedText: string, startOffset?: number, endOffset?: number) => void;
 	removeHighlight: (highlight: PaperHighlight) => void;
 	loadHighlights: () => Promise<void>;
@@ -54,6 +58,7 @@ export function PdfViewer(props: PdfViewerProps) {
 		explicitSearchTerm,
 		setUserMessageReferences,
 		highlights,
+		aiHighlights,
 		setHighlights,
 		selectedText,
 		setSelectedText,
@@ -64,6 +69,8 @@ export function PdfViewer(props: PdfViewerProps) {
 		setIsHighlightInteraction,
 		activeHighlight,
 		setActiveHighlight,
+		activeAIHighlight,
+		setActiveAIHighlight,
 		addHighlight,
 		removeHighlight,
 		loadHighlights,
@@ -189,9 +196,12 @@ export function PdfViewer(props: PdfViewerProps) {
 
 					// Highlighting logic
 					setTimeout(() => {
+
+
 						if (highlights.length > 0) {
 							const allMatches = findAllHighlightedPassages(highlights);
 							console.log("Found highlight matches:", allMatches.length);
+
 							const handlers = {
 								setIsHighlightInteraction,
 								setSelectedText,
@@ -202,6 +212,22 @@ export function PdfViewer(props: PdfViewerProps) {
 
 							for (const match of allMatches) {
 								addHighlightToNodes(match.nodes, match.sourceHighlight, handlers);
+							}
+						}
+
+						if (aiHighlights && aiHighlights.length > 0) {
+							console.log("AI highlights found, processing...");
+							// Process AI highlights if needed
+							const handlers = {
+								setIsHighlightInteraction,
+								setSelectedText,
+								setTooltipPosition,
+								setIsAnnotating,
+								setActiveAIHighlight
+							};
+
+							for (const aiHighlight of aiHighlights || []) {
+								addAIHighlightToNodes(aiHighlight, handlers);
 							}
 						}
 					}, 100);

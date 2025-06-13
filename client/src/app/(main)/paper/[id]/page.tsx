@@ -77,6 +77,7 @@ import {
     PaperHighlight,
     Reference,
     ResponseStyle,
+    AIPaperHighlight,
 } from '@/lib/schema';
 import { Input } from '@/components/ui/input';
 import { AudioOverview } from '@/components/AudioOverview';
@@ -120,6 +121,7 @@ export default function PaperView() {
     const [isLoadingMoreMessages, setIsLoadingMoreMessages] = useState(false);
     const [hasMoreMessages, setHasMoreMessages] = useState(true);
     const {
+        aiHighlights,
         highlights,
         setHighlights,
         selectedText,
@@ -131,7 +133,9 @@ export default function PaperView() {
         isHighlightInteraction,
         setIsHighlightInteraction,
         activeHighlight,
+        activeAIHighlight,
         setActiveHighlight,
+        setActiveAIHighlight,
         handleTextSelection,
         addHighlight,
         removeHighlight,
@@ -207,6 +211,11 @@ export default function PaperView() {
     const handleHighlightClick = (highlight: PaperHighlight) => {
         setActiveHighlight(highlight);
     };
+
+    const handleAIHighlightClick = (highlight: AIPaperHighlight) => {
+        console.log("AI Highlight clicked:", highlight);
+        setActiveAIHighlight(highlight);
+    }
 
     useEffect(() => {
         if (userMessageReferences.length == 0) return;
@@ -840,11 +849,14 @@ export default function PaperView() {
                                 setIsHighlightInteraction={setIsHighlightInteraction}
                                 isHighlightInteraction={isHighlightInteraction}
                                 highlights={highlights}
+                                aiHighlights={aiHighlights}
                                 setHighlights={setHighlights}
                                 selectedText={selectedText}
                                 tooltipPosition={tooltipPosition}
                                 setActiveHighlight={setActiveHighlight}
+                                setActiveAIHighlight={setActiveAIHighlight}
                                 activeHighlight={activeHighlight}
+                                activeAIHighlight={activeAIHighlight}
                                 addHighlight={addHighlight}
                                 loadHighlights={loadHighlights}
                                 removeHighlight={removeHighlight}
@@ -963,9 +975,12 @@ export default function PaperView() {
                                     <AnnotationsView
                                         annotations={annotations}
                                         highlights={highlights}
+                                        aiHighlights={aiHighlights}
                                         onHighlightClick={handleHighlightClick}
+                                        onAIHighlightClick={handleAIHighlightClick}
                                         addAnnotation={addAnnotation}
                                         activeHighlight={activeHighlight}
+                                        activeAIHighlight={activeAIHighlight}
                                         updateAnnotation={updateAnnotation}
                                         removeAnnotation={removeAnnotation}
                                     />

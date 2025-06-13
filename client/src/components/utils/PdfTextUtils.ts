@@ -1,3 +1,5 @@
+import { AIPaperHighlight } from "@/lib/schema";
+
 export const getMatchingNodesInPdf = (searchTerm: string) => {
     const results: Array<{ pageIndex: number; matchIndex: number; nodes: Element[] }> = [];
     const textLayers = document.querySelectorAll('.react-pdf__Page__textContent');
@@ -94,6 +96,60 @@ function prepareTextForFuzzyMatch(text: string): string {
         .toLowerCase()
         // Trim leading/trailing whitespace
         .trim();
+}
+
+export function tryDirectOffsetMatch(sourceHighlight: AIPaperHighlight): Element[] {
+    // Try to use the offset hints as if they were exact offsets
+    const textLayers = document.querySelectorAll('.react-pdf__Page__textContent');
+    if (textLayers.length === 0) return [];
+
+    // Collect all text nodes with their offsets
+    let currentOffset = 0;
+    const textNodes: Array<{ node: Node, start: number, end: number, pageIndex: number }> = [];
+
+    for (let pageIndex = 0; pageIndex < textLayers.length; pageIndex++) {
+        const treeWalker = document.createTreeWalker(
+            textLayers[pageIndex],
+            NodeFilter.SHOW_TEXT,
+            null
+        );
+
+        let currentNode;
+        while ((currentNode = treeWalker.nextNode())) {
+            const length = currentNode.textContent?.length || 0;
+            textNodes.push({
+                node: currentNode,
+                start: currentOffset,
+                end: currentOffset + length,
+                pageIndex
+            });
+            currentOffset += length;
+        }
+    }
+
+    // Find overlapping nodes using the hint offsets
+    const { start_offset_hint, end_offset_hint } = sourceHighlight;
+    const overlappingNodes = textNodes.filter(node =>
+        (node.start <= start_offset_hint && node.end > start_offset_hint) ||
+        (node.start >= start_offset_hint && node.end <= end_offset_hint) ||
+        (node.start < end_offset_hint && node.end >= end_offset_hint) ||
+        (start_offset_hint <= node.start && end_offset_hint >= node.end)
+    );
+
+    // Convert to elements and verify the text content roughly matches
+    const nodeElements = overlappingNodes.map(n => n.node.parentElement).filter(Boolean) as Element[];
+
+    // Simple text validation - check if the combined text from nodes contains most of our target text
+    const combinedText = nodeElements.map(el => el.textContent || '').join(' ').toLowerCase();
+    const targetText = sourceHighlight.raw_text.toLowerCase();
+    const overlap = calculateSimilarity(combinedText, targetText);
+
+    // If there's good text overlap (>70%), consider this a direct match
+    if (overlap > 0.7) {
+        return nodeElements;
+    }
+
+    return [];
 }
 
 export const getFuzzyMatchingNodesInPdf = (originalTerm: string) => {

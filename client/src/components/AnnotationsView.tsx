@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 
 import {
+	AIPaperHighlight,
 	PaperHighlight,
 	PaperHighlightAnnotation
 } from '@/lib/schema';
@@ -172,23 +173,41 @@ function AnnotationCard({ annotation, removeAnnotation, updateAnnotation, readon
 
 interface AnnotationsViewProps {
 	highlights: PaperHighlight[];
+	aiHighlights?: AIPaperHighlight[];
 	annotations: PaperHighlightAnnotation[];
 	onHighlightClick: (highlight: PaperHighlight) => void;
+	onAIHighlightClick?: (aiHighlight: AIPaperHighlight) => void;
 	activeHighlight?: PaperHighlight | null;
-	// Make action functions optional
+	activeAIHighlight?: AIPaperHighlight | null;
 	addAnnotation?: (highlightId: string, content: string) => Promise<PaperHighlightAnnotation>;
 	removeAnnotation?: (annotationId: string) => void;
 	updateAnnotation?: (annotationId: string, content: string) => void;
-	readonly?: boolean; // Keep readonly prop
+	readonly?: boolean;
 }
 
-// Default readonly to false if not provided
-export function AnnotationsView({ highlights, annotations, onHighlightClick, addAnnotation, activeHighlight, removeAnnotation, updateAnnotation, readonly = false }: AnnotationsViewProps) {
-	const [sortedHighlights, setSortedHighlights] = React.useState<PaperHighlight[]>([]);
+
+interface HighlightWithType {
+	highlight: PaperHighlight | AIPaperHighlight;
+	type: 'user' | 'ai';
+}
+
+
+export function AnnotationsView(
+	{ highlights,
+		aiHighlights,
+		annotations,
+		onHighlightClick,
+		onAIHighlightClick,
+		addAnnotation,
+		activeHighlight,
+		activeAIHighlight,
+		removeAnnotation,
+		updateAnnotation,
+		readonly = false }: AnnotationsViewProps) {
+	const [sortedHighlights, setSortedHighlights] = React.useState<HighlightWithType[]>([]);
 	const [highlightAnnotationMap, setHighlightAnnotationMap] = React.useState<Map<string, PaperHighlightAnnotation[] | null>>(new Map());
 	const highlightRefs = useRef(new Map<string, React.RefObject<HTMLDivElement | null>>());
 
-	// ... (useEffect hooks remain the same) ...
 	useEffect(() => {
 		if (activeHighlight?.id) {
 			const ref = highlightRefs.current.get(activeHighlight.id);
@@ -201,14 +220,74 @@ export function AnnotationsView({ highlights, annotations, onHighlightClick, add
 		}
 	}, [activeHighlight]);
 
+	console.log("active ai highlight:", activeAIHighlight);
+
 	useEffect(() => {
-		const sorted = [...highlights].sort((a, b) => {
-			if (a.start_offset === b.start_offset) {
-				return a.end_offset - b.end_offset;
+		console.log("Active AI highlight changed (annotations view):", activeAIHighlight);
+		if (activeAIHighlight?.id) {
+			const ref = highlightRefs.current.get(activeAIHighlight.id);
+			console.log("Ref for active AI highlight:", ref);
+			if (ref?.current) {
+				ref.current.scrollIntoView({
+					behavior: 'smooth',
+					block: 'center'
+				});
 			}
-			return a.start_offset - b.start_offset;
+		}
+	}, [activeAIHighlight]);
+
+
+	// Add these helper functions at the top of the component or outside it
+	const getStartOffset = (item: HighlightWithType): number => {
+		return item.type === 'user'
+			? (item.highlight as PaperHighlight).start_offset
+			: (item.highlight as AIPaperHighlight).start_offset_hint || 0;
+	};
+
+	const getEndOffset = (item: HighlightWithType): number => {
+		return item.type === 'user'
+			? (item.highlight as PaperHighlight).end_offset
+			: (item.highlight as AIPaperHighlight).end_offset_hint || 0;
+	};
+
+	// Then update the sorting logic:
+	useEffect(() => {
+		const mergedHighlights: HighlightWithType[] = [];
+
+		// Add user highlights
+		highlights.forEach(highlight => {
+			mergedHighlights.push({
+				highlight,
+				type: 'user'
+			});
 		});
+
+		// Add AI highlights if they exist
+		if (aiHighlights && aiHighlights.length > 0) {
+			aiHighlights.forEach(aiHighlight => {
+				mergedHighlights.push({
+					highlight: aiHighlight,
+					type: 'ai'
+				});
+			});
+		}
+
+		// Sort by position in document
+		const sorted = mergedHighlights.sort((a, b) => {
+			const aStartOffset = getStartOffset(a);
+			const bStartOffset = getStartOffset(b);
+			const aEndOffset = getEndOffset(a);
+			const bEndOffset = getEndOffset(b);
+
+			if (aStartOffset === bStartOffset) {
+				return aEndOffset - bEndOffset;
+			}
+			return aStartOffset - bStartOffset;
+		});
+
 		setSortedHighlights(sorted);
+
+		console.log("Sorted highlights:", sorted);
 
 		const annotationMap = new Map<string, PaperHighlightAnnotation[]>();
 
@@ -220,79 +299,106 @@ export function AnnotationsView({ highlights, annotations, onHighlightClick, add
 		});
 
 		setHighlightAnnotationMap(annotationMap);
-	}, [highlights, annotations]);
+	}, [highlights, aiHighlights, annotations]);
 
-
-	return (
-		<div className="flex flex-col gap-4 p-4">
-			{highlights.length === 0 ? (
+	if (highlights.length === 0 && (!aiHighlights || aiHighlights.length === 0)) {
+		return (
+			<div className="flex flex-col gap-4 p-4">
 				<p className="text-secondary-foreground text-sm">
 					{readonly ? "No annotations for this paper." : "No annotations yet. Highlight some text to get started."}
 				</p>
-			) : (
-				<div className="space-y-4">
-					{sortedHighlights.map((highlight) => {
-						if (highlight.id && !highlightRefs.current.has(highlight.id)) {
-							const ref = React.createRef<HTMLDivElement>();
-							if (ref && ref !== null) {
-								highlightRefs.current.set(highlight.id, ref);
-							}
-						}
-						// Conditional classes for the main highlight card
-						const cardBaseClasses = "border rounded-lg p-4 transition-colors px-0";
-						const cardInteractiveClasses = "hover:bg-secondary/50 cursor-pointer";
-						const cardActiveClasses = activeHighlight?.id === highlight.id ? "bg-secondary/80" : "";
+			</div>
+		);
+	}
 
-						return (
-							<Card
-								key={highlight.id}
-								ref={highlight.id ? highlightRefs.current.get(highlight.id) : undefined}
-								className={`${cardBaseClasses} ${cardInteractiveClasses} ${cardActiveClasses}`}
-								onClick={() => onHighlightClick(highlight)}
-							>
-								<CardContent>
-									<p className="text-sm font-normal mb-2">
-										&ldquo;{highlight.raw_text}&rdquo;
-									</p>
-									{
-										highlight.id &&
-										highlightAnnotationMap.has(highlight.id) && (
-											<>
-												{
-													highlightAnnotationMap.get(highlight.id)?.map((annotation) => (
-														<AnnotationCard
-															key={annotation.id}
-															annotation={annotation}
-															// Pass down optional functions and readonly status
-															removeAnnotation={removeAnnotation}
-															updateAnnotation={updateAnnotation}
-															readonly={readonly}
-														/>
-													))
-												}
-												{
-													highlightAnnotationMap.get(highlight.id)?.length === 0 && <p className="text-sm text-muted-foreground">No annotation yet.</p>
-												}
-											</>
-										)
-									}
-									{/* Only show AnnotationButton if not readonly, highlight is active, and addAnnotation is provided */}
-									{
-										highlight.id && activeHighlight?.id === highlight.id && !readonly && addAnnotation && (
-											<div className="flex justify-between items-center mt-2 pt-2 border-t"> {/* Added margin/padding/border */}
-												<AnnotationButton
-													highlightId={highlight.id}
-													addAnnotation={addAnnotation}
+	return (
+		<div className="space-y-4">
+			{sortedHighlights.map((item) => {
+				const { highlight, type } = item;
+				const isActive = type === 'user'
+					? activeHighlight?.id === highlight.id
+					: activeAIHighlight?.id === highlight.id;
+
+				if (highlight.id && !highlightRefs.current.has(highlight.id)) {
+					const ref = React.createRef<HTMLDivElement>();
+					if (ref && ref !== null) {
+						highlightRefs.current.set(highlight.id, ref);
+					}
+				}
+
+				// Conditional classes for the main highlight card
+				const cardBaseClasses = "border rounded-lg p-4 transition-colors px-0";
+				const cardInteractiveClasses = "hover:bg-secondary/50 cursor-pointer";
+				const cardActiveClasses = isActive ? "bg-secondary/80" : "";
+				const cardTypeClasses = type === 'ai' ? "border-l-4 border-l-blue-500" : "";
+
+				const handleClick = () => {
+					if (type === 'user' && onHighlightClick) {
+						onHighlightClick(highlight as PaperHighlight);
+					} else if (type === 'ai' && onAIHighlightClick) {
+						onAIHighlightClick(highlight as AIPaperHighlight);
+					}
+				};
+
+				return (
+					<Card
+						key={`${type}-${highlight.id}`}
+						ref={highlight.id ? highlightRefs.current.get(highlight.id) : undefined}
+						className={`${cardBaseClasses} ${cardInteractiveClasses} ${cardActiveClasses} ${cardTypeClasses}`}
+						onClick={handleClick}
+					>
+						<CardContent>
+							<div className="flex items-center gap-2 mb-2">
+								<p className="text-sm font-normal">
+									&ldquo;{highlight.raw_text}&rdquo;
+								</p>
+								{type === 'ai' && (
+									<span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+										AI
+									</span>
+								)}
+							</div>
+							{
+								highlight.id &&
+								highlightAnnotationMap.has(highlight.id) && (
+									<>
+										{
+											highlightAnnotationMap.get(highlight.id)?.map((annotation) => (
+												<AnnotationCard
+													key={annotation.id}
+													annotation={annotation}
+													// Pass down optional functions and readonly status
+													removeAnnotation={removeAnnotation}
+													updateAnnotation={updateAnnotation}
+													readonly={readonly}
 												/>
-											</div>
-										)
-									}
-								</CardContent>
-							</Card>
-						);
-					})}
-				</div>
-			)}
+											))
+										}
+										{
+											highlightAnnotationMap.get(highlight.id)?.length === 0 && <p className="text-sm text-muted-foreground">No annotation yet.</p>
+										}
+									</>
+								)
+							}
+							{/* Only show AnnotationButton for user highlights if not readonly, highlight is active, and addAnnotation is provided */}
+							{
+								highlight.id &&
+								type === 'user' &&
+								activeHighlight?.id === highlight.id &&
+								!readonly &&
+								addAnnotation && (
+									<div className="flex justify-between items-center mt-2 pt-2 border-t">
+										<AnnotationButton
+											highlightId={highlight.id}
+											addAnnotation={addAnnotation}
+										/>
+									</div>
+								)
+							}
+						</CardContent>
+					</Card>
+				);
+			})}
 		</div>
 	);
 }
