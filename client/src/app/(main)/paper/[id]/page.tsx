@@ -209,6 +209,7 @@ export default function PaperView() {
     };
 
     const handleHighlightClick = (highlight: PaperHighlight) => {
+        console.log("normal highlight click callback page.tsx", highlight);
         setActiveHighlight(highlight);
     };
 

@@ -200,7 +200,6 @@ export function PdfViewer(props: PdfViewerProps) {
 
 						if (highlights.length > 0) {
 							const allMatches = findAllHighlightedPassages(highlights);
-							console.log("Found highlight matches:", allMatches.length);
 
 							const handlers = {
 								setIsHighlightInteraction,

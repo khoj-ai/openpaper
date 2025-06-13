@@ -220,13 +220,9 @@ export function AnnotationsView(
 		}
 	}, [activeHighlight]);
 
-	console.log("active ai highlight:", activeAIHighlight);
-
 	useEffect(() => {
-		console.log("Active AI highlight changed (annotations view):", activeAIHighlight);
 		if (activeAIHighlight?.id) {
 			const ref = highlightRefs.current.get(activeAIHighlight.id);
-			console.log("Ref for active AI highlight:", ref);
 			if (ref?.current) {
 				ref.current.scrollIntoView({
 					behavior: 'smooth',
@@ -287,8 +283,6 @@ export function AnnotationsView(
 
 		setSortedHighlights(sorted);
 
-		console.log("Sorted highlights:", sorted);
-
 		const annotationMap = new Map<string, PaperHighlightAnnotation[]>();
 
 		annotations.forEach((annotation) => {
@@ -333,6 +327,7 @@ export function AnnotationsView(
 				const cardTypeClasses = type === 'ai' ? "border-l-4 border-l-blue-500" : "";
 
 				const handleClick = () => {
+					console.log("Clicked highlight:", highlight.id, "Type:", type);
 					if (type === 'user' && onHighlightClick) {
 						onHighlightClick(highlight as PaperHighlight);
 					} else if (type === 'ai' && onAIHighlightClick) {

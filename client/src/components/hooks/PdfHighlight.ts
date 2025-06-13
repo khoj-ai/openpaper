@@ -59,41 +59,89 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
         }
     }, []);
 
+    const scrollToHighlightAndPositionTooltip = (
+        selector: string,
+        setTooltipPosition: (position: { x: number, y: number }) => void
+    ) => {
+        const highlightElement = document.querySelector(selector);
+
+        if (highlightElement) {
+            // Get the scrollable container (usually the document or a specific container)
+            const scrollContainer = highlightElement.closest('.react-pdf__Page') || document.documentElement;
+
+            let timeoutId: NodeJS.Timeout;
+            let hasPositioned = false;
+
+            const positionTooltip = () => {
+                if (hasPositioned) return;
+                hasPositioned = true;
+
+                // Get the element's position after scrolling
+                const rect = highlightElement.getBoundingClientRect();
+
+                // Update tooltip position to be near the highlight
+                setTooltipPosition({
+                    x: rect.right,
+                    y: rect.top + (rect.height / 2)
+                });
+            };
+
+            // Listen for scroll end event (modern browsers)
+            const handleScrollEnd = () => {
+                positionTooltip();
+                scrollContainer.removeEventListener('scrollend', handleScrollEnd);
+                if (timeoutId) clearTimeout(timeoutId);
+            };
+
+            // Add scrollend listener if supported
+            if ('onscrollend' in scrollContainer) {
+                scrollContainer.addEventListener('scrollend', handleScrollEnd, { once: true });
+            }
+
+            // Fallback timeout for browsers that don't support scrollend or if scroll is very quick
+            timeoutId = setTimeout(() => {
+                positionTooltip();
+                scrollContainer.removeEventListener('scrollend', handleScrollEnd);
+            }, 800); // Longer fallback timeout
+
+            // Start the scroll
+            highlightElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    };
+
     useEffect(() => {
         // Scroll to the active highlight.
+        console.log('Active highlight in pdf highlight hook:', activeHighlight);
         if (activeHighlight) {
-            const highlightElement = document.querySelector(
-                `.react-pdf__Page__textContent span[data-highlight-id="${activeHighlight.id}"]`
+            setActiveAIHighlight(null); // Clear AI highlight when a paper highlight is active
+            scrollToHighlightAndPositionTooltip(
+                `.react-pdf__Page__textContent span[data-highlight-id="${activeHighlight.id}"]`,
+                setTooltipPosition
             );
-
-            if (highlightElement) {
-                highlightElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-                // Add a small delay to allow scrolling to complete
-                setTimeout(() => {
-                    // Get the element's position after scrolling
-                    const rect = highlightElement.getBoundingClientRect();
-
-                    // Update tooltip position to be near the highlight
-                    setTooltipPosition({
-                        x: rect.right,
-                        y: rect.top + (rect.height / 2)
-                    });
-                }, 300); // Adjust timeout as needed based on scroll duration
-            }
         }
     }, [activeHighlight]);
 
     useEffect(() => {
-        console.log("IN PDF HIGHLIGHT HOOK: activeAIHighlight:", activeAIHighlight);
+        console.log('Active AI highlight in pdf highlight hook:', activeAIHighlight);
         // Scroll to the active AI highlight.
         if (activeAIHighlight) {
-            console.log("attempt to scroll to AI highlight:", activeAIHighlight);
+            setActiveHighlight(null); // Reset active highlight after scrolling
+            scrollToHighlightAndPositionTooltip(
+                `.react-pdf__Page__textContent span[data-ai-highlight-id="${activeAIHighlight.id}"]`,
+                setTooltipPosition
+            );
+        }
+    }, [activeAIHighlight]);
+
+
+    useEffect(() => {
+        console.log('Active AI highlight in pdf highlight hook:', activeAIHighlight);
+        // Scroll to the active AI highlight.
+        if (activeAIHighlight) {
+            setActiveHighlight(null); // Reset active highlight after scrolling
             const highlightElement = document.querySelector(
                 `.react-pdf__Page__textContent span[data-ai-highlight-id="${activeAIHighlight.id}"]`
             );
-
-            console.log("Found highlight element:", highlightElement);
 
             if (highlightElement) {
                 highlightElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
