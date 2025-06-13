@@ -178,6 +178,9 @@ class Paper(Base):
     publish_date = Column(DateTime, nullable=True)
     starter_questions = Column(ARRAY(String), nullable=True)
     raw_content = Column(Text, nullable=True)
+    page_offset_map = Column(
+        JSONB, nullable=True
+    )  # Maps page numbers to text offsets. Useful for re-annotation.
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     last_accessed_at = Column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
@@ -296,6 +299,24 @@ class Highlight(Base):
     user = relationship("User", back_populates="highlights")
 
 
+class AIHighlight(Base):
+    __tablename__ = "ai_highlights"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    paper_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("papers.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    raw_text = Column(Text, nullable=False)
+
+    start_offset_hint = Column(Integer, nullable=True)
+    end_offset_hint = Column(Integer, nullable=True)
+    page_number = Column(Integer, nullable=True)
+
+
 class Annotation(Base):
     __tablename__ = "annotations"
 
@@ -314,6 +335,23 @@ class Annotation(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
     user = relationship("User", back_populates="annotations")
+
+
+class AIAnnotation(Base):
+    __tablename__ = "ai_annotations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    ai_highlight_id = Column(
+        UUID(as_uuid=True), ForeignKey("ai_highlights.id"), nullable=False
+    )
+
+    paper_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("papers.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    content = Column(Text, nullable=False)
 
 
 class HypothesisJob(Base):

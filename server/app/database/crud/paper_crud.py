@@ -1,16 +1,25 @@
-import os
-import tempfile
+import logging
 import uuid
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import requests
+from app.database.crud.ai_annotation_crud import AIAnnotationCreate, ai_annotation_crud
+from app.database.crud.ai_highlight_crud import AIHighlightCreate, ai_highlight_crud
 from app.database.crud.base_crud import CRUDBase
 from app.database.models import JobStatus, Paper, PaperStatus, PaperUploadJob
-from app.helpers.parser import extract_text_from_pdf
+from app.helpers.parser import (
+    extract_text_from_pdf,
+    get_start_page_from_offset,
+    map_pages_to_text_offsets,
+)
+from app.llm.schemas import PaperMetadataExtraction
+from app.llm.utils import find_offsets
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 
 # Define Pydantic models for type safety
@@ -29,6 +38,8 @@ class PaperBase(BaseModel):
     raw_content: Optional[str] = None
     upload_job_id: Optional[str] = None
     preview_url: Optional[str] = None
+    # We can't save tuples in the db, so we use a list (length 2) to represent page offsets
+    page_offset_map: Optional[dict[int, List[int]]] = None
 
 
 class PaperCreate(PaperBase):
@@ -46,17 +57,22 @@ class PaperUpdate(PaperBase):
     presigned_url_expires_at: Optional[datetime] = None
 
 
+class PaperDocumentMetadata(BaseModel):
+    raw_content: Optional[str] = None
+    page_offsets: Optional[dict[int, Tuple[int, int]]] = None
+
+
 # Paper CRUD that inherits from the base CRUD
 class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
     """CRUD operations specifically for Document model"""
 
-    def read_raw_document_content(
+    def set_raw_document_content(
         self,
         db: Session,
         *,
         paper_id: str,
         current_user: CurrentUser,
-        file_path: Optional[str] = None,
+        file_path: str,
     ) -> str:
         """
         Read raw document content by ID.
@@ -69,43 +85,17 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
         if paper.raw_content:
             return str(paper.raw_content)
 
-        file_url = str(paper.file_url) if file_path is None else file_path
-
         raw_content = ""
-
-        # Handle online files
-        if file_url.startswith("http"):
-            response = requests.get(file_url, stream=True)
-            if response.status_code != 200:
-                raise ValueError(f"Failed to fetch document from {file_url}.")
-
-            # If it's a PDF, download to a temp file and extract text
-            if (
-                file_url.lower().endswith(".pdf")
-                or "content-type" in response.headers
-                and response.headers["content-type"] == "application/pdf"
-            ):
-                with tempfile.NamedTemporaryFile(
-                    delete=False, suffix=".pdf"
-                ) as temp_file:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        temp_file.write(chunk)
-                    temp_file_path = temp_file.name
-
-                try:
-                    raw_content = extract_text_from_pdf(temp_file_path)
-                finally:
-                    os.unlink(temp_file_path)  # Clean up the temp file
-            else:
-                # For non-PDF files, return the text content directly
-                raw_content = response.text
+        offset_map = {}
 
         # Handle local files
-        elif file_url.lower().endswith(".pdf"):
-            raw_content = extract_text_from_pdf(file_url)
+        if file_path.lower().endswith(".pdf"):
+            raw_content = extract_text_from_pdf(file_path)
+            offset_map = map_pages_to_text_offsets(file_path)
+            offset_map = {k: list(v) for k, v in offset_map.items()}
         else:
             # For non-PDF files, read as text
-            with open(file_url, "r", encoding="utf-8", errors="replace") as file:
+            with open(file_path, "r", encoding="utf-8", errors="replace") as file:
                 raw_content = file.read()
 
         self.update(
@@ -113,9 +103,35 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
             db_obj=paper,
             obj_in=PaperUpdate(
                 raw_content=raw_content,
+                page_offset_map=offset_map,
             ),
         )
         return raw_content
+
+    def read_raw_document_content(
+        self,
+        db: Session,
+        *,
+        paper_id: str,
+        current_user: CurrentUser,
+    ) -> PaperDocumentMetadata:
+        """
+        Read raw document content by ID.
+        For PDF files, extract and return the text content.
+        """
+        paper: Paper | None = self.get(db, paper_id, user=current_user)
+        if paper is None:
+            raise ValueError(f"Paper with ID {paper_id} not found.")
+
+        if not paper.raw_content:
+            raise ValueError(f"Raw content for paper {paper_id} is not set.")
+
+        offsets = {k: tuple(v) for k, v in paper.page_offset_map.items()}
+
+        return PaperDocumentMetadata(
+            raw_content=str(paper.raw_content),
+            page_offsets=offsets,
+        )
 
     def get_top_relevant_papers(
         self, db: Session, *, user: CurrentUser, limit: int = 3
@@ -229,6 +245,66 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
             .limit(limit)
             .all()
         )
+
+    def create_ai_annotations(
+        self,
+        db: Session,
+        *,
+        paper_id: str,
+        extract_metadata: PaperMetadataExtraction,
+        current_user: CurrentUser,
+    ):
+        raw_file = self.read_raw_document_content(
+            db, paper_id=paper_id, current_user=current_user
+        )
+
+        if not raw_file.raw_content:
+            raise ValueError(f"Raw content for paper {paper_id} is not set.")
+
+        for ai_highlight in extract_metadata.highlights:
+            offsets = find_offsets(ai_highlight.text, raw_file.raw_content)
+
+            page_number = None
+            if offsets and raw_file.page_offsets:
+                # Get the starting page number from the offsets
+                page_number = get_start_page_from_offset(
+                    raw_file.page_offsets, offsets[0]
+                )
+
+            new_ai_highlight_obj = AIHighlightCreate(
+                paper_id=paper_id,
+                raw_text=ai_highlight.text,
+                start_offset_hint=offsets[0],
+                end_offset_hint=offsets[1],
+                page_number=page_number,
+            )
+
+            n_ai_h = ai_highlight_crud.create(
+                db, obj_in=new_ai_highlight_obj, user=current_user
+            )
+
+            if not n_ai_h:
+                logger.error(
+                    f"Failed to create AI highlights for {paper_id}",
+                    exc_info=True,
+                )
+                continue
+
+            n_annotation_obj = AIAnnotationCreate(
+                paper_id=paper_id,
+                ai_highlight_id=str(n_ai_h.id),
+                content=ai_highlight.annotation,
+            )
+
+            n_ai_annotation = ai_annotation_crud.create(
+                db, obj_in=n_annotation_obj, user=current_user
+            )
+
+            if not n_ai_annotation:
+                logger.error(
+                    f"Failed to create AI annotation for highlight {n_ai_h.id} in {paper_id}",
+                    exc_info=True,
+                )
 
 
 # Create a single instance to use throughout the application

@@ -1,3 +1,4 @@
+import difflib
 import logging
 import os
 import sys
@@ -5,10 +6,12 @@ import tempfile
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
-from typing import Union
+from typing import Tuple, Union
 
 import fitz  # PyMuPDF
 from app.auth.dependencies import get_required_user
+from app.database.crud.ai_annotation_crud import AIAnnotationCreate, ai_annotation_crud
+from app.database.crud.ai_highlight_crud import AIHighlightCreate, ai_highlight_crud
 from app.database.crud.paper_crud import PaperCreate, PaperUpdate, paper_crud
 from app.database.crud.paper_upload_crud import (
     PaperUploadJobCreate,
@@ -19,6 +22,7 @@ from app.database.models import Paper, PaperUploadJob
 from app.database.telemetry import track_event
 from app.helpers.s3 import s3_service
 from app.llm.operations import operations
+from app.llm.schemas import PaperMetadataExtraction
 from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Request, UploadFile
@@ -370,11 +374,13 @@ def create_and_upload_pdf(
 
         # Extract metadata from the temporary file
         try:
-            extract_metadata = operations.extract_paper_metadata(
-                paper_id=str(created_doc.id),
-                user=current_user,
-                file_path=temp_file_path,
-                db=db,
+            extract_metadata: PaperMetadataExtraction = (
+                operations.extract_paper_metadata(
+                    paper_id=str(created_doc.id),
+                    user=current_user,
+                    file_path=temp_file_path,
+                    db=db,
+                )
             )
         except Exception as e:
             logger.error(
@@ -433,6 +439,14 @@ def create_and_upload_pdf(
             )
             raise PaperUploadError(
                 f"Failed to update document with metadata for {safe_filename}"
+            )
+
+        if extract_metadata.highlights:
+            paper_crud.create_ai_annotations(
+                db=db,
+                paper_id=str(created_doc.id),
+                extract_metadata=extract_metadata,
+                current_user=current_user,
             )
 
         # Track paper upload event
@@ -508,6 +522,66 @@ def create_and_upload_pdf(
                 logger.error(
                     f"Failed to delete S3 object: {str(s3_error)}", exc_info=True
                 )
+
+
+def pre_process_pdf(
+    db: Session,
+    pdf_path: str,
+    safe_filename: str,
+    object_key: str,
+    file_url: str,
+    paper_upload_job_id: str,
+    current_user: CurrentUser,
+) -> Paper:
+    """
+    Pre-process the PDF file to ensure it is in a suitable format.
+    This can include removing metadata, optimizing images, etc.
+    """
+    try:
+        # Generate preview image from first page
+        preview_url = None
+        try:
+            preview_object_key, preview_url = generate_pdf_preview(
+                pdf_path, safe_filename
+            )
+            logger.info(f"Generated preview for {safe_filename}: {preview_url}")
+        except Exception as e:
+            logger.warning(f"Failed to generate preview for {safe_filename}: {str(e)}")
+            # Continue without preview - this is not a critical failure
+
+        # Create a new document record in the database with S3 details
+        document = PaperCreate(
+            filename=safe_filename,
+            file_url=file_url,
+            s3_object_key=object_key,
+            upload_job_id=paper_upload_job_id,
+            preview_url=preview_url,
+        )
+
+        created_doc = paper_crud.create(db, obj_in=document, user=current_user)
+        if not created_doc:
+            logger.error(
+                f"Failed to create document record for {safe_filename}", exc_info=True
+            )
+            raise PaperUploadError(
+                f"Failed to create document record for {safe_filename}"
+            )
+
+        return created_doc
+
+    except Exception as e:
+        logger.error(f"Error pre-processing PDF: {str(e)}", exc_info=True)
+
+        try:
+            # Attempt to delete the S3 object if it was uploaded
+            s3_service.delete_file(object_key)
+            # Also delete preview if it was created
+            if preview_object_key:
+                s3_service.delete_file(preview_object_key)
+        except Exception as s3_error:
+            logger.error(f"Failed to delete S3 object: {str(s3_error)}", exc_info=True)
+
+        raise PaperUploadError(f"Error pre-processing PDF: {str(e)}")
 
 
 def generate_pdf_preview(pdf_path: str, filename: str) -> tuple[str, str]:

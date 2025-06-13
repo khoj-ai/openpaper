@@ -3,6 +3,20 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
+class AIHighlight(BaseModel):
+    """
+    Schema for a highlight in the paper.
+    This is used to represent a single highlight with its text and context.
+    """
+
+    text: str = Field(
+        description="The raw text of the highlight as it appears in the paper. Ensure that this is a direct quote or paraphrase from the paper."
+    )
+    annotation: str = Field(
+        description="The context or annotation for the highlight, explaining its significance or relevance to the paper's content. Less than 350 characters."
+    )
+
+
 class PaperMetadataExtraction(BaseModel):
     title: str = Field(description="Title of the paper in normal case")
     authors: List[str] = Field(default=[], description="List of authors")
@@ -41,6 +55,10 @@ The summary should be accessible to readers with basic domain knowledge while ma
         They should help elicit a better understanding of the paper's findings, methodology, and potential applications.
         """,
     )
+    highlights: List[AIHighlight] = Field(
+        default=[],
+        description="List of key highlights from the paper. These should be significant quotes or paraphrases that capture the essence of the paper's findings and contributions. Each highlight should include the text of the highlight and an annotation explaining its significance or relevance to the paper's content.",
+    )
 
 
 class AudioOverviewCitation(BaseModel):
@@ -78,6 +96,11 @@ class HypothesisStep(BaseModel):
     search_terms: List[str] = Field(
         description="List of search terms to use when querying the research API for papers related to this sub-question. Minimum 1 and maximum 3 search terms per step to ensure focused exploration.",
     )
+
+
+################################
+# Hypothesis-related Schemas   #
+################################
 
 
 class HypothesisFanOut(BaseModel):

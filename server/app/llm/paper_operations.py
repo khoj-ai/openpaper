@@ -43,9 +43,9 @@ class PaperOperations(BaseLLMClient):
         self,
         paper_id: str,
         user: CurrentUser,
-        file_path: Optional[str] = None,
+        file_path: str,
         db: Session = Depends(get_db),
-    ):
+    ) -> PaperMetadataExtraction:
         """
         Extract metadata from the paper using the specified model
         """
@@ -55,7 +55,7 @@ class PaperOperations(BaseLLMClient):
             raise ValueError(f"Paper with ID {paper_id} not found.")
 
         # Load and extract raw data from the PDF
-        raw_file = paper_crud.read_raw_document_content(
+        raw_file = paper_crud.set_raw_document_content(
             db, paper_id=paper_id, current_user=user, file_path=file_path
         )
 
@@ -94,6 +94,7 @@ class PaperOperations(BaseLLMClient):
                 "has_authors": bool(metadata.authors),
                 "has_abstract": bool(metadata.abstract),
                 "has_summary": bool(metadata.summary),
+                "has_ai_highlights": bool(metadata.highlights),
                 "num_starter_questions": (
                     len(metadata.starter_questions) if metadata.starter_questions else 0
                 ),
