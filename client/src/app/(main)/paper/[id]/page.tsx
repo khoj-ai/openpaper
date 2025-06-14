@@ -235,6 +235,12 @@ export default function PaperView() {
     }, [rightSideFunction]);
 
     useEffect(() => {
+        if (activeHighlight) {
+            setRightSideFunction('Annotations');
+        }
+    }, [activeHighlight]);
+
+    useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => {
             if (!isDragging) return;
 
@@ -1141,7 +1147,7 @@ export default function PaperView() {
                                                         msg.role === 'user' && user && (
                                                             <Avatar className="h-6 w-6">
                                                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                                {user.picture ? ( <img src={user.picture} alt={user.name} /> ) : ( <User size={16} /> )}
+                                                                {user.picture ? (<img src={user.picture} alt={user.name} />) : (<User size={16} />)}
                                                             </Avatar>
                                                         )
                                                     }
