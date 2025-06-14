@@ -176,6 +176,15 @@ async def create_paper_note(
             detail=f"Failed to create paper note for document ID {paper_id}",
         )
 
+    track_event(
+        "paper_note_created",
+        properties={
+            "paper_id": str(paper_note.paper_id),
+            "note_id": str(paper_note.id),
+        },
+        user_id=str(current_user.id) if current_user else None,
+    )
+
     return JSONResponse(content=paper_note.to_dict(), status_code=201)
 
 
@@ -204,6 +213,15 @@ async def set_paper_status(
             status_code=500,
             detail=f"Failed to update paper status for document ID {paper_id}",
         )
+
+    track_event(
+        "paper_status_updated",
+        properties={
+            "paper_id": str(updated_paper.id),
+            "status": updated_paper.status,
+        },
+        user_id=str(current_user.id),
+    )
 
     return JSONResponse(content=updated_paper.to_dict(), status_code=200)
 
@@ -284,6 +302,20 @@ async def update_paper_note(
             status_code=500,
             detail=f"Failed to update paper note for document ID {paper_id}",
         )
+
+    track_event(
+        "paper_note_updated",
+        properties={
+            "paper_id": str(updated_paper_note.paper_id),
+            "note_id": str(updated_paper_note.id),
+            "content_length": (
+                len(str(updated_paper_note.content))
+                if updated_paper_note.content
+                else 0
+            ),
+        },
+        user_id=str(current_user.id) if current_user else None,
+    )
 
     return JSONResponse(content=updated_paper_note.to_dict(), status_code=200)
 
@@ -416,6 +448,15 @@ async def unshare_pdf(
         return JSONResponse(status_code=404, content={"message": "Document not found"})
 
     paper_crud.make_private(db, paper_id=id, user=current_user)
+
+    track_event(
+        "paper_unshare",
+        properties={
+            "paper_id": str(paper.id),
+            "share_id": paper.share_id,
+        },
+        user_id=str(current_user.id),
+    )
 
     # Return the generated share id
     return JSONResponse(
