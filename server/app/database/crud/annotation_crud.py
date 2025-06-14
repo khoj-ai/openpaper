@@ -12,6 +12,7 @@ class AnnotationBase(BaseModel):
     paper_id: UUID
     highlight_id: UUID
     content: Optional[str] = None
+    role: Optional[str] = None
 
 
 class AnnotationCreate(AnnotationBase):

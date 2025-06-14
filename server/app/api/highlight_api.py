@@ -9,6 +9,7 @@ from app.database.crud.highlight_crud import (
     highlight_crud,
 )
 from app.database.database import get_db
+from app.database.models import RoleType
 from app.database.telemetry import track_event
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends
@@ -50,6 +51,7 @@ async def create_highlight(
                 raw_text=request.raw_text,
                 start_offset=request.start_offset,
                 end_offset=request.end_offset,
+                role=RoleType.USER,
             ),
             user=current_user,
         )
@@ -110,6 +112,12 @@ async def delete_highlight(
                 content={"message": f"Highlight with ID {highlight_id} not found."},
             )
 
+        if existing_highlight.role == RoleType.ASSISTANT:
+            return JSONResponse(
+                status_code=403,
+                content={"message": "Cannot delete assistant highlights."},
+            )
+
         highlight_crud.remove(db, id=highlight_id)
         return JSONResponse(
             status_code=200,
@@ -137,6 +145,12 @@ async def update_highlight(
         existing_highlight = highlight_crud.get(db, id=highlight_id, user=current_user)
         if not existing_highlight:
             raise ValueError(f"Highlight with ID {highlight_id} not found.")
+
+        if existing_highlight.role == RoleType.ASSISTANT:
+            return JSONResponse(
+                status_code=403,
+                content={"message": "Cannot update assistant highlights."},
+            )
 
         highlight = highlight_crud.update(
             db,

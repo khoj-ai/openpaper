@@ -10,8 +10,6 @@ from typing import Tuple, Union
 
 import fitz  # PyMuPDF
 from app.auth.dependencies import get_required_user
-from app.database.crud.ai_annotation_crud import AIAnnotationCreate, ai_annotation_crud
-from app.database.crud.ai_highlight_crud import AIHighlightCreate, ai_highlight_crud
 from app.database.crud.paper_crud import PaperCreate, PaperUpdate, paper_crud
 from app.database.crud.paper_upload_crud import (
     PaperUploadJobCreate,

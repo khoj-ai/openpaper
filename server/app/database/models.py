@@ -137,6 +137,11 @@ class JobStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+class RoleType(str, Enum):
+    USER = "user"
+    ASSISTANT = "assistant"
+
+
 class PaperUploadJob(Base):
     __tablename__ = "paper_upload_jobs"
 
@@ -284,74 +289,51 @@ class Highlight(Base):
     __tablename__ = "highlights"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-
     paper_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("papers.id", ondelete="CASCADE"),
-        nullable=False,
+        UUID(as_uuid=True), ForeignKey("papers.id", ondelete="CASCADE"), nullable=False
     )
-
     raw_text = Column(Text, nullable=False)
-    start_offset = Column(Integer, nullable=False)
-    end_offset = Column(Integer, nullable=False)
+
+    # Position (exact for user, hints for AI)
+    start_offset = Column(Integer, nullable=True)
+    end_offset = Column(Integer, nullable=True)
+    page_number = Column(Integer, nullable=True)
+
+    # Role
+    # This can be user for user-created highlights or assistant for AI-generated highlights
+    role = Column(String, nullable=False, default="user")  # 'user' or 'assistant'
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
+    # Relationships
     user = relationship("User", back_populates="highlights")
-
-
-class AIHighlight(Base):
-    __tablename__ = "ai_highlights"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-
-    paper_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("papers.id", ondelete="CASCADE"),
-        nullable=False,
+    annotations = relationship(
+        "Annotation", back_populates="highlight", cascade="all, delete-orphan"
     )
-
-    raw_text = Column(Text, nullable=False)
-
-    start_offset_hint = Column(Integer, nullable=True)
-    end_offset_hint = Column(Integer, nullable=True)
-    page_number = Column(Integer, nullable=True)
 
 
 class Annotation(Base):
     __tablename__ = "annotations"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    # The associated highlight
     highlight_id = Column(
         UUID(as_uuid=True), ForeignKey("highlights.id"), nullable=False
     )
 
+    # The associated paper
     paper_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("papers.id", ondelete="CASCADE"),
-        nullable=False,
+        UUID(as_uuid=True), ForeignKey("papers.id", ondelete="CASCADE"), nullable=False
     )
-
     content = Column(Text, nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
+    # Role tracking
+    role = Column(String, nullable=False, default="user")  # 'user' or 'assistant'
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+
+    # Relationships
     user = relationship("User", back_populates="annotations")
-
-
-class AIAnnotation(Base):
-    __tablename__ = "ai_annotations"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    ai_highlight_id = Column(
-        UUID(as_uuid=True), ForeignKey("ai_highlights.id"), nullable=False
-    )
-
-    paper_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("papers.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-
-    content = Column(Text, nullable=False)
+    highlight = relationship("Highlight", back_populates="annotations")
 
 
 class HypothesisJob(Base):

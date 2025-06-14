@@ -8,6 +8,7 @@ from app.database.crud.annotation_crud import (
     annotation_crud,
 )
 from app.database.database import get_db
+from app.database.models import RoleType
 from app.database.telemetry import track_event
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends
@@ -45,6 +46,7 @@ async def create_annotation(
                 paper_id=uuid.UUID(request.paper_id),
                 highlight_id=uuid.UUID(request.highlight_id),
                 content=request.content,
+                role=RoleType.USER,
             ),
             user=current_user,
         )
@@ -111,6 +113,12 @@ async def delete_annotation(
                 content={"message": f"Annotation with ID {annotation_id} not found."},
             )
 
+        if existing_annotation.role == RoleType.ASSISTANT:
+            return JSONResponse(
+                status_code=403,
+                content={"message": "Cannot delete assistant annotations."},
+            )
+
         annotation_crud.remove(db, id=annotation_id, user=current_user)
         return JSONResponse(
             status_code=200,
@@ -140,6 +148,12 @@ async def update_annotation(
         )
         if not existing_annotation:
             raise ValueError(f"Annotation with ID {annotation_id} not found.")
+
+        if existing_annotation.role == RoleType.ASSISTANT:
+            return JSONResponse(
+                status_code=403,
+                content={"message": "Cannot update assistant annotations."},
+            )
 
         annotation = annotation_crud.update(
             db,

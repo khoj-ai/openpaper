@@ -4,10 +4,10 @@ from datetime import datetime
 from typing import List, Optional, Tuple
 
 import requests
-from app.database.crud.ai_annotation_crud import AIAnnotationCreate, ai_annotation_crud
-from app.database.crud.ai_highlight_crud import AIHighlightCreate, ai_highlight_crud
+from app.database.crud.annotation_crud import AnnotationCreate, annotation_crud
 from app.database.crud.base_crud import CRUDBase
-from app.database.models import JobStatus, Paper, PaperStatus, PaperUploadJob
+from app.database.crud.highlight_crud import HighlightCreate, highlight_crud
+from app.database.models import JobStatus, Paper, PaperStatus, PaperUploadJob, RoleType
 from app.helpers.parser import (
     extract_text_from_pdf,
     get_start_page_from_offset,
@@ -271,15 +271,16 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
                     raw_file.page_offsets, offsets[0]
                 )
 
-            new_ai_highlight_obj = AIHighlightCreate(
-                paper_id=paper_id,
+            new_ai_highlight_obj = HighlightCreate(
+                paper_id=uuid.UUID(paper_id),
                 raw_text=ai_highlight.text,
-                start_offset_hint=offsets[0],
-                end_offset_hint=offsets[1],
+                start_offset=offsets[0],
+                end_offset=offsets[1],
                 page_number=page_number,
+                role=RoleType.ASSISTANT,
             )
 
-            n_ai_h = ai_highlight_crud.create(
+            n_ai_h = highlight_crud.create(
                 db, obj_in=new_ai_highlight_obj, user=current_user
             )
 
@@ -290,13 +291,14 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
                 )
                 continue
 
-            n_annotation_obj = AIAnnotationCreate(
-                paper_id=paper_id,
-                ai_highlight_id=str(n_ai_h.id),
+            n_annotation_obj = AnnotationCreate(
+                paper_id=uuid.UUID(paper_id),
+                highlight_id=n_ai_h.id,  # type: ignore
+                role=RoleType.ASSISTANT,
                 content=ai_highlight.annotation,
             )
 
-            n_ai_annotation = ai_annotation_crud.create(
+            n_ai_annotation = annotation_crud.create(
                 db, obj_in=n_annotation_obj, user=current_user
             )
 

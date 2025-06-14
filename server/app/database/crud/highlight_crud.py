@@ -13,6 +13,8 @@ class HighlightBase(BaseModel):
     raw_text: Optional[str] = None
     start_offset: Optional[int] = None
     end_offset: Optional[int] = None
+    page_number: Optional[int] = None
+    role: Optional[str] = None
 
 
 class HighlightCreate(HighlightBase):
