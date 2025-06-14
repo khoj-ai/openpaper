@@ -73,7 +73,6 @@ export default function GraphOverview({ paper_title }: GraphOverviewProps) {
             );
 
             setMatchResponse(response);
-            console.log("Match response:", response);
         } catch (error) {
             console.error("Match failed:", error);
             setError("Failed to match paper. Please try again.");

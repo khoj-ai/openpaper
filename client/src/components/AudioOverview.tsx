@@ -221,7 +221,6 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                 setAllAudioOverviews((prevOverviews) => {
                     // Check if overview already exists using the latest state
                     if (!prevOverviews.some(overview => overview.id === response.id)) {
-                        console.log('Adding new audio overview to allAudioOverviews:', response.id);
                         return [...prevOverviews, response];
                     }
                     return prevOverviews; // Return unchanged if already exists
@@ -241,7 +240,6 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
         try {
             const response: JobStatus = await fetchFromApi(`/api/paper/audio/${paper_id}/status`);
             if (response.job_id && response.status) {
-                console.log('Polling job status:', audioOverviewJobId);
                 setJobStatus(response);
                 // If the job is completed, fetch the audio overview
                 if (response.status === 'completed') {
@@ -257,7 +255,6 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
     }, [paper_id, fetchAudioOverview]);
 
     const handleCitationClick = (citationKey: string, messageIndex: number) => {
-        console.log('Citation clicked:', citationKey, messageIndex);
         const citationIndex = parseInt(citationKey);
         // Look up the citations terms from the citationKey
         const citationMatch = audioOverview?.citations.find(c => c.index === citationIndex);
@@ -265,7 +262,6 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
     };
 
     const handleCitationClickFromTranscript = (citationKey: string, messageIndex: number) => {
-        console.log('Citation clicked from transcript:', citationKey, messageIndex);
         const citationIndex = parseInt(citationKey);
         // Look up the citations terms from the citationKey
         const citationMatch = audioOverview?.citations.find(c => c.index === citationIndex);
@@ -365,10 +361,6 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
             default: return 'text-gray-600';
         }
     };
-
-    console.log('audio overview:', audioOverview);
-    console.log('job status:', jobStatus);
-    console.log('show generation form:', showGenerationForm);
 
     return (
         <div className="rounded-lg py-2 h-full w-full">
