@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from './ui/card';
 import { useAuth, User } from "@/lib/auth";
-import { Annotation } from './Annotation';
+import Annotation from './Annotation';
 
 export interface AnnotationButtonProps {
 	highlightId: string;
@@ -37,7 +37,7 @@ export function AnnotationButton({ highlightId, addAnnotation }: AnnotationButto
 	if (!addAnnotation) return null;
 
 	return (
-		<div className="mt-1 pt-1 border-t border-gray-100">
+		<div className="mt-1">
 			<Textarea
 				value={content}
 				onChange={(e) => {
@@ -114,8 +114,8 @@ function HighlightThread({
 			<CardContent className="p-0">
 				{/* The Blockquote */}
 				<blockquote className={`border-l-4 ${highlightBorderColor} pl-4 py-2 mb-4 bg-background`}>
-					<p className="italic text-gray-600">
-						"{highlight.raw_text}"
+					<p className="text-foreground">
+						{highlight.raw_text}
 					</p>
 				</blockquote>
 
@@ -135,7 +135,7 @@ function HighlightThread({
 
 				{/* Add Annotation Form */}
 				{isActive && !readonly && addAnnotation && highlight.id && (
-					<div className="mt-4 pt-4 border-t border-gray-200">
+					<div className="pt-2 pl-2">
 						<AnnotationButton
 							highlightId={highlight.id}
 							addAnnotation={addAnnotation}
