@@ -3,6 +3,7 @@ from uuid import UUID
 
 from app.database.crud.base_crud import CRUDBase
 from app.database.models import AIAnnotation, Paper
+from app.schemas.user import CurrentUser
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -24,11 +25,14 @@ class AIAnnotationUpdate(AIAnnotationBase):
 class AIAnnotationCrud(CRUDBase[AIAnnotation, AIAnnotationCreate, AIAnnotationUpdate]):
     """CRUD operations specifically for AIAnnotation model"""
 
-    def get_ai_annotations_by_paper_id(self, db: Session, *, paper_id: UUID):
+    def get_ai_annotations_by_paper_id(
+        self, db: Session, *, paper_id: UUID, user: CurrentUser
+    ):
         """Get AI annotations associated with document"""
         return (
             db.query(AIAnnotation)
-            .filter(AIAnnotation.paper_id == paper_id)
+            .join(Paper, AIAnnotation.paper_id == Paper.id)
+            .filter(AIAnnotation.paper_id == str(paper_id), Paper.user_id == user.id)
             .order_by(AIAnnotation.id)
             .all()
         )

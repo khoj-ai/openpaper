@@ -2,6 +2,7 @@ import logging
 import os
 
 import uvicorn  # type: ignore
+from app.api.ai_annotation_api import ai_annotation_router
 from app.api.ai_highlight_api import ai_highlight_router
 from app.api.annotation_api import annotation_router
 from app.api.api import router
@@ -58,6 +59,7 @@ app.include_router(paper_search_router, prefix="/api/paper_search")
 app.include_router(paper_audio_router, prefix="/api/paper/audio")
 app.include_router(paper_upload_router, prefix="/api/paper/upload")
 app.include_router(ai_highlight_router, prefix="/api/ai_highlight")
+app.include_router(ai_annotation_router, prefix="/api/ai_annotation")
 
 setup_admin(app)  # Setup admin interface
 
