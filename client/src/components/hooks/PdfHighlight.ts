@@ -72,6 +72,7 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
             // Get the scrollable container (usually the document or a specific container)
             const scrollContainer = highlightElement.closest('.react-pdf__Page') || document.documentElement;
 
+            // eslint-disable-next-line prefer-const
             let timeoutId: NodeJS.Timeout;
             let hasPositioned = false;
 
@@ -193,6 +194,7 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
         }
 
         // Construct the payload, and emit the 'highlight.role' field from the final payload, if it's provided.
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { role, ...highlightWithoutRole } = highlight;
 
         const payload = {

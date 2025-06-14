@@ -139,6 +139,7 @@ export default function Annotation({
                             <Bot size={16} className="text-white" />
                         ) : user?.picture ? (
                             <Avatar className="h-8 w-8">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img src={user.picture} alt={user.name} className="w-full h-full object-cover" />
                             </Avatar>
                         ) : (

@@ -69,14 +69,6 @@ export function AnnotationButton({ highlightId, addAnnotation }: AnnotationButto
 	);
 }
 
-interface AnnotationCardProps {
-	annotation: PaperHighlightAnnotation;
-	removeAnnotation?: (annotationId: string) => void;
-	updateAnnotation?: (annotationId: string, content: string) => void;
-	user?: User;
-	readonly?: boolean;
-}
-
 interface HighlightThreadProps {
 	highlight: PaperHighlight;
 	annotations: PaperHighlightAnnotation[];

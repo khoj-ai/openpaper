@@ -148,6 +148,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
 
     const checkExistingAudioOverview = async () => {
         try {
+            console.debug(`Job ID: ${audioOverviewJobId}, Paper ID: ${paper_id}`);
             const response: AudioOverview | null = await fetchFromApi(`/api/paper/audio/${paper_id}/file`);
             if (response) {
                 setAudioOverview(response);
@@ -256,6 +257,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
 
     const handleCitationClick = (citationKey: string, messageIndex: number) => {
         const citationIndex = parseInt(citationKey);
+        console.debug(`Index: ${citationIndex}, Message Index: ${messageIndex}`);
         // Look up the citations terms from the citationKey
         const citationMatch = audioOverview?.citations.find(c => c.index === citationIndex);
         setExplicitSearchTerm(citationMatch ? citationMatch.text : citationKey);
@@ -263,6 +265,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
 
     const handleCitationClickFromTranscript = (citationKey: string, messageIndex: number) => {
         const citationIndex = parseInt(citationKey);
+        console.debug(`Index: ${citationIndex}, Message Index: ${messageIndex}`);
         // Look up the citations terms from the citationKey
         const citationMatch = audioOverview?.citations.find(c => c.index === citationIndex);
         setExplicitSearchTerm(citationMatch ? citationMatch.text : citationKey);
