@@ -1,4 +1,4 @@
-import { AIPaperHighlight } from "@/lib/schema";
+import { PaperHighlight } from "@/lib/schema";
 
 export const getMatchingNodesInPdf = (searchTerm: string) => {
     const results: Array<{ pageIndex: number; matchIndex: number; nodes: Element[] }> = [];
@@ -98,7 +98,7 @@ function prepareTextForFuzzyMatch(text: string): string {
         .trim();
 }
 
-export function tryDirectOffsetMatch(sourceHighlight: AIPaperHighlight): Element[] {
+export function tryDirectOffsetMatch(sourceHighlight: PaperHighlight): Element[] {
     // Try to use the offset hints as if they were exact offsets
     const textLayers = document.querySelectorAll('.react-pdf__Page__textContent');
     if (textLayers.length === 0) return [];
@@ -128,12 +128,17 @@ export function tryDirectOffsetMatch(sourceHighlight: AIPaperHighlight): Element
     }
 
     // Find overlapping nodes using the hint offsets
-    const { start_offset_hint, end_offset_hint } = sourceHighlight;
+    const { start_offset, end_offset } = sourceHighlight;
+    if (start_offset === undefined || end_offset === undefined) {
+        console.warn("Source highlight does not have valid offsets.");
+        return [];
+    }
+
     const overlappingNodes = textNodes.filter(node =>
-        (node.start <= start_offset_hint && node.end > start_offset_hint) ||
-        (node.start >= start_offset_hint && node.end <= end_offset_hint) ||
-        (node.start < end_offset_hint && node.end >= end_offset_hint) ||
-        (start_offset_hint <= node.start && end_offset_hint >= node.end)
+        (node.start <= start_offset && node.end > start_offset) ||
+        (node.start >= start_offset && node.end <= end_offset) ||
+        (node.start < end_offset && node.end >= end_offset) ||
+        (start_offset <= node.start && end_offset >= node.end)
     );
 
     // Convert to elements and verify the text content roughly matches
@@ -166,10 +171,6 @@ export const getFuzzyMatchingNodesInPdf = (originalTerm: string) => {
     const fullSearchTermLower = fuzzySearchTerm.toLowerCase();
 
     const textLayers = document.querySelectorAll('.react-pdf__Page__textContent');
-
-    console.log("original search term:", originalTerm);
-    console.log("search seed:", searchSeed);
-    console.log("fuzzy search term:", fuzzySearchTerm);
 
     textLayers.forEach((layer, pageIndex) => {
         const textNodes = Array.from(layer.querySelectorAll('span'));

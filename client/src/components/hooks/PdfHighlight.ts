@@ -1,29 +1,29 @@
 import { useState, useEffect } from 'react';
 import {
-    AIPaperHighlight,
     PaperHighlight,
 } from '@/lib/schema';
 
 import { getSelectionOffsets } from '../utils/PdfTextUtils';
-import { addHighlightToNodes, findAllHighlightedPassages } from '../utils/PdfHighlightUtils';
+import { addAIHighlightToNodes, addHighlightToNodes, findAllHighlightedPassages } from '../utils/PdfHighlightUtils';
 import { fetchFromApi } from '@/lib/api';
 
 export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHighlight> = []) {
     const [highlights, setHighlights] = useState<Array<PaperHighlight>>([]);
-    const [aiHighlights, setAIHighlights] = useState<Array<AIPaperHighlight>>([]);
     const [selectedText, setSelectedText] = useState<string>("");
     const [tooltipPosition, setTooltipPosition] = useState<{ x: number, y: number } | null>(null);
     const [isAnnotating, setIsAnnotating] = useState(false);
     const [isHighlightInteraction, setIsHighlightInteraction] = useState(false);
     const [activeHighlight, setActiveHighlight] = useState<PaperHighlight | null>(null);
-    const [activeAIHighlight, setActiveAIHighlight] = useState<AIPaperHighlight | null>(null);
 
     const highlightsStorageName = `highlights-${paperId}`;
 
     // Apply highlights whenever they change
     useEffect(() => {
         if (highlights.length > 0) {
-            const allMatches = findAllHighlightedPassages(highlights);
+            const userHighlights = highlights.filter(h => h.role === 'user');
+            const aiHighlights = highlights.filter(h => h.role === 'assistant');
+
+            const allMatches = findAllHighlightedPassages(userHighlights);
 
             const handlers = {
                 setIsHighlightInteraction,
@@ -35,6 +35,10 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
 
             for (const match of allMatches) {
                 addHighlightToNodes(match.nodes, match.sourceHighlight, handlers);
+            }
+
+            for (const aiHighlight of aiHighlights || []) {
+                addAIHighlightToNodes(aiHighlight, handlers);
             }
         } else {
             // Clear all highlights if none are present
@@ -55,7 +59,6 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
         }
         else {
             loadHighlights();
-            loadAIHighlights();
         }
     }, []);
 
@@ -111,55 +114,13 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
 
     useEffect(() => {
         // Scroll to the active highlight.
-        console.log('Active highlight in pdf highlight hook:', activeHighlight);
         if (activeHighlight) {
-            setActiveAIHighlight(null); // Clear AI highlight when a paper highlight is active
             scrollToHighlightAndPositionTooltip(
                 `.react-pdf__Page__textContent span[data-highlight-id="${activeHighlight.id}"]`,
                 setTooltipPosition
             );
         }
     }, [activeHighlight]);
-
-    useEffect(() => {
-        console.log('Active AI highlight in pdf highlight hook:', activeAIHighlight);
-        // Scroll to the active AI highlight.
-        if (activeAIHighlight) {
-            setActiveHighlight(null); // Reset active highlight after scrolling
-            scrollToHighlightAndPositionTooltip(
-                `.react-pdf__Page__textContent span[data-ai-highlight-id="${activeAIHighlight.id}"]`,
-                setTooltipPosition
-            );
-        }
-    }, [activeAIHighlight]);
-
-
-    useEffect(() => {
-        console.log('Active AI highlight in pdf highlight hook:', activeAIHighlight);
-        // Scroll to the active AI highlight.
-        if (activeAIHighlight) {
-            setActiveHighlight(null); // Reset active highlight after scrolling
-            const highlightElement = document.querySelector(
-                `.react-pdf__Page__textContent span[data-ai-highlight-id="${activeAIHighlight.id}"]`
-            );
-
-            if (highlightElement) {
-                highlightElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-                // Add a small delay to allow scrolling to complete
-                setTimeout(() => {
-                    // Get the element's position after scrolling
-                    const rect = highlightElement.getBoundingClientRect();
-
-                    // Update tooltip position to be near the highlight
-                    setTooltipPosition({
-                        x: rect.right,
-                        y: rect.top + (rect.height / 2)
-                    });
-                }, 300); // Adjust timeout as needed based on scroll duration
-            }
-        }
-    }, [activeAIHighlight]);
 
     const removeHighlight = (highlight: PaperHighlight) => {
         removeHighlightFromServer(highlight);
@@ -231,8 +192,11 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
             return;
         }
 
+        // Construct the payload, and emit the 'highlight.role' field from the final payload, if it's provided.
+        const { role, ...highlightWithoutRole } = highlight;
+
         const payload = {
-            ...highlight,
+            ...highlightWithoutRole,
             paper_id: paperId
         }
 
@@ -304,40 +268,6 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
         }
     }
 
-    const loadAIHighlights = async () => {
-        try {
-            const data: AIPaperHighlight[] = await fetchFromApi(`/api/ai_highlight/${paperId}`, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                }
-            });
-
-            // Check if highlights have the required fields
-            const validHighlights: AIPaperHighlight[] = data.filter(
-                (h: AIPaperHighlight) => h.raw_text &&
-                    typeof h.start_offset_hint === 'number' &&
-                    typeof h.end_offset_hint === 'number'
-            );
-
-            const deduplicatedHighlights = validHighlights.filter((highlight, index, self) =>
-                index === self.findIndex(h =>
-                    h.raw_text === highlight.raw_text &&
-                    h.start_offset_hint === highlight.start_offset_hint &&
-                    h.end_offset_hint === highlight.end_offset_hint
-                )
-            );
-
-            console.log('AI Highlights:', deduplicatedHighlights);
-
-            setAIHighlights(deduplicatedHighlights);
-        }
-        catch (error) {
-            console.error('Error loading AI highlights from server:', error);
-        }
-    }
-
     // Helper function to normalize selected text
     const normalizeSelectedText = (text: string): string => {
         // 1. Identify and preserve paragraph breaks
@@ -383,6 +313,7 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
                 raw_text: selectedText,
                 start_offset: offsets.start,
                 end_offset: offsets.end,
+                role: 'user',
             });
 
             const updatedHighlights = [...highlights, newHighlight];
@@ -412,14 +343,10 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
         setIsHighlightInteraction,
         activeHighlight,
         setActiveHighlight,
-        activeAIHighlight,
-        setActiveAIHighlight,
         handleTextSelection,
         clearHighlights,
         addHighlight,
         removeHighlight,
         loadHighlights,
-        aiHighlights,
-        loadAIHighlights,
     };
 }

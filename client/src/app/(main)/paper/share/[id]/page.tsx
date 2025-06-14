@@ -28,8 +28,6 @@ export default function SharedPaperView() {
     const {
         activeHighlight,
         setActiveHighlight,
-        activeAIHighlight,
-        setActiveAIHighlight,
     } = useHighlights(shareId);
 
     useEffect(() => {
@@ -65,9 +63,6 @@ export default function SharedPaperView() {
     const handleHighlightClick = (highlight: PaperHighlight) => {
         // Allow clicking highlights to potentially scroll/focus, but no editing
         setActiveHighlight(highlight);
-        // You might want to implement scrolling the PDF viewer to the highlight here
-        // This depends on how PdfViewer handles focusing on specific highlights
-        console.log("Clicked highlight (read-only):", highlight.id);
     };
 
     if (loading) {
@@ -92,7 +87,6 @@ export default function SharedPaperView() {
                             pdfUrl={paperData.file_url}
                             highlights={highlights}
                             activeHighlight={activeHighlight}
-                            activeAIHighlight={activeAIHighlight}
                             // Pass empty/dummy handlers or flags to disable interactions
                             // Assuming PdfViewer can operate read-only without these handlers
                             setUserMessageReferences={() => { }}
@@ -104,7 +98,6 @@ export default function SharedPaperView() {
                             setHighlights={() => { }}
                             selectedText={''}
                             tooltipPosition={null}
-                            setActiveAIHighlight={setActiveAIHighlight} // Allow setting active AI highlight for viewing
                             setActiveHighlight={setActiveHighlight} // Allow setting active for viewing
                             addHighlight={async () => { throw new Error("Read-only"); }}
                             loadHighlights={async () => { }} // Load is done initially

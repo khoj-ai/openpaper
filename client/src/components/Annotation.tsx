@@ -7,7 +7,7 @@ import { PaperHighlightAnnotation } from '@/lib/schema';
 import { User } from '@/lib/auth';
 
 interface AnnotationProps {
-    annotation: PaperHighlightAnnotation & { type: 'user' | 'ai' };
+    annotation: PaperHighlightAnnotation;
     user?: User;
     removeAnnotation?: (annotationId: string) => void;
     updateAnnotation?: (annotationId: string, content: string) => void;
@@ -17,7 +17,7 @@ interface AnnotationProps {
 export function Annotation({ annotation, user, removeAnnotation, updateAnnotation, readonly = false }: AnnotationProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [editedContent, setEditedContent] = useState(annotation.content);
-    const isAI = annotation.type === 'ai';
+    const isAI = annotation.role === 'assistant';
 
     const handleSave = async (e: React.MouseEvent) => {
         e.stopPropagation();

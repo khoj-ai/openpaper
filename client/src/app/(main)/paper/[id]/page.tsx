@@ -77,8 +77,8 @@ import {
     PaperHighlight,
     Reference,
     ResponseStyle,
-    AIPaperHighlight,
 } from '@/lib/schema';
+
 import { Input } from '@/components/ui/input';
 import { AudioOverview } from '@/components/AudioOverview';
 import { PaperStatus, PaperStatusEnum } from '@/components/utils/PdfStatus';
@@ -121,7 +121,6 @@ export default function PaperView() {
     const [isLoadingMoreMessages, setIsLoadingMoreMessages] = useState(false);
     const [hasMoreMessages, setHasMoreMessages] = useState(true);
     const {
-        aiHighlights,
         highlights,
         setHighlights,
         selectedText,
@@ -133,9 +132,7 @@ export default function PaperView() {
         isHighlightInteraction,
         setIsHighlightInteraction,
         activeHighlight,
-        activeAIHighlight,
         setActiveHighlight,
-        setActiveAIHighlight,
         handleTextSelection,
         addHighlight,
         removeHighlight,
@@ -144,7 +141,6 @@ export default function PaperView() {
 
     const {
         annotations,
-        aiAnnotations,
         addAnnotation,
         removeAnnotation,
         updateAnnotation,
@@ -210,14 +206,8 @@ export default function PaperView() {
     };
 
     const handleHighlightClick = (highlight: PaperHighlight) => {
-        console.log("normal highlight click callback page.tsx", highlight);
         setActiveHighlight(highlight);
     };
-
-    const handleAIHighlightClick = (highlight: AIPaperHighlight) => {
-        console.log("AI Highlight clicked:", highlight);
-        setActiveAIHighlight(highlight);
-    }
 
     useEffect(() => {
         if (userMessageReferences.length == 0) return;
@@ -851,14 +841,11 @@ export default function PaperView() {
                                 setIsHighlightInteraction={setIsHighlightInteraction}
                                 isHighlightInteraction={isHighlightInteraction}
                                 highlights={highlights}
-                                aiHighlights={aiHighlights}
                                 setHighlights={setHighlights}
                                 selectedText={selectedText}
                                 tooltipPosition={tooltipPosition}
                                 setActiveHighlight={setActiveHighlight}
-                                setActiveAIHighlight={setActiveAIHighlight}
                                 activeHighlight={activeHighlight}
-                                activeAIHighlight={activeAIHighlight}
                                 addHighlight={addHighlight}
                                 loadHighlights={loadHighlights}
                                 removeHighlight={removeHighlight}
@@ -976,14 +963,10 @@ export default function PaperView() {
                                 <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto">
                                     <AnnotationsView
                                         annotations={annotations}
-                                        aiAnnotations={aiAnnotations}
                                         highlights={highlights}
-                                        aiHighlights={aiHighlights}
                                         onHighlightClick={handleHighlightClick}
-                                        onAIHighlightClick={handleAIHighlightClick}
                                         addAnnotation={addAnnotation}
                                         activeHighlight={activeHighlight}
-                                        activeAIHighlight={activeAIHighlight}
                                         updateAnnotation={updateAnnotation}
                                         removeAnnotation={removeAnnotation}
                                     />

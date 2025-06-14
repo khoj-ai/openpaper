@@ -1,5 +1,4 @@
 import {
-    AIPaperHighlight,
     PaperHighlight,
 } from '@/lib/schema';
 import { getFuzzyMatchingNodesInPdf, tryDirectOffsetMatch } from './PdfTextUtils';
@@ -45,13 +44,17 @@ export function findAllHighlightedPassages(highlights: PaperHighlight[]) {
         }
     }
 
-    console.log(`Found ${textNodes.length} text nodes across ${textLayers.length} pages, total text length: ${currentOffset}`);
-
     // For each highlight, find nodes that overlap with the offsets
     for (const highlight of highlights) {
         const { start_offset, end_offset } = highlight;
 
-        console.log(`Finding matches for highlight: "${highlight.raw_text.substring(0, 30)}..." (${start_offset}-${end_offset})`);
+        if (start_offset === undefined || end_offset === undefined) {
+            continue;
+        }
+
+        if (start_offset < 0 || end_offset < 0 || start_offset >= end_offset) {
+            continue;
+        }
 
         // Find all nodes that overlap with this highlight range
         const overlappingNodes = textNodes.filter(node =>
@@ -60,8 +63,6 @@ export function findAllHighlightedPassages(highlights: PaperHighlight[]) {
             (node.start < end_offset && node.end >= end_offset) ||     // Node contains highlight end
             (start_offset <= node.start && end_offset >= node.end)     // Highlight fully contains node
         );
-
-        console.log(`Found ${overlappingNodes.length} overlapping nodes`);
 
         if (overlappingNodes.length > 0) {
             // Convert Node objects to Element objects (their parents)
@@ -85,24 +86,23 @@ export function findAllHighlightedPassages(highlights: PaperHighlight[]) {
 }
 
 export function addAIHighlightToNodes(
-    sourceHighlight: AIPaperHighlight,
+    sourceHighlight: PaperHighlight,
     handlers: {
         setIsHighlightInteraction: (value: boolean) => void;
         setSelectedText: (text: string) => void;
         setTooltipPosition: (position: { x: number; y: number } | null) => void;
         setIsAnnotating: (value: boolean) => void;
-        setActiveAIHighlight: (highlight: AIPaperHighlight | null) => void;
+        setActiveHighlight: (highlight: PaperHighlight | null) => void;
     }
 ) {
     // First, try to use the offset hints for direct matching (like regular highlights)
     const directMatch = tryDirectOffsetMatch(sourceHighlight);
     if (directMatch.length > 0) {
-        console.log(`Direct offset match found for AI highlight with ${directMatch.length} nodes`);
         for (const node of directMatch) {
             applyAIHighlightToNode(node, sourceHighlight, handlers);
         }
         if (sourceHighlight.id) {
-            directMatch[0].setAttribute('data-ai-highlight-id', sourceHighlight.id);
+            directMatch[0].setAttribute('data-highlight-id', sourceHighlight.id);
         }
         return;
     }
@@ -121,44 +121,41 @@ export function addAIHighlightToNodes(
     const bestMatch = fuzzyMatches[0];
     const matchingNodes = bestMatch.nodes;
 
-    console.log(`Found ${matchingNodes.length} nodes for AI highlight with ${(bestMatch.similarity * 100).toFixed(1)}% similarity on page ${sourceHighlight.page_number}`);
-
     for (const node of matchingNodes) {
         applyAIHighlightToNode(node, sourceHighlight, handlers);
     }
 
     if (matchingNodes.length > 0 && sourceHighlight.id) {
-        matchingNodes[0].setAttribute('data-ai-highlight-id', sourceHighlight.id);
+        matchingNodes[0].setAttribute('data-highlight-id', sourceHighlight.id);
     }
 }
 
 function applyAIHighlightToNode(
     node: Element,
-    sourceHighlight: AIPaperHighlight,
+    sourceHighlight: PaperHighlight,
     handlers: {
         setIsHighlightInteraction: (value: boolean) => void;
         setSelectedText: (text: string) => void;
         setTooltipPosition: (position: { x: number; y: number } | null) => void;
         setIsAnnotating: (value: boolean) => void;
-        setActiveAIHighlight: (highlight: AIPaperHighlight | null) => void;
+        setActiveHighlight: (highlight: PaperHighlight | null) => void;
     }
 ) {
     // Add AI-specific highlighting (different styling from regular highlights)
     node.classList.add('border-2', 'border-purple-500', 'bg-purple-100', 'rounded', 'opacity-30');
 
     // Add a visual indicator that this is an AI highlight
-    node.setAttribute('data-ai-highlight', 'true');
+    node.setAttribute('data-highlight', 'true');
     node.setAttribute('title', 'AI-generated highlight');
 
     // Add click event to show highlight options
     node.addEventListener('click', (e: Event) => {
-        console.log(`Clicked AI highlight: ${sourceHighlight.id}`);
         const mouseEvent = e as MouseEvent;
         mouseEvent.stopPropagation();
         handlers.setIsHighlightInteraction(true);
         handlers.setSelectedText(sourceHighlight.raw_text);
         handlers.setTooltipPosition({ x: mouseEvent.clientX, y: mouseEvent.clientY });
-        handlers.setActiveAIHighlight(sourceHighlight);
+        handlers.setActiveHighlight(sourceHighlight);
     });
 }
 
@@ -174,6 +171,16 @@ export function addHighlightToNodes(
     }
 ) {
     const { start_offset, end_offset } = sourceHighlight;
+
+    if (start_offset === undefined || end_offset === undefined) {
+        console.warn(`Highlight ${sourceHighlight.id} has undefined offsets, skipping`);
+        return;
+    }
+
+    if (start_offset < 0 || end_offset < 0 || start_offset >= end_offset) {
+        console.warn(`Invalid highlight offsets for ${sourceHighlight.id}: ${start_offset}-${end_offset}, skipping`);
+        return;
+    }
 
     // Get ALL text content layers (one per page)
     const textLayers = document.querySelectorAll('.react-pdf__Page__textContent');

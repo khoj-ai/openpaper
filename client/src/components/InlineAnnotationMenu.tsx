@@ -1,5 +1,4 @@
 import {
-    AIPaperHighlight,
     PaperHighlight,
 } from '@/lib/schema';
 
@@ -19,7 +18,6 @@ interface InlineAnnotationMenuProps {
     setHighlights: (highlights: Array<PaperHighlight>) => void;
     isHighlightInteraction: boolean;
     activeHighlight: PaperHighlight | null;
-    activeAIHighlight?: AIPaperHighlight | null;
     addHighlight: (selectedText: string, startOffset?: number, endOffset?: number) => void;
     removeHighlight: (highlight: PaperHighlight) => void;
     setUserMessageReferences: React.Dispatch<React.SetStateAction<string[]>>;
@@ -35,7 +33,6 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
         setIsAnnotating,
         isHighlightInteraction,
         activeHighlight,
-        activeAIHighlight,
         addHighlight,
         removeHighlight,
         setUserMessageReferences,
