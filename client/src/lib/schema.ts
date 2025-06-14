@@ -50,6 +50,14 @@ export interface AIPaperHighlight {
     end_offset_hint: number;
 }
 
+export interface AIPaperHighlightAnnotation {
+    id: string;
+    ai_highlight_id: string;
+    paper_id: string;
+    content: string;
+    created_at: string;
+}
+
 export interface Reference {
     citations: Citation[];
 }

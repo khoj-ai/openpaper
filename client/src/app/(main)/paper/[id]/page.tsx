@@ -144,6 +144,7 @@ export default function PaperView() {
 
     const {
         annotations,
+        aiAnnotations,
         addAnnotation,
         removeAnnotation,
         updateAnnotation,
@@ -975,6 +976,7 @@ export default function PaperView() {
                                 <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto">
                                     <AnnotationsView
                                         annotations={annotations}
+                                        aiAnnotations={aiAnnotations}
                                         highlights={highlights}
                                         aiHighlights={aiHighlights}
                                         onHighlightClick={handleHighlightClick}

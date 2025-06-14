@@ -1,4 +1,5 @@
 import {
+    AIPaperHighlightAnnotation,
     PaperHighlightAnnotation
 } from '@/lib/schema';
 import { fetchFromApi } from '@/lib/api';
@@ -6,6 +7,7 @@ import { useEffect, useState } from 'react';
 
 export function useAnnotations(paperId: string) {
     const [annotations, setAnnotations] = useState<PaperHighlightAnnotation[]>([]);
+    const [aiAnnotations, setAIAnnotations] = useState<AIPaperHighlightAnnotation[]>([]);
 
     const addAnnotation = async (highlightId: string, content: string) => {
         const newAnnotation: Partial<PaperHighlightAnnotation> = {
@@ -82,6 +84,20 @@ export function useAnnotations(paperId: string) {
         }
     };
 
+    const loadAIAnnotationsFromServer = async () => {
+        try {
+            const loadedAIAnnotations: AIPaperHighlightAnnotation[] = await fetchFromApi(`/api/ai_annotation/${paperId}`, {
+                method: 'GET',
+            });
+
+            setAIAnnotations(loadedAIAnnotations);
+            return loadedAIAnnotations;
+        } catch (error) {
+            console.error('Error loading AI annotations:', error);
+            throw error;
+        }
+    };
+
     const renderAnnotations = (highlights: PaperHighlightAnnotation[]) => {
         for (const h of highlights) {
             const highlightAnnotations = annotations.filter(a => a.highlight_id === h.id);
@@ -111,15 +127,18 @@ export function useAnnotations(paperId: string) {
 
     useEffect(() => {
         loadAnnotationsFromServer();
+        loadAIAnnotationsFromServer();
     }, []);
 
     return {
         annotations,
+        aiAnnotations,
         setAnnotations,
         addAnnotation,
         removeAnnotation,
         updateAnnotation,
         loadAnnotationsFromServer,
+        loadAIAnnotationsFromServer,
         getAnnotationsForHighlight,
         renderAnnotations,
     };
