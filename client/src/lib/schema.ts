@@ -30,8 +30,10 @@ export interface ChatMessage {
 export interface PaperHighlight {
     id?: string;
     raw_text: string;
-    start_offset: number;
-    end_offset: number;
+    role: 'user' | 'assistant';
+    start_offset?: number;
+    end_offset?: number;
+    page_number?: number;
 }
 
 export interface PaperHighlightAnnotation {
@@ -39,22 +41,7 @@ export interface PaperHighlightAnnotation {
     highlight_id: string;
     paper_id: string;
     content: string;
-    created_at: string;
-}
-
-export interface AIPaperHighlight {
-    id: string;
-    raw_text: string;
-    page_number: number;
-    start_offset_hint: number;
-    end_offset_hint: number;
-}
-
-export interface AIPaperHighlightAnnotation {
-    id: string;
-    ai_highlight_id: string;
-    paper_id: string;
-    content: string;
+    role: 'user' | 'assistant';
     created_at: string;
 }
 
