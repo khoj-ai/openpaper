@@ -1,7 +1,7 @@
 'use client';
 
 import { fetchFromApi } from '@/lib/api';
-import { OpenAlexMatchResponse, OpenAlexPaper, OpenAlexResponse } from '@/lib/schema';
+import { OpenAlexMatchResponse, OpenAlexPaper, OpenAlexResponse, PaperData } from '@/lib/schema';
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import CitationGraph from './CitationGraph';
@@ -10,10 +10,13 @@ import LoadingIndicator from './utils/Loading';
 import { toast } from "sonner";
 
 interface GraphOverviewProps {
-    paper_title?: string;
+    paper_data: PaperData;
+    paper_id: string;
 }
 
-export default function GraphOverview({ paper_title }: GraphOverviewProps) {
+export default function GraphOverview({ paper_data, paper_id }: GraphOverviewProps) {
+    const { open_alex_id, doi, title: paper_title } = paper_data;
+
     const [perPage, setPerPage] = useState(25);
     const [results, setResults] = useState<OpenAlexResponse | null>(null);
     const [loading, setLoading] = useState(false);
@@ -53,10 +56,18 @@ export default function GraphOverview({ paper_title }: GraphOverviewProps) {
 
     // Auto-trigger search when component mounts or paper_title changes
     useEffect(() => {
-        if (paper_title) {
+        if (open_alex_id && doi) {
+            // If open_alex_id is provided, trigger handleMatch
+            setMatchedPaper(null);
+            setResults(null);
+            setError(null);
+            setLoading(true);
+            handleMatch({ id: open_alex_id, doi } as OpenAlexPaper);
+        } else if (paper_title) {
             handleSearch();
         }
-    }, [paper_title]);
+
+    }, [paper_title, doi, open_alex_id]);
 
     const handleMatch = async (matchedPaper: OpenAlexPaper) => {
         if (!matchedPaper) return;
@@ -66,13 +77,14 @@ export default function GraphOverview({ paper_title }: GraphOverviewProps) {
         setLoading(true);
         try {
             const response: OpenAlexMatchResponse = await fetchFromApi(
-                `/api/paper_search/match?open_alex_id=${matchedPaper.id}`,
+                `/api/paper_search/match?open_alex_id=${matchedPaper.id}&doi=${matchedPaper.doi || ''}&paper_id=${paper_id}`,
                 {
                     method: "POST",
                 }
             );
 
             setMatchResponse(response);
+            setMatchedPaper(response.center);
         } catch (error) {
             console.error("Match failed:", error);
             setError("Failed to match paper. Please try again.");
@@ -174,7 +186,7 @@ export default function GraphOverview({ paper_title }: GraphOverviewProps) {
             {matchedPaper && matchResponse && (
                 <div className="mt-6 w-full">
                     <CitationGraph
-                        center={matchedPaper}
+                        center={matchResponse.center}
                         data={matchResponse}
                     />
                 </div>
@@ -201,7 +213,7 @@ export default function GraphOverview({ paper_title }: GraphOverviewProps) {
 
                     <div className="grid gap-4">
                         {filteredResults.map((paper: OpenAlexPaper) => (
-                            <div key={paper.id} className="group border border-gray-200 dark:border-gray-700 rounded-xl p-6 bg-white dark:bg-gray-800 shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02]">
+                            <div key={paper.id} className="group border border-gray-200 dark:border-gray-700 rounded-xl p-6 bg-white dark:bg-gray-800 shadow-sm hover:shadow-lg">
                                 <div className="flex items-start">
                                     <div className="flex-1 pr-4">
                                         <h4 className="font-semibold text-lg text-blue-600 dark:text-blue-400 mb-3 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
@@ -277,7 +289,7 @@ export default function GraphOverview({ paper_title }: GraphOverviewProps) {
                                             <div className="flex flex-col gap-2 mt-2 items-end">
                                                 <Button
                                                     onClick={() => handleMarkAsMatch(paper)}
-                                                    className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold px-4 py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 w-fit"
+                                                    className="bg-green-500 text-white font-semibold px-4 py-2 rounded-lg shadow-lg transition-all duration-200 transform w-fit"
                                                 >
                                                     <Check className="w-4 h-4 mr-2" />
                                                     This is it!
@@ -285,7 +297,7 @@ export default function GraphOverview({ paper_title }: GraphOverviewProps) {
                                                 <Button
                                                     variant="ghost"
                                                     onClick={() => handleDismissPaper(paper.id)}
-                                                    className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 px-4 py-2 rounded-lg transition-all duration-200 w-fit"
+                                                    className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 px-4 py-2 rounded-lg transition-all duration-200 w-fit"
                                                 >
                                                     <X className="w-4 h-4 mr-2" />
                                                     Not this one
