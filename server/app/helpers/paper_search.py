@@ -102,6 +102,15 @@ class OpenAlexWork(BaseOpenAlexModel):
     abstract_inverted_index: Optional[dict]
     abstract: Optional[str]
 
+    @model_validator(mode="before")
+    @classmethod
+    def validate_work(cls, data):
+        if "abstract_inverted_index" in data and data["abstract_inverted_index"]:
+            data["abstract"] = build_abstract_from_inverted_index(
+                data["abstract_inverted_index"]
+            )
+        return data
+
 
 class OpenAlexResponse(BaseModel):
     meta: dict
@@ -114,10 +123,6 @@ class OpenAlexResponse(BaseModel):
             valid_results = []
             for item in data["results"]:
                 try:
-                    if item.get("abstract_inverted_index"):
-                        item["abstract"] = build_abstract_from_inverted_index(
-                            item["abstract_inverted_index"]
-                        )
                     valid_results.append(OpenAlexWork(**item))
                 except Exception as e:
                     logger.warning(f"Skipping invalid OpenAlex work entry: {e}")
@@ -127,6 +132,7 @@ class OpenAlexResponse(BaseModel):
 
 
 class OpenAlexCitationGraph(BaseModel):
+    center: OpenAlexWork
     cites: OpenAlexResponse
     cited_by: OpenAlexResponse
 
@@ -227,6 +233,26 @@ def build_abstract_from_inverted_index(inverted_index: dict) -> str:
     return " ".join(abstract).strip() if abstract else ""
 
 
+def get_paper_by_open_alex_id(open_alex_id: str) -> Optional[OpenAlexWork]:
+    """
+    Retrieve a paper from OpenAlex by its OpenAlex ID.
+
+    Args:
+        open_alex_id (str): The OpenAlex ID of the work.
+
+    Returns:
+        Optional[OpenAlexWork]: The OpenAlexWork object if found, otherwise None.
+    """
+    url = f"https://api.openalex.org/works/{quote(open_alex_id)}"
+    response = requests.get(url, timeout=10)
+    if response.status_code == 200:
+        return OpenAlexWork(**response.json())
+    elif response.status_code == 404:
+        return None
+    else:
+        response.raise_for_status()
+
+
 def construct_citation_graph(open_alex_id: str) -> OpenAlexCitationGraph:
     """
     Construct a citation graph for a given OpenAlex ID, including both citations and cited-by relationships. Use a depth of 1 to include direct citations and works that cite the original work.
@@ -237,6 +263,12 @@ def construct_citation_graph(open_alex_id: str) -> OpenAlexCitationGraph:
     Returns:
         dict: A dictionary representing the citation graph.
     """
+    center = get_paper_by_open_alex_id(open_alex_id)
+    if not center:
+        raise ValueError(f"Paper with OpenAlex ID {open_alex_id} not found.")
+
+    # Construct the citation graph
+
     cites_url = f"https://api.openalex.org/works?filter=cites:{quote(open_alex_id)}&page=1&per_page=20"
     cites_response = requests.get(cites_url, timeout=10)
     cites_response.raise_for_status()
@@ -248,4 +280,6 @@ def construct_citation_graph(open_alex_id: str) -> OpenAlexCitationGraph:
     cites_data = cites_response.json()
     cited_by_data = cited_by_response.json()
 
-    return OpenAlexCitationGraph(cites=cites_data, cited_by=cited_by_data)
+    return OpenAlexCitationGraph(
+        cites=cites_data, cited_by=cited_by_data, center=center
+    )

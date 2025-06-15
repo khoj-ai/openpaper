@@ -4,6 +4,7 @@ from typing import Optional, cast
 
 from app.auth.dependencies import get_current_user, get_db, get_required_user
 from app.database.crud.hypothesis_crud import hypothesis_crud
+from app.database.crud.paper_crud import PaperUpdate, paper_crud
 from app.database.models import JobStatus
 from app.database.telemetry import track_event
 from app.helpers.paper_search import (
@@ -58,6 +59,8 @@ async def search_papers(
 @paper_search_router.post("/match")
 async def get_paper_graph(
     open_alex_id: str,
+    paper_id: str,
+    doi: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_required_user),
 ):
@@ -65,6 +68,13 @@ async def get_paper_graph(
     Get the citation graph for a paper.
     """
     try:
+        paper = paper_crud.get(id=paper_id, db=db, user=current_user)
+        if not paper:
+            raise HTTPException(status_code=404, detail="Paper not found")
+
+        # Update the paper with OpenAlex ID and DOI if provided
+        update_data = PaperUpdate(open_alex_id=open_alex_id, doi=doi)
+        paper_crud.update(db=db, db_obj=paper, obj_in=update_data)
         graph = construct_citation_graph(open_alex_id)
         return Response(content=graph.model_dump_json(), media_type="application/json")
     except Exception as e:

@@ -1,6 +1,5 @@
 import logging
 import uuid
-from typing import List, Optional
 
 from app.auth.dependencies import get_required_user
 from app.database.crud.highlight_crud import (

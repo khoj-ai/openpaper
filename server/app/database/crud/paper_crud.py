@@ -55,6 +55,8 @@ class PaperUpdate(PaperBase):
     status: Optional[PaperStatus] = PaperStatus.todo
     cached_presigned_url: Optional[str] = None
     presigned_url_expires_at: Optional[datetime] = None
+    open_alex_id: Optional[str] = None
+    doi: Optional[str] = None
 
 
 class PaperDocumentMetadata(BaseModel):

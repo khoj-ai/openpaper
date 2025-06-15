@@ -204,6 +204,12 @@ class Paper(Base):
     is_public = Column(Boolean, default=False)
     share_id = Column(String, unique=True, nullable=True, index=True)
 
+    # Additional metadata
+    doi = Column(String, nullable=True)  # Digital Object Identifier
+
+    # OpenAlex metadata
+    open_alex_id = Column(String, nullable=True)  # OpenAlex ID for the paper
+
     user = relationship("User", back_populates="papers")
     conversations = relationship(
         "Conversation", back_populates="paper", cascade="all, delete-orphan"
