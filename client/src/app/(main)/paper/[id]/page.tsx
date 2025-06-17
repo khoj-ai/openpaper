@@ -45,7 +45,6 @@ import {
     SidebarGroupContent,
     SidebarGroupLabel,
     SidebarMenu,
-    SidebarMenuButton,
     SidebarMenuItem,
     SidebarProvider,
 } from "@/components/ui/sidebar";
