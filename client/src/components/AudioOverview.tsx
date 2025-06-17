@@ -568,7 +568,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                         {jobStatus.status === 'failed' && (
                             <button
                                 onClick={() => setShowGenerationForm(true)}
-                                className="mt-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-2 rounded-lg font-medium"
+                                className="mt-6 bg-blue-500 text-white px-6 py-2 rounded-lg font-medium"
                             >
                                 Try Again
                             </button>
@@ -627,7 +627,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                             <button
                                 onClick={togglePlayback}
                                 disabled={!isLoaded}
-                                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-200"
+                                className="bg-blue-500 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-200"
                             >
                                 {isPlaying ? (
                                     <Pause className="w-6 h-6" fill="currentColor" />

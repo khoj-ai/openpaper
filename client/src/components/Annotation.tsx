@@ -61,7 +61,7 @@ export default function Annotation({
                 <div className="flex items-start gap-4 p-4 bg-background dark:bg-card border border-border rounded-xl shadow-sm">
                     {/* Avatar */}
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isAI
-                        ? 'bg-gradient-to-br from-blue-500 to-purple-600'
+                        ? 'bg-blue-400 dark:bg-blue-600'
                         : 'bg-muted dark:bg-muted/70'
                         }`}>
                         {isAI ? (
@@ -121,18 +121,18 @@ export default function Annotation({
         >
             {/* Glow effect for AI annotations */}
             {isAI && (
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-400/10 to-purple-400/10 dark:from-blue-400/20 dark:to-purple-400/20 rounded-xl blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-400/10 to-blue-600/10 dark:from-blue-400/20 dark:to-blue-600/20 rounded-xl blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             )}
 
             <div className={`relative flex items-start gap-4 p-4 rounded-xl border transition-all duration-300 ${isAI
-                ? 'bg-gradient-to-br from-blue-50/50 to-purple-50/50 dark:from-blue-950/20 dark:to-purple-950/20 border-blue-100/50 dark:border-blue-800/30 hover:border-blue-200/70 dark:hover:border-blue-700/50 hover:shadow-md hover:shadow-blue-100/20 dark:hover:shadow-blue-900/10'
+                ? 'bg-blue-500/10 dark:bg-blue-600/10 hover:shadow-lg'
                 : 'bg-background dark:bg-card border-border hover:border-border/80 dark:hover:border-border hover:shadow-sm dark:hover:shadow-lg'
                 }`}>
 
                 {/* Avatar */}
                 <div className="relative">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-transform duration-200 ${isAI
-                        ? 'bg-gradient-to-br from-blue-500 to-purple-600'
+                        ? 'bg-blue-500 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-700'
                         : 'bg-muted dark:bg-muted/70'
                         } ${isHovered ? 'scale-105' : ''}`}>
                         {isAI ? (
