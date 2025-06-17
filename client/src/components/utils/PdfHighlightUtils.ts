@@ -142,7 +142,7 @@ function applyAIHighlightToNode(
     }
 ) {
     // Add AI-specific highlighting (different styling from regular highlights)
-    node.classList.add('border-2', 'border-purple-500', 'bg-purple-100', 'rounded', 'opacity-30');
+    node.classList.add('border-none', 'bg-purple-200', 'rounded', 'opacity-30');
 
     // Add a visual indicator that this is an AI highlight
     node.setAttribute('data-highlight', 'true');
@@ -277,7 +277,7 @@ function applyHighlightToNode(
     handlers: HighlightHandlers
 ) {
     // Add highlighting to the node
-    node.classList.add('border-2', 'border-blue-500', 'bg-blue-100', 'rounded', 'opacity-20');
+    node.classList.add('border-none', 'bg-blue-200', 'rounded', 'opacity-30');
 
     // Add click event to show highlight options
     node.addEventListener('click', (e: Event) => {
@@ -313,7 +313,7 @@ function createHighlightedTextFragments(
     // Add highlighted text
     const highlightSpan = document.createElement('span');
     highlightSpan.textContent = text.substring(startOffset, endOffset);
-    highlightSpan.classList.add('border-2', 'border-blue-500', 'bg-blue-100', 'rounded', 'opacity-20');
+    highlightSpan.classList.add('border-none', 'bg-blue-200', 'rounded', 'opacity-30');
 
     // Add click event to show highlight options
     highlightSpan.addEventListener('click', (e: MouseEvent) => {
