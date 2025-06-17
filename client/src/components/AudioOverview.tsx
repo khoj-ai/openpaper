@@ -162,6 +162,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                 await pollJobStatus(false);
             }
         } catch (err) {
+            console.log('Error checking existing audio overview:', err);
             await pollJobStatus(false); // Don't show error if no overview exists
         } finally {
             setIsInitialLoadDone(true);
