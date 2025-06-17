@@ -236,7 +236,10 @@ export default function PaperView() {
 
     useEffect(() => {
         if (activeHighlight) {
-            setRightSideFunction('Annotations');
+            // Only open the associated annotation view if the highlight is from the assistant to reduce some user confusion?
+            if (activeHighlight.role === 'assistant') {
+                setRightSideFunction('Annotations');
+            }
         }
     }, [activeHighlight]);
 
