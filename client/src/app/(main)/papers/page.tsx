@@ -4,9 +4,12 @@ import { fetchFromApi } from "@/lib/api";
 import { useEffect, useState } from "react";
 import { PaperItem } from "@/components/AppSidebar";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import PaperCard from "@/components/PaperCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth";
+import { FileText, Upload, Search } from "lucide-react";
+import Link from "next/link";
 
 // TODO: We could add a search look-up for the paper journal name to avoid placeholders
 
@@ -16,7 +19,6 @@ export default function PapersPage() {
     const [filteredPapers, setFilteredPapers] = useState<PaperItem[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const { user, loading: authLoading } = useAuth();
-
 
     useEffect(() => {
         const fetchPapers = async () => {
@@ -43,7 +45,6 @@ export default function PapersPage() {
             window.location.href = `/login`;
         }
     }, [authLoading, user]);
-
 
     const deletePaper = async (paperId: string) => {
         try {
@@ -82,6 +83,52 @@ export default function PapersPage() {
         )
     }
 
+    const EmptyState = () => {
+        // No papers uploaded at all
+        if (papers.length === 0) {
+            return (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <FileText className="h-16 w-16 text-muted-foreground mb-6" />
+                    <h3 className="text-xl font-medium text-foreground mb-3">Your paper library is empty</h3>
+                    <p className="text-muted-foreground max-w-md mb-6">
+                        Upload your first research paper to get started. All your papers will appear here for easy access and organization.
+                    </p>
+                    <Link href="/">
+                        <Button className="inline-flex items-center gap-2">
+                            <Upload className="h-4 w-4" />
+                            Upload papers
+                        </Button>
+                    </Link>
+                </div>
+            );
+        }
+
+        // Has papers but search/filter returned no results
+        if (papers.length > 0 && filteredPapers.length === 0) {
+            return (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <Search className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium text-foreground mb-2">No papers found</h3>
+                    <p className="text-muted-foreground max-w-md">
+                        No papers match your search criteria. Try adjusting your search terms.
+                    </p>
+                    <Button
+                        variant="ghost"
+                        onClick={() => {
+                            setSearchTerm("")
+                            setFilteredPapers(papers);
+                        }}
+                        className="mt-4"
+                    >
+                        Clear search
+                    </Button>
+                </div>
+            );
+        }
+
+        return null;
+    }
+
     if (loading) {
         return (
             <div className="container mx-auto sm:w-2/3 p-8">
@@ -95,28 +142,34 @@ export default function PapersPage() {
         )
     }
 
-
     return (
         <div className="container mx-auto sm:w-2/3 p-8">
-            <div className="mb-4">
-                <Input
-                    type="text"
-                    placeholder="Search your paper bank"
-                    value={searchTerm}
-                    onChange={handleSearch}
-                    className="w-full p-2 border border-gray-300 rounded"
-                />
-            </div>
-            <div className="grid grid-cols-1 gap-4">
-                {filteredPapers.map((paper) => (
-                    <PaperCard
-                        key={paper.id}
-                        paper={paper}
-                        handleDelete={deletePaper}
-                        setPaper={handlePaperSet}
+            {papers.length > 0 && (
+                <div className="mb-6">
+                    <Input
+                        type="text"
+                        placeholder="Search your paper bank"
+                        value={searchTerm}
+                        onChange={handleSearch}
+                        className="w-full"
                     />
-                ))}
-            </div>
+                </div>
+            )}
+
+            {filteredPapers.length > 0 ? (
+                <div className="grid grid-cols-1 gap-4">
+                    {filteredPapers.map((paper) => (
+                        <PaperCard
+                            key={paper.id}
+                            paper={paper}
+                            handleDelete={deletePaper}
+                            setPaper={handlePaperSet}
+                        />
+                    ))}
+                </div>
+            ) : (
+                <EmptyState />
+            )}
         </div>
     )
 }
