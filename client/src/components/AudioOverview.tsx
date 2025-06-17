@@ -74,6 +74,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
     const [loadingText, setLoadingText] = useState<string>(audioOverviewLoadingText[Math.floor(Math.random() * audioOverviewLoadingText.length)]);
     const [error, setError] = useState<string | null>(null);
     const [showGenerationForm, setShowGenerationForm] = useState(false);
+    const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
     const [selectedFocus, setSelectedFocus] = useState<string | null>(null);
 
     const [additionalInstructions, setAdditionalInstructions] = useState(DEFAULT_INSTRUCTIONS);
@@ -159,6 +160,8 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
             }
         } catch (err) {
             console.error('Error checking existing audio overview:', err);
+        } finally {
+            setIsInitialLoadDone(true);
         }
     };
 
@@ -234,6 +237,8 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
             setShowGenerationForm(true);
             console.error('Error fetching audio overview:', err);
             setError('Failed to fetch audio overview');
+        } finally {
+            setIsInitialLoadDone(true);
         }
     }, [paper_id, allAudioOverviews]);
 
@@ -429,7 +434,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
             )}
 
             {/* No audio overview exists or showing generation form */}
-            {((!audioOverview && !jobStatus) || showGenerationForm) && (
+            {((!audioOverview && !jobStatus && isInitialLoadDone) || showGenerationForm) && (
                 <div className="text-center py-8">
                     <div className="bg-blue-50 dark:bg-blue-950 rounded-xl p-8 max-w-lg mx-auto">
                         <Mic className="w-16 h-16 text-blue-500 mx-auto mb-4" />
