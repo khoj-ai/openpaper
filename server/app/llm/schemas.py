@@ -17,6 +17,43 @@ class AIHighlight(BaseModel):
     )
 
 
+class ResponseCitation(BaseModel):
+    """
+    Schema for a citation in the paper.
+    This is used to represent a single citation with its text and context.
+    """
+
+    text: str = Field(
+        description="The raw text of the citation as it appears in the paper. Ensure that this is a direct quote or paraphrase from the paper."
+    )
+    index: int = Field(
+        description="The index of the citation in the paper's reference list. This is used to identify the citation in discussions or findings."
+    )
+
+
+class AudioOverviewForLLM(BaseModel):
+    summary: str = Field(
+        description="The helpful summary of the research. This should include key findings, contributions, and implications of the paper."
+    )
+    citations: List[ResponseCitation] = Field(
+        default=[],
+        description="List of the raw text citations from the paper that are relevant to the summary. These should be direct quotes or paraphrases from the paper that support the summary provided. These should not be extracted references from the references of the paper. Rather, they are references relevant to your summary. Remember to include the citation index (e.g., [^1], [^2]) in the summary.",
+    )
+    title: str = Field(description="The title of the narrative overview.")
+
+
+class HypothesisStep(BaseModel):
+    question: str = Field(
+        description="The sub-question to ask about the hypothesis, which will be used to retrieve relevant papers. Limit to 1 sentence per question to ensure clarity and focus."
+    )
+    motivation: str = Field(
+        description="The motivation behind the sub-question, explaining why it is relevant to the hypothesis. Limit to 200 characters to ensure a good research trajectory."
+    )
+    search_terms: List[str] = Field(
+        description="List of search terms to use when querying the research API for papers related to this sub-question. Minimum 1 and maximum 3 search terms per step to ensure focused exploration.",
+    )
+
+
 class PaperMetadataExtraction(BaseModel):
     title: str = Field(description="Title of the paper in normal case")
     authors: List[str] = Field(default=[], description="List of authors")
@@ -35,14 +72,24 @@ A concise, well-structured summary of the paper in markdown format. Include:
 4. Potential applications or impact
 
 Format guidelines:
+- Optional opening title (under 10 words)
 - First paragraph: 2-4 sentence overview of the paper
 - Use clear headings, bullet points, and tables for organization
 - Include relevant data points and metrics when available
 - Use plain language while preserving technical accuracy
-- Optional brief title (under 10 words)
+- Include inline citations to support claims that refer to the paper's content. This is especially important for claims about the findings, methodology, and results.
+
+Citation guidelines:
+- Use [^1], [^2], [^6, ^7] etc. for citations in the summary
+- Always increase the index of the citation sequentially, starting from 1
+- You will separately provide a list of citations in the `summary_citations` field with the raw text and index
 
 The summary should be accessible to readers with basic domain knowledge while maintaining scientific integrity.
                          """,
+    )
+    summary_citations: List[ResponseCitation] = Field(
+        default=[],
+        description="List of citations that are relevant to the summary. These should be direct quotes or paraphrases from the paper that support the summary provided. Remember to include the citation index (e.g., [^1], [^2]) in the summary.",
     )
     publish_date: Optional[str] = Field(
         default=None, description="Publishing date of the paper in YYYY-MM-DD format"
@@ -58,43 +105,6 @@ The summary should be accessible to readers with basic domain knowledge while ma
     highlights: List[AIHighlight] = Field(
         default=[],
         description="List of key highlights from the paper. These should be significant quotes or paraphrases that capture the essence of the paper's findings and contributions. Each highlight should include the text of the highlight and an annotation explaining its significance or relevance to the paper's content. Particularly drill into the results, tables, and figures to make sense of the experimental results.",
-    )
-
-
-class AudioOverviewCitation(BaseModel):
-    """
-    Schema for a citation in the paper.
-    This is used to represent a single citation with its text and context.
-    """
-
-    text: str = Field(
-        description="The raw text of the citation as it appears in the paper. Ensure that this is a direct quote or paraphrase from the paper."
-    )
-    index: int = Field(
-        description="The index of the citation in the paper's reference list. This is used to identify the citation in discussions or findings."
-    )
-
-
-class AudioOverviewForLLM(BaseModel):
-    summary: str = Field(
-        description="The helpful summary of the research. This should include key findings, contributions, and implications of the paper."
-    )
-    citations: List[AudioOverviewCitation] = Field(
-        default=[],
-        description="List of the raw text citations from the paper that are relevant to the summary. These should be direct quotes or paraphrases from the paper that support the summary provided. These should not be extracted references from the references of the paper. Rather, they are references relevant to your summary. Remember to include the citation index (e.g., [^1], [^2]) in the summary.",
-    )
-    title: str = Field(description="The title of the narrative overview.")
-
-
-class HypothesisStep(BaseModel):
-    question: str = Field(
-        description="The sub-question to ask about the hypothesis, which will be used to retrieve relevant papers. Limit to 1 sentence per question to ensure clarity and focus."
-    )
-    motivation: str = Field(
-        description="The motivation behind the sub-question, explaining why it is relevant to the hypothesis. Limit to 200 characters to ensure a good research trajectory."
-    )
-    search_terms: List[str] = Field(
-        description="List of search terms to use when querying the research API for papers related to this sub-question. Minimum 1 and maximum 3 search terms per step to ensure focused exploration.",
     )
 
 

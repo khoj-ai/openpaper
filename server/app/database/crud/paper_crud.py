@@ -13,7 +13,7 @@ from app.helpers.parser import (
     get_start_page_from_offset,
     map_pages_to_text_offsets,
 )
-from app.llm.schemas import PaperMetadataExtraction
+from app.llm.schemas import PaperMetadataExtraction, ResponseCitation
 from app.llm.utils import find_offsets
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
@@ -33,6 +33,7 @@ class PaperBase(BaseModel):
     institutions: Optional[List[str]] = None
     keywords: Optional[List[str]] = None
     summary: Optional[str] = None
+    summary_citations: Optional[List[ResponseCitation]] = None
     starter_questions: Optional[List[str]] = None
     publish_date: Optional[str] = None
     raw_content: Optional[str] = None

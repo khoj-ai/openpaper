@@ -180,6 +180,7 @@ class Paper(Base):
     institutions = Column(ARRAY(String), nullable=True)
     keywords = Column(ARRAY(String), nullable=True)
     summary = Column(Text, nullable=True)
+    summary_citations = Column(JSONB, nullable=True)
     publish_date = Column(DateTime, nullable=True)
     starter_questions = Column(ARRAY(String), nullable=True)
     raw_content = Column(Text, nullable=True)

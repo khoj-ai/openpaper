@@ -4,7 +4,7 @@ from uuid import UUID
 
 from app.database.crud.base_crud import CRUDBase
 from app.database.models import AudioOverview, AudioOverviewJob, JobStatus
-from app.llm.schemas import AudioOverviewCitation
+from app.llm.schemas import ResponseCitation
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -28,7 +28,7 @@ class AudioOverviewBase(BaseModel):
     paper_id: UUID
     s3_object_key: str
     transcript: Optional[str] = None
-    citations: Optional[List[AudioOverviewCitation]] = None
+    citations: Optional[List[ResponseCitation]] = None
     title: Optional[str] = None
 
 
@@ -39,7 +39,7 @@ class AudioOverviewCreate(AudioOverviewBase):
 class AudioOverviewUpdate(BaseModel):
     s3_object_key: Optional[str] = None
     transcript: Optional[str] = None
-    citations: Optional[List[AudioOverviewCitation]] = None
+    citations: Optional[List[ResponseCitation]] = None
     title: Optional[str] = None
 
 
@@ -226,7 +226,7 @@ class AudioOverviewCRUD(
             ),
             "title": overview.title,
             "citations": [
-                AudioOverviewCitation.model_validate(citation).model_dump()
+                ResponseCitation.model_validate(citation).model_dump()
                 for citation in overview.citations or []
             ],
         }

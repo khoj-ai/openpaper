@@ -1,3 +1,4 @@
+import json
 import logging
 import uuid
 from typing import List, Optional
@@ -16,6 +17,7 @@ from app.database.database import get_db
 from app.database.models import Paper, PaperStatus
 from app.database.telemetry import track_event
 from app.helpers.s3 import s3_service
+from app.llm.schemas import ResponseCitation
 from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -390,6 +392,10 @@ async def get_pdf(
         return JSONResponse(status_code=404, content={"message": "File not found"})
 
     paper_data["file_url"] = signed_url
+    paper_data["summary_citations"] = [  # type: ignore
+        ResponseCitation.model_validate(citation).model_dump()
+        for citation in paper.summary_citations or []
+    ]
 
     # Return the file URL
     return JSONResponse(status_code=200, content=paper_data)

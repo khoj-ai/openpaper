@@ -423,6 +423,7 @@ def create_and_upload_pdf(
             institutions=extract_metadata.institutions,
             keywords=extract_metadata.keywords,
             summary=extract_metadata.summary,
+            summary_citations=extract_metadata.summary_citations,
             publish_date=extract_metadata.publish_date,
             starter_questions=extract_metadata.starter_questions,
         )
