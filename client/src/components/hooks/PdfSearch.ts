@@ -11,6 +11,19 @@ export function usePdfSearch(explicitSearchTerm?: string) {
     const [currentMatch, setCurrentMatch] = useState(-1);
     const [notFound, setNotFound] = useState(false);
 
+    const handleClearSearch = () => {
+        setSearchText("");
+        setSearchResults([]);
+        setCurrentMatch(-1);
+        setNotFound(false);
+        // Remove styling from any existing search highlights
+        const pdfTextElements = document.querySelectorAll('.react-pdf__Page__textContent span.border-2');
+        pdfTextElements.forEach(span => {
+            if (span.classList.contains('bg-blue-100')) return; // Don't remove user highlight formatting
+            span.classList.remove('border-2', 'border-yellow-500', 'bg-yellow-100', 'rounded', 'opacity-20');
+        });
+    };
+
     const performSearch = (term?: string) => {
         const textToSearch = term || searchText;
         if (!textToSearch.trim()) {
@@ -42,8 +55,13 @@ export function usePdfSearch(explicitSearchTerm?: string) {
 
     // Handle explicit search term if provided
     useEffect(() => {
-        if (explicitSearchTerm) {
-            performSearch(explicitSearchTerm);
+        if (explicitSearchTerm !== undefined) {
+            if (explicitSearchTerm.trim() === '') {
+                // Clear search results and formatting when explicit search term is empty
+                handleClearSearch();
+            } else {
+                performSearch(explicitSearchTerm);
+            }
         }
     }, [explicitSearchTerm]);
 
@@ -106,5 +124,6 @@ export function usePdfSearch(explicitSearchTerm?: string) {
         setSearchResults,
         setNotFound,
         setCurrentMatch,
+        handleClearSearch,
     };
 }

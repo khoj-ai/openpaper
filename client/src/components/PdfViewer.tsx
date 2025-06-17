@@ -94,7 +94,8 @@ export function PdfViewer(props: PdfViewerProps) {
 		goToPreviousMatch,
 		setSearchResults,
 		setNotFound,
-		setCurrentMatch
+		setCurrentMatch,
+		handleClearSearch,
 	} = usePdfSearch(explicitSearchTerm);
 
 
@@ -304,7 +305,7 @@ export function PdfViewer(props: PdfViewerProps) {
 						<Button onClick={goToNextMatch} size="sm" variant="ghost" className="h-8 w-8 p-0">
 							<ArrowRight size={16} />
 						</Button>
-						<Button onClick={() => setSearchResults([])} size="sm" variant="ghost" className="h-8 w-8 p-0">
+						<Button onClick={() => handleClearSearch()} size="sm" variant="ghost" className="h-8 w-8 p-0">
 							<X size={16} />
 						</Button>
 					</div>
@@ -314,7 +315,7 @@ export function PdfViewer(props: PdfViewerProps) {
 					searchText && notFound && (
 						<div className="flex items-center gap-1 mx-2">
 							<span className="text-xs text-red-500">No results found</span>
-							<Button onClick={() => setSearchText("")} size="sm" variant="ghost" className="h-8 w-8 p-0">
+							<Button onClick={() => handleClearSearch()} size="sm" variant="ghost" className="h-8 w-8 p-0">
 								<X size={16} />
 							</Button>
 						</div>
