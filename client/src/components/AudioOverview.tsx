@@ -100,6 +100,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
         if (jobStatus && (jobStatus.status === 'pending' || jobStatus.status === 'running')) {
             interval = setInterval(() => {
                 pollJobStatus();
+                setIsLoading(true);
                 setLoadingText(audioOverviewLoadingText[Math.floor(Math.random() * audioOverviewLoadingText.length)]);
             }, 3500); // Poll every 3.5 seconds
         }
@@ -157,9 +158,11 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
             } else {
                 setAudioOverview(null);
                 setSelectedAudioId(null);
+                // Check if there is a pending generation job
+                await pollJobStatus(false);
             }
         } catch (err) {
-            console.error('Error checking existing audio overview:', err);
+            await pollJobStatus(false); // Don't show error if no overview exists
         } finally {
             setIsInitialLoadDone(true);
         }
@@ -240,9 +243,9 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
         } finally {
             setIsInitialLoadDone(true);
         }
-    }, [paper_id, allAudioOverviews]);
+    }, [paper_id]);
 
-    const pollJobStatus = useCallback(async () => {
+    const pollJobStatus = useCallback(async (showErrorOnFail: boolean = true) => {
         try {
             const response: JobStatus = await fetchFromApi(`/api/paper/audio/${paper_id}/status`);
             if (response.job_id && response.status) {
@@ -256,7 +259,9 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
             }
         } catch (err) {
             console.error('Error polling job status:', err);
-            setError('Failed to get job status');
+            if (showErrorOnFail) {
+                setError('Failed to get job status');
+            }
         }
     }, [paper_id, fetchAudioOverview]);
 
