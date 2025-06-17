@@ -20,12 +20,15 @@ export interface AnnotationButtonProps {
 export function AnnotationButton({ highlightId, addAnnotation }: AnnotationButtonProps) {
 	const [content, setContent] = useState("");
 	const [isTyping, setIsTyping] = useState(false);
+	const [isAdding, setIsAdding] = useState(false);
 
 	const handleSave = async () => {
 		if (content.trim() && addAnnotation) {
+			setIsAdding(true);
 			await addAnnotation(highlightId, content);
 			setContent("");
 			setIsTyping(false);
+			setIsAdding(false);
 		}
 	};
 
@@ -57,10 +60,10 @@ export function AnnotationButton({ highlightId, addAnnotation }: AnnotationButto
 			/>
 			{isTyping && (
 				<div className="flex justify-end gap-2 mt-2">
-					<Button variant="outline" size="sm" onClick={handleCancel}>
+					<Button variant="outline" size="sm" onClick={handleCancel} disabled={isAdding}>
 						Cancel
 					</Button>
-					<Button size="sm" onClick={handleSave}>
+					<Button size="sm" onClick={handleSave} disabled={isAdding || !content.trim()}>
 						Save
 					</Button>
 				</div>
