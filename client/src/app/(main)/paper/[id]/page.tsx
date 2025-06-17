@@ -1394,16 +1394,16 @@ export default function PaperView() {
                                                 <TooltipProvider>
                                                     <Tooltip>
                                                         <TooltipTrigger asChild>
-                                                            <SidebarMenuButton
-                                                                asChild
-                                                                isActive={item.name === rightSideFunction}
+                                                            <Button
+                                                                variant="outline"
+                                                                className={`w-fit h-10 p-2 rounded-lg ${item.name === rightSideFunction ? 'bg-blue-500 dark:bg-blue-500 text-blue-100 dark:text-blue-100' : 'text-secondary-foreground hover:bg-secondary/50'}`}
                                                                 title={item.name}
                                                                 onClick={() => {
                                                                     setRightSideFunction(item.name);
                                                                 }}
                                                             >
                                                                 <item.icon />
-                                                            </SidebarMenuButton>
+                                                            </Button>
                                                         </TooltipTrigger>
                                                         <TooltipContent side="left">
                                                             <p>{item.name}</p>
