@@ -1,5 +1,6 @@
 import logging
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
 
 from app.auth.dependencies import get_required_user
@@ -10,7 +11,7 @@ from app.database.crud.audio_overview_crud import (
 )
 from app.database.crud.paper_crud import paper_crud
 from app.database.database import get_db
-from app.database.models import Paper
+from app.database.models import JobStatus, Paper
 from app.database.telemetry import track_event
 from app.helpers.s3 import s3_service
 from app.schemas.user import CurrentUser
@@ -134,6 +135,21 @@ async def get_audio_overview_job_status(
 
     if not audio_overview_job:
         return JSONResponse(status_code=404, content={"message": "Job not found"})
+
+    # If the audio overview has been running for more than 10 minutes, mark it as failed
+    if audio_overview_job.status == JobStatus.RUNNING and audio_overview_job.created_at:
+        if (datetime.now(timezone.utc) - audio_overview_job.created_at) > timedelta(
+            minutes=10
+        ):
+            audio_overview_job_crud.update_status(
+                db,
+                job_id=uuid.UUID(str(audio_overview_job.id)),
+                status=JobStatus.FAILED,
+                current_user=current_user,
+            )
+            logger.warning(
+                f"Audio overview job {audio_overview_job.id} marked as failed due to timeout."
+            )
 
     # Return the job status
     return JSONResponse(
