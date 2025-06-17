@@ -52,7 +52,9 @@ Follow these strict formatting rules:
    \\frac{{d}}{{e}} &= f
    ```
 
-Math notation, even in LaTeX syntax, MUST be in a math code block.
+Display Math notation, even in LaTeX syntax, MUST be in a math code block.
+
+Inline Math notation should be wrapped in double dollar signs, like this: $$\\frac{{a}}{{b}} = c$$ or this: $$d_v$$.
 
 3. Format the evidence section as follows:
    ---EVIDENCE---
