@@ -180,7 +180,6 @@ export default function PaperView() {
 
     // Add this function to handle citation clicks
     const handleCitationClick = (key: string, messageIndex: number) => {
-
         setActiveCitationKey(key);
         setActiveCitationMessageIndex(messageIndex);
 
@@ -199,6 +198,19 @@ export default function PaperView() {
             }
             element.scrollIntoView({ behavior: 'smooth' });
         }
+
+        // Clear the highlight after a few seconds
+        setTimeout(() => setActiveCitationKey(null), 3000);
+    };
+
+    const handleCitationClickFromSummary = (citationKey: string, messageIndex: number) => {
+        const citationIndex = parseInt(citationKey);
+        setActiveCitationKey(citationKey);
+        setActiveCitationMessageIndex(messageIndex);
+
+        // Look up the citations terms from the citationKey
+        const citationMatch = paperData?.summary_citations?.find(c => c.index === citationIndex);
+        setExplicitSearchTerm(citationMatch ? citationMatch.text : citationKey);
 
         // Clear the highlight after a few seconds
         setTimeout(() => setActiveCitationKey(null), 3000);
@@ -761,6 +773,7 @@ export default function PaperView() {
     }, [currentMessage]);
 
     const matchesCurrentCitation = (key: string, messageIndex: number) => {
+        console.log(`Checking if active citation matches: ${activeCitationKey} === ${key} && ${activeCitationMessageIndex} === ${messageIndex}`);
         return activeCitationKey === key.toString() && activeCitationMessageIndex === messageIndex;
     }
 
@@ -1040,11 +1053,52 @@ export default function PaperView() {
                                             <h1 className="text-2xl font-bold">{paperData.title}</h1>
                                         )}
                                         <Markdown
-                                            remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
-                                            rehypePlugins={[rehypeKatex]}
+                                            components={{
+                                                // Apply the custom component to text nodes
+                                                p: (props) => <CustomCitationLink
+                                                    {...props}
+                                                    handleCitationClick={handleCitationClickFromSummary}
+                                                    messageIndex={0}
+                                                />,
+                                                li: (props) => <CustomCitationLink
+                                                    {...props}
+                                                    handleCitationClick={handleCitationClickFromSummary}
+                                                    messageIndex={0}
+                                                />,
+                                                div: (props) => <CustomCitationLink
+                                                    {...props}
+                                                    handleCitationClick={handleCitationClickFromSummary}
+                                                    messageIndex={0}
+                                                />,
+                                            }}
                                         >
                                             {paperData.summary}
                                         </Markdown>
+                                        {
+                                            paperData.summary_citations && paperData.summary_citations.length > 0 && (
+                                                <div className="mt-2" id="references-section">
+                                                    <ul className="list-none p-0">
+                                                        {paperData.summary_citations.map((citation, index) => (
+                                                            <div
+                                                                key={index}
+                                                                className={`flex flex-row gap-2 ${matchesCurrentCitation(`${citation.index}`, 0) ? 'bg-blue-100 dark:bg-blue-900 rounded p-1 transition-colors duration-300' : ''}`}
+                                                                id={`citation-${citation.index}-${index}`}
+                                                                onClick={() => handleCitationClickFromSummary(`${citation.index}`, 0)}
+                                                            >
+                                                                <div className={`text-xs text-secondary-foreground`}>
+                                                                    <span>{citation.index}</span>
+                                                                </div>
+                                                                <div
+                                                                    id={`citation-ref-${citation.index}-${index}`}
+                                                                    className={`text-xs text-secondary-foreground
+                                                                        }`}>
+                                                                    {citation.text}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
                                         <div className="sticky bottom-4 right-4 flex justify-end">
                                             <Button
                                                 variant="default"

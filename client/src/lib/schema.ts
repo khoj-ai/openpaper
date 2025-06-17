@@ -1,5 +1,10 @@
 import { PaperStatus } from "@/components/utils/PdfStatus";
 
+export interface ReferenceCitation {
+    index: number;
+    text: string;
+}
+
 export interface PaperData {
     filename: string;
     file_url: string;
@@ -8,6 +13,7 @@ export interface PaperData {
     abstract: string;
     publish_date: string;
     summary: string;
+    summary_citations?: ReferenceCitation[];
     institutions: string[];
     keywords: string[];
     starter_questions: string[];

@@ -17,10 +17,10 @@ export function usePdfSearch(explicitSearchTerm?: string) {
         setCurrentMatch(-1);
         setNotFound(false);
         // Remove styling from any existing search highlights
-        const pdfTextElements = document.querySelectorAll('.react-pdf__Page__textContent span.border-2');
+        const pdfTextElements = document.querySelectorAll('.react-pdf__Page__textContent span.bg-yellow-100');
         pdfTextElements.forEach(span => {
             if (span.classList.contains('bg-blue-100')) return; // Don't remove user highlight formatting
-            span.classList.remove('border-2', 'border-yellow-500', 'bg-yellow-100', 'rounded', 'opacity-20');
+            span.classList.remove('bg-yellow-100', 'rounded', 'opacity-20');
         });
     };
 
@@ -76,17 +76,17 @@ export function usePdfSearch(explicitSearchTerm?: string) {
         pageDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
         // Remove styling from any existing highlights
-        const pdfTextElements = document.querySelectorAll('.react-pdf__Page__textContent span.border-2');
+        const pdfTextElements = document.querySelectorAll('.react-pdf__Page__textContent span.bg-yellow-100');
         pdfTextElements.forEach(span => {
             if (span.classList.contains('bg-blue-100')) return;
-            span.classList.remove('border-2', 'border-yellow-500', 'bg-yellow-100', 'rounded', 'opacity-20');
+            span.classList.remove('bg-yellow-100', 'rounded', 'opacity-20');
         });
 
         // Highlight all nodes that contain parts of the match
         setTimeout(() => {
             match.nodes.forEach(node => {
                 if (node.classList.contains('bg-blue-100')) return;
-                node.classList.add('border-2', 'border-yellow-500', 'bg-yellow-100', 'rounded', 'opacity-20');
+                node.classList.add('bg-yellow-100', 'rounded', 'opacity-20');
             });
 
             // Scroll to the first matching node

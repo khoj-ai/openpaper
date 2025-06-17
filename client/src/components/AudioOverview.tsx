@@ -15,16 +15,12 @@ import Markdown from 'react-markdown';
 import CustomCitationLink from '@/components/utils/CustomCitationLink';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { JobStatusType } from '@/lib/schema';
+import { JobStatusType, ReferenceCitation } from '@/lib/schema';
 
 interface AudioOverviewProps {
     paper_id: string;
     paper_title?: string;
     setExplicitSearchTerm: (term: string) => void;
-}
-interface AudioOverviewCitation {
-    index: number;
-    text: string;
 }
 
 interface AudioOverview {
@@ -33,7 +29,7 @@ interface AudioOverview {
     audio_url: string;
     transcript: string;
     title: string;
-    citations: AudioOverviewCitation[];
+    citations: ReferenceCitation[];
     created_at: string;
     updated_at: string;
     job_id: string;
