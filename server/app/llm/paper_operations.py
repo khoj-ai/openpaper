@@ -1,6 +1,7 @@
 import logging
 import re
 import uuid
+from datetime import datetime, timezone
 from typing import AsyncGenerator, Optional, Sequence, Union
 
 import httpx
@@ -51,6 +52,8 @@ class PaperOperations(BaseLLMClient):
         """
         paper = paper_crud.get(db, id=paper_id, user=user)
 
+        start_time = datetime.now(timezone.utc)
+
         if not paper:
             raise ValueError(f"Paper with ID {paper_id} not found.")
 
@@ -86,6 +89,8 @@ class PaperOperations(BaseLLMClient):
         # Parse the response and return the metadata
         metadata = PaperMetadataExtraction.model_validate(response_json)
 
+        end_time = datetime.now(timezone.utc)
+
         # Track metadata extraction event
         track_event(
             "extracted_metadata",
@@ -98,6 +103,7 @@ class PaperOperations(BaseLLMClient):
                 "num_starter_questions": (
                     len(metadata.starter_questions) if metadata.starter_questions else 0
                 ),
+                "duration": (end_time - start_time).total_seconds(),
             },
             user_id=str(user.id),
         )
