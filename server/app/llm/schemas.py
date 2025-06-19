@@ -104,7 +104,7 @@ The summary should be accessible to readers with basic domain knowledge while ma
     )
     highlights: List[AIHighlight] = Field(
         default=[],
-        description="List of key highlights from the paper. These should be significant quotes or paraphrases that capture the essence of the paper's findings and contributions. Each highlight should include the text of the highlight and an annotation explaining its significance or relevance to the paper's content. Particularly drill into the results, tables, and figures to make sense of the experimental results.",
+        description="List of key highlights from the paper. These should be significant quotes that are must-reads of the paper's findings and contributions. Each highlight should include the text of the highlight and an annotation explaining its significance or relevance to the paper's content. Particularly drill into interesting, novel findings, methodologies, or implications that are worth noting. Pay special attention to tables, figures, and diagrams that may contain important information.",
     )
 
 
