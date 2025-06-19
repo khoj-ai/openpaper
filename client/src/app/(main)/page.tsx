@@ -12,7 +12,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { FileText, GithubIcon, Globe2, HandCoins, Highlighter, Loader2, LucideFileWarning, MessageSquareText, Mic2, Play, Search, Upload } from "lucide-react";
+import { CheckCircle, FileText, GithubIcon, Globe2, HandCoins, Highlighter, Loader2, LucideFileWarning, MessageSquareText, Mic2, Play, Search, Upload } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { PdfDropzone } from "@/components/PdfDropzone";
 import Link from "next/link";
@@ -21,7 +21,7 @@ import Image from "next/image";
 import { PaperItem } from "@/components/AppSidebar";
 import PaperCard from "@/components/PaperCard";
 import { JobStatusType } from "@/lib/schema";
-import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 
 interface PdfUploadResponse {
 	message: string;
@@ -34,11 +34,14 @@ interface JobStatusResponse {
 	started_at: string;
 	completed_at: string | null;
 	paper_id: string | null;
+	has_file_url: boolean;
+	has_metadata: boolean;
 }
 
 export default function Home() {
-	const [isUploading, setIsUploading] = useState(false);
+	const [isUploading, setIsUploading] = useState(true);
 	const [loadingMessage, setLoadingMessage] = useState("Preparing your paper...");
+	const [loadingProgress, setLoadingProgress] = useState(0);
 	const [isUrlDialogOpen, setIsUrlDialogOpen] = useState(false);
 	const [jobUploadStatus, setJobUploadStatus] = useState<JobStatusType | null>(null);
 
@@ -56,9 +59,14 @@ export default function Home() {
 			setJobUploadStatus(response.status);
 
 			if (response.status === 'completed' && response.paper_id) {
+
 				// Success - redirect to paper
+				setLoadingMessage("Paper processed successfully! Redirecting...");
 				const redirectUrl = new URL(`/paper/${response.paper_id}`, window.location.origin);
-				window.location.href = redirectUrl.toString();
+				setTimeout(() => {
+					window.location.href = redirectUrl.toString();
+				}, 500);
+
 			} else if (response.status === 'failed') {
 				// Failed - show error
 				console.error('Upload job failed');
@@ -68,6 +76,17 @@ export default function Home() {
 			} else {
 				// Still processing - poll again
 				setTimeout(() => pollJobStatus(jobId), 2000);
+
+				if (response.has_metadata) {
+					setLoadingMessage("Completed processing metadata...");
+					setLoadingProgress(75);
+				} else if (response.has_file_url) {
+					setLoadingMessage("Completed pre-processing document...");
+					setLoadingProgress(50);
+				} else {
+					setLoadingMessage("Preparing your paper...");
+					setLoadingProgress(25);
+				}
 			}
 		} catch (error) {
 			console.error('Error polling job status:', error);
@@ -75,32 +94,6 @@ export default function Home() {
 			setIsUploading(false);
 		}
 	};
-
-	// Loading messages to cycle through
-	const loadingMessages = [
-		"Crunching the numbers...",
-		"Building an index...",
-		"Squeezing the database...",
-		"Analyzing content...",
-		"Processing pages...",
-		"Extracting insights...",
-		"Preparing annotations...",
-		"Organizing references...",
-		"Setting up your workspace...",
-		"Almost there..."
-	];
-
-	// Cycle through loading messages
-	useEffect(() => {
-		if (!isUploading) return;
-
-		const interval = setInterval(() => {
-			const randomIndex = Math.floor(Math.random() * loadingMessages.length);
-			setLoadingMessage(loadingMessages[randomIndex]);
-		}, 3000);
-
-		return () => clearInterval(interval);
-	}, [isUploading]);
 
 	useEffect(() => {
 		if (!user) return;
@@ -629,16 +622,18 @@ export default function Home() {
 					<div className="flex flex-col items-center justify-center py-8 space-y-6">
 						<EnigmaticLoadingExperience />
 						<div className="flex items-center gap-4 justify-center">
-							<Loader2 className="h-6 w-6 animate-spin text-primary" />
+							{
+								jobUploadStatus === 'completed' ? (
+									<CheckCircle className="h-6 w-6 text-green-500" />
+								) : (
+									<Loader2 className="h-6 w-6 animate-spin text-primary" />
+								)
+							}
 							<p className="text-center text-lg transition-all duration-500 ease-in-out">
 								{loadingMessage}
 							</p>
 						</div>
-						<div className="flex items-center gap-2">
-							<Badge className="text-sm bg-secondary text-secondary-foreground">
-								{jobUploadStatus ? jobUploadStatus : "Processing..."}
-							</Badge>
-						</div>
+						<Progress value={loadingProgress} />
 					</div>
 				</DialogContent>
 			</Dialog>

@@ -55,13 +55,12 @@ async def get_upload_status(
     if not paper_upload_job:
         return JSONResponse(status_code=404, content={"message": "Job not found"})
 
-    paper = None
+    paper = paper_crud.get_by_upload_job_id(
+        db=db, upload_job_id=str(paper_upload_job.id), user=current_user
+    )
 
     if paper_upload_job.status == "completed":
-        # Retrieve the associated paper
-        paper = paper_crud.get_by_upload_job_id(
-            db=db, upload_job_id=str(paper_upload_job.id), user=current_user
-        )
+        # Verify the paper exists
         if not paper:
             return JSONResponse(status_code=404, content={"message": "Paper not found"})
 
@@ -76,6 +75,8 @@ async def get_upload_status(
                 if paper_upload_job.completed_at
                 else None
             ),
+            "has_file_url": bool(paper.file_url) if paper else False,
+            "has_metadata": bool(paper.abstract) if paper else False,
             "paper_id": str(paper.id) if paper else None,
         },
     )
