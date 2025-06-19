@@ -445,7 +445,7 @@ export default function Home() {
 					<p>
 						Made with ❤️ in{" "}
 						<a
-							href="https://github.com/sabaimran/openpaper"
+							href="https://github.com/khoj-ai/openpaper"
 							target="_blank"
 							rel="noopener noreferrer"
 							className="underline hover:text-foreground transition-colors"
@@ -461,7 +461,7 @@ export default function Home() {
 							</Link>
 						</Button>
 						<Button size="lg" variant="outline" asChild>
-							<a href="https://github.com/sabaimran/openpaper">
+							<a href="https://github.com/khoj-ai/openpaper">
 								<GithubIcon className="h-4 w-4 mr-2" />
 								GitHub
 							</a>
@@ -551,7 +551,7 @@ export default function Home() {
 				<p>
 					Made with ❤️ in{" "}
 					<a
-						href="https://github.com/sabaimran/openpaper"
+						href="https://github.com/khoj-ai/openpaper"
 						target="_blank"
 						rel="noopener noreferrer"
 						className="underline hover:text-foreground transition-colors"

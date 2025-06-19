@@ -54,7 +54,7 @@ const items = [
     },
     {
         title: "Feedback",
-        url: "https://github.com/sabaimran/openpaper/issues",
+        url: "https://github.com/khoj-ai/openpaper/issues",
         icon: MessageCircleQuestion,
         requiresAuth: false,
     }

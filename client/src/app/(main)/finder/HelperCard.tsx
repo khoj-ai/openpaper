@@ -111,7 +111,7 @@ export default function HelperCard({ onExampleClick, onExampleFilterClick }: Hel
                 </div>
 
                 <Button variant="outline" size="sm" className="text-xs" asChild>
-                    <Link href="https://github.com/sabaimran/openpaper/issues" className="flex items-center gap-2">
+                    <Link href="https://github.com/khoj-ai/openpaper/issues" className="flex items-center gap-2">
                         <Github className="h-3 w-3" />
                         Feedback & Issues
                     </Link>

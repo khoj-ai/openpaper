@@ -144,7 +144,7 @@ export default function PricingPage() {
                     <p className="text-sm text-blue-800 dark:text-blue-200">
                         <strong>We are in Free, Open Beta for the month of June!</strong> That means you get unlimited usage while we evaluate our roadmap. Help us shape the future of research!{" "}
                         <a
-                            href="https://github.com/sabaimran/openpaper/issues"
+                            href="https://github.com/khoj-ai/openpaper/issues"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="underline hover:no-underline font-medium"

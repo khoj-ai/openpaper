@@ -461,7 +461,7 @@ export default function FinderPage() {
                         </CardContent>
                         <CardFooter className="flex justify-end items-center gap-2">
                             <Button asChild variant="outline" size="sm">
-                                <Link href="https://github.com/sabaimran/openpaper/issues">Report Issue</Link>
+                                <Link href="https://github.com/khoj-ai/openpaper/issues">Report Issue</Link>
                             </Button>
                             <Button
                                 onClick={() => setError(null)}
