@@ -34,7 +34,6 @@ import {
     AudioLines,
     Route,
     User,
-    Network
 } from 'lucide-react';
 
 import { Textarea } from '@/components/ui/textarea';
@@ -84,7 +83,6 @@ import { PaperStatus, PaperStatusEnum } from '@/components/utils/PdfStatus';
 import { useAuth } from '@/lib/auth';
 import CustomCitationLink from '@/components/utils/CustomCitationLink';
 import { Avatar } from '@/components/ui/avatar';
-import GraphOverview from '@/components/GraphOverview';
 
 interface ChatRequestBody {
     user_query: string;
@@ -103,7 +101,6 @@ const PaperToolset = {
         { name: "Annotations", icon: Highlighter },
         { name: "Share", icon: Share },
         { name: "Audio", icon: AudioLines },
-        { name: "Graph", icon: Network },
         { name: "Focus", icon: Focus },
     ],
 }
@@ -1417,16 +1414,6 @@ export default function PaperView() {
                                             </div>
                                         </div>
                                     </form>
-                                </div>
-                            )
-                        }
-                        {
-                            rightSideFunction === 'Graph' && (
-                                <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto">
-                                    <GraphOverview
-                                        paper_data={paperData}
-                                        paper_id={id}
-                                    />
                                 </div>
                             )
                         }
