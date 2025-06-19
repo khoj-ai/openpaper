@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from app.helpers.email import send_onboarding_email
 from app.llm.operations import Operations
 from dotenv import load_dotenv
 from fastapi import APIRouter

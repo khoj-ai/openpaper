@@ -31,4 +31,5 @@ dependencies = [
     "posthog>=4.2.0",
     "pymupdf>=1.25.5",
     "pillow>=11.2.1",
+    "resend>=2.10.0",
 ]

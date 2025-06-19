@@ -16,6 +16,7 @@ from app.database.crud.user_crud import user as user_crud
 from app.database.database import get_db
 from app.database.models import PaperStatus
 from app.database.telemetry import track_event
+from app.helpers.email import send_onboarding_email
 from app.schemas.user import CurrentUser, UserCreateWithProvider
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import RedirectResponse
@@ -166,6 +167,9 @@ async def google_callback(
 
         # Track user signup event
         if newly_created:
+            send_onboarding_email(
+                email=str(db_user.email), name=str(db_user.name) or None
+            )
             track_event(
                 "user_signup",
                 properties={"auth_provider": "google"},
