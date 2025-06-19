@@ -39,7 +39,7 @@ interface JobStatusResponse {
 }
 
 export default function Home() {
-	const [isUploading, setIsUploading] = useState(true);
+	const [isUploading, setIsUploading] = useState(false);
 	const [loadingMessage, setLoadingMessage] = useState("Preparing your paper...");
 	const [loadingProgress, setLoadingProgress] = useState(0);
 	const [isUrlDialogOpen, setIsUrlDialogOpen] = useState(false);
