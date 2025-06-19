@@ -78,13 +78,13 @@ export default function Home() {
 				setTimeout(() => pollJobStatus(jobId), 2000);
 
 				if (response.has_metadata) {
-					setLoadingMessage("Completed processing metadata...");
+					setLoadingMessage("Processing annotations...");
 					setLoadingProgress(75);
 				} else if (response.has_file_url) {
-					setLoadingMessage("Completed pre-processing document...");
+					setLoadingMessage("Processing metadata...");
 					setLoadingProgress(50);
 				} else {
-					setLoadingMessage("Preparing your paper...");
+					setLoadingMessage("Pre-processing your paper...");
 					setLoadingProgress(25);
 				}
 			}
