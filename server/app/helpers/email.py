@@ -9,6 +9,9 @@ import resend
 logger = logging.getLogger(__name__)
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+RESEND_MAIN_AUDIENCE_ID = os.getenv("RESEND_MAIN_AUDIENCE_ID")
+
+resend.api_key = RESEND_API_KEY
 
 
 def load_email_template(template_name: str) -> str:
@@ -26,6 +29,31 @@ def load_email_template(template_name: str) -> str:
         )
 
 
+def add_to_default_audience(email: str, name: Union[str, None] = None) -> None:
+    """
+    Add a user to the default audience in Resend.
+
+    Args:
+        email (str): The email address of the user.
+        name (str): The name of the user.
+    """
+    try:
+        split_name = name.split() if name else []
+        fname = split_name[0] if split_name else ""
+        lname = " ".join(split_name[1:]) if len(split_name) > 1 else ""
+        payload = resend.Contacts.CreateParams = {  # type: ignore
+            "email": email,
+            "first_name": fname,
+            "last_name": lname,
+            "unsubscribed": False,
+            "audience_id": RESEND_MAIN_AUDIENCE_ID,
+        }
+        resend.Contacts.create(payload)  # type: ignore
+
+    except Exception as e:
+        logger.error(f"Failed to add user to audience: {e}", exc_info=True)
+
+
 def send_onboarding_email(email: str, name: Union[str, None] = None) -> None:
     """
     Send an onboarding email to a new user.
@@ -34,16 +62,14 @@ def send_onboarding_email(email: str, name: Union[str, None] = None) -> None:
         email (str): The email address of the user.
         name (str): The name of the user.
     """
-    if not RESEND_API_KEY:
-        raise ValueError("RESEND_API_KEY environment variable is not set.")
-
-    resend.api_key = RESEND_API_KEY
 
     try:
         one_minute_from_now = (
             datetime.now(timezone.utc) + timedelta(minutes=2)
         ).isoformat()
-        formatted_name = f", {name}" if name else ""
+        split_name = name.split() if name else []
+        fname = split_name[0] if split_name else ""
+        formatted_name = f", {fname}" if fname else ""
         payload = resend.Emails.SendParams = {  # type: ignore
             "from": "Open Paper <onboarding@openpaper.ai>",
             "to": [email],
