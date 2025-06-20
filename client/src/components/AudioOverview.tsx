@@ -157,6 +157,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
             const arrayBuffer = await response.arrayBuffer();
 
             // Create audio context
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
             const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
@@ -168,7 +169,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
 
             // Process audio data into waveform points
             for (let i = 0; i < samples; i++) {
-                let blockStart = blockSize * i;
+                const blockStart = blockSize * i;
                 let sum = 0;
 
                 // Calculate RMS (Root Mean Square) for each block
@@ -440,15 +441,6 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
             audio.play();
             setIsPlaying(true);
         }
-    };
-
-    const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const audio = audioRef.current;
-        if (!audio) return;
-
-        const newTime = parseFloat(e.target.value);
-        audio.currentTime = newTime;
-        setCurrentTime(newTime);
     };
 
     const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
