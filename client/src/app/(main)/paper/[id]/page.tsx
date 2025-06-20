@@ -1172,7 +1172,7 @@ export default function PaperView() {
                                                             <Button
                                                                 key={i}
                                                                 variant="outline"
-                                                                className="text-sm font-medium p-2 max-w-full whitespace-normal h-auto text-left justify-start break-words bg-secondary text-secondary-foreground hover:bg-secondary/50"
+                                                                className="text-sm font-medium p-2 max-w-full whitespace-normal h-auto text-left justify-start break-words bg-secondary text-secondary-foreground hover:bg-secondary/50 border-1 bg-background hover:translate-y-0.5 transition-transform duration-200"
                                                                 onClick={() => {
                                                                     setCurrentMessage(question);
                                                                     inputMessageRef.current?.focus();
