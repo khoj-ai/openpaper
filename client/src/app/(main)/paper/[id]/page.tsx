@@ -1166,7 +1166,7 @@ export default function PaperView() {
                                         {messages.length === 0 ? (
                                             <div className="text-center text-gray-500 my-4">
                                                 What do you want to understand about this paper?
-                                                <div className='grid grid-cols-2 gap-2 mt-2'>
+                                                <div className='grid grid-cols-1 gap-2 mt-2'>
                                                     {paperData.starter_questions && paperData.starter_questions.length > 0 ? (
                                                         paperData.starter_questions.slice(0, 5).map((question, i) => (
                                                             <Button

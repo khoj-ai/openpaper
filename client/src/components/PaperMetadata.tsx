@@ -101,7 +101,7 @@ function PaperMetadata({ paperData, onClickStarterQuestion, hasMessages, readonl
         >
             <div className="p-2">
                 <CollapsibleTrigger className="flex flex-row w-full items-center justify-between">
-                    <h2 className="text-xl font-bold">{paperData.title}</h2>
+                    <h2 className={`text-xl font-bold ${isOpen ? '' : 'line-clamp-1'}`}>{paperData.title}</h2>
                     <div className="text-secondary-foreground text-xs flex items-center gap-2 bg-secondary p-1 rounded-md">
                         {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                     </div>
@@ -133,7 +133,7 @@ function PaperMetadata({ paperData, onClickStarterQuestion, hasMessages, readonl
                             </TabsList>
                             <TabsContent value="questions">
                                 {paperData.starter_questions && paperData.starter_questions.length > 0 ? (
-                                    <div className="flex gap-2 flex-wrap">
+                                    <div className="grid gap-2 grid-cols-1">
                                         {paperData.starter_questions.slice(0, 5).map((question, i) => (
                                             <Button
                                                 key={i}
