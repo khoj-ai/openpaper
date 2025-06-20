@@ -61,6 +61,7 @@ const DEFAULT_INSTRUCTIONS = 'Please summarize the key points of this paper, foc
 
 export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: AudioOverviewProps) {
     const audioRef = useRef<HTMLAudioElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
     const [audioOverviewJobId, setAudioOverviewJobId] = useState<string | null>(null);
     const [audioOverview, setAudioOverview] = useState<AudioOverview | null>(null);
     const [allAudioOverviews, setAllAudioOverviews] = useState<AudioOverview[]>([]);
@@ -82,6 +83,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
     const [volume, setVolume] = useState(1);
     const [playbackRate, setPlaybackRate] = useState(1);
     const [isLoaded, setIsLoaded] = useState(false);
+    const [waveformData, setWaveformData] = useState<number[]>([]);
 
     // Check for existing audio overview on component mount
     useEffect(() => {
@@ -143,6 +145,119 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
             audio.removeEventListener('loadstart', handleLoadStart);
         };
     }, [audioOverview]);
+
+
+    // Generate mock waveform data
+    const generateWaveformData = useCallback(async () => {
+        if (!audioOverview?.audio_url) return;
+
+        try {
+            // Fetch the audio file
+            const response = await fetch(audioOverview.audio_url);
+            const arrayBuffer = await response.arrayBuffer();
+
+            // Create audio context
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+            // Get audio data from the first channel
+            const channelData = audioBuffer.getChannelData(0);
+            const samples = 200; // Number of bars in waveform
+            const blockSize = Math.floor(channelData.length / samples);
+            const filteredData = [];
+
+            // Process audio data into waveform points
+            for (let i = 0; i < samples; i++) {
+                let blockStart = blockSize * i;
+                let sum = 0;
+
+                // Calculate RMS (Root Mean Square) for each block
+                for (let j = 0; j < blockSize; j++) {
+                    sum += Math.pow(channelData[blockStart + j], 2);
+                }
+
+                // Normalize the value
+                const rms = Math.sqrt(sum / blockSize);
+                filteredData.push(rms);
+            }
+
+            // Normalize to 0-1 range
+            const maxValue = Math.max(...filteredData);
+            const normalizedData = filteredData.map(value => value / maxValue);
+
+            setWaveformData(normalizedData);
+        } catch (error) {
+            console.error('Error generating waveform data:', error);
+            // Fallback to mock data if audio processing fails
+            generateMockWaveformDataFallback();
+        }
+    }, [audioOverview?.audio_url]);
+
+    // Keep the mock data generation as a fallback
+    const generateMockWaveformDataFallback = useCallback(() => {
+        const points = 200;
+        const data = [];
+        for (let i = 0; i < points; i++) {
+            // Create a more realistic waveform pattern
+            const base = Math.sin(i * 0.1) * 0.5;
+            const noise = (Math.random() - 0.5) * 0.3;
+            const envelope = Math.sin((i / points) * Math.PI) * 0.8;
+            data.push(Math.abs((base + noise) * envelope));
+        }
+        setWaveformData(data);
+    }, []);
+
+    // Draw waveform on canvas
+    const drawWaveform = useCallback(() => {
+        const canvas = canvasRef.current;
+        if (!canvas || waveformData.length === 0) return;
+
+        const ctx = canvas.getContext('2d');
+        const { width, height } = canvas;
+        const progress = duration > 0 ? currentTime / duration : 0;
+
+        if (!ctx) return;
+
+        // Clear canvas
+        ctx.clearRect(0, 0, width, height);
+
+        // Draw waveform
+        const barWidth = width / waveformData.length;
+        const centerY = height / 2;
+
+        waveformData.forEach((value, index) => {
+            const barHeight = Math.abs(value) * (height * 0.8);
+            const x = index * barWidth;
+            const isPlayed = (index / waveformData.length) <= progress;
+
+            // Set color based on whether this part has been played
+            ctx.fillStyle = isPlayed ? '#3b82f6' : '#e5e7eb';
+
+            // Draw the bar
+            ctx.fillRect(x, centerY - barHeight / 2, barWidth - 1, barHeight);
+        });
+
+        // Draw progress line
+        const progressX = progress * width;
+        ctx.strokeStyle = '#1d4ed8';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(progressX, 0);
+        ctx.lineTo(progressX, height);
+        ctx.stroke();
+    }, [waveformData, currentTime, duration]);
+
+    // Generate waveform data on component mount
+    useEffect(() => {
+        if (audioOverview?.audio_url) {
+            generateWaveformData();
+        }
+    }, [generateWaveformData]);
+
+    // Redraw waveform when data or time changes
+    useEffect(() => {
+        drawWaveform();
+    }, [drawWaveform]);
 
     const checkExistingAudioOverview = async () => {
         try {
@@ -298,6 +413,20 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
             setError('Failed to fetch audio overview');
             return null;
         }
+    };
+
+    const handleWaveformClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+        const canvas = canvasRef.current;
+        const audio = audioRef.current;
+        if (!canvas || !audio || !isLoaded) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const progress = x / canvas.width;
+        const newTime = progress * duration;
+
+        audio.currentTime = newTime;
+        setCurrentTime(newTime);
     };
 
     const togglePlayback = () => {
@@ -618,6 +747,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                             preload="metadata"
                         />
 
+
                         {/* Main Controls */}
                         <div className="flex items-center space-x-4 mb-4">
                             <button
@@ -655,20 +785,19 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                             </div>
                         </div>
 
-                        {/* Progress Bar */}
-                        <div className="mb-4">
-                            <input
-                                type="range"
-                                min="0"
-                                max={duration || 0}
-                                step="0.1"
-                                value={currentTime}
-                                onChange={handleSeek}
-                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                                style={{
-                                    background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(currentTime / duration) * 100}%, #e5e7eb ${(currentTime / duration) * 100}%, #e5e7eb 100%)`
-                                }}
+                        {/* Waveform Visualization */}
+                        <div className="relative">
+                            <canvas
+                                ref={canvasRef}
+                                width={800}
+                                height={120}
+                                className="w-full h-24 bg-white dark:bg-gray-700 rounded-lg cursor-pointer border border-gray-200 dark:border-gray-600"
+                                onClick={handleWaveformClick}
+                                style={{ maxWidth: '100%', height: '96px' }}
                             />
+                            <div className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">
+                                Click on the waveform to seek
+                            </div>
                         </div>
 
                         {/* Secondary Controls */}
