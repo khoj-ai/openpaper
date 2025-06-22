@@ -1,4 +1,6 @@
+import { Citation } from "@/lib/schema";
 import { HTMLAttributes, ReactNode, createElement, Children } from "react";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
 // Interface for the CustomCitationLink component props
 interface CustomCitationLinkProps extends HTMLAttributes<HTMLElement> {
@@ -11,8 +13,62 @@ interface CustomCitationLinkProps extends HTMLAttributes<HTMLElement> {
         properties?: Record<string, any>;
     };
     className?: string;
+    citations?: Citation[];
 }
 
+interface CitationLinkProps {
+    citationKey: string;
+    messageIndex: number;
+    handleCitationClick: (key: string, messageIndex: number) => void;
+    citations?: Citation[];
+}
+
+function CitationLink({
+    citationKey,
+    messageIndex,
+    handleCitationClick,
+    citations,
+}: CitationLinkProps) {
+    const matchingCitation = citations?.find(citation => String(citation.key) === citationKey) || null;
+
+    const onClickCitation = (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (handleCitationClick) {
+            handleCitationClick(citationKey, messageIndex);
+        }
+    };
+
+    // If no matching citation, render without hovercard but keep click functionality
+    if (!matchingCitation) {
+        return (
+            <span
+                className="bg-secondary text-secondary-foreground rounded px-1 cursor-pointer"
+                onClick={onClickCitation}
+            >
+                {citationKey}
+            </span>
+        );
+    }
+
+    return (
+        <HoverCard
+            openDelay={100}
+            closeDelay={100}
+        >
+            <HoverCardTrigger asChild>
+                <span
+                    className="bg-secondary text-secondary-foreground rounded px-1 cursor-pointer"
+                    onClick={onClickCitation}
+                >
+                    {citationKey}
+                </span>
+            </HoverCardTrigger>
+            <HoverCardContent className="w-80 p-2 shadow-md bg-accent">
+                <p className="text-sm text-accent-foreground">{matchingCitation.reference}</p>
+            </HoverCardContent>
+        </HoverCard>
+    );
+};
 export default function CustomCitationLink({ children, handleCitationClick, messageIndex, className, ...props }: CustomCitationLinkProps) {
     // Create a clone of props to avoid mutating the original
     const elementProps = {
@@ -33,7 +89,6 @@ export default function CustomCitationLink({ children, handleCitationClick, mess
                 if (citationRegex.test(child)) {
                     // Reset regex state
                     citationRegex.lastIndex = 0;
-
                     // Create a React element array from the string with replaced citations
                     const parts: React.ReactNode[] = [];
                     let lastIndex = 0;
@@ -59,18 +114,13 @@ export default function CustomCitationLink({ children, handleCitationClick, mess
                         parts.push(
                             <span key={`citations-${match.index}`} className="inline-flex gap-1">
                                 {individualCitations.map((citationKey, index) => (
-                                    <a
-                                        key={`citation-${citationKey}-${match!.index}-${index}`}
-                                        href={`#citation-${citationKey}`}
-                                        className="text-secondary-foreground font-medium hover:underline text-sm bg-secondary rounded-xl px-1 py-0.5"
-                                        id={`citation-ref-${citationKey}`}
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            handleCitationClick(citationKey, messageIndex);
-                                        }}
-                                    >
-                                        {citationKey}
-                                    </a>
+                                    <CitationLink
+                                        key={`citation-${citationKey}-${index}`}
+                                        citationKey={citationKey}
+                                        messageIndex={messageIndex}
+                                        handleCitationClick={handleCitationClick}
+                                        citations={props.citations}
+                                    />
                                 ))}
                             </span>
                         );

@@ -770,7 +770,6 @@ export default function PaperView() {
     }, [currentMessage]);
 
     const matchesCurrentCitation = (key: string, messageIndex: number) => {
-        console.log(`Checking if active citation matches: ${activeCitationKey} === ${key} && ${activeCitationMessageIndex} === ${messageIndex}`);
         return activeCitationKey === key.toString() && activeCitationMessageIndex === messageIndex;
     }
 
@@ -1056,16 +1055,35 @@ export default function PaperView() {
                                                     {...props}
                                                     handleCitationClick={handleCitationClickFromSummary}
                                                     messageIndex={0}
+                                                    // Map summary citations to the citation format
+                                                    citations = {
+                                                        paperData.summary_citations?.map(citation => ({
+                                                            key: String(citation.index),
+                                                            reference: citation.text
+                                                        })) || []
+                                                    }
                                                 />,
                                                 li: (props) => <CustomCitationLink
                                                     {...props}
                                                     handleCitationClick={handleCitationClickFromSummary}
                                                     messageIndex={0}
+                                                    citations={
+                                                        paperData.summary_citations?.map(citation => ({
+                                                            key: String(citation.index),
+                                                            reference: citation.text
+                                                        })) || []
+                                                    }
                                                 />,
                                                 div: (props) => <CustomCitationLink
                                                     {...props}
                                                     handleCitationClick={handleCitationClickFromSummary}
                                                     messageIndex={0}
+                                                    citations={
+                                                        paperData.summary_citations?.map(citation => ({
+                                                            key: String(citation.index),
+                                                            reference: citation.text
+                                                        })) || []
+                                                    }
                                                 />,
                                             }}
                                         >
@@ -1220,16 +1238,19 @@ export default function PaperView() {
                                                                     {...props}
                                                                     handleCitationClick={handleCitationClick}
                                                                     messageIndex={index}
+                                                                    citations={msg.references?.citations || []}
                                                                 />,
                                                                 li: (props) => <CustomCitationLink
                                                                     {...props}
                                                                     handleCitationClick={handleCitationClick}
                                                                     messageIndex={index}
+                                                                    citations={msg.references?.citations || []}
                                                                 />,
                                                                 div: (props) => <CustomCitationLink
                                                                     {...props}
                                                                     handleCitationClick={handleCitationClick}
                                                                     messageIndex={index}
+                                                                    citations={msg.references?.citations || []}
                                                                 />,
                                                             }}
                                                         >
@@ -1239,7 +1260,7 @@ export default function PaperView() {
                                                             msg.references && msg.references['citations']?.length > 0 && (
                                                                 <div className="mt-2" id="references-section">
                                                                     <ul className="list-none p-0">
-                                                                        {Object.entries(msg.references['citations']).map(([refIndex, value]) => (
+                                                                        {Object.entries(msg.references.citations).map(([refIndex, value]) => (
                                                                             <div
                                                                                 key={refIndex}
                                                                                 className={`flex flex-row gap-2 ${matchesCurrentCitation(value.key, index) ? 'bg-blue-100 dark:bg-blue-900 rounded p-1 transition-colors duration-300' : ''}`}
