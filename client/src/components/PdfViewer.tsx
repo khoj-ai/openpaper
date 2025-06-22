@@ -76,6 +76,7 @@ export function PdfViewer(props: PdfViewerProps) {
 	} = props;
 
 	const [currentPage, setCurrentPage] = useState<number>(1);
+	const [currSearchText, setCurrSearchText] = useState<string>(explicitSearchTerm || "");
 
 	const [textLayerExtractionFailed, setTextLayerExtractionFailed] = useState(false);
 
@@ -288,7 +289,22 @@ export function PdfViewer(props: PdfViewerProps) {
 								setNotFound(false);
 							}
 						}}
-						onKeyDown={(e) => e.key === 'Enter' && performSearch()}
+						onKeyDown={(e) => {
+							if (e.key === 'Enter') {
+								// If searchText is the same as currSearchText, then go to the next match. If they are different, perform a new search and update currSearchText
+								if (searchText === currSearchText) {
+									if (currentMatch < searchResults.length - 1) {
+										goToNextMatch();
+									}
+								} else {
+									setCurrSearchText(searchText);
+									performSearch();
+								}
+							} else if (e.key === 'Escape') {
+								// Clear search when Escape is pressed
+								handleClearSearch();
+							}
+						}}
 						className="h-8 text-sm"
 					/>
 					<Button onClick={() => performSearch()} size="sm" variant="ghost" className="h-8 px-2" disabled={textLayerExtractionFailed || !allPagesLoaded}>
