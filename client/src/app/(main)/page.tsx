@@ -547,25 +547,29 @@ export default function Home() {
 				)}
 
 			</main>
-			<footer className="row-start-3 grid gap-[24px] items-center justify-center justify-items-center">
-				<p>
-					Made with ❤️ in{" "}
-					<a
-						href="https://github.com/khoj-ai/openpaper"
-						target="_blank"
-						rel="noopener noreferrer"
-						className="underline hover:text-foreground transition-colors"
-					>
-						San Francisco
-					</a>
-				</p>
-				<Button size="lg" className="w-fit" variant="outline" asChild>
-					<Link href="/blog/manifesto">
-						<FileText className="h-4 w-4 mr-2" />
-						Manifesto
-					</Link>
-				</Button>
-			</footer>
+			{
+				relevantPapers.length === 0 && (
+					<footer className="row-start-3 grid gap-[24px] items-center justify-center justify-items-center">
+						<p>
+							Made with ❤️ in{" "}
+							<a
+								href="https://github.com/khoj-ai/openpaper"
+								target="_blank"
+								rel="noopener noreferrer"
+								className="underline hover:text-foreground transition-colors"
+							>
+								San Francisco
+							</a>
+						</p>
+						<Button size="lg" className="w-fit" variant="outline" asChild>
+							<Link href="/blog/manifesto">
+								<FileText className="h-4 w-4 mr-2" />
+								Manifesto
+							</Link>
+						</Button>
+					</footer>
+				)
+			}
 
 			{showErrorAlert && (
 				<Dialog open={showErrorAlert} onOpenChange={setShowErrorAlert}>
