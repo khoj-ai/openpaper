@@ -2,15 +2,16 @@ import uuid
 from enum import Enum
 from types import NoneType
 
-from sqlalchemy import UUID  # type: ignore
-from sqlalchemy import (
+from sqlalchemy import (  # type: ignore
     ARRAY,
+    UUID,
     Boolean,
     Column,
     DateTime,
     ForeignKey,
     Integer,
     String,
+    Table,
     Text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -162,6 +163,16 @@ class PaperStatus(str, Enum):
     completed = "completed"
 
 
+project_papers = Table(
+    "project_papers",
+    Base.metadata,
+    Column(
+        "project_id", UUID(as_uuid=True), ForeignKey("projects.id"), primary_key=True
+    ),
+    Column("paper_id", UUID(as_uuid=True), ForeignKey("papers.id"), primary_key=True),
+)
+
+
 class Paper(Base):
     __tablename__ = "papers"
 
@@ -223,6 +234,27 @@ class Paper(Base):
     )
     audio_overview_jobs = relationship(
         "AudioOverviewJob", back_populates="paper", cascade="all, delete-orphan"
+    )
+    projects = relationship(
+        "Project",
+        secondary="project_papers",
+        back_populates="papers",
+    )
+
+
+class Project(Base):
+    __tablename__ = "projects"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+
+    user = relationship("User", back_populates="projects")
+    papers = relationship(
+        "Paper",
+        secondary="project_papers",
+        back_populates="projects",
     )
 
 
