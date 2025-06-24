@@ -63,7 +63,6 @@ const items = [
 
 export interface PaperItem {
     id: string
-    filename: string
     title: string
     abstract?: string
     authors?: string[]
@@ -148,7 +147,7 @@ export function AppSidebar() {
                                                                 href={`/paper/${paper.id}`}
                                                                 className="text-xs font-medium w-full h-fit my-1"
                                                             >
-                                                                {paper.title || paper.filename}
+                                                                {paper.title}
                                                             </a>
                                                         </SidebarMenuSubButton>
                                                     </SidebarMenuSubItem>
