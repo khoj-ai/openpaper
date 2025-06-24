@@ -1,0 +1,35 @@
+"""
+Celery application configuration and setup.
+"""
+import os
+from dotenv import load_dotenv
+from celery import Celery # type: ignore
+
+# Create Celery instance
+celery_app = Celery(
+    "openpaper_tasks",
+    broker=os.getenv("CELERY_BROKER_URL", "pyamqp://guest@localhost:5672//"),
+    backend=os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/0"),
+    include=["src.tasks"]
+)
+
+load_dotenv()  # Load environment variables from .env file
+
+# Celery configuration
+celery_app.conf.update(
+    task_serializer="json",
+    accept_content=["json"],
+    result_serializer="json",
+    timezone="UTC",
+    enable_utc=True,
+    result_expires=3600,  # Results expire after 1 hour
+    task_routes={
+        "upload_and_process_file": {"queue": "pdf_processing"}
+    },
+    worker_prefetch_multiplier=1,  # Process one task at a time
+    task_acks_late=True,
+    worker_max_tasks_per_child=1000,
+)
+
+if __name__ == "__main__":
+    celery_app.start()
