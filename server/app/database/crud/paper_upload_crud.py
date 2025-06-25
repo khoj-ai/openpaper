@@ -13,6 +13,7 @@ class PaperUploadJobBase(BaseModel):
     status: Optional[JobStatus] = JobStatus.PENDING
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+    task_id: Optional[str] = None
 
 
 class PaperUploadJobCreate(PaperUploadJobBase):
@@ -22,6 +23,7 @@ class PaperUploadJobCreate(PaperUploadJobBase):
 
 class PaperUploadJobUpdate(PaperUploadJobBase):
     status: Optional[JobStatus] = None
+    task_id: Optional[str] = None
 
 
 # PaperUploadJob CRUD that inherits from the base CRUD

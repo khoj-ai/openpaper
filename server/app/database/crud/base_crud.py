@@ -56,6 +56,20 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             )
             return None
 
+    def get_no_auth(self, db: Session, id: Any) -> Optional[ModelType]:
+        """
+        Get a single record by ID without user filtering
+        RISK: This method should be used with caution as it bypasses user ownership checks. Use sparingly and only if absolutely necessary.
+        """
+        try:
+            return db.query(self.model).filter(self.model.id == id).first()
+        except Exception as e:
+            logger.error(
+                f"Error retrieving {self.model.__name__} with ID {id}: {str(e)}",
+                exc_info=True,
+            )
+            return None
+
     def get_multi(
         self,
         db: Session,

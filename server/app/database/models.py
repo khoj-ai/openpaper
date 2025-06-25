@@ -152,6 +152,7 @@ class PaperUploadJob(Base):
     status = Column(String, nullable=False, default=JobStatus.PENDING)
     started_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
+    task_id = Column(String, nullable=True)  # For tracking task in Celery
 
     user = relationship("User", back_populates="paper_upload_jobs")
 

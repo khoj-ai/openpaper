@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 
 # Define Pydantic models for type safety
 class PaperBase(BaseModel):
-    filename: Optional[str] = None
     file_url: Optional[str] = None
     s3_object_key: Optional[str] = None
     authors: Optional[List[str]] = None
@@ -45,8 +44,8 @@ class PaperBase(BaseModel):
 
 class PaperCreate(PaperBase):
     # Only mandate required fields for creation, others are optional
-    filename: str  # type: ignore
     file_url: str  # type: ignore
+    raw_content: str  # type: ignore
     s3_object_key: Optional[str] = None
     upload_job_id: Optional[str] = None
     preview_url: Optional[str] = None
