@@ -38,7 +38,7 @@ jobs:
                   context: ./client
                   file: ./client/Dockerfile
                   push: true
-                  tags: ghcr.io/${{ github.repository_owner }}/ap-client:latest
+                  tags: ghcr.io/${{ github.repository_owner }}/ap-client:${{ github.ref_name == 'master' && 'latest' || github.ref_name }}
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
@@ -65,7 +65,7 @@ jobs:
                 context: ./server
                 file: ./server/Dockerfile
                 push: true
-                tags: ghcr.io/${{ github.repository_owner }}/ap-server:latest
+                tags: ghcr.io/${{ github.repository_owner }}/ap-server:${{ github.ref_name == 'master' && 'latest' || github.ref_name }}
 
     build_jobs:
       name: Build and Push jobs image
@@ -90,4 +90,6 @@ jobs:
                 context: ./jobs
                 file: ./jobs/Dockerfile
                 push: true
-                tags: ghcr.io/${{ github.repository_owner }}/ap-jobs:latest
+                tags: ghcr.io/${{ github.repository_owner }}/ap-jobs:${{ github.ref_name == 'master' && 'latest' || github.ref_name }}
+                cache-from: type=gha
+                cache-to: type=gha,mode=max
