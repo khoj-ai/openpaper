@@ -169,7 +169,6 @@ class Paper(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     # we can change the default to TODO once we have some kind of bulk paper upload? for now, every upload automatically converts to reading
     status = Column(String, nullable=False, default=PaperStatus.reading)
-    filename = Column(String, nullable=False)
     file_url = Column(String, nullable=False)
     preview_url = Column(String, nullable=True)
     s3_object_key = Column(
