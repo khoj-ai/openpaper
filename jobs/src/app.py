@@ -39,41 +39,14 @@ class TaskStatus(BaseModel):
     result: Optional[Dict[str, Any]] = None
     meta: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
+    progress: Optional[int] = None  # Progress percentage (0-100)
+    progress_message: Optional[str] = None  # Human-readable progress message
 
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "service": "pdf-processing"}
-
-
-@app.post("/process-pdf", response_model=TaskResponse)
-async def submit_pdf_processing_task(task_data: TaskSubmission):
-    """
-    Submit a PDF file for processing.
-
-    Returns the task ID which can be used to check status.
-    """
-    try:
-        # Submit task to Celery
-        task = upload_and_process_file.delay( # type: ignore
-            pdf_base64=task_data.pdf_base64,
-            webhook_url=task_data.webhook_url,
-            **task_data.processing_options # type: ignore
-        )
-
-        logger.info(f"Submitted task {task.id} for file: {task_data.webhook_url}")
-
-        return TaskResponse(
-            task_id=task.id,
-            status="submitted",
-            message=f"Task submitted successfully. Use task ID {task.id} to check status."
-        )
-
-    except Exception as e:
-        logger.error(f"Failed to submit task: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to submit task: {str(e)}")
-
 
 @app.get("/task/{task_id}/status", response_model=TaskStatus)
 async def get_task_status(task_id: str):
@@ -92,11 +65,14 @@ async def get_task_status(task_id: str):
                 meta={"message": "Task is pending or does not exist"}
             )
         elif task_result.state == "PROGRESS":
-            # Task is in progress
+            # Task is in progress - extract progress details
+            progress_info = task_result.info or {}
             status_response = TaskStatus(
                 task_id=task_id,
                 status="progress",
-                meta=task_result.info
+                meta=progress_info,
+                progress=progress_info.get("progress", 0),
+                progress_message=progress_info.get("status", "Processing...")
             )
         elif task_result.state == "SUCCESS":
             # Task completed successfully
