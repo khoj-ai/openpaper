@@ -75,7 +75,7 @@ class PDFJobsClient:
         # Connect to Celery broker directly to submit task
         try:
             # Create Celery app instance (this connects to the broker, not the worker code)
-            celery_app = Celery("pdf_jobs", broker=self.celery_broker_url)
+            celery_app = Celery("openpaper_tasks", broker=self.celery_broker_url)
 
             # Configure Celery to be more tolerant of connection issues
             celery_app.conf.update(
