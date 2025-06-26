@@ -15,6 +15,9 @@ COPY pyproject.toml uv.lock ./
 # Install uv for faster package management
 RUN pip install uv
 
+# Set the UV_SYSTEM_PYTHON environment variable
+ENV UV_SYSTEM_PYTHON=true
+
 # Install Python dependencies
 RUN uv sync --frozen
 
