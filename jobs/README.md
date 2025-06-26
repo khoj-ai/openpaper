@@ -1,188 +1,127 @@
-# PDF Processing Jobs Service
+# Jobs Service
 
-This service provides asynchronous PDF processing capabilities using Celery. It extracts metadata from academic papers, generates preview images, and uploads files to S3.
-
-## Features
-
-- **PDF Text Extraction**: Extracts full text content from PDF files
-- **Metadata Extraction**: Uses LLM to extract title, authors, abstract, summary, and other metadata
-- **Preview Generation**: Creates preview images from the first page of PDFs
-- **S3 Upload**: Uploads original PDFs and preview images to S3
-- **Webhook Notifications**: Sends processing results to specified webhook URLs
-
-## Setup
-
-1. Install dependencies:
-```bash
-uv install
-```
-
-2. Set environment variables:
-```bash
-export AWS_ACCESS_KEY_ID=your_access_key
-export AWS_SECRET_ACCESS_KEY=your_secret_key
-export AWS_REGION=us-east-1
-export S3_BUCKET_NAME=your-s3-bucket
-export CLOUDFLARE_BUCKET_NAME=your-cloudflare-bucket
-export CELERY_BROKER_URL=redis://localhost:6379/0
-export CELERY_RESULT_BACKEND=redis://localhost:6379/0
-```
-
-3. Start Redis (for Celery broker):
-```bash
-redis-server
-```
-
-4. Start Celery worker:
-```bash
-./scripts/start_worker.sh
-```
-
-5. Start Flower (optional, for monitoring):
-```bash
-./scripts/start_flower.sh
-```
-
-## Usage
-
-### Basic Task Submission
-
-```python
-import base64
-from src.tasks import upload_and_process_file
-
-# Read PDF file as bytes
-with open("document.pdf", "rb") as f:
-    pdf_bytes = f.read()
-# Encode PDF bytes to base64
-pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
-
-# Submit processing task
-task = upload_and_process_file.delay(
-    pdf_base64=pdf_base64,
-    filename="document.pdf",
-    webhook_url="https://your-app.com/webhooks/pdf-processing"
-)
-
-print(f"Task ID: {task.id}")
-```
-
-### Task Response Format
-
-The task sends a webhook with the following structure:
-
-```json
-{
-  "task_id": "abc-123-def",
-  "status": "completed",
-  "filename": "document.pdf",
-  "result": {
-    "success": true,
-    "metadata": {
-      "title": "Paper Title",
-      "authors": ["Author 1", "Author 2"],
-      "abstract": "Paper abstract...",
-      "summary": "AI-generated summary...",
-      "keywords": ["keyword1", "keyword2"],
-      "highlights": [
-        {
-          "text": "Important finding...",
-          "annotation": "Why this is significant..."
-        }
-      ],
-      "starter_questions": ["Question 1?", "Question 2?"]
-    },
-    "s3_object_key": "uploads/uuid-document.pdf",
-    "file_url": "https://your-cdn.com/uploads/uuid-document.pdf",
-    "preview_url": "https://your-cdn.com/uploads/uuid-preview.png",
-    "filename": "document.pdf"
-  },
-  "error": null
-}
-```
-
-### Webhook Handler Example
-
-```python
-from fastapi import FastAPI
-
-app = FastAPI()
-
-@app.post("/webhooks/pdf-processing")
-async def handle_pdf_processing(data: dict):
-    if data["status"] == "completed" and data["result"]["success"]:
-        # Process successful result
-        metadata = data["result"]["metadata"]
-        file_url = data["result"]["file_url"]
-        # Save to database, notify user, etc.
-    else:
-        # Handle failure
-        error = data["result"]["error"]
-        # Log error, notify user of failure, etc.
-
-    return {"received": True}
-```
+The Jobs Service is a Celery-based asynchronous task processing service that handles heavy-duty, long-running jobs for the Annotated Paper application. The first and primary job is PDF processing, which involves parsing uploaded PDF documents, extracting metadata, and preparing them for use in the main application.
 
 ## Architecture
 
-- **Celery**: Distributed task queue for async processing
-- **Redis**: Message broker and result backend
-- **S3**: File storage for PDFs and preview images
-- **PyMuPDF**: PDF text extraction and preview generation
-- **LLM Integration**: Metadata extraction (placeholder implementation)
+The Jobs Service is designed to be a scalable and robust backend component that offloads intensive processing from the main web server. It communicates with the `server` service via a message broker (Redis) and webhooks.
 
-## Development
+### High-Level Flow
 
-### LLM Integration
+Here's a high-level overview of the PDF processing workflow:
 
-The current LLM client (`src/llm_client.py`) is a placeholder. Replace it with your actual LLM provider:
-
-```python
-# Example with OpenAI
-import openai
-
-class LLMClient:
-    def extract_paper_metadata(self, paper_content: str) -> PaperMetadataExtraction:
-        response = openai.chat.completions.create(
-            model="gpt-4",
-            messages=[{
-                "role": "user",
-                "content": formatted_prompt
-            }]
-        )
-        # Parse response and return metadata
+```
+                               +------------------+
+                               |                  |
+      +----------------------> |   Server (API)   |
+      |                        |                  |
+      |                        +--------+---------+
+      |                                 | 1. User uploads PDF
+      |                                 |
++-----v-----+                           |
+|           |                           |
+|   User    |                           |
+|           |                           |
++-----------+                           |
+      ^                                 |
+      |                                 |
+      | 6. PDF is ready                 v
+      |                        +--------+---------+
+      |                        |                  |
+      +------------------------+ RabbitMQ (Broker)|
+                               |                  |
+                               +--------+---------+
+                                        | 2. Task is sent to queue
+                                        |
+                                        v
+                               +--------+---------+
+                               |                  |
++----------------------------> |  Celery Workers  | <-----------------+
+| 5. Webhook notification      | (Jobs Service)   |                   | 3. LLM extracts
+|    (via Server API)          |                  |                   |    metadata
+|                              +--------+---------+                   |
+|                                       |                             |
+|                                       | 4. PDF and assets           |
+|                                       |    are uploaded to S3       |
+|                                       |                             |
+|   +----------------+                  v                             |
+|   |                |         +--------+---------+                   |
++---+  LLM Service   |         |                  |                   |
+    |                | <-----> |       S3         | <-----------------+
+    +----------------+         |                  |
+                               +------------------+
 ```
 
-### Testing
+1.  **PDF Upload**: A user uploads a PDF file to the `server` via the web application.
+2.  **Task Queuing**: The `server` creates a new paper record in the database with a `processing` status, then dispatches a task to the Celery message broker (Redis) with the PDF data and a webhook URL.
+3.  **Task Consumption**: A Celery worker from the `jobs` service picks up the task from the queue.
+4.  **PDF Processing**: The worker processes the PDF:
+    *   It extracts the full text content.
+    *   It generates a preview image of the first page.
+    *   It calls an LLM service to extract metadata like title, authors, abstract, and keywords.
+5.  **S3 Storage**: The original PDF, the generated preview image, and the extracted text are uploaded to an S3 bucket.
+6.  **Webhook Notification**: Once processing is complete, the `jobs` service sends a webhook notification to the `server` with the results, including the S3 URLs and the extracted metadata.
+7.  **Database Update**: The `server` receives the webhook, updates the paper record in the database with the new information, and marks the status as `complete`. The paper is now available to the user.
 
-Monitor tasks with Flower:
-```bash
-# Access at http://localhost:5555
-flower --app=src.celery_app:celery_app
-```
+### System Dependencies
 
-Check task status programmatically:
-```python
-from src.celery_app import celery_app
+The Jobs Service relies on the following external services:
 
-result = celery_app.AsyncResult(task_id)
-print(f"Status: {result.status}")
-print(f"Result: {result.result}")
-```
+*   **RabbitMQ**: Used as the message broker for Celery to queue and distribute tasks.
+*   **Redis**: Used as the result backend for Celery to store task results.
+*   **PostgreSQL**: The primary database, managed by the `server` service. The `jobs` service does not directly access the database.
+*   **S3-compatible Object Storage**: Used for storing the uploaded PDFs, preview images, and other assets.
+*   **LLM Service**: An external or internal service for extracting metadata from the PDF content.
 
-Check if celery running:
-```bash
-celery -A src.celery_app worker --loglevel=info
-```
+## Setup and Configuration
 
-## Environment Variables
+### Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `AWS_ACCESS_KEY_ID` | AWS access key | Yes |
-| `AWS_SECRET_ACCESS_KEY` | AWS secret key | Yes |
-| `AWS_REGION` | AWS region | No (default: us-east-1) |
-| `S3_BUCKET_NAME` | S3 bucket for file storage | Yes |
-| `CLOUDFLARE_BUCKET_NAME` | CDN bucket name | Yes |
-| `CELERY_BROKER_URL` | Redis URL for Celery | Yes |
-| `CELERY_RESULT_BACKEND` | Redis URL for results | Yes |
+The following environment variables are required to run the Jobs Service:
+
+| Variable                | Description                                      | Required |
+| ----------------------- | ------------------------------------------------ | -------- |
+| `AWS_ACCESS_KEY_ID`     | AWS access key for S3.                           | Yes      |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key for S3.                           | Yes      |
+| `AWS_REGION`            | The AWS region for the S3 bucket.                | No       |
+| `S3_BUCKET_NAME`        | The name of the S3 bucket for file storage.      | Yes      |
+| `CLOUDFLARE_BUCKET_NAME`| The name of the Cloudflare R2 bucket (if used).  | Yes      |
+| `CELERY_BROKER_URL`     | The URL for the Celery message broker (RabbitMQ).   | Yes      |
+| `CELERY_RESULT_BACKEND` | The URL for the Celery result backend (Redis).   | Yes      |
+| `LLM_API_KEY`           | The API key for the LLM service.                 | Yes      |
+
+### Running Locally
+
+1.  **Install Dependencies**:
+    ```bash
+    uv install
+    ```
+
+2.  **Start RabbitMQ and Redis**:
+    Make sure you have RabbitMQ and Redis servers running. You can use Docker to easily start them:
+    ```bash
+    docker run -d -p 5672:5672 rabbitmq
+    docker run -d -p 6379:6379 redis
+    ```
+
+3.  **Start the Celery Worker**:
+    ```bash
+    ./scripts/start_worker.sh
+    ```
+
+4.  **Start Flower (Optional)**:
+    Flower is a web-based tool for monitoring Celery jobs.
+    ```bash
+    ./scripts/start_flower.sh
+    ```
+    You can access the Flower dashboard at `http://localhost:5555`.
+
+## Future Development
+
+The Jobs Service is designed to be extensible. In the future, we plan to add more asynchronous tasks, such as:
+
+*   **Bulk imports**: Processing large batches of papers at once.
+*   **Scheduled tasks**: Periodically fetching new papers from sources like arXiv.
+*   **Data enrichment**: Running additional analysis on papers after they've been uploaded.
+
+By separating these tasks into a dedicated service, we can ensure the main application remains responsive and scalable as we add more features.
