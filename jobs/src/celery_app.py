@@ -2,7 +2,6 @@
 Celery application configuration and setup.
 """
 import os
-import ssl
 from dotenv import load_dotenv
 from celery import Celery # type: ignore
 
