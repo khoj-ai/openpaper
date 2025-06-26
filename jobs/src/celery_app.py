@@ -19,21 +19,11 @@ celery_app = Celery(
     include=["src.tasks"]
 )
 
-transport_options = {}
-
-if BACKEND_URL.startswith("rediss://"):
-    transport_options.update({
-        "ssl_cert_reqs": ssl.CERT_REQUIRED,
-        "ssl_ca_certs": None,  # Use system CA bundle
-        "ssl_check_hostname": True,
-    })
-
 # Celery configuration
 celery_app.conf.update(
     task_serializer="json",
     accept_content=["json"],
     result_serializer="json",
-    result_backend_transport_options=transport_options,
     timezone="UTC",
     enable_utc=True,
     result_expires=3600,  # Results expire after 1 hour
