@@ -6,6 +6,7 @@ import ssl
 from dotenv import load_dotenv
 from celery import Celery # type: ignore
 
+load_dotenv()  # Load environment variables from .env file
 
 BROKER_URL = os.getenv("CELERY_BROKER_URL", "pyamqp://guest@localhost:5672//")
 BACKEND_URL = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
@@ -22,10 +23,10 @@ transport_options = {}
 
 if BACKEND_URL.startswith("rediss://"):
     transport_options.update({
-        "ssl_cert_reqs": ssl.CERT_REQUIRED
+        "ssl_cert_reqs": ssl.CERT_REQUIRED,
+        "ssl_ca_certs": None,  # Use system CA bundle
+        "ssl_check_hostname": True,
     })
-
-load_dotenv()  # Load environment variables from .env file
 
 # Celery configuration
 celery_app.conf.update(
