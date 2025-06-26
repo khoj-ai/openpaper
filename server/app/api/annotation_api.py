@@ -65,7 +65,7 @@ async def create_annotation(
             content=annotation.to_dict(),
         )
     except Exception as e:
-        logger.error(f"Error creating annotation: {e}")
+        logger.error(f"Error creating annotation: {e}", exc_info=True)
         return JSONResponse(
             status_code=400,
             content={"message": f"Failed to create annotation: {str(e)}"},

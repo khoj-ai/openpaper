@@ -27,6 +27,7 @@ class PDFProcessingResult(BaseModel):
     success: bool
     job_id: str
     raw_content: Optional[str] = None
+    page_offset_map: Optional[dict[int, list[int]]] = None
     metadata: Optional[PaperMetadataExtraction] = None
     s3_object_key: Optional[str] = None
     file_url: Optional[str] = None
@@ -117,6 +118,7 @@ async def handle_paper_processing_webhook(
                     publish_date=metadata.publish_date,
                     starter_questions=metadata.starter_questions,
                     raw_content=result.raw_content,
+                    page_offset_map=result.page_offset_map,
                 ),
                 user=job_user,
             )
@@ -132,7 +134,8 @@ async def handle_paper_processing_webhook(
                     )
                 except Exception as e:
                     logger.error(
-                        f"Error creating annotations for job {job_id}: {str(e)}"
+                        f"Error creating annotations for job {job_id}: {str(e)}",
+                        exc_info=True,
                     )
                     # Don't fail the whole process for annotation errors
 

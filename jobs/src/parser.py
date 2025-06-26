@@ -69,7 +69,7 @@ def extract_text_from_pdf(file_path: str) -> str:
 
 def map_pages_to_text_offsets(
     pdf_file_path: str,
-) -> dict[int, tuple[int, int]]:
+) -> dict[int, list[int]]:
     """
     Map each page of the PDF to its corresponding text offsets.
     """
@@ -83,31 +83,12 @@ def map_pages_to_text_offsets(
         page_length = len(page_text)
 
         if page_length > 0:
-            page_offsets[page_num + 1] = (current_offset, current_offset + page_length)
+            # Technically, we're only returning Tuples, but the List is easier to work with for json serialization
+            page_offsets[page_num + 1] = [current_offset, current_offset + page_length]
             current_offset += page_length
 
     return page_offsets
 
-
-def get_start_page_from_offset(offsets: dict[int, Tuple[int, int]], offset: int) -> int:
-    """
-    Get the starting page number for a given text offset.
-    """
-    # Get last offset to ensure the offset is within bounds
-    if not offsets:
-        return -1  # Return -1 if no offsets are available
-    last_page_num = max(offsets.keys())
-    last_offset = offsets[last_page_num][1]
-    if offset < 0 or offset >= last_offset:
-        return -1  # Return -1 if the offset is out of bounds
-
-    # Iterate through the offsets to find the page number for the given offset
-    for page_num, (start, end) in offsets.items():
-        if start <= offset < end:
-            return page_num
-
-    # Return -1 if no matching page is found. This condition should not occur if the offset is valid. Technically, the code should be unreachable given above checks, but need for completeness.
-    return -1
 
 def generate_pdf_preview(file_path: str) -> Tuple[str, str]:
     """

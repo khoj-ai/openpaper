@@ -92,6 +92,7 @@ class PDFProcessingResult(BaseModel):
     success: bool
     job_id: str
     raw_content: Optional[str] = None
+    page_offset_map: Optional[dict[int, list[int]]] = None
     metadata: Optional[PaperMetadataExtraction] = None
     s3_object_key: Optional[str] = None
     file_url: Optional[str] = None
