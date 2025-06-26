@@ -4,6 +4,7 @@ Celery tasks for PDF processing.
 import logging
 import tempfile
 import base64
+import time
 from datetime import datetime, timezone
 from typing import Dict, Any
 import requests
@@ -189,19 +190,26 @@ def upload_and_process_file(
         }
 
         # Send webhook notification
-        try:
-            response = requests.post(
-                webhook_url,
-                json=webhook_payload,
-                timeout=30,
-                headers={"Content-Type": "application/json"}
-            )
-            response.raise_for_status()
-            logger.info(f"Webhook sent successfully for task {task_id}")
-        except requests.RequestException as e:
-            logger.error(f"Failed to send webhook for task {task_id}: {e}")
-            # Don't fail the task if webhook fails, but log it
-            webhook_payload["webhook_error"] = str(e)
+        retries = 3
+        backoff_factor = 0.5
+        for i in range(retries):
+            try:
+                response = requests.post(
+                    webhook_url,
+                    json=webhook_payload,
+                    timeout=60,
+                    headers={"Content-Type": "application/json"}
+                )
+                response.raise_for_status()
+                logger.info(f"Webhook sent successfully for task {task_id}")
+                break
+            except requests.RequestException as e:
+                logger.warning(f"Webhook attempt {i+1}/{retries} failed for task {task_id}: {e}")
+                if i < retries - 1:
+                    time.sleep(backoff_factor * (2 ** i))
+                else:
+                    logger.error(f"Failed to send webhook for task {task_id} after {retries} retries.")
+                    webhook_payload["webhook_error"] = str(e)
 
         logger.info(f"Task {task_id} completed successfully")
         return webhook_payload
@@ -221,7 +229,7 @@ def upload_and_process_file(
             response = requests.post(
                 webhook_url,
                 json=failure_payload,
-                timeout=30,
+                timeout=60,
                 headers={"Content-Type": "application/json"}
             )
             response.raise_for_status()
