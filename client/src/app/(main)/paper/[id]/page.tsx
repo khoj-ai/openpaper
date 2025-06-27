@@ -1049,6 +1049,8 @@ export default function PaperView() {
                                             <h1 className="text-2xl font-bold">{paperData.title}</h1>
                                         )}
                                         <Markdown
+                                            remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
+                                            rehypePlugins={[rehypeKatex]}
                                             components={{
                                                 // Apply the custom component to text nodes
                                                 p: (props) => <CustomCitationLink
@@ -1056,7 +1058,7 @@ export default function PaperView() {
                                                     handleCitationClick={handleCitationClickFromSummary}
                                                     messageIndex={0}
                                                     // Map summary citations to the citation format
-                                                    citations = {
+                                                    citations={
                                                         paperData.summary_citations?.map(citation => ({
                                                             key: String(citation.index),
                                                             reference: citation.text

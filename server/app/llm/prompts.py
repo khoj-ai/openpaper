@@ -1,20 +1,3 @@
-EXTRACT_PAPER_METADATA = """
-You are a metadata extraction assistant. Your task is to extract relevant information from academic papers.
-
-Given the following paper, extract the title, authors, abstract, institutions, keywords, annotations, summary, useful starter questions that can be asked about the paper, and the publish date. The information should be structured in a JSON format.
-
-Extract the title in title case.
-
-Extract the abstract in normal case.
-
-Paper: {paper}
-
-Please provide the necessary details for extraction. Ensure that the information is accurate and complete.
-
-Please format the information in a JSON object as follows:
-Schema: {schema}
-"""
-
 GENERATE_NARRATIVE_SUMMARY = """
 You are on an important mission to generate a narrative summary of the provided paper. Your task is to create a concise and informative summary that captures the essence of the paper, including its key findings, methodologies, and conclusions.
 

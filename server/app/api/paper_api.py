@@ -64,7 +64,6 @@ async def get_paper_ids(
             "papers": [
                 {
                     "id": str(paper.id),
-                    "filename": paper.filename,
                     "title": paper.title,
                     "created_at": str(paper.created_at),
                     "abstract": paper.abstract,
@@ -102,7 +101,6 @@ async def get_active_paper_ids(
             "papers": [
                 {
                     "id": str(paper.id),
-                    "filename": paper.filename,
                     "title": paper.title,
                     "created_at": str(paper.created_at),
                     "abstract": paper.abstract,
@@ -248,7 +246,6 @@ async def get_relevant_papers(
             "papers": [
                 {
                     "id": str(paper.id),
-                    "filename": paper.filename,
                     "title": paper.title,
                     "created_at": str(paper.created_at),
                     "abstract": paper.abstract,

@@ -7,6 +7,7 @@ on:
         paths:
             - 'client/**'
             - 'server/**'
+            - 'jobs/**'
     workflow_dispatch:
 
 permissions:
@@ -37,7 +38,7 @@ jobs:
                   context: ./client
                   file: ./client/Dockerfile
                   push: true
-                  tags: ghcr.io/${{ github.repository_owner }}/ap-client:latest
+                  tags: ghcr.io/${{ github.repository_owner }}/ap-client:${{ github.ref_name == 'master' && 'latest' || github.ref_name }}
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
@@ -64,4 +65,31 @@ jobs:
                 context: ./server
                 file: ./server/Dockerfile
                 push: true
-                tags: ghcr.io/${{ github.repository_owner }}/ap-server:latest
+                tags: ghcr.io/${{ github.repository_owner }}/ap-server:${{ github.ref_name == 'master' && 'latest' || github.ref_name }}
+
+    build_jobs:
+      name: Build and Push jobs image
+      runs-on: ubuntu-latest
+      steps:
+          - name: Checkout code
+            uses: actions/checkout@v3
+
+          - name: Setup Docker Buildx
+            uses: docker/setup-buildx-action@v2
+
+          - name: Login to GitHub container registry
+            uses: docker/login-action@v2
+            with:
+                registry: ghcr.io
+                username: ${{ github.repository_owner }}
+                password: ${{ secrets.GITHUB_TOKEN }}
+
+          - name: Build and push jobs image
+            uses: docker/build-push-action@v3
+            with:
+                context: ./jobs
+                file: ./jobs/Dockerfile
+                push: true
+                tags: ghcr.io/${{ github.repository_owner }}/ap-jobs:${{ github.ref_name == 'master' && 'latest' || github.ref_name }}
+                cache-from: type=gha
+                cache-to: type=gha,mode=max

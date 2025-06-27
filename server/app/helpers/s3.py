@@ -28,7 +28,7 @@ class S3Service:
     def __init__(self):
         """Initialize S3 client"""
         self.s3_client = boto3.client(
-            "s3",
+            "s3",  # type: ignore
             aws_access_key_id=AWS_ACCESS_KEY_ID,
             aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
             region_name=AWS_REGION,
@@ -55,90 +55,6 @@ class S3Service:
             return response.ok and is_pdf
         except requests.RequestException:
             return False
-
-    async def read_and_upload_file_from_url(
-        self, url: str, temp_filepath: str
-    ) -> tuple[str, str]:
-        """
-        Download file from URL and upload to S3
-
-        Args:
-            url: The URL of the file to upload
-
-        Returns:
-            tuple: S3 object key and public URL
-
-        Raises:
-            ValueError: If URL is invalid or file is not a PDF
-        """
-        if not self._validate_pdf_url(url):
-            raise ValueError("Invalid URL or not a PDF file")
-
-        try:
-            # Download file
-            response = requests.get(url, stream=True)
-            response.raise_for_status()
-
-            # Extract filename from URL or generate one
-            parsed_url = urlparse(url)
-            original_filename = os.path.basename(parsed_url.path)
-            if not original_filename:
-                original_filename = f"document-{uuid.uuid4()}.pdf"
-
-            # Generate S3 object key
-            object_key = f"uploads/{uuid.uuid4()}-{original_filename}"
-
-            # Upload to S3
-            self.s3_client.put_object(
-                Bucket=self.bucket_name,
-                Key=object_key,
-                Body=response.content,
-                ContentType="application/pdf",
-            )
-
-            # Write the file to a temporary location
-            with open(temp_filepath, "wb") as temp_file:
-                temp_file.write(response.content)
-                temp_file.flush()
-                os.fsync(temp_file.fileno())
-
-            # Generate the URL for the uploaded file
-            file_url = f"https://{self.cloudflare_bucket_name}/{object_key}"
-
-            return object_key, file_url
-
-        except requests.RequestException as e:
-            logger.error(f"Error downloading file from URL: {e}")
-            raise ValueError("Failed to download file from URL")
-        except ClientError as e:
-            logger.error(f"Error uploading file to S3: {e}")
-            raise
-
-    def upload_any_file_from_bytes(
-        self,
-        file_bytes: bytes,
-        original_filename: str,
-        content_type: str,
-    ):
-        """Upload a file from bytes to S3
-
-        Args:
-            file_bytes (bytes): The file content as bytes
-            original_filename (str): The original filename
-            content_type (str): The MIME type of the file
-
-        Returns:
-            tuple[str, str]: The S3 object key and public URL
-        """
-        object_key = f"uploads/{uuid.uuid4()}-{original_filename}"
-        self.s3_client.put_object(
-            Bucket=self.bucket_name,
-            Key=object_key,
-            Body=file_bytes,
-            ContentType=content_type,
-        )
-        file_url = f"https://{self.cloudflare_bucket_name}/{object_key}"
-        return object_key, file_url
 
     def upload_any_file(
         self, file_path: str, original_filename: str, content_type: str

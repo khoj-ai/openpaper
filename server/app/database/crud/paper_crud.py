@@ -8,11 +8,7 @@ from app.database.crud.annotation_crud import AnnotationCreate, annotation_crud
 from app.database.crud.base_crud import CRUDBase
 from app.database.crud.highlight_crud import HighlightCreate, highlight_crud
 from app.database.models import JobStatus, Paper, PaperStatus, PaperUploadJob, RoleType
-from app.helpers.parser import (
-    extract_text_from_pdf,
-    get_start_page_from_offset,
-    map_pages_to_text_offsets,
-)
+from app.helpers.parser import get_start_page_from_offset
 from app.llm.schemas import PaperMetadataExtraction, ResponseCitation
 from app.llm.utils import find_offsets
 from app.schemas.user import CurrentUser
@@ -24,7 +20,6 @@ logger = logging.getLogger(__name__)
 
 # Define Pydantic models for type safety
 class PaperBase(BaseModel):
-    filename: Optional[str] = None
     file_url: Optional[str] = None
     s3_object_key: Optional[str] = None
     authors: Optional[List[str]] = None
@@ -45,8 +40,8 @@ class PaperBase(BaseModel):
 
 class PaperCreate(PaperBase):
     # Only mandate required fields for creation, others are optional
-    filename: str  # type: ignore
     file_url: str  # type: ignore
+    raw_content: str  # type: ignore
     s3_object_key: Optional[str] = None
     upload_job_id: Optional[str] = None
     preview_url: Optional[str] = None
@@ -68,48 +63,6 @@ class PaperDocumentMetadata(BaseModel):
 # Paper CRUD that inherits from the base CRUD
 class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
     """CRUD operations specifically for Document model"""
-
-    def set_raw_document_content(
-        self,
-        db: Session,
-        *,
-        paper_id: str,
-        current_user: CurrentUser,
-        file_path: str,
-    ) -> str:
-        """
-        Read raw document content by ID.
-        For PDF files, extract and return the text content.
-        """
-        paper: Paper | None = self.get(db, paper_id, user=current_user)
-        if paper is None:
-            raise ValueError(f"Paper with ID {paper_id} not found.")
-
-        if paper.raw_content:
-            return str(paper.raw_content)
-
-        raw_content = ""
-        offset_map = {}
-
-        # Handle local files
-        if file_path.lower().endswith(".pdf"):
-            raw_content = extract_text_from_pdf(file_path)
-            offset_map = map_pages_to_text_offsets(file_path)
-            offset_map = {k: list(v) for k, v in offset_map.items()}
-        else:
-            # For non-PDF files, read as text
-            with open(file_path, "r", encoding="utf-8", errors="replace") as file:
-                raw_content = file.read()
-
-        self.update(
-            db=db,
-            db_obj=paper,
-            obj_in=PaperUpdate(
-                raw_content=raw_content,
-                page_offset_map=offset_map,
-            ),
-        )
-        return raw_content
 
     def read_raw_document_content(
         self,

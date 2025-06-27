@@ -64,7 +64,6 @@ export default function PapersPage() {
         setFilteredPapers(
             papers.filter((paper) =>
                 paper.title?.toLowerCase().includes(term) ||
-                paper.filename?.toLowerCase().includes(term) ||
                 paper.keywords?.some((keyword) => keyword.toLowerCase().includes(term)) ||
                 paper.abstract?.toLowerCase().includes(term) ||
                 paper.authors?.some((author) => author.toLowerCase().includes(term)) ||

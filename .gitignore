@@ -26,6 +26,7 @@ client/out/
 # production
 client/build
 docker-compose.yml
+ecs-task-definitions/
 
 # misc
 .DS_Store

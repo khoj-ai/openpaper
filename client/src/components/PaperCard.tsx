@@ -134,7 +134,7 @@ const getYear = (dateString: string | undefined): string => {
 
 const generateMLA = (paper: PaperItem): string => {
     const authors = formatAuthors(paper.authors, 'MLA');
-    const title = paper.title || paper.filename || "[Untitled]";
+    const title = paper.title || "[Untitled]";
     const year = getYear(paper.created_at);
     // Basic structure: Author(s). "Title." *Source*, Year.
     return `${authors ? authors + '. ' : ''}"${title}." *[Source Placeholder]*, ${year}.`;
@@ -143,7 +143,7 @@ const generateMLA = (paper: PaperItem): string => {
 const generateHarvard = (paper: PaperItem): string => {
     const authors = formatAuthors(paper.authors, 'Harvard');
     const year = getYear(paper.created_at);
-    const title = paper.title || paper.filename || "[Untitled]";
+    const title = paper.title || "[Untitled]";
     // Basic structure: Author(s) (Year). *Title*. [Source Placeholder].
     return `${authors ? authors + ' ' : ''}(${year}). *${title}*. [Source Placeholder].`;
 };
@@ -151,14 +151,14 @@ const generateHarvard = (paper: PaperItem): string => {
 const generateAAA = (paper: PaperItem): string => {
     const authors = formatAuthors(paper.authors, 'AAA');
     const year = getYear(paper.created_at);
-    const title = paper.title || paper.filename || "[Untitled]";
+    const title = paper.title || "[Untitled]";
     // Basic structure: Author(s) Year. "Title." *[Publication Venue Placeholder]*. [Location Placeholder]: [Publisher Placeholder].
     return `${authors ? authors + ' ' : ''}${year}. "${title}." *[Publication Venue Placeholder]*.`;
 };
 
 const generateIEEE = (paper: PaperItem): string => {
     const authors = formatAuthors(paper.authors, 'IEEE');
-    const title = paper.title || paper.filename || "[Untitled]";
+    const title = paper.title || "[Untitled]";
     const year = getYear(paper.created_at);
     // Basic structure: Author(s), "Title," *[Source Abbreviation Placeholder]*, [vol. placeholder], [no. placeholder], [pp. placeholder], ${year}.
     return `${authors ? authors + ', ' : ''}"${title}," *[Source Abbr. Placeholder]*, ${year}.`;
@@ -166,7 +166,7 @@ const generateIEEE = (paper: PaperItem): string => {
 
 const generateAMA = (paper: PaperItem): string => {
     const authors = formatAuthors(paper.authors, 'AMA');
-    const title = paper.title || paper.filename || "[Untitled]";
+    const title = paper.title || "[Untitled]";
     const year = getYear(paper.created_at);
     // Basic structure: Author(s). Title. *JournalAbbr*. Year;vol(issue):pages.
     return `${authors ? authors + '. ' : ''}${title}. *[Journal Abbr. Placeholder]*. ${year}.`;
@@ -175,7 +175,7 @@ const generateAMA = (paper: PaperItem): string => {
 const generateChicago = (paper: PaperItem): string => { // Assuming Author-Date style for simplicity here
     const authors = formatAuthors(paper.authors, 'Chicago'); // Use Chicago formatting for authors
     const year = getYear(paper.created_at);
-    const title = paper.title || paper.filename || "[Untitled]";
+    const title = paper.title || "[Untitled]";
     // Basic Author-Date: Author(s). Year. "Title." *Source*. [DOI/URL Placeholder]
     return `${authors ? authors + '. ' : ''}${year}. "${title}." *[Source Placeholder]*.`;
 };
@@ -183,7 +183,7 @@ const generateChicago = (paper: PaperItem): string => { // Assuming Author-Date 
 const generateAPA = (paper: PaperItem): string => {
     const authors = formatAuthors(paper.authors, 'APA');
     const year = getYear(paper.created_at);
-    const title = paper.title || paper.filename || "[Untitled]";
+    const title = paper.title || "[Untitled]";
     // Basic structure: Author(s). (Year). *Title*. [Source Placeholder]. [DOI/URL Placeholder]
     return `${authors ? authors + ' ' : ''}(${year}). *${title}*. [Source Placeholder].`;
 };
@@ -299,7 +299,7 @@ export default function PaperCard({ paper, handleDelete, setPaper }: PaperCardPr
                                         <DialogHeader>
                                             <DialogTitle>Cite Paper</DialogTitle>
                                             <DialogDescription>
-                                                Copy the citation format you need for <b>{paper.title || paper.filename}</b>.
+                                                Copy the citation format you need for <b>{paper.title}</b>.
                                             </DialogDescription>
                                         </DialogHeader>
                                         <ScrollArea className="h-[300px] w-full rounded-md border p-4">
@@ -346,7 +346,7 @@ export default function PaperCard({ paper, handleDelete, setPaper }: PaperCardPr
                                             <AlertDialogContent>
                                                 <AlertDialogTitle>Delete Paper</AlertDialogTitle>
                                                 <AlertDialogDescription>
-                                                    Are you sure you want to delete {paper.title || paper.filename}?
+                                                    Are you sure you want to delete {paper.title}?
                                                     This action cannot be undone.
                                                 </AlertDialogDescription>
                                                 <AlertDialogFooter>
@@ -364,7 +364,7 @@ export default function PaperCard({ paper, handleDelete, setPaper }: PaperCardPr
 
                         <a href={`/paper/${paper.id}`} className="block group">
                             <h3 className="font-semibold text-gray-900 dark:text-gray-100 line-clamp-2 mb-3 text-sm leading-tight group-hover:underline">
-                                {paper.title || paper.filename}
+                                {paper.title}
                             </h3>
                         </a>
 
@@ -418,8 +418,8 @@ export default function PaperCard({ paper, handleDelete, setPaper }: PaperCardPr
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                                 src={paper.preview_url}
-                                title={paper.title || paper.filename}
-                                alt={paper.title || paper.filename}
+                                title={paper.title}
+                                alt={paper.title}
                                 className="max-h-48 w-full object-cover object-top rounded-t-lg shadow-sm"
                             />
                         </div>

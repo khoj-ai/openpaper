@@ -1,0 +1,25 @@
+[project]
+name = "open-paper-jobs"
+version = "0.1.0"
+requires-python = ">= 3.12"
+description = "An Application to Run Jobs for the Open Paper project"
+readme = "README.md"
+dependencies = [
+    "celery[auth,librabbitmq,msgpack,redis]>=5.5.3",
+    "requests>=2.32.3",
+    "fastapi>=0.115",
+    "uvicorn>=0.34",
+    "flower>=2.0.1",
+    "types-requests>=2.32.4.20250611",
+    "celery-stubs>=0.1.3",
+    "boto3>=1.34.0",
+    "pymupdf>=1.25.5",
+    "pillow>=11.2.1",
+    "pydantic>=2.0.0",
+    "markitdown[pdf]>=0.1.2",
+    "pymupdf4llm>=0.0.25",
+    "python-dotenv>=1.1.0",
+    "openai>=1.91.0",
+    "psutil>=5.9.0",
+    "types-psutil>=7.0.0.20250601",
+]
