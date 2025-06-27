@@ -5,6 +5,8 @@ import logging
 import tempfile
 import base64
 import time
+import psutil
+import os
 from datetime import datetime, timezone
 from typing import Dict, Any
 import requests
@@ -238,3 +240,56 @@ def upload_and_process_file(
 
         # Re-raise the exception to mark task as failed
         raise exc
+
+
+@celery_app.task(bind=True, name="health_check")
+def health_check(self):
+    """
+    Health check task to monitor worker status.
+    Returns system metrics and worker health status.
+    """
+    try:
+        # Get system metrics
+        memory_info = psutil.virtual_memory()
+        cpu_percent = psutil.cpu_percent(interval=1)
+        disk_usage = psutil.disk_usage('/')
+
+        # Get process info
+        process = psutil.Process(os.getpid())
+        process_memory = process.memory_info()
+
+        health_data = {
+            "status": "healthy",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "worker_id": self.request.hostname,
+            "task_id": self.request.id,
+            "system_metrics": {
+                "memory_percent": memory_info.percent,
+                "memory_available_mb": memory_info.available / (1024 * 1024),
+                "cpu_percent": cpu_percent,
+                "disk_percent": disk_usage.percent,
+            },
+            "process_metrics": {
+                "memory_mb": process_memory.rss / (1024 * 1024),
+                "cpu_percent": process.cpu_percent(),
+                "num_threads": process.num_threads(),
+            }
+        }
+
+        # Check if worker is unhealthy
+        if (memory_info.percent > 90 or
+            cpu_percent > 95 or
+            process_memory.rss / (1024 * 1024) > 1500):  # 1.5GB
+            health_data["status"] = "unhealthy"
+            health_data["alert"] = "High resource usage detected"
+
+        return health_data
+
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return {
+            "status": "unhealthy",
+            "error": str(e),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "worker_id": self.request.hostname,
+        }

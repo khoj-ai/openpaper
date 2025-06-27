@@ -32,6 +32,17 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,  # Process one task at a time
     task_acks_late=True,
     worker_max_tasks_per_child=1000,
+    # Health monitoring settings
+    worker_send_task_events=True,
+    task_send_sent_event=True,
+    worker_hijack_root_logger=False,
+    worker_log_color=False,
+    # Worker heartbeat and timeout settings
+    broker_heartbeat=30,
+    broker_heartbeat_checkrate=2.0,
+    worker_disable_rate_limits=True,
+    # Memory and resource limits
+    worker_max_memory_per_child=500000,  # 500MB in KB
 )
 
 celery_app.autodiscover_tasks()
