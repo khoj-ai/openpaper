@@ -99,3 +99,4 @@ class PDFProcessingResult(BaseModel):
     preview_url: Optional[str] = None
     preview_object_key: Optional[str] = None
     error: Optional[str] = None
+    duration: Optional[float] = None  # Duration in seconds

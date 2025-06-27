@@ -114,6 +114,7 @@ def process_pdf_file(
                 job_id=job_id,
                 raw_content=pdf_text,
                 page_offset_map=page_offsets,
+                duration=duration,
             )
 
     except Exception as e:
