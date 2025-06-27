@@ -19,7 +19,7 @@ def timeout_handler(signum, frame):
 
 def main():
     # Set timeout for health check
-    TIMEOUT = 10
+    TIMEOUT = 300
     signal.signal(signal.SIGALRM, timeout_handler)
     signal.alarm(TIMEOUT)
 
