@@ -9,6 +9,7 @@ from typing import Optional
 from app.database.crud.paper_crud import PaperCreate, paper_crud
 from app.database.crud.paper_upload_crud import paper_upload_job_crud
 from app.database.database import get_db
+from app.database.models import JobStatus
 from app.database.telemetry import track_event
 from app.llm.schemas import PaperMetadataExtraction
 from app.schemas.user import CurrentUser
@@ -54,6 +55,10 @@ async def handle_paper_processing_webhook(
         raise HTTPException(status_code=404, detail="Job not found")
 
     job_id = str(job.id)
+
+    if job.status == JobStatus.COMPLETED:
+        logger.warning(f"Received webhook for already completed job {job_id}, ignoring")
+        return {"status": "webhook ignored - job already completed"}
 
     # Get the user object from the relationship
     user = job.user
