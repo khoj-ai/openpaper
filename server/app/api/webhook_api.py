@@ -35,6 +35,7 @@ class PDFProcessingResult(BaseModel):
     preview_url: Optional[str] = None
     preview_object_key: Optional[str] = None
     error: Optional[str] = None
+    duration: Optional[float] = None
 
 
 class WebhookData(BaseModel):
@@ -170,6 +171,7 @@ async def handle_paper_processing_webhook(
                 properties={
                     "has_metadata": bool(metadata),
                     "duration": (end_time - start_time).total_seconds(),
+                    "worker_duration": result.duration,
                 },
                 user_id=str(user.id),
             )

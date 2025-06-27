@@ -1,13 +1,11 @@
 import logging
 import re
 import uuid
-from datetime import datetime, timezone
 from typing import AsyncGenerator, Optional, Sequence, Union
 
 import httpx
 from app.database.crud.paper_crud import paper_crud
 from app.database.models import Paper
-from app.database.telemetry import track_event
 from app.llm.base import BaseLLMClient
 from app.llm.citation_handler import CitationHandler
 from app.llm.json_parser import JSONParser
@@ -16,17 +14,15 @@ from app.llm.prompts import (
     ANSWER_PAPER_QUESTION_USER_MESSAGE,
     CONCISE_MODE_INSTRUCTIONS,
     DETAILED_MODE_INSTRUCTIONS,
-    EXTRACT_PAPER_METADATA,
     GENERATE_NARRATIVE_SUMMARY,
     NORMAL_MODE_INSTRUCTIONS,
 )
 from app.llm.provider import FileContent, LLMProvider, TextContent
-from app.llm.schemas import AudioOverviewForLLM, PaperMetadataExtraction
+from app.llm.schemas import AudioOverviewForLLM
 from app.llm.utils import retry_llm_operation
 from app.schemas.message import ResponseStyle
 from app.schemas.user import CurrentUser
 from fastapi import Depends
-from google.genai.types import Part
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -38,77 +34,6 @@ from app.helpers.s3 import s3_service
 
 class PaperOperations(BaseLLMClient):
     """Operations related to paper analysis and chat functionality"""
-
-    @retry_llm_operation(max_retries=3, delay=1.0)
-    def extract_paper_metadata(
-        self,
-        paper_id: str,
-        user: CurrentUser,
-        file_path: str,
-        db: Session = Depends(get_db),
-    ) -> PaperMetadataExtraction:
-        """
-        Extract metadata from the paper using the specified model
-        """
-        paper = paper_crud.get(db, id=paper_id, user=user)
-
-        start_time = datetime.now(timezone.utc)
-
-        if not paper:
-            raise ValueError(f"Paper with ID {paper_id} not found.")
-
-        # Load and extract raw data from the PDF
-        raw_file = paper_crud.set_raw_document_content(
-            db, paper_id=paper_id, current_user=user, file_path=file_path
-        )
-
-        if not raw_file:
-            raise ValueError(
-                f"Raw file content for paper ID {paper_id} could not be retrieved."
-            )
-
-        formatted_prompt = EXTRACT_PAPER_METADATA.format(
-            paper=raw_file, schema=PaperMetadataExtraction.model_json_schema()
-        )
-
-        # Extract metadata using the LLM
-        response = self.generate_content(
-            contents=formatted_prompt,
-        )
-
-        # Check if the response is valid JSON
-        try:
-            if response and response.text:
-                response_json = JSONParser.validate_and_extract_json(response.text)
-            else:
-                raise ValueError("Empty response from LLM.")
-        except ValueError as e:
-            logger.error(f"Error parsing LLM response: {e}", exc_info=True)
-            raise ValueError(f"Invalid JSON response from LLM: {str(e)}")
-
-        # Parse the response and return the metadata
-        metadata = PaperMetadataExtraction.model_validate(response_json)
-
-        end_time = datetime.now(timezone.utc)
-
-        # Track metadata extraction event
-        track_event(
-            "extracted_metadata",
-            properties={
-                "has_title": bool(metadata.title),
-                "has_authors": bool(metadata.authors),
-                "has_abstract": bool(metadata.abstract),
-                "has_summary": bool(metadata.summary),
-                "has_ai_highlights": bool(metadata.highlights),
-                "num_starter_questions": (
-                    len(metadata.starter_questions) if metadata.starter_questions else 0
-                ),
-                "duration": (end_time - start_time).total_seconds(),
-            },
-            user_id=str(user.id),
-        )
-
-        return metadata
 
     @retry_llm_operation(max_retries=3, delay=1.0)
     def create_narrative_summary(
