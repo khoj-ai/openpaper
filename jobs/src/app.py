@@ -8,7 +8,6 @@ from typing import Dict, Any, Optional
 import logging
 
 from src.celery_app import celery_app
-from src.tasks import upload_and_process_file
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
