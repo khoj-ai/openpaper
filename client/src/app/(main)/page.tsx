@@ -434,7 +434,7 @@ export default function Home() {
 					<div className="flex flex-col items-center justify-center py-8 space-y-6 w-full">
 						<EnigmaticLoadingExperience />
 						<div className="flex items-center justify-center gap-1 font-mono text-lg w-full">
-							<div className="flex items-center gap-1 w-12">
+							<div className="flex items-center gap-1 w-14">
 								<Loader2 className="h-6 w-6 animate-spin text-primary" />
 								<p className="text-gray-400 w-12">
 									{elapsedTime}s
