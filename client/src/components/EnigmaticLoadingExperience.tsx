@@ -19,14 +19,14 @@ export default function EnigmaticLoadingExperience() {
             // Smooth sine wave for pulsating (no random perturbation)
             setScale(() => {
                 // Slower, smoother pulse with reduced amplitude
-                const newScale = 1 + 0.15 * Math.sin(currentTime / 1500);
+                const newScale = 1 + 0.05 * Math.sin(currentTime / 800);
                 return newScale;
             });
 
             // Smooth opacity changes
             setOpacity(() => {
                 // Slower, gentler opacity shift
-                const newOpacity = 0.7 + 0.2 * Math.sin(currentTime / 2000);
+                const newOpacity = 0.7 + 0.1 * Math.sin(currentTime / 1000);
                 return newOpacity;
             });
 
