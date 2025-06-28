@@ -433,12 +433,14 @@ export default function Home() {
 					</DialogHeader>
 					<div className="flex flex-col items-center justify-center py-8 space-y-6 w-full">
 						<EnigmaticLoadingExperience />
-						<div className="flex items-center justify-center gap-4 font-mono text-lg">
-							<Loader2 className="h-6 w-6 animate-spin text-primary" />
-							<p className="text-gray-400">
-								{elapsedTime}s
-							</p>
-							<p className="text-white">{displayedMessage}</p>
+						<div className="flex items-center justify-center gap-1 font-mono text-lg w-full">
+							<div className="flex items-center gap-1 w-12">
+								<Loader2 className="h-6 w-6 animate-spin text-primary" />
+								<p className="text-gray-400 w-12">
+									{elapsedTime}s
+								</p>
+							</div>
+							<p className="text-primary text-right flex-1">{displayedMessage}</p>
 						</div>
 					</div>
 				</DialogContent>
