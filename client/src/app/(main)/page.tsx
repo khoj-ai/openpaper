@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { fetchFromApi } from "@/lib/api";
 import { useIsMobile } from "@/lib/useMobile";;
 import {
@@ -12,7 +12,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { CheckCircle, FileText, Loader2, LucideFileWarning } from "lucide-react";
+import { FileText, Loader2, LucideFileWarning } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { PdfDropzone } from "@/components/PdfDropzone";
 import Link from "next/link";
@@ -20,7 +20,6 @@ import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience"
 import { PaperItem } from "@/components/AppSidebar";
 import PaperCard from "@/components/PaperCard";
 import { JobStatusType } from "@/lib/schema";
-import { Progress } from "@/components/ui/progress";
 import OpenPaperLanding from "@/components/OpenPaperLanding";
 
 interface PdfUploadResponse {
@@ -40,9 +39,9 @@ interface JobStatusResponse {
 
 export default function Home() {
 	const [isUploading, setIsUploading] = useState(false);
-	const [loadingMessage, setLoadingMessage] = useState("Preparing your paper...");
-	const [loadingProgress, setLoadingProgress] = useState(0);
 	const [isUrlDialogOpen, setIsUrlDialogOpen] = useState(false);
+
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	const [jobUploadStatus, setJobUploadStatus] = useState<JobStatusType | null>(null);
 
 	const [pdfUrl, setPdfUrl] = useState("");
@@ -51,6 +50,70 @@ export default function Home() {
 
 	const { user, loading: authLoading } = useAuth();
 	const isMobile = useIsMobile();
+
+	// New state for loading experience
+	const [elapsedTime, setElapsedTime] = useState(0);
+	const [messageIndex, setMessageIndex] = useState(0);
+	const [fileSize, setFileSize] = useState<number | null>(null);
+	const [fileLength, setFileLength] = useState<string | null>(null);
+	const [displayedMessage, setDisplayedMessage] = useState("");
+
+
+	const loadingMessages = useMemo(() => [
+		`Processing ${fileLength ? fileLength : 'lots of'} characters`,
+		"Uploading to the cloud",
+		"Extracting metadata",
+		`Processing ${fileSize ? (fileSize / 1024 / 1024).toFixed(2) + 'mb' : '...'} `,
+		"Crafting grounded citations",
+	], [fileLength, fileSize]);
+
+	// Effect for timer and message cycling
+	useEffect(() => {
+		let timer: NodeJS.Timeout | undefined;
+		let messageTimer: NodeJS.Timeout | undefined;
+
+		if (isUploading) {
+
+			setElapsedTime(0);
+			setMessageIndex(0);
+
+			timer = setInterval(() => {
+				setElapsedTime((prevTime) => prevTime + 1);
+			}, 1000);
+
+			messageTimer = setInterval(() => {
+				setMessageIndex((prevIndex) => {
+					if (prevIndex < loadingMessages.length - 1) {
+						return prevIndex + 1;
+					}
+					return prevIndex;
+				});
+			}, 8000);
+		}
+
+		return () => {
+			if (timer) clearInterval(timer);
+			if (messageTimer) clearInterval(messageTimer);
+		};
+	}, [isUploading, fileSize, loadingMessages]);
+
+	// Typewriter effect
+	useEffect(() => {
+		setDisplayedMessage("");
+		let i = 0;
+		const typingTimer = setInterval(() => {
+			const currentMessage = loadingMessages[messageIndex];
+			if (i < currentMessage.length) {
+				setDisplayedMessage(currentMessage.slice(0, i + 1));
+				i++;
+			} else {
+				clearInterval(typingTimer);
+			}
+		}, 50);
+
+		return () => clearInterval(typingTimer);
+	}, [messageIndex, loadingMessages]);
+
 
 	// Poll job status
 	const pollJobStatus = async (jobId: string) => {
@@ -61,7 +124,6 @@ export default function Home() {
 			if (response.status === 'completed' && response.paper_id) {
 
 				// Success - redirect to paper
-				setLoadingMessage("Paper processed successfully! Redirecting...");
 				const redirectUrl = new URL(`/paper/${response.paper_id}`, window.location.origin);
 				setTimeout(() => {
 					window.location.href = redirectUrl.toString();
@@ -76,17 +138,6 @@ export default function Home() {
 			} else {
 				// Still processing - poll again
 				setTimeout(() => pollJobStatus(jobId), 2000);
-
-				if (response.has_metadata) {
-					setLoadingMessage("Processing annotations...");
-					setLoadingProgress(75);
-				} else if (response.has_file_url) {
-					setLoadingMessage("Processing metadata...");
-					setLoadingProgress(50);
-				} else {
-					setLoadingMessage("Pre-processing your paper...");
-					setLoadingProgress(25);
-				}
 			}
 		} catch (error) {
 			console.error('Error polling job status:', error);
@@ -119,6 +170,15 @@ export default function Home() {
 
 	const handleFileUpload = async (file: File) => {
 		setIsUploading(true);
+		setFileSize(file.size);
+
+		file.text().then(text => {
+			setFileLength(text.length.toString());
+		}).catch(err => {
+			console.error('Error reading file text:', err);
+			setFileLength('lots of');
+		});
+
 		const formData = new FormData();
 		formData.append('file', file);
 
@@ -142,6 +202,7 @@ export default function Home() {
 
 	const handlePdfUrl = async (url: string) => {
 		setIsUploading(true);
+		setFileSize(null);
 		try {
 			const response = await fetch(url, {
 				method: 'GET',
@@ -370,21 +431,15 @@ export default function Home() {
 							This might take up to two minutes...
 						</DialogDescription>
 					</DialogHeader>
-					<div className="flex flex-col items-center justify-center py-8 space-y-6">
+					<div className="flex flex-col items-center justify-center py-8 space-y-6 w-full">
 						<EnigmaticLoadingExperience />
-						<div className="flex items-center gap-4 justify-center">
-							{
-								jobUploadStatus === 'completed' ? (
-									<CheckCircle className="h-6 w-6 text-green-500" />
-								) : (
-									<Loader2 className="h-6 w-6 animate-spin text-primary" />
-								)
-							}
-							<p className="text-center text-lg transition-all duration-500 ease-in-out">
-								{loadingMessage}
+						<div className="flex items-center justify-center gap-4 font-mono text-lg">
+							<Loader2 className="h-6 w-6 animate-spin text-primary" />
+							<p className="text-gray-400">
+								{elapsedTime}s
 							</p>
+							<p className="text-white">{displayedMessage}</p>
 						</div>
-						<Progress value={loadingProgress} />
 					</div>
 				</DialogContent>
 			</Dialog>
