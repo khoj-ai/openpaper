@@ -13,15 +13,15 @@ Here's a high-level overview of the PDF processing workflow:
 ```
                                +------------------+
                                |                  |
-      +----------------------> |   Server (API)   |
-      |                        |                  |
-      |                        +--------+---------+
-      |                                 | 1. User uploads PDF
-      |                                 |
-+-----v-----+                           |
-|           |                           |
-|   User    |                           |
-|           |                           |
+      +----------------------> |   Server (API)   | <-----------------+
+      |                        |                  |                   |
+      |                        +--------+---------+                   |
+      |                                 | 1. Client uploads PDF       |
+      |                                 |                             |
++-----v-----+                           |                             |
+|           |                           |                             |
+|  Client   | <-------------------------)-----------------------------+
+|           |   Polling for status      |
 +-----------+                           |
       ^                                 |
       |                                 |
@@ -35,11 +35,11 @@ Here's a high-level overview of the PDF processing workflow:
                                         |
                                         v
                                +--------+---------+
-                               |                  |
-+----------------------------> |  Celery Workers  | <-----------------+
-| 5. Webhook notification      | (Jobs Service)   |                   | 3. LLM extracts
-|    (via Server API)          |                  |                   |    metadata
-|                              +--------+---------+                   |
+                               |                  | <-----------------+
++----------------------------> |  Celery Workers  | ----------------->|
+| 5. Webhook notification      | (Jobs Service)   |   Status polling  |
+|    (via Server API)          |                  |                   | 3. LLM extracts
+|                              +--------+---------+                   |    metadata
 |                                       |                             |
 |                                       | 4. PDF and assets           |
 |                                       |    are uploaded to S3       |
@@ -52,7 +52,7 @@ Here's a high-level overview of the PDF processing workflow:
                                +------------------+
 ```
 
-1.  **PDF Upload**: A user uploads a PDF file to the `server` via the web application.
+1.  **PDF Upload**: A client uploads a PDF file to the `server` via the web application.
 2.  **Task Queuing**: The `server` creates a new paper record in the database with a `processing` status, then dispatches a task to the Celery message broker (Redis) with the PDF data and a webhook URL.
 3.  **Task Consumption**: A Celery worker from the `jobs` service picks up the task from the queue.
 4.  **PDF Processing**: The worker processes the PDF:
@@ -61,7 +61,8 @@ Here's a high-level overview of the PDF processing workflow:
     *   It calls an LLM service to extract metadata like title, authors, abstract, and keywords.
 5.  **S3 Storage**: The original PDF, the generated preview image, and the extracted text are uploaded to an S3 bucket.
 6.  **Webhook Notification**: Once processing is complete, the `jobs` service sends a webhook notification to the `server` with the results, including the S3 URLs and the extracted metadata.
-7.  **Database Update**: The `server` receives the webhook, updates the paper record in the database with the new information, and marks the status as `complete`. The paper is now available to the user.
+7.  **Database Update**: The `server` receives the webhook, updates the paper record in the database with the new information, and marks the status as `complete`. The paper is now available to the client.
+8.  **Status Polling**: The client can poll the `server` for status updates, and the `server` can query the `jobs` service for real-time task progress information.
 
 ### System Dependencies
 
