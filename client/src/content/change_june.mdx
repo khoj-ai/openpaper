@@ -1,0 +1,59 @@
+export const metadata = {
+    title: "Changelog (June 2025)",
+    description: "Complete list of changes made in June 2025.",
+    date: "06-28-2025",
+    image: "https://assets.khoj.dev/blue_ethereal_orbs.png",
+}
+
+import Image from "next/image";
+
+## Changelog for June 2025
+
+We started off the month with a fun launch on [Product Hunt](https://www.producthunt.com/products/open-paper-2) and have been working hard to improve the platform since then.
+
+Broadly, these changes help create a more personalized, efficient, and engaging research experience.
+
+Here are the key changes we've made in June:
+
+### New Features
+
+- [77af49](https://github.com/khoj-ai/openpaper/commit/77af49830b4cc45479b5eea21f48198b40593f7f) Add support for tracking reading status (`todo`, `reading`, `completed`) of papers
+- [f6297f](https://github.com/khoj-ai/openpaper/commit/f6297f75de50a0de975cd8e65e574cefa666a1e4) Add search filters to the paper finder, like author, institution, and only Open Access
+- [847e32](https://github.com/khoj-ai/openpaper/commit/2e8b8bca7b8f8800c8aedb2684d4a7807d078cd7) Add relevant papers on the home page
+- [336a1d](https://github.com/khoj-ai/openpaper/commit/336a1d2c06803150e604076c8dee12aaeba3da5a) Allow customization options when generation an audio overview, incl. focus and style
+- [9401fa](https://github.com/khoj-ai/openpaper/commit/a4af04191140cf4fcb271816656c3de3d1bc569d) Add realtime tracking for the paper upload status from client
+- [e880d7](https://github.com/khoj-ai/openpaper/commit/e880d727635a85ff57620b741cacbef74880db6c) Add preview image to the uploaded paper for easier lookup
+- [9fa6d7](https://github.com/khoj-ai/openpaper/commit/9fa6d7881e76c010c72d8f39e3b77313e8c042ee) Add optional SciHub direct link from the paper finder
+- [61cbc3](https://github.com/khoj-ai/openpaper/commit/61cbc32ffa51a86027c1e169d6ffbc11af31b2b8) Add support for AI-generated annotations in the paper viewer to help with skimming more effectively
+- [3b5c5e](https://github.com/khoj-ai/openpaper/commit/3b5c5e88cdaaff0d9d947a1e949b9e7e9ccf6827) Add citations to the initial overview that's generated for briefing
+- [b0e27b](https://github.com/khoj-ai/openpaper/commit/b0e27b1fe7b63cc67ad47d8305690e92a9f4e2a2) Create a separate microservice that handles paper uploading in separate Celery worker jobs. Track upload status by querying the service and getting status updates.
+
+#### Architecture
+
+For the separate microservice change, you can see the whole project here: [open paper jobs](https://github.com/khoj-ai/openpaper/tree/master/jobs)
+
+Here's a diagram of the current architecture for processing a single document, as of this change:
+
+<div className="my-8 mx-auto">
+<a href="/bg_processing_dg.svg" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity">
+<Image
+  src="/bg_processing_dg.svg"
+  alt="Background Processing Architecture Diagram. Celery microservice that handles paper uploads and processing. Polling for status updates from the client to server to worker allow for real-time updates. Click to view full size."
+  width={1000}
+  height={600}
+  className="mx-auto my-8 cursor-pointer border border-gray-200 rounded-lg"
+/>
+</a>
+<p className="text-sm text-gray-600 text-center mt-2 italic">Click the diagram to view full size</p>
+</div>
+
+### Improvements
+
+- [9ffd5a](https://github.com/khoj-ai/openpaper/commit/c4857babbf12d85ee3f144169be101ac3eb80a00) Improved reliability of audio summaries with inline citations
+- [b1f838](https://github.com/khoj-ai/openpaper/commit/b1f838ea049d0cebdc10619bebd73bd37d55473b) Improve upload speeds to S3
+- [2e7721](https://github.com/khoj-ai/openpaper/commit/2e7721666ae8244909d7ae69e73393a62b939696) Improved some reliability of paper upload process
+
+### Fixes
+
+- [1153d1](https://github.com/khoj-ai/openpaper/commit/1153d14fff18900fc661b599a4fb6f92cfb354d8) Fixed issues with inline math annotations
+- [f08709](https://github.com/khoj-ai/openpaper/commit/f0870919550190b6c3759544e4e84a348ae3e136) Fix some navigation issues in the PDF viewer - hitting enter goes to next, clear search when hit x
