@@ -1087,6 +1087,17 @@ export default function PaperView() {
                                                         })) || []
                                                     }
                                                 />,
+                                                td: (props) => <CustomCitationLink
+                                                    {...props}
+                                                    handleCitationClick={handleCitationClickFromSummary}
+                                                    messageIndex={0}
+                                                    citations={
+                                                        paperData.summary_citations?.map(citation => ({
+                                                            key: String(citation.index),
+                                                            reference: citation.text
+                                                        })) || []
+                                                    }
+                                                />,
                                             }}
                                         >
                                             {paperData.summary}
@@ -1254,8 +1265,13 @@ export default function PaperView() {
                                                                     messageIndex={index}
                                                                     citations={msg.references?.citations || []}
                                                                 />,
-                                                            }}
-                                                        >
+                                                                td: (props) => <CustomCitationLink
+                                                                    {...props}
+                                                                    handleCitationClick={handleCitationClickFromSummary}
+                                                                    messageIndex={0}
+                                                                    citations={msg.references?.citations || []}
+                                                                />,
+                                                            }}>
                                                             {msg.content}
                                                         </Markdown>
                                                         {
