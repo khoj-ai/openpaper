@@ -70,6 +70,16 @@ export function usePdfSearch(explicitSearchTerm?: string) {
 
         // Get the page div from the document
         const pageDiv = document.querySelectorAll('.react-pdf__Page')[match.pageIndex];
+
+        // If the we are already on the page, do not scroll
+        if (pageDiv && pageDiv.classList.contains('react-pdf__Page--active')) {
+            // Scroll to the first matching node
+            if (match.nodes.length > 0) {
+                match.nodes[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            return;
+        }
+
         if (!pageDiv) return;
 
         // Scroll to the page
@@ -79,14 +89,14 @@ export function usePdfSearch(explicitSearchTerm?: string) {
         const pdfTextElements = document.querySelectorAll('.react-pdf__Page__textContent span.bg-yellow-100');
         pdfTextElements.forEach(span => {
             if (span.classList.contains('bg-blue-100')) return;
-            span.classList.remove('bg-yellow-100', 'rounded', 'opacity-20');
+            span.classList.remove('bg-yellow-100', 'rounded', 'opacity-40');
         });
 
         // Highlight all nodes that contain parts of the match
         setTimeout(() => {
             match.nodes.forEach(node => {
                 if (node.classList.contains('bg-blue-100')) return;
-                node.classList.add('bg-yellow-100', 'rounded', 'opacity-20');
+                node.classList.add('bg-yellow-100', 'rounded', 'opacity-40');
             });
 
             // Scroll to the first matching node
