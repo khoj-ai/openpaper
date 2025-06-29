@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "../lib/promisePolyfill";
 import { Document, Page } from "react-pdf";
 import "react-pdf/dist/esm/Page/AnnotationLayer.css";
@@ -83,6 +83,8 @@ export function PdfViewer(props: PdfViewerProps) {
 	const { numPages, allPagesLoaded, onDocumentLoadSuccess, handlePageLoadSuccess } = usePdfLoader();
 	const { scale, width, pagesRef, containerRef, goToPreviousPage, goToNextPage, zoomIn, zoomOut } = usePdfNavigation(numPages);
 
+	const searchInputRef = useRef<HTMLInputElement>(null);
+
 	// Search functionality
 	const {
 		searchText,
@@ -98,6 +100,28 @@ export function PdfViewer(props: PdfViewerProps) {
 		setCurrentMatch,
 		handleClearSearch,
 	} = usePdfSearch(explicitSearchTerm);
+
+	useEffect(() => {
+		// If cmd / ctrl + F is pressed, focus the search input. If pressed again while the search input is already focused, flow to default behavior.
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+				if (searchInputRef.current) {
+					if (document.activeElement !== searchInputRef.current) {
+						// Focus the search input if it's not already focused
+						searchInputRef.current.focus();
+						e.preventDefault();
+					} else {
+						// If already focused, allow default behavior (e.g., browser search)
+						return;
+					}
+				}
+			}
+		};
+		document.addEventListener('keydown', handleKeyDown);
+		return () => {
+			document.removeEventListener('keydown', handleKeyDown);
+		};
+	}, []);
 
 
 	// Add this new effect for handling outside clicks
@@ -277,6 +301,7 @@ export function PdfViewer(props: PdfViewerProps) {
 						type="text"
 						placeholder={textLayerExtractionFailed ? "Search is unavailable" : "Search..."}
 						value={searchText}
+						ref={searchInputRef}
 						disabled={textLayerExtractionFailed || !allPagesLoaded}
 						onChange={(e) => {
 							if (e.target.value.trim() === "") {

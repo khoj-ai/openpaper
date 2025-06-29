@@ -7,7 +7,12 @@ export const getMatchingNodesInPdf = (searchTerm: string) => {
         const textNodes = Array.from(layer.querySelectorAll('span'));
         if (textNodes.length === 0) return;
 
-        const filteredTextNodes = textNodes.filter(node => node.textContent && node.textContent.trim() !== '');
+        const filteredTextNodes = textNodes.filter(node =>
+            node.textContent &&
+            node.textContent.trim() !== '' &&
+            !node.classList.contains('markedContent')
+        );
+
         const fullPageText = filteredTextNodes.map(node => node.textContent || '').join(' ');
 
         const searchTextLower = searchTerm.toLowerCase();
