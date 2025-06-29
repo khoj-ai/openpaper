@@ -7,17 +7,27 @@ import remarkMath from 'remark-math';
 import Markdown, { Components } from 'react-markdown';
 import { PluggableList } from 'unified';
 
+
+// Define a simple CSS-in-JS for the blinking cursor animation
+const cursorStyle = `
+  @keyframes blink {
+    50% { opacity: 0; }
+  }
+  .blinking-cursor {
+    animation: blink 1s step-end infinite;
+  }
+`;
+
 interface AnimatedMarkdownProps {
     content: string;
     remarkPlugins?: PluggableList;
     rehypePlugins?: PluggableList;
     components?: Components;
     className?: string;
-    animationDuration?: number;
-    chunkDelay?: number;
+    typewriterSpeed?: number;
     enableAnimation?: boolean;
-    debugMode?: boolean;
 }
+
 
 export function AnimatedMarkdown({
     content,
@@ -25,96 +35,96 @@ export function AnimatedMarkdown({
     rehypePlugins = [rehypeKatex],
     components,
     className = '',
-    animationDuration = 50,
-    chunkDelay = 150,
+    typewriterSpeed = 30,
     enableAnimation = true,
 }: AnimatedMarkdownProps) {
-    const [displayedContent, setDisplayedContent] = useState('');
-    const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const pendingContentRef = useRef('');
+    const [stableContent, setStableContent] = useState('');
+    const [liveContent, setLiveContent] = useState('');
+    const liveContentTargetRef = useRef('');
 
-    // Chunk-based animation effect with content accumulation
+    // Effect 1: Split incoming content into "stable" and "live" parts.
     useEffect(() => {
         if (!enableAnimation) {
-            setDisplayedContent(content);
+            setStableContent(content);
+            setLiveContent('');
             return;
         }
 
-        // Update pending content buffer
-        pendingContentRef.current = content;
+        // Heuristic: A "stable" block is a chunk of markdown ending in a double newline.
+        const lastStableIndex = content.lastIndexOf('\n\n');
 
-        // Start animation if not already running
-        if (!animationTimeoutRef.current) {
+        let newStableContent = '';
+        let newLiveContentTarget = content;
 
-            const animateChunk = () => {
-                setDisplayedContent(currentDisplayed => {
-                    const currentPending = pendingContentRef.current;
-
-                    // If there's no new content to display, stop animating
-                    if (currentPending === currentDisplayed) {
-                        animationTimeoutRef.current = null;
-                        return currentDisplayed;
-                    }
-
-                    // Calculate chunk size (aim for reasonable chunks, not too small or large)
-                    const remainingLength = currentPending.length - currentDisplayed.length;
-                    const chunkSize = Math.max(1, Math.min(20, Math.ceil(remainingLength / 3)));
-
-                    // Add the next chunk to displayed content
-                    const newDisplayedLength = Math.min(
-                        currentDisplayed.length + chunkSize,
-                        currentPending.length
-                    );
-                    const newDisplayedContent = currentPending.substring(0, newDisplayedLength);
-
-                    // Continue animating if there's more content
-                    if (newDisplayedContent.length < currentPending.length) {
-                        animationTimeoutRef.current = setTimeout(animateChunk, chunkDelay);
-                    } else {
-                        animationTimeoutRef.current = null;
-                    }
-
-                    return newDisplayedContent;
-                });
-            };
-
-            // Start with initial delay
-            animationTimeoutRef.current = setTimeout(animateChunk, animationDuration);
+        if (lastStableIndex !== -1) {
+            // Split content at the last stable point
+            newStableContent = content.substring(0, lastStableIndex + 2);
+            newLiveContentTarget = content.substring(lastStableIndex + 2);
         }
 
-        return () => {
-            if (animationTimeoutRef.current) {
-                clearTimeout(animationTimeoutRef.current);
-                animationTimeoutRef.current = null;
-            }
-        };
-    }, [content, chunkDelay, animationDuration, enableAnimation]);
+        // Update the stable content if it has grown. This "locks in" the previous blocks.
+        if (newStableContent.length > stableContent.length) {
+            setStableContent(newStableContent);
+            // The new live part starts fresh
+            setLiveContent('');
+        }
 
-    // Clean up on unmount
+        liveContentTargetRef.current = newLiveContentTarget;
+
+    }, [content, stableContent, enableAnimation]);
+
+    // Effect 2: Animate the "live" part using a typewriter effect.
     useEffect(() => {
-        return () => {
-            if (animationTimeoutRef.current) {
-                clearTimeout(animationTimeoutRef.current);
-            }
-        };
-    }, []);
+        if (!enableAnimation) return;
 
-    // Memoize the markdown component to avoid unnecessary re-renders
-    const markdownContent = useMemo(() => {
-        return (
-            <Markdown
-                remarkPlugins={remarkPlugins}
-                rehypePlugins={rehypePlugins}
-                components={components}
-            >
-                {displayedContent}
-            </Markdown>
-        );
-    }, [displayedContent, remarkPlugins, rehypePlugins, components]);
+        // If the live content has caught up to the target, we stop.
+        if (liveContent.length >= liveContentTargetRef.current.length) {
+            return;
+        }
+
+        const animationTimeout = setTimeout(() => {
+            setLiveContent(prevLiveContent => {
+                const target = liveContentTargetRef.current;
+                const nextChunkSize = Math.min(3, target.length - prevLiveContent.length);
+                return target.substring(0, prevLiveContent.length + nextChunkSize);
+            });
+        }, typewriterSpeed);
+
+        return () => clearTimeout(animationTimeout);
+    }, [liveContent, enableAnimation, typewriterSpeed]);
+
+    // Memoize the final rendered components for performance.
+    const StableMarkdown = useMemo(() => (
+        <Markdown
+            remarkPlugins={remarkPlugins}
+            rehypePlugins={rehypePlugins}
+            components={components}
+        >
+            {stableContent}
+        </Markdown>
+    ), [stableContent, remarkPlugins, rehypePlugins, components]);
+
+    const LiveMarkdown = useMemo(() => (
+        <Markdown
+            remarkPlugins={remarkPlugins}
+            rehypePlugins={rehypePlugins}
+            components={components}
+        >
+            {/* Add a blinking cursor for a classic typewriter feel */}
+            {liveContent ? `${liveContent}` : ''}
+        </Markdown>
+    ), [liveContent, remarkPlugins, rehypePlugins, components]);
+
+    // The cursor is handled separately to prevent re-rendering the entire LiveMarkdown component on each blink
+    const Cursor = useMemo(() => <span className="blinking-cursor">▋</span>, []);
 
     return (
-        <div className={`${className} relative`}>
-            {markdownContent}
+        <div className={`${className} prose`}>
+            {/* Inject the keyframes for the cursor animation */}
+            <style>{cursorStyle}</style>
+            {StableMarkdown}
+            {/* We render the live part and the cursor as siblings */}
+            {liveContent && <div style={{ display: 'inline' }}>{LiveMarkdown}{Cursor}</div>}
         </div>
     );
 }
