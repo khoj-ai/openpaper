@@ -106,6 +106,17 @@ const PaperToolset = {
     ],
 }
 
+const chatLoadingMessages = [
+    "Thinking about your question...",
+    "Analyzing the paper...",
+    "Gathering citations...",
+    "Double-checking references...",
+    "Formulating a response...",
+    "Verifying information...",
+    "Crafting insights...",
+    "Synthesizing findings...",
+]
+
 export default function PaperView() {
     const params = useParams();
     const id = params.id as string;
@@ -179,15 +190,6 @@ export default function PaperView() {
     const chatInputFormRef = useRef<HTMLFormElement>(null);
 
     const END_DELIMITER = "END_OF_STREAM";
-
-    const chatLoadingMessages = [
-        "Thinking about your question...",
-        "Analyzing the paper...",
-        "Gathering citations...",
-        "Double-checking references...",
-        "Formulating a response...",
-    ]
-
 
     // Add this function to handle citation clicks
     const handleCitationClick = useCallback((key: string, messageIndex: number) => {
