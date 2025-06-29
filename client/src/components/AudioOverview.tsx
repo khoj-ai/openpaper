@@ -851,6 +851,11 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                                     handleCitationClick={handleCitationClickFromTranscript}
                                     messageIndex={0}
                                 />,
+                                td: (props) => <CustomCitationLink
+                                    {...props}
+                                    handleCitationClick={handleCitationClickFromTranscript}
+                                    messageIndex={0}
+                                />,
                             }}
                         >
                             {audioOverview.transcript}
