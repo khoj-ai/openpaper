@@ -1,6 +1,7 @@
 'use client';
 
 import { PdfViewer } from '@/components/PdfViewer';
+import { AnimatedMarkdown } from '@/components/AnimatedMarkdown';
 import { Button } from '@/components/ui/button';
 import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
 import { useParams } from 'next/navigation';
@@ -1222,97 +1223,57 @@ export default function PaperView() {
                                                 </div>
                                             </div>
                                         ) : (
-                                            messages.map((msg, index) => (
-                                                <div
-                                                    key={index}
-                                                    className='flex flex-row gap-2 items-end'
-                                                >
-                                                    {
-                                                        msg.role === 'user' && user && (
-                                                            <Avatar className="h-6 w-6">
-                                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                                {user.picture ? (<img src={user.picture} alt={user.name} />) : (<User size={16} />)}
-                                                            </Avatar>
-                                                        )
-                                                    }
-                                                    <div
-                                                        data-message-index={index}
-                                                        className={`prose dark:prose-invert p-2 !max-w-full rounded-lg ${msg.role === 'user'
-                                                            ? 'bg-blue-200 text-blue-800 w-fit'
-                                                            : 'w-full text-primary'
-                                                            }`}
-                                                    >
-                                                        <Markdown
-                                                            remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
-                                                            rehypePlugins={[rehypeKatex]}
-                                                            components={{
-                                                                // Apply the custom component to text nodes
-                                                                p: (props) => <CustomCitationLink
-                                                                    {...props}
-                                                                    handleCitationClick={handleCitationClick}
-                                                                    messageIndex={index}
-                                                                    citations={msg.references?.citations || []}
-                                                                />,
-                                                                li: (props) => <CustomCitationLink
-                                                                    {...props}
-                                                                    handleCitationClick={handleCitationClick}
-                                                                    messageIndex={index}
-                                                                    citations={msg.references?.citations || []}
-                                                                />,
-                                                                div: (props) => <CustomCitationLink
-                                                                    {...props}
-                                                                    handleCitationClick={handleCitationClick}
-                                                                    messageIndex={index}
-                                                                    citations={msg.references?.citations || []}
-                                                                />,
-                                                                td: (props) => <CustomCitationLink
-                                                                    {...props}
-                                                                    handleCitationClick={handleCitationClickFromSummary}
-                                                                    messageIndex={0}
-                                                                    citations={msg.references?.citations || []}
-                                                                />,
-                                                            }}>
-                                                            {msg.content}
-                                                        </Markdown>
-                                                        {
-                                                            msg.references && msg.references['citations']?.length > 0 && (
-                                                                <div className="mt-2" id="references-section">
-                                                                    <ul className="list-none p-0">
-                                                                        {Object.entries(msg.references.citations).map(([refIndex, value]) => (
-                                                                            <div
-                                                                                key={refIndex}
-                                                                                className={`flex flex-row gap-2 ${matchesCurrentCitation(value.key, index) ? 'bg-blue-100 dark:bg-blue-900 rounded p-1 transition-colors duration-300' : ''}`}
-                                                                                id={`citation-${value.key}-${index}`}
-                                                                                onClick={() => handleCitationClick(value.key, index)}
-                                                                            >
-                                                                                <div className={`text-xs ${msg.role === 'user'
-                                                                                    ? 'bg-blue-200 text-blue-800'
-                                                                                    : 'text-secondary-foreground'
-                                                                                    }`}>
-                                                                                    <a href={`#citation-ref-${value.key}`}>{value.key}</a>
-                                                                                </div>
-                                                                                <div
-                                                                                    id={`citation-ref-${value.key}-${index}`}
-                                                                                    className={`text-xs ${msg.role === 'user'
-                                                                                        ? 'bg-blue-200 text-blue-800 line-clamp-1'
-                                                                                        : 'text-secondary-foreground'
-                                                                                        }`}
-                                                                                >
-                                                                                    {value.reference}
-                                                                                </div>
-                                                                            </div>
-                                                                        ))}
-                                                                    </ul>
-                                                                </div>
-                                                            )}
-                                                    </div>
-                                                </div>
-                                            ))
-
+                                            memoizedMessages
                                         )}
                                         {
+                                            isStreaming && streamingChunks.length > 0 && (
+                                                <div className="prose dark:prose-invert p-2 !max-w-full rounded-lg w-full text-primary">
+                                                    <AnimatedMarkdown
+                                                        content={streamingChunks.join('')}
+                                                        remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
+                                                        rehypePlugins={[rehypeKatex]}
+                                                        components={{
+                                                            // Apply the custom component to text nodes
+                                                            p: (props) => <CustomCitationLink
+                                                                {...props}
+                                                                handleCitationClick={handleCitationClick}
+                                                                messageIndex={messages.length} // Use the next message index
+                                                                citations={streamingReferences?.citations || []}
+                                                            />,
+                                                            li: (props) => <CustomCitationLink
+                                                                {...props}
+                                                                handleCitationClick={handleCitationClick}
+                                                                messageIndex={messages.length} // Use the next message index
+                                                                citations={streamingReferences?.citations || []}
+                                                            />,
+                                                            div: (props) => <CustomCitationLink
+                                                                {...props}
+                                                                handleCitationClick={handleCitationClick}
+                                                                messageIndex={messages.length} // Use the next message index
+                                                                citations={streamingReferences?.citations || []}
+                                                            />,
+                                                            td: (props) => <CustomCitationLink
+                                                                {...props}
+                                                                handleCitationClick={handleCitationClickFromSummary}
+                                                                messageIndex={0}
+                                                                citations={streamingReferences?.citations || []}
+                                                            />,
+                                                        }}
+                                                    />
+                                                </div>
+                                            )
+                                        }
+                                        {
                                             isStreaming && (
-                                                <Loader className="animate-spin w-6 h-6 text-blue-500" />
+                                                <div className="flex items-center gap-3 p-2">
+                                                    <Loader className="animate-spin w-6 h-6 text-blue-500 flex-shrink-0" />
+                                                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                                                        {displayedText}
+                                                        {isTyping && (
+                                                            <span className="animate-pulse">|</span>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             )
                                         }
                                         <div ref={messagesEndRef} />
