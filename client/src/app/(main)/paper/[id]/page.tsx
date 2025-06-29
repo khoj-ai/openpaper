@@ -5,7 +5,7 @@ import { AnimatedMarkdown } from '@/components/AnimatedMarkdown';
 import { Button } from '@/components/ui/button';
 import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
 import { useParams } from 'next/navigation';
-import { useState, useEffect, FormEvent, useRef } from 'react';
+import { useState, useEffect, FormEvent, useRef, useCallback, useMemo } from 'react';
 
 // Reference to react-markdown documents: https://github.com/remarkjs/react-markdown?tab=readme-ov-file
 import Markdown from 'react-markdown';
@@ -162,6 +162,11 @@ export default function PaperView() {
     const [isSharing, setIsSharing] = useState(false);
     const [availableModels, setAvailableModels] = useState<Record<string, string>>({});
     const [selectedModel, setSelectedModel] = useState<string>('');
+    const [streamingChunks, setStreamingChunks] = useState<string[]>([]);
+    const [streamingReferences, setStreamingReferences] = useState<Reference | undefined>(undefined);
+    const [currentLoadingMessageIndex, setCurrentLoadingMessageIndex] = useState(0);
+    const [displayedText, setDisplayedText] = useState('');
+    const [isTyping, setIsTyping] = useState(false);
 
     const [rightSideFunction, setRightSideFunction] = useState<string>('Overview');
     const [leftPanelWidth, setLeftPanelWidth] = useState(60); // percentage
@@ -173,11 +178,19 @@ export default function PaperView() {
     const inputMessageRef = useRef<HTMLTextAreaElement>(null);
     const chatInputFormRef = useRef<HTMLFormElement>(null);
 
-    const END_DELIMITER = "END_OF_STREAM"
+    const END_DELIMITER = "END_OF_STREAM";
+
+    const chatLoadingMessages = [
+        "Thinking about your question...",
+        "Analyzing the paper...",
+        "Gathering citations...",
+        "Double-checking references...",
+        "Formulating a response...",
+    ]
 
 
     // Add this function to handle citation clicks
-    const handleCitationClick = (key: string, messageIndex: number) => {
+    const handleCitationClick = useCallback((key: string, messageIndex: number) => {
         setActiveCitationKey(key);
         setActiveCitationMessageIndex(messageIndex);
 
@@ -199,9 +212,9 @@ export default function PaperView() {
 
         // Clear the highlight after a few seconds
         setTimeout(() => setActiveCitationKey(null), 3000);
-    };
+    }, []);
 
-    const handleCitationClickFromSummary = (citationKey: string, messageIndex: number) => {
+    const handleCitationClickFromSummary = useCallback((citationKey: string, messageIndex: number) => {
         const citationIndex = parseInt(citationKey);
         setActiveCitationKey(citationKey);
         setActiveCitationMessageIndex(messageIndex);
@@ -212,11 +225,11 @@ export default function PaperView() {
 
         // Clear the highlight after a few seconds
         setTimeout(() => setActiveCitationKey(null), 3000);
-    };
+    }, [paperData?.summary_citations]);
 
-    const handleHighlightClick = (highlight: PaperHighlight) => {
+    const handleHighlightClick = useCallback((highlight: PaperHighlight) => {
         setActiveHighlight(highlight);
-    };
+    }, []);
 
     useEffect(() => {
         if (userMessageReferences.length == 0) return;
@@ -330,6 +343,52 @@ export default function PaperView() {
         }
     }, [isStreaming]);
 
+    // Handle typing effect for loading messages
+    useEffect(() => {
+        if (!isStreaming) {
+            setDisplayedText('');
+            setIsTyping(false);
+            return;
+        }
+
+        const currentMessage = chatLoadingMessages[currentLoadingMessageIndex];
+        let charIndex = 0;
+        setDisplayedText('');
+        setIsTyping(true);
+
+        const typingInterval = setInterval(() => {
+            if (charIndex < currentMessage.length) {
+                setDisplayedText(currentMessage.slice(0, charIndex + 1));
+                charIndex++;
+            } else {
+                setIsTyping(false);
+                clearInterval(typingInterval);
+            }
+        }, 50); // 50ms per character for smooth typing
+
+        return () => clearInterval(typingInterval);
+    }, [isStreaming, currentLoadingMessageIndex]);
+
+    // Cycle through loading messages every 11 seconds
+    useEffect(() => {
+        if (!isStreaming) return;
+
+        const messageInterval = setInterval(() => {
+            setCurrentLoadingMessageIndex((prev) =>
+                (prev + 1) % chatLoadingMessages.length
+            );
+        }, 11000); // 11 seconds
+
+        return () => clearInterval(messageInterval);
+    }, [isStreaming]);
+
+    // Reset loading message index when streaming starts
+    useEffect(() => {
+        if (isStreaming) {
+            setCurrentLoadingMessageIndex(0);
+        }
+    }, [isStreaming]);
+
     const scrollToLatestMessage = () => {
         // TODO: Should this be scroll to second to last message / user message instead of latest message? Used for loading from history and loading new message.
         if (messagesContainerRef.current && messages.length > 0) {
@@ -394,6 +453,85 @@ export default function PaperView() {
         fetchAvailableModels();
         fetchPaper();
     }, [id]);
+
+    useEffect(() => {
+        if (!paperData) return;
+
+        // Initialize conversation once paper data is available
+        async function fetchConversation() {
+            let retrievedConversationId = null;
+            try {
+                const response = await fetchFromApi(`/api/paper/conversation?paper_id=${id}`, {
+                    method: 'GET',
+                });
+
+                if (response && response.id) {
+                    retrievedConversationId = response.id;
+                }
+                setConversationId(retrievedConversationId);
+            } catch (error) {
+                console.error('Error fetching conversation ID:', error);
+
+                try {
+
+                    if (!retrievedConversationId) {
+                        // If no conversation ID is returned, create a new one
+                        const newConversationResponse = await fetchFromApi(`/api/conversation/${id}`, {
+                            method: 'POST',
+                        });
+                        retrievedConversationId = newConversationResponse.id;
+                    }
+
+                    setConversationId(retrievedConversationId);
+                } catch (error) {
+                    console.error('Error fetching conversation:', error);
+                }
+            }
+        }
+
+        fetchConversation();
+    }, [paperData, id]);
+
+    useEffect(() => {
+        if (!conversationId) return;
+
+        // Fetch initial messages for the conversation
+        async function fetchMessages() {
+            try {
+                const response = await fetchFromApi(`/api/conversation/${conversationId}?page=${pageNumberConversationHistory}`, {
+                    method: 'GET',
+                });
+
+                // Map the response messages to the expected format
+                const fetchedMessages = response.messages.map((msg: ChatMessage) => ({
+                    role: msg.role,
+                    content: msg.content,
+                    id: msg.id,
+                    references: msg.references || {}
+                }));
+
+                if (fetchedMessages.length === 0) {
+                    setHasMoreMessages(false);
+                    return;
+                }
+
+                if (messages.length === 0) {
+                    scrollToBottom();
+                } else {
+                    // Add a 1/2 second delay before scrolling to the latest message
+                    setTimeout(() => {
+                        scrollToLatestMessage();
+                    }, 500);
+                }
+
+                setMessages(prev => [...fetchedMessages, ...prev]);
+                setPageNumberConversationHistory(pageNumberConversationHistory + 1);
+            } catch (error) {
+                console.error('Error fetching messages:', error);
+            }
+        }
+        fetchMessages();
+    }, [conversationId, pageNumberConversationHistory]);
 
     useEffect(() => {
         if (!paperData) return;
@@ -548,7 +686,7 @@ export default function PaperView() {
         }
     };
 
-    const updateNote = async (note: string) => {
+    const updateNote = useCallback(async (note: string) => {
         if (!id) return;
         try {
             if (!paperNoteData) {
@@ -574,30 +712,35 @@ export default function PaperView() {
             console.error('Error updating note:', error);
             // Keep the local storage version for retry later
         }
-    };
+    }, [id, paperNoteData]);
+
+    // Debounced save to prevent excessive local storage writes and re-renders
+    const debouncedSaveNote = useCallback((content: string) => {
+        // Save to local storage
+        try {
+            localStorage.setItem(`paper-note-${id}`, content);
+        } catch (error) {
+            console.error('Error saving to local storage:', error);
+        }
+
+        // Clear existing timeout
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+        }
+
+        // Set new timeout for server save
+        saveTimeoutRef.current = setTimeout(() => {
+            updateNote(content);
+        }, 2000);
+    }, [id, updateNote]);
 
     useEffect(() => {
         if (paperNoteContent) {
-            // Save to local storage
-            try {
-                localStorage.setItem(`paper-note-${id}`, paperNoteContent);
-            } catch (error) {
-                console.error('Error saving to local storage:', error);
-            }
-
-            // Clear existing timeout
-            if (saveTimeoutRef.current) {
-                clearTimeout(saveTimeoutRef.current);
-            }
-
-            // Set new timeout for server save
-            saveTimeoutRef.current = setTimeout(() => {
-                updateNote(paperNoteContent);
-            }, 2000);
+            debouncedSaveNote(paperNoteContent);
         }
-    }, [paperNoteContent, paperNoteData]);
+    }, [paperNoteContent, debouncedSaveNote]);
 
-    const transformReferencesToFormat = (references: string[]) => {
+    const transformReferencesToFormat = useCallback((references: string[]) => {
         const citations = references.map((ref, index) => ({
             key: `${index + 1}`,
             reference: ref,
@@ -606,8 +749,9 @@ export default function PaperView() {
         return {
             "citations": citations,
         }
-    }
-    const handleSubmit = async (e: FormEvent | null = null) => {
+    }, []);
+
+    const handleSubmit = useCallback(async (e: FormEvent | null = null) => {
         if (e) {
             e.preventDefault();
         }
@@ -625,8 +769,10 @@ export default function PaperView() {
         setUserMessageReferences([]);
 
         // Create placeholder for assistant response
-        setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+        // setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
         setIsStreaming(true);
+        setStreamingChunks([]); // Clear previous chunks
+        setStreamingReferences(undefined); // Clear previous references
 
         const requestBody: ChatRequestBody = {
             user_query: userMessage.content,
@@ -704,14 +850,10 @@ export default function PaperView() {
                             accumulatedContent += chunkContent;
 
                             // Update the message with the new content
-                            setMessages(prev => {
-                                const updatedMessages = [...prev];
-                                updatedMessages[updatedMessages.length - 1] = {
-                                    ...updatedMessages[updatedMessages.length - 1],
-                                    content: accumulatedContent,
-                                    references
-                                };
-                                return updatedMessages;
+                            setStreamingChunks(prev => {
+                                const newChunks = [...prev, chunkContent];
+                                // Update previous content for animation tracking
+                                return newChunks;
                             });
                         }
                         else if (chunkType === 'references') {
@@ -722,15 +864,7 @@ export default function PaperView() {
                             references = chunkContent;
 
                             // Update the message with the references
-                            setMessages(prev => {
-                                const updatedMessages = [...prev];
-                                updatedMessages[updatedMessages.length - 1] = {
-                                    ...updatedMessages[updatedMessages.length - 1],
-                                    content: accumulatedContent,
-                                    references
-                                };
-                                return updatedMessages;
-                            });
+                            setStreamingReferences(chunkContent);
                         }
                         else {
                             console.warn(`Unknown chunk type: ${chunkType}`);
@@ -747,6 +881,16 @@ export default function PaperView() {
             console.log("Final accumulated content:", accumulatedContent);
             console.log("Final references:", references);
 
+            // After streaming is complete, add the full message to the state
+            if (accumulatedContent) {
+                const finalMessage: ChatMessage = {
+                    role: 'assistant',
+                    content: accumulatedContent,
+                    references: references,
+                };
+                setMessages(prev => [...prev, finalMessage]);
+            }
+
         } catch (error) {
             console.error('Error during streaming:', error);
             setMessages(prev => {
@@ -760,7 +904,7 @@ export default function PaperView() {
         } finally {
             setIsStreaming(false);
         }
-    };
+    }, [currentMessage, isStreaming, conversationId, id, userMessageReferences, selectedModel, responseStyle, transformReferencesToFormat]);
 
     // Add useEffect to handle starter question submission
     useEffect(() => {
@@ -768,13 +912,175 @@ export default function PaperView() {
             handleSubmit(null);
             setPendingStarterQuestion(null);
         }
-    }, [currentMessage]);
+    }, [currentMessage, pendingStarterQuestion, handleSubmit]);
 
-    const matchesCurrentCitation = (key: string, messageIndex: number) => {
+    const matchesCurrentCitation = useCallback((key: string, messageIndex: number) => {
         return activeCitationKey === key.toString() && activeCitationMessageIndex === messageIndex;
-    }
+    }, [activeCitationKey, activeCitationMessageIndex]);
 
-    const handleShare = async () => {
+    // Memoize expensive markdown components to prevent re-renders
+    const memoizedOverviewContent = useMemo(() => {
+        if (!paperData?.summary) return null;
+
+        return (
+            <Markdown
+                remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
+                rehypePlugins={[rehypeKatex]}
+                components={{
+                    // Apply the custom component to text nodes
+                    p: (props) => <CustomCitationLink
+                        {...props}
+                        handleCitationClick={handleCitationClickFromSummary}
+                        messageIndex={0}
+                        // Map summary citations to the citation format
+                        citations={
+                            paperData.summary_citations?.map(citation => ({
+                                key: String(citation.index),
+                                reference: citation.text
+                            })) || []
+                        }
+                    />,
+                    li: (props) => <CustomCitationLink
+                        {...props}
+                        handleCitationClick={handleCitationClickFromSummary}
+                        messageIndex={0}
+                        citations={
+                            paperData.summary_citations?.map(citation => ({
+                                key: String(citation.index),
+                                reference: citation.text
+                            })) || []
+                        }
+                    />,
+                    div: (props) => <CustomCitationLink
+                        {...props}
+                        handleCitationClick={handleCitationClickFromSummary}
+                        messageIndex={0}
+                        citations={
+                            paperData.summary_citations?.map(citation => ({
+                                key: String(citation.index),
+                                reference: citation.text
+                            })) || []
+                        }
+                    />,
+                    td: (props) => <CustomCitationLink
+                        {...props}
+                        handleCitationClick={handleCitationClickFromSummary}
+                        messageIndex={0}
+                        citations={
+                            paperData.summary_citations?.map(citation => ({
+                                key: String(citation.index),
+                                reference: citation.text
+                            })) || []
+                        }
+                    />,
+                }}
+            >
+                {paperData.summary}
+            </Markdown>
+        );
+    }, [paperData?.summary, paperData?.summary_citations, handleCitationClickFromSummary]);
+
+    // Optimize textarea change handler to prevent excessive re-renders
+    const handleTextareaChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setCurrentMessage(e.target.value);
+    }, []);
+
+    // Optimize notes textarea change handler
+    const handleNotesChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setPaperNoteContent(e.target.value);
+    }, []);
+
+    // Memoize message rendering to prevent unnecessary re-renders
+    const memoizedMessages = useMemo(() => {
+        return messages.map((msg, index) => (
+            <div
+                key={`${msg.id || index}-${msg.content.slice(0, 20)}`} // Use a stable key
+                className='flex flex-row gap-2 items-end'
+            >
+                {
+                    msg.role === 'user' && user && (
+                        <Avatar className="h-6 w-6">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            {user.picture ? (<img src={user.picture} alt={user.name} />) : (<User size={16} />)}
+                        </Avatar>
+                    )
+                }
+                <div
+                    data-message-index={index}
+                    className={`prose dark:prose-invert p-2 !max-w-full rounded-lg ${msg.role === 'user'
+                        ? 'bg-blue-200 text-blue-800 w-fit animate-fade-in'
+                        : 'w-full text-primary'
+                        }`}
+                >
+                    <Markdown
+                        remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
+                        rehypePlugins={[rehypeKatex]}
+                        components={{
+                            // Apply the custom component to text nodes
+                            p: (props) => <CustomCitationLink
+                                {...props}
+                                handleCitationClick={handleCitationClick}
+                                messageIndex={index}
+                                citations={msg.references?.citations || []}
+                            />,
+                            li: (props) => <CustomCitationLink
+                                {...props}
+                                handleCitationClick={handleCitationClick}
+                                messageIndex={index}
+                                citations={msg.references?.citations || []}
+                            />,
+                            div: (props) => <CustomCitationLink
+                                {...props}
+                                handleCitationClick={handleCitationClick}
+                                messageIndex={index}
+                                citations={msg.references?.citations || []}
+                            />,
+                            td: (props) => <CustomCitationLink
+                                {...props}
+                                handleCitationClick={handleCitationClickFromSummary}
+                                messageIndex={0}
+                                citations={msg.references?.citations || []}
+                            />,
+                        }}>
+                        {msg.content}
+                    </Markdown>
+                    {
+                        msg.references && msg.references['citations']?.length > 0 && (
+                            <div className="mt-2" id="references-section">
+                                <ul className="list-none p-0">
+                                    {Object.entries(msg.references.citations).map(([refIndex, value]) => (
+                                        <div
+                                            key={refIndex}
+                                            className={`flex flex-row gap-2 animate-fade-in ${matchesCurrentCitation(value.key, index) ? 'bg-blue-100 dark:bg-blue-900 rounded p-1 transition-colors duration-300' : ''}`}
+                                            id={`citation-${value.key}-${index}`}
+                                            onClick={() => handleCitationClick(value.key, index)}
+                                        >
+                                            <div className={`text-xs ${msg.role === 'user'
+                                                ? 'bg-blue-200 text-blue-800'
+                                                : 'text-secondary-foreground'
+                                                }`}>
+                                                <a href={`#citation-ref-${value.key}`}>{value.key}</a>
+                                            </div>
+                                            <div
+                                                id={`citation-ref-${value.key}-${index}`}
+                                                className={`text-xs ${msg.role === 'user'
+                                                    ? 'bg-blue-200 text-blue-800 line-clamp-1'
+                                                    : 'text-secondary-foreground'
+                                                    }`}
+                                            >
+                                                {value.reference}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                </div>
+            </div>
+        ));
+    }, [messages, user, handleCitationClick, handleCitationClickFromSummary, matchesCurrentCitation]);
+
+    const handleShare = useCallback(async () => {
         if (!id || !paperData || isSharing) return;
         setIsSharing(true);
         try {
@@ -791,9 +1097,9 @@ export default function PaperView() {
         } finally {
             setIsSharing(false);
         }
-    };
+    }, [id, paperData, isSharing]);
 
-    const handleUnshare = async () => {
+    const handleUnshare = useCallback(async () => {
         if (!id || !paperData || !paperData.share_id || isSharing) return;
         setIsSharing(true);
         try {
@@ -808,9 +1114,9 @@ export default function PaperView() {
         } finally {
             setIsSharing(false);
         }
-    };
+    }, [id, paperData, isSharing]);
 
-    const handleStatusChange = (status: PaperStatus) => {
+    const handleStatusChange = useCallback((status: PaperStatus) => {
         try {
             const url = `/api/paper/status?status=${status}&paper_id=${id}`;
             fetchFromApi(url, {
@@ -831,7 +1137,9 @@ export default function PaperView() {
             console.error('Error updating paper status:', error);
             toast.error("Failed to update paper status.");
         }
-    };
+    }, [id, paperData]);
+
+
 
     if (loading) return <div>Loading paper data...</div>;
 
@@ -961,9 +1269,7 @@ export default function PaperView() {
                                         <Textarea
                                             className='w-full flex-1'
                                             value={paperNoteContent}
-                                            onChange={(e) =>
-                                                setPaperNoteContent(e.target.value)
-                                            }
+                                            onChange={handleNotesChange}
                                             placeholder="Start taking notes..."
                                         />
                                     )}
@@ -1043,66 +1349,13 @@ export default function PaperView() {
                         }
                         {
                             rightSideFunction === 'Overview' && paperData.summary && (
-                                <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto m-2 relative">
+                                <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto m-2 relative animate-fade-in">
                                     {/* Paper Metadata Section */}
                                     <div className="prose dark:prose-invert !max-w-full text-sm">
                                         {paperData.title && (
                                             <h1 className="text-2xl font-bold">{paperData.title}</h1>
                                         )}
-                                        <Markdown
-                                            remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
-                                            rehypePlugins={[rehypeKatex]}
-                                            components={{
-                                                // Apply the custom component to text nodes
-                                                p: (props) => <CustomCitationLink
-                                                    {...props}
-                                                    handleCitationClick={handleCitationClickFromSummary}
-                                                    messageIndex={0}
-                                                    // Map summary citations to the citation format
-                                                    citations={
-                                                        paperData.summary_citations?.map(citation => ({
-                                                            key: String(citation.index),
-                                                            reference: citation.text
-                                                        })) || []
-                                                    }
-                                                />,
-                                                li: (props) => <CustomCitationLink
-                                                    {...props}
-                                                    handleCitationClick={handleCitationClickFromSummary}
-                                                    messageIndex={0}
-                                                    citations={
-                                                        paperData.summary_citations?.map(citation => ({
-                                                            key: String(citation.index),
-                                                            reference: citation.text
-                                                        })) || []
-                                                    }
-                                                />,
-                                                div: (props) => <CustomCitationLink
-                                                    {...props}
-                                                    handleCitationClick={handleCitationClickFromSummary}
-                                                    messageIndex={0}
-                                                    citations={
-                                                        paperData.summary_citations?.map(citation => ({
-                                                            key: String(citation.index),
-                                                            reference: citation.text
-                                                        })) || []
-                                                    }
-                                                />,
-                                                td: (props) => <CustomCitationLink
-                                                    {...props}
-                                                    handleCitationClick={handleCitationClickFromSummary}
-                                                    messageIndex={0}
-                                                    citations={
-                                                        paperData.summary_citations?.map(citation => ({
-                                                            key: String(citation.index),
-                                                            reference: citation.text
-                                                        })) || []
-                                                    }
-                                                />,
-                                            }}
-                                        >
-                                            {paperData.summary}
-                                        </Markdown>
+                                        {memoizedOverviewContent}
                                         {
                                             paperData.summary_citations && paperData.summary_citations.length > 0 && (
                                                 <div className="mt-2" id="references-section">
@@ -1204,7 +1457,7 @@ export default function PaperView() {
                                                             <Button
                                                                 key={i}
                                                                 variant="outline"
-                                                                className="text-sm font-medium p-2 max-w-full whitespace-normal h-auto text-left justify-start break-words bg-secondary text-secondary-foreground hover:bg-secondary/50 border-1 bg-background hover:translate-y-0.5 transition-transform duration-200"
+                                                                className="text-sm font-medium p-2 max-w-full whitespace-normal h-auto text-left justify-start break-words bg-background text-secondary-foreground hover:bg-secondary/50 border-1 hover:translate-y-0.5 transition-transform duration-200"
                                                                 onClick={() => {
                                                                     setCurrentMessage(question);
                                                                     inputMessageRef.current?.focus();
@@ -1319,7 +1572,7 @@ export default function PaperView() {
                                             {/* User message input area */}
                                             <Textarea
                                                 value={currentMessage}
-                                                onChange={(e) => setCurrentMessage(e.target.value)}
+                                                onChange={handleTextareaChange}
                                                 ref={inputMessageRef}
                                                 placeholder="Ask something about this paper."
                                                 className="border-none bg-secondary dark:bg-secondary rounded-md resize-none hover:resize-y p-2 focus-visible:outline-none focus-visible:ring-0 shadow-none min-h-[2rem] max-h-32"
