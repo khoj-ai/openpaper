@@ -424,7 +424,12 @@ export default function Home() {
 			</Dialog>
 
 			<Dialog open={isUploading} onOpenChange={(open) => !open && setIsUploading(false)}>
-				<DialogContent className="sm:max-w-md" hideCloseButton>
+				<DialogContent
+					className="sm:max-w-md"
+					hideCloseButton
+					onInteractOutside={(e) => {
+						e.preventDefault();
+					}}>
 					<DialogHeader>
 						<DialogTitle className="text-center">Processing Your Paper</DialogTitle>
 						<DialogDescription className="text-center">
