@@ -10,6 +10,7 @@ import os
 from datetime import datetime, timezone
 from typing import Dict, Any
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from src.celery_app import celery_app
 from src.schemas import PDFProcessingResult
@@ -48,23 +49,7 @@ def process_pdf_file(
             # Sanitize filename
             safe_filename = f"pdf-{job_id}.pdf"
 
-            # Upload PDF to S3 first
-            object_key, file_url = s3_service.upload_any_file(
-                temp_file_path, safe_filename, "application/pdf"
-            )
-            logger.info(f"Uploaded PDF to S3: {file_url}")
-
-            # Generate preview image from first page
-            preview_object_key = None
-            preview_url = None
-            try:
-                preview_object_key, preview_url = generate_pdf_preview(temp_file_path)
-                logger.info(f"Generated preview for {safe_filename}: {preview_url}")
-            except Exception as e:
-                logger.warning(f"Failed to generate preview for {safe_filename}: {str(e)}")
-                # Continue without preview - this is not a critical failure
-
-            # Extract text content from PDF
+            # Extract text content from PDF first (needed for metadata extraction)
             try:
                 pdf_text = extract_text_from_pdf(temp_file_path)
                 logger.info(f"Extracted {len(pdf_text)} characters of text from PDF")
@@ -73,17 +58,67 @@ def process_pdf_file(
                 logger.error(f"Failed to extract text from PDF: {e}")
                 raise Exception(f"Failed to extract text from PDF: {e}")
 
-            # Extract metadata using LLM
-            try:
-                metadata = llm_client.extract_paper_metadata(pdf_text)
-                logger.info(f"Successfully extracted metadata for {safe_filename}")
-            except Exception as e:
-                logger.error(f"Error extracting metadata: {str(e)}")
-                # Continue with basic metadata if LLM extraction fails
-                raise Exception(f"Failed to extract metadata: {str(e)}")
+            # Define functions for parallel execution
+            def upload_pdf():
+                return s3_service.upload_any_file(
+                    temp_file_path, safe_filename, "application/pdf"
+                )
+
+            def generate_preview():
+                try:
+                    return generate_pdf_preview(temp_file_path)
+                except Exception as e:
+                    logger.warning(f"Failed to generate preview for {safe_filename}: {str(e)}")
+                    return None, None
+
+            def extract_metadata():
+                try:
+                    return llm_client.extract_paper_metadata(pdf_text)
+                except Exception as e:
+                    logger.error(f"Error extracting metadata: {str(e)}")
+                    raise Exception(f"Failed to extract metadata: {str(e)}")
+
+            # Execute operations in parallel
+            with ThreadPoolExecutor(max_workers=3) as executor:
+                # Submit all tasks
+                future_to_operation = {
+                    executor.submit(upload_pdf): 'upload_pdf',
+                    executor.submit(generate_preview): 'generate_preview',
+                    executor.submit(extract_metadata): 'extract_metadata'
+                }
+
+                # Collect results
+                object_key = None
+                file_url = None
+                preview_object_key = None
+                preview_url = None
+                metadata = None
+
+                for future in as_completed(future_to_operation):
+                    operation = future_to_operation[future]
+                    try:
+                        result = future.result()
+                        if operation == 'upload_pdf':
+                            object_key, file_url = result
+                            logger.info(f"Uploaded PDF to S3: {file_url}")
+                        elif operation == 'generate_preview':
+                            preview_object_key, preview_url = result
+                            if preview_url:
+                                logger.info(f"Generated preview for {safe_filename}: {preview_url}")
+                        elif operation == 'extract_metadata':
+                            metadata = result
+                            logger.info(f"Successfully extracted metadata for {safe_filename}")
+                    except Exception as e:
+                        if operation == 'upload_pdf':
+                            logger.error(f"Failed to upload PDF: {e}")
+                            raise e
+                        elif operation == 'extract_metadata':
+                            logger.error(f"Failed to extract metadata: {e}")
+                            raise e
+                        # Preview generation failure is non-critical, already logged
 
             # Process the publication date if available
-            if metadata.publish_date:
+            if metadata and metadata.publish_date:
                 try:
                     # Try different date formats
                     for date_format in ["%Y-%m-%d", "%Y", "%Y-%m"]:
@@ -104,6 +139,12 @@ def process_pdf_file(
 
             logger.info(f"PDF processing completed successfully for {safe_filename} in {duration:.2f} seconds")
 
+            # Clean up temporary file
+            try:
+                os.unlink(temp_file_path)
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to clean up temporary file: {str(cleanup_error)}")
+
             return PDFProcessingResult(
                 success=True,
                 metadata=metadata,
@@ -120,9 +161,16 @@ def process_pdf_file(
     except Exception as e:
         logger.error(f"PDF processing failed for {job_id}: {str(e)}", exc_info=True)
 
+        # Clean up temporary file
+        try:
+            if 'temp_file_path' in locals():
+                os.unlink(temp_file_path)
+        except Exception as cleanup_error:
+            logger.warning(f"Failed to clean up temporary file: {str(cleanup_error)}")
+
         # Clean up S3 objects if they were created
         try:
-            if 'object_key' in locals():
+            if 'object_key' in locals() and object_key:
                 s3_service.delete_file(object_key)
             if 'preview_object_key' in locals() and preview_object_key:
                 s3_service.delete_file(preview_object_key)
