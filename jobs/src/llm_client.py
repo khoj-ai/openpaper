@@ -5,52 +5,69 @@ This is a placeholder that would need to be implemented with your actual LLM pro
 import json
 import logging
 import os
+import asyncio
 from google import genai
 from google.genai import types
-from typing import Optional
-from enum import Enum
+from typing import Optional, Type, TypeVar, Dict, Any
 
+from pydantic import BaseModel
 
-from src.schemas import PaperMetadataExtraction
+from src.schemas import (
+    PaperMetadataExtraction,
+    TitleAuthorsAbstract,
+    InstitutionsKeywords,
+    SummaryAndCitations,
+    StarterQuestions,
+    Highlights,
+)
 from src.utils import retry_llm_operation
 
 logger = logging.getLogger(__name__)
 
-# LLM Prompt for metadata extraction
-EXTRACT_PAPER_METADATA = """
-You are a metadata extraction assistant. Your task is to extract relevant information from academic papers.
+# Constants
+DEFAULT_CHAT_MODEL = "gemini-2.5-pro-preview-03-25"
+CACHE_TTL_SECONDS = 3600
 
-Given the following paper, extract the title, authors, abstract, institutions, keywords, annotations, summary, useful starter questions that can be asked about the paper, and the publish date. The information should be structured in a JSON format.
+# Pydantic model type variable
+T = TypeVar("T", bound=BaseModel)
 
-Extract the title in title case.
 
-Extract the abstract in normal case.
+SYSTEM_INSTRUCTIONS_CACHE = """
+You are a metadata extraction assistant. Your task is to extract specific information from the provided academic paper content. Pay special attention ot the details and ensure accuracy in the extracted metadata.
 
-Please provide the necessary details for extraction. Ensure that the information is accurate and complete.
+Always think step-by-step when making a determination with respect to the contents of the paper. If you are unsure about a specific field, provide a best guess based on the content available.
 
-Please format the information in a JSON object as follows:
+You will be rewarded for your accuracy and attention to detail. You are helping to facilitate humanity's understanding of scientific knowledge by delivering accurate and reliable metadata extraction.
+"""
+
+# LLM Prompts
+EXTRACT_METADATA_PROMPT_TEMPLATE = """
+You are a metadata extraction assistant. Your task is to extract specific information from the provided academic paper content.
+
+Please extract the following fields and structure them in a JSON format according to the provided schema.
+
 Schema: {schema}
 """
 
-DEFAULT_CHAT_MODEL = "gemini-2.5-pro-preview-03-25"
 
 class JSONParser:
     @staticmethod
-    def validate_and_extract_json(response_text: str) -> dict:
+    def validate_and_extract_json(response_text: str) -> Dict[str, Any]:
         """Extract and validate JSON from LLM response."""
-        # Try to find JSON in the response
-        start_idx = response_text.find('{')
-        end_idx = response_text.rfind('}') + 1
-
-        if start_idx == -1 or end_idx == 0:
-            raise ValueError("No JSON found in response")
-
-        json_str = response_text[start_idx:end_idx]
-
         try:
+            # Find the start and end of the JSON object
+            start_idx = response_text.find("{")
+            end_idx = response_text.rfind("}") + 1
+            if start_idx == -1 or end_idx == 0:
+                raise ValueError("No JSON object found in the response.")
+
+            json_str = response_text[start_idx:end_idx]
             return json.loads(json_str)
         except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON: {e}")
+            raise ValueError(f"Invalid JSON format: {e}")
+        except Exception as e:
+            raise ValueError(f"Error processing JSON response: {e}")
+
 
 class SimpleLLMClient:
     """
@@ -84,7 +101,8 @@ class SimpleLLMClient:
                 contents=types.Content(
                     role='user',
                     parts=[
-                        types.Part.from_text(text=cache_content)
+                        types.Part.from_text(text=cache_content),
+                        types.Part.from_text(text=SYSTEM_INSTRUCTIONS_CACHE)
                     ]
                 ),
                 display_name="Paper Metadata Cache",
@@ -100,7 +118,7 @@ class SimpleLLMClient:
 
         return cached_content.name
 
-    def generate_content(self, prompt: str, cache_key: Optional[str] = None, model: Optional[str] = None) -> str:
+    async def generate_content(self, prompt: str, cache_key: Optional[str] = None, model: Optional[str] = None) -> str:
         """
         Generate content using the LLM.
 
@@ -114,7 +132,7 @@ class SimpleLLMClient:
         if not model:
             model = self.default_model
 
-        response = self.client.models.generate_content(
+        response = await self.client.aio.models.generate_content(
             model=model if model else self.default_model,
             contents=prompt,
             config=types.GenerateContentConfig(
@@ -125,7 +143,8 @@ class SimpleLLMClient:
         if response and response.text:
             return response.text
 
-        raise ValueError("No content generated by the LLM")
+        raise ValueError("No content generated from LLM response")
+
 
 class PaperOperations(SimpleLLMClient):
     """
@@ -138,8 +157,61 @@ class PaperOperations(SimpleLLMClient):
         """Initialize the LLM client for paper operations."""
         super().__init__(api_key, default_model=default_model)
 
+    async def _extract_single_metadata_field(
+        self, cache_key: str, model: Type[T]
+    ) -> T:
+        """
+        Helper function to extract a single metadata field.
+
+        Args:
+            cache_key: The cache key for the paper content.
+            model: The Pydantic model for the data to extract.
+
+        Returns:
+            An instance of the provided Pydantic model.
+        """
+        formatted_prompt = EXTRACT_METADATA_PROMPT_TEMPLATE.format(
+            schema=model.model_json_schema()
+        )
+        response = await self.generate_content(formatted_prompt, cache_key=cache_key)
+        response_json = JSONParser.validate_and_extract_json(response)
+        return model.model_validate(response_json)
+
     @retry_llm_operation(max_retries=3, delay=1.0)
-    def extract_paper_metadata(self, paper_content: str) -> PaperMetadataExtraction:
+    async def extract_title_authors_abstract(
+        self, cache_key: str
+    ) -> TitleAuthorsAbstract:
+        return await self._extract_single_metadata_field(
+            cache_key, TitleAuthorsAbstract
+        )
+
+    @retry_llm_operation(max_retries=3, delay=1.0)
+    async def extract_institutions_keywords(
+        self, cache_key: str
+    ) -> InstitutionsKeywords:
+        return await self._extract_single_metadata_field(
+            cache_key, InstitutionsKeywords
+        )
+
+    @retry_llm_operation(max_retries=3, delay=1.0)
+    async def extract_summary_and_citations(
+        self, cache_key: str
+    ) -> SummaryAndCitations:
+        return await self._extract_single_metadata_field(
+            cache_key, SummaryAndCitations
+        )
+
+    @retry_llm_operation(max_retries=3, delay=1.0)
+    async def extract_starter_questions(self, cache_key: str) -> StarterQuestions:
+        return await self._extract_single_metadata_field(cache_key, StarterQuestions)
+
+    @retry_llm_operation(max_retries=3, delay=1.0)
+    async def extract_highlights(self, cache_key: str) -> Highlights:
+        return await self._extract_single_metadata_field(cache_key, Highlights)
+
+    async def extract_paper_metadata(
+        self, paper_content: str
+    ) -> PaperMetadataExtraction:
         """
         Extract metadata from paper content using LLM.
 
@@ -150,28 +222,51 @@ class PaperOperations(SimpleLLMClient):
             PaperMetadataExtraction: Extracted metadata
         """
         try:
-            # Upload the paper content to cache
-            cache_key = self.create_cache(paper_content)
+            try:
+                cache_key = self.create_cache(paper_content)
+            except Exception as e:
+                logger.error(f"Failed to create cache: {e}", exc_info=True)
+                cache_key = None
 
-            # Format the prompt
-            formatted_prompt = EXTRACT_PAPER_METADATA.format(
-                schema=PaperMetadataExtraction.model_json_schema()
+            # Run all extraction tasks concurrently
+            tasks = [
+                self.extract_title_authors_abstract(cache_key),
+                self.extract_institutions_keywords(cache_key),
+                self.extract_summary_and_citations(cache_key),
+                self.extract_starter_questions(cache_key),
+                self.extract_highlights(cache_key),
+            ]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Process results and handle potential errors
+            (
+                title_authors_abstract,
+                institutions_keywords,
+                summary_and_citations,
+                starter_questions,
+                highlights,
+            ) = results
+
+            # Combine the results into the final metadata object
+            return PaperMetadataExtraction(
+                title=getattr(title_authors_abstract, "title", ""),
+                authors=getattr(title_authors_abstract, "authors", []),
+                abstract=getattr(title_authors_abstract, "abstract", ""),
+                institutions=getattr(institutions_keywords, "institutions", []),
+                keywords=getattr(institutions_keywords, "keywords", []),
+                summary=getattr(summary_and_citations, "summary", ""),
+                summary_citations=getattr(
+                    summary_and_citations, "summary_citations", []
+                ),
+                starter_questions=getattr(starter_questions, "starter_questions", []),
+                highlights=getattr(highlights, "highlights", []),
+                publish_date=getattr(title_authors_abstract, "publish_date", None),
             )
-
-            response = self.generate_content(formatted_prompt, cache_key=cache_key)
-
-            # Parse and validate the response
-            response_json = JSONParser.validate_and_extract_json(response)
-
-            # Parse the response and return the metadata
-            metadata = PaperMetadataExtraction.model_validate(response_json)
-
-            return metadata
 
         except Exception as e:
             logger.error(f"Error extracting metadata: {e}", exc_info=True)
-            # Return minimal metadata if extraction fails
             raise ValueError(f"Failed to extract metadata: {str(e)}")
+
 
 # Create a single instance to use throughout the application
 api_key = os.getenv("GOOGLE_API_KEY")
