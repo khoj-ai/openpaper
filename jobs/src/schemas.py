@@ -53,7 +53,6 @@ class InstitutionsKeywords(BaseModel):
 class SummaryAndCitations(BaseModel):
     """Schema for summary and citations extraction."""
     summary: str = Field(
-        default="",
         description="""
 A concise, well-structured summary of the paper in markdown format. Include:
 1. Key findings and contributions
@@ -78,7 +77,6 @@ The summary should be accessible to readers with basic domain knowledge while ma
                          """,
     )
     summary_citations: List[ResponseCitation] = Field(
-        default=[],
         description="List of citations that are relevant to the summary. These should be direct quotes or paraphrases from the paper that support the summary provided. Remember to include the citation index (e.g., [^1], [^2]) in the summary.",
     )
 
