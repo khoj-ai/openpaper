@@ -232,7 +232,7 @@ class PaperOperations(AsyncLLMClient):
             starter_questions = getattr(instance, "starter_questions", [])
             if starter_questions:
                 status_callback(
-                    f"Generated {len(starter_questions)} starter questions"
+                    f"Constructed {len(starter_questions)} initial questions"
                 )
             else:
                 status_callback("No starter questions generated")
@@ -240,10 +240,10 @@ class PaperOperations(AsyncLLMClient):
             highlights = getattr(instance, "highlights", [])
             if highlights:
                 status_callback(
-                    f"Formulated {len(highlights)} highlights"
+                    f"Formulated {len(highlights)} annotations"
                 )
             else:
-                status_callback("No highlights extracted")
+                status_callback("No annotations extracted")
         elif model == TitleAuthorsAbstract:
             title = getattr(instance, "title", "")
             status_callback(
