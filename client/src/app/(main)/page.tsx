@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { fetchFromApi } from "@/lib/api";
 import { useIsMobile } from "@/lib/useMobile";;
 import {
@@ -35,6 +35,7 @@ interface JobStatusResponse {
 	paper_id: string | null;
 	has_file_url: boolean;
 	has_metadata: boolean;
+	celery_progress_message: string | null;
 }
 
 export default function Home() {
@@ -57,13 +58,22 @@ export default function Home() {
 	const [fileSize, setFileSize] = useState<number | null>(null);
 	const [fileLength, setFileLength] = useState<string | null>(null);
 	const [displayedMessage, setDisplayedMessage] = useState("");
+	const [celeryMessage, setCeleryMessage] = useState<string | null>(null);
+
+	// Ref to access latest celeryMessage value in intervals
+	const celeryMessageRef = useRef<string | null>(null);
+
+	// Keep ref in sync with state
+	useEffect(() => {
+		celeryMessageRef.current = celeryMessage;
+	}, [celeryMessage]);
 
 
 	const loadingMessages = useMemo(() => [
 		`Processing ${fileLength ? fileLength : 'lots of'} characters`,
+		`Processing ${fileSize ? (fileSize / 1024 / 1024).toFixed(2) + 'mb' : '...'} `,
 		"Uploading to the cloud",
 		"Extracting metadata",
-		`Processing ${fileSize ? (fileSize / 1024 / 1024).toFixed(2) + 'mb' : '...'} `,
 		"Crafting grounded citations",
 	], [fileLength, fileSize]);
 
@@ -82,6 +92,16 @@ export default function Home() {
 			}, 1000);
 
 			messageTimer = setInterval(() => {
+				// Check if celery message is set using ref
+				if (celeryMessageRef.current) {
+					// Clear the message timer if celery message is available
+					if (messageTimer) {
+						clearInterval(messageTimer);
+						messageTimer = undefined;
+					}
+					return;
+				}
+
 				setMessageIndex((prevIndex) => {
 					if (prevIndex < loadingMessages.length - 1) {
 						return prevIndex + 1;
@@ -102,7 +122,8 @@ export default function Home() {
 		setDisplayedMessage("");
 		let i = 0;
 		const typingTimer = setInterval(() => {
-			const currentMessage = loadingMessages[messageIndex];
+			// Use celery message if available, otherwise use the cycling message
+			const currentMessage = celeryMessage || loadingMessages[messageIndex];
 			if (i < currentMessage.length) {
 				setDisplayedMessage(currentMessage.slice(0, i + 1));
 				i++;
@@ -112,7 +133,7 @@ export default function Home() {
 		}, 50);
 
 		return () => clearInterval(typingTimer);
-	}, [messageIndex, loadingMessages]);
+	}, [messageIndex, loadingMessages, celeryMessage]);
 
 
 	// Poll job status
@@ -120,6 +141,11 @@ export default function Home() {
 		try {
 			const response: JobStatusResponse = await fetchFromApi(`/api/paper/upload/status/${jobId}`);
 			setJobUploadStatus(response.status);
+
+			// Update celery message if available
+			if (response.celery_progress_message) {
+				setCeleryMessage(response.celery_progress_message);
+			}
 
 			if (response.status === 'completed' && response.paper_id) {
 
@@ -171,6 +197,7 @@ export default function Home() {
 	const handleFileUpload = async (file: File) => {
 		setIsUploading(true);
 		setFileSize(file.size);
+		setCeleryMessage(null); // Reset celery message
 
 		file.text().then(text => {
 			setFileLength(text.length.toString());
@@ -203,6 +230,7 @@ export default function Home() {
 	const handlePdfUrl = async (url: string) => {
 		setIsUploading(true);
 		setFileSize(null);
+		setCeleryMessage(null); // Reset celery message
 		try {
 			const response = await fetch(url, {
 				method: 'GET',
