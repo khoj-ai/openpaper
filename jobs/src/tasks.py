@@ -62,43 +62,40 @@ async def process_pdf_file(
             logger.error(f"Failed to extract text from PDF: {e}")
             raise Exception(f"Failed to extract text from PDF: {e}")
 
-        # Define functions for I/O-bound operations
-        def upload_pdf_sync(status_callback: Callable[[str], None]):
+        # Define async functions for I/O-bound operations
+        async def upload_pdf_async():
             status_callback("PDF ascending to the cloud")
-            return s3_service.upload_any_file(
-                temp_file_path, safe_filename, "application/pdf"
+            return await asyncio.to_thread(
+                s3_service.upload_any_file,
+                temp_file_path,
+                safe_filename,
+                "application/pdf"
             )
 
-        def generate_preview_sync(status_callback: Callable[[str], None]):
+        async def generate_preview_async():
             status_callback("Taking a snapshot")
             try:
-                return generate_pdf_preview(temp_file_path)
+                return await asyncio.to_thread(generate_pdf_preview, temp_file_path)
             except Exception as e:
                 logger.warning(f"Failed to generate preview for {safe_filename}: {str(e)}")
                 return None, None
 
         # Run I/O-bound tasks and LLM extraction concurrently
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            loop = asyncio.get_event_loop()
-
-            # Schedule sync I/O tasks in thread pool
-            upload_future = loop.run_in_executor(executor, upload_pdf_sync, status_callback)
-            preview_future = loop.run_in_executor(executor, generate_preview_sync, status_callback)
-
-            # Schedule async LLM task
-            metadata_task = asyncio.create_task(
-                llm_client.extract_paper_metadata(
-                    pdf_text, status_callback=status_callback
-                )
+        upload_task = asyncio.create_task(upload_pdf_async())
+        preview_task = asyncio.create_task(generate_preview_async())
+        metadata_task = asyncio.create_task(
+            llm_client.extract_paper_metadata(
+                pdf_text, status_callback=status_callback
             )
+        )
 
-            # Await all tasks
-            results = await asyncio.gather(
-                upload_future,
-                preview_future,
-                metadata_task,
-                return_exceptions=True
-            )
+        # Await all tasks
+        results = await asyncio.gather(
+            upload_task,
+            preview_task,
+            metadata_task,
+            return_exceptions=True
+        )
 
         # Process results
         upload_result, preview_result, metadata_result = results
