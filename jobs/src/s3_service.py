@@ -18,6 +18,7 @@ AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME")
 CLOUDFLARE_BUCKET_NAME = os.environ.get("CLOUDFLARE_BUCKET_NAME")
+UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "uploads")
 
 
 class S3Service:
@@ -50,7 +51,7 @@ class S3Service:
         Returns:
             tuple[str, str]: The S3 object key and public URL
         """
-        object_key = f"uploads/{uuid.uuid4()}-{original_filename}"
+        object_key = f"{UPLOAD_DIR}/{uuid.uuid4()}-{original_filename}"
         self.s3_client.put_object(
             Bucket=self.bucket_name,
             Key=object_key,
@@ -76,7 +77,7 @@ class S3Service:
         try:
             # Generate a unique key for the S3 object
             # Use a UUID prefix to avoid naming conflicts
-            object_key = f"uploads/{uuid.uuid4()}-{original_filename}"
+            object_key = f"{UPLOAD_DIR}/{uuid.uuid4()}-{original_filename}"
 
             logger.info(f"Uploading file {original_filename} to S3 with key {object_key}")
             logger.info(f"bucket_name: {self.bucket_name}, cloudflare_bucket_name: {self.cloudflare_bucket_name}")
