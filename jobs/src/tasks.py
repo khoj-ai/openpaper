@@ -9,7 +9,7 @@ import psutil
 import os
 import asyncio
 from datetime import datetime, timezone
-from typing import Dict, Any
+from typing import Dict, Any, Callable
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -24,7 +24,8 @@ logger = logging.getLogger(__name__)
 
 async def process_pdf_file(
     pdf_bytes: bytes,
-    job_id: str
+    job_id: str,
+    status_callback: Callable[[str], None],
 ) -> PDFProcessingResult:
     """
     Process a PDF file by extracting metadata and uploading to S3.
@@ -32,6 +33,7 @@ async def process_pdf_file(
     Args:
         pdf_bytes: The PDF file content as bytes
         job_id: Job ID for tracking
+        status_callback: Function to update task status
 
     Returns:
         PDFProcessingResult: Processing results
@@ -53,6 +55,7 @@ async def process_pdf_file(
         # Extract text and page offsets from PDF
         try:
             pdf_text = extract_text_from_pdf(temp_file_path)
+            status_callback(f"Processed bits and bytes")
             logger.info(f"Extracted {len(pdf_text)} characters of text from PDF")
             page_offsets = map_pages_to_text_offsets(temp_file_path)
         except Exception as e:
@@ -60,12 +63,14 @@ async def process_pdf_file(
             raise Exception(f"Failed to extract text from PDF: {e}")
 
         # Define functions for I/O-bound operations
-        def upload_pdf_sync():
+        def upload_pdf_sync(status_callback: Callable[[str], None]):
+            status_callback("PDF ascending to the cloud")
             return s3_service.upload_any_file(
                 temp_file_path, safe_filename, "application/pdf"
             )
 
-        def generate_preview_sync():
+        def generate_preview_sync(status_callback: Callable[[str], None]):
+            status_callback("Taking a snapshot")
             try:
                 return generate_pdf_preview(temp_file_path)
             except Exception as e:
@@ -77,11 +82,15 @@ async def process_pdf_file(
             loop = asyncio.get_event_loop()
 
             # Schedule sync I/O tasks in thread pool
-            upload_future = loop.run_in_executor(executor, upload_pdf_sync)
-            preview_future = loop.run_in_executor(executor, generate_preview_sync)
+            upload_future = loop.run_in_executor(executor, upload_pdf_sync, status_callback)
+            preview_future = loop.run_in_executor(executor, generate_preview_sync, status_callback)
 
             # Schedule async LLM task
-            metadata_task = asyncio.create_task(llm_client.extract_paper_metadata(pdf_text))
+            metadata_task = asyncio.create_task(
+                llm_client.extract_paper_metadata(
+                    pdf_text, status_callback=status_callback
+                )
+            )
 
             # Await all tasks
             results = await asyncio.gather(
@@ -172,20 +181,30 @@ def upload_and_process_file(
     task_id = self.request.id
     pdf_bytes = base64.b64decode(pdf_base64)
 
+    def write_to_status(new_status: str):
+        """Helper to update task status."""
+        logger.info(f"Updating task {task_id} status: {new_status}")
+        try:
+            self.update_state(state="PROGRESS", meta={"status": new_status})
+        except Exception as e:
+            logger.error(f"Failed to update task {task_id} status: {e}. New status: {new_status}")
+
     try:
         logger.info(f"Starting PDF processing for task {task_id}")
-        self.update_state(state="PROGRESS", meta={"status": "Processing PDF file", "progress": 0})
+        write_to_status("Processing PDF file")
 
         # Run the async processing function
-        result = asyncio.run(process_pdf_file(pdf_bytes, task_id))
+        result = asyncio.run(
+            process_pdf_file(pdf_bytes, task_id, status_callback=write_to_status)
+        )
 
-        self.update_state(state="PROGRESS", meta={"status": "PDF processing complete, sending webhook", "progress": 90})
+        write_to_status("PDF processing complete!")
 
         webhook_payload = {
             "task_id": task_id,
             "status": "completed" if result.success else "failed",
             "result": result.model_dump(),
-            "error": result.error if not result.success else None
+            "error": result.error if not result.success else None,
         }
 
         # Send webhook notification
@@ -194,7 +213,7 @@ def upload_and_process_file(
                 webhook_url,
                 json=webhook_payload,
                 timeout=60,
-                headers={"Content-Type": "application/json"}
+                headers={"Content-Type": "application/json"},
             )
             response.raise_for_status()
             logger.info(f"Webhook sent successfully for task {task_id}")
@@ -212,14 +231,14 @@ def upload_and_process_file(
             "task_id": task_id,
             "status": "failed",
             "result": None,
-            "error": str(exc)
+            "error": str(exc),
         }
         try:
             requests.post(
                 webhook_url,
                 json=failure_payload,
                 timeout=60,
-                headers={"Content-Type": "application/json"}
+                headers={"Content-Type": "application/json"},
             ).raise_for_status()
         except requests.RequestException as e:
             logger.error(f"Failed to send failure webhook for task {task_id}: {e}")

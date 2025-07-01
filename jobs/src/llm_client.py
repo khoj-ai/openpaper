@@ -1,6 +1,5 @@
 """
 Simplified LLM client for metadata extraction.
-This is a placeholder that would need to be implemented with your actual LLM provider.
 """
 import json
 import logging
@@ -8,7 +7,7 @@ import os
 import asyncio
 from google import genai
 from google.genai import types
-from typing import Optional, Type, TypeVar, Dict, Any
+from typing import Optional, Type, TypeVar, Dict, Any, Callable
 
 from pydantic import BaseModel
 
@@ -160,23 +159,21 @@ class PaperOperations(SimpleLLMClient):
     async def _extract_single_metadata_field(
         self,
         model: Type[T],
+        paper_content: str,
+        status_callback: Callable[[str], None],
         cache_key: Optional[str] = None,
-        paper_content: Optional[str] = None,
     ) -> T:
         """
         Helper function to extract a single metadata field.
 
         Args:
             model: The Pydantic model for the data to extract.
-            cache_key: The cache key for the paper content.
-            paper_content: The paper content, used if cache_key is None.
+            paper_content: The paper content.
+            status_callback: Optional function to update task status.
 
         Returns:
             An instance of the provided Pydantic model.
         """
-        if not cache_key and not paper_content:
-            raise ValueError("Either cache_key or paper_content must be provided")
-
         prompt = EXTRACT_METADATA_PROMPT_TEMPLATE.format(
             schema=model.model_json_schema()
         )
@@ -186,62 +183,135 @@ class PaperOperations(SimpleLLMClient):
 
         response = await self.generate_content(prompt, cache_key=cache_key)
         response_json = JSONParser.validate_and_extract_json(response)
-        return model.model_validate(response_json)
+        instance = model.model_validate(response_json)
+
+        if model == SummaryAndCitations:
+            n_citations = len(getattr(instance, "summary_citations", []))
+            status_callback(f"Compiled with {n_citations} citations")
+        elif model == InstitutionsKeywords:
+            keywords = getattr(instance, "keywords", [])
+            institutions = getattr(instance, "institutions", [])
+            first_keyword = keywords[0] if keywords else ""
+            if first_keyword:
+                status_callback(
+                    f"Building on {first_keyword} context"
+                )
+            elif institutions:
+                institutions = getattr(instance, "institutions", [])
+                first_institution = institutions[0] if institutions else ""
+                status_callback(
+                    f"Adding context from institution: {first_institution}"
+                )
+            else:
+                status_callback("Processing without keyword data")
+        elif model == StarterQuestions:
+            starter_questions = getattr(instance, "starter_questions", [])
+            if starter_questions:
+                status_callback(
+                    f"Generated {len(starter_questions)} starter questions"
+                )
+            else:
+                status_callback("No starter questions generated")
+        elif model == Highlights:
+            highlights = getattr(instance, "highlights", [])
+            if highlights:
+                status_callback(
+                    f"Formulated {len(highlights)} highlights"
+                )
+            else:
+                status_callback("No highlights extracted")
+        elif model == TitleAuthorsAbstract:
+            title = getattr(instance, "title", "")
+            status_callback(
+                f"Reading {title if title else 'untitled paper'}"
+            )
+        else:
+            status_callback(f"Successfully extracted {model.__name__}")
+
+        return instance
 
     @retry_llm_operation(max_retries=3, delay=1.0)
     async def extract_title_authors_abstract(
-        self, cache_key: Optional[str] = None, paper_content: Optional[str] = None
+        self,
+        paper_content: str,
+        status_callback: Callable[[str], None],
+        cache_key: Optional[str] = None,
     ) -> TitleAuthorsAbstract:
-        return await self._extract_single_metadata_field(
+        result = await self._extract_single_metadata_field(
             model=TitleAuthorsAbstract,
             cache_key=cache_key,
             paper_content=paper_content,
+            status_callback=status_callback,
         )
+        return result
 
     @retry_llm_operation(max_retries=3, delay=1.0)
     async def extract_institutions_keywords(
-        self, cache_key: Optional[str] = None, paper_content: Optional[str] = None
+        self,
+        paper_content: str,
+        status_callback: Callable[[str], None],
+        cache_key: Optional[str] = None,
     ) -> InstitutionsKeywords:
         return await self._extract_single_metadata_field(
             model=InstitutionsKeywords,
             cache_key=cache_key,
             paper_content=paper_content,
+            status_callback=status_callback,
         )
 
     @retry_llm_operation(max_retries=3, delay=1.0)
     async def extract_summary_and_citations(
-        self, cache_key: Optional[str] = None, paper_content: Optional[str] = None
+        self,
+        paper_content: str,
+        status_callback: Callable[[str], None],
+        cache_key: Optional[str] = None,
     ) -> SummaryAndCitations:
         return await self._extract_single_metadata_field(
             model=SummaryAndCitations,
             cache_key=cache_key,
             paper_content=paper_content,
+            status_callback=status_callback,
         )
 
     @retry_llm_operation(max_retries=3, delay=1.0)
     async def extract_starter_questions(
-        self, cache_key: Optional[str] = None, paper_content: Optional[str] = None
+        self,
+        paper_content: str,
+        status_callback: Callable[[str], None],
+        cache_key: Optional[str] = None,
     ) -> StarterQuestions:
         return await self._extract_single_metadata_field(
-            model=StarterQuestions, cache_key=cache_key, paper_content=paper_content
+            model=StarterQuestions,
+            cache_key=cache_key,
+            paper_content=paper_content,
+            status_callback=status_callback,
         )
 
     @retry_llm_operation(max_retries=3, delay=1.0)
     async def extract_highlights(
-        self, cache_key: Optional[str] = None, paper_content: Optional[str] = None
+        self,
+        paper_content: str,
+        status_callback: Callable[[str], None],
+        cache_key: Optional[str] = None,
     ) -> Highlights:
         return await self._extract_single_metadata_field(
-            model=Highlights, cache_key=cache_key, paper_content=paper_content
+            model=Highlights,
+            paper_content=paper_content,
+            status_callback=status_callback,
+            cache_key=cache_key,
         )
 
     async def extract_paper_metadata(
-        self, paper_content: str
+        self,
+        paper_content: str,
+        status_callback: Optional[Callable[[str], None]] = None,
     ) -> PaperMetadataExtraction:
         """
         Extract metadata from paper content using LLM.
 
         Args:
             paper_content: The extracted text content from the PDF
+            status_callback: Optional function to update task status
 
         Returns:
             PaperMetadataExtraction: Extracted metadata
@@ -256,24 +326,29 @@ class PaperOperations(SimpleLLMClient):
             # Run all extraction tasks concurrently
             tasks = [
                 self.extract_title_authors_abstract(
+                    paper_content=paper_content,
                     cache_key=cache_key,
-                    paper_content=paper_content if not cache_key else None,
+                    status_callback=status_callback
                 ),
                 self.extract_institutions_keywords(
+                    paper_content=paper_content,
                     cache_key=cache_key,
-                    paper_content=paper_content if not cache_key else None,
+                    status_callback=status_callback
                 ),
                 self.extract_summary_and_citations(
+                    paper_content=paper_content,
                     cache_key=cache_key,
-                    paper_content=paper_content if not cache_key else None,
+                    status_callback=status_callback
                 ),
                 self.extract_starter_questions(
+                    paper_content=paper_content,
                     cache_key=cache_key,
-                    paper_content=paper_content if not cache_key else None,
+                    status_callback=status_callback
                 ),
                 self.extract_highlights(
+                    paper_content=paper_content,
                     cache_key=cache_key,
-                    paper_content=paper_content if not cache_key else None,
+                    status_callback=status_callback
                 ),
             ]
             results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -305,6 +380,8 @@ class PaperOperations(SimpleLLMClient):
 
         except Exception as e:
             logger.error(f"Error extracting metadata: {e}", exc_info=True)
+            if status_callback:
+                status_callback(f"Error during metadata extraction: {e}")
             raise ValueError(f"Failed to extract metadata: {str(e)}")
 
 

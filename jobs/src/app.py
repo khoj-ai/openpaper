@@ -38,7 +38,6 @@ class TaskStatus(BaseModel):
     result: Optional[Dict[str, Any]] = None
     meta: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
-    progress: Optional[int] = None  # Progress percentage (0-100)
     progress_message: Optional[str] = None  # Human-readable progress message
 
 
@@ -70,7 +69,6 @@ async def get_task_status(task_id: str):
                 task_id=task_id,
                 status="progress",
                 meta=progress_info,
-                progress=progress_info.get("progress", 0),
                 progress_message=progress_info.get("status", "Processing...")
             )
         elif task_result.state == "SUCCESS":
