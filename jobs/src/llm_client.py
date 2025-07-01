@@ -86,7 +86,7 @@ class JSONParser:
         )
 
 
-class SimpleLLMClient:
+class AsyncLLMClient:
     """
     A simple LLM client for metadata extraction.
     This is a placeholder implementation that would need to be replaced
@@ -100,9 +100,9 @@ class SimpleLLMClient:
     ):
         self.api_key = api_key
         self.default_model: str = default_model or DEFAULT_CHAT_MODEL
-        self.client = genai.Client(api_key=self.api_key)
+        self.client: Optional[genai.Client] = None
 
-    def create_cache(self, cache_content: str) -> str:
+    async def create_cache(self, cache_content: str) -> str:
         """Create a cache entry for the given content.
 
         Args:
@@ -112,7 +112,10 @@ class SimpleLLMClient:
             str: The cache key for the stored content.
         """
 
-        cached_content = self.client.caches.create(
+        if not self.client:
+            raise ValueError("Client not initialized. Call extract_paper_metadata first.")
+
+        cached_content = await self.client.aio.caches.create(
             model=self.default_model,
             config=types.CreateCachedContentConfig(
                 contents=types.Content(
@@ -146,6 +149,9 @@ class SimpleLLMClient:
         Returns:
             str: The generated content from the LLM
         """
+        if not self.client:
+            raise ValueError("Client not initialized. Call extract_paper_metadata first.")
+
         if not model:
             model = self.default_model
 
@@ -163,7 +169,7 @@ class SimpleLLMClient:
         raise ValueError("No content generated from LLM response")
 
 
-class PaperOperations(SimpleLLMClient):
+class PaperOperations(AsyncLLMClient):
     """
     Simplified LLM client for metadata extraction.
     This is a placeholder implementation that would need to be replaced
@@ -284,12 +290,13 @@ class PaperOperations(SimpleLLMClient):
         status_callback: Callable[[str], None],
         cache_key: Optional[str] = None,
     ) -> SummaryAndCitations:
-        return await self._extract_single_metadata_field(
+        result = await self._extract_single_metadata_field(
             model=SummaryAndCitations,
             cache_key=cache_key,
             paper_content=paper_content,
             status_callback=status_callback,
         )
+        return result
 
     @retry_llm_operation(max_retries=3, delay=1.0)
     async def extract_starter_questions(
@@ -334,9 +341,12 @@ class PaperOperations(SimpleLLMClient):
         Returns:
             PaperMetadataExtraction: Extracted metadata
         """
+        # Create a new client for this operation
+        self.client = genai.Client(api_key=self.api_key)
+
         try:
             try:
-                cache_key = self.create_cache(paper_content)
+                cache_key = await self.create_cache(paper_content)
             except Exception as e:
                 logger.error(f"Failed to create cache: {e}", exc_info=True)
                 cache_key = None
@@ -369,7 +379,10 @@ class PaperOperations(SimpleLLMClient):
                     status_callback=status_callback
                 ),
             ]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Use shield to prevent task cancellation during cleanup
+            shielded_tasks = [asyncio.shield(task) for task in tasks]
+            results = await asyncio.gather(*shielded_tasks, return_exceptions=True)
 
             # Process results and handle potential errors
             (
@@ -401,8 +414,9 @@ class PaperOperations(SimpleLLMClient):
             if status_callback:
                 status_callback(f"Error during metadata extraction: {e}")
             raise ValueError(f"Failed to extract metadata: {str(e)}")
-
-
+        finally:
+            # Set client to None to allow for proper garbage collection
+            self.client = None
 # Create a single instance to use throughout the application
 api_key = os.getenv("GOOGLE_API_KEY")
 
