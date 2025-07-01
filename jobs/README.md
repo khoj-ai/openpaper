@@ -52,6 +52,80 @@ Here's a high-level overview of the PDF processing workflow:
                                +------------------+
 ```
 
+Within the Jobs Service, the PDF processing task is broken down into several subtasks that run concurrently. Each subtask is responsible for a specific aspect of the PDF processing, such as extracting text, generating preview images, and calling an LLM service for metadata extraction.
+
+
+```
++-------------------------------------------------------------------------------------------------+
+|                                                                                                 |
+|  Incoming Request with PDF Content                                                              |
+|  (paper_content: str)                                                                           |
+|                                                                                                 |
++-------------------------------------------------------------------------------------------------+
+      |
+      |
+      v
++-------------------------------------------------------------------------------------------------+
+|                                                                                                 |
+|  Orchestrate end-to-end metadata extraction                                                     |
+|                                                                                                 |
++-------------------------------------------------------------------------------------------------+
+      |
+      |
+      v
++-------------------------------------------------------------------------------------------------+
+|                                                                                                 |
+|  Cache the paper content to optimize performance                                                |
+|  (Caches the PDF content for 3600 seconds)                                                      |
+|                                                                                                 |
++-------------------------------------------------------------------------------------------------+
+      |
+      |
+      v
++-------------------------------------------------------------------------------------------------+
+|                                                                                                 |
+|  Fan-out Subtasks                                                                               |
+|  (All subtasks run concurrently using the same cache_key)                                       |
+|                                                                                                 |
++-------+-----------------------------------------------------------------------------------------+
+        |
+        |
++-------+-----------------------------------------------------------------------------------------+
+|                                                                                                 |
+|   +--------------------------+   +---------------------------+   +---------------------------+  |
+|   | Get Title, Authors,      |   | Find Institutions and     |   | Generate Summary and      |  |
+|   | and Abstract             |   | Keywords                  |   | Find Citations            |  |
+|   +--------------------------+   +---------------------------+   +---------------------------+  |
+|                                                                                                 |
+|   +--------------------------+   +---------------------------+                                  |
+|   | Create Starter Questions |   | Identify Key Highlights   |                                  |
+|   | for Discussion           |   | and Takeaways             |                                  |
+|   +--------------------------+   +---------------------------+                                  |
+|                                                                                                 |
++-------+-----------------------------------------------------------------------------------------+
+        |
+        |
+        v
++-------+-----------------------------------------------------------------------------------------+
+|                                                                                                 |
+|  Rejoin Results                                                                                 |
+|  (Results from all subtasks are gathered)                                                       |
+|                                                                                                 |
+|                                                                                                 |
++-------------------------------------------------------------------------------------------------+
+      |
+      |
+      v
++-------------------------------------------------------------------------------------------------+
+|                                                                                                 |
+|  Final Result                                                                                   |
+|  (PaperMetadataExtraction object)                                                               |
+|                                                                                                 |
++-------------------------------------------------------------------------------------------------+
+
+```
+
+
 1.  **PDF Upload**: A client uploads a PDF file to the `server` via the web application.
 2.  **Task Queuing**: The `server` creates a new paper record in the database with a `processing` status, then dispatches a task to the Celery message broker (Redis) with the PDF data and a webhook URL.
 3.  **Task Consumption**: A Celery worker from the `jobs` service picks up the task from the queue.
