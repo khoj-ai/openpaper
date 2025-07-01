@@ -9,9 +9,10 @@ import psutil
 import os
 import asyncio
 from datetime import datetime, timezone
-from typing import Dict, Any, Callable
+from typing import Dict, Any, Callable, TypeVar, Coroutine
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import wraps
 
 from src.celery_app import celery_app
 from src.schemas import PDFProcessingResult, PaperMetadataExtraction
@@ -20,6 +21,65 @@ from src.parser import extract_text_from_pdf, generate_pdf_preview, map_pages_to
 from src.llm_client import llm_client
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar('T')
+
+def run_async_safely(coro: Coroutine[Any, Any, T]) -> T:
+    """
+    Run an async function safely in a Celery task by creating a new event loop.
+
+    This ensures proper cleanup of the event loop to avoid "Event loop is closed" errors.
+
+    Args:
+        coro: Coroutine to run
+
+    Returns:
+        The result of the coroutine
+    """
+    # Store the old loop if one exists
+    try:
+        old_loop = asyncio.get_event_loop()
+    except RuntimeError:
+        old_loop = None
+
+    # Create a new event loop for this task
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    try:
+        # Run the coroutine and return its result
+        return loop.run_until_complete(coro)
+    finally:
+        try:
+            # Properly clean up pending tasks
+            pending = asyncio.all_tasks(loop)
+            for task in pending:
+                task.cancel()
+
+            # Run the event loop until all tasks are done
+            if pending:
+                loop.run_until_complete(
+                    asyncio.gather(*pending, return_exceptions=True)
+                )
+
+            # Shutdown async generators
+            if not loop.is_closed():
+                loop.run_until_complete(loop.shutdown_asyncgens())
+
+        except Exception as e:
+            logger.warning(f"Error during event loop cleanup: {e}")
+
+        finally:
+            # Close the event loop
+            try:
+                if not loop.is_closed():
+                    loop.close()
+            except Exception as e:
+                logger.warning(f"Error closing event loop: {e}")
+
+            # Restore the old event loop if it was valid
+            if old_loop is not None and not old_loop.is_closed():
+                asyncio.set_event_loop(old_loop)
 
 
 async def process_pdf_file(
@@ -190,8 +250,9 @@ def upload_and_process_file(
         logger.info(f"Starting PDF processing for task {task_id}")
         write_to_status("Processing PDF file")
 
-        # Run the async processing function
-        result = asyncio.run(
+        # Run the async processing function in a way that properly manages the event loop
+        # This prevents "Event loop is closed" errors
+        result = run_async_safely(
             process_pdf_file(pdf_bytes, task_id, status_callback=write_to_status)
         )
 
