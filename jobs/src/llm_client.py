@@ -4,6 +4,7 @@ Simplified LLM client for metadata extraction.
 import json
 import logging
 import os
+import re
 import asyncio
 from google import genai
 from google.genai import types
@@ -50,22 +51,39 @@ Schema: {schema}
 
 
 class JSONParser:
-    @staticmethod
-    def validate_and_extract_json(response_text: str) -> Dict[str, Any]:
-        """Extract and validate JSON from LLM response."""
-        try:
-            # Find the start and end of the JSON object
-            start_idx = response_text.find("{")
-            end_idx = response_text.rfind("}") + 1
-            if start_idx == -1 or end_idx == 0:
-                raise ValueError("No JSON object found in the response.")
 
-            json_str = response_text[start_idx:end_idx]
-            return json.loads(json_str)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON format: {e}")
-        except Exception as e:
-            raise ValueError(f"Error processing JSON response: {e}")
+    @staticmethod
+    def validate_and_extract_json(json_data: str) -> dict:
+        """Extract and validate JSON data from various formats"""
+        if not json_data or not isinstance(json_data, str):
+            raise ValueError("Invalid input: empty or non-string data")
+
+        json_data = json_data.strip()
+
+        # Case 1: Try parsing directly first
+        try:
+            return json.loads(json_data)
+        except json.JSONDecodeError:
+            pass
+
+        # Case 2: Check for code block format
+        if "```" in json_data:
+            code_blocks = re.findall(r"```(?:json)?\s*([\s\S]*?)```", json_data)
+
+            for block in code_blocks:
+                block = block.strip()
+                block = re.sub(r"}\s+\w+\s+}", "}}", block)
+                block = re.sub(r"}\s+\w+\s+,", "},", block)
+
+                try:
+                    return json.loads(block)
+                except json.JSONDecodeError:
+                    continue
+
+        raise ValueError(
+            "Could not extract valid JSON from the provided string. "
+            "Please ensure the response contains proper JSON format."
+        )
 
 
 class SimpleLLMClient:
