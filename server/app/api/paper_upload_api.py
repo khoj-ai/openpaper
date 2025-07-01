@@ -104,7 +104,6 @@ async def get_upload_status(
         response_content.update(
             {
                 "celery_status": celery_task_status.get("status"),
-                "celery_progress": celery_task_status.get("progress"),
                 "celery_progress_message": celery_task_status.get("progress_message"),
                 "celery_error": celery_task_status.get("error"),
             }
