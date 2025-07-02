@@ -106,6 +106,8 @@ async def handle_paper_processing_webhook(
                     "status": "webhook processed - failed due to missing raw_content"
                 }
 
+            publish_date = metadata.publish_date if metadata.publish_date else None
+
             # Create paper record
             paper = paper_crud.create(
                 db=db,
@@ -121,7 +123,7 @@ async def handle_paper_processing_webhook(
                     summary_citations=metadata.summary_citations,
                     keywords=metadata.keywords,
                     institutions=metadata.institutions,
-                    publish_date=metadata.publish_date,
+                    publish_date=publish_date,
                     starter_questions=metadata.starter_questions,
                     raw_content=result.raw_content,
                     page_offset_map=result.page_offset_map,
