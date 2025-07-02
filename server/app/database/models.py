@@ -84,6 +84,12 @@ class User(Base):
     # Optional profile information
     locale = Column(String, nullable=True)
 
+    # Subscription fields
+    subscription_plan = Column(String, nullable=True)
+    subscription_status = Column(String, nullable=True)
+    subscription_start_date = Column(DateTime(timezone=True), nullable=True)
+    subscription_end_date = Column(DateTime(timezone=True), nullable=True)
+
     papers = relationship("Paper", back_populates="user", cascade="all, delete-orphan")
     sessions = relationship(
         "Session", back_populates="user", cascade="all, delete-orphan"
@@ -112,6 +118,12 @@ class User(Base):
     paper_upload_jobs = relationship(
         "PaperUploadJob", back_populates="user", cascade="all, delete-orphan"
     )
+    subscription = relationship(
+        "Subscription",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
 
 class Session(Base):
@@ -135,6 +147,20 @@ class JobStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+
+
+class SubscriptionPlan(str, Enum):
+    BASE = "base"
+    RESEARCHER = "researcher"
+
+
+class SubscriptionStatus(str, Enum):
+    ACTIVE = "active"
+    CANCELED = "canceled"
+    PAST_DUE = "past_due"
+    INCOMPLETE = "incomplete"
+    TRIALING = "trialing"
+    UNPAID = "unpaid"
 
 
 class RoleType(str, Enum):
@@ -524,3 +550,36 @@ class AudioOverview(Base):
     title = Column(String, nullable=True)
 
     paper = relationship("Paper", back_populates="audio_overviews")
+
+
+class Subscription(Base):
+    __tablename__ = "subscriptions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+
+    # Subscription details
+    plan = Column(String, nullable=False, default=SubscriptionPlan.BASE)
+    status = Column(String, nullable=False, default=SubscriptionStatus.ACTIVE)
+
+    # Billing period
+    current_period_start = Column(DateTime(timezone=True), nullable=True)
+    current_period_end = Column(DateTime(timezone=True), nullable=True)
+
+    # Stripe integration fields
+    stripe_customer_id = Column(String, nullable=True)
+    stripe_subscription_id = Column(String, nullable=True)
+
+    # Cancel at period end flag
+    cancel_at_period_end = Column(Boolean, default=False)
+
+    # When the subscription was canceled, if it was
+    canceled_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationship with User
+    user = relationship("User", back_populates="subscription")
