@@ -81,7 +81,43 @@ def send_onboarding_email(email: str, name: Union[str, None] = None) -> None:
             "reply_to": "saba@openpaper.ai",
         }
 
-        email = resend.Emails.send(payload)  # type: ignore
+        first_email = resend.Emails.send(payload)  # type: ignore
+
+        two_days_from_now = (datetime.now(timezone.utc) + timedelta(days=2)).isoformat()
+
+        payload = resend.Emails.SendParams = {  # type: ignore
+            "from": "Open Paper <onboarding@openpaper.ai>",
+            "to": [email],
+            "subject": "How Researchers are Using AI to Read Papers",
+            "html": load_email_template("some_tips.html"),
+            "scheduled_at": two_days_from_now,
+            "reply_to": "saba@openpaper.ai",
+        }
+
+        second_email = resend.Emails.send(payload)  # type: ignore
+
+        four_days_from_now = (
+            datetime.now(timezone.utc) + timedelta(days=4)
+        ).isoformat()
+
+        formatted_name = f" {fname}" if fname else ""
+
+        payload = resend.Emails.SendParams = {  # type: ignore
+            "from": "Open Paper <onboarding@openpaper.ai>",
+            "to": [email],
+            "subject": "Design Principles by Open Paper",
+            "html": load_email_template("design_principles.html").replace(
+                "{{user_name}}", formatted_name
+            ),
+            "scheduled_at": four_days_from_now,
+            "reply_to": "saba@openpaper.ai",
+        }
+
+        third_email = resend.Emails.send(payload)  # type: ignore
+
+        logger.info(
+            f"Onboarding emails sent successfully: {first_email['id'] if first_email else ''}, {second_email['id'] if second_email else ''}, {third_email['id'] if third_email else ''}"
+        )
 
     except Exception as e:
         logger.error(f"Failed to send onboarding email: {e}", exc_info=True)
