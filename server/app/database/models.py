@@ -67,6 +67,24 @@ class AuthProvider(str, Enum):
     # MICROSOFT = "microsoft"
 
 
+# BASIC plans are not considered active subscriptions.
+# They are used for users who have not yet subscribed.
+class SubscriptionPlan(str, Enum):
+    BASIC = "basic"
+    RESEARCHER = "researcher"
+
+
+# When a user has a RESEARCHER (or more advanced) subscription,
+# they can have one of the following statuses.
+class SubscriptionStatus(str, Enum):
+    ACTIVE = "active"
+    CANCELED = "canceled"
+    PAST_DUE = "past_due"
+    INCOMPLETE = "incomplete"
+    TRIALING = "trialing"
+    UNPAID = "unpaid"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -83,12 +101,6 @@ class User(Base):
 
     # Optional profile information
     locale = Column(String, nullable=True)
-
-    # Subscription fields
-    subscription_plan = Column(String, nullable=True)
-    subscription_status = Column(String, nullable=True)
-    subscription_start_date = Column(DateTime(timezone=True), nullable=True)
-    subscription_end_date = Column(DateTime(timezone=True), nullable=True)
 
     papers = relationship("Paper", back_populates="user", cascade="all, delete-orphan")
     sessions = relationship(
@@ -118,6 +130,8 @@ class User(Base):
     paper_upload_jobs = relationship(
         "PaperUploadJob", back_populates="user", cascade="all, delete-orphan"
     )
+
+    # The associated subscription for the user.
     subscription = relationship(
         "Subscription",
         back_populates="user",
@@ -147,20 +161,6 @@ class JobStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
-
-
-class SubscriptionPlan(str, Enum):
-    BASE = "base"
-    RESEARCHER = "researcher"
-
-
-class SubscriptionStatus(str, Enum):
-    ACTIVE = "active"
-    CANCELED = "canceled"
-    PAST_DUE = "past_due"
-    INCOMPLETE = "incomplete"
-    TRIALING = "trialing"
-    UNPAID = "unpaid"
 
 
 class RoleType(str, Enum):
@@ -564,7 +564,7 @@ class Subscription(Base):
     )
 
     # Subscription details
-    plan = Column(String, nullable=False, default=SubscriptionPlan.BASE)
+    plan = Column(String, nullable=False, default=SubscriptionPlan.BASIC)
     status = Column(String, nullable=False, default=SubscriptionStatus.ACTIVE)
 
     # Billing period
