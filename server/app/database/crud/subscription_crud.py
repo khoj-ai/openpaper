@@ -40,7 +40,7 @@ class CRUDSubscription(CRUDBase[Subscription, SubscriptionCreate, SubscriptionUp
     def is_user_active(self, db: Session, user: CurrentUser) -> bool:
         """Check if the user has an active subscription"""
         subscription = self.get_by_user_id(db, user.id)
-        if not subscription:
+        if not subscription or not subscription.current_period_end:
             return False
         # User is active if `current_period_end` is in the future
         return subscription.current_period_end > datetime.now(
