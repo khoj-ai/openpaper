@@ -9,6 +9,7 @@ WORKDIR /app
 # Set as environment variable for build time
 # These are set early as they might be needed by package scripts during install
 ENV NEXT_PUBLIC_API_URL=https://openpaper.ai
+ENV NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_51O33aTCUG3OIDR6rhzcP0aDTftZyC07Iyf59NG8dAjPCLcmKyv0ADqSfO9CUYz5ugF7GI91JcyM6rIwp56Ehp41V00MYxGF8d7
 
 # womp womp add posthog env vars
 ENV NEXT_PUBLIC_POSTHOG_KEY=phc_i84JqfidoQncsSmusoeZF9oshYHV2SebGZkKMVtF8AG

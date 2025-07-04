@@ -4,78 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check, X, Clock } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { loadStripe } from '@stripe/stripe-js';
-import {
-    EmbeddedCheckoutProvider,
-    EmbeddedCheckout
-} from '@stripe/react-stripe-js';
-import { fetchFromApi } from "@/lib/api";
-import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-
-const STRIPE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
-
-const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY || '');
-
-interface CheckoutFormProps {
-    interval: "month" | "year";
-}
-
-const CheckoutForm = ({ interval }: CheckoutFormProps) => {
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    const fetchClientSecret = useCallback(() => {
-        setIsLoading(true);
-        setError(null);
-        // Create a Checkout Session
-
-        console.log("CREATING CHECKOUT SESSION", interval);
-        return fetchFromApi(`/api/subscription/create-checkout-session?interval=${interval}`, {
-            method: "POST",
-        })
-            .then((data) => {
-                console.log("CHECKOUT SESSION CREATED", data);
-                setIsLoading(false);
-                return data.client_secret;
-            })
-            .catch((err) => {
-                setError('An error occurred while setting up the checkout. Please try again.');
-                setIsLoading(false);
-                console.error(err);
-                throw err;
-            });
-    }, [interval]);
-
-    const options = { fetchClientSecret };
-
-    return (
-        <div id="checkout">
-            {error && (
-                <div className="bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md p-3 mb-4 text-sm text-red-800 dark:text-red-200">
-                    {error}
-                </div>
-            )}
-            {isLoading && (
-                <div className="text-center py-4">
-                    <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
-                    <p className="mt-2 text-sm text-muted-foreground">Setting up your checkout...</p>
-                </div>
-            )}
-            <EmbeddedCheckoutProvider
-                stripe={stripePromise}
-                options={options}
-            >
-                <EmbeddedCheckout />
-            </EmbeddedCheckoutProvider>
-        </div>
-    );
-}
-
-
+import CheckoutSheet from "./checkout";
 
 interface PricingFeature {
     name: string;
@@ -153,9 +86,16 @@ const features: PricingFeature[] = [
     }
 ];
 
+const monthlyPrice = 12;
+const annualPrice = 8;
+
 export default function PricingPage() {
     const [isAnnual, setIsAnnual] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState("base");
+
+    const annualSavings = (monthlyPrice - annualPrice) * 12;
+
+    const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
     const planOptions = [
         { value: "base", label: "Base" },
@@ -261,42 +201,14 @@ export default function PricingPage() {
                             <span className="text-lg font-normal text-muted-foreground">/mo</span>
                         </div>
                         {isAnnual && (
-                            <p className="text-sm text-muted-foreground">Billed annually at $96/year</p>
+                            <p className="text-sm text-muted-foreground">Billed annually at ${annualPrice * 12}/year</p>
                         )}
                     </CardHeader>
                     <CardContent>
-                        <Sheet>
-                            <SheetTrigger asChild>
-                                <Button className="w-full bg-blue-600 dark:bg-blue-400">
-                                    Upgrade to Researcher
-                                </Button>
-                            </SheetTrigger>
-                            <SheetContent className="w-6xl">
-                                <SheetHeader>
-                                    <SheetTitle>Subscribe to Researcher Plan</SheetTitle>
-                                    <SheetDescription>
-                                        {isAnnual
-                                            ? "Annual subscription - $8/month, billed yearly at $96/year."
-                                            : "Monthly subscription - $12/month."}
-                                    </SheetDescription>
-                                </SheetHeader>
-                                <div className="px-4">
-                                    <p className="text-sm text-muted-foreground mb-4">
-                                        Enjoy 500 paper uploads, 3 GB knowledge base, and more! Get access to advanced features and increased limits.
-                                    </p>
-                                    <div className="bg-muted/30 rounded-md mb-4">
-                                        <CheckoutForm interval={isAnnual ? "year" : "month"} />
-                                    </div>
-                                </div>
-                                <div className="text-sm text-muted-foreground mb-2 flex justify-between">
-                                    <SheetClose asChild>
-                                        <Button variant="outline" className="w-fit">
-                                            Cancel
-                                        </Button>
-                                    </SheetClose>
-                                </div>
-                            </SheetContent>
-                        </Sheet>
+                        <Button className="w-full bg-blue-600 dark:bg-blue-400" onClick={() => setIsCheckoutOpen(true)}>
+                            Upgrade to Researcher
+                        </Button>
+                        <CheckoutSheet open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen} interval={isAnnual ? "year" : "month"} planName="Researcher" annualSavings={annualSavings} />
                     </CardContent>
                 </Card>
 
