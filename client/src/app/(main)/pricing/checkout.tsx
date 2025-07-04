@@ -24,9 +24,10 @@ interface CheckoutSheetProps {
     interval: "month" | "year";
     planName?: string;
     annualSavings?: number;
+    isResubscription?: boolean;
 }
 
-export default function CheckoutSheet({ open, onOpenChange, interval, planName, annualSavings }: CheckoutSheetProps) {
+export default function CheckoutSheet({ open, onOpenChange, interval, planName, annualSavings, isResubscription = false }: CheckoutSheetProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -67,11 +68,13 @@ export default function CheckoutSheet({ open, onOpenChange, interval, planName, 
             <SheetContent className="w-full sm:max-w-2xl overflow-auto py-2">
                 <SheetHeader>
                     <SheetTitle>
-                        Complete Your Subscription
+                        {isResubscription ? "Reactivate Your Subscription" : "Complete Your Subscription"}
                         {planName && ` - ${planName}`}
                     </SheetTitle>
                     <SheetDescription>
-                        Secure checkout powered by Stripe. Your subscription will be billed {interval === 'month' ? 'monthly' : 'annually'}. {interval === 'year' ? `You are saving $${annualSavings} with annual billing!` : `Save $${annualSavings} with annual billing!`}
+                        Secure checkout powered by Stripe. Your subscription will be billed {interval === 'month' ? 'monthly' : 'annually'}.
+                        {interval === 'year' ? ` You are saving $${annualSavings} with annual billing!` : ` Save $${annualSavings} with annual billing!`}
+                        {isResubscription && " Your subscription will be reactivated immediately upon successful payment."}
                     </SheetDescription>
                 </SheetHeader>
 

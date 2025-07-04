@@ -21,6 +21,7 @@ export default function PricingPage() {
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
     const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
     const [loading, setLoading] = useState(true);
+    const [isPortalLoading, setIsPortalLoading] = useState(false);
 
     const annualSavings = (monthlyPrice - annualPrice) * 12;
 
@@ -49,6 +50,24 @@ export default function PricingPage() {
 
         fetchSubscription();
     }, []);
+
+    const handleManageSubscription = async () => {
+        setIsPortalLoading(true);
+        try {
+            const response = await fetchFromApi("/api/subscription/create-portal-session", {
+                method: "POST",
+            });
+
+            if (response.url) {
+                window.location.href = response.url;
+            }
+        } catch (error) {
+            console.error('Failed to create portal session:', error);
+            // You might want to show a toast notification here
+        } finally {
+            setIsPortalLoading(false);
+        }
+    };
 
     const formatDate = (dateString: string) => {
         return new Date(dateString).toLocaleDateString('en-US', {
@@ -237,17 +256,33 @@ export default function PricingPage() {
                             </div>
                         )}
 
-                        {/* Resubscribe button for canceled/ending subscriptions */}
-                        {canResubscribe && (
-                            <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                        {/* Action buttons based on subscription status */}
+                        <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                            {isActiveSubscription ? (
+                                <Button
+                                    className="w-full bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-medium"
+                                    onClick={handleManageSubscription}
+                                    disabled={isPortalLoading}
+                                >
+                                    {isPortalLoading ? "Loading..." : "Manage Subscription"}
+                                </Button>
+                            ) : canResubscribe ? (
                                 <Button
                                     className="w-full bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-medium"
                                     onClick={() => setIsCheckoutOpen(true)}
                                 >
                                     Reactivate Subscription
                                 </Button>
-                            </div>
-                        )}
+                            ) : (
+                                <Button
+                                    className="w-full bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-medium"
+                                    onClick={handleManageSubscription}
+                                    disabled={isPortalLoading}
+                                >
+                                    {isPortalLoading ? "Loading..." : "Manage Subscription"}
+                                </Button>
+                            )}
+                        </div>
                     </CardContent>
                 </Card>
             )}
@@ -407,6 +442,7 @@ export default function PricingPage() {
                     interval={isAnnual ? "year" : "month"}
                     planName="Researcher"
                     annualSavings={annualSavings}
+                    isResubscription={canResubscribe}
                 />
 
                 {/* Teams Plan */}
