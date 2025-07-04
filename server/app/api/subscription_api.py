@@ -1,7 +1,7 @@
 import logging
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 import stripe
@@ -127,6 +127,8 @@ async def get_user_subscription(
         if not subscription:
             return {"has_subscription": False, "subscription": None}
 
+        plan_interval = None
+
         # If we have a Stripe subscription ID, get the latest data from Stripe
         if subscription and subscription.stripe_subscription_id:
             try:
@@ -149,6 +151,20 @@ async def get_user_subscription(
                             stripe_sub["current_period_end"]
                         )
 
+                    # Extract the product_id from the price object
+                    stripe_price_id = stripe_sub.get("plan", {}).get("id")
+                    if stripe_price_id not in [MONTHLY_PRICE_ID, YEARLY_PRICE_ID]:
+                        logger.info(
+                            f"Skipping subscription update for unsupported price ID: {stripe_price_id}"
+                        )
+                        return {"has_subscription": False, "subscription": None}
+
+                    # Determine plan interval based on price ID
+                    if stripe_price_id == MONTHLY_PRICE_ID:
+                        plan_interval = SubscriptionInterval.MONTHLY
+                    elif stripe_price_id == YEARLY_PRICE_ID:
+                        plan_interval = SubscriptionInterval.YEARLY
+
                     # Update subscription status
                     subscription = subscription_crud.update_subscription_status(
                         db,
@@ -168,16 +184,24 @@ async def get_user_subscription(
         # Format response
         status = str(subscription.status) if subscription.status else "inactive"
         current_period_end = subscription.current_period_end
+        current_period_start = subscription.current_period_start
         cancel_at_period_end = (
             bool(subscription.cancel_at_period_end)
             if subscription.cancel_at_period_end is not None
             else False
         )
 
+        is_valid_subscription = (
+            current_period_end is not None
+            and current_period_end > datetime.now(tz=timezone.utc)
+        )
+
         return {
-            "has_subscription": status == "active",
+            "has_subscription": is_valid_subscription,
             "subscription": {
                 "status": status,
+                "interval": plan_interval,
+                "current_period_start": current_period_start,
                 "current_period_end": current_period_end,
                 "cancel_at_period_end": cancel_at_period_end,
             },
@@ -196,6 +220,11 @@ async def handle_stripe_webhook(
     """
     Handle Stripe webhook events for subscription management
     """
+
+    def is_valid_price_id(price_id: str) -> bool:
+        """Check if the price ID is one of our configured prices."""
+        return price_id in [MONTHLY_PRICE_ID, YEARLY_PRICE_ID]
+
     if not STRIPE_WEBHOOK_SECRET:
         raise HTTPException(
             status_code=500, detail="Stripe webhook secret not configured"
@@ -220,6 +249,15 @@ async def handle_stripe_webhook(
         event_type = event["type"]
         logger.info(f"Processing Stripe event: {event_type}")
 
+        # Skip processing events that are not supported
+        if event_type not in [
+            "checkout.session.completed",
+            "customer.subscription.updated",
+            "customer.subscription.deleted",
+        ]:
+            logger.info(f"Skipping unsupported event type: {event_type}")
+            return {"success": False}
+
         if event_type == "checkout.session.completed":
             # Payment is successful and the subscription is created
             session = event["data"]["object"]
@@ -232,36 +270,37 @@ async def handle_stripe_webhook(
             if client_reference_id and subscription_id:
                 # Fetch subscription details from Stripe
                 try:
-                    stripe_sub = stripe.Subscription.retrieve(subscription_id)
-                    subscription_obj = stripe_sub["items"]["data"][0]
+                    stripe_sub = stripe.Subscription.retrieve(
+                        subscription_id, expand=["items.data.price"]
+                    )
 
-                    stripe_received_price_id = stripe_sub.get("plan", {}).get("id")
+                    # Get price ID from subscription items
+                    stripe_received_price_id = None
+                    if stripe_sub.items.data:
+                        stripe_received_price_id = stripe_sub.items.data[0].price.id
 
-                    if stripe_received_price_id not in [
-                        MONTHLY_PRICE_ID,
-                        YEARLY_PRICE_ID,
-                    ]:
+                    if stripe_received_price_id and not is_valid_price_id(
+                        stripe_received_price_id
+                    ):
                         logger.info(
                             f"Skipping subscription creation for unsupported price ID: {stripe_received_price_id}"
                         )
-                        return  # Stop processing if the price ID is unsupported
+                        return {"success": False}
 
                     # Update subscription in database. Upgrade to a researcher plan!
                     subscription_data = {
                         "stripe_customer_id": customer_id,
                         "stripe_subscription_id": subscription_id,
-                        "stripe_price_id": stripe_sub.get("plan", {}).get("id"),
+                        "stripe_price_id": stripe_received_price_id,
                         "plan": SubscriptionPlan.RESEARCHER,
-                        "status": stripe_sub.get("status"),
+                        "status": stripe_sub.status,
                         "current_period_start": datetime.fromtimestamp(
-                            subscription_obj.get("current_period_start", 0)
+                            stripe_sub["current_period_start"]
                         ),
                         "current_period_end": datetime.fromtimestamp(
-                            subscription_obj.get("current_period_end", 0)
+                            stripe_sub["current_period_end"]
                         ),
-                        "cancel_at_period_end": stripe_sub.get(
-                            "cancel_at_period_end", False
-                        ),
+                        "cancel_at_period_end": stripe_sub["cancel_at_period_end"],
                     }
 
                     # Save to database
@@ -280,7 +319,7 @@ async def handle_stripe_webhook(
                             "user_id": client_reference_id,
                             "subscription_id": subscription_id,
                             "customer_id": customer_id,
-                            "status": stripe_sub.get("status"),
+                            "status": stripe_sub.status,
                         },
                     )
 
@@ -298,30 +337,49 @@ async def handle_stripe_webhook(
                 )
 
                 if subscription:
-                    # Update with new data
+                    # Get the full subscription details from Stripe to ensure we have all data
+                    full_stripe_sub = stripe.Subscription.retrieve(
+                        subscription_id, expand=["items.data.price"]
+                    )
 
+                    # Get price ID from subscription items to validate it's one of ours
+                    stripe_received_price_id = None
+                    if full_stripe_sub.items.data:
+                        stripe_received_price_id = full_stripe_sub.items.data[
+                            0
+                        ].price.id
+
+                    if stripe_received_price_id and not is_valid_price_id(
+                        stripe_received_price_id
+                    ):
+                        logger.info(
+                            f"Skipping subscription update for unsupported price ID: {stripe_received_price_id}"
+                        )
+                        return {"success": False}
+
+                    # Update with new data
                     subscription_crud.update_subscription_status(
                         db,
                         subscription_id,
-                        stripe_sub.get("status"),
+                        full_stripe_sub.status,
                         period_start=(
                             datetime.fromtimestamp(
-                                stripe_sub.get("current_period_start", 0)
+                                full_stripe_sub["current_period_start"]
                             )
-                            if stripe_sub.get("current_period_start")
+                            if full_stripe_sub.get("current_period_start")
                             else None
                         ),
                         period_end=(
                             datetime.fromtimestamp(
-                                stripe_sub.get("current_period_end", 0)
+                                full_stripe_sub["current_period_end"]
                             )
-                            if stripe_sub.get("current_period_end")
+                            if full_stripe_sub.get("current_period_end")
                             else None
                         ),
                     )
 
                     logger.info(
-                        f"Subscription {subscription_id} updated to status: {stripe_sub.get('status')}"
+                        f"Subscription {subscription_id} updated to status: {full_stripe_sub.status}"
                     )
 
             except Exception as e:
@@ -332,12 +390,37 @@ async def handle_stripe_webhook(
             subscription_id = stripe_sub.get("id")
 
             try:
-                # Update subscription status to canceled
+                # Find subscription in our database
                 subscription = subscription_crud.get_by_stripe_subscription_id(
                     db, subscription_id
                 )
 
                 if subscription:
+                    # Get the full subscription details from Stripe to validate it's one of ours
+                    try:
+                        full_stripe_sub = stripe.Subscription.retrieve(
+                            subscription_id, expand=["items.data.price"]
+                        )
+
+                        # Get price ID from subscription items to validate it's one of ours
+                        stripe_received_price_id = None
+                        if full_stripe_sub.items.data:
+                            stripe_received_price_id = full_stripe_sub.items.data[
+                                0
+                            ].price.id
+
+                        if stripe_received_price_id and not is_valid_price_id(
+                            stripe_received_price_id
+                        ):
+                            logger.info(
+                                f"Skipping subscription deletion for unsupported price ID: {stripe_received_price_id}"
+                            )
+                            return {"success": False}
+
+                    except stripe.InvalidRequestError:
+                        # Subscription might already be deleted from Stripe, continue with local deletion
+                        pass
+
                     # Downgrade to BASIC plan on cancellation
                     subscription_crud.update_subscription_status(
                         db,
@@ -351,7 +434,7 @@ async def handle_stripe_webhook(
             except Exception as e:
                 logger.error(f"Error canceling subscription: {e}")
 
-        # Return a 200 response to acknowledge receipt of the event
+        # Return a 200 response to acknowledge receipt of the event. We should only arrive here if the event was processed successfully.
         return {"success": True}
 
     except Exception as e:
