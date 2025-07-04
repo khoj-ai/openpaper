@@ -94,6 +94,7 @@ class CRUDSubscription(CRUDBase[Subscription, SubscriptionCreate, SubscriptionUp
         db: Session,
         subscription_id: str,
         status: str,
+        stripe_price_id: Optional[str] = None,
         plan: Optional[SubscriptionPlan] = None,
         period_start: Optional[datetime] = None,
         period_end: Optional[datetime] = None,
@@ -107,6 +108,9 @@ class CRUDSubscription(CRUDBase[Subscription, SubscriptionCreate, SubscriptionUp
         setattr(subscription, "status", status)
         if plan:
             setattr(subscription, "plan", plan)
+
+        if stripe_price_id:
+            setattr(subscription, "stripe_price_id", stripe_price_id)
 
         # Update period dates if provided
         if period_start:
