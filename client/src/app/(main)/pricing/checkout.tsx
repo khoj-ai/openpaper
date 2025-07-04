@@ -64,7 +64,7 @@ export default function CheckoutSheet({ open, onOpenChange, interval, planName, 
 
     return (
         <Sheet open={open} onOpenChange={handleOpenChange}>
-            <SheetContent className="w-full sm:max-w-6xl overflow-auto py-2">
+            <SheetContent className="w-full sm:max-w-2xl overflow-auto py-2">
                 <SheetHeader>
                     <SheetTitle>
                         Complete Your Subscription
