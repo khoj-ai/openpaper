@@ -98,6 +98,7 @@ class CRUDSubscription(CRUDBase[Subscription, SubscriptionCreate, SubscriptionUp
         plan: Optional[SubscriptionPlan] = None,
         period_start: Optional[datetime] = None,
         period_end: Optional[datetime] = None,
+        cancel_at_period_end: Optional[bool] = None,
     ) -> Optional[Subscription]:
         """Update subscription status and period dates"""
         subscription = self.get_by_stripe_subscription_id(db, subscription_id)
@@ -118,6 +119,9 @@ class CRUDSubscription(CRUDBase[Subscription, SubscriptionCreate, SubscriptionUp
 
         if period_end:
             setattr(subscription, "current_period_end", period_end)
+
+        if cancel_at_period_end is not None:
+            setattr(subscription, "cancel_at_period_end", cancel_at_period_end)
 
         db.commit()
         db.refresh(subscription)

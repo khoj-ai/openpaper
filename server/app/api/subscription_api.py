@@ -418,17 +418,10 @@ async def handle_stripe_webhook(
                 )
 
                 if subscription:
-                    # Get the full subscription details from Stripe to ensure we have all data
-                    full_stripe_sub = stripe.Subscription.retrieve(
-                        subscription_id, expand=["items.data.price"]
-                    )
-
                     # Get price ID from subscription items to validate it's one of ours
                     stripe_received_price_id = None
-                    if full_stripe_sub.items.data:
-                        stripe_received_price_id = full_stripe_sub.items.data[
-                            0
-                        ].price.id
+                    if stripe_sub.get("plan"):
+                        stripe_received_price_id = stripe_sub.plan.stripe_id
 
                     if stripe_received_price_id and not is_valid_price_id(
                         stripe_received_price_id
@@ -442,26 +435,25 @@ async def handle_stripe_webhook(
                     subscription_crud.update_subscription_status(
                         db,
                         subscription_id,
-                        full_stripe_sub.status,
+                        stripe_sub.status,
                         stripe_price_id=stripe_received_price_id,
                         period_start=(
-                            datetime.fromtimestamp(
-                                full_stripe_sub["current_period_start"]
-                            )
-                            if full_stripe_sub.get("current_period_start")
+                            datetime.fromtimestamp(stripe_sub["current_period_start"])
+                            if stripe_sub.get("current_period_start")
                             else None
                         ),
                         period_end=(
-                            datetime.fromtimestamp(
-                                full_stripe_sub["current_period_end"]
-                            )
-                            if full_stripe_sub.get("current_period_end")
+                            datetime.fromtimestamp(stripe_sub["current_period_end"])
+                            if stripe_sub.get("current_period_end")
                             else None
+                        ),
+                        cancel_at_period_end=stripe_sub.get(
+                            "cancel_at_period_end", False
                         ),
                     )
 
                     logger.info(
-                        f"Subscription {subscription_id} updated to status: {full_stripe_sub.status}"
+                        f"Subscription {subscription_id} updated to status: {stripe_sub.status}"
                     )
 
             except Exception as e:
@@ -478,30 +470,18 @@ async def handle_stripe_webhook(
                 )
 
                 if subscription:
-                    # Get the full subscription details from Stripe to validate it's one of ours
-                    try:
-                        full_stripe_sub = stripe.Subscription.retrieve(
-                            subscription_id, expand=["items.data.price"]
+                    # Get price ID from subscription items to validate it's one of ours
+                    stripe_received_price_id = None
+                    if stripe_sub.get("plan"):
+                        stripe_received_price_id = stripe_sub.plan.stripe_id
+
+                    if stripe_received_price_id and not is_valid_price_id(
+                        stripe_received_price_id
+                    ):
+                        logger.info(
+                            f"Skipping subscription deletion for unsupported price ID: {stripe_received_price_id}"
                         )
-
-                        # Get price ID from subscription items to validate it's one of ours
-                        stripe_received_price_id = None
-                        if full_stripe_sub.items.data:
-                            stripe_received_price_id = full_stripe_sub.items.data[
-                                0
-                            ].price.id
-
-                        if stripe_received_price_id and not is_valid_price_id(
-                            stripe_received_price_id
-                        ):
-                            logger.info(
-                                f"Skipping subscription deletion for unsupported price ID: {stripe_received_price_id}"
-                            )
-                            return {"success": False}
-
-                    except stripe.InvalidRequestError:
-                        # Subscription might already be deleted from Stripe, continue with local deletion
-                        pass
+                        return {"success": False}
 
                     # Downgrade to BASIC plan on cancellation
                     subscription_crud.update_subscription_status(
@@ -510,6 +490,7 @@ async def handle_stripe_webhook(
                         stripe_price_id=stripe_received_price_id,
                         status=SubscriptionStatus.CANCELED,
                         plan=SubscriptionPlan.BASIC,
+                        cancel_at_period_end=True,
                     )
 
                     logger.info(f"Subscription {subscription_id} has been canceled")
@@ -522,4 +503,50 @@ async def handle_stripe_webhook(
 
     except Exception as e:
         logger.error(f"Error processing Stripe webhook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@subscription_router.get("/usage")
+async def get_user_usage(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """Get the current user's subscription usage and limits"""
+    try:
+        usage_info = get_user_usage_info(db, current_user)
+        return usage_info
+    except Exception as e:
+        logger.error(f"Error getting user usage: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@subscription_router.post("/create-portal-session")
+def create_customer_portal_session(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """Create a Stripe customer portal session for the current user"""
+    try:
+        # Get the user's subscription to retrieve the Stripe customer ID
+        subscription = subscription_crud.get_by_user_id(db, current_user.id)
+
+        if not subscription or not subscription.stripe_customer_id:
+            raise HTTPException(
+                status_code=400,
+                detail="No active subscription found or customer ID not available",
+            )
+
+        # Create the customer portal session
+        portal_session = stripe.billing_portal.Session.create(
+            customer=str(subscription.stripe_customer_id),
+            return_url=f"{YOUR_DOMAIN}/pricing",  # Redirect back to pricing page
+        )
+
+        return {"url": portal_session.url}
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Error creating customer portal session: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
