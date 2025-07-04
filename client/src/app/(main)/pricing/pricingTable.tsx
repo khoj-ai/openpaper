@@ -1,12 +1,12 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, Clock, Crown, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 interface PricingFeature {
     name: string;
-    base: string | boolean;
+    basic: string | boolean;
     researcher: string | boolean;
     teams: string | boolean;
 }
@@ -14,67 +14,67 @@ interface PricingFeature {
 const features: PricingFeature[] = [
     {
         name: "Annotations",
-        base: true,
+        basic: true,
         researcher: true,
         teams: true
     },
     {
         name: "Notes",
-        base: true,
+        basic: true,
         researcher: true,
         teams: true
     },
     {
         name: "Paper finder",
-        base: true,
+        basic: true,
         researcher: true,
         teams: true
     },
     {
         name: "Paper uploads",
-        base: "10",
+        basic: "10",
         researcher: "500",
         teams: "unlimited"
     },
     {
         name: "Knowledge base size",
-        base: "500 MB",
+        basic: "500 MB",
         researcher: "3 GB",
         teams: "50 GB"
     },
     {
         name: "Models",
-        base: "Basic",
+        basic: "Basic",
         researcher: "Advanced",
         teams: "Advanced"
     },
     {
         name: "Chat credits (daily)",
-        base: "500",
+        basic: "500",
         researcher: "10,000",
         teams: "unlimited"
     },
     {
         name: "Audio overviews (monthly)",
-        base: "5",
+        basic: "5",
         researcher: "100",
         teams: "unlimited"
     },
     {
         name: "Literature review (monthly)",
-        base: "2",
+        basic: "2",
         researcher: "100",
         teams: "500"
     },
     {
         name: "Team annotations",
-        base: false,
+        basic: false,
         researcher: false,
         teams: true
     },
     {
         name: "Team chat",
-        base: false,
+        basic: false,
         researcher: false,
         teams: true
     }
@@ -106,13 +106,13 @@ export default function PricingTable({
     const getFeatureValueForPlan = (feature: PricingFeature, plan: string) => {
         switch (plan) {
             case "base":
-                return feature.base;
+                return feature.basic;
             case "researcher":
                 return feature.researcher;
             case "teams":
                 return feature.teams;
             default:
-                return feature.base;
+                return feature.basic;
         }
     };
 
@@ -185,10 +185,10 @@ export default function PricingTable({
                         <thead>
                             <tr className="border-b bg-muted/50">
                                 <th className="text-left p-2 sm:p-4 font-semibold">Features</th>
-                                <th className="text-center p-2 sm:p-4 font-semibold min-w-[80px]">Base</th>
+                                <th className="text-center p-2 sm:p-4 font-semibold min-w-[80px]">Basic</th>
                                 <th className={cn(
                                     "text-center p-2 sm:p-4 font-semibold min-w-[100px]",
-                                    isActiveSubscription && "bg-green-50 dark:bg-green-950/20"
+                                    isActiveSubscription && "bg-green-50 dark:bg-green-950"
                                 )}>
                                     <div className="flex items-center justify-center gap-2">
                                         Researcher
@@ -220,11 +220,11 @@ export default function PricingTable({
                                             </div>
                                         </td>
                                         <td className="p-2 sm:p-4 text-center text-sm sm:text-base">
-                                            {renderFeatureValue(feature.base, isComingSoon)}
+                                            {renderFeatureValue(feature.basic, isComingSoon)}
                                         </td>
                                         <td className={cn(
                                             "p-2 sm:p-4 text-center text-sm sm:text-base",
-                                            isActiveSubscription && "bg-green-50 dark:bg-green-950/20"
+                                            isActiveSubscription && "bg-green-50 dark:bg-green-950"
                                         )}>
                                             {renderFeatureValue(feature.researcher, isComingSoon)}
                                         </td>

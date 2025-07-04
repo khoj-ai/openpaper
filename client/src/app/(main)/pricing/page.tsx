@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Crown, Calendar, CheckCircle } from "lucide-react";
+import { Clock, Calendar, CheckCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -86,17 +86,17 @@ export default function PricingPage() {
     const getStatusBadgeColor = (status: string | undefined) => {
         switch (status) {
             case 'active':
-                return 'bg-slate-800 text-white border-slate-800';
+                return 'bg-green-600 text-white border-green-600';
             case 'trialing':
-                return 'bg-slate-600 text-white border-slate-600';
+                return 'bg-yellow-600 text-white border-yellow-600';
             case 'canceled':
-                return 'bg-slate-400 text-white border-slate-400';
+                return 'bg-red-400 text-white border-red-400';
             case 'past_due':
                 return 'bg-amber-600 text-white border-amber-600';
             case 'incomplete':
-                return 'bg-slate-400 text-white border-slate-400';
+                return 'bg-amber-400 text-white border-amber-400';
             case 'unpaid':
-                return 'bg-slate-400 text-white border-slate-400';
+                return 'bg-amber-400 text-white border-amber-400';
             default:
                 return 'bg-slate-400 text-white border-slate-400';
         }
@@ -258,15 +258,7 @@ export default function PricingPage() {
 
                         {/* Action buttons based on subscription status */}
                         <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
-                            {isActiveSubscription ? (
-                                <Button
-                                    className="w-full bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-medium"
-                                    onClick={handleManageSubscription}
-                                    disabled={isPortalLoading}
-                                >
-                                    {isPortalLoading ? "Loading..." : "Manage Subscription"}
-                                </Button>
-                            ) : canResubscribe ? (
+                            {canResubscribe ? (
                                 <Button
                                     className="w-full bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-medium"
                                     onClick={() => setIsCheckoutOpen(true)}
