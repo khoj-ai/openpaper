@@ -12,6 +12,7 @@ from app.database.crud.user_crud import user as user_crud
 from app.database.database import get_db
 from app.database.models import SubscriptionPlan, SubscriptionStatus
 from app.database.telemetry import track_event
+from app.helpers.email import notify_converted_billing_interval
 from app.helpers.subscription_limits import get_user_usage_info
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -300,17 +301,10 @@ async def handle_stripe_webhook(
             customer_id = stripe_sub.get("customer")
 
             try:
-                # Get the full subscription details from Stripe to ensure we have all data
-                full_stripe_sub = stripe.Subscription.retrieve(
-                    subscription_id, expand=["items.data.price"]
-                )
-
                 # Get price ID from subscription items to validate it's one of ours
                 stripe_received_price_id = None
                 if stripe_sub.get("plan"):
-                    stripe_received_price_id = full_stripe_sub.get("plan", {}).get(
-                        "stripe_id"
-                    )
+                    stripe_received_price_id = stripe_sub.plan.stripe_id
 
                 if stripe_received_price_id and not is_valid_price_id(
                     stripe_received_price_id
@@ -328,7 +322,7 @@ async def handle_stripe_webhook(
                 user_id: Optional[uuid.UUID] = None
                 if existing_subscription:
                     # Get the user_id from the subscription
-                    user_id = uuid.UUID(existing_subscription.user_id)  # type: ignore
+                    user_id = existing_subscription.user_id  # type: ignore
                 else:
                     # No existing subscription found, try to find user by email from Stripe customer
                     try:
@@ -502,7 +496,7 @@ async def handle_stripe_webhook(
         return {"success": True}
 
     except Exception as e:
-        logger.error(f"Error processing Stripe webhook: {e}")
+        logger.error(f"Error processing Stripe webhook: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -550,3 +544,332 @@ def create_customer_portal_session(
     except Exception as e:
         logger.error(f"Error creating customer portal session: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@subscription_router.post("/resubscribe")
+def resubscribe(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """
+    Reactivate a canceled subscription or reverse a scheduled cancellation.
+
+    This endpoint handles two scenarios:
+    1. If subscription is scheduled for cancellation (cancel_at_period_end=true),
+       it will reverse the cancellation by setting cancel_at_period_end=false
+    2. If subscription is already canceled, it will create a new subscription
+       using the existing customer and payment method
+
+    Requirements:
+    - User must have an existing subscription record
+    - User must have a Stripe customer ID
+    - User must have a Stripe subscription ID (active, canceled, or scheduled for cancellation)
+    """
+    try:
+        # Get the user's existing subscription
+        subscription = subscription_crud.get_by_user_id(db, current_user.id)
+
+        if not subscription:
+            return {
+                "success": False,
+                "error": "No existing subscription found. Please create a new subscription instead.",
+            }
+
+        if not subscription.stripe_customer_id:
+            return {
+                "success": False,
+                "error": "No Stripe customer ID found. Please create a new subscription instead.",
+            }
+
+        if not subscription.stripe_subscription_id:
+            return {
+                "success": False,
+                "error": "No Stripe subscription found. Please create a new subscription instead.",
+            }
+
+        try:
+            # Check if the Stripe subscription still exists and is canceled
+            stripe_sub = stripe.Subscription.retrieve(
+                str(subscription.stripe_subscription_id)
+            )
+
+            if stripe_sub.status == "canceled":
+                # Subscription is already canceled - create a new subscription
+                logger.info(
+                    f"Subscription {stripe_sub.id} is already canceled, creating new subscription"
+                )
+
+                # Try to get the payment method from the previous subscription
+                payment_method_id = None
+                try:
+                    # Get the customer's default payment method
+                    customer = stripe.Customer.retrieve(
+                        str(subscription.stripe_customer_id)
+                    )
+                    if customer.get("invoice_settings", {}).get(
+                        "default_payment_method"
+                    ):
+                        payment_method_id = customer["invoice_settings"][
+                            "default_payment_method"
+                        ]
+
+                    # If no default payment method, try to get from the canceled subscription
+                    if not payment_method_id and stripe_sub.get(
+                        "default_payment_method"
+                    ):
+                        payment_method_id = stripe_sub["default_payment_method"]
+
+                    # If still no payment method, get the customer's payment methods
+                    if not payment_method_id:
+                        payment_methods = stripe.PaymentMethod.list(
+                            customer=str(subscription.stripe_customer_id), type="card"
+                        )
+                        if payment_methods.data:
+                            payment_method_id = payment_methods.data[0].id
+
+                except Exception as pm_error:
+                    logger.warning(
+                        f"Could not retrieve payment method for customer {subscription.stripe_customer_id}: {pm_error}"
+                    )
+                    return {
+                        "success": False,
+                        "error": "no_payment_method",
+                        "message": "No payment method available. Please use the checkout flow to add a payment method and resubscribe.",
+                        "redirect_to_checkout": True,
+                    }
+
+                stripe_price_id = str(subscription.stripe_price_id)
+                if not stripe_price_id:
+                    return {
+                        "success": False,
+                        "error": "no_price_id",
+                        "message": "No price ID found for the subscription. Please contact support.",
+                        "redirect_to_checkout": True,
+                    }
+
+                # Create subscription parameters
+                subscription_params = {
+                    "customer": str(subscription.stripe_customer_id),
+                    "items": [{"price": stripe_price_id}],
+                    "metadata": {"user_id": str(current_user.id)},
+                }
+
+                # Add payment method if we found one
+                if payment_method_id:
+                    subscription_params["default_payment_method"] = payment_method_id
+
+                # Create a new subscription for the existing customer
+                new_stripe_sub = stripe.Subscription.create(**subscription_params)
+
+                # Track resubscription event
+                track_event(
+                    event_name="subscription_reactivated_new",
+                    properties={
+                        "user_id": str(current_user.id),
+                        "old_subscription_id": str(subscription.stripe_subscription_id),
+                        "new_subscription_id": new_stripe_sub.id,
+                        "customer_id": str(subscription.stripe_customer_id),
+                        "interval": (
+                            "yearly"
+                            if stripe_price_id == YEARLY_PRICE_ID
+                            else "monthly"
+                        ),
+                    },
+                )
+
+                logger.info(
+                    f"Created new subscription {new_stripe_sub.id} for user {current_user.id}"
+                )
+                return {"success": True, "subscription_id": new_stripe_sub.id}
+
+            elif stripe_sub.cancel_at_period_end:
+                # Subscription is scheduled for cancellation - reverse the cancellation
+                logger.info(
+                    f"Subscription {stripe_sub.id} is scheduled for cancellation, reversing cancellation"
+                )
+
+                # Update the subscription to prevent cancellation
+                updated_sub = stripe.Subscription.modify(
+                    str(subscription.stripe_subscription_id), cancel_at_period_end=False
+                )
+
+                # We should receive a webhook event for this, so let the db update take place in the webhook handler
+
+                logger.info(f"Reversed cancellation for subscription {updated_sub.id}")
+
+                # Track cancellation reversal event
+                track_event(
+                    event_name="subscription_cancellation_reversed",
+                    properties={
+                        "user_id": str(current_user.id),
+                        "subscription_id": str(subscription.stripe_subscription_id),
+                        "customer_id": str(subscription.stripe_customer_id),
+                    },
+                )
+
+                logger.info(
+                    f"Reversed cancellation for subscription {stripe_sub.id} for user {current_user.id}"
+                )
+                return {
+                    "success": True,
+                    "subscription_id": str(subscription.stripe_subscription_id),
+                    "action": "cancellation_reversed",
+                    "message": "Your subscription cancellation has been reversed and will continue.",
+                }
+
+            else:
+                # Subscription is active or in trial - no action needed
+                logger.info(f"Subscription {stripe_sub.id} is active, no action needed")
+                return {
+                    "success": True,
+                    "subscription_id": str(subscription.stripe_subscription_id),
+                    "action": "no_action",
+                    "message": "Your subscription is still active.",
+                }
+
+        except Exception as stripe_error:
+            # Check if the error is due to missing payment method
+            if (
+                "no attached payment source" in str(stripe_error).lower()
+                or "default payment method" in str(stripe_error).lower()
+            ):
+                logger.info(
+                    f"No payment method available for customer {subscription.stripe_customer_id}, redirecting to checkout"
+                )
+                return {
+                    "success": False,
+                    "error": "no_payment_method",
+                    "message": "No payment method available. Please use the checkout flow to add a payment method and resubscribe.",
+                    "redirect_to_checkout": True,
+                }
+            else:
+                # Stripe subscription doesn't exist anymore or other error
+                logger.error(
+                    f"Error retrieving Stripe subscription {subscription.stripe_subscription_id}: {stripe_error}",
+                    exc_info=True,
+                )
+                return {
+                    "success": False,
+                    "error": "Previous subscription not found in Stripe",
+                }
+
+    except Exception as e:
+        logger.error(f"Error during resubscription: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Subscription Interval Management Endpoints
+# These endpoints allow users to change their subscription billing intervals
+@subscription_router.post("/change-interval")
+def change_subscription_interval(
+    new_interval: SubscriptionInterval,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """
+    Change the subscription interval (monthly/yearly) for an active subscription.
+    The change will take effect at the end of the current billing cycle.
+    """
+    try:
+        # Get the user's current subscription
+        subscription = subscription_crud.get_by_user_id(db, current_user.id)
+
+        if not subscription:
+            return {"success": False, "error": "No existing subscription found"}
+
+        if not subscription.stripe_subscription_id:
+            return {"success": False, "error": "No Stripe subscription ID found"}
+
+        # Get the current Stripe subscription
+        stripe_sub = stripe.Subscription.retrieve(
+            str(subscription.stripe_subscription_id)
+        )
+
+        # Check if subscription is active
+        if stripe_sub.status not in ["active", "trialing"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot change interval for subscription with status: {stripe_sub.status}",
+            )
+
+        # Determine the new price ID based on the requested interval
+        if MONTHLY_PRICE_ID is None or YEARLY_PRICE_ID is None:
+            raise HTTPException(
+                status_code=500, detail="Stripe price IDs not properly configured"
+            )
+
+        new_price_id: str = (
+            MONTHLY_PRICE_ID
+            if new_interval == SubscriptionInterval.MONTHLY
+            else YEARLY_PRICE_ID
+        )
+
+        # Get current price ID to check if change is actually needed
+        current_price_id = stripe_sub.get("plan", {}).get("id")
+
+        if current_price_id == new_price_id:
+            return {
+                "success": False,
+                "message": f"Subscription is already on {new_interval.value}ly billing",
+            }
+
+        # Schedule the subscription modification at the end of current period
+        # We'll update the subscription to change the price at period end
+        updated_sub = stripe.Subscription.modify(
+            str(subscription.stripe_subscription_id),
+            items=[
+                {
+                    "id": stripe_sub["items"]["data"][0]["id"],
+                    "price": new_price_id,
+                }
+            ],
+            proration_behavior="none",  # No proration - change happens at period end
+        )
+
+        # Track the interval change event
+        track_event(
+            event_name="subscription_interval_changed",
+            properties={
+                "user_id": str(current_user.id),
+                "subscription_id": str(subscription.stripe_subscription_id),
+                "old_interval": (
+                    "yearly" if current_price_id == YEARLY_PRICE_ID else "monthly"
+                ),
+                "new_interval": new_interval.value + "ly",
+            },
+        )
+
+        logger.info(
+            f"Scheduled interval change for user {current_user.id} from "
+            f"{'yearly' if current_price_id == YEARLY_PRICE_ID else 'monthly'} to "
+            f"{new_interval.value}ly, effective at period end: {subscription.current_period_end}"
+        )
+
+        # Notify user about the billing interval change
+        notify_converted_billing_interval(
+            email=current_user.email,
+            name=current_user.name,
+            new_interval=new_interval.value,
+        )
+
+        return {
+            "success": True,
+            "message": f"Subscription interval will change to {new_interval.value}ly at the end of the current billing cycle",
+            "current_period_end": datetime.fromtimestamp(
+                updated_sub["current_period_end"]
+            ),
+            "new_interval": new_interval.value + "ly",
+        }
+
+    except Exception as stripe_error:
+        logger.error(f"Error when changing subscription interval: {stripe_error}")
+        if "stripe" in str(stripe_error).lower():
+            raise HTTPException(
+                status_code=400, detail=f"Stripe error: {str(stripe_error)}"
+            )
+        else:
+            logger.error(
+                f"Error changing subscription interval: {str(stripe_error)}",
+                exc_info=True,
+            )
+            raise HTTPException(status_code=500, detail=str(stripe_error))
