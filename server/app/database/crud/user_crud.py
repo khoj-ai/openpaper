@@ -88,11 +88,11 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
                 f"but is now authenticating with {obj_in.auth_provider}"
             )
             # Update user with new provider info
-            db_user.auth_provider = obj_in.auth_provider
-            db_user.provider_user_id = obj_in.provider_user_id
-            db_user.name = obj_in.name or db_user.name
-            db_user.picture = obj_in.picture or db_user.picture
-            db_user.locale = obj_in.locale or db_user.locale
+            db_user.auth_provider = obj_in.auth_provider  # type: ignore
+            db_user.provider_user_id = obj_in.provider_user_id  # type: ignore
+            db_user.name = obj_in.name or db_user.name  # type: ignore
+            db_user.picture = obj_in.picture or db_user.picture  # type: ignore
+            db_user.locale = obj_in.locale or db_user.locale  # type: ignore
             db.add(db_user)
             db.commit()
             db.refresh(db_user)

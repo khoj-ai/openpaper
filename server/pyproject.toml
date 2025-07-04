@@ -30,4 +30,5 @@ dependencies = [
     "pillow>=11.2.1",
     "resend>=2.10.0",
     "celery>=5.5.3",
+    "stripe>=12.3.0",
 ]

@@ -3,7 +3,6 @@ import uuid
 from datetime import datetime
 from typing import List, Optional, Tuple
 
-import requests
 from app.database.crud.annotation_crud import AnnotationCreate, annotation_crud
 from app.database.crud.base_crud import CRUDBase
 from app.database.crud.highlight_crud import HighlightCreate, highlight_crud

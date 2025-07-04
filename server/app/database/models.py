@@ -574,6 +574,7 @@ class Subscription(Base):
     # Stripe integration fields
     stripe_customer_id = Column(String, nullable=True)
     stripe_subscription_id = Column(String, nullable=True)
+    stripe_price_id = Column(String, nullable=True)
 
     # Cancel at period end flag
     cancel_at_period_end = Column(Boolean, default=False)
