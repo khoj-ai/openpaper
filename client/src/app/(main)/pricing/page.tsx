@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Crown, Calendar } from "lucide-react";
+import { Clock, Crown, Calendar, CheckCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -67,19 +67,19 @@ export default function PricingPage() {
     const getStatusBadgeColor = (status: string | undefined) => {
         switch (status) {
             case 'active':
-                return 'bg-green-600 text-white';
+                return 'bg-slate-800 text-white border-slate-800';
             case 'trialing':
-                return 'bg-blue-600 text-white';
+                return 'bg-slate-600 text-white border-slate-600';
             case 'canceled':
-                return 'bg-red-600 text-white';
+                return 'bg-slate-400 text-white border-slate-400';
             case 'past_due':
-                return 'bg-yellow-600 text-white';
+                return 'bg-amber-600 text-white border-amber-600';
             case 'incomplete':
-                return 'bg-orange-600 text-white';
+                return 'bg-slate-400 text-white border-slate-400';
             case 'unpaid':
-                return 'bg-red-600 text-white';
+                return 'bg-slate-400 text-white border-slate-400';
             default:
-                return 'bg-gray-600 text-white';
+                return 'bg-slate-400 text-white border-slate-400';
         }
     };
 
@@ -102,105 +102,83 @@ export default function PricingPage() {
         }
     };
 
-
     return (
-        <div className="max-w-6xl mx-auto p-2 sm:p-8 space-y-12">
+        <div className="max-w-6xl mx-auto p-2 sm:p-8 space-y-16">
             {/* Header */}
-            <div className="text-center space-y-4">
-                <h1 className="text-4xl font-bold">Simple, Transparent Pricing</h1>
-                <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                    Choose the plan fit for your research needs. All plans include unlimited annotations and notes.
-                </p>
-
-
-                {/* Billing Toggle */}
-                {!loading && (
-                    <div className="flex items-center justify-center gap-4 mt-8">
-                        <span className={cn("text-sm", !isAnnual && "font-semibold")}>Monthly</span>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setIsAnnual(!isAnnual)}
-                            className="relative"
-                            disabled={isActiveSubscription} // Only disable for truly active subscriptions
-                        >
-                            <div className={cn(
-                                "w-12 h-6 rounded-full transition-colors",
-                                isAnnual ? "bg-primary" : "bg-gray-300"
-                            )}>
-                                <div className={cn(
-                                    "w-5 h-5 rounded-full bg-white transition-transform mt-0.5",
-                                    isAnnual ? "translate-x-6 ml-0.5" : "translate-x-0.5"
-                                )} />
-                            </div>
-                        </Button>
-                        <span className={cn("text-sm", isAnnual && "font-semibold")}>
-                            Annual
-                            <Badge variant="secondary" className="ml-2">33% off</Badge>
-                        </span>
-                        {isCurrentlySubscribed && (
-                            <Badge variant="outline" className="ml-2">
-                                {isActiveSubscription ? "Current: " : "Previous: "}
-                                {userSubscription?.subscription.interval === "year" ? "Annual" : "Monthly"}
-                            </Badge>
-                        )}
-                    </div>
-                )}
+            <div className="text-center space-y-6">
+                <div className="space-y-3">
+                    <h1 className="text-4xl font-light tracking-tight text-slate-900 dark:text-slate-100">
+                        Research Plans
+                    </h1>
+                    <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed">
+                        Choose the plan that fits your research workflow. All plans include unlimited annotations and comprehensive note-taking capabilities.
+                    </p>
+                </div>
             </div>
 
             {/* Current Subscription Card */}
             {isCurrentlySubscribed && (
                 <Card className={cn(
-                    "border-2",
-                    isActiveSubscription ? "border-green-500 bg-green-50 dark:bg-green-950/20" : "border-red-500 bg-red-50 dark:bg-red-950/20"
+                    "border-2 transition-all duration-200",
+                    isActiveSubscription
+                        ? "border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50"
+                        : "border-slate-200 dark:border-slate-700 bg-slate-50/30 dark:bg-slate-900/30"
                 )}>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <Crown className={cn(
-                                "h-5 w-5",
-                                isActiveSubscription ? "text-green-600" : "text-red-600"
-                            )} />
-                            <CardTitle className={cn(
-                                "text-xl",
-                                isActiveSubscription ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"
+                    <CardHeader className="py-4">
+                        <div className="flex items-center gap-3">
+                            <div className={cn(
+                                "p-2 rounded-full",
+                                isActiveSubscription
+                                    ? "bg-slate-100 dark:bg-slate-800"
+                                    : "bg-slate-100 dark:bg-slate-800"
                             )}>
-                                Your Current Subscription
-                            </CardTitle>
-                            <Badge className={getStatusBadgeColor(subscriptionStatus)}>
+                                <CheckCircle className={cn(
+                                    "h-4 w-4",
+                                    isActiveSubscription
+                                        ? "text-slate-700 dark:text-slate-300"
+                                        : "text-slate-500 dark:text-slate-400"
+                                )} />
+                            </div>
+                            <div className="flex-1">
+                                <CardTitle className="text-lg font-medium text-slate-900 dark:text-slate-100">
+                                    Your Research Plan
+                                </CardTitle>
+                                <CardDescription className="text-sm text-slate-600 dark:text-slate-400">
+                                    {isActiveSubscription ? "Currently active" : "Subscription not active"}
+                                </CardDescription>
+                            </div>
+                            <Badge className={cn("font-normal", getStatusBadgeColor(subscriptionStatus))}>
                                 {getStatusDisplay(subscriptionStatus)}
                             </Badge>
                         </div>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="grid md:grid-cols-3 gap-4">
-                            <div className="text-center">
-                                <div className={cn(
-                                    "text-2xl font-bold",
-                                    isActiveSubscription ? "text-green-600" : "text-red-600"
-                                )}>
+                    <CardContent className="space-y-6 my-4">
+                        <div className="grid md:grid-cols-3 gap-6">
+                            <div className="text-center space-y-1">
+                                <div className="text-xl font-medium text-slate-900 dark:text-slate-100">
                                     Researcher Plan
                                 </div>
-                                <div className="text-sm text-muted-foreground">
-                                    {isActiveSubscription ? "Active Subscription" : "Subscription Not Active"}
+                                <div className="text-sm text-slate-500 dark:text-slate-400">
+                                    Full access to all features
                                 </div>
                             </div>
-                            <div className="text-center">
-                                <div className="text-2xl font-bold">
+                            <div className="text-center space-y-1">
+                                <div className="text-xl font-medium text-slate-900 dark:text-slate-100">
                                     ${userSubscription?.subscription.interval === "year" ? annualPrice : monthlyPrice}
-                                    <span className="text-lg font-normal text-muted-foreground">/mo</span>
+                                    <span className="text-base font-normal text-slate-500 dark:text-slate-400">/month</span>
                                 </div>
-                                <div className="text-sm text-muted-foreground">
-                                    Billed {userSubscription?.subscription.interval === "year" ? "Annually" : "Monthly"}
+                                <div className="text-sm text-slate-500 dark:text-slate-400">
+                                    Billed {userSubscription?.subscription.interval === "year" ? "annually" : "monthly"}
                                 </div>
                             </div>
-                            <div className="text-center">
-                                <div className="flex items-center justify-center gap-1 text-lg font-semibold">
+                            <div className="text-center space-y-1">
+                                <div className="flex items-center justify-center gap-2 text-lg font-medium text-slate-900 dark:text-slate-100">
                                     <Calendar className="h-4 w-4" />
                                     {userSubscription?.subscription.current_period_end &&
                                         formatDate(userSubscription.subscription.current_period_end)
                                     }
                                 </div>
-                                <div className="text-sm text-muted-foreground">
+                                <div className="text-sm text-slate-500 dark:text-slate-400">
                                     {subscriptionStatus === 'canceled' || userSubscription?.subscription.cancel_at_period_end ? "Expires" : "Renews"}
                                 </div>
                             </div>
@@ -208,13 +186,13 @@ export default function PricingPage() {
 
                         {/* Status-specific alerts */}
                         {subscriptionStatus === 'canceled' && (
-                            <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                                <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
+                            <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+                                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
                                     <Clock className="h-4 w-4" />
                                     <span className="font-medium">Subscription Canceled</span>
                                 </div>
-                                <p className="text-sm text-red-600 dark:text-red-500 mt-1">
-                                    Your subscription was canceled and will end on {userSubscription?.subscription.current_period_end &&
+                                <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                                    Your subscription will end on {userSubscription?.subscription.current_period_end &&
                                         formatDate(userSubscription.subscription.current_period_end)}.
                                     You can reactivate anytime before this date.
                                 </p>
@@ -223,11 +201,11 @@ export default function PricingPage() {
 
                         {userSubscription?.subscription.cancel_at_period_end && subscriptionStatus === 'active' && (
                             <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-                                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
                                     <Clock className="h-4 w-4" />
                                     <span className="font-medium">Subscription Ending</span>
                                 </div>
-                                <p className="text-sm text-amber-600 dark:text-amber-500 mt-1">
+                                <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
                                     Your subscription will end on {userSubscription?.subscription.current_period_end &&
                                         formatDate(userSubscription.subscription.current_period_end)}.
                                     You can reactivate anytime before this date.
@@ -236,24 +214,24 @@ export default function PricingPage() {
                         )}
 
                         {subscriptionStatus === 'past_due' && (
-                            <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-                                <div className="flex items-center gap-2 text-yellow-700 dark:text-yellow-400">
+                            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
                                     <Clock className="h-4 w-4" />
                                     <span className="font-medium">Payment Past Due</span>
                                 </div>
-                                <p className="text-sm text-yellow-600 dark:text-yellow-500 mt-1">
+                                <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
                                     Your payment is past due. Please update your payment method to continue your subscription.
                                 </p>
                             </div>
                         )}
 
                         {subscriptionStatus === 'incomplete' && (
-                            <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
-                                <div className="flex items-center gap-2 text-orange-700 dark:text-orange-400">
+                            <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+                                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
                                     <Clock className="h-4 w-4" />
                                     <span className="font-medium">Payment Incomplete</span>
                                 </div>
-                                <p className="text-sm text-orange-600 dark:text-orange-500 mt-1">
+                                <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                                     Your payment is incomplete. Please complete the payment process to activate your subscription.
                                 </p>
                             </div>
@@ -261,9 +239,9 @@ export default function PricingPage() {
 
                         {/* Resubscribe button for canceled/ending subscriptions */}
                         {canResubscribe && (
-                            <div className="pt-4 border-t">
+                            <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
                                 <Button
-                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                                    className="w-full bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-medium"
                                     onClick={() => setIsCheckoutOpen(true)}
                                 >
                                     Reactivate Subscription
@@ -274,20 +252,76 @@ export default function PricingPage() {
                 </Card>
             )}
 
+            {/* Billing Toggle */}
+            {!loading && (
+                <div className="flex items-center justify-center gap-6 mt-12">
+                    <span className={cn(
+                        "text-sm font-medium transition-colors",
+                        !isAnnual ? "text-slate-900 dark:text-slate-100" : "text-slate-500 dark:text-slate-400"
+                    )}>
+                        Monthly
+                    </span>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setIsAnnual(!isAnnual)}
+                        className="relative p-0"
+                        disabled={isActiveSubscription}
+                    >
+                        <div className={cn(
+                            "w-14 h-7 rounded-full transition-all duration-200",
+                            isAnnual ? "bg-slate-800 dark:bg-slate-200" : "bg-slate-200 dark:bg-slate-700"
+                        )}>
+                            <div className={cn(
+                                "w-5 h-5 rounded-full transition-all duration-200 mt-1",
+                                isAnnual
+                                    ? "translate-x-8 bg-white dark:bg-slate-800"
+                                    : "translate-x-1 bg-slate-600 dark:bg-slate-300"
+                            )} />
+                        </div>
+                    </Button>
+                    <div className="flex items-center gap-2">
+                        <span className={cn(
+                            "text-sm font-medium transition-colors",
+                            isAnnual ? "text-slate-900 dark:text-slate-100" : "text-slate-500 dark:text-slate-400"
+                        )}>
+                            Annual
+                        </span>
+                        <Badge variant="secondary" className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-0 text-xs">
+                            Save 33%
+                        </Badge>
+                    </div>
+                    {isCurrentlySubscribed && (
+                        <Badge variant="outline" className="border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400">
+                            Current: {userSubscription?.subscription.interval === "year" ? "Annual" : "Monthly"}
+                        </Badge>
+                    )}
+                </div>
+            )}
+
             {/* Pricing Cards */}
-            <div className="grid md:grid-cols-3 gap-8 mb-12">
+            <div className="grid md:grid-cols-3 gap-8 py-4">
                 {/* Base Plan */}
-                <Card className="relative">
-                    <CardHeader>
-                        <CardTitle className="text-2xl">Base</CardTitle>
-                        <CardDescription>Perfect for getting started</CardDescription>
-                        <div className="text-3xl font-bold">
-                            $0<span className="text-lg font-normal text-muted-foreground">/mo</span>
+                <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:shadow-lg transition-shadow duration-200">
+                    <CardHeader className="pb-4">
+                        <div className="space-y-2">
+                            <CardTitle className="text-xl font-medium text-slate-900 dark:text-slate-100">
+                                Base
+                            </CardTitle>
+                            <CardDescription className="text-slate-600 dark:text-slate-400">
+                                Perfect for getting started with research
+                            </CardDescription>
+                        </div>
+                        <div className="pt-4">
+                            <div className="text-3xl font-light text-slate-900 dark:text-slate-100">
+                                $0
+                                <span className="text-lg font-normal text-slate-500 dark:text-slate-400">/month</span>
+                            </div>
                         </div>
                     </CardHeader>
                     <CardContent>
                         <Button
-                            className="w-full"
+                            className="w-full font-medium border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
                             variant="outline"
                             onClick={() => { window.location.href = '/login' }}
                             disabled={isActiveSubscription}
@@ -299,34 +333,48 @@ export default function PricingPage() {
 
                 {/* Researcher Plan */}
                 <Card className={cn(
-                    "relative shadow-lg",
+                    "relative border-2 transition-all duration-200",
                     isActiveSubscription
-                        ? "border-green-500 bg-green-50 dark:bg-green-950/20"
-                        : "border-blue-600 dark:border-blue-400"
+                        ? "border-slate-300 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-900/50 shadow-lg"
+                        : "border-slate-900 dark:border-slate-100 bg-white dark:bg-slate-900 shadow-lg"
                 )}>
-                    <Badge className={cn(
-                        "absolute -top-3 left-1/2 -translate-x-1/2",
-                        isActiveSubscription
-                            ? "bg-green-600 dark:bg-green-400"
-                            : "bg-blue-600 dark:bg-blue-400"
-                    )}>
-                        {isActiveSubscription ? "Current Plan" : "Recommended"}
-                    </Badge>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <CardTitle className="text-2xl">Researcher</CardTitle>
-                            {isActiveSubscription && <Crown className="h-5 w-5 text-green-600" />}
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                        <Badge className={cn(
+                            "font-normal px-3 py-1",
+                            isActiveSubscription
+                                ? "bg-blue-800 dark:bg-blue-200 text-white dark:text-slate-900"
+                                : "bg-blue-900 dark:bg-blue-100 text-white dark:text-slate-900"
+                        )}>
+                            {isActiveSubscription ? "Your Plan" : "Recommended"}
+                        </Badge>
+                    </div>
+                    <CardHeader className="pb-4">
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                                <CardTitle className="text-xl font-medium text-slate-900 dark:text-slate-100">
+                                    Researcher
+                                </CardTitle>
+                                {isActiveSubscription && (
+                                    <CheckCircle className="h-5 w-5 text-slate-700 dark:text-slate-300" />
+                                )}
+                            </div>
+                            <CardDescription className="text-slate-600 dark:text-slate-400">
+                                For independent researchers and academics
+                            </CardDescription>
                         </div>
-                        <CardDescription>For independent researchers</CardDescription>
-                        <div className="text-3xl font-bold">
-                            ${isAnnual ? annualPrice : monthlyPrice}
-                            <span className="text-lg font-normal text-muted-foreground">/mo</span>
+                        <div className="pt-4">
+                            <div className="text-3xl font-light text-slate-900 dark:text-slate-100">
+                                ${isAnnual ? annualPrice : monthlyPrice}
+                                <span className="text-lg font-normal text-slate-500 dark:text-slate-400">/month</span>
+                            </div>
+                            {isAnnual && (
+                                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                                    Billed annually at ${annualPrice * 12}/year
+                                </p>
+                            )}
                         </div>
-                        {isAnnual && (
-                            <p className="text-sm text-muted-foreground">Billed annually at ${annualPrice * 12}/year</p>
-                        )}
                         {isActiveSubscription && (
-                            <Badge variant="outline" className="w-fit">
+                            <Badge variant="outline" className="w-fit mt-2 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400">
                                 Active since {userSubscription?.subscription.current_period_start &&
                                     formatDate(userSubscription.subscription.current_period_start)
                                 }
@@ -336,12 +384,10 @@ export default function PricingPage() {
                     <CardContent>
                         <Button
                             className={cn(
-                                "w-full",
+                                "w-full font-medium transition-colors",
                                 isActiveSubscription
-                                    ? "bg-green-600 dark:bg-green-400"
-                                    : canResubscribe
-                                    ? "bg-blue-600 dark:bg-blue-400"
-                                    : "bg-blue-600 dark:bg-blue-400"
+                                    ? "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 cursor-default"
+                                    : "bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900"
                             )}
                             onClick={() => setIsCheckoutOpen(true)}
                             disabled={isActiveSubscription}
@@ -349,8 +395,8 @@ export default function PricingPage() {
                             {isActiveSubscription
                                 ? "Current Plan"
                                 : canResubscribe
-                                ? "Reactivate Subscription"
-                                : "Upgrade to Researcher"}
+                                    ? "Reactivate Subscription"
+                                    : "Upgrade to Researcher"}
                         </Button>
                     </CardContent>
                 </Card>
@@ -364,19 +410,34 @@ export default function PricingPage() {
                 />
 
                 {/* Teams Plan */}
-                <Card className="relative opacity-75">
-                    <Badge variant="secondary" className="absolute -top-3 left-1/2 -translate-x-1/2">
-                        Coming Soon
-                    </Badge>
-                    <CardHeader>
-                        <CardTitle className="text-2xl">Teams</CardTitle>
-                        <CardDescription>For research teams and organizations</CardDescription>
-                        <div className="text-3xl font-bold">
-                            TBD<span className="text-lg font-normal text-muted-foreground">/mo</span>
+                <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 opacity-60 relative">
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                        <Badge variant="secondary" className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-0">
+                            Coming Soon
+                        </Badge>
+                    </div>
+                    <CardHeader className="pb-4">
+                        <div className="space-y-2">
+                            <CardTitle className="text-xl font-medium text-slate-900 dark:text-slate-100">
+                                Teams
+                            </CardTitle>
+                            <CardDescription className="text-slate-600 dark:text-slate-400">
+                                For research teams and organizations
+                            </CardDescription>
+                        </div>
+                        <div className="pt-4">
+                            <div className="text-3xl font-light text-slate-900 dark:text-slate-100">
+                                TBD
+                                <span className="text-lg font-normal text-slate-500 dark:text-slate-400">/month</span>
+                            </div>
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <Button className="w-full" variant="outline" disabled>
+                        <Button
+                            className="w-full font-medium border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400"
+                            variant="outline"
+                            disabled
+                        >
                             Coming Soon
                         </Button>
                     </CardContent>
@@ -391,32 +452,36 @@ export default function PricingPage() {
                 isCurrentlySubscribed={isCurrentlySubscribed || false}
             />
 
-            {/* FAQ or Additional Info */}
-            <div className="text-center space-y-4 pt-8 border-t">
-                <h3 className="text-xl font-semibold">Questions?</h3>
-                <p className="text-muted-foreground">
-                    Need help choosing the right plan? Contact us and we will help you find the perfect fit for your research needs.
-                </p>
+            {/* Support Section */}
+            <div className="text-center space-y-6 pt-12 border-t border-slate-200 dark:border-slate-700">
+                <div className="space-y-3">
+                    <h3 className="text-xl font-medium text-slate-900 dark:text-slate-100">
+                        Questions about pricing?
+                    </h3>
+                    <p className="text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
+                        We're here to help you find the right plan for your research needs.
+                        Our team understands the unique requirements of academic work.
+                    </p>
+                </div>
                 <Dialog>
                     <DialogTrigger asChild>
-                        <Button variant="outline" className="w-fit mx-auto">
+                        <Button variant="outline" className="border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">
                             Contact Support
                         </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="border-slate-200 dark:border-slate-700">
                         <DialogHeader>
-                            <DialogTitle>Contact Support</DialogTitle>
-                            <DialogDescription>
+                            <DialogTitle className="text-slate-900 dark:text-slate-100">Contact Support</DialogTitle>
+                            <DialogDescription className="text-slate-600 dark:text-slate-400">
                                 If you have any questions about our pricing or need help choosing a plan, please reach out to us.
                             </DialogDescription>
                         </DialogHeader>
                         <div className="mt-4">
-                            <p className="text-sm text-muted-foreground mb-2">
-                                You can email us at {" "}
-                                <a href="mailto:saba@openpaper.ai" className="underline">
+                            <p className="text-sm text-slate-600 dark:text-slate-400">
+                                You can email us at{" "}
+                                <a href="mailto:saba@openpaper.ai" className="text-slate-900 dark:text-slate-100 underline underline-offset-2">
                                     saba@openpaper.ai
                                 </a>
-                                .
                             </p>
                         </div>
                     </DialogContent>
