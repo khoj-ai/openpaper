@@ -11,6 +11,7 @@ import CheckoutSheet from "./checkout";
 import { fetchFromApi } from "@/lib/api";
 import { UserSubscription } from "@/lib/schema";
 import PricingTable from "./pricingTable";
+import { toast } from "sonner";
 
 const monthlyPrice = 12;
 const annualPrice = 8;
@@ -22,6 +23,8 @@ export default function PricingPage() {
     const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
     const [loading, setLoading] = useState(true);
     const [isPortalLoading, setIsPortalLoading] = useState(false);
+    const [isIntervalChangeLoading, setIsIntervalChangeLoading] = useState(false);
+    const [isResubscribeLoading, setIsResubscribeLoading] = useState(false);
 
     const annualSavings = (monthlyPrice - annualPrice) * 12;
 
@@ -64,8 +67,88 @@ export default function PricingPage() {
         } catch (error) {
             console.error('Failed to create portal session:', error);
             // You might want to show a toast notification here
+            toast.error('Failed to open subscription management portal. Please try again later. Contact support if the issue persists.');
         } finally {
             setIsPortalLoading(false);
+        }
+    };
+
+    const handleIntervalChange = async (newInterval: "month" | "year") => {
+        setIsIntervalChangeLoading(true);
+        try {
+            const response = await fetchFromApi(`/api/subscription/change-interval?new_interval=${newInterval}`, {
+                method: "POST",
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (response.success) {
+                // Update the local state to reflect the change
+                setIsAnnual(newInterval === "year");
+
+                toast.success(`Billing interval changed to ${newInterval === "year" ? "annual" : "monthly"} successfully.`);
+
+                // Add delay to ensure backend state is updated before refreshing
+                await new Promise(resolve => setTimeout(resolve, 800));
+
+                // Optionally refresh the subscription data
+                const updatedSubscription = await fetchFromApi("/api/subscription/user-subscription", {
+                    method: "GET",
+                });
+                setUserSubscription(updatedSubscription);
+
+                // You might want to show a success toast here
+                console.log('Interval change successful:', response.message);
+            } else {
+                console.error('Failed to change interval:', response.message);
+                // You might want to show an error toast here
+                toast.error(`Failed to change billing interval: ${response.message}`);
+            }
+        } catch (error) {
+            console.error('Failed to change interval:', error);
+            // You might want to show an error toast here
+            toast.error('Failed to change billing interval. Please try again later.');
+        } finally {
+            setIsIntervalChangeLoading(false);
+        }
+    };
+
+    const handleResubscribe = async () => {
+        setIsResubscribeLoading(true);
+        try {
+            const response = await fetchFromApi("/api/subscription/resubscribe", {
+                method: "POST",
+            });
+
+            if (response.success) {
+                toast.success('Resubscription successful', {
+                    description: 'Thank you for supporting open research! Your subscription has been reactivated.',
+                });
+
+                // Add delay to ensure backend state is updated before refreshing
+                await new Promise(resolve => setTimeout(resolve, 800));
+
+                // Refresh the subscription data to reflect the reactivated subscription
+                const updatedSubscription = await fetchFromApi("/api/subscription/user-subscription", {
+                    method: "GET",
+                });
+
+                setUserSubscription(updatedSubscription);
+
+                console.log('Resubscription successful');
+
+            } else {
+                console.error('Failed to resubscribe:', response.error);
+                // You might want to show an error toast here
+                toast.error(`Failed to resubscribe: ${response.error}`);
+            }
+        } catch (error) {
+            console.error('Failed to resubscribe:', error);
+            // You might want to show an error toast here
+            toast.error('Failed to resubscribe. Please try again later.');
+        } finally {
+            setIsResubscribeLoading(false);
         }
     };
 
@@ -188,6 +271,11 @@ export default function PricingPage() {
                                 </div>
                                 <div className="text-sm text-slate-500 dark:text-slate-400">
                                     Billed {userSubscription?.subscription.interval === "year" ? "annually" : "monthly"}
+                                    {isIntervalChangeLoading && (
+                                        <Badge variant="secondary" className="ml-2 text-xs">
+                                            Updating...
+                                        </Badge>
+                                    )}
                                 </div>
                             </div>
                             <div className="text-center space-y-1">
@@ -261,9 +349,10 @@ export default function PricingPage() {
                             {canResubscribe ? (
                                 <Button
                                     className="w-full bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-medium"
-                                    onClick={() => setIsCheckoutOpen(true)}
+                                    onClick={handleResubscribe}
+                                    disabled={isResubscribeLoading}
                                 >
-                                    Reactivate Subscription
+                                    {isResubscribeLoading ? "Reactivating..." : "Reactivate Subscription"}
                                 </Button>
                             ) : (
                                 <Button
@@ -288,25 +377,75 @@ export default function PricingPage() {
                     )}>
                         Monthly
                     </span>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setIsAnnual(!isAnnual)}
-                        className="relative p-0"
-                        disabled={isActiveSubscription}
-                    >
-                        <div className={cn(
-                            "w-14 h-7 rounded-full transition-all duration-200",
-                            isAnnual ? "bg-slate-800 dark:bg-slate-200" : "bg-slate-200 dark:bg-slate-700"
-                        )}>
+                    {isActiveSubscription ? (
+                        <Dialog>
+                            <DialogTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="relative p-0"
+                                    disabled={isIntervalChangeLoading}
+                                >
+                                    <div className={cn(
+                                        "w-14 h-7 rounded-full transition-all duration-200",
+                                        isAnnual ? "bg-slate-800 dark:bg-slate-200" : "bg-slate-200 dark:bg-slate-700"
+                                    )}>
+                                        <div className={cn(
+                                            "w-5 h-5 rounded-full transition-all duration-200 mt-1",
+                                            isAnnual
+                                                ? "translate-x-8 bg-white dark:bg-slate-800"
+                                                : "translate-x-1 bg-slate-600 dark:bg-slate-300"
+                                        )} />
+                                    </div>
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="border-slate-200 dark:border-slate-700">
+                                <DialogHeader>
+                                    <DialogTitle className="text-slate-900 dark:text-slate-100">
+                                        Change Billing Cycle
+                                    </DialogTitle>
+                                    <DialogDescription className="text-slate-600 dark:text-slate-400">
+                                        Switch from {isAnnual ? "annual" : "monthly"} to {isAnnual ? "monthly" : "annual"} billing.
+                                        The change will take effect at the end of your current billing cycle.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="flex gap-3 mt-4">
+                                    <DialogTrigger asChild>
+                                        <Button variant="outline" className="flex-1">
+                                            Cancel
+                                        </Button>
+                                    </DialogTrigger>
+                                    <Button
+                                        className="flex-1 bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900"
+                                        onClick={() => handleIntervalChange(isAnnual ? "month" : "year")}
+                                        disabled={isIntervalChangeLoading}
+                                    >
+                                        {isIntervalChangeLoading ? "Changing..." : `Switch to ${isAnnual ? "Monthly" : "Annual"}`}
+                                    </Button>
+                                </div>
+                            </DialogContent>
+                        </Dialog>
+                    ) : (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setIsAnnual(!isAnnual)}
+                            className="relative p-0"
+                            disabled={isActiveSubscription}
+                        >
                             <div className={cn(
-                                "w-5 h-5 rounded-full transition-all duration-200 mt-1",
-                                isAnnual
-                                    ? "translate-x-8 bg-white dark:bg-slate-800"
-                                    : "translate-x-1 bg-slate-600 dark:bg-slate-300"
-                            )} />
-                        </div>
-                    </Button>
+                                "w-14 h-7 rounded-full transition-all duration-200",
+                                isAnnual ? "bg-slate-800 dark:bg-slate-200" : "bg-slate-200 dark:bg-slate-700"
+                            )}>
+                                <div className={cn(
+                                    "w-5 h-5 rounded-full transition-all duration-200 mt-1",
+                                    isAnnual
+                                        ? "translate-x-8 bg-white dark:bg-slate-800"
+                                        : "translate-x-1 bg-slate-600 dark:bg-slate-300"
+                                )} />
+                            </div>
+                        </Button>
+                    )}
                     <div className="flex items-center gap-2">
                         <span className={cn(
                             "text-sm font-medium transition-colors",
@@ -319,9 +458,16 @@ export default function PricingPage() {
                         </Badge>
                     </div>
                     {isCurrentlySubscribed && (
-                        <Badge variant="outline" className="border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400">
-                            Current: {userSubscription?.subscription.interval === "year" ? "Annual" : "Monthly"}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400">
+                                Current: {userSubscription?.subscription.interval === "year" ? "Annual" : "Monthly"}
+                            </Badge>
+                            {isActiveSubscription && (
+                                <span className="text-xs text-slate-500 dark:text-slate-400">
+                                    Click toggle to change
+                                </span>
+                            )}
+                        </div>
                     )}
                 </div>
             )}
@@ -416,13 +562,19 @@ export default function PricingPage() {
                                     ? "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 cursor-default"
                                     : "bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900"
                             )}
-                            onClick={() => setIsCheckoutOpen(true)}
-                            disabled={isActiveSubscription}
+                            onClick={() => {
+                                if (canResubscribe) {
+                                    handleResubscribe();
+                                } else {
+                                    setIsCheckoutOpen(true);
+                                }
+                            }}
+                            disabled={isActiveSubscription || isResubscribeLoading}
                         >
                             {isActiveSubscription
                                 ? "Current Plan"
                                 : canResubscribe
-                                    ? "Reactivate Subscription"
+                                    ? (isResubscribeLoading ? "Reactivating..." : "Reactivate Subscription")
                                     : "Upgrade to Researcher"}
                         </Button>
                     </CardContent>
