@@ -1,6 +1,8 @@
 import logging
+import uuid
 from typing import Annotated, Optional
 
+from app.database.crud.subscription_crud import subscription_crud
 from app.database.crud.user_crud import user as user_crud
 from app.database.database import get_db
 from app.schemas.user import CurrentUser
@@ -50,13 +52,22 @@ async def get_current_user(
     if not db_user or not db_user.is_active:
         return None
 
+    if not db_user.id:
+        logger.error("User ID is missing in the database record.")
+        return None
+
+    id_as_uuid = uuid.UUID(str(db_user.id))
+
+    is_user_active = subscription_crud.is_user_active(db, db_user)
+
     # Return CurrentUser model
     return CurrentUser(
-        id=db_user.id,
-        email=db_user.email,
-        name=db_user.name,
-        is_admin=db_user.is_admin,
-        picture=db_user.picture,
+        id=id_as_uuid,
+        email=str(db_user.email),
+        name=str(db_user.name),
+        is_admin=bool(db_user.is_admin),
+        picture=str(db_user.picture),
+        is_active=is_user_active,
     )
 
 
