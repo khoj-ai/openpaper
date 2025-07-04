@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Union
 
 from app.database.crud.base_crud import CRUDBase
@@ -36,6 +36,16 @@ class SubscriptionUpdate(BaseModel):
 
 class CRUDSubscription(CRUDBase[Subscription, SubscriptionCreate, SubscriptionUpdate]):
     """CRUD operations for subscription management"""
+
+    def is_user_active(self, db: Session, user: CurrentUser) -> bool:
+        """Check if the user has an active subscription"""
+        subscription = self.get_by_user_id(db, user.id)
+        if not subscription:
+            return False
+        # User is active if `current_period_end` is in the future
+        return subscription.current_period_end > datetime.now(
+            tz=timezone.utc
+        )  # type: ignore
 
     def get_by_user_id(self, db: Session, user_id: uuid.UUID) -> Optional[Subscription]:
         """Get subscription by user_id"""

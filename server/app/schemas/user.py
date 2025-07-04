@@ -99,5 +99,8 @@ class CurrentUser(BaseModel):
     is_admin: bool = False
     picture: Optional[str] = None
 
+    # is_active describes if the user account is on the RESEARCHER or BASIC plan
+    is_active: bool = False
+
     class ConfigDict:
         from_attributes = True
