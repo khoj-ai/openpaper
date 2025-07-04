@@ -121,3 +121,28 @@ def send_onboarding_email(email: str, name: Union[str, None] = None) -> None:
 
     except Exception as e:
         logger.error(f"Failed to send onboarding email: {e}", exc_info=True)
+
+
+def notify_converted_billing_interval(
+    email: str, name: Union[str, None] = None, new_interval: str = "yearly"
+) -> None:
+    """
+    Notify user about their billing interval change.
+
+    Args:
+        email (str): The email address of the user.
+        name (str): The name of the user.
+        new_interval (str): The new billing interval (e.g., "yearly").
+    """
+    try:
+        payload = resend.Emails.SendParams = {  # type: ignore
+            "from": "Open Paper <billing@openpaper.ai>",
+            "to": [email],
+            "subject": "Your Billing Cycle for Open Paper Has Changed",
+            "text": f"Hello {name},\n\nYour billing cycle has been successfully changed to {new_interval}. Thank you for your continued support for open research!\n\nBest regards,\nOpen Paper Team",
+        }
+
+        resend.Emails.send(payload)  # type: ignore
+
+    except Exception as e:
+        logger.error(f"Failed to notify billing interval change: {e}", exc_info=True)
