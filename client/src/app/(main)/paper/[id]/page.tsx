@@ -1030,7 +1030,7 @@ export default function PaperView() {
     const memoizedMessages = useMemo(() => {
         return messages.map((msg, index) => (
             <div
-                key={`${msg.id || index}-${msg.content.slice(0, 20)}`} // Use a stable key
+                key={`${msg.id || `msg-${index}`}-${index}-${msg.role}-${msg.content.slice(0, 20).replace(/\s+/g, '')}`} // Use a stable and unique key
                 className='flex flex-row gap-2 items-end'
             >
                 {
