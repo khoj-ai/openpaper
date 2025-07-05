@@ -10,24 +10,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/lib/auth";
+import { useSubscription, getStorageUsagePercentage, isStorageNearLimit, isStorageAtLimit } from "@/hooks/useSubscription";
 import { FileText, Upload, Search, AlertTriangle, AlertCircle, HardDrive } from "lucide-react";
 import Link from "next/link";
 
 // TODO: We could add a search look-up for the paper journal name to avoid placeholders
-
-interface StorageUsage {
-    total_size_kb: number;
-    total_size_allowed_kb: number;
-}
 
 export default function PapersPage() {
     const [papers, setPapers] = useState<PaperItem[]>([]);
     const [searchTerm, setSearchTerm] = useState<string>("");
     const [filteredPapers, setFilteredPapers] = useState<PaperItem[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
-    const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null);
-    const [storageLoading, setStorageLoading] = useState<boolean>(true);
     const { user, loading: authLoading } = useAuth();
+    const { subscription, loading: subscriptionLoading } = useSubscription();
 
     useEffect(() => {
         const fetchPapers = async () => {
@@ -45,19 +40,7 @@ export default function PapersPage() {
             }
         }
 
-        const fetchStorageUsage = async () => {
-            try {
-                const response = await fetchFromApi("/api/paper/all/size");
-                setStorageUsage(response);
-            } catch (error) {
-                console.error("Error fetching storage usage:", error);
-            } finally {
-                setStorageLoading(false);
-            }
-        }
-
         fetchPapers();
-        fetchStorageUsage();
     }, [])
 
     useEffect(() => {
@@ -114,26 +97,24 @@ export default function PapersPage() {
     };
 
     const getUsagePercentage = () => {
-        if (!storageUsage) return 0;
-        return (storageUsage.total_size_kb / storageUsage.total_size_allowed_kb) * 100;
+        return getStorageUsagePercentage(subscription);
     };
 
     const getUsageAlert = () => {
-        const percentage = getUsagePercentage();
-        if (percentage >= 100) {
+        if (isStorageAtLimit(subscription)) {
             return "error";
-        } else if (percentage >= 75) {
+        } else if (isStorageNearLimit(subscription)) {
             return "warning";
         }
         return null;
     };
 
     const StorageUsageDisplay = () => {
-        if (storageLoading) {
+        if (subscriptionLoading) {
             return <Skeleton className="h-20 w-full mb-6" />;
         }
 
-        if (!storageUsage) {
+        if (!subscription) {
             return null;
         }
 
@@ -149,8 +130,8 @@ export default function PapersPage() {
 
                 <div className="space-y-2">
                     <div className="flex justify-between text-sm text-muted-foreground">
-                        <span>{formatFileSize(storageUsage.total_size_kb)} used</span>
-                        <span>{formatFileSize(storageUsage.total_size_allowed_kb)} total</span>
+                        <span>{formatFileSize(subscription.usage.knowledge_base_size)} used</span>
+                        <span>{formatFileSize(subscription.usage.knowledge_base_size + subscription.usage.knowledge_base_size_remaining)} total</span>
                     </div>
 
                     <Progress
