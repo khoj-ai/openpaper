@@ -49,13 +49,13 @@ const features: PricingFeature[] = [
         teams: "Advanced"
     },
     {
-        name: "Chat credits (daily)",
+        name: "Chat credits (weekly)",
         basic: "500",
         researcher: "10,000",
         teams: "unlimited"
     },
     {
-        name: "Audio overviews (monthly)",
+        name: "Audio overviews (weekly)",
         basic: "5",
         researcher: "100",
         teams: "unlimited"
