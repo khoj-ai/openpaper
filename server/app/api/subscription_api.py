@@ -12,7 +12,7 @@ from app.database.crud.user_crud import user as user_crud
 from app.database.database import get_db
 from app.database.models import SubscriptionPlan, SubscriptionStatus
 from app.database.telemetry import track_event
-from app.helpers.email import notify_converted_billing_interval
+from app.helpers.email import notify_billing_issue, notify_converted_billing_interval
 from app.helpers.subscription_limits import get_user_usage_info
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -260,6 +260,9 @@ async def handle_stripe_webhook(
             "customer.subscription.updated",
             "customer.subscription.created",
             "customer.subscription.deleted",
+            "invoice.payment_failed",
+            "invoice.payment_action_required",
+            "customer.subscription.past_due",
         ]:
             logger.info(f"Skipping unsupported event type: {event_type}")
             return {"success": False}
@@ -492,6 +495,144 @@ async def handle_stripe_webhook(
             except Exception as e:
                 logger.error(f"Error canceling subscription: {e}")
 
+        elif event_type == "invoice.payment_failed":
+            invoice = event["data"]["object"]
+            subscription_id = invoice.get("subscription")
+            customer_id = invoice.get("customer")
+
+            try:
+                if subscription_id:
+                    # Find subscription in our database
+                    subscription = subscription_crud.get_by_stripe_subscription_id(
+                        db, subscription_id
+                    )
+
+                    if subscription:
+                        # Update subscription status to past_due
+                        subscription_crud.update_subscription_status(
+                            db, subscription_id, status=SubscriptionStatus.PAST_DUE
+                        )
+
+                        # Track payment failure event
+                        track_event(
+                            event_name="payment_failed",
+                            properties={
+                                "user_id": str(subscription.user_id),
+                                "subscription_id": subscription_id,
+                                "customer_id": customer_id,
+                                "invoice_id": invoice.get("id"),
+                            },
+                        )
+
+                        # Get user email and name for notification
+                        user = user_crud.get(db, id=subscription.user_id)
+
+                        if not user:
+                            logger.warning(
+                                f"No user found for subscription {subscription_id} when processing payment failure"
+                            )
+                            return {"success": False}
+
+                        logger.warning(
+                            f"Payment failed for subscription {subscription_id}, user {subscription.user_id}"
+                        )
+
+                        email_message = "Payment failed for your subscription. Please update your payment method."
+
+                        notify_billing_issue(
+                            str(user.email), email_message, str(user.name)
+                        )
+
+            except Exception as e:
+                logger.error(f"Error processing payment failure: {e}", exc_info=True)
+
+        elif event_type == "invoice.payment_action_required":
+            invoice = event["data"]["object"]
+            subscription_id = invoice.get("subscription")
+
+            try:
+                if subscription_id:
+                    subscription = subscription_crud.get_by_stripe_subscription_id(
+                        db, subscription_id
+                    )
+
+                    if subscription:
+                        # Track payment action required event
+                        track_event(
+                            event_name="payment_action_required",
+                            properties={
+                                "user_id": str(subscription.user_id),
+                                "subscription_id": subscription_id,
+                                "invoice_id": invoice.get("id"),
+                            },
+                        )
+
+                        logger.info(
+                            f"Payment action required for subscription {subscription_id}"
+                        )
+
+                        # Get user email and name for notification
+                        user = user_crud.get(db, id=subscription.user_id)
+                        if not user:
+                            logger.warning(
+                                f"No user found for subscription {subscription_id} when processing payment action required"
+                            )
+                            return {"success": False}
+
+                        email_message = "Payment action required for your subscription. Please complete the required action."
+
+                        notify_billing_issue(
+                            str(user.email), email_message, str(user.name)
+                        )
+
+            except Exception as e:
+                logger.error(
+                    f"Error processing payment action required: {e}", exc_info=True
+                )
+
+        elif event_type == "customer.subscription.past_due":
+            stripe_sub = event["data"]["object"]
+            subscription_id = stripe_sub.get("id")
+
+            try:
+                subscription = subscription_crud.get_by_stripe_subscription_id(
+                    db, subscription_id
+                )
+
+                if subscription:
+                    # Update subscription status
+                    subscription_crud.update_subscription_status(
+                        db,
+                        subscription_id,
+                        status="past_due",
+                    )
+
+                    # Track past due event
+                    track_event(
+                        event_name="subscription_past_due",
+                        properties={
+                            "user_id": str(subscription.user_id),
+                            "subscription_id": subscription_id,
+                        },
+                    )
+
+                    logger.warning(f"Subscription {subscription_id} is now past due")
+
+                    # Get user email and name for notification
+                    user = user_crud.get(db, id=subscription.user_id)
+                    if not user:
+                        logger.warning(
+                            f"No user found for subscription {subscription_id} when processing past due subscription"
+                        )
+                        return {"success": False}
+                    email_message = "Your subscription is past due. Please update your payment method to avoid service interruption."
+                    notify_billing_issue(str(user.email), email_message, str(user.name))
+
+            except Exception as e:
+                logger.error(
+                    f"Error processing past due subscription: {e}", exc_info=True
+                )
+
         # Return a 200 response to acknowledge receipt of the event. We should only arrive here if the event was processed successfully.
         return {"success": True}
 
@@ -659,28 +800,51 @@ def resubscribe(
                     subscription_params["default_payment_method"] = payment_method_id
 
                 # Create a new subscription for the existing customer
-                new_stripe_sub = stripe.Subscription.create(**subscription_params)
+                try:
+                    new_stripe_sub = stripe.Subscription.create(**subscription_params)
 
-                # Track resubscription event
-                track_event(
-                    event_name="subscription_reactivated_new",
-                    properties={
-                        "user_id": str(current_user.id),
-                        "old_subscription_id": str(subscription.stripe_subscription_id),
-                        "new_subscription_id": new_stripe_sub.id,
-                        "customer_id": str(subscription.stripe_customer_id),
-                        "interval": (
-                            "yearly"
-                            if stripe_price_id == YEARLY_PRICE_ID
-                            else "monthly"
-                        ),
-                    },
-                )
+                    # Track resubscription event
+                    track_event(
+                        event_name="subscription_reactivated_new",
+                        properties={
+                            "user_id": str(current_user.id),
+                            "old_subscription_id": str(
+                                subscription.stripe_subscription_id
+                            ),
+                            "new_subscription_id": new_stripe_sub.id,
+                            "customer_id": str(subscription.stripe_customer_id),
+                            "interval": (
+                                "yearly"
+                                if stripe_price_id == YEARLY_PRICE_ID
+                                else "monthly"
+                            ),
+                        },
+                    )
 
-                logger.info(
-                    f"Created new subscription {new_stripe_sub.id} for user {current_user.id}"
-                )
-                return {"success": True, "subscription_id": new_stripe_sub.id}
+                    logger.info(
+                        f"Created new subscription {new_stripe_sub.id} for user {current_user.id}"
+                    )
+                    return {"success": True, "subscription_id": new_stripe_sub.id}
+
+                except Exception as stripe_error:
+                    # Check for specific payment-related errors
+                    error_message = str(stripe_error).lower()
+                    if any(
+                        keyword in error_message
+                        for keyword in ["card", "declined", "insufficient", "payment"]
+                    ):
+                        logger.warning(
+                            f"Payment error during resubscription for user {current_user.id}: {stripe_error}"
+                        )
+                        return {
+                            "success": False,
+                            "error": "payment_failed",
+                            "message": "Your payment method was declined. Please update your payment method and try again.",
+                            "redirect_to_checkout": True,
+                        }
+                    else:
+                        # Re-raise other errors to be handled by outer exception handler
+                        raise stripe_error
 
             elif stripe_sub.cancel_at_period_end:
                 # Subscription is scheduled for cancellation - reverse the cancellation
@@ -848,8 +1012,8 @@ def change_subscription_interval(
         # Notify user about the billing interval change
         notify_converted_billing_interval(
             email=current_user.email,
-            name=current_user.name,
             new_interval=new_interval.value,
+            name=current_user.name,
         )
 
         return {
