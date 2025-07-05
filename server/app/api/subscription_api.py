@@ -91,7 +91,7 @@ def create_checkout_session(
             "client_reference_id": str(current_user.id),
             "line_items": [{"quantity": 1, "price": price_id}],
             "mode": "subscription",
-            "return_url": f"{YOUR_DOMAIN}/return?session_id={{CHECKOUT_SESSION_ID}}",
+            "return_url": f"{YOUR_DOMAIN}/subscribed?session_id={{CHECKOUT_SESSION_ID}}",
         }
 
         # Add customer if available
@@ -108,17 +108,68 @@ def create_checkout_session(
 
 
 @subscription_router.get("/session-status")
-async def session_status(session_id: str):
+async def session_status(
+    session_id: str,
+    db: Session = Depends(get_db),
+):
     try:
         session = stripe.checkout.Session.retrieve(session_id)
         customer_email = None
+        backend_subscription_status = None
+        backend_subscription_found = False
+
         if (
             hasattr(session, "customer_details")
             and session.customer_details is not None
         ):
             customer_email = session.customer_details.email
 
-        return {"status": session.status, "customer_email": customer_email}
+        # If the session is complete, also check our backend subscription status
+        if session.status == "complete":
+            # Get the client_reference_id which contains our user ID
+            client_reference_id = session.get("client_reference_id")
+            subscription_id = session.get("subscription")
+
+            if client_reference_id:
+                try:
+                    # Check if we have the subscription in our database
+                    user_id = uuid.UUID(client_reference_id)
+                    subscription = subscription_crud.get_by_user_id(db, user_id)
+
+                    if subscription and subscription.stripe_subscription_id:
+                        backend_subscription_found = True
+                        backend_subscription_status = (
+                            str(subscription.status)
+                            if subscription.status
+                            else "unknown"
+                        )
+
+                        # Double-check that the subscription IDs match
+                        if str(subscription.stripe_subscription_id) != subscription_id:
+                            logger.warning(
+                                f"Subscription ID mismatch for user {user_id}: "
+                                f"session subscription {subscription_id} vs "
+                                f"backend subscription {subscription.stripe_subscription_id}"
+                            )
+                    else:
+                        logger.warning(
+                            f"No subscription found in backend for user {user_id} "
+                            f"despite completed checkout session {session_id}"
+                        )
+
+                except ValueError as ve:
+                    logger.error(
+                        f"Invalid user ID in session client_reference_id: {client_reference_id}"
+                    )
+                except Exception as be:
+                    logger.error(f"Error checking backend subscription status: {be}")
+
+        return {
+            "status": session.status,
+            "customer_email": customer_email,
+            "backend_subscription_found": backend_subscription_found,
+            "backend_subscription_status": backend_subscription_status,
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
