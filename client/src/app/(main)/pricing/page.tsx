@@ -164,7 +164,7 @@ export default function PricingPage() {
     const subscriptionStatus = userSubscription?.subscription?.status;
     const isActiveSubscription = subscriptionStatus === 'active' || subscriptionStatus === 'trialing';
     const isCanceled = subscriptionStatus === 'canceled' || userSubscription?.subscription?.cancel_at_period_end;
-    const canResubscribe = userSubscription?.has_subscription && (subscriptionStatus === 'canceled' || userSubscription?.subscription?.cancel_at_period_end);
+    const canResubscribe = userSubscription?.has_subscription && isCanceled;
 
     const getStatusBadgeColor = (status: string | undefined) => {
         switch (status) {
