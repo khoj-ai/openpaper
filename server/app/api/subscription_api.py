@@ -12,7 +12,11 @@ from app.database.crud.user_crud import user as user_crud
 from app.database.database import get_db
 from app.database.models import SubscriptionPlan, SubscriptionStatus
 from app.database.telemetry import track_event
-from app.helpers.email import notify_billing_issue, notify_converted_billing_interval
+from app.helpers.email import (
+    notify_billing_issue,
+    notify_converted_billing_interval,
+    send_subscription_welcome_email,
+)
 from app.helpers.subscription_limits import get_user_usage_info
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -383,6 +387,11 @@ async def handle_stripe_webhook(
                     logger.info(
                         f"Subscription created for user {user_id} with ID {subscription_id}"
                     )
+
+                    # Send welcome email!
+                    user = user_crud.get(db, id=user_id)
+                    if user:
+                        send_subscription_welcome_email(str(user.email))
 
                     # Track subscription creation event
                     track_event(
