@@ -194,6 +194,29 @@ class S3Service:
             logger.error(f"Error generating presigned URL: {e}")
             return None
 
+    def get_file_size_in_kb(self, object_key: str) -> Optional[int]:
+        """
+        Get the size of a file in KB from S3
+
+        Args:
+            object_key: The S3 object key
+            db: Database session
+            paper_id: The paper ID to cache the size for
+            current_user: Current user for ownership verification
+
+        Returns:
+            int: Size in KB or None if error
+        """
+        try:
+            response = self.s3_client.head_object(
+                Bucket=self.bucket_name, Key=object_key
+            )
+            size_in_kb = response.get("ContentLength", 0) // 1024
+            return size_in_kb
+        except ClientError as e:
+            logger.error(f"Error getting file size for {object_key}: {e}")
+            return None
+
     def get_cached_presigned_url(
         self,
         db: Session,
@@ -241,12 +264,21 @@ class S3Service:
             # Cache the URL with expiration (subtract 5 minutes for safety buffer)
             expires_at = now + timedelta(seconds=expiration - 300)
 
+            # Calculate the size of the file in KB
+            current_size = getattr(paper, "size_in_kb", None)
+            if current_size is not None:
+                size_in_kb: Optional[int] = current_size
+            else:
+                size_in_kb = self.get_file_size_in_kb(object_key)
+
             # Update using CRUD
             updated_paper = paper_crud.update(
                 db=db,
                 db_obj=paper,
                 obj_in=PaperUpdate(
-                    cached_presigned_url=url, presigned_url_expires_at=expires_at
+                    cached_presigned_url=url,
+                    presigned_url_expires_at=expires_at,
+                    size_in_kb=size_in_kb,
                 ),
                 user=current_user,
             )

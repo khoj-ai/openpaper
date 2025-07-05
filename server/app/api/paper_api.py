@@ -17,6 +17,7 @@ from app.database.database import get_db
 from app.database.models import Paper, PaperStatus
 from app.database.telemetry import track_event
 from app.helpers.s3 import s3_service
+from app.helpers.subscription_limits import get_user_knowledge_base_size_limit
 from app.llm.schemas import ResponseCitation
 from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
@@ -555,3 +556,26 @@ async def delete_pdf(
             status_code=500,
             content={"message": f"Error deleting document: {str(e)}"},
         )
+
+
+@paper_router.get("/all/size")
+async def get_all_papers_size(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """
+    Get the total size of all papers uploaded by the user
+    """
+    total_size = paper_crud.get_size_of_knowledge_base(db, user=current_user)
+    total_size_allowed = get_user_knowledge_base_size_limit(db, user=current_user)
+
+    if total_size is None:
+        return JSONResponse(status_code=404, content={"message": "No papers found"})
+
+    return JSONResponse(
+        status_code=200,
+        content={
+            "total_size_kb": total_size,
+            "total_size_allowed_kb": total_size_allowed,
+        },
+    )

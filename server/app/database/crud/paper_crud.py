@@ -33,6 +33,7 @@ class PaperBase(BaseModel):
     raw_content: Optional[str] = None
     upload_job_id: Optional[str] = None
     preview_url: Optional[str] = None
+    size_in_kb: Optional[int] = None
     # We can't save tuples in the db, so we use a list (length 2) to represent page offsets
     page_offset_map: Optional[dict[int, List[int]]] = None
 
@@ -52,6 +53,7 @@ class PaperUpdate(PaperBase):
     presigned_url_expires_at: Optional[datetime] = None
     open_alex_id: Optional[str] = None
     doi: Optional[str] = None
+    size_in_kb: Optional[int] = None
 
 
 class PaperDocumentMetadata(BaseModel):
@@ -125,6 +127,32 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
 
         # Combine and return
         return reading_papers + todo_papers
+
+    def get_size_of_knowledge_base(self, db: Session, *, user: CurrentUser) -> int:
+        """
+        Get the total size of the user's knowledge base in KB.
+        This includes all papers that have completed uploads.
+        """
+        from app.helpers.s3 import s3_service
+
+        papers = self.get_multi_uploads_completed(db, user=user)
+        total_size = 0
+        for paper in papers:
+            # Use the size_in_kb if available, otherwise fetch from S3 and update the paper.size_in_kb value
+            size_value = getattr(paper, "size_in_kb", None)
+            if size_value is not None:
+                total_size += size_value
+            elif paper.s3_object_key:
+                paper_size_in_kb = s3_service.get_file_size_in_kb(
+                    str(paper.s3_object_key)
+                )
+                total_size += paper_size_in_kb if paper_size_in_kb is not None else 0
+                if paper_size_in_kb:
+                    # Update the paper's size_in_kb field in the database
+                    update_paper = PaperUpdate(size_in_kb=paper_size_in_kb)
+                    self.update(db, db_obj=paper, obj_in=update_paper)
+
+        return total_size
 
     def make_public(
         self, db: Session, *, paper_id: str, user: CurrentUser

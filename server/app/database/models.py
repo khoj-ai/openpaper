@@ -233,6 +233,7 @@ class Paper(Base):
 
     # Additional metadata
     doi = Column(String, nullable=True)  # Digital Object Identifier
+    size_in_kb = Column(Integer, nullable=True)  # Size of the paper file in KB
 
     # OpenAlex metadata
     open_alex_id = Column(String, nullable=True)  # OpenAlex ID for the paper

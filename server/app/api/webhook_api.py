@@ -11,6 +11,7 @@ from app.database.crud.paper_upload_crud import paper_upload_job_crud
 from app.database.database import get_db
 from app.database.models import JobStatus
 from app.database.telemetry import track_event
+from app.helpers.s3 import s3_service
 from app.llm.schemas import PaperMetadataExtraction
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends, HTTPException
@@ -106,6 +107,12 @@ async def handle_paper_processing_webhook(
                     "status": "webhook processed - failed due to missing raw_content"
                 }
 
+            size_in_kb = (
+                s3_service.get_file_size_in_kb(result.s3_object_key)
+                if result.s3_object_key
+                else None
+            )
+
             # Create paper record
             paper = paper_crud.create(
                 db=db,
@@ -125,6 +132,7 @@ async def handle_paper_processing_webhook(
                     starter_questions=metadata.starter_questions,
                     raw_content=result.raw_content,
                     page_offset_map=result.page_offset_map,
+                    size_in_kb=size_in_kb,
                 ),
                 user=job_user,
             )

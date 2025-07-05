@@ -16,6 +16,7 @@ The client can poll the job status using the same job_id throughout the process.
 
 import logging
 from datetime import datetime, timezone
+from typing import Union
 
 import requests
 from app.auth.dependencies import get_required_user
@@ -29,6 +30,10 @@ from app.database.database import get_db
 from app.database.models import PaperUploadJob
 from app.database.telemetry import track_event
 from app.helpers.pdf_jobs import pdf_jobs_client
+from app.helpers.subscription_limits import (
+    can_user_access_knowledge_base,
+    can_user_upload_paper,
+)
 from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Request, UploadFile
@@ -123,6 +128,17 @@ async def upload_pdf_from_url(
     Upload a document from a given URL, rather than the raw file.
     """
 
+    # Check subscription limits before proceeding
+    err_message = await check_subscription_limits(current_user, db)
+    if err_message:
+        return JSONResponse(
+            status_code=403,
+            content={
+                "message": err_message,
+                "error_code": "SUBSCRIPTION_LIMIT_EXCEEDED",
+            },
+        )
+
     # Validate the URL
     url = request.url
     if not url or not str(url).lower().endswith(".pdf"):
@@ -173,6 +189,17 @@ async def upload_pdf(
     """
     Upload a PDF file
     """
+    # Check subscription limits before proceeding
+    err_message = await check_subscription_limits(current_user, db)
+    if err_message:
+        return JSONResponse(
+            status_code=403,
+            content={
+                "message": err_message,
+                "error_code": "SUBSCRIPTION_LIMIT_EXCEEDED",
+            },
+        )
+
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         return JSONResponse(status_code=400, content={"message": "File must be a PDF"})
 
@@ -266,6 +293,25 @@ async def upload_file_from_url_microservice(
             job_id=str(paper_upload_job.id),
             user=current_user,
         )
+
+
+async def check_subscription_limits(
+    current_user: CurrentUser,
+    db: Session,
+) -> Union[str, None]:
+    """
+    Check if the user can upload a new paper based on their subscription limits.
+    Returns a JSONResponse with an error message if limits are exceeded.
+    """
+    can_upload, error_message = can_user_upload_paper(db, current_user)
+    if not can_upload and error_message:
+        return error_message
+
+    can_access, error_message = can_user_access_knowledge_base(db, current_user)
+    if not can_access and error_message:
+        return error_message
+
+    return None
 
 
 async def upload_raw_file_microservice(
