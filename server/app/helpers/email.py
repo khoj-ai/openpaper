@@ -179,3 +179,27 @@ def notify_billing_issue(email: str, issue: str, name: Union[str, None] = None) 
 
     except Exception as e:
         logger.error(f"Failed to notify billing issue: {e}", exc_info=True)
+
+
+def send_subscription_welcome_email(
+    email: str,
+) -> None:
+    """
+    Send a welcome email to a new subscriber.
+
+    Args:
+        email (str): The email address of the user.
+        name (str): The name of the user.
+    """
+    try:
+        payload = resend.Emails.SendParams = {  # type: ignore
+            "from": f"Saba <{REPLY_TO_DEFAULT_EMAIL}>",
+            "to": [email],
+            "subject": "What will you discover today? - Open Paper",
+            "html": load_email_template("subscription_welcome.html"),
+        }
+
+        resend.Emails.send(payload)  # type: ignore
+
+    except Exception as e:
+        logger.error(f"Failed to send subscription welcome email: {e}", exc_info=True)
