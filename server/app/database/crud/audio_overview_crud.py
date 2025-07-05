@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -230,6 +230,27 @@ class AudioOverviewCRUD(
                 for citation in overview.citations or []
             ],
         }
+
+    def get_audio_overviews_used_this_week(
+        self, db: Session, *, current_user: CurrentUser
+    ) -> int:
+        """
+        Get the number of audio overviews used by the user this week.
+        """
+        start_of_week = datetime.now(timezone.utc) - timedelta(
+            days=datetime.now(timezone.utc).weekday()
+        )
+        start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_of_week = start_of_week + timedelta(days=7)
+        return (
+            db.query(AudioOverview)
+            .filter(
+                AudioOverview.user_id == current_user.id,
+                AudioOverview.created_at >= start_of_week,
+                AudioOverview.created_at < end_of_week,
+            )
+            .count()
+        )
 
 
 # Create single instances to use throughout the application

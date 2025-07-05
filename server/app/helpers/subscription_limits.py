@@ -10,6 +10,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Dict, Optional
 
+from app.database.crud.audio_overview_crud import audio_overview_crud
+from app.database.crud.message_crud import message_crud
 from app.database.crud.paper_crud import paper_crud
 from app.database.crud.subscription_crud import subscription_crud
 from app.database.models import SubscriptionPlan, SubscriptionStatus
@@ -19,9 +21,9 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 PAPER_UPLOAD_KEY = "paper_uploads"
-KB_SIZE_KEY = "knowledge_base_size_mb"
-CHAT_CREDITS_KEY = "chat_credits_daily"
-AUDIO_OVERVIEWS_KEY = "audio_overviews_monthly"
+KB_SIZE_KEY = "knowledge_base_size"
+CHAT_CREDITS_KEY = "chat_credits_weekly"
+AUDIO_OVERVIEWS_KEY = "audio_overviews_weekly"
 MODELS_KEY = "models"
 
 # Define subscription plan limits
@@ -29,7 +31,7 @@ SUBSCRIPTION_LIMITS = {
     SubscriptionPlan.BASIC: {
         # PAPER_UPLOAD_KEY: 10,
         PAPER_UPLOAD_KEY: 0,  # test
-        # KB_SIZE_KEY: 500,
+        # KB_SIZE_KEY: 5 * 1024 * 100,  # 500 MB in KB
         KB_SIZE_KEY: 0,  # test
         CHAT_CREDITS_KEY: 500,
         AUDIO_OVERVIEWS_KEY: 5,
@@ -38,7 +40,7 @@ SUBSCRIPTION_LIMITS = {
     SubscriptionPlan.RESEARCHER: {
         # PAPER_UPLOAD_KEY: 500,
         PAPER_UPLOAD_KEY: 0,  # test
-        # KB_SIZE_KEY: 3 * 1024,  # 3 GB in MB
+        # KB_SIZE_KEY: 3 * 1024 * 1024,  # 3 GB in KB
         KB_SIZE_KEY: 0,  # test
         CHAT_CREDITS_KEY: 10000,
         AUDIO_OVERVIEWS_KEY: 100,
@@ -77,13 +79,17 @@ def get_plan_limits(plan: SubscriptionPlan) -> Dict:
     return SUBSCRIPTION_LIMITS.get(plan, SUBSCRIPTION_LIMITS[SubscriptionPlan.BASIC])
 
 
-def get_user_paper_count(db: Session, user: CurrentUser) -> int:
+def get_user_paper_count_limit(db: Session, user: CurrentUser) -> int:
     """
-    Get the total number of successfully uploaded papers for a user.
-    Only counts papers that have completed upload processing.
+    Get the paper upload limits for a user based on their subscription plan.
+
+    Returns:
+        int: The paper upload limit.
     """
-    papers = paper_crud.get_multi_uploads_completed(db=db, user=user, limit=1000)
-    return len(papers)
+    plan = get_user_subscription_plan(db, user)
+    limits = get_plan_limits(plan)
+
+    return limits[PAPER_UPLOAD_KEY]
 
 
 def get_user_knowledge_base_size(db: Session, user: CurrentUser) -> int:
@@ -93,12 +99,12 @@ def get_user_knowledge_base_size(db: Session, user: CurrentUser) -> int:
     return paper_crud.get_size_of_knowledge_base(db, user=user)
 
 
-def get_user_knowledge_base_size_limit(db: Session, user: CurrentUser) -> Dict:
+def get_user_knowledge_base_size_limit(db: Session, user: CurrentUser) -> int:
     """
     Get the knowledge base limits for a user based on their subscription plan.
 
     Returns:
-        Dict: A dictionary containing the knowledge base size limit in MB.
+        int: The knowledge base size limit in MB.
     """
     plan = get_user_subscription_plan(db, user)
     limits = get_plan_limits(plan)
@@ -116,7 +122,7 @@ def can_user_upload_paper(db: Session, user: CurrentUser) -> tuple[bool, Optiona
     plan = get_user_subscription_plan(db, user)
     limits = get_plan_limits(plan)
 
-    current_paper_count = get_user_paper_count(db, user)
+    current_paper_count = paper_crud.get_total_paper_count(db=db, user=user)
     paper_limit = limits[PAPER_UPLOAD_KEY]
 
     # Handle unlimited plans
@@ -131,7 +137,7 @@ def can_user_upload_paper(db: Session, user: CurrentUser) -> tuple[bool, Optiona
         }.get(plan, "Basic")
         return (
             False,
-            f"You have reached your paper upload limit ({int(paper_limit)} papers) for the {plan_name} plan. Please upgrade your subscription to upload more papers.",
+            f"You have reached your paper upload limit ({int(paper_limit)} papers) for the {plan_name} plan. Please upgrade your subscription to upload more papers, or delete existing papers to free up space.",
         )
 
     return True, None
@@ -170,6 +176,20 @@ def can_user_access_knowledge_base(
     return True, None
 
 
+def get_user_chat_credits_used_today(db: Session, user: CurrentUser) -> int:
+    """
+    Get the number of chat credits used by the user today.
+    """
+    return message_crud.get_chat_credits_used_this_week(db, current_user=user)
+
+
+def get_user_audio_overviews_used_this_month(db: Session, user: CurrentUser) -> int:
+    """
+    Get the number of audio overviews used by the user this month.
+    """
+    return audio_overview_crud.get_audio_overviews_used_this_week(db, current_user=user)
+
+
 def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
     """
     Get comprehensive usage information for a user.
@@ -179,8 +199,29 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
     plan = get_user_subscription_plan(db, user)
     limits = get_plan_limits(plan)
 
-    current_paper_count = get_user_paper_count(db, user)
+    current_paper_count = paper_crud.get_total_paper_count(db=db, user=user)
     paper_limit = limits[PAPER_UPLOAD_KEY]
+
+    total_size = paper_crud.get_size_of_knowledge_base(db, user=user)
+    total_size_allowed = limits[KB_SIZE_KEY]
+
+    chat_credits_allowed = limits[CHAT_CREDITS_KEY]
+    chat_credits_used_today = get_user_chat_credits_used_today(db, user)
+
+    audio_overviews_allowed = limits[AUDIO_OVERVIEWS_KEY]
+    audio_overviews_used_this_month = get_user_audio_overviews_used_this_month(db, user)
+
+    chat_credits_remaining = (
+        None
+        if chat_credits_allowed == float("inf")
+        else max(0, int(chat_credits_allowed) - chat_credits_used_today)
+    )
+
+    audio_overviews_remaining = (
+        None
+        if audio_overviews_allowed == float("inf")
+        else max(0, int(audio_overviews_allowed) - audio_overviews_used_this_month)
+    )
 
     # Handle unlimited plans
     papers_remaining = (
@@ -189,27 +230,25 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
         else max(0, int(paper_limit) - current_paper_count)
     )
 
+    knowledge_base_remaining = (
+        None
+        if total_size_allowed == float("inf")
+        else max(0, int(total_size_allowed) - total_size)
+    )
+
     return {
         "plan": plan.value,
         "limits": {
             **limits,
-            # Convert inf to a more readable format for the API
-            "paper_uploads": (
-                "unlimited" if paper_limit == float("inf") else int(paper_limit)
-            ),
-            "chat_credits_daily": (
-                "unlimited"
-                if limits["chat_credits_daily"] == float("inf")
-                else limits["chat_credits_daily"]
-            ),
-            "audio_overviews_monthly": (
-                "unlimited"
-                if limits["audio_overviews_monthly"] == float("inf")
-                else limits["audio_overviews_monthly"]
-            ),
         },
         "usage": {
-            "papers_uploaded": current_paper_count,
-            "papers_remaining": papers_remaining,
+            "paper_uploads": current_paper_count,
+            "paper_uploads_remaining": papers_remaining,
+            "knowledge_base_size": total_size,
+            "knowledge_base_size_remaining": knowledge_base_remaining,
+            "chat_credits_used_today": chat_credits_used_today,
+            "chat_credits_remaining": chat_credits_remaining,
+            "audio_overviews": audio_overviews_used_this_month,
+            "audio_overviews_remaining": audio_overviews_remaining,
         },
     }

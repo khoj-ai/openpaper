@@ -135,23 +135,54 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
         """
         from app.helpers.s3 import s3_service
 
-        papers = self.get_multi_uploads_completed(db, user=user)
-        total_size = 0
-        for paper in papers:
-            # Use the size_in_kb if available, otherwise fetch from S3 and update the paper.size_in_kb value
-            size_value = getattr(paper, "size_in_kb", None)
-            if size_value is not None:
-                total_size += size_value
-            elif paper.s3_object_key:
+        # First, get papers with missing size_in_kb and update them
+        papers_without_size = (
+            db.query(Paper)
+            .outerjoin(PaperUploadJob, Paper.upload_job_id == PaperUploadJob.id)
+            .filter(
+                Paper.user_id == user.id,
+                (
+                    Paper.upload_job_id.is_(None)  # No upload job (direct uploads)
+                    | (
+                        PaperUploadJob.status == JobStatus.COMPLETED
+                    )  # Or job is completed
+                ),
+                Paper.size_in_kb.is_(None),  # Only papers without size_in_kb
+                Paper.s3_object_key.isnot(None),  # Must have S3 object key
+            )
+            .all()
+        )
+
+        # Update papers that don't have size_in_kb set
+        for paper in papers_without_size:
+            if paper.s3_object_key:
                 paper_size_in_kb = s3_service.get_file_size_in_kb(
                     str(paper.s3_object_key)
                 )
-                total_size += paper_size_in_kb if paper_size_in_kb is not None else 0
                 if paper_size_in_kb:
                     # Update the paper's size_in_kb field in the database
                     update_paper = PaperUpdate(size_in_kb=paper_size_in_kb)
                     self.update(db, db_obj=paper, obj_in=update_paper)
 
+        # Now get all completed papers and sum their sizes
+        papers_with_size = (
+            db.query(Paper.size_in_kb)
+            .outerjoin(PaperUploadJob, Paper.upload_job_id == PaperUploadJob.id)
+            .filter(
+                Paper.user_id == user.id,
+                (
+                    Paper.upload_job_id.is_(None)  # No upload job (direct uploads)
+                    | (
+                        PaperUploadJob.status == JobStatus.COMPLETED
+                    )  # Or job is completed
+                ),
+                Paper.size_in_kb.isnot(None),  # Only papers with size_in_kb
+            )
+            .all()
+        )
+
+        # Sum all the sizes efficiently
+        total_size = sum(size[0] for size in papers_with_size if size[0] is not None)
         return total_size
 
     def make_public(
@@ -195,6 +226,26 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
             db.query(Paper)
             .filter(Paper.upload_job_id == upload_job_id, Paper.user_id == user.id)
             .first()
+        )
+
+    def get_total_paper_count(self, db: Session, *, user: CurrentUser) -> int:
+        """
+        Get the total number of papers uploaded by a user.
+        This includes all papers that have completed uploads.
+        """
+        return (
+            db.query(Paper)
+            .outerjoin(PaperUploadJob, Paper.upload_job_id == PaperUploadJob.id)
+            .filter(
+                Paper.user_id == user.id,
+                (
+                    Paper.upload_job_id.is_(None)  # No upload job (direct uploads)
+                    | (
+                        PaperUploadJob.status == JobStatus.COMPLETED
+                    )  # Or job is completed
+                ),
+            )
+            .count()
         )
 
     def get_multi_uploads_completed(
