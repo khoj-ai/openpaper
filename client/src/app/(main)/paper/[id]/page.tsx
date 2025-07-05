@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
 import { useParams } from 'next/navigation';
 import { useState, useEffect, FormEvent, useRef, useCallback, useMemo } from 'react';
+import { useSubscription } from '@/hooks/useSubscription';
 
 // Reference to react-markdown documents: https://github.com/remarkjs/react-markdown?tab=readme-ov-file
 import Markdown from 'react-markdown';
@@ -84,6 +85,8 @@ import { PaperStatus, PaperStatusEnum } from '@/components/utils/PdfStatus';
 import { useAuth } from '@/lib/auth';
 import CustomCitationLink from '@/components/utils/CustomCitationLink';
 import { Avatar } from '@/components/ui/avatar';
+import Link from 'next/link';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 
 interface ChatRequestBody {
     user_query: string;
@@ -121,6 +124,7 @@ export default function PaperView() {
     const params = useParams();
     const id = params.id as string;
     const { user, loading: authLoading } = useAuth();
+    const { subscription, refetch: refetchSubscription } = useSubscription();
     const [paperData, setPaperData] = useState<PaperData | null>(null);
     const [loading, setLoading] = useState(true);
     const [paperNoteData, setPaperNoteData] = useState<PaperNoteData | null>(null);
@@ -178,6 +182,29 @@ export default function PaperView() {
     const [currentLoadingMessageIndex, setCurrentLoadingMessageIndex] = useState(0);
     const [displayedText, setDisplayedText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
+
+    // Chat credit usage state
+    const [creditUsage, setCreditUsage] = useState<{
+        used: number;
+        remaining: number;
+        total: number;
+        usagePercentage: number;
+        showWarning: boolean;
+        isNearLimit: boolean;
+        isCritical: boolean;
+    } | null>(null);
+
+    const nextMonday = (() => {
+        const now = new Date();
+        const currentDayUTC = now.getUTCDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+        const daysUntilMonday = currentDayUTC === 0 ? 1 : (8 - currentDayUTC) % 7; // Days until next Monday
+        const nextMondayUTC = new Date(now.getTime() + daysUntilMonday * 24 * 60 * 60 * 1000);
+
+        // Set to start of day in UTC (00:00:00 UTC)
+        nextMondayUTC.setUTCHours(0, 0, 0, 0);
+
+        return nextMondayUTC;
+    })();
 
     const [rightSideFunction, setRightSideFunction] = useState<string>('Overview');
     const [leftPanelWidth, setLeftPanelWidth] = useState(60); // percentage
@@ -893,6 +920,13 @@ export default function PaperView() {
                 setMessages(prev => [...prev, finalMessage]);
             }
 
+            // Refetch subscription data to update credit usage
+            try {
+                await refetchSubscription();
+            } catch (error) {
+                console.error('Error refetching subscription:', error);
+            }
+
         } catch (error) {
             console.error('Error during streaming:', error);
             setMessages(prev => {
@@ -906,7 +940,7 @@ export default function PaperView() {
         } finally {
             setIsStreaming(false);
         }
-    }, [currentMessage, isStreaming, conversationId, id, userMessageReferences, selectedModel, responseStyle, transformReferencesToFormat]);
+    }, [currentMessage, isStreaming, conversationId, id, userMessageReferences, selectedModel, responseStyle, transformReferencesToFormat, refetchSubscription]);
 
     // Add useEffect to handle starter question submission
     useEffect(() => {
@@ -1140,6 +1174,33 @@ export default function PaperView() {
             toast.error("Failed to update paper status.");
         }
     }, [id, paperData]);
+
+    // useCallback to calculate chat credit usage
+    const updateCreditUsage = useCallback(() => {
+        if (!subscription) {
+            setCreditUsage(null);
+            return;
+        }
+
+        const { chat_credits_used_today, chat_credits_remaining } = subscription.usage;
+        const total = chat_credits_used_today + chat_credits_remaining;
+        const usagePercentage = total > 0 ? (chat_credits_used_today / total) * 100 : 0;
+
+        setCreditUsage({
+            used: chat_credits_used_today,
+            remaining: chat_credits_remaining,
+            total,
+            usagePercentage,
+            showWarning: usagePercentage > 75,
+            isNearLimit: usagePercentage > 75,
+            isCritical: usagePercentage > 95
+        });
+    }, [subscription]);
+
+    // Update credit usage whenever subscription changes
+    useEffect(() => {
+        updateCreditUsage();
+    }, [updateCreditUsage]);
 
 
 
@@ -1578,7 +1639,7 @@ export default function PaperView() {
                                                 ref={inputMessageRef}
                                                 placeholder="Ask something about this paper."
                                                 className="border-none bg-secondary dark:bg-secondary rounded-md resize-none hover:resize-y p-2 focus-visible:outline-none focus-visible:ring-0 shadow-none min-h-[2rem] max-h-32"
-                                                disabled={isStreaming}
+                                                disabled={isStreaming || (creditUsage?.usagePercentage ?? 0) >= 100}
                                                 onKeyDown={(e) => {
                                                     if (e.key === 'Enter' && !e.shiftKey) {
                                                         e.preventDefault();
@@ -1668,6 +1729,28 @@ export default function PaperView() {
                                                 </Button>
                                             </div>
                                         </div>
+                                        {/* Chat Credit Usage Display */}
+                                        {creditUsage && creditUsage.showWarning && (
+                                            <div className={`text-xs px-2 py-1 ${creditUsage.isCritical ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'} justify-between flex`}>
+                                                <div className="font-semibold">{creditUsage.used} credits used</div>
+                                                <div className="font-semibold">
+                                                    <HoverCard>
+                                                        <HoverCardTrigger asChild>
+                                                            <span>{creditUsage.remaining} credits remaining</span>
+                                                        </HoverCardTrigger>
+                                                        <HoverCardContent side="top" className="w-48">
+                                                            <p className="text-sm">Resets on {nextMonday.toLocaleDateString()}</p>
+                                                        </HoverCardContent>
+                                                    </HoverCard>
+                                                    <Link
+                                                        href="/pricing"
+                                                        className="text-blue-500 hover:text-blue-700 ml-1"
+                                                    >
+                                                        Upgrade
+                                                    </Link>
+                                                </div>
+                                            </div>
+                                        )}
                                     </form>
                                 </div>
                             )
