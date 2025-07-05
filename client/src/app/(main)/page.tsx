@@ -38,6 +38,8 @@ interface JobStatusResponse {
 	celery_progress_message: string | null;
 }
 
+const DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE = "We encountered an error processing your request. Please check the file or URL and try again.";
+
 export default function Home() {
 	const [isUploading, setIsUploading] = useState(false);
 	const [isUrlDialogOpen, setIsUrlDialogOpen] = useState(false);
@@ -48,6 +50,7 @@ export default function Home() {
 	const [pdfUrl, setPdfUrl] = useState("");
 	const [relevantPapers, setRelevantPapers] = useState<PaperItem[]>([]);
 	const [showErrorAlert, setShowErrorAlert] = useState(false);
+	const [errorAlertMessage, setErrorAlertMessage] = useState(DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE);
 
 	const { user, loading: authLoading } = useAuth();
 	const isMobile = useIsMobile();
@@ -223,6 +226,7 @@ export default function Home() {
 		} catch (error) {
 			console.error('Error uploading file:', error);
 			setShowErrorAlert(true);
+			setErrorAlertMessage(error instanceof Error ? error.message : DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE);
 			setIsUploading(false);
 		}
 	};
@@ -413,8 +417,7 @@ export default function Home() {
 						<DialogTitle>Upload Failed</DialogTitle>
 						<DialogDescription className="space-y-4 inline-flex items-center">
 							<LucideFileWarning className="h-6 w-6 text-red-500 mr-2 flex-shrink-0" />
-							{/* Generic error message (temp) */}
-							We encountered an error processing your request. Please check the file or URL and try again.
+							{errorAlertMessage ?? DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE}
 						</DialogDescription>
 						<div className="flex justify-end mt-4">
 							<Button variant="outline" onClick={() => setShowErrorAlert(false)}>Close</Button>
