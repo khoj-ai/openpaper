@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -16,7 +16,7 @@ interface SessionStatusResponse {
     backend_subscription_status: string | null
 }
 
-export default function SubscribedPage() {
+function SubscribedPageContent() {
     const searchParams = useSearchParams()
     const router = useRouter()
     const sessionId = searchParams.get('session_id')
@@ -257,5 +257,31 @@ export default function SubscribedPage() {
                 </CardContent>
             </Card>
         </div>
+    )
+}
+
+function SubscribedPageSkeleton() {
+    return (
+        <div className="container mx-auto max-w-2xl py-12 px-4">
+            <Card>
+                <CardHeader className="text-center">
+                    <Skeleton className="h-16 w-16 rounded-full mx-auto mb-4" />
+                    <Skeleton className="h-8 w-64 mx-auto mb-2" />
+                    <Skeleton className="h-4 w-96 mx-auto" />
+                </CardHeader>
+                <CardContent className="text-center">
+                    <Skeleton className="h-4 w-full mb-2" />
+                    <Skeleton className="h-4 w-3/4 mx-auto" />
+                </CardContent>
+            </Card>
+        </div>
+    )
+}
+
+export default function SubscribedPage() {
+    return (
+        <Suspense fallback={<SubscribedPageSkeleton />}>
+            <SubscribedPageContent />
+        </Suspense>
     )
 }
