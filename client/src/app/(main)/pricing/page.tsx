@@ -680,7 +680,7 @@ export default function PricingPage() {
                         Questions about pricing?
                     </h3>
                     <p className="text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
-                        We're here to help you find the right plan for your research needs.
+                        We&apos;re here to help you find the right plan for your research needs.
                         Our team understands the unique requirements of academic work.
                     </p>
                 </div>

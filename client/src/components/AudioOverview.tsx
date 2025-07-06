@@ -723,7 +723,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                                     <HelpCircle className="w-4 h-4" />
                                     <span className="font-semibold">Audio Overview Limit Reached</span>
                                 </div>
-                                <p className="mt-1">You've used all your monthly audio overviews. Credits reset every Monday at 12 AM UTC.</p>
+                                <p className="mt-1">You&apos;ve used all your monthly audio overviews. Credits reset every Monday at 12 AM UTC.</p>
                                 <Link
                                     href="/pricing"
                                     className="text-blue-500 hover:text-blue-700 font-medium"
