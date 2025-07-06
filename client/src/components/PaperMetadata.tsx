@@ -101,7 +101,7 @@ function PaperMetadata({ paperData, onClickStarterQuestion, hasMessages, readonl
         >
             <div className="p-2">
                 <CollapsibleTrigger className="flex flex-row w-full items-center justify-between">
-                    <h2 className={`text-xl font-bold ${isOpen ? '' : 'line-clamp-1'}`}>{paperData.title}</h2>
+                    <h2 className={`text-xl font-bold text-left ${isOpen ? '' : 'line-clamp-1'}`}>{paperData.title}</h2>
                     <div className="text-secondary-foreground text-xs flex items-center gap-2 bg-secondary p-1 rounded-md">
                         {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                     </div>
