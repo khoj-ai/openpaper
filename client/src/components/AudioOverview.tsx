@@ -70,6 +70,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
     const audioRef = useRef<HTMLAudioElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const { subscription, refetch: refetchSubscription } = useSubscription();
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [audioOverviewJobId, setAudioOverviewJobId] = useState<string | null>(null);
     const [audioOverview, setAudioOverview] = useState<AudioOverview | null>(null);
     const [allAudioOverviews, setAllAudioOverviews] = useState<AudioOverview[]>([]);
@@ -281,7 +282,6 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
 
     const checkExistingAudioOverview = async () => {
         try {
-            console.debug(`Job ID: ${audioOverviewJobId}, Paper ID: ${paper_id}`);
             const response: AudioOverview | null = await fetchFromApi(`/api/paper/audio/${paper_id}/file`);
             if (response) {
                 setAudioOverview(response);
