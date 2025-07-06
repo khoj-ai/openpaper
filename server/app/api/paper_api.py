@@ -73,6 +73,7 @@ async def get_paper_ids(
                     "summary": paper.summary,
                     "status": paper.status,
                     "preview_url": paper.preview_url,
+                    "size_in_kb": paper.size_in_kb,
                 }
                 for paper in papers
             ]
@@ -255,6 +256,7 @@ async def get_relevant_papers(
                     "summary": paper.summary,
                     "status": paper.status,
                     "preview_url": paper.preview_url,
+                    "size_in_kb": paper.size_in_kb,
                 }
                 for paper in papers
             ]
