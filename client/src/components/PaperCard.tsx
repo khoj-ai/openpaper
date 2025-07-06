@@ -10,6 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { getStatusIcon, PaperStatus, PaperStatusEnum } from "@/components/utils/PdfStatus";
 import { fetchFromApi } from "@/lib/api";
 import Link from "next/link";
+import { formatFileSize } from "@/hooks/useSubscription";
 
 
 interface PaperCardProps {
@@ -401,9 +402,15 @@ export default function PaperCard({ paper, handleDelete, setPaper }: PaperCardPr
 
                     {/* Footer */}
                     <div className="flex items-center justify-between">
-                        <p className="text-xs text-gray-400 dark:text-gray-500">
-                            {new Date(paper.created_at || "").toLocaleDateString()}
-                        </p>
+                        <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+                            <span>{new Date(paper.created_at || "").toLocaleDateString()}</span>
+                            {paper.size_in_kb && (
+                                <>
+                                    <span>•</span>
+                                    <span>{formatFileSize(paper.size_in_kb)}</span>
+                                </>
+                            )}
+                        </div>
                         <Link href={`/paper/${paper.id}`} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
                             Read
                             <Book className="inline ml-1 h-3 w-3" />

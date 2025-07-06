@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/lib/auth";
-import { useSubscription, getStorageUsagePercentage, isStorageNearLimit, isStorageAtLimit } from "@/hooks/useSubscription";
+import { useSubscription, getStorageUsagePercentage, isStorageNearLimit, isStorageAtLimit, formatFileSize } from "@/hooks/useSubscription";
 import { FileText, Upload, Search, AlertTriangle, AlertCircle, HardDrive } from "lucide-react";
 import Link from "next/link";
 
@@ -86,16 +86,6 @@ export default function PapersPage() {
         )
     }
 
-    const formatFileSize = (sizeInKb: number) => {
-        if (sizeInKb < 1024) {
-            return `${sizeInKb.toFixed(1)} KB`;
-        } else if (sizeInKb < 1024 * 1024) {
-            return `${(sizeInKb / 1024).toFixed(1)} MB`;
-        } else {
-            return `${(sizeInKb / (1024 * 1024)).toFixed(1)} GB`;
-        }
-    };
-
     const getUsagePercentage = () => {
         return getStorageUsagePercentage(subscription);
     };
@@ -131,7 +121,7 @@ export default function PapersPage() {
                 <div className="space-y-2">
                     <div className="flex justify-between text-sm text-muted-foreground">
                         <span>{formatFileSize(subscription.usage.knowledge_base_size)} used</span>
-                        <span>{formatFileSize(subscription.usage.knowledge_base_size + subscription.usage.knowledge_base_size_remaining)} total</span>
+                        <span>{formatFileSize(subscription.limits.knowledge_base_size)} total</span>
                     </div>
 
                     <Progress

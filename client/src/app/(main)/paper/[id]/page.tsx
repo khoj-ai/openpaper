@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
 import { useParams } from 'next/navigation';
 import { useState, useEffect, FormEvent, useRef, useCallback, useMemo } from 'react';
-import { useSubscription } from '@/hooks/useSubscription';
+import { useSubscription, nextMonday } from '@/hooks/useSubscription';
 
 // Reference to react-markdown documents: https://github.com/remarkjs/react-markdown?tab=readme-ov-file
 import Markdown from 'react-markdown';
@@ -193,18 +193,6 @@ export default function PaperView() {
         isNearLimit: boolean;
         isCritical: boolean;
     } | null>(null);
-
-    const nextMonday = (() => {
-        const now = new Date();
-        const currentDayUTC = now.getUTCDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-        const daysUntilMonday = currentDayUTC === 0 ? 1 : (8 - currentDayUTC) % 7; // Days until next Monday
-        const nextMondayUTC = new Date(now.getTime() + daysUntilMonday * 24 * 60 * 60 * 1000);
-
-        // Set to start of day in UTC (00:00:00 UTC)
-        nextMondayUTC.setUTCHours(0, 0, 0, 0);
-
-        return nextMondayUTC;
-    })();
 
     const [rightSideFunction, setRightSideFunction] = useState<string>('Overview');
     const [leftPanelWidth, setLeftPanelWidth] = useState(60); // percentage

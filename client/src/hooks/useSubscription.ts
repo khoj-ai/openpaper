@@ -106,3 +106,33 @@ export const formatFileSize = (sizeInKb: number): string => {
         return `${(sizeInKb / (1024 * 1024)).toFixed(1)} GB`;
     }
 };
+
+// Audio overview credit helper functions
+export const getAudioOverviewUsagePercentage = (subscription: SubscriptionData | null): number => {
+    if (!subscription) return 0;
+    const { audio_overviews, audio_overviews_remaining } = subscription.usage;
+    const total = audio_overviews + audio_overviews_remaining;
+    if (total === 0) return 0;
+    return (audio_overviews / total) * 100;
+};
+
+export const isAudioOverviewNearLimit = (subscription: SubscriptionData | null, threshold: number = 75): boolean => {
+    return getAudioOverviewUsagePercentage(subscription) >= threshold;
+};
+
+export const isAudioOverviewAtLimit = (subscription: SubscriptionData | null): boolean => {
+    return getAudioOverviewUsagePercentage(subscription) >= 100;
+};
+
+// Calculate next Monday at 12 AM UTC for credit reset
+export const nextMonday = (() => {
+    const now = new Date();
+    const currentDayUTC = now.getUTCDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    const daysUntilMonday = currentDayUTC === 0 ? 1 : (8 - currentDayUTC) % 7; // Days until next Monday
+    const nextMondayUTC = new Date(now.getTime() + daysUntilMonday * 24 * 60 * 60 * 1000);
+
+    // Set to start of day in UTC (00:00:00 UTC)
+    nextMondayUTC.setUTCHours(0, 0, 0, 0);
+
+    return nextMondayUTC;
+})();

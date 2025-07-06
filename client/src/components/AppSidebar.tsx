@@ -75,6 +75,7 @@ export interface PaperItem {
     created_at?: string
     status?: PaperStatus
     preview_url?: string
+    size_in_kb?: number
 }
 
 export function AppSidebar() {
