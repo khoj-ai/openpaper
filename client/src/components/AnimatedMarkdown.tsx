@@ -119,7 +119,7 @@ export function AnimatedMarkdown({
     const Cursor = useMemo(() => <span className="blinking-cursor">▋</span>, []);
 
     return (
-        <div className={`${className} prose`}>
+        <div className={`${className} prose dark:prose-invert p-2 !max-w-full rounded-lg w-full text-primary`}>
             {/* Inject the keyframes for the cursor animation */}
             <style>{cursorStyle}</style>
             {StableMarkdown}

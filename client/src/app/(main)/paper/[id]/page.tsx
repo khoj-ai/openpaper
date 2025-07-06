@@ -1170,12 +1170,25 @@ export default function PaperView() {
             return;
         }
 
-        const { chat_credits_used_today, chat_credits_remaining } = subscription.usage;
-        const total = chat_credits_used_today + chat_credits_remaining;
-        const usagePercentage = total > 0 ? (chat_credits_used_today / total) * 100 : 0;
+        const { chat_credits_used, chat_credits_remaining } = subscription.usage;
+        const total = chat_credits_used + chat_credits_remaining;
+        const usagePercentage = total > 0 ? (chat_credits_used / total) * 100 : 0;
+
+        if (usagePercentage >= 100) {
+            console.log("Chat credits exceeded 100% usage, showing upgrade toast.");
+            toast.info('Nice! You have used your chat credits for the week. Feel free to upgrade your plan to use more.', {
+                duration: 5000,
+                action: {
+                    label: 'Upgrade',
+                    onClick: () => {
+                        window.location.href = '/pricing';
+                    }
+                }
+            })
+        };
 
         setCreditUsage({
-            used: chat_credits_used_today,
+            used: chat_credits_used,
             remaining: chat_credits_remaining,
             total,
             usagePercentage,
@@ -1531,7 +1544,7 @@ export default function PaperView() {
                                         )}
                                         {
                                             isStreaming && streamingChunks.length > 0 && (
-                                                <div className="prose dark:prose-invert p-2 !max-w-full rounded-lg w-full text-primary">
+                                                <div className="prose dark:prose-invert p-2 !max-w-full rounded-lg w-full text-primary dark:text-primary-foreground">
                                                     <AnimatedMarkdown
                                                         content={streamingChunks.join('')}
                                                         remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
@@ -1571,7 +1584,7 @@ export default function PaperView() {
                                             isStreaming && (
                                                 <div className="flex items-center gap-3 p-2">
                                                     <Loader className="animate-spin w-6 h-6 text-blue-500 flex-shrink-0" />
-                                                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                                                    <div className="text-sm text-secondary-foreground">
                                                         {displayedText}
                                                         {isTyping && (
                                                             <span className="animate-pulse">|</span>

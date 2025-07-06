@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Clock, Calendar, CheckCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -35,8 +36,6 @@ export default function PricingPage() {
                 const response: UserSubscription = await fetchFromApi("/api/subscription/user-subscription", {
                     method: "GET",
                 });
-
-                console.log('Fetched user subscription:', response);
 
                 setUserSubscription(response);
 
@@ -218,8 +217,43 @@ export default function PricingPage() {
                 </div>
             </div>
 
+            {/* Loading Skeleton for Subscription Card */}
+            {loading && (
+                <Card className="border-2 border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+                    <CardHeader className="py-4">
+                        <div className="flex items-center gap-3">
+                            <Skeleton className="h-8 w-8 rounded-full" />
+                            <div className="flex-1 space-y-2">
+                                <Skeleton className="h-5 w-32" />
+                                <Skeleton className="h-4 w-24" />
+                            </div>
+                            <Skeleton className="h-6 w-16 rounded-full" />
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-6 my-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+                            <div className="text-center sm:text-left space-y-2">
+                                <Skeleton className="h-6 w-28 mx-auto sm:mx-0" />
+                                <Skeleton className="h-4 w-36 mx-auto sm:mx-0" />
+                            </div>
+                            <div className="text-center space-y-2">
+                                <Skeleton className="h-6 w-20 mx-auto" />
+                                <Skeleton className="h-4 w-24 mx-auto" />
+                            </div>
+                            <div className="text-center sm:text-right space-y-2 sm:col-span-2 md:col-span-1">
+                                <Skeleton className="h-5 w-32 mx-auto sm:ml-auto sm:mr-0" />
+                                <Skeleton className="h-4 w-16 mx-auto sm:ml-auto sm:mr-0" />
+                            </div>
+                        </div>
+                        <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                            <Skeleton className="h-10 w-full" />
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Current Subscription Card */}
-            {isCurrentlySubscribed && (
+            {isCurrentlySubscribed && !loading && (
                 <Card className={cn(
                     "border-2 transition-all duration-200",
                     isActiveSubscription

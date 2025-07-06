@@ -39,11 +39,12 @@ SUBSCRIPTION_LIMITS = {
     },
     SubscriptionPlan.RESEARCHER: {
         # PAPER_UPLOAD_KEY: 500,
-        PAPER_UPLOAD_KEY: 0,  # test
+        PAPER_UPLOAD_KEY: 10,  # test
         # KB_SIZE_KEY: 3 * 1024 * 1024,  # 3 GB in KB
-        KB_SIZE_KEY: 0,  # test
-        CHAT_CREDITS_KEY: 10000,
-        AUDIO_OVERVIEWS_KEY: 100,
+        KB_SIZE_KEY: 1 * 1024 * 1024,  # test
+        # CHAT_CREDITS_KEY: 10000,
+        CHAT_CREDITS_KEY: 100,  # test
+        AUDIO_OVERVIEWS_KEY: 1,
         MODELS_KEY: ["basic", "advanced"],
     },
 }
@@ -206,7 +207,7 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
     total_size_allowed = limits[KB_SIZE_KEY]
 
     chat_credits_allowed = limits[CHAT_CREDITS_KEY]
-    chat_credits_used_today = get_user_chat_credits_used_today(db, user)
+    chat_credits_used = get_user_chat_credits_used_today(db, user)
 
     audio_overviews_allowed = limits[AUDIO_OVERVIEWS_KEY]
     audio_overviews_used_this_month = get_user_audio_overviews_used_this_month(db, user)
@@ -214,7 +215,7 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
     chat_credits_remaining = (
         None
         if chat_credits_allowed == float("inf")
-        else max(0, int(chat_credits_allowed) - chat_credits_used_today)
+        else max(0, int(chat_credits_allowed) - chat_credits_used)
     )
 
     audio_overviews_remaining = (
@@ -246,9 +247,9 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
             "paper_uploads_remaining": papers_remaining,
             "knowledge_base_size": total_size,
             "knowledge_base_size_remaining": knowledge_base_remaining,
-            "chat_credits_used_today": chat_credits_used_today,
+            "chat_credits_used": chat_credits_used,
             "chat_credits_remaining": chat_credits_remaining,
-            "audio_overviews": audio_overviews_used_this_month,
+            "audio_overviews_used": audio_overviews_used_this_month,
             "audio_overviews_remaining": audio_overviews_remaining,
         },
     }

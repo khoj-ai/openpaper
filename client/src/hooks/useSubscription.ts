@@ -14,9 +14,9 @@ export interface SubscriptionUsage {
     paper_uploads_remaining: number;
     knowledge_base_size: number;
     knowledge_base_size_remaining: number;
-    chat_credits_used_today: number;
+    chat_credits_used: number;
     chat_credits_remaining: number;
-    audio_overviews: number;
+    audio_overviews_used: number;
     audio_overviews_remaining: number;
 }
 
@@ -110,7 +110,7 @@ export const formatFileSize = (sizeInKb: number): string => {
 // Audio overview credit helper functions
 export const getAudioOverviewUsagePercentage = (subscription: SubscriptionData | null): number => {
     if (!subscription) return 0;
-    const { audio_overviews, audio_overviews_remaining } = subscription.usage;
+    const { audio_overviews_used: audio_overviews, audio_overviews_remaining } = subscription.usage;
     const total = audio_overviews + audio_overviews_remaining;
     if (total === 0) return 0;
     return (audio_overviews / total) * 100;

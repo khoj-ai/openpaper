@@ -312,12 +312,12 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
             return;
         }
 
-        const { audio_overviews, audio_overviews_remaining } = subscription.usage;
-        const total = audio_overviews + audio_overviews_remaining;
-        const usagePercentage = total > 0 ? (audio_overviews / total) * 100 : 0;
+        const { audio_overviews_used, audio_overviews_remaining } = subscription.usage;
+        const total = audio_overviews_used + audio_overviews_remaining;
+        const usagePercentage = total > 0 ? (audio_overviews_used / total) * 100 : 0;
 
         setAudioCreditUsage({
-            used: audio_overviews,
+            used: audio_overviews_used,
             remaining: audio_overviews_remaining,
             total,
             usagePercentage,
