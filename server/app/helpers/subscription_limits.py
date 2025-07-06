@@ -24,28 +24,20 @@ PAPER_UPLOAD_KEY = "paper_uploads"
 KB_SIZE_KEY = "knowledge_base_size"
 CHAT_CREDITS_KEY = "chat_credits_weekly"
 AUDIO_OVERVIEWS_KEY = "audio_overviews_weekly"
-MODELS_KEY = "models"
 
 # Define subscription plan limits
 SUBSCRIPTION_LIMITS = {
     SubscriptionPlan.BASIC: {
-        # PAPER_UPLOAD_KEY: 10,
-        PAPER_UPLOAD_KEY: 0,  # test
-        # KB_SIZE_KEY: 5 * 1024 * 100,  # 500 MB in KB
-        KB_SIZE_KEY: 0,  # test
+        PAPER_UPLOAD_KEY: 20,
+        KB_SIZE_KEY: 500 * 1024,  # 500 MB in KB
         CHAT_CREDITS_KEY: 500,
         AUDIO_OVERVIEWS_KEY: 5,
-        MODELS_KEY: ["basic"],
     },
     SubscriptionPlan.RESEARCHER: {
-        # PAPER_UPLOAD_KEY: 500,
-        PAPER_UPLOAD_KEY: 10,  # test
-        # KB_SIZE_KEY: 3 * 1024 * 1024,  # 3 GB in KB
-        KB_SIZE_KEY: 1 * 1024 * 1024,  # test
-        # CHAT_CREDITS_KEY: 10000,
-        CHAT_CREDITS_KEY: 100,  # test
-        AUDIO_OVERVIEWS_KEY: 1,
-        MODELS_KEY: ["basic", "advanced"],
+        PAPER_UPLOAD_KEY: 500,
+        KB_SIZE_KEY: 3 * 1024 * 1024,  # 3 GB in KB
+        CHAT_CREDITS_KEY: 10000,
+        AUDIO_OVERVIEWS_KEY: 50,
     },
 }
 
