@@ -196,7 +196,14 @@ export default function PricingTable({
                                         {canResubscribe && !isActiveSubscription && <Clock className="h-4 w-4 text-amber-600" />}
                                     </div>
                                 </th>
-                                <th className="text-center p-2 sm:p-4 font-semibold min-w-[80px]">Teams</th>
+                                <th className="text-center p-2 sm:p-4 font-semibold min-w-[80px] text-muted-foreground">
+                                    <div className="flex flex-col items-center gap-1">
+                                        Teams
+                                        <Badge variant="outline" className="text-xs">
+                                            Coming Soon
+                                        </Badge>
+                                    </div>
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
@@ -228,7 +235,7 @@ export default function PricingTable({
                                         )}>
                                             {renderFeatureValue(feature.researcher, isComingSoon)}
                                         </td>
-                                        <td className="p-2 sm:p-4 text-center text-sm sm:text-base">
+                                        <td className="p-2 sm:p-4 text-center text-sm sm:text-base text-muted-foreground">
                                             {isTeamsOnly ? (
                                                 <div className="flex flex-col items-center justify-center gap-1">
                                                     <Check className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />

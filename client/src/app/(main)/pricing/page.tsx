@@ -255,9 +255,9 @@ export default function PricingPage() {
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-6 my-4">
-                        <div className="grid md:grid-cols-3 gap-6">
-                            <div className="text-center space-y-1">
-                                <div className="text-xl font-medium text-slate-900 dark:text-slate-100">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+                            <div className="text-center sm:text-left space-y-1">
+                                <div className="text-lg sm:text-xl font-medium text-slate-900 dark:text-slate-100">
                                     Researcher Plan
                                 </div>
                                 <div className="text-sm text-slate-500 dark:text-slate-400">
@@ -265,11 +265,11 @@ export default function PricingPage() {
                                 </div>
                             </div>
                             <div className="text-center space-y-1">
-                                <div className="text-xl font-medium text-slate-900 dark:text-slate-100">
+                                <div className="text-lg sm:text-xl font-medium text-slate-900 dark:text-slate-100">
                                     ${userSubscription?.subscription.interval === "year" ? annualPrice : monthlyPrice}
-                                    <span className="text-base font-normal text-slate-500 dark:text-slate-400">/month</span>
+                                    <span className="text-sm sm:text-base font-normal text-slate-500 dark:text-slate-400">/month</span>
                                 </div>
-                                <div className="text-sm text-slate-500 dark:text-slate-400">
+                                <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
                                     Billed {userSubscription?.subscription.interval === "year" ? "annually" : "monthly"}
                                     {isIntervalChangeLoading && (
                                         <Badge variant="secondary" className="ml-2 text-xs">
@@ -278,14 +278,16 @@ export default function PricingPage() {
                                     )}
                                 </div>
                             </div>
-                            <div className="text-center space-y-1">
-                                <div className="flex items-center justify-center gap-2 text-lg font-medium text-slate-900 dark:text-slate-100">
-                                    <Calendar className="h-4 w-4" />
-                                    {userSubscription?.subscription.current_period_end &&
-                                        formatDate(userSubscription.subscription.current_period_end)
-                                    }
+                            <div className="text-center sm:text-right space-y-1 sm:col-span-2 md:col-span-1">
+                                <div className="flex items-center justify-center sm:justify-end gap-2 text-sm sm:text-lg font-medium text-slate-900 dark:text-slate-100">
+                                    <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+                                    <span className="break-words">
+                                        {userSubscription?.subscription.current_period_end &&
+                                            formatDate(userSubscription.subscription.current_period_end)
+                                        }
+                                    </span>
                                 </div>
-                                <div className="text-sm text-slate-500 dark:text-slate-400">
+                                <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
                                     {subscriptionStatus === 'canceled' || userSubscription?.subscription.cancel_at_period_end ? "Expires" : "Renews"}
                                 </div>
                             </div>
@@ -293,12 +295,12 @@ export default function PricingPage() {
 
                         {/* Status-specific alerts */}
                         {subscriptionStatus === 'canceled' && (
-                            <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+                            <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 sm:p-4">
                                 <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-                                    <Clock className="h-4 w-4" />
-                                    <span className="font-medium">Subscription Canceled</span>
+                                    <Clock className="h-4 w-4 flex-shrink-0" />
+                                    <span className="font-medium text-sm sm:text-base">Subscription Canceled</span>
                                 </div>
-                                <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
                                     Your subscription will end on {userSubscription?.subscription.current_period_end &&
                                         formatDate(userSubscription.subscription.current_period_end)}.
                                     You can reactivate anytime before this date.
@@ -307,12 +309,12 @@ export default function PricingPage() {
                         )}
 
                         {userSubscription?.subscription.cancel_at_period_end && subscriptionStatus === 'active' && (
-                            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 sm:p-4">
                                 <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
-                                    <Clock className="h-4 w-4" />
-                                    <span className="font-medium">Subscription Ending</span>
+                                    <Clock className="h-4 w-4 flex-shrink-0" />
+                                    <span className="font-medium text-sm sm:text-base">Subscription Ending</span>
                                 </div>
-                                <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
+                                <p className="text-xs sm:text-sm text-amber-600 dark:text-amber-400 mt-1">
                                     Your subscription will end on {userSubscription?.subscription.current_period_end &&
                                         formatDate(userSubscription.subscription.current_period_end)}.
                                     You can reactivate anytime before this date.
@@ -321,24 +323,24 @@ export default function PricingPage() {
                         )}
 
                         {subscriptionStatus === 'past_due' && (
-                            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 sm:p-4">
                                 <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
-                                    <Clock className="h-4 w-4" />
-                                    <span className="font-medium">Payment Past Due</span>
+                                    <Clock className="h-4 w-4 flex-shrink-0" />
+                                    <span className="font-medium text-sm sm:text-base">Payment Past Due</span>
                                 </div>
-                                <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
+                                <p className="text-xs sm:text-sm text-amber-600 dark:text-amber-400 mt-1">
                                     Your payment is past due. Please update your payment method to continue your subscription.
                                 </p>
                             </div>
                         )}
 
                         {subscriptionStatus === 'incomplete' && (
-                            <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+                            <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 sm:p-4">
                                 <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-                                    <Clock className="h-4 w-4" />
-                                    <span className="font-medium">Payment Incomplete</span>
+                                    <Clock className="h-4 w-4 flex-shrink-0" />
+                                    <span className="font-medium text-sm sm:text-base">Payment Incomplete</span>
                                 </div>
-                                <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
                                     Your payment is incomplete. Please complete the payment process to activate your subscription.
                                 </p>
                             </div>
@@ -370,100 +372,105 @@ export default function PricingPage() {
 
             {/* Billing Toggle */}
             {!loading && (
-                <div className="flex items-center justify-center gap-6 mt-12">
-                    <span className={cn(
-                        "text-sm font-medium transition-colors",
-                        !isAnnual ? "text-slate-900 dark:text-slate-100" : "text-slate-500 dark:text-slate-400"
-                    )}>
-                        Monthly
-                    </span>
-                    {isActiveSubscription ? (
-                        <Dialog>
-                            <DialogTrigger asChild>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="relative p-0"
-                                    disabled={isIntervalChangeLoading}
-                                >
-                                    <div className={cn(
-                                        "w-14 h-7 rounded-full transition-all duration-200",
-                                        isAnnual ? "bg-slate-800 dark:bg-slate-200" : "bg-slate-200 dark:bg-slate-700"
-                                    )}>
-                                        <div className={cn(
-                                            "w-5 h-5 rounded-full transition-all duration-200 mt-1",
-                                            isAnnual
-                                                ? "translate-x-8 bg-white dark:bg-slate-800"
-                                                : "translate-x-1 bg-slate-600 dark:bg-slate-300"
-                                        )} />
-                                    </div>
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent className="border-slate-200 dark:border-slate-700">
-                                <DialogHeader>
-                                    <DialogTitle className="text-slate-900 dark:text-slate-100">
-                                        Change Billing Cycle
-                                    </DialogTitle>
-                                    <DialogDescription className="text-slate-600 dark:text-slate-400">
-                                        Switch from {isAnnual ? "annual" : "monthly"} to {isAnnual ? "monthly" : "annual"} billing.
-                                        The change will take effect at the end of your current billing cycle.
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <div className="flex gap-3 mt-4">
-                                    <DialogTrigger asChild>
-                                        <Button variant="outline" className="flex-1">
-                                            Cancel
-                                        </Button>
-                                    </DialogTrigger>
+                <div className="flex flex-col items-center justify-center gap-3 sm:gap-6 mt-12 px-4">
+                    {/* Toggle Row */}
+                    <div className="flex items-center gap-3 sm:gap-4">
+                        <span className={cn(
+                            "text-xs sm:text-sm font-medium transition-colors",
+                            !isAnnual ? "text-slate-900 dark:text-slate-100" : "text-slate-500 dark:text-slate-400"
+                        )}>
+                            Monthly
+                        </span>
+                        {isActiveSubscription ? (
+                            <Dialog>
+                                <DialogTrigger asChild>
                                     <Button
-                                        className="flex-1 bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900"
-                                        onClick={() => handleIntervalChange(isAnnual ? "month" : "year")}
+                                        variant="ghost"
+                                        size="sm"
+                                        className="relative p-0"
                                         disabled={isIntervalChangeLoading}
                                     >
-                                        {isIntervalChangeLoading ? "Changing..." : `Switch to ${isAnnual ? "Monthly" : "Annual"}`}
+                                        <div className={cn(
+                                            "w-12 h-6 sm:w-14 sm:h-7 rounded-full transition-all duration-200",
+                                            isAnnual ? "bg-slate-800 dark:bg-slate-200" : "bg-slate-200 dark:bg-slate-700"
+                                        )}>
+                                            <div className={cn(
+                                                "w-4 h-4 sm:w-5 sm:h-5 rounded-full transition-all duration-200 mt-1",
+                                                isAnnual
+                                                    ? "translate-x-7 sm:translate-x-8 bg-white dark:bg-slate-800"
+                                                    : "translate-x-1 bg-slate-600 dark:bg-slate-300"
+                                            )} />
+                                        </div>
                                     </Button>
-                                </div>
-                            </DialogContent>
-                        </Dialog>
-                    ) : (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setIsAnnual(!isAnnual)}
-                            className="relative p-0"
-                            disabled={isActiveSubscription}
-                        >
-                            <div className={cn(
-                                "w-14 h-7 rounded-full transition-all duration-200",
-                                isAnnual ? "bg-slate-800 dark:bg-slate-200" : "bg-slate-200 dark:bg-slate-700"
-                            )}>
+                                </DialogTrigger>
+                                <DialogContent className="border-slate-200 dark:border-slate-700 mx-4">
+                                    <DialogHeader>
+                                        <DialogTitle className="text-slate-900 dark:text-slate-100">
+                                            Change Billing Cycle
+                                        </DialogTitle>
+                                        <DialogDescription className="text-slate-600 dark:text-slate-400">
+                                            Switch from {isAnnual ? "annual" : "monthly"} to {isAnnual ? "monthly" : "annual"} billing.
+                                            The change will take effect at the end of your current billing cycle.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <div className="flex gap-3 mt-4">
+                                        <DialogTrigger asChild>
+                                            <Button variant="outline" className="flex-1">
+                                                Cancel
+                                            </Button>
+                                        </DialogTrigger>
+                                        <Button
+                                            className="flex-1 bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900"
+                                            onClick={() => handleIntervalChange(isAnnual ? "month" : "year")}
+                                            disabled={isIntervalChangeLoading}
+                                        >
+                                            {isIntervalChangeLoading ? "Changing..." : `Switch to ${isAnnual ? "Monthly" : "Annual"}`}
+                                        </Button>
+                                    </div>
+                                </DialogContent>
+                            </Dialog>
+                        ) : (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setIsAnnual(!isAnnual)}
+                                className="relative p-0"
+                                disabled={isActiveSubscription}
+                            >
                                 <div className={cn(
-                                    "w-5 h-5 rounded-full transition-all duration-200 mt-1",
-                                    isAnnual
-                                        ? "translate-x-8 bg-white dark:bg-slate-800"
-                                        : "translate-x-1 bg-slate-600 dark:bg-slate-300"
-                                )} />
-                            </div>
-                        </Button>
-                    )}
-                    <div className="flex items-center gap-2">
-                        <span className={cn(
-                            "text-sm font-medium transition-colors",
-                            isAnnual ? "text-slate-900 dark:text-slate-100" : "text-slate-500 dark:text-slate-400"
-                        )}>
-                            Annual
-                        </span>
-                        <Badge variant="secondary" className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-0 text-xs">
-                            Save 33%
-                        </Badge>
+                                    "w-12 h-6 sm:w-14 sm:h-7 rounded-full transition-all duration-200",
+                                    isAnnual ? "bg-slate-800 dark:bg-slate-200" : "bg-slate-200 dark:bg-slate-700"
+                                )}>
+                                    <div className={cn(
+                                        "w-4 h-4 sm:w-5 sm:h-5 rounded-full transition-all duration-200 mt-1",
+                                        isAnnual
+                                            ? "translate-x-7 sm:translate-x-8 bg-white dark:bg-slate-800"
+                                            : "translate-x-1 bg-slate-600 dark:bg-slate-300"
+                                    )} />
+                                </div>
+                            </Button>
+                        )}
+                        <div className="flex items-center gap-1 sm:gap-2">
+                            <span className={cn(
+                                "text-xs sm:text-sm font-medium transition-colors",
+                                isAnnual ? "text-slate-900 dark:text-slate-100" : "text-slate-500 dark:text-slate-400"
+                            )}>
+                                Annual
+                            </span>
+                            <Badge variant="secondary" className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-0 text-xs px-2 py-0.5">
+                                Save 33%
+                            </Badge>
+                        </div>
                     </div>
+
+                    {/* Current Subscription Info */}
                     {isCurrentlySubscribed && (
-                        <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400">
+                        <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 text-center sm:text-left">
+                            <Badge variant="outline" className="border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-xs">
                                 Current: {userSubscription?.subscription.interval === "year" ? "Annual" : "Monthly"}
                             </Badge>
                             {isActiveSubscription && (
-                                <span className="text-xs text-slate-500 dark:text-slate-400">
+                                <span className="text-xs text-slate-500 dark:text-slate-400 max-w-xs sm:max-w-none">
                                     Click toggle to change
                                 </span>
                             )}
