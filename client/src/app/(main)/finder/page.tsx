@@ -85,7 +85,7 @@ export default function FinderPage() {
             const hasFilters = (filter.authors?.length ?? 0 > 0) || (filter.institutions?.length ?? 0 > 0) || filter.only_oa;
 
             const response: OpenAlexResponse = await fetchFromApi(
-                `/api/paper_search/search?query=${encodeURIComponent(query)}&page=${pageNumber}&per_page=${perPage}`,
+                `/api/search/global/search?query=${encodeURIComponent(query)}&page=${pageNumber}&per_page=${perPage}`,
                 {
                     method: "POST",
                     ...(hasFilters && { body: JSON.stringify(filter) }),

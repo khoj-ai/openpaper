@@ -1,11 +1,13 @@
 "use client"
 
 import { fetchFromApi } from "@/lib/api";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { PaperItem } from "@/components/AppSidebar";
+import { PaperStatus } from "@/components/utils/PdfStatus";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import PaperCard from "@/components/PaperCard";
+import PaperSearchResultCard from "@/components/PaperSearchResultCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -13,6 +15,7 @@ import { useAuth } from "@/lib/auth";
 import { useSubscription, getStorageUsagePercentage, isStorageNearLimit, isStorageAtLimit, formatFileSize } from "@/hooks/useSubscription";
 import { FileText, Upload, Search, AlertTriangle, AlertCircle, HardDrive } from "lucide-react";
 import Link from "next/link";
+import { SearchResults, PaperResult } from "@/lib/schema";
 
 // TODO: We could add a search look-up for the paper journal name to avoid placeholders
 
@@ -20,7 +23,11 @@ export default function PapersPage() {
     const [papers, setPapers] = useState<PaperItem[]>([]);
     const [searchTerm, setSearchTerm] = useState<string>("");
     const [filteredPapers, setFilteredPapers] = useState<PaperItem[]>([]);
+    const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
+    const [searching, setSearching] = useState<boolean>(false);
+    const searchInputRef = useRef<HTMLInputElement | null>(null);
+    const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
     const { user, loading: authLoading } = useAuth();
     const { subscription, loading: subscriptionLoading } = useSubscription();
 
@@ -44,11 +51,30 @@ export default function PapersPage() {
     }, [])
 
     useEffect(() => {
+        // Cleanup timeout on unmount
+        return () => {
+            if (searchTimeout) {
+                clearTimeout(searchTimeout)
+            }
+        }
+    }, [searchTimeout])
+
+    useEffect(() => {
         if (!authLoading && !user) {
             // Redirect to login if user is not authenticated
             window.location.href = `/login`;
         }
     }, [authLoading, user]);
+
+    // Restore focus to search input after search results update
+    useEffect(() => {
+        if (searchTerm.trim() && searchInputRef.current && !searching) {
+            // Use requestAnimationFrame to ensure DOM has been updated
+            requestAnimationFrame(() => {
+                searchInputRef.current?.focus();
+            });
+        }
+    }, [searchResults, filteredPapers, searching, searchTerm]);
 
     const deletePaper = async (paperId: string) => {
         try {
@@ -62,19 +88,67 @@ export default function PapersPage() {
         }
     }
 
-    const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const term = event.target.value.toLowerCase()
-        setSearchTerm(term)
-        setFilteredPapers(
-            papers.filter((paper) =>
-                paper.title?.toLowerCase().includes(term) ||
-                paper.keywords?.some((keyword) => keyword.toLowerCase().includes(term)) ||
-                paper.abstract?.toLowerCase().includes(term) ||
-                paper.authors?.some((author) => author.toLowerCase().includes(term)) ||
-                paper.institutions?.some((institution) => institution.toLowerCase().includes(term)) ||
-                paper.summary?.toLowerCase().includes(term)
+    const performSearch = useCallback(async (term: string) => {
+        if (!term.trim()) {
+            setFilteredPapers(papers)
+            setSearchResults(null)
+            return
+        }
+
+        setSearching(true)
+        try {
+            const response: SearchResults = await fetchFromApi(`/api/search/local?q=${encodeURIComponent(term)}`);
+
+            // Store the complete search results
+            setSearchResults(response);
+
+            // Convert PaperResult to PaperItem format for compatibility with existing UI
+            const searchResultsPapers = response.papers.map((paper: PaperResult): PaperItem => ({
+                id: paper.id,
+                title: paper.title || "Untitled", // PaperItem expects non-nullable title
+                authors: paper.authors || undefined,
+                abstract: paper.abstract || undefined,
+                status: paper.status as PaperStatus || undefined,
+                created_at: paper.created_at,
+                // Add any other fields that PaperItem expects
+                keywords: [], // API doesn't return keywords, so default to empty
+                institutions: [], // API doesn't return institutions, so default to empty
+                summary: paper.abstract || undefined // Use abstract as summary fallback
+            }))
+            setFilteredPapers(searchResultsPapers)
+        } catch (error) {
+            setSearchResults(null)
+            // Fall back to client-side search if API fails
+            setFilteredPapers(
+                papers.filter((paper) =>
+                    paper.title?.toLowerCase().includes(term.toLowerCase()) ||
+                    paper.keywords?.some((keyword) => keyword.toLowerCase().includes(term.toLowerCase())) ||
+                    paper.abstract?.toLowerCase().includes(term.toLowerCase()) ||
+                    paper.authors?.some((author) => author.toLowerCase().includes(term.toLowerCase())) ||
+                    paper.institutions?.some((institution) => institution.toLowerCase().includes(term.toLowerCase())) ||
+                    paper.summary?.toLowerCase().includes(term.toLowerCase())
+                )
             )
-        )
+        } finally {
+            setSearching(false)
+        }
+    }, [papers])
+
+    const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const term = event.target.value
+        setSearchTerm(term)
+
+        // Clear existing timeout
+        if (searchTimeout) {
+            clearTimeout(searchTimeout)
+        }
+
+        // Debounce search by 300ms
+        const timeout = setTimeout(() => {
+            performSearch(term)
+        }, 300)
+
+        setSearchTimeout(timeout)
     }
 
     const handlePaperSet = (paperId: string, paper: PaperItem) => {
@@ -151,6 +225,32 @@ export default function PapersPage() {
         );
     };
 
+    const SearchStatsDisplay = () => {
+        if (!searchResults || !searchTerm.trim()) {
+            return null;
+        }
+
+        return (
+            <div className="mb-4 p-3 bg-muted/50 rounded-lg border">
+                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <span>
+                        <strong>{searchResults.total_papers}</strong> papers found
+                    </span>
+                    {searchResults.total_highlights > 0 && (
+                        <span>
+                            <strong>{searchResults.total_highlights}</strong> highlights
+                        </span>
+                    )}
+                    {searchResults.total_annotations > 0 && (
+                        <span>
+                            <strong>{searchResults.total_annotations}</strong> annotations
+                        </span>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
     const EmptyState = () => {
         // No papers uploaded at all
         if (papers.length === 0) {
@@ -185,6 +285,10 @@ export default function PapersPage() {
                         onClick={() => {
                             setSearchTerm("")
                             setFilteredPapers(papers);
+                            setSearchResults(null);
+                            if (searchTimeout) {
+                                clearTimeout(searchTimeout)
+                            }
                         }}
                         className="mt-4"
                     >
@@ -215,27 +319,50 @@ export default function PapersPage() {
             <StorageUsageDisplay />
 
             {papers.length > 0 && (
-                <div className="mb-6">
+                <div className="mb-6 relative">
                     <Input
                         type="text"
-                        placeholder="Search your paper bank"
+                        placeholder="Search your paper bank (including annotations and highlights)"
                         value={searchTerm}
+                        ref={searchInputRef}
                         onChange={handleSearch}
                         className="w-full"
+                        disabled={searching}
                     />
+                    {searching && (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
+                        </div>
+                    )}
                 </div>
             )}
 
+            <SearchStatsDisplay />
+
             {filteredPapers.length > 0 ? (
                 <div className="grid grid-cols-1 gap-4">
-                    {filteredPapers.map((paper) => (
-                        <PaperCard
-                            key={paper.id}
-                            paper={paper}
-                            handleDelete={deletePaper}
-                            setPaper={handlePaperSet}
-                        />
-                    ))}
+                    {searchResults && searchTerm.trim() ? (
+                        // Use PaperSearchResultCard for search results
+                        searchResults.papers.map((paper) => (
+                            <PaperSearchResultCard
+                                key={paper.id}
+                                paper={paper}
+                                searchTerm={searchTerm}
+                                handleDelete={deletePaper}
+                                setPaper={handlePaperSet}
+                            />
+                        ))
+                    ) : (
+                        // Use regular PaperCard for normal view
+                        filteredPapers.map((paper) => (
+                            <PaperCard
+                                key={paper.id}
+                                paper={paper}
+                                handleDelete={deletePaper}
+                                setPaper={handlePaperSet}
+                            />
+                        ))
+                    )}
                 </div>
             ) : (
                 <EmptyState />

@@ -143,3 +143,41 @@ export interface UserSubscription {
         cancel_at_period_end: boolean;
     };
 }
+
+export interface HighlightResult {
+    id: string;
+    raw_text: string;
+    start_offset: number | null;
+    end_offset: number | null;
+    page_number: number | null;
+    role: string;
+    created_at: string;
+}
+
+export interface AnnotationResult {
+    id: string;
+    content: string;
+    role: string;
+    created_at: string;
+    highlight: HighlightResult;
+}
+
+export interface PaperResult {
+    id: string;
+    title: string | null;
+    authors: string[] | null;
+    abstract: string | null;
+    status: string;
+    publish_date: string | null;
+    created_at: string;
+    last_accessed_at: string;
+    highlights: HighlightResult[];
+    annotations: AnnotationResult[];
+}
+
+export interface SearchResults {
+    papers: PaperResult[];
+    total_papers: number;
+    total_highlights: number;
+    total_annotations: number;
+}

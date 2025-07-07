@@ -8,9 +8,9 @@ import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getStatusIcon, PaperStatus, PaperStatusEnum } from "@/components/utils/PdfStatus";
-import { fetchFromApi } from "@/lib/api";
 import Link from "next/link";
 import { formatFileSize } from "@/hooks/useSubscription";
+import { citationStyles, handleStatusChange } from "./utils/paperUtils";
 
 
 interface PaperCardProps {
@@ -18,188 +18,6 @@ interface PaperCardProps {
     handleDelete?: (paperId: string) => void;
     setPaper(paperId: string, paper: PaperItem): void;
 }
-
-// Helper function to format author names based on citation style rules
-const formatAuthors = (authors: string[] | undefined, style: 'MLA' | 'APA' | 'Harvard' | 'Chicago' | 'IEEE' | 'AMA' | 'AAA'): string => {
-    if (!authors || authors.length === 0) return "";
-
-    const formatSingleName = (name: string, index: number, total: number, style: string): string => {
-        const parts = name.trim().split(' ');
-        const lastName = parts.pop() || "";
-        const firstNames = parts; // Keep all remaining parts as first/middle names
-
-        switch (style) {
-            case 'MLA':
-            case 'Chicago': // Notes & Bibliography style uses First Last
-            case 'AAA':
-                // First author: Last, First Middle
-                // Subsequent authors: First Middle Last
-                if (index === 0) return `${lastName}, ${firstNames.join(' ')}`;
-                return `${firstNames.join(' ')} ${lastName}`;
-            case 'APA':
-            case 'Harvard':
-                // All authors: Last, F. M. (using initials)
-                const apaInitials = firstNames.map(part => part.charAt(0).toUpperCase() + '.').join(' ');
-                return `${lastName}, ${apaInitials}`;
-            case 'AMA':
-                // All authors: Last FM (no periods, no space between initials)
-                const amaInitials = firstNames.map(part => part.charAt(0).toUpperCase()).join('');
-                return `${lastName} ${amaInitials}`;
-            case 'IEEE':
-                // All authors: F. M. Last
-                const ieeeInitials = firstNames.map(part => part.charAt(0).toUpperCase() + '.').join('. ');
-                return `${ieeeInitials}. ${lastName}`; // Added period after initials block
-            default:
-                return name; // Should not happen
-        }
-    };
-
-    // Basic 'et al.' rules (can be more complex)
-    let maxAuthorsToShow = authors.length;
-    let useEtAl = false;
-
-    if (style === 'MLA' && authors.length > 2) { maxAuthorsToShow = 1; useEtAl = true; }
-    else if (style === 'APA' && authors.length > 20) { maxAuthorsToShow = 19; useEtAl = true; } // Show first 19, ..., last 1
-    else if (style === 'Harvard' && authors.length > 3) { maxAuthorsToShow = 3; useEtAl = true; }
-    else if (style === 'AMA' && authors.length > 6) { maxAuthorsToShow = 3; useEtAl = true; } // Show first 3, et al.
-    else if (style === 'IEEE' && authors.length > 6) { maxAuthorsToShow = 3; useEtAl = true; } // Show first 3, et al.
-    else if (style === 'Chicago' && authors.length > 10) { maxAuthorsToShow = 7; useEtAl = true; } // Show first 7, et al.
-    else if (style === 'AAA' && authors.length > 3) { maxAuthorsToShow = 1; useEtAl = true; } // Show first 1, et al.
-
-
-    const formattedNames = authors.slice(0, maxAuthorsToShow).map((name, index) => formatSingleName(name, index, authors.length, style));
-
-    // Handle APA's specific ellipsis for >20 authors
-    if (style === 'APA' && useEtAl) {
-        formattedNames.push('...');
-        formattedNames.push(formatSingleName(authors[authors.length - 1], authors.length - 1, authors.length, style));
-    }
-
-    let joinedNames = "";
-    if (formattedNames.length === 1) {
-        joinedNames = formattedNames[0];
-    } else {
-        const separator = (style === 'AMA' || style === 'IEEE') ? ", " : ", "; // Default separator
-        const conjunction = (style === 'APA') ? ' &' : (style === 'MLA' || style === 'Chicago' || style === 'AAA') ? ' and' : ','; // Conjunction before last author
-
-        if (style === 'APA' && formattedNames.includes('...')) {
-            // Join with commas, including the ellipsis
-            joinedNames = formattedNames.join(separator);
-        } else if (formattedNames.length > 1) {
-            const lastAuthor = formattedNames.pop() || '';
-            joinedNames = formattedNames.join(separator);
-            // Add appropriate conjunction if needed (not for AMA/IEEE which just use commas)
-            if (style !== 'AMA' && style !== 'IEEE') {
-                joinedNames += (formattedNames.length > 0 ? conjunction : '') + ' ' + lastAuthor;
-            } else {
-                joinedNames += separator + lastAuthor; // Just use comma for AMA/IEEE
-            }
-        }
-    }
-
-
-    // Add 'et al.' if applicable (and not handled by APA's ellipsis)
-    if (useEtAl && !(style === 'APA' && authors.length > 20)) {
-        // Check if et al. should replace names or be appended
-        if (style === 'AMA' || style === 'IEEE' || style === 'Harvard' || style === 'Chicago' || style === 'AAA' || style === 'MLA') {
-            // Replace names after max shown with et al.
-            joinedNames = authors.slice(0, maxAuthorsToShow).map((name, index) => formatSingleName(name, index, authors.length, style)).join(style === 'AMA' || style === 'IEEE' ? ", " : ", ") + ", et al.";
-        }
-        // For MLA with exactly 2 authors, no et al. is used. If > 2, only first author + et al.
-        if (style === 'MLA' && authors.length > 2) {
-            joinedNames = formatSingleName(authors[0], 0, authors.length, style) + ", et al.";
-        }
-    }
-
-
-    return joinedNames;
-};
-
-
-// Helper to get year or n.d.
-const getYear = (dateString: string | undefined): string => {
-    if (!dateString) return "n.d.";
-    try {
-        const date = new Date(dateString);
-        if (isNaN(date.getTime())) return "n.d."; // Invalid date
-        return date.getFullYear().toString();
-    } catch {
-        return "n.d.";
-    }
-};
-
-// --- Citation Generation Functions ---
-// Note: These are simplified and assume a generic "paper" type.
-// Real-world citations need more specific info (journal, book title, publisher, DOI, etc.)
-// Using placeholders like "[Source Placeholder]" where data is missing.
-
-const generateMLA = (paper: PaperItem): string => {
-    const authors = formatAuthors(paper.authors, 'MLA');
-    const title = paper.title || "[Untitled]";
-    const year = getYear(paper.created_at);
-    // Basic structure: Author(s). "Title." *Source*, Year.
-    return `${authors ? authors + '. ' : ''}"${title}." *[Source Placeholder]*, ${year}.`;
-};
-
-const generateHarvard = (paper: PaperItem): string => {
-    const authors = formatAuthors(paper.authors, 'Harvard');
-    const year = getYear(paper.created_at);
-    const title = paper.title || "[Untitled]";
-    // Basic structure: Author(s) (Year). *Title*. [Source Placeholder].
-    return `${authors ? authors + ' ' : ''}(${year}). *${title}*. [Source Placeholder].`;
-};
-
-const generateAAA = (paper: PaperItem): string => {
-    const authors = formatAuthors(paper.authors, 'AAA');
-    const year = getYear(paper.created_at);
-    const title = paper.title || "[Untitled]";
-    // Basic structure: Author(s) Year. "Title." *[Publication Venue Placeholder]*. [Location Placeholder]: [Publisher Placeholder].
-    return `${authors ? authors + ' ' : ''}${year}. "${title}." *[Publication Venue Placeholder]*.`;
-};
-
-const generateIEEE = (paper: PaperItem): string => {
-    const authors = formatAuthors(paper.authors, 'IEEE');
-    const title = paper.title || "[Untitled]";
-    const year = getYear(paper.created_at);
-    // Basic structure: Author(s), "Title," *[Source Abbreviation Placeholder]*, [vol. placeholder], [no. placeholder], [pp. placeholder], ${year}.
-    return `${authors ? authors + ', ' : ''}"${title}," *[Source Abbr. Placeholder]*, ${year}.`;
-};
-
-const generateAMA = (paper: PaperItem): string => {
-    const authors = formatAuthors(paper.authors, 'AMA');
-    const title = paper.title || "[Untitled]";
-    const year = getYear(paper.created_at);
-    // Basic structure: Author(s). Title. *JournalAbbr*. Year;vol(issue):pages.
-    return `${authors ? authors + '. ' : ''}${title}. *[Journal Abbr. Placeholder]*. ${year}.`;
-};
-
-const generateChicago = (paper: PaperItem): string => { // Assuming Author-Date style for simplicity here
-    const authors = formatAuthors(paper.authors, 'Chicago'); // Use Chicago formatting for authors
-    const year = getYear(paper.created_at);
-    const title = paper.title || "[Untitled]";
-    // Basic Author-Date: Author(s). Year. "Title." *Source*. [DOI/URL Placeholder]
-    return `${authors ? authors + '. ' : ''}${year}. "${title}." *[Source Placeholder]*.`;
-};
-
-const generateAPA = (paper: PaperItem): string => {
-    const authors = formatAuthors(paper.authors, 'APA');
-    const year = getYear(paper.created_at);
-    const title = paper.title || "[Untitled]";
-    // Basic structure: Author(s). (Year). *Title*. [Source Placeholder]. [DOI/URL Placeholder]
-    return `${authors ? authors + ' ' : ''}(${year}). *${title}*. [Source Placeholder].`;
-};
-
-// Define citation styles and their generators
-const citationStyles = [
-    { name: 'MLA', generator: generateMLA },
-    { name: 'Harvard', generator: generateHarvard },
-    { name: 'AAA', generator: generateAAA },
-    { name: 'IEEE', generator: generateIEEE },
-    { name: 'AMA', generator: generateAMA },
-    { name: 'Chicago (Author-Date)', generator: generateChicago },
-    { name: 'APA', generator: generateAPA },
-];
-
 
 export default function PaperCard({ paper, handleDelete, setPaper }: PaperCardProps) {
 
@@ -221,38 +39,6 @@ export default function PaperCard({ paper, handleDelete, setPaper }: PaperCardPr
         });
     };
 
-    const handleStatusChange = async (status: PaperStatus) => {
-        try {
-            const url = `/api/paper/status?status=${status}&paper_id=${paper?.id}`;
-            const response: PaperItem = await fetchFromApi(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            });
-
-            if (status === PaperStatusEnum.COMPLETED) {
-                toast.success(
-                    "Completed reading! 🎉",
-                    {
-                        description: `Congrats on finishing ${paper?.title}!`,
-                        duration: 5000,
-                    }
-                )
-            } else {
-                toast.info(
-                    `Marked as ${status}. Keep going!`,
-                    {
-                        description: `You have marked ${paper?.title} as ${status}.`,
-                        duration: 3000,
-                    }
-                );
-            }
-            setPaper(paper.id, response); // Update the paper state with the new status
-        } catch (error) {
-            console.error('Error updating paper status:', error);
-            toast.error("Failed to update paper status.");
-        }
-    };
-
     return (
         <Card key={paper.id} className="overflow-hidden hover:shadow-md transition-shadow pt-2 pb-0">
             <div className="flex h-fit flex-col md:flex-row">
@@ -272,15 +58,15 @@ export default function PaperCard({ paper, handleDelete, setPaper }: PaperCardPr
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onClick={() => handleStatusChange(PaperStatusEnum.TODO)}>
+                                        <DropdownMenuItem onClick={() => handleStatusChange(paper, PaperStatusEnum.TODO, setPaper)}>
                                             {getStatusIcon("todo")}
                                             Todo
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleStatusChange(PaperStatusEnum.READING)}>
+                                        <DropdownMenuItem onClick={() => handleStatusChange(paper, PaperStatusEnum.READING, setPaper)}>
                                             {getStatusIcon("reading")}
                                             Reading
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleStatusChange(PaperStatusEnum.COMPLETED)}>
+                                        <DropdownMenuItem onClick={() => handleStatusChange(paper, PaperStatusEnum.COMPLETED, setPaper)}>
                                             {getStatusIcon("completed")}
                                             Completed
                                         </DropdownMenuItem>
