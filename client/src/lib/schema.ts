@@ -130,3 +130,16 @@ export interface OpenAlexMatchResponse {
 }
 
 export type JobStatusType = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+export type SubscriptionStatusType = 'active' | 'canceled' | 'past_due' | 'incomplete' | 'trialing' | 'unpaid';
+
+export interface UserSubscription {
+    has_subscription: boolean;
+    subscription: {
+        status: SubscriptionStatusType;
+        interval: "month" | "year";
+        current_period_end: string;
+        current_period_start: string;
+        cancel_at_period_end: boolean;
+    };
+}

@@ -7,8 +7,8 @@ export interface User {
 	id: string;
 	email: string;
 	name: string;
-	is_admin: boolean;
 	picture?: string;
+	is_active: boolean;
 }
 
 interface AuthContextType {

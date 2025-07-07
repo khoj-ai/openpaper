@@ -12,6 +12,7 @@ from app.api.paper_api import paper_router
 from app.api.paper_audio_api import paper_audio_router
 from app.api.paper_search_api import paper_search_router
 from app.api.paper_upload_api import paper_upload_router
+from app.api.subscription_api import subscription_router
 from app.api.webhook_api import webhook_router
 from app.database.admin import setup_admin
 from dotenv import load_dotenv
@@ -57,6 +58,9 @@ app.include_router(annotation_router, prefix="/api/annotation")
 app.include_router(paper_search_router, prefix="/api/paper_search")
 app.include_router(paper_audio_router, prefix="/api/paper/audio")
 app.include_router(paper_upload_router, prefix="/api/paper/upload")
+app.include_router(
+    subscription_router, prefix="/api/subscription"
+)  # Subscription routes
 app.include_router(webhook_router, prefix="/api/webhooks")  # Webhook routes
 
 setup_admin(app)  # Setup admin interface

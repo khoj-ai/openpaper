@@ -67,6 +67,24 @@ class AuthProvider(str, Enum):
     # MICROSOFT = "microsoft"
 
 
+# BASIC plans are not considered active subscriptions.
+# They are used for users who have not yet subscribed.
+class SubscriptionPlan(str, Enum):
+    BASIC = "basic"
+    RESEARCHER = "researcher"
+
+
+# When a user has a RESEARCHER (or more advanced) subscription,
+# they can have one of the following statuses.
+class SubscriptionStatus(str, Enum):
+    ACTIVE = "active"
+    CANCELED = "canceled"
+    PAST_DUE = "past_due"
+    INCOMPLETE = "incomplete"
+    TRIALING = "trialing"
+    UNPAID = "unpaid"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -111,6 +129,14 @@ class User(Base):
     )
     paper_upload_jobs = relationship(
         "PaperUploadJob", back_populates="user", cascade="all, delete-orphan"
+    )
+
+    # The associated subscription for the user.
+    subscription = relationship(
+        "Subscription",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
     )
 
 
@@ -207,6 +233,7 @@ class Paper(Base):
 
     # Additional metadata
     doi = Column(String, nullable=True)  # Digital Object Identifier
+    size_in_kb = Column(Integer, nullable=True)  # Size of the paper file in KB
 
     # OpenAlex metadata
     open_alex_id = Column(String, nullable=True)  # OpenAlex ID for the paper
@@ -524,3 +551,37 @@ class AudioOverview(Base):
     title = Column(String, nullable=True)
 
     paper = relationship("Paper", back_populates="audio_overviews")
+
+
+class Subscription(Base):
+    __tablename__ = "subscriptions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+
+    # Subscription details
+    plan = Column(String, nullable=False, default=SubscriptionPlan.BASIC)
+    status = Column(String, nullable=False, default=SubscriptionStatus.ACTIVE)
+
+    # Billing period
+    current_period_start = Column(DateTime(timezone=True), nullable=True)
+    current_period_end = Column(DateTime(timezone=True), nullable=True)
+
+    # Stripe integration fields
+    stripe_customer_id = Column(String, nullable=True)
+    stripe_subscription_id = Column(String, nullable=True)
+    stripe_price_id = Column(String, nullable=True)
+
+    # Cancel at period end flag
+    cancel_at_period_end = Column(Boolean, default=False)
+
+    # When the subscription was canceled, if it was
+    canceled_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationship with User
+    user = relationship("User", back_populates="subscription")

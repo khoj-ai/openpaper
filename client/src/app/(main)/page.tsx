@@ -12,7 +12,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { FileText, Loader2, LucideFileWarning } from "lucide-react";
+import { FileText, Loader2, MessageCircleWarning } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { PdfDropzone } from "@/components/PdfDropzone";
 import Link from "next/link";
@@ -21,6 +21,8 @@ import { PaperItem } from "@/components/AppSidebar";
 import PaperCard from "@/components/PaperCard";
 import { JobStatusType } from "@/lib/schema";
 import OpenPaperLanding from "@/components/OpenPaperLanding";
+import { toast } from "sonner";
+import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isPaperUploadNearLimit, isStorageNearLimit } from "@/hooks/useSubscription";
 
 interface PdfUploadResponse {
 	message: string;
@@ -38,6 +40,8 @@ interface JobStatusResponse {
 	celery_progress_message: string | null;
 }
 
+const DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE = "We encountered an error processing your request. Please check the file or URL and try again.";
+
 export default function Home() {
 	const [isUploading, setIsUploading] = useState(false);
 	const [isUrlDialogOpen, setIsUrlDialogOpen] = useState(false);
@@ -48,9 +52,54 @@ export default function Home() {
 	const [pdfUrl, setPdfUrl] = useState("");
 	const [relevantPapers, setRelevantPapers] = useState<PaperItem[]>([]);
 	const [showErrorAlert, setShowErrorAlert] = useState(false);
+	const [errorAlertMessage, setErrorAlertMessage] = useState(DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE);
+	const [showPricingOnError, setShowPricingOnError] = useState(false);
 
 	const { user, loading: authLoading } = useAuth();
+	const { subscription, loading: subscriptionLoading } = useSubscription();
 	const isMobile = useIsMobile();
+
+	// Toast notifications for subscription limits
+	useEffect(() => {
+		if (!subscriptionLoading && subscription && user) {
+			// Check for at-limit conditions (error styling)
+			if (isStorageAtLimit(subscription)) {
+				toast.error("Storage limit reached", {
+					description: "You've reached your storage limit. Please upgrade your plan or delete some papers to continue.",
+					action: {
+						label: "Upgrade",
+						onClick: () => window.location.href = "/pricing"
+					},
+				});
+			} else if (isPaperUploadAtLimit(subscription)) {
+				toast.error("Upload limit reached", {
+					description: "You've reached your paper upload limit for this month. Please upgrade your plan to upload more papers.",
+					action: {
+						label: "Upgrade",
+						onClick: () => window.location.href = "/pricing"
+					},
+				});
+			}
+			// Check for near-limit conditions (warning styling)
+			else if (isStorageNearLimit(subscription)) {
+				toast.warning("Storage nearly full", {
+					description: "You're approaching your storage limit. Consider upgrading your plan or managing your papers.",
+					action: {
+						label: "Plans",
+						onClick: () => window.location.href = "/pricing"
+					},
+				});
+			} else if (isPaperUploadNearLimit(subscription)) {
+				toast.warning("Upload limit approaching", {
+					description: "You're approaching your monthly paper upload limit. Consider upgrading your plan.",
+					action: {
+						label: "Plans",
+						onClick: () => window.location.href = "/pricing"
+					},
+				});
+			}
+		}
+	}, [subscription, subscriptionLoading, user]);
 
 	// New state for loading experience
 	const [elapsedTime, setElapsedTime] = useState(0);
@@ -223,6 +272,12 @@ export default function Home() {
 		} catch (error) {
 			console.error('Error uploading file:', error);
 			setShowErrorAlert(true);
+			setErrorAlertMessage(error instanceof Error ? error.message : DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE);
+			if (error instanceof Error && error.message.includes('upgrade') && error.message.includes('upload limit')) {
+				setShowPricingOnError(true);
+			} else {
+				setShowPricingOnError(false);
+			}
 			setIsUploading(false);
 		}
 	};
@@ -412,12 +467,17 @@ export default function Home() {
 					<DialogContent>
 						<DialogTitle>Upload Failed</DialogTitle>
 						<DialogDescription className="space-y-4 inline-flex items-center">
-							<LucideFileWarning className="h-6 w-6 text-red-500 mr-2 flex-shrink-0" />
-							{/* Generic error message (temp) */}
-							We encountered an error processing your request. Please check the file or URL and try again.
+							<MessageCircleWarning className="h-6 w-6 text-slate-500 mr-2 flex-shrink-0" />
+							{errorAlertMessage ?? DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE}
 						</DialogDescription>
 						<div className="flex justify-end mt-4">
-							<Button variant="outline" onClick={() => setShowErrorAlert(false)}>Close</Button>
+							{
+								showPricingOnError && (
+									<Button variant="default" asChild className="mr-2 bg-blue-500 hover:bg-blue-200 dark:bg-blue-600 dark:hover:bg-blue-700 text-white">
+										<Link href="/pricing">Upgrade</Link>
+									</Button>
+								)
+							}
 						</div>
 					</DialogContent>
 				</Dialog>

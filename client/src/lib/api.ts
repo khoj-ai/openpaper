@@ -18,7 +18,23 @@ export async function fetchFromApi(endpoint: string, options: RequestInit = {}) 
     });
 
     if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        let errorMessage = `API error: ${response.status}`;
+
+        try {
+            const errorData = await response.json();
+            if (errorData.message) {
+                errorMessage = errorData.message;
+            } else if (errorData.error) {
+                errorMessage = errorData.error;
+            } else if (errorData.detail) {
+                errorMessage = errorData.detail;
+            }
+        } catch {
+            // If we can't parse the error response, fall back to status text
+            errorMessage = `API error: ${response.status} ${response.statusText}`;
+        }
+
+        throw new Error(errorMessage)
     }
 
     return response.json();

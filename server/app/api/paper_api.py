@@ -22,7 +22,7 @@ from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 load_dotenv()
@@ -73,6 +73,7 @@ async def get_paper_ids(
                     "summary": paper.summary,
                     "status": paper.status,
                     "preview_url": paper.preview_url,
+                    "size_in_kb": paper.size_in_kb,
                 }
                 for paper in papers
             ]
@@ -255,6 +256,7 @@ async def get_relevant_papers(
                     "summary": paper.summary,
                     "status": paper.status,
                     "preview_url": paper.preview_url,
+                    "size_in_kb": paper.size_in_kb,
                 }
                 for paper in papers
             ]

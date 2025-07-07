@@ -3,434 +3,706 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, X, Clock } from "lucide-react";
-import { useState } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Clock, Calendar, CheckCircle } from "lucide-react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import CheckoutSheet from "./checkout";
+import { fetchFromApi } from "@/lib/api";
+import { UserSubscription } from "@/lib/schema";
+import PricingTable from "./pricingTable";
+import { toast } from "sonner";
 
-
-interface PricingFeature {
-    name: string;
-    base: string | boolean;
-    researcher: string | boolean;
-    teams: string | boolean;
-}
-
-const features: PricingFeature[] = [
-    {
-        name: "Annotations",
-        base: true,
-        researcher: true,
-        teams: true
-    },
-    {
-        name: "Notes",
-        base: true,
-        researcher: true,
-        teams: true
-    },
-    {
-        name: "Paper finder",
-        base: true,
-        researcher: true,
-        teams: true
-    },
-    {
-        name: "Paper uploads",
-        base: "10",
-        researcher: "500",
-        teams: "unlimited"
-    },
-    {
-        name: "Knowledge base size",
-        base: "500 MB",
-        researcher: "3 GB",
-        teams: "50 GB"
-    },
-    {
-        name: "Models",
-        base: "Basic",
-        researcher: "Advanced",
-        teams: "Advanced"
-    },
-    {
-        name: "Chat credits (daily)",
-        base: "500",
-        researcher: "10,000",
-        teams: "unlimited"
-    },
-    {
-        name: "Audio overviews (monthly)",
-        base: "5",
-        researcher: "100",
-        teams: "unlimited"
-    },
-    {
-        name: "Literature review (monthly)",
-        base: "2",
-        researcher: "100",
-        teams: "500"
-    },
-    {
-        name: "Team annotations",
-        base: false,
-        researcher: false,
-        teams: true
-    },
-    {
-        name: "Team chat",
-        base: false,
-        researcher: false,
-        teams: true
-    }
-];
+const monthlyPrice = 12;
+const annualPrice = 8;
 
 export default function PricingPage() {
     const [isAnnual, setIsAnnual] = useState(false);
-    const [selectedPlan, setSelectedPlan] = useState("base");
+    const [selectedPlan, setSelectedPlan] = useState("basic");
+    const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+    const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [isPortalLoading, setIsPortalLoading] = useState(false);
+    const [isIntervalChangeLoading, setIsIntervalChangeLoading] = useState(false);
+    const [isResubscribeLoading, setIsResubscribeLoading] = useState(false);
 
-    const planOptions = [
-        { value: "base", label: "Base" },
-        { value: "researcher", label: "Researcher" },
-        { value: "teams", label: "Teams" }
-    ];
+    const annualSavings = (monthlyPrice - annualPrice) * 12;
 
-    const getFeatureValueForPlan = (feature: PricingFeature, plan: string) => {
-        switch (plan) {
-            case "base":
-                return feature.base;
-            case "researcher":
-                return feature.researcher;
-            case "teams":
-                return feature.teams;
-            default:
-                return feature.base;
+    // Fetch user subscription status
+    useEffect(() => {
+        const fetchSubscription = async () => {
+            try {
+                const response: UserSubscription = await fetchFromApi("/api/subscription/user-subscription", {
+                    method: "GET",
+                });
+
+                setUserSubscription(response);
+
+                // Set billing toggle based on user's current subscription
+                if (response.has_subscription) {
+                    setIsAnnual(response.subscription.interval === "year");
+                }
+            } catch (error) {
+                console.error('Failed to fetch subscription:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchSubscription();
+    }, []);
+
+    const handleManageSubscription = async () => {
+        setIsPortalLoading(true);
+        try {
+            const response = await fetchFromApi("/api/subscription/create-portal-session", {
+                method: "POST",
+            });
+
+            if (response.url) {
+                window.location.href = response.url;
+            }
+        } catch (error) {
+            console.error('Failed to create portal session:', error);
+            // You might want to show a toast notification here
+            toast.error('Failed to open subscription management portal. Please try again later. Contact support if the issue persists.');
+        } finally {
+            setIsPortalLoading(false);
         }
     };
 
-    const renderFeatureValue = (value: string | boolean, isComingSoon?: boolean) => {
-        if (typeof value === "boolean") {
-            return value ? (
-                <Check className="h-5 w-5 text-green-500 mx-auto" />
-            ) : (
-                <X className="h-5 w-5 text-gray-400 mx-auto" />
-            );
-        }
+    const handleIntervalChange = async (newInterval: "month" | "year") => {
+        setIsIntervalChangeLoading(true);
+        try {
+            const response = await fetchFromApi(`/api/subscription/change-interval?new_interval=${newInterval}`, {
+                method: "POST",
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
 
-        if (isComingSoon) {
-            return (
-                <div className="flex items-center gap-2 justify-center">
-                    <Clock className="h-4 w-4 text-amber-500" />
-                    <span className="text-sm text-muted-foreground">{value}</span>
-                </div>
-            );
-        }
+            if (response.success) {
+                // Update the local state to reflect the change
+                setIsAnnual(newInterval === "year");
 
-        return <span>{value}</span>;
+                toast.success(`Billing interval changed to ${newInterval === "year" ? "annual" : "monthly"} successfully.`);
+
+                // Add delay to ensure backend state is updated before refreshing
+                await new Promise(resolve => setTimeout(resolve, 800));
+
+                // Optionally refresh the subscription data
+                const updatedSubscription = await fetchFromApi("/api/subscription/user-subscription", {
+                    method: "GET",
+                });
+                setUserSubscription(updatedSubscription);
+
+                // You might want to show a success toast here
+                console.log('Interval change successful:', response.message);
+            } else {
+                console.error('Failed to change interval:', response.message);
+                // You might want to show an error toast here
+                toast.error(`Failed to change billing interval: ${response.message}`);
+            }
+        } catch (error) {
+            console.error('Failed to change interval:', error);
+            // You might want to show an error toast here
+            toast.error('Failed to change billing interval. Please try again later.');
+        } finally {
+            setIsIntervalChangeLoading(false);
+        }
+    };
+
+    const handleResubscribe = async () => {
+        setIsResubscribeLoading(true);
+        try {
+            const response = await fetchFromApi("/api/subscription/resubscribe", {
+                method: "POST",
+            });
+
+            if (response.success) {
+                toast.success('Resubscription successful', {
+                    description: 'Thank you for supporting open research! Your subscription has been reactivated.',
+                });
+
+                // Add delay to ensure backend state is updated before refreshing
+                await new Promise(resolve => setTimeout(resolve, 800));
+
+                // Refresh the subscription data to reflect the reactivated subscription
+                const updatedSubscription = await fetchFromApi("/api/subscription/user-subscription", {
+                    method: "GET",
+                });
+
+                setUserSubscription(updatedSubscription);
+
+                console.log('Resubscription successful');
+
+            } else {
+                console.error('Failed to resubscribe:', response.error);
+                // You might want to show an error toast here
+                toast.error(`Failed to resubscribe: ${response.error}`);
+            }
+        } catch (error) {
+            console.error('Failed to resubscribe:', error);
+            // You might want to show an error toast here
+            toast.error('Failed to resubscribe. Please try again later.');
+        } finally {
+            setIsResubscribeLoading(false);
+        }
+    };
+
+    const formatDate = (dateString: string) => {
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    };
+
+    const isCurrentlySubscribed = userSubscription?.has_subscription;
+    const subscriptionStatus = userSubscription?.subscription?.status;
+    const isActiveSubscription = subscriptionStatus === 'active' || subscriptionStatus === 'trialing';
+    const isCanceled = subscriptionStatus === 'canceled' || userSubscription?.subscription?.cancel_at_period_end;
+    const canResubscribe = userSubscription?.has_subscription && isCanceled;
+
+    const getStatusBadgeColor = (status: string | undefined) => {
+        switch (status) {
+            case 'active':
+                return 'bg-green-600 text-white border-green-600';
+            case 'trialing':
+                return 'bg-yellow-600 text-white border-yellow-600';
+            case 'canceled':
+                return 'bg-red-400 text-white border-red-400';
+            case 'past_due':
+                return 'bg-amber-600 text-white border-amber-600';
+            case 'incomplete':
+                return 'bg-amber-400 text-white border-amber-400';
+            case 'unpaid':
+                return 'bg-amber-400 text-white border-amber-400';
+            default:
+                return 'bg-slate-400 text-white border-slate-400';
+        }
+    };
+
+    const getStatusDisplay = (status: string | undefined) => {
+        switch (status) {
+            case 'active':
+                return 'Active';
+            case 'trialing':
+                return 'Trial';
+            case 'canceled':
+                return 'Canceled';
+            case 'past_due':
+                return 'Past Due';
+            case 'incomplete':
+                return 'Incomplete';
+            case 'unpaid':
+                return 'Unpaid';
+            default:
+                return 'Unknown';
+        }
     };
 
     return (
-        <div className="max-w-6xl mx-auto p-2 sm:p-8 space-y-12">
+        <div className="max-w-6xl mx-auto p-2 sm:p-8 space-y-16">
             {/* Header */}
-            <div className="text-center space-y-4">
-                <h1 className="text-4xl font-bold">Simple, Transparent Pricing</h1>
-                <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                    Choose the plan fit for your research needs. All plans include unlimited annotations and notes.
-                </p>
-
-                {/* Beta Banner */}
-                <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 max-w-4xl mx-auto mt-6">
-                    <p className="text-sm text-blue-800 dark:text-blue-200">
-                        <strong>We are in Free, Open Beta for the month of June!</strong> That means you get unlimited usage while we evaluate our roadmap. Help us shape the future of research!{" "}
-                        <a
-                            href="https://github.com/khoj-ai/openpaper/issues"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="underline hover:no-underline font-medium"
-                        >
-                            Submit feedback here
-                        </a>
-                        .
+            <div className="text-center space-y-6">
+                <div className="space-y-3">
+                    <h1 className="text-4xl font-light tracking-tight text-slate-900 dark:text-slate-100">
+                        Research Plans
+                    </h1>
+                    <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed">
+                        Choose the plan that fits your research workflow. All plans include unlimited annotations and comprehensive note-taking capabilities.
                     </p>
-                </div>
-
-                {/* Billing Toggle */}
-                <div className="flex items-center justify-center gap-4 mt-8">
-                    <span className={cn("text-sm", !isAnnual && "font-semibold")}>Monthly</span>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setIsAnnual(!isAnnual)}
-                        className="relative"
-                    >
-                        <div className={cn(
-                            "w-12 h-6 rounded-full transition-colors",
-                            isAnnual ? "bg-primary" : "bg-gray-300"
-                        )}>
-                            <div className={cn(
-                                "w-5 h-5 rounded-full bg-white transition-transform mt-0.5",
-                                isAnnual ? "translate-x-6 ml-0.5" : "translate-x-0.5"
-                            )} />
-                        </div>
-                    </Button>
-                    <span className={cn("text-sm", isAnnual && "font-semibold")}>
-                        Annual
-                        <Badge variant="secondary" className="ml-2">33% off</Badge>
-                    </span>
                 </div>
             </div>
 
+            {/* Loading Skeleton for Subscription Card */}
+            {loading && (
+                <Card className="border-2 border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+                    <CardHeader className="py-4">
+                        <div className="flex items-center gap-3">
+                            <Skeleton className="h-8 w-8 rounded-full" />
+                            <div className="flex-1 space-y-2">
+                                <Skeleton className="h-5 w-32" />
+                                <Skeleton className="h-4 w-24" />
+                            </div>
+                            <Skeleton className="h-6 w-16 rounded-full" />
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-6 my-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+                            <div className="text-center sm:text-left space-y-2">
+                                <Skeleton className="h-6 w-28 mx-auto sm:mx-0" />
+                                <Skeleton className="h-4 w-36 mx-auto sm:mx-0" />
+                            </div>
+                            <div className="text-center space-y-2">
+                                <Skeleton className="h-6 w-20 mx-auto" />
+                                <Skeleton className="h-4 w-24 mx-auto" />
+                            </div>
+                            <div className="text-center sm:text-right space-y-2 sm:col-span-2 md:col-span-1">
+                                <Skeleton className="h-5 w-32 mx-auto sm:ml-auto sm:mr-0" />
+                                <Skeleton className="h-4 w-16 mx-auto sm:ml-auto sm:mr-0" />
+                            </div>
+                        </div>
+                        <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                            <Skeleton className="h-10 w-full" />
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Current Subscription Card */}
+            {isCurrentlySubscribed && !loading && (
+                <Card className={cn(
+                    "border-2 transition-all duration-200",
+                    isActiveSubscription
+                        ? "border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50"
+                        : "border-slate-200 dark:border-slate-700 bg-slate-50/30 dark:bg-slate-900/30"
+                )}>
+                    <CardHeader className="py-4">
+                        <div className="flex items-center gap-3">
+                            <div className={cn(
+                                "p-2 rounded-full",
+                                isActiveSubscription
+                                    ? "bg-slate-100 dark:bg-slate-800"
+                                    : "bg-slate-100 dark:bg-slate-800"
+                            )}>
+                                <CheckCircle className={cn(
+                                    "h-4 w-4",
+                                    isActiveSubscription
+                                        ? "text-slate-700 dark:text-slate-300"
+                                        : "text-slate-500 dark:text-slate-400"
+                                )} />
+                            </div>
+                            <div className="flex-1">
+                                <CardTitle className="text-lg font-medium text-slate-900 dark:text-slate-100">
+                                    Your Research Plan
+                                </CardTitle>
+                                <CardDescription className="text-sm text-slate-600 dark:text-slate-400">
+                                    {isActiveSubscription ? "Currently active" : "Subscription not active"}
+                                </CardDescription>
+                            </div>
+                            <Badge className={cn("font-normal", getStatusBadgeColor(subscriptionStatus))}>
+                                {getStatusDisplay(subscriptionStatus)}
+                            </Badge>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-6 my-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+                            <div className="text-center sm:text-left space-y-1">
+                                <div className="text-lg sm:text-xl font-medium text-slate-900 dark:text-slate-100">
+                                    Researcher Plan
+                                </div>
+                                <div className="text-sm text-slate-500 dark:text-slate-400">
+                                    Full access to all features
+                                </div>
+                            </div>
+                            <div className="text-center space-y-1">
+                                <div className="text-lg sm:text-xl font-medium text-slate-900 dark:text-slate-100">
+                                    ${userSubscription?.subscription.interval === "year" ? annualPrice : monthlyPrice}
+                                    <span className="text-sm sm:text-base font-normal text-slate-500 dark:text-slate-400">/month</span>
+                                </div>
+                                <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                                    Billed {userSubscription?.subscription.interval === "year" ? "annually" : "monthly"}
+                                    {isIntervalChangeLoading && (
+                                        <Badge variant="secondary" className="ml-2 text-xs">
+                                            Updating...
+                                        </Badge>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="text-center sm:text-right space-y-1 sm:col-span-2 md:col-span-1">
+                                <div className="flex items-center justify-center sm:justify-end gap-2 text-sm sm:text-lg font-medium text-slate-900 dark:text-slate-100">
+                                    <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+                                    <span className="break-words">
+                                        {userSubscription?.subscription.current_period_end &&
+                                            formatDate(userSubscription.subscription.current_period_end)
+                                        }
+                                    </span>
+                                </div>
+                                <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                                    {subscriptionStatus === 'canceled' || userSubscription?.subscription.cancel_at_period_end ? "Expires" : "Renews"}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Status-specific alerts */}
+                        {subscriptionStatus === 'canceled' && (
+                            <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 sm:p-4">
+                                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+                                    <Clock className="h-4 w-4 flex-shrink-0" />
+                                    <span className="font-medium text-sm sm:text-base">Subscription Canceled</span>
+                                </div>
+                                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
+                                    Your subscription will end on {userSubscription?.subscription.current_period_end &&
+                                        formatDate(userSubscription.subscription.current_period_end)}.
+                                    You can reactivate anytime before this date.
+                                </p>
+                            </div>
+                        )}
+
+                        {userSubscription?.subscription.cancel_at_period_end && subscriptionStatus === 'active' && (
+                            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 sm:p-4">
+                                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
+                                    <Clock className="h-4 w-4 flex-shrink-0" />
+                                    <span className="font-medium text-sm sm:text-base">Subscription Ending</span>
+                                </div>
+                                <p className="text-xs sm:text-sm text-amber-600 dark:text-amber-400 mt-1">
+                                    Your subscription will end on {userSubscription?.subscription.current_period_end &&
+                                        formatDate(userSubscription.subscription.current_period_end)}.
+                                    You can reactivate anytime before this date.
+                                </p>
+                            </div>
+                        )}
+
+                        {subscriptionStatus === 'past_due' && (
+                            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 sm:p-4">
+                                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
+                                    <Clock className="h-4 w-4 flex-shrink-0" />
+                                    <span className="font-medium text-sm sm:text-base">Payment Past Due</span>
+                                </div>
+                                <p className="text-xs sm:text-sm text-amber-600 dark:text-amber-400 mt-1">
+                                    Your payment is past due. Please update your payment method to continue your subscription.
+                                </p>
+                            </div>
+                        )}
+
+                        {subscriptionStatus === 'incomplete' && (
+                            <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 sm:p-4">
+                                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+                                    <Clock className="h-4 w-4 flex-shrink-0" />
+                                    <span className="font-medium text-sm sm:text-base">Payment Incomplete</span>
+                                </div>
+                                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
+                                    Your payment is incomplete. Please complete the payment process to activate your subscription.
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Action buttons based on subscription status */}
+                        <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                            {canResubscribe ? (
+                                <Button
+                                    className="w-full bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-medium"
+                                    onClick={handleResubscribe}
+                                    disabled={isResubscribeLoading}
+                                >
+                                    {isResubscribeLoading ? "Reactivating..." : "Reactivate Subscription"}
+                                </Button>
+                            ) : (
+                                <Button
+                                    className="w-full bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-medium"
+                                    onClick={handleManageSubscription}
+                                    disabled={isPortalLoading}
+                                >
+                                    {isPortalLoading ? "Loading..." : "Manage Subscription"}
+                                </Button>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Billing Toggle */}
+            {!loading && (
+                <div className="flex flex-col items-center justify-center gap-3 sm:gap-6 mt-12 px-4">
+                    {/* Toggle Row */}
+                    <div className="flex items-center gap-3 sm:gap-4">
+                        <span className={cn(
+                            "text-xs sm:text-sm font-medium transition-colors",
+                            !isAnnual ? "text-slate-900 dark:text-slate-100" : "text-slate-500 dark:text-slate-400"
+                        )}>
+                            Monthly
+                        </span>
+                        {isActiveSubscription ? (
+                            <Dialog>
+                                <DialogTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="relative p-0"
+                                        disabled={isIntervalChangeLoading}
+                                    >
+                                        <div className={cn(
+                                            "w-12 h-6 sm:w-14 sm:h-7 rounded-full transition-all duration-200",
+                                            isAnnual ? "bg-slate-800 dark:bg-slate-200" : "bg-slate-200 dark:bg-slate-700"
+                                        )}>
+                                            <div className={cn(
+                                                "w-4 h-4 sm:w-5 sm:h-5 rounded-full transition-all duration-200 mt-1",
+                                                isAnnual
+                                                    ? "translate-x-7 sm:translate-x-8 bg-white dark:bg-slate-800"
+                                                    : "translate-x-1 bg-slate-600 dark:bg-slate-300"
+                                            )} />
+                                        </div>
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="border-slate-200 dark:border-slate-700 mx-4">
+                                    <DialogHeader>
+                                        <DialogTitle className="text-slate-900 dark:text-slate-100">
+                                            Change Billing Cycle
+                                        </DialogTitle>
+                                        <DialogDescription className="text-slate-600 dark:text-slate-400">
+                                            Switch from {isAnnual ? "annual" : "monthly"} to {isAnnual ? "monthly" : "annual"} billing.
+                                            The change will take effect at the end of your current billing cycle.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <div className="flex gap-3 mt-4">
+                                        <DialogTrigger asChild>
+                                            <Button variant="outline" className="flex-1">
+                                                Cancel
+                                            </Button>
+                                        </DialogTrigger>
+                                        <Button
+                                            className="flex-1 bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900"
+                                            onClick={() => handleIntervalChange(isAnnual ? "month" : "year")}
+                                            disabled={isIntervalChangeLoading}
+                                        >
+                                            {isIntervalChangeLoading ? "Changing..." : `Switch to ${isAnnual ? "Monthly" : "Annual"}`}
+                                        </Button>
+                                    </div>
+                                </DialogContent>
+                            </Dialog>
+                        ) : (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setIsAnnual(!isAnnual)}
+                                className="relative p-0"
+                                disabled={isActiveSubscription}
+                            >
+                                <div className={cn(
+                                    "w-12 h-6 sm:w-14 sm:h-7 rounded-full transition-all duration-200",
+                                    isAnnual ? "bg-slate-800 dark:bg-slate-200" : "bg-slate-200 dark:bg-slate-700"
+                                )}>
+                                    <div className={cn(
+                                        "w-4 h-4 sm:w-5 sm:h-5 rounded-full transition-all duration-200 mt-1",
+                                        isAnnual
+                                            ? "translate-x-7 sm:translate-x-8 bg-white dark:bg-slate-800"
+                                            : "translate-x-1 bg-slate-600 dark:bg-slate-300"
+                                    )} />
+                                </div>
+                            </Button>
+                        )}
+                        <div className="flex items-center gap-1 sm:gap-2">
+                            <span className={cn(
+                                "text-xs sm:text-sm font-medium transition-colors",
+                                isAnnual ? "text-slate-900 dark:text-slate-100" : "text-slate-500 dark:text-slate-400"
+                            )}>
+                                Annual
+                            </span>
+                            <Badge variant="secondary" className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-0 text-xs px-2 py-0.5">
+                                Save 33%
+                            </Badge>
+                        </div>
+                    </div>
+
+                    {/* Current Subscription Info */}
+                    {isCurrentlySubscribed && (
+                        <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 text-center sm:text-left">
+                            <Badge variant="outline" className="border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-xs">
+                                Current: {userSubscription?.subscription.interval === "year" ? "Annual" : "Monthly"}
+                            </Badge>
+                            {isActiveSubscription && (
+                                <span className="text-xs text-slate-500 dark:text-slate-400 max-w-xs sm:max-w-none">
+                                    Click toggle to change
+                                </span>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Pricing Cards */}
-            <div className="grid md:grid-cols-3 gap-8 mb-12">
+            <div className="grid md:grid-cols-3 gap-8 py-4">
                 {/* Base Plan */}
-                <Card className="relative">
-                    <CardHeader>
-                        <CardTitle className="text-2xl">Base</CardTitle>
-                        <CardDescription>Perfect for getting started</CardDescription>
-                        <div className="text-3xl font-bold">
-                            $0<span className="text-lg font-normal text-muted-foreground">/mo</span>
+                <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:shadow-lg transition-shadow duration-200">
+                    <CardHeader className="pb-4">
+                        <div className="space-y-2">
+                            <CardTitle className="text-xl font-medium text-slate-900 dark:text-slate-100">
+                                Base
+                            </CardTitle>
+                            <CardDescription className="text-slate-600 dark:text-slate-400">
+                                Perfect for getting started with research
+                            </CardDescription>
+                        </div>
+                        <div className="pt-4">
+                            <div className="text-3xl font-light text-slate-900 dark:text-slate-100">
+                                $0
+                                <span className="text-lg font-normal text-slate-500 dark:text-slate-400">/month</span>
+                            </div>
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <Button className="w-full" variant="outline" onClick={() => { window.location.href = '/login' }}>
-                            Get Started
+                        <Button
+                            className="w-full font-medium border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+                            variant="outline"
+                            onClick={() => { window.location.href = '/login' }}
+                            disabled={isActiveSubscription}
+                        >
+                            {isActiveSubscription ? "Researcher Plan Active" : "Get Started"}
                         </Button>
                     </CardContent>
                 </Card>
 
                 {/* Researcher Plan */}
-                <Card className="relative border-blue-600 dark:border-blue-400 shadow-lg">
-                    <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 dark:bg-blue-400">Recommended</Badge>
-                    <CardHeader>
-                        <CardTitle className="text-2xl">Researcher</CardTitle>
-                        <CardDescription>For independent researchers</CardDescription>
-                        <div className="text-3xl font-bold">
-                            ${isAnnual ? "8" : "12"}
-                            <span className="text-lg font-normal text-muted-foreground">/mo</span>
+                <Card className={cn(
+                    "relative border-2 transition-all duration-200",
+                    isActiveSubscription
+                        ? "border-slate-300 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-900/50 shadow-lg"
+                        : "border-slate-900 dark:border-slate-100 bg-white dark:bg-slate-900 shadow-lg"
+                )}>
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                        <Badge className={cn(
+                            "font-normal px-3 py-1",
+                            isActiveSubscription
+                                ? "bg-blue-800 dark:bg-blue-200 text-white dark:text-slate-900"
+                                : "bg-blue-900 dark:bg-blue-100 text-white dark:text-slate-900"
+                        )}>
+                            {isActiveSubscription ? "Your Plan" : "Recommended"}
+                        </Badge>
+                    </div>
+                    <CardHeader className="pb-4">
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                                <CardTitle className="text-xl font-medium text-slate-900 dark:text-slate-100">
+                                    Researcher
+                                </CardTitle>
+                                {isActiveSubscription && (
+                                    <CheckCircle className="h-5 w-5 text-slate-700 dark:text-slate-300" />
+                                )}
+                            </div>
+                            <CardDescription className="text-slate-600 dark:text-slate-400">
+                                For independent researchers and academics
+                            </CardDescription>
                         </div>
-                        {isAnnual && (
-                            <p className="text-sm text-muted-foreground">Billed annually at $96/year</p>
+                        <div className="pt-4">
+                            <div className="text-3xl font-light text-slate-900 dark:text-slate-100">
+                                ${isAnnual ? annualPrice : monthlyPrice}
+                                <span className="text-lg font-normal text-slate-500 dark:text-slate-400">/month</span>
+                            </div>
+                            {isAnnual && (
+                                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                                    Billed annually at ${annualPrice * 12}/year
+                                </p>
+                            )}
+                        </div>
+                        {isActiveSubscription && (
+                            <Badge variant="outline" className="w-fit mt-2 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400">
+                                Active since {userSubscription?.subscription.current_period_start &&
+                                    formatDate(userSubscription.subscription.current_period_start)
+                                }
+                            </Badge>
                         )}
                     </CardHeader>
                     <CardContent>
-                        <Dialog>
-                            <DialogTrigger asChild>
-                                <Button className="w-full bg-blue-600 dark:bg-blue-400">
-                                    Upgrade to Researcher
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>Free for 1 Month</DialogTitle>
-                                    <DialogDescription>
-                                        While we are in open beta, everyone has access to the Researcher plan until July 1st, 2025. Check back then to start your subscription!
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <div className="mt-4">
-                                    <p className="text-sm text-muted-foreground mb-2">
-                                        Enjoy 500 paper uploads, 3 GB knowledge base, and more! Get access to advanced features and increased limits.
-                                    </p>
-                                </div>
-                                <div className="text-sm text-muted-foreground mb-4 flex justify-between">
-                                    <DialogClose asChild>
-                                        <Button variant="outline" className="w-fit">
-                                            Cancel
-                                        </Button>
-                                    </DialogClose>
-                                    <DialogClose asChild>
-                                        <Button variant="outline" className="w-auto bg-blue-600 dark:bg-blue-400 text-primary-foreground">
-                                            Got it
-                                        </Button>
-                                    </DialogClose>
-                                </div>
-                            </DialogContent>
-                        </Dialog>
+                        <Button
+                            className={cn(
+                                "w-full font-medium transition-colors",
+                                isActiveSubscription
+                                    ? "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 cursor-default"
+                                    : "bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900"
+                            )}
+                            onClick={() => {
+                                if (canResubscribe) {
+                                    handleResubscribe();
+                                } else {
+                                    setIsCheckoutOpen(true);
+                                }
+                            }}
+                            disabled={isActiveSubscription || isResubscribeLoading}
+                        >
+                            {isActiveSubscription
+                                ? "Current Plan"
+                                : canResubscribe
+                                    ? (isResubscribeLoading ? "Reactivating..." : "Reactivate Subscription")
+                                    : "Upgrade to Researcher"}
+                        </Button>
                     </CardContent>
                 </Card>
 
+                <CheckoutSheet
+                    open={isCheckoutOpen}
+                    onOpenChange={setIsCheckoutOpen}
+                    interval={isAnnual ? "year" : "month"}
+                    planName="Researcher"
+                    annualSavings={annualSavings}
+                    isResubscription={canResubscribe}
+                />
+
                 {/* Teams Plan */}
-                <Card className="relative opacity-75">
-                    <Badge variant="secondary" className="absolute -top-3 left-1/2 -translate-x-1/2">
-                        Coming Soon
-                    </Badge>
-                    <CardHeader>
-                        <CardTitle className="text-2xl">Teams</CardTitle>
-                        <CardDescription>For research teams and organizations</CardDescription>
-                        <div className="text-3xl font-bold">
-                            TBD<span className="text-lg font-normal text-muted-foreground">/mo</span>
+                <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 opacity-60 relative">
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                        <Badge variant="secondary" className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-0">
+                            Coming Soon
+                        </Badge>
+                    </div>
+                    <CardHeader className="pb-4">
+                        <div className="space-y-2">
+                            <CardTitle className="text-xl font-medium text-slate-900 dark:text-slate-100">
+                                Teams
+                            </CardTitle>
+                            <CardDescription className="text-slate-600 dark:text-slate-400">
+                                For research teams and organizations
+                            </CardDescription>
+                        </div>
+                        <div className="pt-4">
+                            <div className="text-3xl font-light text-slate-900 dark:text-slate-100">
+                                TBD
+                                <span className="text-lg font-normal text-slate-500 dark:text-slate-400">/month</span>
+                            </div>
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <Button className="w-full" variant="outline" disabled>
+                        <Button
+                            className="w-full font-medium border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400"
+                            variant="outline"
+                            disabled
+                        >
                             Coming Soon
                         </Button>
                     </CardContent>
                 </Card>
             </div>
-            {/* Feature Comparison Table */}
-            <div className="space-y-4">
-                <h2 className="text-2xl font-bold text-center">Feature Comparison</h2>
 
-                {/* Mobile Plan Selector */}
-                <div className="sm:hidden mb-4">
-                    <Select value={selectedPlan} onValueChange={setSelectedPlan}>
-                        <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select a plan" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {planOptions.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
-                                    {option.value === "researcher" && (
-                                        <Badge variant="secondary" className="ml-2 text-xs">
-                                            Recommended
-                                        </Badge>
-                                    )}
-                                    {option.value === "teams" && (
-                                        <Badge variant="outline" className="ml-2 text-xs">
-                                            Coming Soon
-                                        </Badge>
-                                    )}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+            <PricingTable
+                selectedPlan={selectedPlan}
+                setSelectedPlan={setSelectedPlan}
+                isActiveSubscription={isActiveSubscription}
+                canResubscribe={canResubscribe ?? false}
+                isCurrentlySubscribed={isCurrentlySubscribed || false}
+            />
+
+            {/* Support Section */}
+            <div className="text-center space-y-6 pt-12 border-t border-slate-200 dark:border-slate-700">
+                <div className="space-y-3">
+                    <h3 className="text-xl font-medium text-slate-900 dark:text-slate-100">
+                        Questions about pricing?
+                    </h3>
+                    <p className="text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
+                        We&apos;re here to help you find the right plan for your research needs.
+                        Our team understands the unique requirements of academic work.
+                    </p>
                 </div>
-
-                {/* Desktop Table */}
-                <div className="hidden sm:block border border-border rounded-lg min-w-[600px]">
-                    <table className="w-full">
-                        <thead>
-                            <tr className="border-b bg-muted/50">
-                                <th className="text-left p-2 sm:p-4 font-semibold">Features</th>
-                                <th className="text-center p-2 sm:p-4 font-semibold min-w-[80px]">Base</th>
-                                <th className="text-center p-2 sm:p-4 font-semibold min-w-[100px]">Researcher</th>
-                                <th className="text-center p-2 sm:p-4 font-semibold min-w-[80px]">Teams</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {features.map((feature, index) => {
-                                const isComingSoon = feature.name === "Literature review (monthly)";
-                                const isTeamsOnly = feature.name === "Team annotations" || feature.name === "Team chat";
-
-                                return (
-                                    <tr key={feature.name} className={cn(
-                                        "border-b",
-                                        index % 2 === 0 && "bg-muted/20"
-                                    )}>
-                                        <td className="p-2 sm:p-4 font-medium">
-                                            <div className="flex flex-col gap-1">
-                                                <span className="text-sm sm:text-base">{feature.name}</span>
-                                                {isComingSoon && (
-                                                    <Badge variant="outline" className="text-xs w-fit">
-                                                        Coming Soon
-                                                    </Badge>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="p-2 sm:p-4 text-center text-sm sm:text-base">
-                                            {renderFeatureValue(feature.base, isComingSoon)}
-                                        </td>
-                                        <td className="p-2 sm:p-4 text-center text-sm sm:text-base">
-                                            {renderFeatureValue(feature.researcher, isComingSoon)}
-                                        </td>
-                                        <td className="p-2 sm:p-4 text-center text-sm sm:text-base">
-                                            {isTeamsOnly ? (
-                                                <div className="flex flex-col items-center justify-center gap-1">
-                                                    <Check className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
-                                                    <Badge variant="secondary" className="text-xs">
-                                                        Coming Soon
-                                                    </Badge>
-                                                </div>
-                                            ) : (
-                                                renderFeatureValue(feature.teams, isComingSoon)
-                                            )}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* Mobile Table */}
-                <div className="sm:hidden">
-                    <Card>
-                        <CardHeader className="pb-4">
-                            <CardTitle className="text-lg capitalize">{selectedPlan} Plan</CardTitle>
-                            {selectedPlan === "researcher" && (
-                                <Badge className="w-fit bg-blue-600 dark:bg-blue-400">Recommended</Badge>
-                            )}
-                            {selectedPlan === "teams" && (
-                                <Badge variant="secondary" className="w-fit">Coming Soon</Badge>
-                            )}
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            {features.map((feature, index) => {
-                                const isComingSoon = feature.name === "Literature review (monthly)";
-                                const isTeamsOnly = feature.name === "Team annotations" || feature.name === "Team chat";
-                                const featureValue = getFeatureValueForPlan(feature, selectedPlan);
-
-                                return (
-                                    <div key={feature.name} className={cn(
-                                        "flex justify-between items-center py-3 px-4 rounded-lg",
-                                        index % 2 === 0 && "bg-muted/20"
-                                    )}>
-                                        <div className="flex flex-col gap-1">
-                                            <span className="font-medium text-sm">{feature.name}</span>
-                                            {isComingSoon && (
-                                                <Badge variant="outline" className="text-xs w-fit">
-                                                    Coming Soon
-                                                </Badge>
-                                            )}
-                                        </div>
-                                        <div className="text-right">
-                                            {isTeamsOnly && selectedPlan === "teams" ? (
-                                                <div className="flex flex-col items-end gap-1">
-                                                    <Check className="h-4 w-4 text-green-500" />
-                                                    <Badge variant="secondary" className="text-xs">
-                                                        Coming Soon
-                                                    </Badge>
-                                                </div>
-                                            ) : (
-                                                renderFeatureValue(featureValue, isComingSoon)
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
-
-            {/* FAQ or Additional Info */}
-            <div className="text-center space-y-4 pt-8 border-t">
-                <h3 className="text-xl font-semibold">Questions?</h3>
-                <p className="text-muted-foreground">
-                    Need help choosing the right plan? Contact us and we will help you find the perfect fit for your research needs.
-                </p>
                 <Dialog>
                     <DialogTrigger asChild>
-                        <Button variant="outline" className="w-fit mx-auto">
+                        <Button variant="outline" className="border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">
                             Contact Support
                         </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="border-slate-200 dark:border-slate-700">
                         <DialogHeader>
-                            <DialogTitle>Contact Support</DialogTitle>
-                            <DialogDescription>
+                            <DialogTitle className="text-slate-900 dark:text-slate-100">Contact Support</DialogTitle>
+                            <DialogDescription className="text-slate-600 dark:text-slate-400">
                                 If you have any questions about our pricing or need help choosing a plan, please reach out to us.
                             </DialogDescription>
                         </DialogHeader>
                         <div className="mt-4">
-                            <p className="text-sm text-muted-foreground mb-2">
-                                You can email us at {" "}
-                                <a href="mailto:saba@openpaper.ai" className="underline">
+                            <p className="text-sm text-slate-600 dark:text-slate-400">
+                                You can email us at{" "}
+                                <a href="mailto:saba@openpaper.ai" className="text-slate-900 dark:text-slate-100 underline underline-offset-2">
                                     saba@openpaper.ai
                                 </a>
-                                .
                             </p>
                         </div>
                     </DialogContent>

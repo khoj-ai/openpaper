@@ -1,6 +1,6 @@
 "use client"
 
-import { Clock, FileText, Globe2, Home, LogOut, MessageCircleQuestion, Moon, Route, Sun, User } from "lucide-react";
+import { AlertTriangle, Clock, FileText, Globe2, Home, LogOut, MessageCircleQuestion, Moon, Route, Sun, User, X } from "lucide-react";
 
 import {
     Sidebar,
@@ -21,13 +21,16 @@ import { fetchFromApi } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { Avatar } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useIsDarkMode } from "@/hooks/useDarkMode";
+import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isStorageNearLimit, isPaperUploadNearLimit } from "@/hooks/useSubscription";
 import Image from "next/image";
 import Link from "next/link";
 import { PaperStatus } from "@/components/utils/PdfStatus";
@@ -72,6 +75,7 @@ export interface PaperItem {
     created_at?: string
     status?: PaperStatus
     preview_url?: string
+    size_in_kb?: number
 }
 
 export function AppSidebar() {
@@ -79,6 +83,8 @@ export function AppSidebar() {
     const { user, logout } = useAuth();
     const [allPapers, setAllPapers] = useState<PaperItem[]>([])
     const { darkMode, toggleDarkMode } = useIsDarkMode();
+    const { subscription, loading: subscriptionLoading } = useSubscription();
+    const [dismissedWarning, setDismissedWarning] = useState<string | null>(null);
 
     useEffect(() => {
         // Define an async function inside useEffect
@@ -103,6 +109,61 @@ export function AppSidebar() {
         await logout();
         router.push('/login');
     }
+
+    // Determine current subscription warning state
+    const getSubscriptionWarning = () => {
+        if (!subscription || !user || subscriptionLoading) return null;
+
+        // Check for critical states first (red warnings)
+        if (isStorageAtLimit(subscription)) {
+            return {
+                type: 'error' as const,
+                key: 'storage-limit',
+                title: 'Storage limit reached',
+                description: 'Upgrade your plan or delete papers to continue.',
+            };
+        }
+
+        if (isPaperUploadAtLimit(subscription)) {
+            return {
+                type: 'error' as const,
+                key: 'upload-limit',
+                title: 'Upload limit reached',
+                description: 'Upgrade your plan to upload more.',
+            };
+        }
+
+        // Check for warning states (yellow warnings)
+        if (isStorageNearLimit(subscription)) {
+            return {
+                type: 'warning' as const,
+                key: 'storage-near-limit',
+                title: 'Storage nearly full',
+                description: 'Consider upgrading your plan.',
+            };
+        }
+
+        if (isPaperUploadNearLimit(subscription)) {
+            return {
+                type: 'warning' as const,
+                key: 'upload-near-limit',
+                title: 'Upload limit approaching',
+                description: 'Consider upgrading your plan.',
+            };
+        }
+
+        return null;
+    };
+
+    const currentWarning = getSubscriptionWarning();
+    const shouldShowWarning = currentWarning && dismissedWarning !== currentWarning.key;
+
+    // Reset dismissed warning when warning changes
+    useEffect(() => {
+        if (currentWarning && dismissedWarning && dismissedWarning !== currentWarning.key) {
+            setDismissedWarning(null);
+        }
+    }, [currentWarning?.key, dismissedWarning]);
 
     return (
         <Sidebar variant="floating">
@@ -162,13 +223,52 @@ export function AppSidebar() {
                 </SidebarGroup>
             </SidebarContent>
             <SidebarFooter>
-                {/* Dark Mode Toggle */}
-                <SidebarMenuItem>
-                    <SidebarMenuButton onClick={toggleDarkMode}>
-                        {darkMode ? <Sun size={16} /> : <Moon size={16} />}
-                        <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
+                {/* Subscription Warning */}
+                {shouldShowWarning && (
+                    <div className="mb-2">
+                        <Alert variant={currentWarning.type === 'error' ? 'destructive' : 'warning'} className="p-3">
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-start gap-2 flex-1 min-w-0">
+                                    <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-xs font-medium mb-1">
+                                            {currentWarning.title}
+                                        </div>
+                                        <AlertDescription className="text-xs">
+                                            {currentWarning.description}
+                                        </AlertDescription>
+                                        <Link href="/pricing" className="inline-block mt-2">
+                                            <Button size="sm" variant="outline" className="h-6 text-xs px-2">
+                                                Upgrade Plan
+                                            </Button>
+                                        </Link>
+                                    </div>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-4 w-4 p-0 hover:bg-transparent"
+                                    onClick={() => setDismissedWarning(currentWarning.key)}
+                                >
+                                    <X className="h-3 w-3" />
+                                </Button>
+                            </div>
+                        </Alert>
+                    </div>
+                )}
+
+                {/* User Status Badge */}
+                {user && (
+                    <div className="px-2 py-1">
+                        <Badge
+                            variant={user.is_active ? "default" : "secondary"}
+                            className={`w-fit justify-center ${user.is_active ? "bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-200" : "bg-gray-100 text-gray-800"}`}
+                        >
+                            {user.is_active ? "Researcher" : "Basic"}
+                        </Badge>
+                    </div>
+                )}
+
                 {/* User Profile (if logged in) */}
                 {user && (
                     <SidebarMenuItem className="mb-2">
@@ -203,6 +303,11 @@ export function AppSidebar() {
                                             Plans
                                         </Button>
                                     </Link>
+                                    {/* Dark Mode Toggle */}
+                                    <Button onClick={toggleDarkMode} className="w-full justify-start">
+                                        {darkMode ? <Sun size={16} className="mr-2" /> : <Moon size={16} className="mr-2" />}
+                                        {darkMode ? 'Light Mode' : 'Dark Mode'}
+                                    </Button>
                                     <Button
                                         variant="outline"
                                         className="w-full justify-start"

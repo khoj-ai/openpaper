@@ -1,5 +1,5 @@
 import { fetchFromApi } from '@/lib/api';
-import { Pause, Play, RotateCcw, Volume2, Download, Clock, FileAudio, History, ChevronDown, Plus, Mic } from 'lucide-react';
+import { Pause, Play, RotateCcw, Volume2, Download, Clock, FileAudio, History, ChevronDown, Plus, Mic, HelpCircle } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -8,6 +8,11 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    HoverCard,
+    HoverCardContent,
+    HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import EnigmaticLoadingExperience from './EnigmaticLoadingExperience';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +21,8 @@ import CustomCitationLink from '@/components/utils/CustomCitationLink';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { JobStatusType, ReferenceCitation } from '@/lib/schema';
+import { useSubscription, isAudioOverviewAtLimit, nextMonday } from '@/hooks/useSubscription';
+import Link from 'next/link';
 
 interface AudioOverviewProps {
     paper_id: string;
@@ -62,6 +69,8 @@ const DEFAULT_INSTRUCTIONS = 'Please summarize the key points of this paper, foc
 export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: AudioOverviewProps) {
     const audioRef = useRef<HTMLAudioElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const { subscription, refetch: refetchSubscription } = useSubscription();
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [audioOverviewJobId, setAudioOverviewJobId] = useState<string | null>(null);
     const [audioOverview, setAudioOverview] = useState<AudioOverview | null>(null);
     const [allAudioOverviews, setAllAudioOverviews] = useState<AudioOverview[]>([]);
@@ -84,6 +93,17 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
     const [playbackRate, setPlaybackRate] = useState(1);
     const [isLoaded, setIsLoaded] = useState(false);
     const [waveformData, setWaveformData] = useState<number[]>([]);
+
+    // Audio overview credit usage state
+    const [audioCreditUsage, setAudioCreditUsage] = useState<{
+        used: number;
+        remaining: number;
+        total: number;
+        usagePercentage: number;
+        showWarning: boolean;
+        isNearLimit: boolean;
+        isCritical: boolean;
+    } | null>(null);
 
     // Check for existing audio overview on component mount
     useEffect(() => {
@@ -262,7 +282,6 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
 
     const checkExistingAudioOverview = async () => {
         try {
-            console.debug(`Job ID: ${audioOverviewJobId}, Paper ID: ${paper_id}`);
             const response: AudioOverview | null = await fetchFromApi(`/api/paper/audio/${paper_id}/file`);
             if (response) {
                 setAudioOverview(response);
@@ -286,7 +305,40 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
         setAllAudioOverviews(overviews);
     };
 
+    // useCallback to calculate audio overview credit usage
+    const updateAudioCreditUsage = useCallback(() => {
+        if (!subscription) {
+            setAudioCreditUsage(null);
+            return;
+        }
+
+        const { audio_overviews_used, audio_overviews_remaining } = subscription.usage;
+        const total = audio_overviews_used + audio_overviews_remaining;
+        const usagePercentage = total > 0 ? (audio_overviews_used / total) * 100 : 0;
+
+        setAudioCreditUsage({
+            used: audio_overviews_used,
+            remaining: audio_overviews_remaining,
+            total,
+            usagePercentage,
+            showWarning: usagePercentage > 75,
+            isNearLimit: usagePercentage > 75,
+            isCritical: usagePercentage > 95
+        });
+    }, [subscription]);
+
+    // Update audio credit usage whenever subscription changes
+    useEffect(() => {
+        updateAudioCreditUsage();
+    }, [updateAudioCreditUsage]);
+
     const createAudioOverview = async (additionalInstructions: string) => {
+        // Check if user has remaining audio overview credits
+        if (isAudioOverviewAtLimit(subscription)) {
+            setError('You have reached your monthly audio overview limit. Please upgrade your plan or wait until next Monday for credits to reset.');
+            return;
+        }
+
         setIsLoading(true);
         setError(null);
 
@@ -308,6 +360,13 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                 setJobStatus(response);
                 setAudioOverviewJobId(response.job_id);
                 setAudioOverview(null);
+
+                // Refetch subscription data to update credit usage
+                try {
+                    await refetchSubscription();
+                } catch (error) {
+                    console.error('Error refetching subscription after audio overview creation:', error);
+                }
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'An error occurred');
@@ -649,13 +708,30 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                                     createAudioOverview(additionalInstructions);
                                     setShowGenerationForm(false);
                                 }}
-                                disabled={isLoading}
-                                className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-400 text-white px-8 py-3 rounded-lg font-medium text-base shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+                                disabled={isLoading || isAudioOverviewAtLimit(subscription)}
+                                className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-400 disabled:cursor-not-allowed text-white px-8 py-3 rounded-lg font-medium text-base shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
                             >
                                 <Play className="w-4 h-4" />
-                                {isLoading ? 'Generating...' : 'Generate Audio Overview'}
+                                {isLoading ? 'Generating...' : isAudioOverviewAtLimit(subscription) ? 'Limit Reached' : 'Generate Audio Overview'}
                             </button>
                         </div>
+
+                        {/* Show limit reached message if at 100% */}
+                        {isAudioOverviewAtLimit(subscription) && (
+                            <div className="text-red-600 dark:text-red-400 text-sm mt-4 p-3 bg-red-50 dark:bg-red-950 rounded-lg border border-red-200 dark:border-red-800">
+                                <div className="flex items-center gap-2">
+                                    <HelpCircle className="w-4 h-4" />
+                                    <span className="font-semibold">Audio Overview Limit Reached</span>
+                                </div>
+                                <p className="mt-1">You&apos;ve used all your monthly audio overviews. Credits reset every Monday at 12 AM UTC.</p>
+                                <Link
+                                    href="/pricing"
+                                    className="text-blue-500 hover:text-blue-700 font-medium"
+                                >
+                                    Upgrade for more audio overviews →
+                                </Link>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -678,7 +754,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                             </Badge>
                         </div>
                         <p className="text-primary text-lg">
-                            {jobStatus.status === 'pending' && 'Your audio overview is queued for processing...'}
+                            {jobStatus.status === 'pending' && 'Preparing your audio overview'}
                             {jobStatus.status === 'running' && loadingText}
                             {jobStatus.status === 'failed' && 'Audio overview generation failed. Please try again.'}
                         </p>
@@ -697,6 +773,28 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
             {/* Enhanced Audio Player */}
             {audioOverview && !showGenerationForm && (
                 <div className="space-y-6">
+                    {/* Audio Overview Credit Usage Display */}
+                    {audioCreditUsage && audioCreditUsage.showWarning && (
+                        <div className={`text-xs px-2 py-1 mt-4 ${audioCreditUsage.isCritical ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'} justify-between flex`}>
+                            <div className="font-semibold">{audioCreditUsage.used} audio overviews used</div>
+                            <div className="font-semibold">
+                                <HoverCard>
+                                    <HoverCardTrigger asChild>
+                                        <span>{audioCreditUsage.remaining} remaining</span>
+                                    </HoverCardTrigger>
+                                    <HoverCardContent side="top" className="w-48">
+                                        <p className="text-sm">Resets on {nextMonday.toLocaleDateString()}</p>
+                                    </HoverCardContent>
+                                </HoverCard>
+                                <Link
+                                    href="/pricing"
+                                    className="text-blue-500 hover:text-blue-700 ml-1"
+                                >
+                                    Upgrade
+                                </Link>
+                            </div>
+                        </div>
+                    )}
                     <div className="flex items-center justify-between">
                         <div className="text-sm text-secondary-foreground flex items-center gap-2">
                             <Clock className="w-4 h-4" />
@@ -722,11 +820,15 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                                     setShowGenerationForm(true);
                                     setAdditionalInstructions(DEFAULT_INSTRUCTIONS);
                                 }}
-                                disabled={isLoading}
-                                className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-500 text-sm font-medium flex items-center gap-1"
+                                disabled={isLoading || isAudioOverviewAtLimit(subscription)}
+                                className={`text-sm font-medium flex items-center gap-1 ${isLoading || isAudioOverviewAtLimit(subscription)
+                                    ? 'text-gray-400 cursor-not-allowed'
+                                    : 'text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-500'
+                                    }`}
+                                title={isAudioOverviewAtLimit(subscription) ? 'Audio overview limit reached' : 'Create new audio overview'}
                             >
                                 <Plus className="w-4 h-4 mr-1" />
-                                New
+                                {isAudioOverviewAtLimit(subscription) ? 'Limit Reached' : 'New'}
                             </button>
                         </div>
                     </div>
@@ -856,6 +958,11 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                                     handleCitationClick={handleCitationClickFromTranscript}
                                     messageIndex={0}
                                 />,
+                                table: (props) => (
+                                    <div className="w-full overflow-x-auto">
+                                        <table {...props} className="min-w-full border-collapse" />
+                                    </div>
+                                ),
                             }}
                         >
                             {audioOverview.transcript}

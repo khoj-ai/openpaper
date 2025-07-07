@@ -127,6 +127,7 @@ dependencies = [
     { name = "sqladmin", extra = ["full"] },
     { name = "sqlalchemy" },
     { name = "sqlalchemy2-stubs" },
+    { name = "stripe" },
     { name = "types-boto3" },
     { name = "types-psycopg2" },
     { name = "types-requests" },
@@ -156,6 +157,7 @@ requires-dist = [
     { name = "sqladmin", extras = ["full"], specifier = ">=0.20.1" },
     { name = "sqlalchemy", specifier = ">=2.0.39" },
     { name = "sqlalchemy2-stubs", specifier = ">=0.0.2a38" },
+    { name = "stripe", specifier = ">=12.3.0" },
     { name = "types-boto3", specifier = ">=1.37.33" },
     { name = "types-psycopg2", specifier = ">=2.9.21.20250318" },
     { name = "types-requests", specifier = ">=2.32.0.20250306" },
@@ -1288,6 +1290,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/04/1b/52b27f2e13ceedc79a908e29eac426a63465a1a01248e5f24aa36a62aeb3/starlette-0.46.1.tar.gz", hash = "sha256:3c88d58ee4bd1bb807c0d1acb381838afc7752f9ddaec81bbe4383611d833230", size = 2580102 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a0/4b/528ccf7a982216885a1ff4908e886b8fb5f19862d1962f56a3fce2435a70/starlette-0.46.1-py3-none-any.whl", hash = "sha256:77c74ed9d2720138b25875133f3a2dae6d854af2ec37dceb56aef370c1d8a227", size = 71995 },
+]
+
+[[package]]
+name = "stripe"
+version = "12.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5b/d1/294e4b3081cf6deff32c230511f07546fc2bf256ebdf7a90dc2d70a6154b/stripe-12.3.0.tar.gz", hash = "sha256:ad8afdab8acdbd75fc098b0fefdfee698f68334a3f6e787633e8d290da89932b", size = 1407878 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5c/d5/aa5147e38a75d999a16ef20ba8a55e80935372780650026b83cbdc816afe/stripe-12.3.0-py2.py3-none-any.whl", hash = "sha256:f53daf37253cef0323613aa298b66d2d2081d37d0f2e4d9f8639824bf67185b9", size = 1647774 },
 ]
 
 [[package]]

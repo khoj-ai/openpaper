@@ -7,8 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import PaperCard from "@/components/PaperCard";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/lib/auth";
-import { FileText, Upload, Search } from "lucide-react";
+import { useSubscription, getStorageUsagePercentage, isStorageNearLimit, isStorageAtLimit, formatFileSize } from "@/hooks/useSubscription";
+import { FileText, Upload, Search, AlertTriangle, AlertCircle, HardDrive } from "lucide-react";
 import Link from "next/link";
 
 // TODO: We could add a search look-up for the paper journal name to avoid placeholders
@@ -19,6 +22,7 @@ export default function PapersPage() {
     const [filteredPapers, setFilteredPapers] = useState<PaperItem[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const { user, loading: authLoading } = useAuth();
+    const { subscription, loading: subscriptionLoading } = useSubscription();
 
     useEffect(() => {
         const fetchPapers = async () => {
@@ -36,7 +40,7 @@ export default function PapersPage() {
             }
         }
 
-        fetchPapers()
+        fetchPapers();
     }, [])
 
     useEffect(() => {
@@ -81,6 +85,71 @@ export default function PapersPage() {
             prevFiltered.map((p) => (p.id === paperId ? { ...p, ...paper } : p))
         )
     }
+
+    const getUsagePercentage = () => {
+        return getStorageUsagePercentage(subscription);
+    };
+
+    const getUsageAlert = () => {
+        if (isStorageAtLimit(subscription)) {
+            return "error";
+        } else if (isStorageNearLimit(subscription)) {
+            return "warning";
+        }
+        return null;
+    };
+
+    const StorageUsageDisplay = () => {
+        if (subscriptionLoading) {
+            return <Skeleton className="h-20 w-full mb-6" />;
+        }
+
+        if (!subscription) {
+            return null;
+        }
+
+        const usagePercentage = getUsagePercentage();
+        const alertType = getUsageAlert();
+
+        return (
+            <div className="mb-6 p-4 border rounded-lg bg-card">
+                <div className="flex items-center gap-2 mb-2">
+                    <HardDrive className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Storage Usage</span>
+                </div>
+
+                <div className="space-y-2">
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                        <span>{formatFileSize(subscription.usage.knowledge_base_size)} used</span>
+                        <span>{formatFileSize(subscription.limits.knowledge_base_size)} total</span>
+                    </div>
+
+                    <Progress
+                        value={usagePercentage}
+                        className="h-2"
+                    />
+
+                    {alertType && (
+                        <Alert variant={alertType === "error" ? "destructive" : "default"} className="mt-3">
+                            <div className="flex items-center gap-2">
+                                {alertType === "error" ? (
+                                    <AlertCircle className="h-4 w-4" />
+                                ) : (
+                                    <AlertTriangle className="h-4 w-4" />
+                                )}
+                                <AlertDescription>
+                                    {alertType === "error"
+                                        ? "You've reached your storage limit. Please delete some papers to upload new ones."
+                                        : "You're approaching your storage limit. Consider reviewing your papers."
+                                    }
+                                </AlertDescription>
+                            </div>
+                        </Alert>
+                    )}
+                </div>
+            </div>
+        );
+    };
 
     const EmptyState = () => {
         // No papers uploaded at all
@@ -143,6 +212,8 @@ export default function PapersPage() {
 
     return (
         <div className="container mx-auto sm:w-2/3 p-8">
+            <StorageUsageDisplay />
+
             {papers.length > 0 && (
                 <div className="mb-6">
                     <Input
