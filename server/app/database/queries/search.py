@@ -43,6 +43,7 @@ class PaperResult(BaseModel):
     last_accessed_at: datetime
     highlights: List[HighlightResult]
     annotations: List[AnnotationResult]
+    preview_url: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -194,6 +195,7 @@ def search_knowledge_base(
             last_accessed_at=paper.last_accessed_at,
             highlights=highlight_results,
             annotations=annotation_results,
+            preview_url=paper.preview_url,
         )
 
         results.append(paper_result)
