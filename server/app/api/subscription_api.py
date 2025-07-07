@@ -318,6 +318,7 @@ async def handle_stripe_webhook(
             "invoice.payment_failed",
             "invoice.payment_action_required",
             "customer.subscription.past_due",
+            "invoice.payment_succeeded",
         ]:
             logger.info(f"Skipping unsupported event type: {event_type}")
             return {"success": False}
@@ -605,6 +606,40 @@ async def handle_stripe_webhook(
 
             except Exception as e:
                 logger.error(f"Error processing payment failure: {e}", exc_info=True)
+
+        elif event_type == "invoice.payment_succeeded":
+            invoice = event["data"]["object"]
+            subscription_id = invoice.get("subscription")
+
+            try:
+                if subscription_id:
+                    # Find subscription in our database
+                    subscription = subscription_crud.get_by_stripe_subscription_id(
+                        db, subscription_id
+                    )
+
+                    if subscription:
+                        # Update subscription status to active
+                        subscription_crud.update_subscription_status(
+                            db, subscription_id, status=SubscriptionStatus.ACTIVE
+                        )
+
+                        # Track payment success event
+                        track_event(
+                            event_name="payment_succeeded",
+                            properties={
+                                "user_id": str(subscription.user_id),
+                                "subscription_id": subscription_id,
+                                "invoice_id": invoice.get("id"),
+                            },
+                        )
+
+                        logger.info(
+                            f"Payment succeeded for subscription {subscription_id}"
+                        )
+
+            except Exception as e:
+                logger.error(f"Error processing payment success: {e}", exc_info=True)
 
         elif event_type == "invoice.payment_action_required":
             invoice = event["data"]["object"]
