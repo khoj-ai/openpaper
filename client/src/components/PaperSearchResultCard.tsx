@@ -250,7 +250,7 @@ export default function PaperSearchResultCard({ paper, searchTerm, setPaper, han
                                 <AlertDialogContent>
                                     <AlertDialogTitle>Delete Paper</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                        Are you sure you want to delete "{paper.title}"?
+                                        Are you sure you want to delete &quot;{paper.title}&quot;?
                                         This action cannot be undone.
                                     </AlertDialogDescription>
                                     <AlertDialogFooter>

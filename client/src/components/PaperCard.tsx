@@ -7,7 +7,7 @@ import { Book, Copy, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { getStatusIcon, PaperStatus, PaperStatusEnum } from "@/components/utils/PdfStatus";
+import { getStatusIcon, PaperStatusEnum } from "@/components/utils/PdfStatus";
 import Link from "next/link";
 import { formatFileSize } from "@/hooks/useSubscription";
 import { citationStyles, handleStatusChange } from "./utils/paperUtils";

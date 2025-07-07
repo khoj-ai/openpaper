@@ -1,4 +1,3 @@
-import React from "react";
 import { toast } from "sonner";
 import { fetchFromApi } from "@/lib/api";
 import { PaperStatus, PaperStatusEnum } from "@/components/utils/PdfStatus";

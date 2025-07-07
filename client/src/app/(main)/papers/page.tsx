@@ -16,6 +16,7 @@ import { useSubscription, getStorageUsagePercentage, isStorageNearLimit, isStora
 import { FileText, Upload, Search, AlertTriangle, AlertCircle, HardDrive } from "lucide-react";
 import Link from "next/link";
 import { SearchResults, PaperResult } from "@/lib/schema";
+import { toast } from "sonner";
 
 // TODO: We could add a search look-up for the paper journal name to avoid placeholders
 
@@ -83,8 +84,23 @@ export default function PapersPage() {
             })
             setPapers(papers.filter((paper) => paper.id !== paperId));
             setFilteredPapers(filteredPapers.filter((paper) => paper.id !== paperId));
+            setSearchResults((prevResults) => {
+                if (!prevResults) return null;
+                const removedHighlights = prevResults.papers.find(p => p.id === paperId)?.highlights?.length || 0;
+                const removedAnnotations = prevResults.papers.find(p => p.id === paperId)?.annotations?.length || 0;
+                return {
+                    ...prevResults,
+                    papers: prevResults.papers.filter((paper) => paper.id !== paperId),
+                    total_papers: prevResults.total_papers - 1,
+                    total_highlights: prevResults.total_highlights - removedHighlights,
+                    total_annotations: prevResults.total_annotations - removedAnnotations
+                }
+            })
+            toast.success("Paper deleted successfully");
         } catch (error) {
             console.error("Error deleting paper:", error)
+            toast.error("Failed to delete paper. Please try again.");
+            // TODO Could also try to handle this by re-fetching papers
         }
     }
 
@@ -117,6 +133,7 @@ export default function PapersPage() {
             }))
             setFilteredPapers(searchResultsPapers)
         } catch (error) {
+            console.log("Error performing search:", error);
             setSearchResults(null)
             // Fall back to client-side search if API fails
             setFilteredPapers(
