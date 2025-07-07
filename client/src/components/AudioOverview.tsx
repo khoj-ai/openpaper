@@ -822,8 +822,8 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                                 }}
                                 disabled={isLoading || isAudioOverviewAtLimit(subscription)}
                                 className={`text-sm font-medium flex items-center gap-1 ${isLoading || isAudioOverviewAtLimit(subscription)
-                                        ? 'text-gray-400 cursor-not-allowed'
-                                        : 'text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-500'
+                                    ? 'text-gray-400 cursor-not-allowed'
+                                    : 'text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-500'
                                     }`}
                                 title={isAudioOverviewAtLimit(subscription) ? 'Audio overview limit reached' : 'Create new audio overview'}
                             >
@@ -958,6 +958,11 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                                     handleCitationClick={handleCitationClickFromTranscript}
                                     messageIndex={0}
                                 />,
+                                table: (props) => (
+                                    <div className="w-full overflow-x-auto">
+                                        <table {...props} className="min-w-full border-collapse" />
+                                    </div>
+                                ),
                             }}
                         >
                             {audioOverview.transcript}
