@@ -28,7 +28,7 @@ AUDIO_OVERVIEWS_KEY = "audio_overviews_weekly"
 # Define subscription plan limits
 SUBSCRIPTION_LIMITS = {
     SubscriptionPlan.BASIC: {
-        PAPER_UPLOAD_KEY: 20,
+        PAPER_UPLOAD_KEY: 50,
         KB_SIZE_KEY: 500 * 1024,  # 500 MB in KB
         CHAT_CREDITS_KEY: 5000,
         AUDIO_OVERVIEWS_KEY: 5,
