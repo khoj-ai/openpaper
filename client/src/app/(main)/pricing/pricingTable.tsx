@@ -32,7 +32,7 @@ const features: PricingFeature[] = [
     },
     {
         name: "Paper uploads",
-        basic: "10",
+        basic: "20",
         researcher: "500",
         teams: "unlimited"
     },
@@ -50,8 +50,8 @@ const features: PricingFeature[] = [
     },
     {
         name: "Chat credits (weekly)",
-        basic: "500",
-        researcher: "10,000",
+        basic: "5000",
+        researcher: "100,000",
         teams: "unlimited"
     },
     {

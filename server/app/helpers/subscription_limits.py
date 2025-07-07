@@ -30,14 +30,14 @@ SUBSCRIPTION_LIMITS = {
     SubscriptionPlan.BASIC: {
         PAPER_UPLOAD_KEY: 20,
         KB_SIZE_KEY: 500 * 1024,  # 500 MB in KB
-        CHAT_CREDITS_KEY: 500,
+        CHAT_CREDITS_KEY: 5000,
         AUDIO_OVERVIEWS_KEY: 5,
     },
     SubscriptionPlan.RESEARCHER: {
         PAPER_UPLOAD_KEY: 500,
         KB_SIZE_KEY: 3 * 1024 * 1024,  # 3 GB in KB
-        CHAT_CREDITS_KEY: 10000,
-        AUDIO_OVERVIEWS_KEY: 50,
+        CHAT_CREDITS_KEY: 100000,
+        AUDIO_OVERVIEWS_KEY: 100,
     },
 }
 
