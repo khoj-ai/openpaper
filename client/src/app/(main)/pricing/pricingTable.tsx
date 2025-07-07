@@ -32,7 +32,7 @@ const features: PricingFeature[] = [
     },
     {
         name: "Paper uploads",
-        basic: "20",
+        basic: "50",
         researcher: "500",
         teams: "unlimited"
     },
