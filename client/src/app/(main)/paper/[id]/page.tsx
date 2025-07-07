@@ -520,7 +520,7 @@ export default function PaperView() {
                 });
 
                 // Map the response messages to the expected format
-                const fetchedMessages = response.messages.map((msg: ChatMessage) => ({
+                const fetchedMessages: ChatMessage[] = response.messages.map((msg: ChatMessage) => ({
                     role: msg.role,
                     content: msg.content,
                     id: msg.id,
@@ -587,47 +587,6 @@ export default function PaperView() {
 
         fetchConversation();
     }, [paperData, id]);
-
-    useEffect(() => {
-        if (!conversationId) return;
-
-        // Fetch initial messages for the conversation
-        async function fetchMessages() {
-            try {
-                const response = await fetchFromApi(`/api/conversation/${conversationId}?page=${pageNumberConversationHistory}`, {
-                    method: 'GET',
-                });
-
-                // Map the response messages to the expected format
-                const fetchedMessages = response.messages.map((msg: ChatMessage) => ({
-                    role: msg.role,
-                    content: msg.content,
-                    id: msg.id,
-                    references: msg.references || {}
-                }));
-
-                if (fetchedMessages.length === 0) {
-                    setHasMoreMessages(false);
-                    return;
-                }
-
-                if (messages.length === 0) {
-                    scrollToBottom();
-                } else {
-                    // Add a 1/2 second delay before scrolling to the latest message
-                    setTimeout(() => {
-                        scrollToLatestMessage();
-                    }, 500);
-                }
-
-                setMessages(prev => [...fetchedMessages, ...prev]);
-                setPageNumberConversationHistory(pageNumberConversationHistory + 1);
-            } catch (error) {
-                console.error('Error fetching messages:', error);
-            }
-        }
-        fetchMessages();
-    }, [conversationId, pageNumberConversationHistory]);
 
     useEffect(() => {
         if (addedContentForPaperNote) {
@@ -997,6 +956,11 @@ export default function PaperView() {
                             })) || []
                         }
                     />,
+                    table: (props) => (
+                        <div className="w-full overflow-x-auto">
+                            <table {...props} className="min-w-full border-collapse" />
+                        </div>
+                    ),
                 }}
             >
                 {paperData.summary}
@@ -1065,6 +1029,11 @@ export default function PaperView() {
                                 messageIndex={0}
                                 citations={msg.references?.citations || []}
                             />,
+                            table: (props) => (
+                                <div className="w-full overflow-x-auto">
+                                    <table {...props} className="min-w-full border-collapse" />
+                                </div>
+                            ),
                         }}>
                         {msg.content}
                     </Markdown>
@@ -1575,6 +1544,11 @@ export default function PaperView() {
                                                                 messageIndex={0}
                                                                 citations={streamingReferences?.citations || []}
                                                             />,
+                                                            table: (props) => (
+                                                                <div className="w-full overflow-x-auto">
+                                                                    <table {...props} className="min-w-full border-collapse" />
+                                                                </div>
+                                                            ),
                                                         }}
                                                     />
                                                 </div>
