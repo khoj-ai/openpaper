@@ -173,6 +173,7 @@ export interface PaperResult {
     last_accessed_at: string;
     highlights: HighlightResult[];
     annotations: AnnotationResult[];
+    preview_url: string | null;
 }
 
 export interface SearchResults {
