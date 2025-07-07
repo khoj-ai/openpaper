@@ -24,11 +24,17 @@ import {
     GithubIcon,
     Menu,
 } from "lucide-react";
-import Link from "next/link";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsDarkMode } from "@/hooks/useDarkMode";
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 
 export default function OpenPaperLanding() {
+    const isMobile = useIsMobile();
+    const { darkMode } = useIsDarkMode();
+    const mobileAndDark = isMobile && darkMode;
+
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     return (
@@ -573,7 +579,7 @@ export default function OpenPaperLanding() {
                         {/* Institution Logos Grid */}
                         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-10 gap-8 items-center justify-items-center opacity-60 dark:opacity-90 hover:opacity-100 transition-opacity duration-300">
                             {/* Stanford */}
-                            <div className="flex items-center justify-center h-12 w-20 rounded-md grayscale dark:grayscale dark:brightness-150 hover:grayscale-0 hover:brightness-100 hover:bg-white/80 dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300">
+                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
                                 <Image
                                     src="/logos/stanford_logo.svg"
                                     alt="Stanford University"
@@ -584,7 +590,7 @@ export default function OpenPaperLanding() {
                             </div>
 
                             {/* Yale */}
-                            <div className="flex items-center justify-center h-12 w-20 rounded-md grayscale dark:grayscale dark:brightness-150 hover:grayscale-0 hover:brightness-100 hover:bg-white/80 dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300">
+                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
                                 <Image
                                     src="/logos/yale_logo.svg"
                                     alt="Yale University"
@@ -595,7 +601,7 @@ export default function OpenPaperLanding() {
                             </div>
 
                             {/* Google */}
-                            <div className="flex items-center justify-center h-12 w-20 rounded-md grayscale dark:grayscale dark:brightness-150 hover:grayscale-0 hover:brightness-100 hover:bg-white/80 dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300">
+                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
                                 <Image
                                     src="/logos/google.svg"
                                     alt="Google"
@@ -606,7 +612,7 @@ export default function OpenPaperLanding() {
                             </div>
 
                             {/* Rice University */}
-                            <div className="flex items-center justify-center h-12 w-20 rounded-md grayscale dark:grayscale dark:brightness-150 hover:grayscale-0 hover:brightness-100 hover:bg-white/80 dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300">
+                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
                                 <Image
                                     src="/logos/rice_logo.svg"
                                     alt="Rice University"
@@ -617,7 +623,7 @@ export default function OpenPaperLanding() {
                             </div>
 
                             {/* University of Michigan */}
-                            <div className="flex items-center justify-center h-12 w-20 rounded-md grayscale dark:grayscale dark:brightness-150 hover:grayscale-0 hover:brightness-100 hover:bg-white/80 dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300">
+                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
                                 <Image
                                     src="/logos/umich_logo.svg"
                                     alt="University of Michigan"
@@ -628,7 +634,7 @@ export default function OpenPaperLanding() {
                             </div>
 
                             {/* UIUC */}
-                            <div className="flex items-center justify-center h-12 w-20 rounded-md grayscale dark:grayscale dark:brightness-150 hover:grayscale-0 hover:brightness-100 hover:bg-white/80 dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300">
+                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
                                 <Image
                                     src="/logos/uiuc_logo.svg"
                                     alt="University of Illinois Urbana-Champaign"
@@ -639,7 +645,7 @@ export default function OpenPaperLanding() {
                             </div>
 
                             {/* MIT */}
-                            <div className="flex items-center justify-center h-12 w-20 rounded-md grayscale dark:grayscale dark:brightness-150 hover:grayscale-0 hover:brightness-100 hover:bg-white/80 dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300">
+                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
                                 <Image
                                     src="/logos/mit_logo.svg"
                                     alt="Massachusetts Institute of Technology"
@@ -650,7 +656,7 @@ export default function OpenPaperLanding() {
                             </div>
 
                             {/* Johns Hopkins */}
-                            <div className="flex items-center justify-center h-12 w-20 rounded-md grayscale dark:grayscale dark:brightness-150 hover:grayscale-0 hover:brightness-100 hover:bg-white/80 dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300">
+                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
                                 <Image
                                     src="/logos/jhu_logo.svg"
                                     alt="Johns Hopkins University"
@@ -661,7 +667,7 @@ export default function OpenPaperLanding() {
                             </div>
 
                             {/* Waterloo */}
-                            <div className="flex items-center justify-center h-12 w-20 rounded-md grayscale dark:grayscale dark:brightness-150 hover:grayscale-0 hover:brightness-100 hover:bg-white/80 dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300">
+                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
                                 <Image
                                     src="/logos/waterloo_logo.svg"
                                     alt="University of Waterloo"
@@ -672,7 +678,7 @@ export default function OpenPaperLanding() {
                             </div>
 
                             {/* NIH */}
-                            <div className="flex items-center justify-center h-12 w-20 rounded-md grayscale dark:grayscale dark:brightness-150 hover:grayscale-0 hover:brightness-100 hover:bg-white/80 dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300">
+                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
                                 <Image
                                     src="/logos/nih_logo.svg"
                                     alt="National Institutes of Health"
