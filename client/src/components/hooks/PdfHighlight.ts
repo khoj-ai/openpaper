@@ -129,12 +129,19 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
 
     // Clear highlights from DOM
     const clearHighlightsFromDOM = () => {
+        // Use data attribute instead of CSS classes for identification
         const existingHighlights = document.querySelectorAll(
-            '.react-pdf__Page__textContent span.border-2.border-blue-500'
+            '.react-pdf__Page__textContent span[data-highlight]'
         );
 
         existingHighlights.forEach(node => {
-            node.classList.remove('border-2', 'border-blue-500', 'bg-blue-100', 'rounded', 'opacity-20');
+            // Remove all highlight-related classes (both user and AI)
+            node.classList.remove('border-2', 'bg-blue-100', 'rounded', 'opacity-20', 'border-none', 'bg-blue-200', 'bg-purple-200', 'opacity-30');
+
+            // Remove the data attribute
+            node.removeAttribute('data-highlight');
+            node.removeAttribute('data-highlight-id');
+            node.removeAttribute('title');
 
             // Remove event listeners by cloning and replacing the node
             const newNode = node.cloneNode(true);
@@ -143,7 +150,6 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
             }
         });
     };
-
     // Clear all highlights
     const clearHighlights = () => {
         localStorage.removeItem(highlightsStorageName);

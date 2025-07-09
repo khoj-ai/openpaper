@@ -144,8 +144,8 @@ function applyAIHighlightToNode(
     // Add AI-specific highlighting (different styling from regular highlights)
     node.classList.add('border-none', 'bg-purple-200', 'rounded', 'opacity-30');
 
-    // Add a visual indicator that this is an AI highlight
-    node.setAttribute('data-highlight', 'true');
+    // Add data attributes to identify as AI highlight
+    node.setAttribute('data-highlight', 'ai');
     node.setAttribute('title', 'AI-generated highlight');
 
     // Add click event to show highlight options
@@ -158,6 +158,7 @@ function applyAIHighlightToNode(
         handlers.setActiveHighlight(sourceHighlight);
     });
 }
+
 
 export function addHighlightToNodes(
     nodes: Element[],
@@ -279,6 +280,9 @@ function applyHighlightToNode(
     // Add highlighting to the node
     node.classList.add('border-none', 'bg-blue-200', 'rounded', 'opacity-30');
 
+    // Add data attribute to identify as highlight
+    node.setAttribute('data-highlight', 'user');
+
     // Add click event to show highlight options
     node.addEventListener('click', (e: Event) => {
         const mouseEvent = e as MouseEvent;
@@ -289,6 +293,7 @@ function applyHighlightToNode(
         handlers.setActiveHighlight(sourceHighlight);
     });
 }
+
 
 function createHighlightedTextFragments(
     node: Element,
@@ -314,6 +319,9 @@ function createHighlightedTextFragments(
     const highlightSpan = document.createElement('span');
     highlightSpan.textContent = text.substring(startOffset, endOffset);
     highlightSpan.classList.add('border-none', 'bg-blue-200', 'rounded', 'opacity-30');
+
+    // Add data attribute to identify as highlight
+    highlightSpan.setAttribute('data-highlight', 'user');
 
     // Add click event to show highlight options
     highlightSpan.addEventListener('click', (e: MouseEvent) => {
