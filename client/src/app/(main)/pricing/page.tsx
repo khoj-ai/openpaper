@@ -96,9 +96,6 @@ export default function PricingPage() {
                     method: "GET",
                 });
                 setUserSubscription(updatedSubscription);
-
-                // You might want to show a success toast here
-                console.log('Interval change successful:', response.message);
             } else {
                 console.error('Failed to change interval:', response.message);
                 // You might want to show an error toast here
@@ -134,9 +131,6 @@ export default function PricingPage() {
                 });
 
                 setUserSubscription(updatedSubscription);
-
-                console.log('Resubscription successful');
-
             } else {
                 console.error('Failed to resubscribe:', response.error);
                 // You might want to show an error toast here

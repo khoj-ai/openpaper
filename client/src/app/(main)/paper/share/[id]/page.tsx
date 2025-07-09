@@ -42,7 +42,6 @@ export default function SharedPaperView() {
             setError(null);
             try {
                 const response: SharedPaperResponse = await fetchFromApi(`/api/paper/share?id=${shareId}`);
-                console.log("Fetched shared paper data:", response);
                 setPaperData(response.paper);
                 setHighlights(response.highlights || []);
                 setAnnotations(response.annotations || []);

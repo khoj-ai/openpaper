@@ -35,12 +35,10 @@ export default function CheckoutSheet({ open, onOpenChange, interval, planName, 
         setIsLoading(true);
         setError(null);
 
-        console.log("CREATING CHECKOUT SESSION", interval);
         return fetchFromApi(`/api/subscription/create-checkout-session?interval=${interval}`, {
             method: "POST",
         })
             .then((data) => {
-                console.log("CHECKOUT SESSION CREATED", data);
                 setIsLoading(false);
                 return data.client_secret;
             })
