@@ -69,6 +69,22 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
         const highlightElement = document.querySelector(selector);
 
         if (highlightElement) {
+            // Check if the element is already visible in the viewport
+            const rect = highlightElement.getBoundingClientRect();
+            const isVisible = rect.top >= 0 &&
+                rect.bottom <= window.innerHeight &&
+                rect.left >= 0 &&
+                rect.right <= window.innerWidth;
+
+            if (isVisible) {
+                // Element is already visible, just position the tooltip without scrolling
+                setTooltipPosition({
+                    x: rect.right,
+                    y: rect.top + (rect.height / 2)
+                });
+                return;
+            }
+
             // Get the scrollable container (usually the document or a specific container)
             const scrollContainer = highlightElement.closest('.react-pdf__Page') || document.documentElement;
 
