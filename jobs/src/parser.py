@@ -218,19 +218,21 @@ async def extract_images_from_pdf(file_path: str, job_id: str) -> List[PDFImage]
                     }
                     content_type = content_type_map.get(image_ext.lower(), "image/png")
 
-                    # Upload to S3
-                    s3_object_key, image_url = s3_service.upload_any_file_from_bytes(
+                    # Upload to S3 asynchronously
+                    s3_object_key, image_url = await asyncio.to_thread(
+                        s3_service.upload_any_file_from_bytes,
                         image_bytes,
                         image_filename,
                         content_type=content_type
                     )
 
-                    # For testing, write image to file
+                    # For testing, write image to file asynchronously
                     image_buffer = BytesIO(image_bytes)
                     image_buffer.seek(0)
                     image_filename = f"{image_filename}"
-                    with open(image_filename, "wb") as f:
-                        f.write(image_buffer.getvalue())
+                    await asyncio.to_thread(
+                        lambda: open(image_filename, "wb").write(image_buffer.getvalue())
+                    )
 
                     # Create PDFImage object
                     pdf_image = PDFImage(
