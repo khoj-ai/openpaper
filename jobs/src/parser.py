@@ -164,6 +164,7 @@ async def extract_images_from_pdf(file_path: str, job_id: str) -> List[PDFImage]
     Returns:
         List[PDFImage]: List of extracted images with metadata
     """
+    logger.info(f"=== STARTING extract_images_from_pdf for job {job_id} ===")
     extracted_images: List[PDFImage] = []
 
     try:
@@ -325,6 +326,7 @@ async def extract_images_from_pdf(file_path: str, job_id: str) -> List[PDFImage]
 
         extracted_images = [img for img in extracted_images if img.caption is not None or img.s3_object_key is not None]
 
+        logger.info(f"=== COMPLETED extract_images_from_pdf for job {job_id}, returning {len(extracted_images)} images ===")
         return extracted_images
 
     except Exception as e:

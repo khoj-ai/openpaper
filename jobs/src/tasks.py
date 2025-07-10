@@ -122,6 +122,8 @@ async def process_pdf_file(
             raise Exception(f"Failed to extract text from PDF: {e}")
 
         # Define async functions for I/O-bound operations
+        logger.info(f"About to define async functions for job {job_id}")
+
         async def upload_pdf_async():
             status_callback("PDF ascending to the cloud")
             return await asyncio.to_thread(
@@ -141,10 +143,13 @@ async def process_pdf_file(
 
         async def extract_images_async():
             status_callback("Extracting images from PDF")
+            logger.info(f"About to call extract_images_from_pdf for job {job_id}")
             try:
-                return await asyncio.to_thread(extract_images_from_pdf, temp_file_path, job_id)
+                result = await extract_images_from_pdf(temp_file_path, job_id)
+                logger.info(f"extract_images_from_pdf returned {len(result) if result else 0} images")
+                return result
             except Exception as e:
-                logger.warning(f"Failed to extract images from {safe_filename}: {str(e)}")
+                logger.error(f"Failed to extract images from {safe_filename}: {str(e)}", exc_info=True)
                 return []
 
         # Run I/O-bound tasks and LLM extraction concurrently

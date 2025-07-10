@@ -514,8 +514,7 @@ class PaperOperations(AsyncLLMClient):
         self.client = genai.Client(api_key=self.api_key)
 
         try:
-            schema = ImageCaptionExtraction.model_json_schema()
-            system_instructions = SYSTEM_INSTRUCTIONS_IMAGE_CAPTION_CACHE.format(schema=schema)
+            system_instructions = SYSTEM_INSTRUCTIONS_IMAGE_CAPTION_CACHE
 
             response = await self.generate_content(
                 system_instructions,
