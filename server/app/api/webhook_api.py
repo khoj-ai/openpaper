@@ -3,10 +3,12 @@ Webhook handlers for PDF processing service integration.
 """
 
 import logging
+import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import List, Optional
 
 from app.database.crud.paper_crud import PaperCreate, paper_crud
+from app.database.crud.paper_image_crud import PaperImageCreate, paper_image_crud
 from app.database.crud.paper_upload_crud import paper_upload_job_crud
 from app.database.database import get_db
 from app.database.models import JobStatus
@@ -23,6 +25,22 @@ logger = logging.getLogger(__name__)
 webhook_router = APIRouter()
 
 
+class PDFImage(BaseModel):
+    """
+    Schema for an image extracted from a PDF.
+    """
+
+    page_number: int
+    image_index: int
+    s3_object_key: str
+    image_url: str
+    width: int
+    height: int
+    format: str
+    size_bytes: int
+    caption: Optional[str] = None
+
+
 class PDFProcessingResult(BaseModel):
     """Result of PDF processing"""
 
@@ -37,6 +55,7 @@ class PDFProcessingResult(BaseModel):
     preview_object_key: Optional[str] = None
     error: Optional[str] = None
     duration: Optional[float] = None
+    extracted_images: Optional[List[PDFImage]] = None
 
 
 class WebhookData(BaseModel):
@@ -154,6 +173,40 @@ async def handle_paper_processing_webhook(
                         exc_info=True,
                     )
                     # Don't fail the whole process for annotation errors
+
+            # Create images if any
+            if result.extracted_images and paper:
+                try:
+                    # Create all PaperImageCreate objects in memory first
+                    paper_image_creates = []
+                    for image in result.extracted_images:
+                        paper_image_creates.append(
+                            PaperImageCreate(
+                                paper_id=uuid.UUID(str(paper.id)),
+                                s3_object_key=image.s3_object_key,
+                                image_url=image.image_url,
+                                format=image.format,
+                                size_bytes=image.size_bytes,
+                                width=image.width,
+                                height=image.height,
+                                page_number=image.page_number,
+                                image_index=image.image_index,
+                                caption=image.caption,
+                            )
+                        )
+
+                    # Create all images in a single batch operation
+                    paper_image_crud.create_multiple_with_paper_validation(
+                        db=db,
+                        images=paper_image_creates,
+                        user=job_user,
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Error creating images for job {job_id}: {str(e)}",
+                        exc_info=True,
+                    )
+                    # Don't fail the whole process for image errors
 
             # Track metadata extraction event
             track_event(
