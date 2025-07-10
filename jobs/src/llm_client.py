@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import re
+import io
 import asyncio
 from google import genai
 from google.genai import types
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 # Constants
 DEFAULT_CHAT_MODEL = "gemini-2.5-pro-preview-03-25"
+FAST_CHAT_MODEL = "gemini-2.5-flash"
 CACHE_TTL_SECONDS = 3600
 
 # Pydantic model type variable
@@ -47,6 +49,10 @@ You are a metadata extraction assistant. Your task is to extract specific inform
 Please extract the following fields and structure them in a JSON format according to the provided schema.
 
 Schema: {schema}
+"""
+
+SYSTEM_INSTRUCTIONS_IMAGE_CAPTION_CACHE = """
+You are an image captioning assistant. Given reference images from a paper, your task is to find exact captions for the image and return it in the response. Include the exact caption and nothing else. Do not include any additional text or explanations or qualifications. If the image is not a graph, chart, or figure, simply return an empty string.
 """
 
 
@@ -102,6 +108,12 @@ class AsyncLLMClient:
         self.default_model: str = default_model or DEFAULT_CHAT_MODEL
         self.client: Optional[genai.Client] = None
 
+    def refresh_client(self):
+        """Refresh the LLM client with the current API key."""
+        if not self.api_key:
+            raise ValueError("API key is not set")
+        self.client = genai.Client(api_key=self.api_key)
+
     async def create_cache(self, cache_content: str) -> str:
         """Create a cache entry for the given content.
 
@@ -138,7 +150,61 @@ class AsyncLLMClient:
 
         return cached_content.name
 
-    async def generate_content(self, prompt: str, cache_key: Optional[str] = None, model: Optional[str] = None) -> str:
+    async def create_file_cache(
+        self,
+        file_path: str,
+        system_instructions: Optional[str] = None,
+    ):
+        """Create a cache entry for the given file.
+
+        Args:
+            file_path (str): The path to the file to cache.
+
+        Returns:
+            str: The cache key for the stored file.
+        """
+
+        if not self.client:
+            raise ValueError("Client not initialized. Call extract_paper_metadata first.")
+
+        # Read the file content
+        with open(file_path, 'rb') as f:
+            file_content = f.read()
+
+        doc_io = io.BytesIO(file_content)
+        document = await self.client.aio.files.upload(
+            file=doc_io,
+            config=types.UploadFileConfig(
+                mime_type='application/pdf',
+            )
+        )
+
+        cached_content = await self.client.aio.caches.create(
+            model=self.default_model,
+            config=types.CreateCachedContentConfig(
+                contents=document,
+                display_name="Paper Metadata Cache",
+                ttl='3600s',
+                system_instruction=system_instructions or SYSTEM_INSTRUCTIONS_CACHE
+            ),
+        )
+
+        if cached_content and cached_content.name:
+            logger.info(f"File cache created successfully: {cached_content.name}")
+        else:
+            logger.error("Failed to create cache entry")
+            raise ValueError("Cache creation failed")
+
+        return cached_content.name
+
+    async def generate_content(
+        self,
+        prompt: str,
+        image_bytes: Optional[bytes] = None,
+        image_mime_type: Optional[str] = None,
+        cache_key: Optional[str] = None,
+        model: Optional[str] = None
+    ) -> str:
         """
         Generate content using the LLM.
 
@@ -155,9 +221,18 @@ class AsyncLLMClient:
         if not model:
             model = self.default_model
 
+        parts = []
+        if image_bytes:
+            parts.append(types.Part.from_bytes(data=image_bytes, mime_type=image_mime_type or 'image/png'))
+
+        parts.append(types.Part.from_text(text=prompt))
+
         response = await self.client.aio.models.generate_content(
-            model=model if model else self.default_model,
-            contents=prompt,
+            model=model,
+            contents=types.Content(
+                role='user',
+                parts=parts
+            ),
             config=types.GenerateContentConfig(
                 cached_content=cache_key,
             )
@@ -417,6 +492,47 @@ class PaperOperations(AsyncLLMClient):
         finally:
             # Set client to None to allow for proper garbage collection
             self.client = None
+
+    async def extract_image_captions(
+        self,
+        cache_key: Optional[str],
+        image_data: bytes,
+        image_mime_type: Optional[str] = None,
+    ) -> str:
+        """
+        Extract caption for an image in a PDF using LLM.
+
+        Args:
+            cache_key: Optional cache key for the LLM
+            image_data: Bytes of the image to extract captions for
+            image_mime_type: Optional MIME type of the image
+
+        Returns:
+            The caption for the image as a string
+        """
+        # Create a new client for this operation
+        self.client = genai.Client(api_key=self.api_key)
+
+        try:
+            schema = ImageCaptionExtraction.model_json_schema()
+            system_instructions = SYSTEM_INSTRUCTIONS_IMAGE_CAPTION_CACHE.format(schema=schema)
+
+            response = await self.generate_content(
+                system_instructions,
+                cache_key=cache_key,
+                image_bytes=image_data,
+                image_mime_type=image_mime_type
+            )
+
+            return response
+
+        except Exception as e:
+            logger.error(f"Error extracting image captions: {e}", exc_info=True)
+            return ""
+        finally:
+            # Set client to None to allow for proper garbage collection
+            self.client = None
+
 # Create a single instance to use throughout the application
 api_key = os.getenv("GOOGLE_API_KEY")
 
@@ -424,3 +540,4 @@ if not api_key:
     raise ValueError("GOOGLE_API_KEY environment variable is not set")
 
 llm_client = PaperOperations(api_key=api_key, default_model=DEFAULT_CHAT_MODEL)
+fast_llm_client = PaperOperations(api_key=api_key, default_model=FAST_CHAT_MODEL)

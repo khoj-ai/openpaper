@@ -9,15 +9,13 @@ import psutil
 import os
 import asyncio
 from datetime import datetime, timezone
-from typing import Dict, Any, Callable, TypeVar, Coroutine
+from typing import Dict, Any, Callable, TypeVar, Coroutine, List
 import requests
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from functools import wraps
 
 from src.celery_app import celery_app
-from src.schemas import PDFProcessingResult, PaperMetadataExtraction
+from src.schemas import PDFProcessingResult, PaperMetadataExtraction, PDFImage
 from src.s3_service import s3_service
-from src.parser import extract_text_from_pdf, generate_pdf_preview, map_pages_to_text_offsets
+from src.parser import extract_text_from_pdf, generate_pdf_preview, map_pages_to_text_offsets, extract_images_from_pdf
 from src.llm_client import llm_client
 
 logger = logging.getLogger(__name__)
@@ -102,6 +100,7 @@ async def process_pdf_file(
     temp_file_path = None
     object_key = None
     preview_object_key = None
+    extracted_images: List[PDFImage] = []
 
     try:
         logger.info(f"Starting PDF processing for job {job_id}")
@@ -140,9 +139,18 @@ async def process_pdf_file(
                 logger.warning(f"Failed to generate preview for {safe_filename}: {str(e)}")
                 return None, None
 
+        async def extract_images_async():
+            status_callback("Extracting images from PDF")
+            try:
+                return await asyncio.to_thread(extract_images_from_pdf, temp_file_path, job_id)
+            except Exception as e:
+                logger.warning(f"Failed to extract images from {safe_filename}: {str(e)}")
+                return []
+
         # Run I/O-bound tasks and LLM extraction concurrently
         upload_task = asyncio.create_task(upload_pdf_async())
         preview_task = asyncio.create_task(generate_preview_async())
+        images_task = asyncio.create_task(extract_images_async())
         metadata_task = asyncio.create_task(
             llm_client.extract_paper_metadata(
                 pdf_text, status_callback=status_callback
@@ -153,12 +161,13 @@ async def process_pdf_file(
         results = await asyncio.gather(
             upload_task,
             preview_task,
+            images_task,
             metadata_task,
             return_exceptions=True
         )
 
         # Process results
-        upload_result, preview_result, metadata_result = results
+        upload_result, preview_result, images_result, metadata_result = results
 
         if isinstance(upload_result, Exception):
             logger.error(f"Failed to upload PDF: {upload_result}")
@@ -173,6 +182,18 @@ async def process_pdf_file(
             preview_object_key, preview_url = preview_result # type: ignore
             if preview_url:
                 logger.info(f"Generated preview for {safe_filename}: {preview_url}")
+
+        if isinstance(images_result, Exception):
+            logger.warning(f"Failed to extract images: {images_result}")
+            extracted_images = []
+        elif isinstance(images_result, list):
+            extracted_images = images_result
+            if extracted_images:
+                logger.info(f"Successfully extracted {len(extracted_images)} images from {safe_filename}")
+            else:
+                logger.info(f"No images found in {safe_filename}")
+        else:
+            extracted_images = []
 
         if isinstance(metadata_result, Exception):
             logger.error(f"Failed to extract metadata: {metadata_result}")
@@ -202,6 +223,7 @@ async def process_pdf_file(
             file_url=file_url,
             preview_url=preview_url,
             preview_object_key=preview_object_key,
+            extracted_images=extracted_images,
             job_id=job_id,
             raw_content=pdf_text,
             page_offset_map=page_offsets,
