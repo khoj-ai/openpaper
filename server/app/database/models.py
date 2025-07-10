@@ -2,9 +2,9 @@ import uuid
 from enum import Enum
 from types import NoneType
 
+from sqlalchemy import UUID  # type: ignore
 from sqlalchemy import (  # type: ignore
     ARRAY,
-    UUID,
     Boolean,
     Column,
     DateTime,
@@ -198,9 +198,6 @@ class Paper(Base):
     status = Column(String, nullable=False, default=PaperStatus.reading)
     file_url = Column(String, nullable=False)
     preview_url = Column(String, nullable=True)
-    extracted_images = Column(
-        ARRAY(String), nullable=True
-    )  # List of image URLs extracted from the paper
     s3_object_key = Column(String, nullable=True)
     authors = Column(ARRAY(String), nullable=True)
     title = Column(Text, nullable=True)
@@ -253,6 +250,9 @@ class Paper(Base):
     audio_overview_jobs = relationship(
         "AudioOverviewJob", back_populates="paper", cascade="all, delete-orphan"
     )
+    paper_images = relationship(
+        "PaperImage", back_populates="paper", cascade="all, delete-orphan"
+    )
 
 
 class PaperImage(Base):
@@ -277,7 +277,7 @@ class PaperImage(Base):
 
     caption = Column(Text, nullable=True)  # Optional caption for the image
 
-    paper = relationship("Paper", back_populates="extracted_images")
+    paper = relationship("Paper", back_populates="paper_images")
 
 
 class Message(Base):
