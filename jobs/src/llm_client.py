@@ -52,7 +52,18 @@ Schema: {schema}
 """
 
 SYSTEM_INSTRUCTIONS_IMAGE_CAPTION_CACHE = """
-You are an image captioning assistant. Given reference images from a paper, your task is to find exact captions for the image and return it in the response. Include the exact caption and nothing else. Do not include any additional text or explanations or qualifications. If the image is not a graph, chart, or figure, simply return an empty string. If the image is not useful for understanding the paper, return an empty string.
+You are an image captioning assistant for academic papers. Your task is to extract exact captions for images.
+
+Return only the caption text with no additional commentary or explanations.
+
+Rules:
+- For figures, graphs, or charts: Return the exact caption from the paper
+- If no caption exists but the image is useful for understanding the paper: Provide a brief description
+- Return an empty string if the image is:
+  • Not a graph, chart, or figure
+  • Not useful for understanding the paper
+  • A partial portion of a larger figure
+  • Has no caption and is not useful for understanding the paper
 """
 
 
