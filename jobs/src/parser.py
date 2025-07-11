@@ -247,15 +247,15 @@ async def extract_text_and_images_combined(file_path: str, job_id: str) -> Tuple
 
                     # Replace image in PDF with placeholder text
                     # Get image rectangle
-                    image_rects = page.get_image_rects(xref)
+                    image_rects = page.get_image_rects(xref) # type: ignore
                     if image_rects:
                         for rect in image_rects:
                             # Remove the image
-                            page.delete_image(xref)
+                            page.delete_image(xref) # type: ignore
 
                             # Insert placeholder text
                             placeholder_text = f"[IMAGE_PLACEHOLDER_{placeholder_id}]"
-                            page.insert_text(
+                            page.insert_text( # type: ignore
                                 rect.tl,  # top-left corner
                                 placeholder_text,
                                 fontsize=8,
