@@ -364,7 +364,7 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
         def _find_and_replace_all_placeholders(summary: str, images: List[PaperImage]):
             """Find all the image placeholders in the paper. Placeholders are referenced by markdown-style image syntax, where the link is just the placeholder ID. If a placeholder is found, replace it with the actual image URL."""
             for image in images:
-                placeholder = f"{image.placeholder_id}"
+                placeholder = f"IMAGE_PLACEHOLDER_{image.placeholder_id}"
                 summary = summary.replace(placeholder, str(image.image_url))
             return summary
 
