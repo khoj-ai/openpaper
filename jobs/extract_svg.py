@@ -48,28 +48,31 @@ def extract_figures_from_pdf(pdf_path):
             print(f"No figures found on page {page_num + 1}.")
             continue
 
-        # Create a new SVG structure, preserving original attributes
-        new_svg_root = ET.Element('svg', attrib=root.attrib)
+        # Create separate SVG files for each figure element
+        for fig_idx, figure_elem in enumerate(figure_elements):
+            # Create a new SVG structure, preserving original attributes
+            new_svg_root = ET.Element('svg', attrib=root.attrib)
 
-        # --- Add the <defs> section to the new SVG if it exists ---
-        if defs_element is not None:
-            new_svg_root.append(defs_element)
+            # --- Add the <defs> section to the new SVG if it exists ---
+            if defs_element is not None:
+                new_svg_root.append(defs_element)
 
-        new_parent_group = ET.Element('g')
-        for elem in figure_elements:
-            new_parent_group.append(elem)
+            # Create a new group and add the single figure element
+            new_parent_group = ET.Element('g')
+            new_parent_group.append(figure_elem)
+            new_svg_root.append(new_parent_group)
 
-        new_svg_root.append(new_parent_group)
+            output_filename = f"page_{page_num + 1}_figure_{fig_idx + 1}.svg"
+            output_path = os.path.join(output_dir, output_filename)
 
-        output_filename = f"page_{page_num + 1}_figures.svg"
-        output_path = os.path.join(output_dir, output_filename)
+            tree = ET.ElementTree(new_svg_root)
+            try:
+                tree.write(output_path, encoding='utf-8', xml_declaration=True)
+                print(f"✅ Extracted figure {fig_idx + 1} from page {page_num + 1} to '{output_path}'")
+            except Exception as e:
+                print(f"❌ Error writing SVG for page {page_num + 1}, figure {fig_idx + 1}: {e}")
 
-        tree = ET.ElementTree(new_svg_root)
-        try:
-            tree.write(output_path, encoding='utf-8', xml_declaration=True)
-            print(f"✅ Extracted figures for page {page_num + 1} to '{output_path}'")
-        except Exception as e:
-            print(f"❌ Error writing SVG for page {page_num + 1}: {e}")
+        print(f"Total figures extracted from page {page_num + 1}: {len(figure_elements)}")
 
     doc.close()
 
