@@ -1,4 +1,5 @@
 import logging
+import re
 import uuid
 from datetime import datetime
 from typing import List, Optional, Tuple
@@ -364,11 +365,38 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
         def _find_and_replace_all_placeholders(summary: str, images: List[PaperImage]):
             """Find all the image placeholders in the paper. Placeholders are referenced by markdown-style image syntax, where the link is just the placeholder ID. If a placeholder is found, replace it with the actual image URL."""
             for image in images:
-                placeholder = f"IMAGE_PLACEHOLDER_{image.placeholder_id}"
-                summary = summary.replace(placeholder, str(image.image_url))
                 placeholder = f"({image.placeholder_id})"
                 summary = summary.replace(placeholder, f"({image.image_url})")
-            return summary
+
+            # Remove any remaining image references in markdown format that don't match database entries
+            # Match markdown image syntax: ![alt text](url) or ![](url)
+            # Split by lines and filter out lines that contain unmatched image references
+            lines = summary.split("\n")
+            filtered_lines = []
+
+            for line in lines:
+                # Check if line contains markdown image syntax
+                if re.search(r"!\[.*?\]\([^)]+\)", line):
+                    # If it contains an image reference, check if it's a valid URL or still a placeholder
+                    # Remove lines that contain placeholder-style references (not actual URLs)
+                    image_refs = re.findall(r"!\[.*?\]\(([^)]+)\)", line)
+                    has_unmatched_placeholder = False
+
+                    for ref in image_refs:
+                        # If it's not a proper URL (doesn't start with http/https) and looks like a placeholder
+                        if not ref.startswith(
+                            ("http://", "https://")
+                        ) and not ref.startswith("/"):
+                            has_unmatched_placeholder = True
+                            break
+
+                    # Only keep the line if it doesn't have unmatched placeholders
+                    if not has_unmatched_placeholder:
+                        filtered_lines.append(line)
+                else:
+                    filtered_lines.append(line)
+
+            return "\n".join(filtered_lines)
 
         # Get the paper
         paper = self.get(db, id=paper_id, user=current_user)
