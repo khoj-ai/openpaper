@@ -254,7 +254,7 @@ async def extract_text_and_images_combined(file_path: str, job_id: str) -> Tuple
                             page.delete_image(xref) # type: ignore
 
                             # Insert placeholder text
-                            placeholder_text = f"[IMAGE_PLACEHOLDER_{placeholder_id}]"
+                            placeholder_text = f"[{placeholder_id}]"
                             page.insert_text( # type: ignore
                                 rect.tl,  # top-left corner
                                 placeholder_text,
@@ -319,8 +319,8 @@ def _clean_image_placeholders(markdown_text: str, placeholder_ids: List[str]) ->
     for placeholder_id in placeholder_ids:
         # Look for various forms of the placeholder that might appear in the text
         patterns = [
-            f"\\[IMAGE_PLACEHOLDER_{placeholder_id}\\]",
-            f"IMAGE_PLACEHOLDER_{placeholder_id}",
+            f"\\[{placeholder_id}\\]",
+            f"{placeholder_id}",
             f"\\[.*{placeholder_id}.*\\]",
         ]
 
@@ -328,7 +328,7 @@ def _clean_image_placeholders(markdown_text: str, placeholder_ids: List[str]) ->
             # Replace with clean placeholder format
             cleaned_text = re.sub(
                 pattern,
-                f"[IMAGE_PLACEHOLDER_{placeholder_id}]",
+                f"[{placeholder_id}]",
                 cleaned_text,
                 flags=re.IGNORECASE
             )
