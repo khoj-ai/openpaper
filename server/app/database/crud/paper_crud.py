@@ -409,9 +409,6 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
             db, paper_id=paper_id, user=current_user
         )
 
-        if not paper_images:
-            return str(paper.summary)
-
         # Get all image placeholders in the paper
         image_placeholders = _find_and_replace_all_placeholders(
             str(paper.summary), paper_images
