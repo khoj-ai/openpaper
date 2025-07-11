@@ -366,6 +366,8 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
             for image in images:
                 placeholder = f"IMAGE_PLACEHOLDER_{image.placeholder_id}"
                 summary = summary.replace(placeholder, str(image.image_url))
+                placeholder = f"({image.placeholder_id})"
+                summary = summary.replace(placeholder, f"({image.image_url})")
             return summary
 
         # Get the paper
