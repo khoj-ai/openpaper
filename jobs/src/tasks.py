@@ -15,7 +15,7 @@ import requests
 from src.celery_app import celery_app
 from src.schemas import PDFProcessingResult, PaperMetadataExtraction, PDFImage
 from src.s3_service import s3_service
-from src.parser import extract_text_from_pdf, generate_pdf_preview, map_pages_to_text_offsets, extract_images_from_pdf
+from src.parser import extract_text_and_images_combined, generate_pdf_preview, map_pages_to_text_offsets, extract_captions_for_images
 from src.llm_client import llm_client
 
 logger = logging.getLogger(__name__)
@@ -113,7 +113,7 @@ async def process_pdf_file(
 
         # Extract text and page offsets from PDF
         try:
-            pdf_text = extract_text_from_pdf(temp_file_path)
+            pdf_text, extracted_images, placeholder_to_path = await extract_text_and_images_combined(temp_file_path, job_id)
             status_callback(f"Processed bits and bytes")
             logger.info(f"Extracted {len(pdf_text)} characters of text from PDF")
             page_offsets = map_pages_to_text_offsets(temp_file_path)
@@ -145,7 +145,11 @@ async def process_pdf_file(
             status_callback("Extracting images from PDF")
             logger.info(f"About to call extract_images_from_pdf for job {job_id}")
             try:
-                result = await extract_images_from_pdf(temp_file_path, job_id)
+                result = await extract_captions_for_images(
+                    images=extracted_images,
+                    file_path=temp_file_path,
+                    image_id_to_location=placeholder_to_path,
+                )
                 logger.info(f"extract_images_from_pdf returned {len(result) if result else 0} images")
                 return result
             except Exception as e:
