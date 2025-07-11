@@ -200,7 +200,7 @@ async def process_pdf_file(
         elif isinstance(images_result, list):
             extracted_images = images_result
             # Filter out images that do not have a valid caption
-            extracted_images = [img for img in extracted_images if img.caption or img.image_url]
+            extracted_images = [img for img in extracted_images if img.caption]
             if extracted_images:
                 logger.info(f"Successfully extracted {len(extracted_images)} images from {safe_filename}")
             else:

@@ -58,11 +58,10 @@ Return only the caption text with no additional commentary or explanations.
 
 Rules:
 - For figures, graphs, or charts: Return the exact caption from the paper
-- If no caption exists but the image is useful for understanding the paper: Provide a brief description
 - Return an empty string if the image is:
   • Not a graph, chart, or figure
   • Not useful for understanding the paper
-  • A partial portion of a larger figure
+  • A partial portion of a larger figure, thus not a standalone or complete figure
   • Has no caption and is not useful for understanding the paper
 """
 
