@@ -22,4 +22,5 @@ dependencies = [
     "psutil>=5.9.0",
     "types-psutil>=7.0.0.20250601",
     "google-genai>=1.23.0",
+    "posthog>=6.1.0",
 ]

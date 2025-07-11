@@ -4,7 +4,6 @@ Celery tasks for PDF processing.
 import logging
 import tempfile
 import base64
-import time
 import psutil
 import os
 import asyncio
@@ -17,6 +16,7 @@ from src.schemas import PDFProcessingResult, PaperMetadataExtraction, PDFImage
 from src.s3_service import s3_service
 from src.parser import extract_text_and_images_combined, generate_pdf_preview, map_pages_to_text_offsets, extract_captions_for_images
 from src.llm_client import llm_client
+from src.utils import time_it
 
 logger = logging.getLogger(__name__)
 
@@ -113,10 +113,11 @@ async def process_pdf_file(
 
         # Extract text and page offsets from PDF
         try:
-            pdf_text, extracted_images, placeholder_to_path = await extract_text_and_images_combined(temp_file_path, job_id)
-            status_callback(f"Processed bits and bytes")
-            logger.info(f"Extracted {len(pdf_text)} characters of text from PDF")
-            page_offsets = map_pages_to_text_offsets(temp_file_path)
+            async with time_it("Extracting text, images, and page offsets from PDF", job_id=job_id):
+                pdf_text, extracted_images, placeholder_to_path = await extract_text_and_images_combined(temp_file_path, job_id)
+                status_callback(f"Processed bits and bytes")
+                logger.info(f"Extracted {len(pdf_text)} characters of text from PDF")
+                page_offsets = map_pages_to_text_offsets(temp_file_path)
         except Exception as e:
             logger.error(f"Failed to extract text from PDF: {e}")
             raise Exception(f"Failed to extract text from PDF: {e}")
@@ -157,23 +158,24 @@ async def process_pdf_file(
                 return []
 
         # Run I/O-bound tasks and LLM extraction concurrently
-        upload_task = asyncio.create_task(upload_pdf_async())
-        preview_task = asyncio.create_task(generate_preview_async())
-        images_task = asyncio.create_task(extract_images_async())
-        metadata_task = asyncio.create_task(
-            llm_client.extract_paper_metadata(
-                pdf_text, status_callback=status_callback
+        async with time_it("Running I/O-bound tasks and LLM extraction concurrently", job_id=job_id):
+            upload_task = asyncio.create_task(upload_pdf_async())
+            preview_task = asyncio.create_task(generate_preview_async())
+            images_task = asyncio.create_task(extract_images_async())
+            metadata_task = asyncio.create_task(
+                llm_client.extract_paper_metadata(
+                    pdf_text, job_id=job_id, status_callback=status_callback
+                )
             )
-        )
 
-        # Await all tasks
-        results = await asyncio.gather(
-            upload_task,
-            preview_task,
-            images_task,
-            metadata_task,
-            return_exceptions=True
-        )
+            # Await all tasks
+            results = await asyncio.gather(
+                upload_task,
+                preview_task,
+                images_task,
+                metadata_task,
+                return_exceptions=True
+            )
 
         # Process results
         upload_result, preview_result, images_result, metadata_result = results

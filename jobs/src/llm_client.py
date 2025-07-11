@@ -21,7 +21,7 @@ from src.schemas import (
     StarterQuestions,
     Highlights,
 )
-from src.utils import retry_llm_operation
+from src.utils import retry_llm_operation, time_it
 
 logger = logging.getLogger(__name__)
 
@@ -404,6 +404,7 @@ class PaperOperations(AsyncLLMClient):
     async def extract_paper_metadata(
         self,
         paper_content: str,
+        job_id: str,  # Add job_id here
         status_callback: Optional[Callable[[str], None]] = None,
     ) -> PaperMetadataExtraction:
         """
@@ -416,82 +417,95 @@ class PaperOperations(AsyncLLMClient):
         Returns:
             PaperMetadataExtraction: Extracted metadata
         """
-        # Create a new client for this operation
-        self.client = genai.Client(api_key=self.api_key)
+        async with time_it("Extracting paper metadata from LLM", job_id=job_id):
+            # Create a new client for this operation
+            self.client = genai.Client(api_key=self.api_key)
 
-        try:
             try:
-                cache_key = await self.create_cache(paper_content)
+                try:
+                    async with time_it("Creating cache for paper content", job_id=job_id):
+                        cache_key = await self.create_cache(paper_content)
+                except Exception as e:
+                    logger.error(f"Failed to create cache: {e}", exc_info=True)
+                    cache_key = None
+
+                # Run all extraction tasks concurrently
+                async with time_it("Running all metadata extraction tasks concurrently", job_id=job_id):
+                    tasks = [
+                        asyncio.create_task(time_it("Extracting title, authors, and abstract", job_id=job_id)                        (
+                            self.extract_title_authors_abstract
+                        )(
+                            paper_content=paper_content,
+                            cache_key=cache_key,
+                            status_callback=status_callback
+                        )),
+                        asyncio.create_task(time_it("Extracting institutions and keywords", job_id=job_id)                        (
+                            self.extract_institutions_keywords
+                        )(
+                            paper_content=paper_content,
+                            cache_key=cache_key,
+                            status_callback=status_callback
+                        )),
+                        asyncio.create_task(time_it("Extracting summary and citations", job_id=job_id)                        (
+                            self.extract_summary_and_citations
+                        )(
+                            paper_content=paper_content,
+                            cache_key=cache_key,
+                            status_callback=status_callback
+                        )),
+                        asyncio.create_task(time_it("Extracting starter questions", job_id=job_id)                        (
+                            self.extract_starter_questions
+                        )(
+                            paper_content=paper_content,
+                            cache_key=cache_key,
+                            status_callback=status_callback
+                        )),
+                        asyncio.create_task(time_it("Extracting highlights", job_id=job_id)                        (
+                            self.extract_highlights
+                        )(
+                            paper_content=paper_content,
+                            cache_key=cache_key,
+                            status_callback=status_callback
+                        )),
+                    ]
+
+                    # Use shield to prevent task cancellation during cleanup
+                    shielded_tasks = [asyncio.shield(task) for task in tasks]
+                    results = await asyncio.gather(*shielded_tasks, return_exceptions=True)
+
+                # Process results and handle potential errors
+                (
+                    title_authors_abstract,
+                    institutions_keywords,
+                    summary_and_citations,
+                    starter_questions,
+                    highlights,
+                ) = results
+
+                # Combine the results into the final metadata object
+                return PaperMetadataExtraction(
+                    title=getattr(title_authors_abstract, "title", ""),
+                    authors=getattr(title_authors_abstract, "authors", []),
+                    abstract=getattr(title_authors_abstract, "abstract", ""),
+                    institutions=getattr(institutions_keywords, "institutions", []),
+                    keywords=getattr(institutions_keywords, "keywords", []),
+                    summary=getattr(summary_and_citations, "summary", ""),
+                    summary_citations=getattr(
+                        summary_and_citations, "summary_citations", []
+                    ),
+                    starter_questions=getattr(starter_questions, "starter_questions", []),
+                    highlights=getattr(highlights, "highlights", []),
+                    publish_date=getattr(title_authors_abstract, "publish_date", None),
+                )
+
             except Exception as e:
-                logger.error(f"Failed to create cache: {e}", exc_info=True)
-                cache_key = None
-
-            # Run all extraction tasks concurrently
-            tasks = [
-                self.extract_title_authors_abstract(
-                    paper_content=paper_content,
-                    cache_key=cache_key,
-                    status_callback=status_callback
-                ),
-                self.extract_institutions_keywords(
-                    paper_content=paper_content,
-                    cache_key=cache_key,
-                    status_callback=status_callback
-                ),
-                self.extract_summary_and_citations(
-                    paper_content=paper_content,
-                    cache_key=cache_key,
-                    status_callback=status_callback
-                ),
-                self.extract_starter_questions(
-                    paper_content=paper_content,
-                    cache_key=cache_key,
-                    status_callback=status_callback
-                ),
-                self.extract_highlights(
-                    paper_content=paper_content,
-                    cache_key=cache_key,
-                    status_callback=status_callback
-                ),
-            ]
-
-            # Use shield to prevent task cancellation during cleanup
-            shielded_tasks = [asyncio.shield(task) for task in tasks]
-            results = await asyncio.gather(*shielded_tasks, return_exceptions=True)
-
-            # Process results and handle potential errors
-            (
-                title_authors_abstract,
-                institutions_keywords,
-                summary_and_citations,
-                starter_questions,
-                highlights,
-            ) = results
-
-            # Combine the results into the final metadata object
-            return PaperMetadataExtraction(
-                title=getattr(title_authors_abstract, "title", ""),
-                authors=getattr(title_authors_abstract, "authors", []),
-                abstract=getattr(title_authors_abstract, "abstract", ""),
-                institutions=getattr(institutions_keywords, "institutions", []),
-                keywords=getattr(institutions_keywords, "keywords", []),
-                summary=getattr(summary_and_citations, "summary", ""),
-                summary_citations=getattr(
-                    summary_and_citations, "summary_citations", []
-                ),
-                starter_questions=getattr(starter_questions, "starter_questions", []),
-                highlights=getattr(highlights, "highlights", []),
-                publish_date=getattr(title_authors_abstract, "publish_date", None),
-            )
-
-        except Exception as e:
-            logger.error(f"Error extracting metadata: {e}", exc_info=True)
-            if status_callback:
-                status_callback(f"Error during metadata extraction: {e}")
-            raise ValueError(f"Failed to extract metadata: {str(e)}")
-        finally:
-            # Set client to None to allow for proper garbage collection
-            self.client = None
+                logger.error(f"Error extracting metadata: {e}", exc_info=True)
+                if status_callback:
+                    status_callback(f"Error during metadata extraction: {e}")
+                raise ValueError(f"Failed to extract metadata: {str(e)}")
+            finally:
+                # Set client to None to allow for proper garbage collection
+                self.client = None
 
     async def extract_image_captions(
         self,
