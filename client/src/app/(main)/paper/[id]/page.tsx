@@ -78,7 +78,6 @@ import {
     PaperHighlight,
     Reference,
     ResponseStyle,
-    PaperImage,
 } from '@/lib/schema';
 
 import { Input } from '@/components/ui/input';
