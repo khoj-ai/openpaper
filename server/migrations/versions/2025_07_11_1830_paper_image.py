@@ -1,8 +1,8 @@
-"""store paper images
+"""paper image
 
-Revision ID: cb874d6c3557
+Revision ID: 8a530de3b9e6
 Revises: 16fc429323a5
-Create Date: 2025-07-10 02:44:42.914864+00:00
+Create Date: 2025-07-11 18:30:54.497137+00:00
 
 """
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "cb874d6c3557"
+revision: str = "8a530de3b9e6"
 down_revision: Union[str, None] = "16fc429323a5"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -34,6 +34,7 @@ def upgrade() -> None:
         sa.Column("page_number", sa.Integer(), nullable=False),
         sa.Column("image_index", sa.Integer(), nullable=False),
         sa.Column("caption", sa.Text(), nullable=True),
+        sa.Column("placeholder_id", sa.String(), nullable=True),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
