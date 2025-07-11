@@ -368,7 +368,7 @@ async def get_pdf(
     request: Request,
     id: str,
     db: Session = Depends(get_db),
-    current_user: Optional[CurrentUser] = Depends(get_required_user),
+    current_user: CurrentUser = Depends(get_required_user),
 ):
     """
     Get a document by ID
@@ -395,6 +395,10 @@ async def get_pdf(
         ResponseCitation.model_validate(citation).model_dump()
         for citation in paper.summary_citations or []
     ]
+
+    paper_data["summary"] = paper_crud.get_summary_replace_image_placeholders(
+        db, paper_id=id, current_user=current_user
+    )
 
     # Return the file URL
     return JSONResponse(status_code=200, content=paper_data)

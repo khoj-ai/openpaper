@@ -22,6 +22,7 @@ class PaperImageBase(BaseModel):
     height: int
     page_number: int
     image_index: int
+    placeholder_id: str
     caption: Optional[str] = None
 
 
@@ -39,6 +40,7 @@ class PaperImageUpdate(BaseModel):
     page_number: Optional[int] = None
     image_index: Optional[int] = None
     caption: Optional[str] = None
+    placeholder_id: Optional[str] = None
 
 
 # Paper Image CRUD that inherits from the base CRUD

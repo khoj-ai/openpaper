@@ -6,7 +6,15 @@ from typing import List, Optional, Tuple
 from app.database.crud.annotation_crud import AnnotationCreate, annotation_crud
 from app.database.crud.base_crud import CRUDBase
 from app.database.crud.highlight_crud import HighlightCreate, highlight_crud
-from app.database.models import JobStatus, Paper, PaperStatus, PaperUploadJob, RoleType
+from app.database.crud.paper_image_crud import paper_image_crud
+from app.database.models import (
+    JobStatus,
+    Paper,
+    PaperImage,
+    PaperStatus,
+    PaperUploadJob,
+    RoleType,
+)
 from app.helpers.parser import get_start_page_from_offset
 from app.llm.schemas import PaperMetadataExtraction, ResponseCitation
 from app.llm.utils import find_offsets
@@ -341,6 +349,45 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
                     f"Failed to create AI annotation for highlight {n_ai_h.id} in {paper_id}",
                     exc_info=True,
                 )
+
+    def get_summary_replace_image_placeholders(
+        self, db: Session, *, paper_id: str, current_user: CurrentUser
+    ) -> str:
+        """Replace image placeholders with actual images in the paper.
+
+        Args:
+            db (Session): Database session.
+            paper_id (str): ID of the paper to update.
+            user (CurrentUser): Current user making the request.
+        """
+
+        def _find_and_replace_all_placeholders(summary: str, images: List[PaperImage]):
+            """Find all the image placeholders in the paper. Placeholders are referenced by markdown-style image syntax, where the link is just the placeholder ID. If a placeholder is found, replace it with the actual image URL."""
+            for image in images:
+                placeholder = f"{image.placeholder_id}"
+                summary = summary.replace(placeholder, str(image.image_url))
+            return summary
+
+        # Get the paper
+        paper = self.get(db, id=paper_id, user=current_user)
+        if not paper:
+            raise ValueError(
+                f"Paper with ID {paper_id} not found or doesn't belong to user"
+            )
+
+        paper_images = paper_image_crud.get_by_paper_id(
+            db, paper_id=paper_id, user=current_user
+        )
+
+        if not paper_images:
+            return str(paper.summary)
+
+        # Get all image placeholders in the paper
+        image_placeholders = _find_and_replace_all_placeholders(
+            str(paper.summary), paper_images
+        )
+
+        return image_placeholders
 
 
 # Create a single instance to use throughout the application

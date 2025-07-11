@@ -277,6 +277,8 @@ class PaperImage(Base):
 
     caption = Column(Text, nullable=True)  # Optional caption for the image
 
+    placeholder_id = Column(String, nullable=True)  # Placeholder ID for the image
+
     paper = relationship("Paper", back_populates="paper_images")
 
 

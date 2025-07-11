@@ -38,6 +38,7 @@ class PDFImage(BaseModel):
     height: int
     format: str
     size_bytes: int
+    placeholder_id: str
     caption: Optional[str] = None
 
 
@@ -192,6 +193,7 @@ async def handle_paper_processing_webhook(
                                 page_number=image.page_number,
                                 image_index=image.image_index,
                                 caption=image.caption,
+                                placeholder_id=image.placeholder_id,
                             )
                         )
 
