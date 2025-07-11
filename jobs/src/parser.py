@@ -211,25 +211,25 @@ async def extract_text_and_images_combined(file_path: str, job_id: str) -> Tuple
                     should_include, reason = should_include_image(image_bytes, quality_metrics)
 
                     # Log detailed information about the decision
-                    logger.info(f"Image analysis for page {page_num + 1}, index {img_index}:")
-                    logger.info(f"  Size: {quality_metrics.get('width', 0)}x{quality_metrics.get('height', 0)}")
-                    logger.info(f"  File size: {len(image_bytes)} bytes")
-                    logger.info(f"  Entropy: {quality_metrics.get('entropy', 0):.2f}")
-                    logger.info(f"  Edge density: {quality_metrics.get('edge_density', 0):.4f}")
-                    logger.info(f"  Text density: {quality_metrics.get('text_density', 0):.4f}")
-                    logger.info(f"  Color variance: {quality_metrics.get('color_variance', 0):.1f}")
-                    logger.info(f"  Brightness: {quality_metrics.get('avg_brightness', 0):.1f}")
-                    logger.info(f"  Decision: {should_include} - {reason}")
+                    logger.debug(f"Image analysis for page {page_num + 1}, index {img_index}:")
+                    logger.debug(f"  Size: {quality_metrics.get('width', 0)}x{quality_metrics.get('height', 0)}")
+                    logger.debug(f"  File size: {len(image_bytes)} bytes")
+                    logger.debug(f"  Entropy: {quality_metrics.get('entropy', 0):.2f}")
+                    logger.debug(f"  Edge density: {quality_metrics.get('edge_density', 0):.4f}")
+                    logger.debug(f"  Text density: {quality_metrics.get('text_density', 0):.4f}")
+                    logger.debug(f"  Color variance: {quality_metrics.get('color_variance', 0):.1f}")
+                    logger.debug(f"  Brightness: {quality_metrics.get('avg_brightness', 0):.1f}")
+                    logger.debug(f"  Decision: {should_include} - {reason}")
 
                     if not should_include:
-                        logger.info(f"Skipping image on page {page_num + 1}, index {img_index}: {reason}")
+                        logger.debug(f"Skipping image on page {page_num + 1}, index {img_index}: {reason}")
                         continue
 
                     # Get image dimensions and other metadata
                     width = quality_metrics.get('width', 0)
                     height = quality_metrics.get('height', 0)
 
-                    logger.info(f"Including image on page {page_num + 1}: {width}x{height}, {len(image_bytes)} bytes, entropy={quality_metrics.get('entropy', 0):.2f}")
+                    logger.debug(f"Including image on page {page_num + 1}: {width}x{height}, {len(image_bytes)} bytes, entropy={quality_metrics.get('entropy', 0):.2f}")
 
                     # Generate placeholder ID
                     placeholder_id = f"IMG_{job_id}_{page_num + 1}_{img_index}_{uuid.uuid4().hex[:8]}"
