@@ -4,6 +4,22 @@ Pydantic schemas for PDF processing.
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
+class PDFImage(BaseModel):
+    """
+    Schema for an image extracted from a PDF.
+    """
+    page_number: int = Field(description="Page number where the image was found (1-indexed)")
+    image_index: int = Field(description="Index of the image on the page")
+    s3_object_key: str = Field(description="S3 object key for the extracted image")
+    image_url: str = Field(description="Public URL to access the image")
+    width: int = Field(description="Width of the image in pixels")
+    height: int = Field(description="Height of the image in pixels")
+    format: str = Field(description="Image format (e.g., 'PNG', 'JPEG')")
+    size_bytes: int = Field(description="Size of the image in bytes")
+    caption: Optional[str] = Field(default=None, description="Extracted caption or subtitle for the image")
+    placeholder_id: Optional[str] = Field(default=None, description="Placeholder ID for the image in the PDF, if applicable")
+
+
 class ResponseCitation(BaseModel):
     """
     Schema for a citation in the paper.
@@ -50,6 +66,7 @@ class InstitutionsKeywords(BaseModel):
     keywords: List[str] = Field(default=[], description="List of keywords")
 
 
+# Extracted images are referenced here! Refer to parser.py to see how place holder IDs are generated and inserted. This logic is super convoluted unfortunately, but the best workaround for image understanding in the PDF + LLM flow.
 class SummaryAndCitations(BaseModel):
     """Schema for summary and citations extraction."""
     summary: str = Field(
@@ -67,6 +84,7 @@ Format guidelines:
 - Include relevant data points and metrics when available
 - Use plain language while preserving technical accuracy
 - Include inline citations to support claims that refer to the paper's content. This is especially important for claims about the findings, methodology, and results.
+- You may include images of figures if they are helpful to the summary. You may reference them in markdown image format inline using the placeholder IDs. Example: ![Figure 1](IMG_placeholder_1)
 
 Citation guidelines:
 - Use [^1], [^2], [^6, ^7] etc. for citations in the summary
@@ -156,7 +174,6 @@ The summary should be accessible to readers with basic domain knowledge while ma
     )
 
 
-
 class PDFProcessingResult(BaseModel):
     """Result of PDF processing"""
     success: bool
@@ -168,5 +185,6 @@ class PDFProcessingResult(BaseModel):
     file_url: Optional[str] = None
     preview_url: Optional[str] = None
     preview_object_key: Optional[str] = None
+    extracted_images: Optional[List[PDFImage]] = Field(default=None, description="List of images extracted from the PDF")
     error: Optional[str] = None
     duration: Optional[float] = None  # Duration in seconds

@@ -3,11 +3,12 @@ from enum import Enum
 from types import NoneType
 
 from sqlalchemy import UUID  # type: ignore
-from sqlalchemy import (
+from sqlalchemy import (  # type: ignore
     ARRAY,
     Boolean,
     Column,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     String,
@@ -197,9 +198,7 @@ class Paper(Base):
     status = Column(String, nullable=False, default=PaperStatus.reading)
     file_url = Column(String, nullable=False)
     preview_url = Column(String, nullable=True)
-    s3_object_key = Column(
-        String, nullable=True
-    )  # Store the S3 object key for deletion
+    s3_object_key = Column(String, nullable=True)
     authors = Column(ARRAY(String), nullable=True)
     title = Column(Text, nullable=True)
     abstract = Column(Text, nullable=True)
@@ -251,6 +250,36 @@ class Paper(Base):
     audio_overview_jobs = relationship(
         "AudioOverviewJob", back_populates="paper", cascade="all, delete-orphan"
     )
+    paper_images = relationship(
+        "PaperImage", back_populates="paper", cascade="all, delete-orphan"
+    )
+
+
+class PaperImage(Base):
+    __tablename__ = "paper_images"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    paper_id = Column(
+        UUID(as_uuid=True), ForeignKey("papers.id", ondelete="CASCADE"), nullable=False
+    )
+    s3_object_key = Column(String, nullable=False)
+    image_url = Column(String, nullable=False)
+    format = Column(String, nullable=False)  # e.g., 'png', 'jpg'
+
+    size_bytes = Column(Integer, nullable=False)  # Size of the image in bytes
+    width = Column(Integer, nullable=False)  # Width of the image in pixels
+    height = Column(Integer, nullable=False)  # Height of the image in pixels
+
+    page_number = Column(
+        Integer, nullable=False
+    )  # Page number where the image is located
+    image_index = Column(Integer, nullable=False)  # Index of the image in the paper
+
+    caption = Column(Text, nullable=True)  # Optional caption for the image
+
+    placeholder_id = Column(String, nullable=True)  # Placeholder ID for the image
+
+    paper = relationship("Paper", back_populates="paper_images")
 
 
 class Message(Base):

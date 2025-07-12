@@ -4,21 +4,19 @@ Celery tasks for PDF processing.
 import logging
 import tempfile
 import base64
-import time
 import psutil
 import os
 import asyncio
 from datetime import datetime, timezone
-from typing import Dict, Any, Callable, TypeVar, Coroutine
+from typing import Dict, Any, Callable, TypeVar, Coroutine, List
 import requests
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from functools import wraps
 
 from src.celery_app import celery_app
-from src.schemas import PDFProcessingResult, PaperMetadataExtraction
+from src.schemas import PDFProcessingResult, PaperMetadataExtraction, PDFImage
 from src.s3_service import s3_service
-from src.parser import extract_text_from_pdf, generate_pdf_preview, map_pages_to_text_offsets
+from src.parser import extract_text_and_images_combined, generate_pdf_preview, map_pages_to_text_offsets, extract_captions_for_images
 from src.llm_client import llm_client
+from src.utils import time_it
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +100,7 @@ async def process_pdf_file(
     temp_file_path = None
     object_key = None
     preview_object_key = None
+    extracted_images: List[PDFImage] = []
 
     try:
         logger.info(f"Starting PDF processing for job {job_id}")
@@ -114,15 +113,18 @@ async def process_pdf_file(
 
         # Extract text and page offsets from PDF
         try:
-            pdf_text = extract_text_from_pdf(temp_file_path)
-            status_callback(f"Processed bits and bytes")
-            logger.info(f"Extracted {len(pdf_text)} characters of text from PDF")
-            page_offsets = map_pages_to_text_offsets(temp_file_path)
+            async with time_it("Extracting text, images, and page offsets from PDF", job_id=job_id):
+                pdf_text, extracted_images, placeholder_to_path = await extract_text_and_images_combined(temp_file_path, job_id)
+                status_callback(f"Processed bits and bytes")
+                logger.info(f"Extracted {len(pdf_text)} characters of text from PDF")
+                page_offsets = map_pages_to_text_offsets(temp_file_path)
         except Exception as e:
             logger.error(f"Failed to extract text from PDF: {e}")
             raise Exception(f"Failed to extract text from PDF: {e}")
 
         # Define async functions for I/O-bound operations
+        logger.info(f"About to define async functions for job {job_id}")
+
         async def upload_pdf_async():
             status_callback("PDF ascending to the cloud")
             return await asyncio.to_thread(
@@ -140,25 +142,43 @@ async def process_pdf_file(
                 logger.warning(f"Failed to generate preview for {safe_filename}: {str(e)}")
                 return None, None
 
-        # Run I/O-bound tasks and LLM extraction concurrently
-        upload_task = asyncio.create_task(upload_pdf_async())
-        preview_task = asyncio.create_task(generate_preview_async())
-        metadata_task = asyncio.create_task(
-            llm_client.extract_paper_metadata(
-                pdf_text, status_callback=status_callback
-            )
-        )
+        async def extract_images_async():
+            status_callback("Extracting images from PDF")
+            logger.info(f"About to call extract_images_from_pdf for job {job_id}")
+            try:
+                result = await extract_captions_for_images(
+                    images=extracted_images,
+                    file_path=temp_file_path,
+                    image_id_to_location=placeholder_to_path,
+                )
+                logger.info(f"extract_images_from_pdf returned {len(result) if result else 0} images")
+                return result
+            except Exception as e:
+                logger.error(f"Failed to extract images from {safe_filename}: {str(e)}", exc_info=True)
+                return []
 
-        # Await all tasks
-        results = await asyncio.gather(
-            upload_task,
-            preview_task,
-            metadata_task,
-            return_exceptions=True
-        )
+        # Run I/O-bound tasks and LLM extraction concurrently
+        async with time_it("Running I/O-bound tasks and LLM extraction concurrently", job_id=job_id):
+            upload_task = asyncio.create_task(upload_pdf_async())
+            preview_task = asyncio.create_task(generate_preview_async())
+            images_task = asyncio.create_task(extract_images_async())
+            metadata_task = asyncio.create_task(
+                llm_client.extract_paper_metadata(
+                    pdf_text, job_id=job_id, status_callback=status_callback
+                )
+            )
+
+            # Await all tasks
+            results = await asyncio.gather(
+                upload_task,
+                preview_task,
+                images_task,
+                metadata_task,
+                return_exceptions=True
+            )
 
         # Process results
-        upload_result, preview_result, metadata_result = results
+        upload_result, preview_result, images_result, metadata_result = results
 
         if isinstance(upload_result, Exception):
             logger.error(f"Failed to upload PDF: {upload_result}")
@@ -173,6 +193,20 @@ async def process_pdf_file(
             preview_object_key, preview_url = preview_result # type: ignore
             if preview_url:
                 logger.info(f"Generated preview for {safe_filename}: {preview_url}")
+
+        if isinstance(images_result, Exception):
+            logger.warning(f"Failed to extract images: {images_result}")
+            extracted_images = []
+        elif isinstance(images_result, list):
+            extracted_images = images_result
+            # Filter out images that do not have a valid caption
+            extracted_images = [img for img in extracted_images if img.caption]
+            if extracted_images:
+                logger.info(f"Successfully extracted {len(extracted_images)} images from {safe_filename}")
+            else:
+                logger.info(f"No images found in {safe_filename}")
+        else:
+            extracted_images = []
 
         if isinstance(metadata_result, Exception):
             logger.error(f"Failed to extract metadata: {metadata_result}")
@@ -202,6 +236,7 @@ async def process_pdf_file(
             file_url=file_url,
             preview_url=preview_url,
             preview_object_key=preview_object_key,
+            extracted_images=extracted_images,
             job_id=job_id,
             raw_content=pdf_text,
             page_offset_map=page_offsets,

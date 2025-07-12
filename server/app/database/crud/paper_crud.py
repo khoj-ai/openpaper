@@ -1,4 +1,5 @@
 import logging
+import re
 import uuid
 from datetime import datetime
 from typing import List, Optional, Tuple
@@ -6,7 +7,15 @@ from typing import List, Optional, Tuple
 from app.database.crud.annotation_crud import AnnotationCreate, annotation_crud
 from app.database.crud.base_crud import CRUDBase
 from app.database.crud.highlight_crud import HighlightCreate, highlight_crud
-from app.database.models import JobStatus, Paper, PaperStatus, PaperUploadJob, RoleType
+from app.database.crud.paper_image_crud import paper_image_crud
+from app.database.models import (
+    JobStatus,
+    Paper,
+    PaperImage,
+    PaperStatus,
+    PaperUploadJob,
+    RoleType,
+)
 from app.helpers.parser import get_start_page_from_offset
 from app.llm.schemas import PaperMetadataExtraction, ResponseCitation
 from app.llm.utils import find_offsets
@@ -341,6 +350,71 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
                     f"Failed to create AI annotation for highlight {n_ai_h.id} in {paper_id}",
                     exc_info=True,
                 )
+
+    def get_summary_replace_image_placeholders(
+        self, db: Session, *, paper_id: str, current_user: CurrentUser
+    ) -> str:
+        """Replace image placeholders with actual images in the paper.
+
+        Args:
+            db (Session): Database session.
+            paper_id (str): ID of the paper to update.
+            user (CurrentUser): Current user making the request.
+        """
+
+        def _find_and_replace_all_placeholders(summary: str, images: List[PaperImage]):
+            """Find all the image placeholders in the paper. Placeholders are referenced by markdown-style image syntax, where the link is just the placeholder ID. If a placeholder is found, replace it with the actual image URL."""
+            for image in images:
+                placeholder = f"({image.placeholder_id})"
+                summary = summary.replace(placeholder, f"({image.image_url})")
+
+            # Remove any remaining image references in markdown format that don't match database entries
+            # Match markdown image syntax: ![alt text](url) or ![](url)
+            # Split by lines and filter out lines that contain unmatched image references
+            lines = summary.split("\n")
+            filtered_lines = []
+
+            for line in lines:
+                # Check if line contains markdown image syntax
+                if re.search(r"!\[.*?\]\([^)]+\)", line):
+                    # If it contains an image reference, check if it's a valid URL or still a placeholder
+                    # Remove lines that contain placeholder-style references (not actual URLs)
+                    image_refs = re.findall(r"!\[.*?\]\(([^)]+)\)", line)
+                    has_unmatched_placeholder = False
+
+                    for ref in image_refs:
+                        # If it's not a proper URL (doesn't start with http/https) and looks like a placeholder
+                        if not ref.startswith(
+                            ("http://", "https://")
+                        ) and not ref.startswith("/"):
+                            has_unmatched_placeholder = True
+                            break
+
+                    # Only keep the line if it doesn't have unmatched placeholders
+                    if not has_unmatched_placeholder:
+                        filtered_lines.append(line)
+                else:
+                    filtered_lines.append(line)
+
+            return "\n".join(filtered_lines)
+
+        # Get the paper
+        paper = self.get(db, id=paper_id, user=current_user)
+        if not paper:
+            raise ValueError(
+                f"Paper with ID {paper_id} not found or doesn't belong to user"
+            )
+
+        paper_images = paper_image_crud.get_by_paper_id(
+            db, paper_id=paper_id, user=current_user
+        )
+
+        # Get all image placeholders in the paper
+        image_placeholders = _find_and_replace_all_placeholders(
+            str(paper.summary), paper_images
+        )
+
+        return image_placeholders
 
 
 # Create a single instance to use throughout the application

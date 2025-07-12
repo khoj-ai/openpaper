@@ -3,9 +3,44 @@ import functools
 import json
 import logging
 import random
-from typing import Any, Callable
+import time
+from contextlib import asynccontextmanager
+from typing import Any, Callable, AsyncGenerator, Optional, Dict
+
+from src.telemetry import track_event
 
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def time_it(
+    description: str,
+    job_id: Optional[str] = None,
+    event_properties: Optional[Dict[str, Any]] = None,
+) -> AsyncGenerator[None, None]:
+    """
+    An async context manager to measure and log the execution time of a code block.
+
+    Args:
+        description: A description of the code block being timed.
+        job_id: The job ID for tracking.
+        event_properties: Additional properties for the tracking event.
+    """
+    start_time = time.monotonic()
+    logger.info(f"Starting: {description}...")
+    yield
+    end_time = time.monotonic()
+    duration = end_time - start_time
+    logger.info(f"Finished: {description}. Duration: {duration:.2f} seconds")
+
+    if job_id:
+        event_name = f"timer:{description.lower().replace(' ', '_')}"
+        properties = {"duration": duration}
+        if event_properties:
+            properties.update(event_properties)
+        track_event(event_name, distinct_id=job_id, properties=properties)
+
+
 
 def retry_llm_operation(max_retries: int = 3, delay: float = 1.0):
     """

@@ -10,6 +10,7 @@ from app.api.highlight_api import highlight_router
 from app.api.message_api import message_router
 from app.api.paper_api import paper_router
 from app.api.paper_audio_api import paper_audio_router
+from app.api.paper_image_api import paper_image_router
 from app.api.paper_search_api import paper_search_router
 from app.api.paper_upload_api import paper_upload_router
 from app.api.search_api import search_router
@@ -59,6 +60,7 @@ app.include_router(annotation_router, prefix="/api/annotation")
 app.include_router(paper_search_router, prefix="/api/search/global")
 app.include_router(search_router, prefix="/api/search/local")
 app.include_router(paper_audio_router, prefix="/api/paper/audio")
+app.include_router(paper_image_router, prefix="/api/paper/image")
 app.include_router(paper_upload_router, prefix="/api/paper/upload")
 app.include_router(
     subscription_router, prefix="/api/subscription"

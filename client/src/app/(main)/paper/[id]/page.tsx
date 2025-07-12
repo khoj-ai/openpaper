@@ -36,6 +36,7 @@ import {
     AudioLines,
     Route,
     User,
+    ChartBar,
 } from 'lucide-react';
 
 import { Textarea } from '@/components/ui/textarea';
@@ -87,6 +88,7 @@ import CustomCitationLink from '@/components/utils/CustomCitationLink';
 import { Avatar } from '@/components/ui/avatar';
 import Link from 'next/link';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import PaperImageView from '@/components/PaperImageView';
 
 interface ChatRequestBody {
     user_query: string;
@@ -105,6 +107,7 @@ const PaperToolset = {
         { name: "Annotations", icon: Highlighter },
         { name: "Share", icon: Share },
         { name: "Audio", icon: AudioLines },
+        { name: "Figures", icon: ChartBar },
         { name: "Focus", icon: Focus },
     ],
 }
@@ -1378,6 +1381,14 @@ export default function PaperView() {
                                                     </Button>
                                                 </div>
                                             )}
+                                        </div>
+                                    )
+                                }
+                                {
+                                    rightSideFunction === 'Figures' && (
+                                        <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto">
+                                            {/* Paper Images Section */}
+                                            <PaperImageView paperId={id} />
                                         </div>
                                     )
                                 }
