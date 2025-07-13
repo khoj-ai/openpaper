@@ -317,6 +317,7 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
             new_ai_highlight_obj = HighlightCreate(
                 paper_id=uuid.UUID(paper_id),
                 raw_text=ai_highlight.text,
+                type=ai_highlight.type,
                 start_offset=offsets[0],
                 end_offset=offsets[1],
                 page_number=page_number,

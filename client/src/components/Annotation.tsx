@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bot, Check, Pencil, Sparkles, Trash2, User as UserIcon, X } from 'lucide-react';
+import { Bot, Check, File, Pencil, Sparkles, Trash2, User as UserIcon, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar } from '@/components/ui/avatar';
@@ -61,11 +61,11 @@ export default function Annotation({
                 <div className="flex items-start gap-4 p-4 bg-background dark:bg-card border border-border rounded-xl shadow-sm">
                     {/* Avatar */}
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isAI
-                        ? 'bg-blue-400 dark:bg-blue-600'
+                        ? 'bg-blue-200 dark:bg-blue-800'
                         : 'bg-muted dark:bg-muted/70'
                         }`}>
                         {isAI ? (
-                            <Bot size={16} className="text-white" />
+                            <File size={16} className="text-blue-500" />
                         ) : (
                             <UserIcon size={16} className="text-muted-foreground" />
                         )}
@@ -75,7 +75,7 @@ export default function Annotation({
                     <div className="flex-1 space-y-3">
                         <div className="flex items-center justify-between">
                             <h4 className="text-sm font-semibold text-foreground">
-                                {isAI ? 'AI Analysis' : user?.name || 'User'}
+                                {isAI ? 'Open Paper' : user?.name || 'User'}
                             </h4>
                         </div>
 
@@ -119,24 +119,16 @@ export default function Annotation({
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
-            {/* Glow effect for AI annotations */}
-            {isAI && (
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-400/10 to-blue-600/10 dark:from-blue-400/20 dark:to-blue-600/20 rounded-xl blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            )}
-
-            <div className={`relative flex items-start gap-4 p-4 rounded-xl border transition-all duration-300 ${isAI
-                ? 'bg-blue-500/10 dark:bg-blue-600/10 hover:shadow-lg'
-                : 'bg-background dark:bg-card border-border hover:border-border/80 dark:hover:border-border hover:shadow-sm dark:hover:shadow-lg'
-                }`}>
+            <div className="relative flex items-start gap-4 p-4 rounded-xl border bg-background dark:bg-card border-border hover:border-border/80 dark:hover:border-border hover:shadow-sm dark:hover:shadow-lg transition-all duration-300">
 
                 {/* Avatar */}
                 <div className="relative">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-transform duration-200 ${isAI
-                        ? 'bg-blue-500 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-700'
+                        ? 'bg-blue-200 dark:bg-blue-800'
                         : 'bg-muted dark:bg-muted/70'
                         } ${isHovered ? 'scale-105' : ''}`}>
                         {isAI ? (
-                            <Bot size={16} className="text-white" />
+                            <File size={16} className="text-blue-500" />
                         ) : user?.picture ? (
                             <Avatar className="h-8 w-8">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -146,13 +138,6 @@ export default function Annotation({
                             <UserIcon size={16} className="text-muted-foreground" />
                         )}
                     </div>
-
-                    {/* AI sparkle indicator */}
-                    {isAI && (
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                            <Sparkles size={8} className="text-white" />
-                        </div>
-                    )}
                 </div>
 
                 {/* Content */}
@@ -160,7 +145,7 @@ export default function Annotation({
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                             <h4 className="text-sm font-semibold text-foreground">
-                                {isAI ? 'AI Analysis' : user?.name || 'User'}
+                                {isAI ? 'Open Paper' : user?.name || 'User'}
                             </h4>
                             <span className="text-xs text-muted-foreground bg-muted dark:bg-muted/50 px-2 py-0.5 rounded-full">
                                 {formatDate(annotation.created_at)}
@@ -168,23 +153,27 @@ export default function Annotation({
                         </div>
 
                         {/* Action buttons */}
-                        {!readonly && !isAI && removeAnnotation && updateAnnotation && (
+                        {!readonly && removeAnnotation && updateAnnotation && (
                             <div className={`flex items-center gap-1 transition-all duration-200 ${isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-2'
                                 }`}>
-                                <button
-                                    className="p-1.5 hover:bg-muted dark:hover:bg-muted/70 rounded-lg transition-colors duration-200 group/btn"
-                                    onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
-                                    title="Edit annotation"
-                                >
-                                    <Pencil size={14} className="text-muted-foreground group-hover/btn:text-primary transition-colors" />
-                                </button>
-                                <button
-                                    className="p-1.5 hover:bg-destructive/10 dark:hover:bg-destructive/20 rounded-lg transition-colors duration-200 group/btn"
-                                    onClick={(e) => { e.stopPropagation(); removeAnnotation(annotation.id); }}
-                                    title="Delete annotation"
-                                >
-                                    <Trash2 size={14} className="text-muted-foreground group-hover/btn:text-destructive transition-colors" />
-                                </button>
+                                {!isAI && (
+                                    <button
+                                        className="p-1.5 hover:bg-muted dark:hover:bg-muted/70 rounded-lg transition-colors duration-200 group/btn"
+                                        onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
+                                        title="Edit annotation"
+                                    >
+                                        <Pencil size={14} className="text-muted-foreground group-hover/btn:text-primary transition-colors" />
+                                    </button>
+                                )}
+                                {!isAI && (
+                                    <button
+                                        className="p-1.5 hover:bg-destructive/10 dark:hover:bg-destructive/20 rounded-lg transition-colors duration-200 group/btn"
+                                        onClick={(e) => { e.stopPropagation(); removeAnnotation(annotation.id); }}
+                                        title="Delete annotation"
+                                    >
+                                        <Trash2 size={14} className="text-muted-foreground group-hover/btn:text-destructive transition-colors" />
+                                    </button>
+                                )}
                             </div>
                         )}
                     </div>

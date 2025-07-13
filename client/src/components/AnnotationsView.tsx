@@ -2,14 +2,38 @@ import React, { useEffect, useState, useRef } from 'react';
 
 import {
 	PaperHighlight,
-	PaperHighlightAnnotation
+	PaperHighlightAnnotation,
+	HighlightType
 } from '@/lib/schema';
 
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from './ui/card';
+import { Badge } from '@/components/ui/badge';
 import { useAuth, User } from "@/lib/auth";
 import Annotation from './Annotation';
+
+// Function to get badge styling based on highlight type
+function getHighlightTypeStyling(type: string) {
+	switch (type) {
+		case 'topic':
+			return { variant: 'default' as const, className: 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200' };
+		case 'motivation':
+			return { variant: 'default' as const, className: 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200' };
+		case 'method':
+			return { variant: 'default' as const, className: 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200' };
+		case 'evidence':
+			return { variant: 'default' as const, className: 'bg-orange-100 text-orange-800 border-orange-200 hover:bg-orange-200' };
+		case 'result':
+			return { variant: 'default' as const, className: 'bg-red-100 text-red-800 border-red-200 hover:bg-red-200' };
+		case 'impact':
+			return { variant: 'default' as const, className: 'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200' };
+		case 'general':
+			return { variant: 'secondary' as const, className: 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200' };
+		default:
+			return { variant: 'secondary' as const, className: 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200' };
+	}
+}
 
 export interface AnnotationButtonProps {
 	highlightId: string;
@@ -109,9 +133,24 @@ function HighlightThread({
 			<CardContent className="p-0">
 				{/* The Blockquote */}
 				<blockquote className={`border-l-4 ${highlightBorderColor} pl-4 py-2 mb-4 bg-background`}>
-					<p className="text-foreground">
-						{highlight.raw_text}
-					</p>
+					<div className="flex items-start justify-between gap-2">
+						<p className="text-foreground flex-1">
+							{highlight.raw_text}
+						</p>
+						{highlight.type && (
+							(() => {
+								const styling = getHighlightTypeStyling(highlight.type);
+								return (
+									<Badge
+										variant={styling.variant}
+										className={`text-xs shrink-0 ${styling.className}`}
+									>
+										{highlight.type.replace('_', ' ').toLowerCase()}
+									</Badge>
+								);
+							})()
+						)}
+					</div>
 				</blockquote>
 
 				{/* The Annotation Thread */}
