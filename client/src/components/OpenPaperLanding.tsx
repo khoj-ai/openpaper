@@ -370,6 +370,7 @@ export default function OpenPaperLanding() {
                     </div>
                 </section>
 
+
                 {/* Pain Points Section */}
                 <section className="w-full py-12 md:py-24 lg:py-32 bg-muted/50">
                     <div className="container px-4 md:px-6 max-w-6xl mx-auto">
@@ -431,188 +432,204 @@ export default function OpenPaperLanding() {
                     </div>
                 </section>
 
-                {/* Features */}
+
+                {/* Feature Screenshots Section */}
                 <section id="features" className="w-full py-12 md:py-24 lg:py-32">
                     <div className="container px-4 md:px-6 max-w-6xl mx-auto">
                         <div className="text-center mb-12">
-                            <Badge variant="outline" className="mb-4 border-primary/30 text-primary">
-                                Practical Tools
-                            </Badge>
                             <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">
-                                Built for <span className="text-primary">Real Research</span>
+                                Powerful Features in <span className="text-primary">Action</span>
                             </h2>
                             <p className="mt-4 text-muted-foreground md:text-lg max-w-2xl mx-auto">
-                                Every feature designed with academic rigor in mind. Transparent, verifiable, and properly attributed.
+                                See how Open Paper transforms your research workflow with these key capabilities.
                             </p>
                         </div>
-                        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-                            <Card className="hover:border-primary/50 transition-all duration-300">
-                                <CardHeader>
-                                    <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center mb-4 border border-blue-500/30">
-                                        <FileText className="w-6 h-6 text-blue-500" />
-                                    </div>
-                                    <CardTitle>Stay Focused</CardTitle>
-                                    <CardDescription>
-                                        Read your papers side by side with your notes and AI insights
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <ul className="space-y-2 text-sm text-muted-foreground">
-                                        <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-blue-500" />
-                                            Side-by-side paper and notes view
-                                        </li>
-                                        <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-blue-500" />
-                                            Seamless chat integration
-                                        </li>
-                                        <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-blue-500" />
-                                            Never lose your flow
-                                        </li>
-                                    </ul>
-                                </CardContent>
-                            </Card>
 
-                            <Card className="hover:border-primary/50 transition-all duration-300">
-                                <CardHeader>
-                                    <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center mb-4 border border-blue-500/30">
-                                        <Highlighter className="w-6 h-6 text-blue-500" />
-                                    </div>
-                                    <CardTitle>Annotate</CardTitle>
-                                    <CardDescription>
-                                        Highlight key insights and add notes that stay in sync
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <ul className="space-y-2 text-sm text-muted-foreground">
+                        <div className="grid gap-12 lg:gap-16">
+                            {/* Deep Reading */}
+                            <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 items-center">
+                                <div className="space-y-4">
+                                    <Badge variant="outline" className="w-fit border-blue-500/30 text-blue-500">
+                                        <FileText className="w-3 h-3 mr-1" />
+                                        Deep Reading
+                                    </Badge>
+                                    <h3 className="text-2xl font-bold">Read Papers Side-by-Side with AI</h3>
+                                    <p className="text-muted-foreground">
+                                        Never lose context while reading. Our split-pane interface keeps your paper and AI chat
+                                        visible simultaneously, making it easy to ask questions and get instant, cited responses.
+                                    </p>
+                                    <ul className="space-y-2 text-sm">
                                         <li className="flex items-center gap-2">
                                             <CheckCircle className="w-4 h-4 text-blue-500" />
-                                            Persistent highlights and notes
+                                            <span>Seamless paper-chat integration</span>
                                         </li>
                                         <li className="flex items-center gap-2">
                                             <CheckCircle className="w-4 h-4 text-blue-500" />
-                                            Sync across all your devices
+                                            <span>Context-aware AI responses</span>
                                         </li>
                                         <li className="flex items-center gap-2">
                                             <CheckCircle className="w-4 h-4 text-blue-500" />
-                                            Never lose important information
+                                            <span>Maintain reading flow</span>
                                         </li>
                                     </ul>
-                                </CardContent>
-                            </Card>
+                                </div>
+                                <div className="relative">
+                                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg blur-xl"></div>
+                                    <img
+                                        src="https://assets.khoj.dev/openpaper/read_paper_deeply.png"
+                                        alt="Deep paper reading with AI assistance"
+                                        className="relative rounded-lg shadow-lg border border-border w-full h-auto"
+                                    />
+                                </div>
+                            </div>
 
-                            <Card className="hover:border-primary/50 transition-all duration-300">
-                                <CardHeader>
-                                    <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center mb-4 border border-blue-500/30">
-                                        <MessageSquareText className="w-6 h-6 text-blue-500" />
-                                    </div>
-                                    <CardTitle>Get Grounded Insights</CardTitle>
-                                    <CardDescription>
-                                        Ask questions and get trusted responses with citations
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <ul className="space-y-2 text-sm text-muted-foreground">
+                            {/* Grounded Citations */}
+                            <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 items-center">
+                                <div className="space-y-4">
+                                    <Badge variant="outline" className="w-fit border-green-500/30 text-green-500">
+                                        <MessageSquareText className="w-3 h-3 mr-1" />
+                                        Grounded Responses
+                                    </Badge>
+                                    <h3 className="text-2xl font-bold">Trust Every AI Response</h3>
+                                    <p className="text-muted-foreground">
+                                        Every AI answer includes precise citations that link back to specific sections in your paper.
+                                        Click any citation to jump directly to the source material for verification.
+                                    </p>
+                                    <ul className="space-y-2 text-sm">
                                         <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-blue-500" />
-                                            Every response includes citations
+                                            <CheckCircle className="w-4 h-4 text-green-500" />
+                                            <span>Clickable citations to source</span>
                                         </li>
                                         <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-blue-500" />
-                                            Links back to paper sections
+                                            <CheckCircle className="w-4 h-4 text-green-500" />
+                                            <span>Page-specific references</span>
                                         </li>
                                         <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-blue-500" />
-                                            Research with confidence
+                                            <CheckCircle className="w-4 h-4 text-green-500" />
+                                            <span>Academic integrity built-in</span>
                                         </li>
                                     </ul>
-                                </CardContent>
-                            </Card>
+                                </div>
+                                <div className="relative">
+                                    <div className="absolute inset-0 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-lg blur-xl"></div>
+                                    <img
+                                        src="https://assets.khoj.dev/openpaper/grounded_citations.png"
+                                        alt="AI responses with grounded citations"
+                                        className="relative rounded-lg shadow-lg border border-border w-full h-auto"
+                                    />
+                                </div>
+                            </div>
 
-                            <Card className="hover:border-primary/50 transition-all duration-300">
-                                <CardHeader>
-                                    <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center mb-4 border border-blue-500/30">
-                                        <Mic2 className="w-6 h-6 text-blue-500" />
-                                    </div>
-                                    <CardTitle>Listen to Your Paper</CardTitle>
-                                    <CardDescription>
-                                        Get audio summaries for research on the go
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <ul className="space-y-2 text-sm text-muted-foreground">
+                            {/* Inline Annotations */}
+                            <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 items-center">
+                                <div className="space-y-4">
+                                    <Badge variant="outline" className="w-fit border-purple-500/30 text-purple-500">
+                                        <Highlighter className="w-3 h-3 mr-1" />
+                                        Smart Annotations
+                                    </Badge>
+                                    <h3 className="text-2xl font-bold">Highlight and Annotate Seamlessly</h3>
+                                    <p className="text-muted-foreground">
+                                        Select text to instantly highlight and add notes. Your annotations sync across devices
+                                        and integrate with the AI chat for contextual discussions about your highlights.
+                                    </p>
+                                    <ul className="space-y-2 text-sm">
                                         <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-blue-500" />
-                                            Natural voice synthesis
+                                            <CheckCircle className="w-4 h-4 text-purple-500" />
+                                            <span>One-click highlighting</span>
                                         </li>
                                         <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-blue-500" />
-                                            Perfect for commutes
+                                            <CheckCircle className="w-4 h-4 text-purple-500" />
+                                            <span>Rich annotation tools</span>
                                         </li>
                                         <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-blue-500" />
-                                            Grasp key points quickly
+                                            <CheckCircle className="w-4 h-4 text-purple-500" />
+                                            <span>Cross-device synchronization</span>
                                         </li>
                                     </ul>
-                                </CardContent>
-                            </Card>
+                                </div>
+                                <div className="relative">
+                                    <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg blur-xl"></div>
+                                    <img
+                                        src="https://assets.khoj.dev/openpaper/inline_annotations.png"
+                                        alt="Inline annotations and highlighting"
+                                        className="relative rounded-lg shadow-lg border border-border w-full h-auto"
+                                    />
+                                </div>
+                            </div>
 
-                            <Card className="hover:border-primary/50 transition-all duration-300">
-                                <CardHeader>
-                                    <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center mb-4 border border-blue-500/30">
-                                        <Search className="w-6 h-6 text-blue-500" />
-                                    </div>
-                                    <CardTitle>Find Related Research</CardTitle>
-                                    <CardDescription>
-                                        Discover papers related to your current research
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <ul className="space-y-2 text-sm text-muted-foreground">
+                            {/* Paper to Podcast */}
+                            <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 items-center">
+                                <div className="space-y-4">
+                                    <Badge variant="outline" className="w-fit border-orange-500/30 text-orange-500">
+                                        <Mic2 className="w-3 h-3 mr-1" />
+                                        Audio Summaries
+                                    </Badge>
+                                    <h3 className="text-2xl font-bold">Listen to Research On-the-Go</h3>
+                                    <p className="text-muted-foreground">
+                                        Transform dense academic papers into engaging audio summaries. Perfect for commutes,
+                                        workouts, or when you need to absorb information hands-free.
+                                    </p>
+                                    <ul className="space-y-2 text-sm">
                                         <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-blue-500" />
-                                            Semantic search across databases
+                                            <CheckCircle className="w-4 h-4 text-orange-500" />
+                                            <span>Natural voice synthesis</span>
                                         </li>
                                         <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-blue-500" />
-                                            Open Access content focus
+                                            <CheckCircle className="w-4 h-4 text-orange-500" />
+                                            <span>Key insights highlighted</span>
                                         </li>
                                         <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-blue-500" />
-                                            Expand your understanding
+                                            <CheckCircle className="w-4 h-4 text-orange-500" />
+                                            <span>Mobile-friendly playback</span>
                                         </li>
                                     </ul>
-                                </CardContent>
-                            </Card>
+                                </div>
+                                <div className="relative">
+                                    <div className="absolute inset-0 bg-gradient-to-r from-orange-500/10 to-red-500/10 rounded-lg blur-xl"></div>
+                                    <img
+                                        src="https://assets.khoj.dev/openpaper/paper_to_podcast.png"
+                                        alt="Convert papers to audio podcasts"
+                                        className="relative rounded-lg shadow-lg border border-border w-full h-auto"
+                                    />
+                                </div>
+                            </div>
 
-                            <Card className="hover:border-primary/50 transition-all duration-300">
-                                <CardHeader>
-                                    <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center mb-4 border border-blue-500/30">
-                                        <Globe2 className="w-6 h-6 text-blue-500" />
-                                    </div>
-                                    <CardTitle>Share Your Annotations</CardTitle>
-                                    <CardDescription>
-                                        Collaborate with colleagues and the community
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <ul className="space-y-2 text-sm text-muted-foreground">
+                            {/* Find Related Papers */}
+                            <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 items-center">
+                                <div className="space-y-4">
+                                    <Badge variant="outline" className="w-fit border-indigo-500/30 text-indigo-500">
+                                        <Search className="w-3 h-3 mr-1" />
+                                        Discovery
+                                    </Badge>
+                                    <h3 className="text-2xl font-bold">Discover Connected Research</h3>
+                                    <p className="text-muted-foreground">
+                                        Find papers that build on your current research. Our semantic search understands context
+                                        and relationships between studies, helping you discover relevant work you might have missed.
+                                    </p>
+                                    <ul className="space-y-2 text-sm">
                                         <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-blue-500" />
-                                            Share insights efficiently
+                                            <CheckCircle className="w-4 h-4 text-indigo-500" />
+                                            <span>Semantic similarity search</span>
                                         </li>
                                         <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-blue-500" />
-                                            Collaborate without losing context
+                                            <CheckCircle className="w-4 h-4 text-indigo-500" />
+                                            <span>Open access focus</span>
                                         </li>
                                         <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-blue-500" />
-                                            Build on each other&rsquo;s work
+                                            <CheckCircle className="w-4 h-4 text-indigo-500" />
+                                            <span>Expand your literature review</span>
                                         </li>
                                     </ul>
-                                </CardContent>
-                            </Card>
+                                </div>
+                                <div className="relative">
+                                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-blue-500/10 rounded-lg blur-xl"></div>
+                                    <img
+                                        src="https://assets.khoj.dev/openpaper/find_related_papers.png"
+                                        alt="Find related research papers"
+                                        className="relative rounded-lg shadow-lg border border-border w-full h-auto"
+                                    />
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </section>
