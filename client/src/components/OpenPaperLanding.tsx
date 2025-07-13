@@ -209,6 +209,167 @@ export default function OpenPaperLanding() {
                     </div>
                 </section>
 
+
+                {/* Social Proof - Institution Logos */}
+                <section id="about" className="w-full py-12 md:py-24 lg:py-32 bg-muted/50">
+                    <div className="container px-4 md:px-6 max-w-6xl mx-auto">
+                        <div className="text-center mb-12">
+                            <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">
+                                Trusted by <span className="text-primary">Researchers</span>
+                            </h2>
+                            <p className="mt-4 text-muted-foreground md:text-lg max-w-3xl mx-auto">
+                                Used by PhD students, academics, and industry researchers.
+                            </p>
+                        </div>
+
+                        {/* Institution Logos Grid */}
+                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-10 gap-8 items-center justify-items-center opacity-60 dark:opacity-90 hover:opacity-100 transition-opacity duration-300">
+                            {/* Stanford */}
+                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
+                                <Image
+                                    src="/logos/stanford_logo.svg"
+                                    alt="Stanford University"
+                                    width={60}
+                                    height={40}
+                                    className="object-contain"
+                                />
+                            </div>
+
+                            {/* Yale */}
+                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
+                                <Image
+                                    src="/logos/yale_logo.svg"
+                                    alt="Yale University"
+                                    width={60}
+                                    height={40}
+                                    className="object-contain"
+                                />
+                            </div>
+
+                            {/* Google */}
+                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
+                                <Image
+                                    src="/logos/google.svg"
+                                    alt="Google"
+                                    width={60}
+                                    height={40}
+                                    className="object-contain"
+                                />
+                            </div>
+
+                            {/* Rice University */}
+                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
+                                <Image
+                                    src="/logos/rice_logo.svg"
+                                    alt="Rice University"
+                                    width={60}
+                                    height={40}
+                                    className="object-contain"
+                                />
+                            </div>
+
+                            {/* University of Michigan */}
+                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
+                                <Image
+                                    src="/logos/umich_logo.svg"
+                                    alt="University of Michigan"
+                                    width={60}
+                                    height={40}
+                                    className="object-contain"
+                                />
+                            </div>
+
+                            {/* UIUC */}
+                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
+                                <Image
+                                    src="/logos/uiuc_logo.svg"
+                                    alt="University of Illinois Urbana-Champaign"
+                                    width={60}
+                                    height={40}
+                                    className="object-contain"
+                                />
+                            </div>
+
+                            {/* MIT */}
+                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
+                                <Image
+                                    src="/logos/mit_logo.svg"
+                                    alt="Massachusetts Institute of Technology"
+                                    width={60}
+                                    height={40}
+                                    className="object-contain"
+                                />
+                            </div>
+
+                            {/* Johns Hopkins */}
+                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
+                                <Image
+                                    src="/logos/jhu_logo.svg"
+                                    alt="Johns Hopkins University"
+                                    width={60}
+                                    height={40}
+                                    className="object-contain"
+                                />
+                            </div>
+
+                            {/* Waterloo */}
+                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
+                                <Image
+                                    src="/logos/waterloo_logo.svg"
+                                    alt="University of Waterloo"
+                                    width={40}
+                                    height={36}
+                                    className="object-contain"
+                                />
+                            </div>
+
+                            {/* NIH */}
+                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
+                                <Image
+                                    src="/logos/nih_logo.svg"
+                                    alt="National Institutes of Health"
+                                    width={40}
+                                    height={36}
+                                    className="object-contain"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="mt-12 text-center">
+                            <p className="text-sm text-muted-foreground italic">
+                                Join hundreds of researchers accelerating their work with Open Paper
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+
+                {/* Video Demo Section */}
+                <section id="demo" className="w-full py-12 md:py-24 lg:py-32">
+                    <div className="container px-4 md:px-6 max-w-6xl mx-auto">
+                        <div className="text-center mb-12">
+                            <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl mb-4">
+                                See Open Paper in Action
+                            </h2>
+                            <p className="text-muted-foreground md:text-lg max-w-2xl mx-auto">
+                                Watch how Open Paper transforms your research workflow with AI-powered insights and annotations.
+                            </p>
+                        </div>
+                        <div className="w-full max-w-4xl mx-auto">
+                            <div className="aspect-video relative rounded-lg overflow-hidden shadow-lg">
+                                <iframe
+                                    className="absolute top-0 left-0 w-full h-full"
+                                    src="https://www.youtube.com/embed/33l8fFKgXMw?si=lbrMSmVS7gpdDicd"
+                                    title="Accelerate your research with Open Paper"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                    referrerPolicy="strict-origin-when-cross-origin"
+                                    allowFullScreen
+                                ></iframe>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 {/* Pain Points Section */}
                 <section className="w-full py-12 md:py-24 lg:py-32 bg-muted/50">
                     <div className="container px-4 md:px-6 max-w-6xl mx-auto">
@@ -456,34 +617,8 @@ export default function OpenPaperLanding() {
                     </div>
                 </section>
 
-                {/* Video Demo Section */}
-                <section id="demo" className="w-full py-12 md:py-24 lg:py-32 bg-muted/50">
-                    <div className="container px-4 md:px-6 max-w-6xl mx-auto">
-                        <div className="text-center mb-12">
-                            <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl mb-4">
-                                See Open Paper in Action
-                            </h2>
-                            <p className="text-muted-foreground md:text-lg max-w-2xl mx-auto">
-                                Watch how Open Paper transforms your research workflow with AI-powered insights and annotations.
-                            </p>
-                        </div>
-                        <div className="w-full max-w-4xl mx-auto">
-                            <div className="aspect-video relative rounded-lg overflow-hidden shadow-lg">
-                                <iframe
-                                    className="absolute top-0 left-0 w-full h-full"
-                                    src="https://www.youtube.com/embed/fwXzXgmhy08?si=BFasAO--Qr4MRSVG"
-                                    title="Open Paper Demo"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                    referrerPolicy="strict-origin-when-cross-origin"
-                                    allowFullScreen
-                                ></iframe>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
                 {/* Open Source Section */}
-                <section id="open-source" className="w-full py-12 md:py-24 lg:py-32">
+                <section id="open-source" className="w-full py-12 md:py-24 lg:py-32 bg-muted/50">
                     <div className="container px-4 md:px-6 max-w-6xl mx-auto">
                         <div className="text-center mb-12">
                             <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">
@@ -564,141 +699,8 @@ export default function OpenPaperLanding() {
                     </div>
                 </section>
 
-                {/* Social Proof - Institution Logos */}
-                <section id="about" className="w-full py-12 md:py-24 lg:py-32">
-                    <div className="container px-4 md:px-6 max-w-6xl mx-auto">
-                        <div className="text-center mb-12">
-                            <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">
-                                Trusted by <span className="text-primary">Researchers</span>
-                            </h2>
-                            <p className="mt-4 text-muted-foreground md:text-lg max-w-3xl mx-auto">
-                                Used by PhD students, academics, and industry researchers.
-                            </p>
-                        </div>
-
-                        {/* Institution Logos Grid */}
-                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-10 gap-8 items-center justify-items-center opacity-60 dark:opacity-90 hover:opacity-100 transition-opacity duration-300">
-                            {/* Stanford */}
-                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
-                                <Image
-                                    src="/logos/stanford_logo.svg"
-                                    alt="Stanford University"
-                                    width={60}
-                                    height={40}
-                                    className="object-contain"
-                                />
-                            </div>
-
-                            {/* Yale */}
-                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
-                                <Image
-                                    src="/logos/yale_logo.svg"
-                                    alt="Yale University"
-                                    width={60}
-                                    height={40}
-                                    className="object-contain"
-                                />
-                            </div>
-
-                            {/* Google */}
-                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
-                                <Image
-                                    src="/logos/google.svg"
-                                    alt="Google"
-                                    width={60}
-                                    height={40}
-                                    className="object-contain"
-                                />
-                            </div>
-
-                            {/* Rice University */}
-                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
-                                <Image
-                                    src="/logos/rice_logo.svg"
-                                    alt="Rice University"
-                                    width={60}
-                                    height={40}
-                                    className="object-contain"
-                                />
-                            </div>
-
-                            {/* University of Michigan */}
-                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
-                                <Image
-                                    src="/logos/umich_logo.svg"
-                                    alt="University of Michigan"
-                                    width={60}
-                                    height={40}
-                                    className="object-contain"
-                                />
-                            </div>
-
-                            {/* UIUC */}
-                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
-                                <Image
-                                    src="/logos/uiuc_logo.svg"
-                                    alt="University of Illinois Urbana-Champaign"
-                                    width={60}
-                                    height={40}
-                                    className="object-contain"
-                                />
-                            </div>
-
-                            {/* MIT */}
-                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
-                                <Image
-                                    src="/logos/mit_logo.svg"
-                                    alt="Massachusetts Institute of Technology"
-                                    width={60}
-                                    height={40}
-                                    className="object-contain"
-                                />
-                            </div>
-
-                            {/* Johns Hopkins */}
-                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
-                                <Image
-                                    src="/logos/jhu_logo.svg"
-                                    alt="Johns Hopkins University"
-                                    width={60}
-                                    height={40}
-                                    className="object-contain"
-                                />
-                            </div>
-
-                            {/* Waterloo */}
-                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
-                                <Image
-                                    src="/logos/waterloo_logo.svg"
-                                    alt="University of Waterloo"
-                                    width={40}
-                                    height={36}
-                                    className="object-contain"
-                                />
-                            </div>
-
-                            {/* NIH */}
-                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
-                                <Image
-                                    src="/logos/nih_logo.svg"
-                                    alt="National Institutes of Health"
-                                    width={40}
-                                    height={36}
-                                    className="object-contain"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="mt-12 text-center">
-                            <p className="text-sm text-muted-foreground italic">
-                                Join hundreds of researchers accelerating their work with Open Paper
-                            </p>
-                        </div>
-                    </div>
-                </section>
-
                 {/* CTA Section */}
-                <section className="w-full py-12 md:py-24 lg:py-32 bg-muted/50">
+                <section className="w-full py-12 md:py-24 lg:py-32">
                     <div className="container px-4 md:px-6 max-w-6xl mx-auto">
                         <div className="flex flex-col items-center justify-center space-y-8 text-center">
                             <div className="space-y-4">
@@ -744,7 +746,7 @@ export default function OpenPaperLanding() {
             </main>
 
             {/* Footer */}
-            <footer className="flex flex-col gap-4 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t border-border/40">
+            <footer className="flex flex-col gap-4 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t border-border/40 bg-muted/50">
                 <p className="text-xs text-muted-foreground text-center sm:text-left">
                     Made with ❤️ in{" "}
                     <a
