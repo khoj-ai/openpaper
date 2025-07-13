@@ -168,7 +168,7 @@ export default function PaperSearchResultCard({ paper, searchTerm, setPaper, han
                     <div className="flex flex-col items-end gap-2 flex-shrink-0">
                         {/* Preview image */}
                         <div className="w-20 h-24 bg-muted rounded border overflow-hidden relative">
-                            <Image
+                            <img
                                 src={paper.preview_url || ''}
                                 alt={`Preview of ${paper.title}`}
                                 width={80}
