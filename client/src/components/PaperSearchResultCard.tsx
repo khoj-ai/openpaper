@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { formatDate, truncateText, handleStatusChange } from "./utils/paperUtils";
 import { PaperItem } from "./AppSidebar";
 import { getStatusIcon, PaperStatus, PaperStatusEnum } from "@/components/utils/PdfStatus";
