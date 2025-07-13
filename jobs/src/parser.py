@@ -189,7 +189,7 @@ async def extract_text_and_images_combined(file_path: str, job_id: str) -> Tuple
             page = doc[page_num]
 
             # Get all images on this page
-            image_list = page.get_images(full=True)
+            image_list = page.get_images(full=True) # type: ignore
 
             for img_index, img in enumerate(image_list):
                 try:
