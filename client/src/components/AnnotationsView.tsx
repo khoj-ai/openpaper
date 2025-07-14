@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { useAuth, User } from "@/lib/auth";
 import { User as UserIcon } from 'lucide-react';
+import { smoothScrollTo } from '@/lib/animation';
 import Annotation from './Annotation';
 
 // Function to get badge styling based on highlight type
@@ -258,7 +259,8 @@ export function AnnotationsView(
 	const [highlightAnnotationMap, setHighlightAnnotationMap] = React.useState<Map<string, PaperHighlightAnnotation[]>>(new Map());
 	const [selectedHighlightType, setSelectedHighlightType] = React.useState<string>('all');
 	const [showJustMine, setShowJustMine] = React.useState<boolean>(false);
-	const highlightRefs = useRef(new Map<string, React.RefObject<HTMLDivElement | null>>());
+	const highlightRefs = useRef<Record<string, HTMLDivElement | null>>({});
+	const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 	const { user } = useAuth();
 
 	// Get unique highlight types for filter dropdown
@@ -272,12 +274,9 @@ export function AnnotationsView(
 
 	useEffect(() => {
 		if (activeHighlight?.id) {
-			const ref = highlightRefs.current.get(activeHighlight.id);
-			if (ref?.current) {
-				ref.current.scrollIntoView({
-					behavior: 'smooth',
-					block: 'center'
-				});
+			const element = highlightRefs.current[activeHighlight.id];
+			if (element && scrollContainerRef.current) {
+				smoothScrollTo(element, scrollContainerRef.current);
 			}
 		}
 	}, [activeHighlight]);
@@ -353,7 +352,7 @@ export function AnnotationsView(
 				highlightTypes={uniqueHighlightTypes}
 			/>
 
-			<div className="flex-1 overflow-auto">
+			<div className="flex-1 overflow-auto" ref={scrollContainerRef}>
 				<div className="space-y-6 p-4">
 					{filteredHighlights.length === 0 ? (
 						<div className="text-center text-muted-foreground text-sm py-8">
@@ -370,7 +369,14 @@ export function AnnotationsView(
 							};
 
 							return (
-								<div key={`${highlight.role}-${highlight.id}`} ref={highlight.id ? highlightRefs.current.get(highlight.id) : undefined}>
+								<div
+									key={`${highlight.role}-${highlight.id}`}
+									ref={(el) => {
+										if (highlight.id) {
+											highlightRefs.current[highlight.id] = el;
+										}
+									}}
+								>
 									<HighlightThread
 										highlight={highlight}
 										annotations={annotations}
