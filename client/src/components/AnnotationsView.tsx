@@ -3,7 +3,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import {
 	PaperHighlight,
 	PaperHighlightAnnotation,
-	HighlightType
 } from '@/lib/schema';
 
 import { Button } from '@/components/ui/button';
@@ -13,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { useAuth, User } from "@/lib/auth";
-import { Filter, Users, User as UserIcon } from 'lucide-react';
+import { User as UserIcon } from 'lucide-react';
 import Annotation from './Annotation';
 
 // Function to get badge styling based on highlight type

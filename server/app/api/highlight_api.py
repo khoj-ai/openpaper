@@ -27,6 +27,7 @@ class CreateHighlightRequest(BaseModel):
     raw_text: str
     start_offset: int
     end_offset: int
+    page_number: int
 
 
 class UpdateHighlightRequest(BaseModel):
@@ -50,6 +51,7 @@ async def create_highlight(
                 raw_text=request.raw_text,
                 start_offset=request.start_offset,
                 end_offset=request.end_offset,
+                page_number=request.page_number,
                 role=RoleType.USER,
             ),
             user=current_user,

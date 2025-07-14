@@ -37,7 +37,7 @@ interface PdfViewerProps {
 	setIsHighlightInteraction: (isHighlightInteraction: boolean) => void;
 	activeHighlight: PaperHighlight | null;
 	setActiveHighlight: (highlight: PaperHighlight | null) => void;
-	addHighlight: (selectedText: string, startOffset?: number, endOffset?: number) => void;
+	addHighlight: (selectedText: string, startOffset?: number, endOffset?: number, pageNumber?: number) => void;
 	removeHighlight: (highlight: PaperHighlight) => void;
 	loadHighlights: () => Promise<void>;
 	handleTextSelection: (e: React.MouseEvent) => void;

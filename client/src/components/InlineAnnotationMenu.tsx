@@ -18,7 +18,7 @@ interface InlineAnnotationMenuProps {
     setHighlights: (highlights: Array<PaperHighlight>) => void;
     isHighlightInteraction: boolean;
     activeHighlight: PaperHighlight | null;
-    addHighlight: (selectedText: string, startOffset?: number, endOffset?: number) => void;
+    addHighlight: (selectedText: string, startOffset?: number, endOffset?: number, pageNumber?: number) => void;
     removeHighlight: (highlight: PaperHighlight) => void;
     setUserMessageReferences: React.Dispatch<React.SetStateAction<string[]>>;
     setAddedContentForPaperNote: (content: string) => void;
@@ -39,7 +39,7 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
         setAddedContentForPaperNote
     } = props;
 
-    const [offsets, setOffsets] = useState<{ start: number; end: number } | null>(null);
+    const [offsets, setOffsets] = useState<{ start: number; end: number, pageNumber: number } | null>(null);
 
 
     useEffect(() => {
@@ -68,7 +68,8 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                 setTooltipPosition(null);
                 setIsAnnotating(false);
             } else if (e.key === "h" && (e.ctrlKey || e.metaKey)) {
-                addHighlight(selectedText, offsets?.start, offsets?.end);
+                // Page offsets are zero-indexed, so inc. by 1 for consistency
+                addHighlight(selectedText, offsets?.start, offsets?.end, (offsets?.pageNumber || 0) + 1);
                 e.stopPropagation();
             } else if (e.key === "d" && (e.ctrlKey || e.metaKey) && isHighlightInteraction && activeHighlight) {
                 removeHighlight(activeHighlight);
@@ -133,7 +134,7 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={(e) => {
                                 e.stopPropagation();
-                                addHighlight(selectedText, offsets?.start, offsets?.end);
+                                addHighlight(selectedText, offsets?.start, offsets?.end, offsets?.pageNumber);
                             }}
                         >
                             <div className="flex items-center gap-2">
