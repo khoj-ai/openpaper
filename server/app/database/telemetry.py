@@ -7,11 +7,13 @@ DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "t")
 
 posthog = Posthog(POSTHOG_API_KEY, host="https://us.i.posthog.com")
 
+posthog_sync = Posthog(POSTHOG_API_KEY, host="https://us.i.posthog.com", sync_mode=True)
+
 if DEBUG:
     posthog.debug = True
 
 
-def track_event(event_name, properties=None, user_id=None):
+def track_event(event_name, properties=None, user_id=None, sync=False):
     """
     Track an event with PostHog.
 
@@ -22,9 +24,14 @@ def track_event(event_name, properties=None, user_id=None):
         if user_id is None:
             user_id = "anonymous"
 
-        posthog.capture(
-            distinct_id=user_id, event=event_name, properties=properties or {}
-        )
+        if sync:
+            posthog_sync.capture(
+                distinct_id=user_id, event=event_name, properties=properties or {}
+            )
+        else:
+            posthog.capture(
+                distinct_id=user_id, event=event_name, properties=properties or {}
+            )
     else:
         print(
             f"PostHog tracking disabled. Event: {event_name}, Properties: {properties}"

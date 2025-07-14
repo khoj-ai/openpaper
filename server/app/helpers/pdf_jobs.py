@@ -5,15 +5,21 @@ This client connects to the Celery broker to submit PDF processing tasks
 to the separate jobs service worker, and uses the HTTP API to check task status.
 """
 
-import base64
+import logging
 import os
+import time
+from io import BytesIO
 from typing import Any, Dict, Optional
 
 import requests
+from app.database.telemetry import track_event
+from app.helpers.s3 import s3_service
 from celery import Celery
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 
 class PDFJobsClient:
@@ -45,12 +51,12 @@ class PDFJobsClient:
             "CELERY_API_URL", "http://localhost:8001"
         )
 
-    def submit_pdf_processing_job(self, pdf_bytes: bytes, job_id: str) -> str:
+    def submit_pdf_processing_job(self, s3_object_key: str, job_id: str) -> str:
         """
         Submit a PDF processing job to the separate Celery service.
 
         Args:
-            pdf_bytes: The PDF file content as bytes
+            s3_object_key: The S3 object key for the PDF file
             job_id: Your internal job ID for tracking
 
         Returns:
@@ -61,15 +67,15 @@ class PDFJobsClient:
             Exception: If task submission fails
         """
         # Validate input data
-        if pdf_bytes is None:
-            raise ValueError("pdf_bytes cannot be None")
-        if not isinstance(pdf_bytes, bytes):
-            raise ValueError(f"pdf_bytes must be bytes, got {type(pdf_bytes)}")
-        if len(pdf_bytes) == 0:
-            raise ValueError("pdf_bytes cannot be empty")
+        if s3_object_key is None:
+            raise ValueError("s3_object_key cannot be None")
+        if not isinstance(s3_object_key, str):
+            raise ValueError(f"s3_object_key must be str, got {type(s3_object_key)}")
+        if len(s3_object_key) == 0:
+            raise ValueError("s3_object_key cannot be empty")
 
         print(
-            f"DEBUG: Submitting PDF job - Size: {len(pdf_bytes)} bytes, Job ID: {job_id}"
+            f"DEBUG: Submitting PDF job - S3 Object Key: {s3_object_key}, Job ID: {job_id}"
         )
 
         # Connect to Celery broker directly to submit task
@@ -94,14 +100,10 @@ class PDFJobsClient:
             )
             print(f"DEBUG: Webhook URL: {webhook_url}")
 
-            # Encode bytes to base64 string for JSON serialization
-            pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
-            print(f"DEBUG: Base64 encoded length: {len(pdf_base64)} characters")
-
             # Submit the task to the queue (the separate jobs service will pick it up)
             task = celery_app.send_task(
                 "upload_and_process_file",  # Task name as registered by the worker
-                kwargs={"pdf_base64": pdf_base64, "webhook_url": webhook_url},
+                kwargs={"s3_object_key": s3_object_key, "webhook_url": webhook_url},
             )
 
             print(f"DEBUG: Task submitted successfully with ID: {task.id}")
@@ -200,6 +202,73 @@ class PDFJobsClient:
                 "status": "ERROR",
                 "error": f"Unexpected error cancelling task: {str(e)}",
             }
+
+    async def submit_pdf_processing_job_with_upload(
+        self, pdf_bytes: bytes, job_id: str
+    ) -> str:
+        """
+        Upload a PDF file to S3 and submit a processing job.
+
+        Args:
+            pdf_bytes: The PDF file content as bytes
+            job_id: Your internal job ID for tracking
+
+        Returns:
+            tuple: (Celery task ID, S3 object key)
+
+        Raises:
+            ValueError: If input validation fails
+            Exception: If upload or task submission fails
+        """
+
+        # Validate input data
+        if pdf_bytes is None:
+            raise ValueError("pdf_bytes cannot be None")
+        if not isinstance(pdf_bytes, bytes):
+            raise ValueError(f"pdf_bytes must be bytes, got {type(pdf_bytes)}")
+        if len(pdf_bytes) == 0:
+            raise ValueError("pdf_bytes cannot be empty")
+
+        # Generate filename based on job_id
+        filename = f"{job_id}.pdf"
+
+        logger.info(
+            f"Uploading PDF and submitting job - Size: {len(pdf_bytes)} bytes, Filename: {filename}, Job ID: {job_id}"
+        )
+
+        try:
+            # Upload PDF to S3
+            file_obj = BytesIO(pdf_bytes)
+
+            # Start timer for S3 upload
+            upload_start_time = time.time()
+            s3_object_key, file_url = await s3_service.upload_file(file_obj, filename)
+            upload_end_time = time.time()
+            upload_duration = upload_end_time - upload_start_time
+
+            logger.debug(f"PDF uploaded to S3 with key: {s3_object_key}")
+            logger.info(f"S3 upload took {upload_duration:.2f} seconds")
+
+            track_event(
+                "timer:initial_pdf_upload_for_microservice",
+                user_id=job_id,
+                properties={
+                    "duration": upload_duration,
+                },
+                sync=True,
+            )
+
+            # Submit processing job with S3 object key
+            task_id = self.submit_pdf_processing_job(s3_object_key, job_id)
+
+            return task_id
+
+        except Exception as e:
+            error_msg = str(e)
+            print(f"DEBUG: PDF upload and job submission failed: {error_msg}")
+            raise Exception(
+                f"Failed to upload PDF and submit processing job: {error_msg}"
+            ) from e
 
 
 # Create a client instance to use throughout the application

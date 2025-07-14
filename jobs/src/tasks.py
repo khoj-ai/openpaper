@@ -3,7 +3,6 @@ Celery tasks for PDF processing.
 """
 import logging
 import tempfile
-import base64
 import psutil
 import os
 import asyncio
@@ -82,14 +81,16 @@ def run_async_safely(coro: Coroutine[Any, Any, T]) -> T:
 
 async def process_pdf_file(
     pdf_bytes: bytes,
+    s3_object_key: str,
     job_id: str,
     status_callback: Callable[[str], None],
 ) -> PDFProcessingResult:
     """
-    Process a PDF file by extracting metadata and uploading to S3.
+    Process a PDF file by extracting metadata from bytes.
 
     Args:
         pdf_bytes: The PDF file content as bytes
+        s3_object_key: The S3 object key of the PDF file
         job_id: Job ID for tracking
         status_callback: Function to update task status
 
@@ -98,13 +99,13 @@ async def process_pdf_file(
     """
     start_time = datetime.now(timezone.utc)
     temp_file_path = None
-    object_key = None
     preview_object_key = None
     extracted_images: List[PDFImage] = []
 
     try:
         logger.info(f"Starting PDF processing for job {job_id}")
 
+        # Write to temporary file
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
             temp_file.write(pdf_bytes)
             temp_file_path = temp_file.name
@@ -124,15 +125,6 @@ async def process_pdf_file(
 
         # Define async functions for I/O-bound operations
         logger.info(f"About to define async functions for job {job_id}")
-
-        async def upload_pdf_async():
-            status_callback("PDF ascending to the cloud")
-            return await asyncio.to_thread(
-                s3_service.upload_any_file,
-                temp_file_path,
-                safe_filename,
-                "application/pdf"
-            )
 
         async def generate_preview_async():
             status_callback("Taking a snapshot")
@@ -159,7 +151,6 @@ async def process_pdf_file(
 
         # Run I/O-bound tasks and LLM extraction concurrently
         async with time_it("Running I/O-bound tasks and LLM extraction concurrently", job_id=job_id):
-            upload_task = asyncio.create_task(upload_pdf_async())
             preview_task = asyncio.create_task(generate_preview_async())
             images_task = asyncio.create_task(extract_images_async())
             metadata_task = asyncio.create_task(
@@ -170,7 +161,6 @@ async def process_pdf_file(
 
             # Await all tasks
             results = await asyncio.gather(
-                upload_task,
                 preview_task,
                 images_task,
                 metadata_task,
@@ -178,13 +168,11 @@ async def process_pdf_file(
             )
 
         # Process results
-        upload_result, preview_result, images_result, metadata_result = results
+        preview_result, images_result, metadata_result = results
 
-        if isinstance(upload_result, Exception):
-            logger.error(f"Failed to upload PDF: {upload_result}")
-            raise upload_result
-        object_key, file_url = upload_result # type: ignore
-        logger.info(f"Uploaded PDF to S3: {file_url}")
+        # Generate file URL from the existing S3 object key
+        file_url = f"https://{s3_service.cloudflare_bucket_name}/{s3_object_key}"
+        logger.info(f"PDF already uploaded to S3: {file_url}")
 
         if isinstance(preview_result, Exception):
             logger.warning(f"Failed to generate preview: {preview_result}")
@@ -232,7 +220,7 @@ async def process_pdf_file(
         return PDFProcessingResult(
             success=True,
             metadata=metadata,
-            s3_object_key=object_key,
+            s3_object_key=s3_object_key,
             file_url=file_url,
             preview_url=preview_url,
             preview_object_key=preview_object_key,
@@ -263,15 +251,14 @@ async def process_pdf_file(
 @celery_app.task(bind=True, name="upload_and_process_file")
 def upload_and_process_file(
     self,
-    pdf_base64: str,
+    s3_object_key: str,
     webhook_url: str,
     **processing_kwargs
 ) -> Dict[str, Any]:
     """
-    Process a PDF file from base64 string and send results to webhook.
+    Process a PDF file from S3 object key and send results to webhook.
     """
     task_id = self.request.id
-    pdf_bytes = base64.b64decode(pdf_base64)
 
     def write_to_status(new_status: str):
         """Helper to update task status."""
@@ -283,12 +270,21 @@ def upload_and_process_file(
 
     try:
         logger.info(f"Starting PDF processing for task {task_id}")
+        write_to_status("Downloading PDF from S3")
+
+        # Download PDF from S3
+        async def download_with_timer():
+            async with time_it("Downloading PDF from S3", job_id=task_id):
+                return s3_service.download_file_to_bytes(s3_object_key)
+
+        pdf_bytes = run_async_safely(download_with_timer())
+
         write_to_status("Processing PDF file")
 
         # Run the async processing function in a way that properly manages the event loop
         # This prevents "Event loop is closed" errors
         result = run_async_safely(
-            process_pdf_file(pdf_bytes, task_id, status_callback=write_to_status)
+            process_pdf_file(pdf_bytes, s3_object_key, task_id, status_callback=write_to_status)
         )
 
         write_to_status("PDF processing complete!")

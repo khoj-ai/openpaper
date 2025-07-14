@@ -272,7 +272,7 @@ async def upload_file_from_url_microservice(
         file_contents = response.content
 
         # Submit to microservice
-        task_id = pdf_jobs_client.submit_pdf_processing_job(
+        task_id = await pdf_jobs_client.submit_pdf_processing_job_with_upload(
             pdf_bytes=file_contents, job_id=str(paper_upload_job.id)
         )
 
@@ -341,7 +341,7 @@ async def upload_raw_file_microservice(
 
     try:
         # Submit to microservice
-        task_id = pdf_jobs_client.submit_pdf_processing_job(
+        task_id = await pdf_jobs_client.submit_pdf_processing_job_with_upload(
             pdf_bytes=file_contents, job_id=str(paper_upload_job.id)
         )
 

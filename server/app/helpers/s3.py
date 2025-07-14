@@ -21,6 +21,8 @@ AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME")
 CLOUDFLARE_BUCKET_NAME = os.environ.get("CLOUDFLARE_BUCKET_NAME")
 
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
+
 
 class S3Service:
     """Service for handling S3 operations"""
@@ -72,7 +74,7 @@ class S3Service:
         try:
             # Generate a unique key for the S3 object
             # Use a UUID prefix to avoid naming conflicts
-            object_key = f"uploads/{uuid.uuid4()}-{original_filename}"
+            object_key = f"{UPLOAD_DIR}/{uuid.uuid4()}-{original_filename}"
 
             # Upload to S3
             with open(file_path, "rb") as file_obj:
@@ -110,7 +112,7 @@ class S3Service:
             # Sanitize filename
             original_filename = filename.replace(" ", "_")
             file_extension = original_filename.split(".")[-1].lower()
-            object_key = f"uploads/{uuid.uuid4()}-{original_filename}"
+            object_key = f"{UPLOAD_DIR}/{uuid.uuid4()}-{original_filename}"
 
             # Stream upload directly from BytesIO object
             self.s3_client.upload_fileobj(

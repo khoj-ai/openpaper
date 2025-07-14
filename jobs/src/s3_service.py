@@ -35,6 +35,26 @@ class S3Service:
         self.bucket_name = S3_BUCKET_NAME
         self.cloudflare_bucket_name = CLOUDFLARE_BUCKET_NAME
 
+    def download_file_to_bytes(self, object_key: str) -> bytes:
+        """Download a file from S3 and return its content as bytes
+
+        Args:
+            object_key (str): The S3 object key to download
+
+        Returns:
+            bytes: The file content as bytes
+
+        Raises:
+            ClientError: If the file cannot be downloaded from S3
+        """
+        try:
+            logger.info(f"Downloading file from S3 with key: {object_key}")
+            response = self.s3_client.get_object(Bucket=self.bucket_name, Key=object_key)
+            return response['Body'].read()
+        except ClientError as e:
+            logger.error(f"Error downloading file from S3: {e}")
+            raise
+
     def upload_any_file_from_bytes(
         self,
         file_bytes: bytes,
