@@ -10,7 +10,10 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from './ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { useAuth, User } from "@/lib/auth";
+import { Filter, Users, User as UserIcon } from 'lucide-react';
 import Annotation from './Annotation';
 
 // Function to get badge styling based on highlight type
@@ -192,6 +195,52 @@ interface AnnotationsViewProps {
 	readonly?: boolean;
 }
 
+interface AnnotationsToolbarProps {
+	onHighlightTypeFilter: (type: string) => void;
+	onShowJustMine: (show: boolean) => void;
+	selectedHighlightType: string;
+	showJustMine: boolean;
+	highlightTypes: string[];
+}
+
+function AnnotationsToolbar({
+	onHighlightTypeFilter,
+	onShowJustMine,
+	selectedHighlightType,
+	showJustMine,
+	highlightTypes
+}: AnnotationsToolbarProps) {
+	return (
+		<div className="flex items-center gap-3 p-3 border-b border-border bg-muted/20">
+			<Select value={selectedHighlightType} onValueChange={onHighlightTypeFilter}>
+				<SelectTrigger className="w-[140px] h-8">
+					<SelectValue placeholder="All types" />
+				</SelectTrigger>
+				<SelectContent>
+					<SelectItem value="all">All types</SelectItem>
+					{highlightTypes.map((type) => (
+						<SelectItem key={type} value={type}>
+							{type.replace('_', ' ').toLowerCase()}
+						</SelectItem>
+					))}
+				</SelectContent>
+			</Select>
+
+			<div className="flex items-center gap-2">
+				<Switch
+					checked={showJustMine}
+					onCheckedChange={onShowJustMine}
+					id="just-mine"
+				/>
+				<label htmlFor="just-mine" className="text-sm font-medium text-foreground cursor-pointer flex items-center gap-1">
+					<UserIcon size={14} />
+					Just mine
+				</label>
+			</div>
+		</div>
+	);
+}
+
 export function AnnotationsView(
 	{
 		highlights,
@@ -206,9 +255,21 @@ export function AnnotationsView(
 ) {
 	// All your existing useEffect hooks for sorting and mapping data remain the same
 	const [sortedHighlights, setSortedHighlights] = React.useState<PaperHighlight[]>([]);
+	const [filteredHighlights, setFilteredHighlights] = React.useState<PaperHighlight[]>([]);
 	const [highlightAnnotationMap, setHighlightAnnotationMap] = React.useState<Map<string, PaperHighlightAnnotation[]>>(new Map());
+	const [selectedHighlightType, setSelectedHighlightType] = React.useState<string>('all');
+	const [showJustMine, setShowJustMine] = React.useState<boolean>(false);
 	const highlightRefs = useRef(new Map<string, React.RefObject<HTMLDivElement | null>>());
 	const { user } = useAuth();
+
+	// Get unique highlight types for filter dropdown
+	const uniqueHighlightTypes = React.useMemo(() => {
+		const types = new Set<string>();
+		highlights.forEach(h => {
+			if (h.type) types.add(h.type);
+		});
+		return Array.from(types).sort();
+	}, [highlights]);
 
 	useEffect(() => {
 		if (activeHighlight?.id) {
@@ -222,9 +283,7 @@ export function AnnotationsView(
 		}
 	}, [activeHighlight]);
 
-
 	useEffect(() => {
-
 		const sortedHighlights = highlights.sort((a, b) => {
 			const aStart = a.start_offset || 0;
 			const bStart = b.start_offset || 0;
@@ -242,8 +301,37 @@ export function AnnotationsView(
 			annotationMap.set(highlightId, existingAnnotations);
 		});
 		setHighlightAnnotationMap(annotationMap);
-
 	}, [highlights, annotations]);
+
+	// Filter highlights based on selected filters
+	useEffect(() => {
+		let filtered = sortedHighlights;
+
+		// Filter by highlight type
+		if (selectedHighlightType !== 'all') {
+			filtered = filtered.filter(h => h.type === selectedHighlightType);
+		}
+
+		// Filter to show only user's annotations if enabled
+		if (showJustMine) {
+			filtered = filtered.filter(h => {
+				const highlightAnnotations = h.id ? highlightAnnotationMap.get(h.id) || [] : [];
+				const hasUserAnnotations = highlightAnnotations.some(a => a.role === 'user');
+				const isUserHighlight = h.role === 'user';
+				return isUserHighlight || hasUserAnnotations;
+			});
+		}
+
+		setFilteredHighlights(filtered);
+	}, [sortedHighlights, selectedHighlightType, showJustMine, highlightAnnotationMap]);
+
+	const handleHighlightTypeFilter = (type: string) => {
+		setSelectedHighlightType(type);
+	};
+
+	const handleShowJustMine = (show: boolean) => {
+		setShowJustMine(show);
+	};
 
 
 	if (sortedHighlights.length === 0) {
@@ -257,31 +345,50 @@ export function AnnotationsView(
 	}
 
 	return (
-		<div className="space-y-6">
-			{sortedHighlights.map((highlight) => {
+		<div className="flex flex-col h-full">
+			<AnnotationsToolbar
+				onHighlightTypeFilter={handleHighlightTypeFilter}
+				onShowJustMine={handleShowJustMine}
+				selectedHighlightType={selectedHighlightType}
+				showJustMine={showJustMine}
+				highlightTypes={uniqueHighlightTypes}
+			/>
 
-				const annotations = (highlight.id && highlightAnnotationMap.get(highlight.id) || []).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+			<div className="flex-1 overflow-auto">
+				<div className="space-y-6 p-4">
+					{filteredHighlights.length === 0 ? (
+						<div className="text-center text-muted-foreground text-sm py-8">
+							No highlights match the current filters.
+						</div>
+					) : (
+						filteredHighlights.map((highlight) => {
+							const annotations = (highlight.id && highlightAnnotationMap.get(highlight.id) || [])
+								.filter(annotation => !showJustMine || annotation.role === 'user')
+								.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
-				const handleClick = () => {
-					onHighlightClick(highlight);
-				};
+							const handleClick = () => {
+								onHighlightClick(highlight);
+							};
 
-				return (
-					<div key={`${highlight.role}-${highlight.id}`} ref={highlight.id ? highlightRefs.current.get(highlight.id) : undefined}>
-						<HighlightThread
-							highlight={highlight}
-							annotations={annotations}
-							isActive={activeHighlight?.id === highlight.id}
-							onClick={handleClick}
-							addAnnotation={addAnnotation}
-							removeAnnotation={removeAnnotation}
-							updateAnnotation={updateAnnotation}
-							user={user ?? undefined}
-							readonly={readonly}
-						/>
-					</div>
-				);
-			})}
+							return (
+								<div key={`${highlight.role}-${highlight.id}`} ref={highlight.id ? highlightRefs.current.get(highlight.id) : undefined}>
+									<HighlightThread
+										highlight={highlight}
+										annotations={annotations}
+										isActive={activeHighlight?.id === highlight.id}
+										onClick={handleClick}
+										addAnnotation={addAnnotation}
+										removeAnnotation={removeAnnotation}
+										updateAnnotation={updateAnnotation}
+										user={user ?? undefined}
+										readonly={readonly}
+									/>
+								</div>
+							);
+						})
+					)}
+				</div>
+			</div>
 		</div>
 	);
 }
