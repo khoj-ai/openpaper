@@ -348,6 +348,16 @@ class PaperNote(Base):
     paper = relationship("Paper", back_populates="paper_notes")
 
 
+class HighlightType(str, Enum):
+    TOPIC = "topic"
+    MOTIVATION = "motivation"
+    METHOD = "method"
+    EVIDENCE = "evidence"
+    RESULT = "result"
+    IMPACT = "impact"
+    GENERAL = "general"
+
+
 class Highlight(Base):
     __tablename__ = "highlights"
 
@@ -356,6 +366,7 @@ class Highlight(Base):
         UUID(as_uuid=True), ForeignKey("papers.id", ondelete="CASCADE"), nullable=False
     )
     raw_text = Column(Text, nullable=False)
+    type = Column(String, nullable=True)  # HighlightType enum value)
 
     # Position (exact for user, hints for AI)
     start_offset = Column(Integer, nullable=True)

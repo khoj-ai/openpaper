@@ -15,6 +15,7 @@ class HighlightBase(BaseModel):
     end_offset: Optional[int] = None
     page_number: Optional[int] = None
     role: Optional[str] = None
+    type: Optional[str] = None  # HighlightType enum value
 
 
 class HighlightCreate(HighlightBase):

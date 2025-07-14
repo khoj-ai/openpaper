@@ -330,7 +330,7 @@ function mapPreparedToOriginal(preparedIndex: number, mapping: { preparedToOrigi
     return mapping.preparedToOriginal[preparedIndex] || 0;
 }
 
-export function getSelectionOffsets(): { start: number, end: number } | null {
+export function getSelectionOffsets(): { start: number, end: number, pageNumber: number } | null {
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0 || !selection.toString()) {
         return null;
@@ -344,8 +344,10 @@ export function getSelectionOffsets(): { start: number, end: number } | null {
     let startOffset = -1;
     let endOffset = -1;
 
+    let startPage: number | undefined;
+
     // Create a map to store node offsets
-    const nodeOffsets = new Map<Node, { start: number, end: number }>();
+    const nodeOffsets = new Map<Node, { start: number, end: number, pageIndex: number }>();
 
     // Calculate offsets for all text nodes across all pages
     for (let i = 0; i < textLayers.length; i++) {
@@ -360,7 +362,8 @@ export function getSelectionOffsets(): { start: number, end: number } | null {
             const length = currentNode.textContent?.length || 0;
             nodeOffsets.set(currentNode, {
                 start: offset,
-                end: offset + length
+                end: offset + length,
+                pageIndex: i
             });
             offset += length;
         }
@@ -375,6 +378,7 @@ export function getSelectionOffsets(): { start: number, end: number } | null {
     if (nodeOffsets.has(startNode)) {
         const nodeOffset = nodeOffsets.get(startNode)!;
         startOffset = nodeOffset.start + range.startOffset;
+        startPage = nodeOffset.pageIndex;
     }
 
     // Calculate end offset
@@ -383,13 +387,13 @@ export function getSelectionOffsets(): { start: number, end: number } | null {
         endOffset = nodeOffset.start + range.endOffset;
     }
 
-    if (startOffset > -1 && endOffset > -1) {
+    if (startOffset > -1 && endOffset > -1 && startPage !== undefined) {
         // Handle backwards selection (user selected from right to left)
         if (startOffset > endOffset) {
             [startOffset, endOffset] = [endOffset, startOffset];
         }
 
-        return { start: startOffset, end: endOffset };
+        return { start: startOffset, end: endOffset, pageNumber: startPage };
     }
 
     return null;

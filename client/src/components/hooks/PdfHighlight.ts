@@ -221,7 +221,8 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
 
         const payload = {
             ...highlightWithoutRole,
-            paper_id: paperId
+            paper_id: paperId,
+            page_number: highlight.page_number
         }
 
         try {
@@ -315,15 +316,17 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
     const addHighlight = async (
         selectedText: string,
         startOffset: number | undefined,
-        endOffset: number | undefined) => {
+        endOffset: number | undefined,
+        pageNumber: number | undefined) => {
         // Get offsets from the current selection
         let offsets;
-        if (!startOffset || !endOffset) {
+        if (!startOffset || !endOffset || !pageNumber) {
             offsets = getSelectionOffsets();
         } else {
             offsets = {
                 start: startOffset,
-                end: endOffset
+                end: endOffset,
+                pageNumber: pageNumber
             };
         }
 
@@ -337,6 +340,7 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
                 raw_text: selectedText,
                 start_offset: offsets.start,
                 end_offset: offsets.end,
+                page_number: offsets.pageNumber,
                 role: 'user',
             });
 

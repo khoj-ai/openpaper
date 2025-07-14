@@ -474,6 +474,7 @@ export default function OpenPaperLanding() {
                                 </div>
                                 <div className="relative">
                                     <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg blur-xl"></div>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
                                         src="https://assets.khoj.dev/openpaper/read_paper_deeply.png"
                                         alt="Deep paper reading with AI assistance"
@@ -511,6 +512,7 @@ export default function OpenPaperLanding() {
                                 </div>
                                 <div className="relative">
                                     <div className="absolute inset-0 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-lg blur-xl"></div>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
                                         src="https://assets.khoj.dev/openpaper/grounded_citations.png"
                                         alt="AI responses with grounded citations"
@@ -548,6 +550,7 @@ export default function OpenPaperLanding() {
                                 </div>
                                 <div className="relative">
                                     <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg blur-xl"></div>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
                                         src="https://assets.khoj.dev/openpaper/inline_annotations.png"
                                         alt="Inline annotations and highlighting"
@@ -585,6 +588,7 @@ export default function OpenPaperLanding() {
                                 </div>
                                 <div className="relative">
                                     <div className="absolute inset-0 bg-gradient-to-r from-orange-500/10 to-red-500/10 rounded-lg blur-xl"></div>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
                                         src="https://assets.khoj.dev/openpaper/paper_to_podcast.png"
                                         alt="Convert papers to audio podcasts"
@@ -622,6 +626,7 @@ export default function OpenPaperLanding() {
                                 </div>
                                 <div className="relative">
                                     <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-blue-500/10 rounded-lg blur-xl"></div>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
                                         src="https://assets.khoj.dev/openpaper/find_related_papers.png"
                                         alt="Find related research papers"

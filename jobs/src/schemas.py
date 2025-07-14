@@ -1,6 +1,7 @@
 """
 Pydantic schemas for PDF processing.
 """
+from enum import Enum
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
@@ -34,6 +35,14 @@ class ResponseCitation(BaseModel):
     )
 
 
+class HighlightType(str, Enum):
+    TOPIC = "topic"
+    MOTIVATION = "motivation"
+    METHOD = "method"
+    EVIDENCE = "evidence"
+    RESULT = "result"
+    IMPACT = "impact"
+
 class AIHighlight(BaseModel):
     """
     Schema for a highlight in the paper.
@@ -45,6 +54,10 @@ class AIHighlight(BaseModel):
     )
     annotation: str = Field(
         description="The context or annotation for the highlight, explaining its significance or relevance to the paper's content. Less than 350 characters."
+    )
+
+    type: HighlightType = Field(
+        description="The type of highlight. This can be one of the following: topic, motivation, method, evidence, result, impact. This helps categorize the highlight based on its content and significance."
     )
 
 

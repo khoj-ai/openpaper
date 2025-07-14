@@ -1,5 +1,7 @@
 import { PaperStatus } from "@/components/utils/PdfStatus";
 
+export type HighlightType = 'topic' | 'motivation' | 'method' | 'evidence' | 'result' | 'impact' | 'general';
+
 export interface ReferenceCitation {
     index: number;
     text: string;
@@ -42,6 +44,7 @@ export interface PaperHighlight {
     start_offset?: number;
     end_offset?: number;
     page_number?: number;
+    type?: HighlightType;
 }
 
 export interface PaperHighlightAnnotation {
@@ -152,6 +155,7 @@ export interface HighlightResult {
     page_number: number | null;
     role: string;
     created_at: string;
+    type?: HighlightType;
 }
 
 export interface AnnotationResult {
