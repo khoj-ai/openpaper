@@ -259,7 +259,7 @@ export default function Home() {
 		formData.append('file', file);
 
 		try {
-			const response: PdfUploadResponse = await fetchFromApi('/api/paper/upload', {
+			const response: PdfUploadResponse = await fetchFromApi('/api/paper/upload/', {
 				method: 'POST',
 				body: formData,
 				headers: {
