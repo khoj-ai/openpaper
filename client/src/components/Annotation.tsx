@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bot, Check, File, Pencil, Sparkles, Trash2, User as UserIcon, X } from 'lucide-react';
+import { Check, File, Pencil, Trash2, User as UserIcon, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar } from '@/components/ui/avatar';
