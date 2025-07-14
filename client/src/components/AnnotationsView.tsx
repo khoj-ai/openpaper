@@ -122,7 +122,7 @@ function HighlightThread({
 	readonly
 }: HighlightThreadProps) {
 
-	const highlightBorderColor = highlight.role === 'assistant' ? 'border-blue-500' : 'border-gray-400';
+	const highlightBorderColor = highlight.role === 'assistant' ? 'border-blue-500' : 'border-blue-200 dark:border-blue-800';
 	const activeBgColor = isActive ? 'bg-secondary' : 'hover:bg-secondary/50';
 
 	return (
@@ -133,10 +133,7 @@ function HighlightThread({
 			<CardContent className="p-0">
 				{/* The Blockquote */}
 				<blockquote className={`border-l-4 ${highlightBorderColor} pl-4 py-2 mb-4 bg-background`}>
-					<div className="flex items-start justify-between gap-2">
-						<p className="text-foreground flex-1">
-							{highlight.raw_text}
-						</p>
+					<div className="flex items-start flex-col gap-2">
 						{highlight.type && (
 							(() => {
 								const styling = getHighlightTypeStyling(highlight.type);
@@ -150,6 +147,9 @@ function HighlightThread({
 								);
 							})()
 						)}
+						<p className="text-foreground flex-1">
+							{highlight.raw_text}
+						</p>
 					</div>
 				</blockquote>
 
