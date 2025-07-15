@@ -84,6 +84,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
     const [selectedFocus, setSelectedFocus] = useState<string | null>(null);
 
     const [additionalInstructions, setAdditionalInstructions] = useState(DEFAULT_INSTRUCTIONS);
+    const [activeCitationKey, setActiveCitationKey] = useState<string | null>(null);
 
     // Enhanced audio states
     const [isPlaying, setIsPlaying] = useState(false);
@@ -93,6 +94,10 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
     const [playbackRate, setPlaybackRate] = useState(1);
     const [isLoaded, setIsLoaded] = useState(false);
     const [waveformData, setWaveformData] = useState<number[]>([]);
+
+    const matchesCurrentCitation = useCallback((key: string) => {
+        return activeCitationKey === key;
+    }, [activeCitationKey]);
 
     // Audio overview credit usage state
     const [audioCreditUsage, setAudioCreditUsage] = useState<{
@@ -443,6 +448,8 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
         // Look up the citations terms from the citationKey
         const citationMatch = audioOverview?.citations.find(c => c.index === citationIndex);
         setExplicitSearchTerm(citationMatch ? citationMatch.text : citationKey);
+        setActiveCitationKey(citationKey);
+        setTimeout(() => setActiveCitationKey(null), 3000);
     };
 
     const handleCitationClickFromTranscript = (citationKey: string, messageIndex: number) => {
@@ -451,6 +458,8 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
         // Look up the citations terms from the citationKey
         const citationMatch = audioOverview?.citations.find(c => c.index === citationIndex);
         setExplicitSearchTerm(citationMatch ? citationMatch.text : citationKey);
+        setActiveCitationKey(citationKey);
+        setTimeout(() => setActiveCitationKey(null), 3000);
     };
 
     const fetchAllAudioOverviews = async () => {
@@ -942,21 +951,25 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                                     {...props}
                                     handleCitationClick={handleCitationClickFromTranscript}
                                     messageIndex={0}
+                                    citations={audioOverview.citations.map(c => ({ key: String(c.index), reference: c.text }))}
                                 />,
                                 li: (props) => <CustomCitationLink
                                     {...props}
                                     handleCitationClick={handleCitationClickFromTranscript}
                                     messageIndex={0}
+                                    citations={audioOverview.citations.map(c => ({ key: String(c.index), reference: c.text }))}
                                 />,
                                 div: (props) => <CustomCitationLink
                                     {...props}
                                     handleCitationClick={handleCitationClickFromTranscript}
                                     messageIndex={0}
+                                    citations={audioOverview.citations.map(c => ({ key: String(c.index), reference: c.text }))}
                                 />,
                                 td: (props) => <CustomCitationLink
                                     {...props}
                                     handleCitationClick={handleCitationClickFromTranscript}
                                     messageIndex={0}
+                                    citations={audioOverview.citations.map(c => ({ key: String(c.index), reference: c.text }))}
                                 />,
                                 table: (props) => (
                                     <div className="w-full overflow-x-auto">
@@ -971,22 +984,27 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
 
                     {/* Citations */}
                     {audioOverview.citations && audioOverview.citations.length > 0 && (
-                        <div className="mt-6">
-                            <h4 className="text-md font-semibold mb-2">Citations</h4>
-                            <div className="space-y-1">
+                        <div className="mt-4 pt-4 border-t border-gray-300 dark:border-gray-700" id="references-section">
+                            <h4 className="text-sm font-semibold mb-2">References</h4>
+                            <ul className="list-none p-0">
                                 {audioOverview.citations.map((citation) => (
-                                    <div key={citation.index} className="flex items-center gap-1">
-                                        <span className="text-muted-foreground text-xs cursor-pointer"
-                                            onClick={() => handleCitationClick(citation.text, 0)}
+                                    <div
+                                        key={citation.index}
+                                        className={`flex flex-row gap-2 animate-fade-in ${matchesCurrentCitation(String(citation.index)) ? 'bg-blue-100 dark:bg-blue-900 rounded p-1 transition-colors duration-300' : ''}`}
+                                        onClick={() => handleCitationClick(String(citation.index), 0)}
+                                    >
+                                        <div className={`text-xs text-secondary-foreground`}>
+                                            <a href={`#citation-ref-${citation.index}`}>{citation.index}</a>
+                                        </div>
+                                        <div
+                                            id={`citation-ref-${citation.index}`}
+                                            className={`text-xs text-secondary-foreground`}
                                         >
                                             {citation.text}
-                                        </span>
-                                        <span className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-500">
-                                            [{citation.index}]
-                                        </span>
+                                        </div>
                                     </div>
                                 ))}
-                            </div>
+                            </ul>
                         </div>
                     )}
                 </div>

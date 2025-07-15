@@ -1,4 +1,4 @@
-import { Citation } from "@/lib/schema";
+import { Citation, ReferenceCitation } from "@/lib/schema";
 import { HTMLAttributes, ReactNode, createElement, Children } from "react";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
@@ -13,14 +13,14 @@ interface CustomCitationLinkProps extends HTMLAttributes<HTMLElement> {
         properties?: Record<string, any>;
     };
     className?: string;
-    citations?: Citation[];
+    citations?: (Citation | ReferenceCitation)[];
 }
 
 interface CitationLinkProps {
     citationKey: string;
     messageIndex: number;
     handleCitationClick: (key: string, messageIndex: number) => void;
-    citations?: Citation[];
+    citations?: (Citation | ReferenceCitation)[];
 }
 
 function CitationLink({
@@ -29,7 +29,7 @@ function CitationLink({
     handleCitationClick,
     citations,
 }: CitationLinkProps) {
-    const matchingCitation = citations?.find(citation => String(citation.key) === citationKey) || null;
+    const matchingCitation = citations?.find(citation => 'key' in citation ? String(citation.key) === citationKey : String(citation.index) === citationKey) || null;
 
     const onClickCitation = (e: React.MouseEvent) => {
         e.preventDefault();
@@ -64,7 +64,7 @@ function CitationLink({
                 </span>
             </HoverCardTrigger>
             <HoverCardContent className="w-80 p-2 shadow-md bg-accent">
-                <p className="text-sm text-accent-foreground">{matchingCitation.reference}</p>
+                <p className="text-sm text-accent-foreground">{'reference' in matchingCitation ? matchingCitation.reference : matchingCitation.text}</p>
             </HoverCardContent>
         </HoverCard>
     );
