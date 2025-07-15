@@ -40,16 +40,6 @@ import {
 } from 'lucide-react';
 
 import { Textarea } from '@/components/ui/textarea';
-import {
-    Sidebar,
-    SidebarContent,
-    SidebarGroup,
-    SidebarGroupContent,
-    SidebarGroupLabel,
-    SidebarMenu,
-    SidebarMenuItem,
-    SidebarProvider,
-} from "@/components/ui/sidebar";
 
 import {
     DropdownMenu,
