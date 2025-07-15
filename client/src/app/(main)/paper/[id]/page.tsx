@@ -1047,7 +1047,8 @@ export default function PaperView() {
                     )}
                     {
                         msg.references && msg.references['citations']?.length > 0 && (
-                            <div className="mt-2" id="references-section">
+                            <div className="mt-4 pt-4 border-t border-gray-300 dark:border-gray-700" id="references-section">
+                                <h4 className="text-sm font-semibold mb-2">References</h4>
                                 <ul className="list-none p-0">
                                     {Object.entries(msg.references.citations).map(([refIndex, value]) => (
                                         <div
