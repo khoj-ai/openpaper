@@ -90,6 +90,7 @@ import Link from 'next/link';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { ChatMessageActions } from '@/components/ChatMessageActions';
 import PaperImageView from '@/components/PaperImageView';
+import { PaperSidebar } from '@/components/PaperSidebar';
 
 interface ChatRequestBody {
     user_query: string;
@@ -1239,7 +1240,7 @@ export default function PaperView() {
 
                 {/* Right Side Panel */}
                 <div
-                    className="flex flex-row h-full"
+                    className="flex flex-row h-full relative pr-[60px]"
                     style={rightSideFunction !== 'Focus' ? { width: `${100 - leftPanelWidth}%` } : { width: 'auto' }}
                 >
                     {
@@ -1750,44 +1751,11 @@ export default function PaperView() {
                             </div>
                         )
                     }
-                    <div className="hidden md:flex flex-col w-fit h-[calc(100vh-64px)]">
-                        <SidebarProvider className="items-start h-[calc(100vh-64px)] min-h-fit w-fit">
-                            <Sidebar collapsible="none" className="hidden md:flex w-fit">
-                                <SidebarContent>
-                                    <SidebarGroup>
-                                        <SidebarGroupLabel>Tools</SidebarGroupLabel>
-                                        <SidebarGroupContent>
-                                            <SidebarMenu>
-                                                {PaperToolset.nav.map((item) => (
-                                                    <SidebarMenuItem key={item.name}>
-                                                        <TooltipProvider>
-                                                            <Tooltip>
-                                                                <TooltipTrigger asChild>
-                                                                    <Button
-                                                                        variant="outline"
-                                                                        className={`w-fit h-10 p-2 rounded-lg ${item.name === rightSideFunction ? 'bg-blue-500 dark:bg-blue-500 text-blue-100 dark:text-blue-100' : 'text-secondary-foreground hover:bg-secondary/50'}`}
-                                                                        title={item.name}
-                                                                        onClick={() => {
-                                                                            setRightSideFunction(item.name);
-                                                                        }}
-                                                                    >
-                                                                        <item.icon />
-                                                                    </Button>
-                                                                </TooltipTrigger>
-                                                                <TooltipContent side="left">
-                                                                    <p>{item.name}</p>
-                                                                </TooltipContent>
-                                                            </Tooltip>
-                                                        </TooltipProvider>
-                                                    </SidebarMenuItem>
-                                                ))}
-                                            </SidebarMenu>
-                                        </SidebarGroupContent>
-                                    </SidebarGroup>
-                                </SidebarContent>
-                            </Sidebar>
-                        </SidebarProvider>
-                    </div>
+                    <PaperSidebar
+                        rightSideFunction={rightSideFunction}
+                        setRightSideFunction={setRightSideFunction}
+                        PaperToolset={PaperToolset}
+                    />
                 </div>
             </div >
         </div >
