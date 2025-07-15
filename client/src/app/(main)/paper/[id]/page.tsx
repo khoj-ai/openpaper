@@ -88,6 +88,7 @@ import CustomCitationLink from '@/components/utils/CustomCitationLink';
 import { Avatar } from '@/components/ui/avatar';
 import Link from 'next/link';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import { ChatMessageActions } from '@/components/ChatMessageActions';
 import PaperImageView from '@/components/PaperImageView';
 
 interface ChatRequestBody {
@@ -998,7 +999,7 @@ export default function PaperView() {
                 }
                 <div
                     data-message-index={index}
-                    className={`prose dark:prose-invert p-2 !max-w-full rounded-lg ${msg.role === 'user'
+                    className={`relative group prose dark:prose-invert p-2 !max-w-full rounded-lg ${msg.role === 'user'
                         ? 'bg-blue-200 text-blue-800 w-fit animate-fade-in'
                         : 'w-full text-primary'
                         }`}
@@ -1040,6 +1041,9 @@ export default function PaperView() {
                         }}>
                         {msg.content}
                     </Markdown>
+                    {msg.role === 'assistant' && (
+                        <ChatMessageActions message={msg.content} references={msg.references} />
+                    )}
                     {
                         msg.references && msg.references['citations']?.length > 0 && (
                             <div className="mt-2" id="references-section">
@@ -1525,7 +1529,7 @@ export default function PaperView() {
                                                 )}
                                                 {
                                                     isStreaming && streamingChunks.length > 0 && (
-                                                        <div className="prose dark:prose-invert p-2 !max-w-full rounded-lg w-full text-primary dark:text-primary-foreground">
+                                                        <div className="relative group prose dark:prose-invert p-2 !max-w-full rounded-lg w-full text-primary dark:text-primary-foreground">
                                                             <AnimatedMarkdown
                                                                 content={streamingChunks.join('')}
                                                                 remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
@@ -1563,6 +1567,7 @@ export default function PaperView() {
                                                                     ),
                                                                 }}
                                                             />
+                                                            <ChatMessageActions message={streamingChunks.join('')} references={streamingReferences} />
                                                         </div>
                                                     )
                                                 }
