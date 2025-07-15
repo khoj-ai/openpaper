@@ -41,7 +41,7 @@ export default function PaperImageView({ paperId }: PaperImageViewProps) {
             {
                 paperImages.length > 0 && (
                     <div className="my-6">
-                        <h3 className="text-lg font-semibold mb-4">Figures and Images</h3>
+                        <h3 className="text-lg font-semibold mb-4">Figures and Images (Beta)</h3>
                         {loadingImages ? (
                             <div className="flex items-center justify-center py-8">
                                 <Loader className="animate-spin h-6 w-6 text-gray-500" />
