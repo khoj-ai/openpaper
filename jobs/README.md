@@ -41,8 +41,8 @@ Here's a high-level overview of the PDF processing workflow:
 |    (via Server API)          |                  |                   | 3. LLM extracts
 |                              +--------+---------+                   |    metadata
 |                                       |                             |
-|                                       | 4. PDF and assets           |
-|                                       |    are uploaded to S3       |
+|                                       | 4. PDF downloaded from S3,  |
+|                                       |    assets uploaded to S3.   |
 |                                       |                             |
 |   +----------------+                  v                             |
 |   |                |         +--------+---------+                   |
@@ -135,7 +135,7 @@ Within the Jobs Service, the PDF processing task is broken down into several sub
     *   For each extracted image, it generates a caption using an LLM service.
     *   It generates a preview image of the first page.
     *   It calls an LLM service to extract metadata like title, authors, abstract, and keywords.
-5.  **S3 Storage**: The original PDF, the generated preview image, the extracted text, and all extracted images and their captions are uploaded to an S3 bucket.
+5.  **S3 Storage**: The original PDF is downloaded from S3. The generated preview image, the extracted text, and all extracted images and their captions are uploaded to an S3 bucket.
 6.  **Webhook Notification**: Once processing is complete, the `jobs` service sends a webhook notification to the `server` with the results, including the S3 URLs and the extracted metadata.
 7.  **Database Update**: The `server` receives the webhook, updates the paper record in the database with the new information, and marks the status as `complete`. The paper is now available to the client.
 8.  **Status Polling**: The client can poll the `server` for status updates, and the `server` can query the `jobs` service for real-time task progress information.
