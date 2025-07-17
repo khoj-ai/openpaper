@@ -2,10 +2,11 @@ import uuid
 from enum import Enum
 from types import NoneType
 
-from sqlalchemy import UUID  # type: ignore
 from sqlalchemy import (  # type: ignore
     ARRAY,
+    UUID,
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     Float,
@@ -13,9 +14,16 @@ from sqlalchemy import (  # type: ignore
     Integer,
     String,
     Text,
+    and_,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import DeclarativeBase, relationship  # type: ignore
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.orm import (  # type: ignore
+    DeclarativeBase,
+    foreign,
+    relationship,
+    sessionmaker,
+)
 from sqlalchemy.sql import func
 
 # Special notes:
@@ -190,6 +198,109 @@ class PaperStatus(str, Enum):
     completed = "completed"
 
 
+class Message(Base):
+    __tablename__ = "messages"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    conversation_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    role = Column(String, nullable=False)  # 'user' or 'assistant'
+    content = Column(Text, nullable=False)
+
+    # References from the paper
+    references = Column(JSONB, nullable=True)
+
+    bucket = Column(JSONB, nullable=True)  # For any additional attributes
+    sequence = Column(Integer, nullable=False)  # To maintain message order
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
+    user = relationship("User", back_populates="messages")
+    conversation = relationship("Conversation", back_populates="messages")
+
+
+class ConversableType(str, Enum):
+    PAPER = "paper"
+    EVERYTHING = (
+        "everything"  # For conversations that are across the user's entire library
+    )
+
+
+def generic_relationship(type_col_name, id_col_name):
+    """Returns a property that emulates a generic relationship."""
+
+    def getter(self):
+        """Get the related object."""
+        # Get the type and ID from the instance
+        type_name = getattr(self, type_col_name)
+        id_val = getattr(self, id_col_name)
+        if type_name is None or id_val is None:
+            return None
+
+        # Get the session and find the object
+        session = sessionmaker.object_session(self)
+        if not session:
+            # Cannot function without a session
+            return None
+
+        # Dynamically get the parent class from the Base's registry
+        parent_class = self.registry.class_mapper(type_name).class_
+        return session.get(parent_class, id_val)
+
+    def setter(self, value):
+        """Set the related object."""
+        # Get the type and ID from the object being assigned
+        type_name = value.__tablename__ if value else None
+        id_val = value.id if value else None
+
+        setattr(self, type_col_name, type_name)
+        setattr(self, id_col_name, id_val)
+
+    return property(getter, setter)
+
+
+class Conversation(Base):
+    __tablename__ = "conversations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    title = Column(String, nullable=True)  # Optional conversation title
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
+    # Polymorphic Columns
+    conversable_id = Column(UUID(as_uuid=True), nullable=True)
+    conversable_type = Column(String, nullable=False, default=ConversableType.PAPER)
+    conversable = generic_relationship("conversable_type", "conversable_id")
+
+    # Specific relationship for papers
+    paper = relationship(
+        "Paper",
+        primaryjoin=lambda: and_(
+            foreign(Conversation.conversable_id) == Paper.id,
+            Conversation.conversable_type == ConversableType.PAPER.value,
+        ),
+        viewonly=True,
+    )
+
+    user = relationship("User", back_populates="conversations")
+
+    messages = relationship(
+        "Message",
+        back_populates="conversation",
+        order_by=Message.sequence,
+        cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "(conversable_type = 'paper' AND conversable_id IS NOT NULL) OR "
+            "(conversable_type = 'everything' AND conversable_id IS NULL)",
+            name="check_conversable_consistency",
+        ),
+    )
+
+
 class Paper(Base):
     __tablename__ = "papers"
 
@@ -239,7 +350,13 @@ class Paper(Base):
 
     user = relationship("User", back_populates="papers")
     conversations = relationship(
-        "Conversation", back_populates="paper", cascade="all, delete-orphan"
+        "Conversation",
+        back_populates="paper",
+        cascade="all, delete-orphan",
+        primaryjoin=lambda: and_(
+            Paper.id == foreign(Conversation.conversable_id),
+            Conversation.conversable_type == ConversableType.PAPER.value,
+        ),
     )
     paper_notes = relationship(
         "PaperNote", back_populates="paper", cascade="all, delete-orphan"
@@ -280,52 +397,6 @@ class PaperImage(Base):
     placeholder_id = Column(String, nullable=True)  # Placeholder ID for the image
 
     paper = relationship("Paper", back_populates="paper_images")
-
-
-class Message(Base):
-    __tablename__ = "messages"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    conversation_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("conversations.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    role = Column(String, nullable=False)  # 'user' or 'assistant'
-    content = Column(Text, nullable=False)
-
-    # References from the paper
-    references = Column(JSONB, nullable=True)
-
-    bucket = Column(JSONB, nullable=True)  # For any additional attributes
-    sequence = Column(Integer, nullable=False)  # To maintain message order
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-
-    user = relationship("User", back_populates="messages")
-    conversation = relationship("Conversation", back_populates="messages")
-
-
-class Conversation(Base):
-    __tablename__ = "conversations"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    paper_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("papers.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    title = Column(String, nullable=True)  # Optional conversation title
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-
-    user = relationship("User", back_populates="conversations")
-
-    paper = relationship("Paper", back_populates="conversations")
-    messages = relationship(
-        "Message",
-        back_populates="conversation",
-        order_by=Message.sequence,
-        cascade="all, delete-orphan",
-    )
 
 
 class PaperNote(Base):

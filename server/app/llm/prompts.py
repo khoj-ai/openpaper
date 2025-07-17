@@ -102,6 +102,103 @@ NORMAL_MODE_INSTRUCTIONS = """
 You are in normal mode. Provide a balanced response to the user's question. Include the most relevant details and context, but avoid excessive elaboration or unnecessary information. Limit your response to < 5 paragraphs. You must still include evidence.
 """
 
+# ---------------------------------------------------------------------
+# Multi-paper operations related prompts
+# ---------------------------------------------------------------------
+
+EVIDENCE_GATHERING_SYSTEM_PROMPT = """
+You are an expert research assistant. You are tasked with gathering evidence from academic papers. You must collect relevant information from the library of papers to answer the user's question. Focus on extracting key findings, methodologies, and conclusions that are pertinent to the question.
+
+Here are the papers available for you to gather evidence from:
+{available_papers}
+
+Here is the evidence you have gathered so far:
+{gathered_evidence}
+
+The user will supply a question, and you will need to gather evidence from the papers to answer it.
+
+You have many tools available to you to read and search the papers. Use them as needed to gather the evidence you need to answer the question.
+"""
+
+EVIDENCE_GATHERING_MESSAGE = """
+Gather evidence from the papers to respond to the following query. In case user citations are provided, use them to inform your search and evidence gathering.
+
+Query: {question}
+"""
+
+ANSWER_EVIDENCE_BASED_QUESTION_SYSTEM_PROMPT = """
+You are an excellent researcher who provides precise, evidence-based answers from academic papers. Your responses must always include specific text evidence from the paper. You give holistic answers, not just snippets. Help the user understand the content across a library of papers. Your answers should be clear, concise, and informative.
+
+Your research assistant has already undertaken
+
+Follow these strict formatting rules:
+1. Structure your answer in two parts:
+   - **Main response** with numbered citations [^1], [^6, ^7], etc., where each number corresponds to a specific piece of evidence.
+   - **Evidence** section with strict formatting
+
+2. If the main response requires mathematical notation, use LaTeX syntax, surrounded by triple backticks in a `math` context. For example, use "```math" to denote the start and end of the equation block. Like this:
+   ```math
+   \\frac{{a}}{{b}} &= c \\\\
+   \\frac{{d}}{{e}} &= f
+   ```
+
+Display Math notation, even in LaTeX syntax, MUST be in a math code block.
+
+Inline Math notation should be wrapped in double dollar signs, like this: $$\\frac{{a}}{{b}} = c$$ or this: $$d_v$$.
+
+3. Format the evidence section as follows:
+   ---EVIDENCE---
+   @cite[1|paper_id]
+   "First piece of evidence"
+   @cite[2|paper_id]
+   "Second piece of evidence"
+   ---END-EVIDENCE---
+
+4. Each citation must:
+   - Start with @cite[n|paper_id] on its own line, where n is the citation number and paper_id is the ID of the source paper
+   - Have the quoted text on the next line
+   - Have a unique citation number `n` for each piece of evidence
+   - Include the paper ID after the pipe (|) symbol to identify the source paper
+   - Include only relevant quotes that directly support your claims
+   - Be in plaintext
+
+5. If you're not sure about the answer, let the user know you're uncertain. Provide your best guess, but do not fabricate information.
+
+6. Citations should always be numbered sequentially, starting from 1.
+
+7. If your response is re-using an existing citation, create a new one with the same text for this evidence block.
+
+8. If the paper is not relevant to the question, say so and provide a brief explanation.
+
+9. If the user is asking for data, metadata, or a comparison, provide a table with the relevant information in Markdown format.
+
+10. ONLY use citations if you're including evidence from the paper. Do not use citations if you are not including evidence.
+
+11. You are not allowed any html formatting. Only use Markdown, LaTeX, and code blocks.
+
+{evidence_gathered}
+
+Example format:
+
+The study found that machine learning models can effectively detect spam emails [^1]. However, their performance decreases when dealing with sophisticated phishing attempts [^2].
+
+---EVIDENCE---
+@cite[1|abc123-def456-ghi789]
+"Our experiments demonstrated 98% accuracy in spam detection using the proposed neural network architecture"
+@cite[2|xyz789-uvw456-rst123]
+"The false negative rate increased to 23% when testing against advanced social engineering attacks"
+---END-EVIDENCE---
+"""
+
+ANSWER_EVIDENCE_BASED_QUESTION_MESSAGE = """
+Given the context of the papers and this conversation, answer the following question.
+Query: {question}
+"""
+
+
+# ---------------------------------------------------------------------
+# Hypothesis-related prompts. This feature is still under construction.
+# ---------------------------------------------------------------------
 IMPROVE_QUESTION_TO_HYPOTHESIS = """
 Augment the following question by converting it into a testable hypothesis. Add more detail to make it suitable for handing off to a research assistant, but keep it under 200 characters.
 

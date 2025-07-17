@@ -489,7 +489,7 @@ export default function PaperView() {
 
                     if (!retrievedConversationId) {
                         // If no conversation ID is returned, create a new one
-                        const newConversationResponse = await fetchFromApi(`/api/conversation/${id}`, {
+                        const newConversationResponse = await fetchFromApi(`/api/conversation/paper/${id}`, {
                             method: 'POST',
                         });
                         retrievedConversationId = newConversationResponse.id;
@@ -762,7 +762,7 @@ export default function PaperView() {
         }
 
         try {
-            const stream = await fetchStreamFromApi('/api/message/chat', {
+            const stream = await fetchStreamFromApi('/api/message/chat/paper', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestBody),

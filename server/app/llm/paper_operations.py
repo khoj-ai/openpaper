@@ -115,49 +115,6 @@ class PaperOperations(BaseLLMClient):
         Chat with the paper using the specified model
         """
 
-        def parse_evidence_block(evidence_text: str) -> list[dict]:
-            """
-            Parse evidence block into structured citations
-            Handles multi-line citations between @cite markers
-
-            Incoming format of evidence_text:
-            @cite[1]
-            "First piece of evidence"
-            @cite[2]
-            "Second piece of evidence"
-            """
-            citations = []
-            lines = evidence_text.strip().split("\n")
-            current_citation: dict[str, Union[int, str]] | None = None
-            current_text_lines: list[str] = []
-
-            for line in lines:
-                line = line.strip()
-                if line.startswith("@cite["):
-                    # If we have a previous citation pending, save it
-                    if current_citation is not None:
-                        current_citation["reference"] = " ".join(
-                            current_text_lines
-                        ).strip()
-                        citations.append(current_citation)
-
-                    # Start new citation
-                    match = re.search(r"@cite\[(\d+)\]", line)
-                    if match:
-                        number = int(match.group(1))
-                        current_citation = {"key": number, "reference": ""}
-                        current_text_lines = []
-                elif current_citation is not None and line:
-                    # Accumulate lines for the current citation
-                    current_text_lines.append(line)
-
-            # Don't forget to save the last citation
-            if current_citation is not None and current_text_lines:
-                current_citation["reference"] = " ".join(current_text_lines).strip()
-                citations.append(current_citation)
-
-            return citations
-
         user_citations = (
             CitationHandler.convert_references_to_citations(user_references)
             if user_references
@@ -261,7 +218,9 @@ class PaperOperations(BaseLLMClient):
                 remaining = reconstructed_buffer[delimiter_pos + len(END_DELIMITER) :]
 
                 # Parse the complete evidence block
-                structured_evidence = parse_evidence_block(evidence_part)
+                structured_evidence = CitationHandler.parse_evidence_block(
+                    evidence_part
+                )
 
                 # Yield both raw and structured evidence
                 yield {

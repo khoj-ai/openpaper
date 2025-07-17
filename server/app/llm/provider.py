@@ -1,4 +1,5 @@
 import base64
+import json
 import logging
 import os
 from abc import ABC, abstractmethod
@@ -10,11 +11,22 @@ import openai
 from app.database.models import Message
 from app.llm.citation_handler import CitationHandler
 from google import genai
-from google.genai.types import Content, GenerateContentConfig
+from google.genai.types import (
+    AutomaticFunctionCallingConfig,
+    Content,
+    ContentListUnion,
+    FunctionCallingConfig,
+    FunctionCallingConfigMode,
+    FunctionDeclaration,
+    GenerateContentConfig,
+    Tool,
+    ToolConfig,
+)
 from openai.types.chat import (
     ChatCompletionAssistantMessageParam,
     ChatCompletionMessageParam,
     ChatCompletionSystemMessageParam,
+    ChatCompletionToolParam,
     ChatCompletionUserMessageParam,
 )
 
@@ -26,13 +38,28 @@ class LLMProvider(Enum):
     OPENAI = "openai"
 
 
+@dataclass
+class ToolCall:
+    """Standardized tool call format"""
+
+    name: str
+    args: Dict[str, Any]
+
+
 class LLMResponse:
     """Standardized response format across all LLM providers"""
 
-    def __init__(self, text: str, model: str, provider: LLMProvider):
+    def __init__(
+        self,
+        text: str,
+        model: str,
+        provider: LLMProvider,
+        tool_calls: Optional[List[ToolCall]] = None,
+    ):
         self.text = text
         self.model = model
         self.provider = provider
+        self.tool_calls = tool_calls or []
 
 
 class StreamChunk:
@@ -77,7 +104,13 @@ class BaseLLMProvider(ABC):
 
     @abstractmethod
     def generate_content(
-        self, model: str, contents: Union[str, MessageParam], **kwargs
+        self,
+        model: str,
+        contents: Union[str, MessageParam],
+        system_prompt: Optional[str] = None,
+        history: Optional[List[Message]] = None,
+        function_declarations: Optional[List[Dict]] = None,
+        **kwargs,
     ) -> LLMResponse:
         """Generate content using the provider's API"""
         pass
@@ -128,16 +161,64 @@ class GeminiProvider(BaseLLMProvider):
         return self._client
 
     def generate_content(
-        self, model: str, contents: Union[str, MessageParam], **kwargs
+        self,
+        model: str,
+        contents: Union[str, MessageParam],
+        history: Optional[List[Message]] = None,
+        system_prompt: str = "",
+        function_declarations: Optional[List[Dict]] = None,
+        **kwargs,
     ) -> LLMResponse:
-        response = self.client.models.generate_content(
-            model=model, contents=self._convert_message_content(contents), **kwargs
+        tool_options: List[FunctionDeclaration] = []
+        # Cast function declarations to Gemini's FunctionDeclaration type
+        if function_declarations:
+            tool_options = [
+                FunctionDeclaration(**func) for func in function_declarations
+            ]
+
+        tools = Tool(function_declarations=tool_options) if tool_options else None
+
+        config = GenerateContentConfig()
+        if tools:
+            config.tools = [tools]
+            config.tool_config = ToolConfig(
+                function_calling_config=FunctionCallingConfig(
+                    mode=FunctionCallingConfigMode.ANY
+                )
+            )
+            config.automatic_function_calling = AutomaticFunctionCallingConfig(
+                disable=True  # Disable automatic function calling
+            )
+
+        if system_prompt:
+            config.system_instruction = system_prompt
+
+        # Build contents list directly without intermediate conversion
+        all_contents = self._prepare_gemini_messages(
+            history=history or [],
+            new_message=contents,
         )
 
-        if not response or not response.text:
+        response = self.client.models.generate_content(
+            model=model, contents=all_contents, config=config, **kwargs
+        )
+
+        if not response or (not response.text and not response.function_calls):
             raise ValueError("Empty response from Gemini API")
 
-        return LLMResponse(text=response.text, model=model, provider=LLMProvider.GEMINI)
+        # Extract tool calls from Gemini response
+        tool_calls = []
+        if response.function_calls:
+            for fn in response.function_calls:
+                if fn.name and fn.args:
+                    tool_calls.append(ToolCall(name=fn.name, args=dict(fn.args)))
+
+        return LLMResponse(
+            text=response.text or "",
+            model=model,
+            provider=LLMProvider.GEMINI,
+            tool_calls=tool_calls,
+        )
 
     def send_message_stream(
         self,
@@ -155,18 +236,9 @@ class GeminiProvider(BaseLLMProvider):
         )
 
         # Start with file content for caching if present
-        contents = []
-        if file:
-            formatted_file = self._convert_message_content([file])
-            contents.append(formatted_file)
-
-        # Add history after file
-        formatted_history = self._convert_chat_history_to_api_format(history)
-        contents.extend(formatted_history)
-
-        # Add the new message last
-        converted_message = self._convert_message_content(message)
-        contents.append(converted_message)
+        contents = self._prepare_gemini_messages(
+            history=history, new_message=message, file=file
+        )
 
         response_stream = self.client.models.generate_content_stream(
             model=model,
@@ -184,6 +256,30 @@ class GeminiProvider(BaseLLMProvider):
             )
             if chunk.usage_metadata:
                 logger.debug(f"Gemini usage stats: {chunk.usage_metadata}")
+
+    def _prepare_gemini_messages(
+        self,
+        history: List[Message],
+        new_message: MessageParam,
+        file: FileContent | None = None,
+    ) -> ContentListUnion:
+        """Prepare Gemini messages format including history and new message with front-loading for caching"""
+        messages: List[Content] = []
+
+        contents = []
+        if file:
+            formatted_file = self._convert_message_content([file])
+            contents.append(formatted_file)
+
+        # Add history after file
+        formatted_history = self._convert_chat_history_to_api_format(history)
+        contents.extend(formatted_history)
+
+        # Add the new message last
+        converted_message = self._convert_message_content(new_message)
+        contents.append(converted_message)
+
+        return messages  # type: ignore
 
     def get_default_model(self) -> str:
         return self._default_model
@@ -268,30 +364,65 @@ class OpenAIProvider(BaseLLMProvider):
         return self._client
 
     def generate_content(
-        self, model: str, contents: Union[str, MessageParam], **kwargs
+        self,
+        model: str,
+        contents: Union[str, MessageParam],
+        history: Optional[List[Message]] = None,
+        function_declarations: Optional[List[Dict]] = None,
+        system_prompt: Optional[str] = None,
+        **kwargs,
     ) -> LLMResponse:
         # Convert to OpenAI format
         if isinstance(contents, str):
             content = contents
         else:
-            content = self._convert_message_content(contents)
+            content = self._convert_message_content(
+                contents, system_instructions=system_prompt
+            )
 
-        user_msg: ChatCompletionUserMessageParam = {
-            "role": "user",
-            "content": content,
-        }
+        all_messages = self._prepare_openai_messages(
+            history=history or [],
+            new_message=content,
+            system_prompt=system_prompt or "",
+        )
+
+        tools = (
+            [
+                self._cast_tool_declaration(func_decl)
+                for func_decl in function_declarations
+            ]
+            if function_declarations
+            else None
+        )
+
+        if tools:
+            kwargs["tools"] = tools
 
         response = self.client.chat.completions.create(
-            model=model, messages=[user_msg], **kwargs
+            model=model, messages=all_messages, **kwargs
         )
 
         if not response.choices or not response.choices[0].message.content:
             raise ValueError("Empty response from OpenAI API")
 
+        message = response.choices[0].message
+
+        # Extract tool calls from OpenAI response
+        tool_calls = []
+        if message.tool_calls:
+            for tool_call in message.tool_calls:
+                tool_calls.append(
+                    ToolCall(
+                        name=tool_call.function.name,
+                        args=json.loads(tool_call.function.arguments),
+                    )
+                )
+
         return LLMResponse(
-            text=response.choices[0].message.content,
+            text=message.content or "",
             model=model,
             provider=LLMProvider.OPENAI,
+            tool_calls=tool_calls,
         )
 
     def send_message_stream(
@@ -324,13 +455,19 @@ class OpenAIProvider(BaseLLMProvider):
             elif chunk.usage:
                 logger.debug(f"OpenAI usage stats: {chunk.usage}")
 
-    def _convert_message_content(self, content: MessageParam) -> Any:
+    def _convert_message_content(
+        self, content: MessageParam, system_instructions: Optional[str] = None
+    ) -> Any:
         """Convert generic message content to OpenAI format"""
         if isinstance(content, str):
             return content
 
         if isinstance(content, list):
             content_parts = []
+
+            if system_instructions:
+                content_parts.append({"type": "system", "text": system_instructions})
+
             for item in content:
                 if isinstance(item, TextContent):
                     content_parts.append({"type": "text", "text": item.text})
@@ -403,6 +540,18 @@ class OpenAIProvider(BaseLLMProvider):
         messages.append(user_msg)
 
         return messages
+
+    def _cast_tool_declaration(
+        self, func_decl: Dict[str, Any]
+    ) -> ChatCompletionToolParam:
+        return {
+            "type": "function",
+            "function": {
+                "name": func_decl["name"],
+                "description": func_decl.get("description", ""),
+                "parameters": func_decl.get("parameters", {}),
+            },
+        }
 
     def get_default_model(self) -> str:
         return self._default_model

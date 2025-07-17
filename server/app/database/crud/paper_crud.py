@@ -417,6 +417,20 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
 
         return image_placeholders
 
+    def get_all_available_papers(
+        self, db: Session, *, user: CurrentUser
+    ) -> List[Paper]:
+        """
+        Get all papers available to the user, regardless of status.
+        This includes papers with 'todo', 'reading', and 'completed' statuses.
+        """
+        return (
+            db.query(Paper)
+            .filter(Paper.user_id == user.id)
+            .order_by(Paper.updated_at.desc())
+            .all()
+        )
+
 
 # Create a single instance to use throughout the application
 paper_crud = PaperCRUD(Paper)

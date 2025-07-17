@@ -11,7 +11,7 @@ from app.database.crud.coversation_crud import (
 )
 from app.database.crud.message_crud import message_crud
 from app.database.database import get_db
-from app.database.models import Conversation
+from app.database.models import ConversableType, Conversation
 from app.llm.operations import operations
 from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
@@ -73,7 +73,7 @@ async def get_conversation(
         )
 
 
-@conversation_router.post("/{paper_id}")
+@conversation_router.post("/paper/{paper_id}")
 async def create_conversation(
     paper_id: str,
     title: str | None = None,
@@ -84,7 +84,9 @@ async def create_conversation(
     try:
         # Create a conversation with the user ID
         conversation_data = ConversationCreate(
-            paper_id=uuid.UUID(paper_id), title=title
+            conversable_type=ConversableType.PAPER,
+            conversable_id=uuid.UUID(paper_id),
+            title=title,
         )
 
         conversation: Conversation | None = conversation_crud.create(
@@ -102,6 +104,40 @@ async def create_conversation(
         )
     except Exception as e:
         logger.error(f"Error creating conversation: {e}")
+        return JSONResponse(
+            status_code=400,
+            content={"message": f"Failed to create conversation: {str(e)}"},
+        )
+
+
+@conversation_router.post("/everything")
+async def create_everything_conversation(
+    title: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+) -> JSONResponse:
+    """Create a new conversation for everything"""
+    try:
+        # Create a conversation with the user ID
+        conversation_data = ConversationCreate(
+            conversable_type=ConversableType.EVERYTHING, title=title
+        )
+
+        conversation: Conversation | None = conversation_crud.create(
+            db, obj_in=conversation_data, user=current_user
+        )
+        if not conversation:
+            raise ValueError("Failed to create conversation.")
+        return JSONResponse(
+            status_code=201,
+            content={
+                "id": str(conversation.id),
+                "title": conversation.title,
+                "messages": [],
+            },
+        )
+    except Exception as e:
+        logger.error(f"Error creating everything conversation: {e}")
         return JSONResponse(
             status_code=400,
             content={"message": f"Failed to create conversation: {str(e)}"},
