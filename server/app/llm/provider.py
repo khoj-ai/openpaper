@@ -10,6 +10,7 @@ from typing import Any, Dict, Iterator, List, Literal, Optional, Sequence, Union
 import openai
 from app.database.models import Message
 from app.llm.citation_handler import CitationHandler
+from app.schemas.responses import FileContent, TextContent, ToolCall
 from google import genai
 from google.genai.types import (
     AutomaticFunctionCallingConfig,
@@ -38,14 +39,6 @@ class LLMProvider(Enum):
     OPENAI = "openai"
 
 
-@dataclass
-class ToolCall:
-    """Standardized tool call format"""
-
-    name: str
-    args: Dict[str, Any]
-
-
 class LLMResponse:
     """Standardized response format across all LLM providers"""
 
@@ -72,20 +65,6 @@ class StreamChunk:
         self.model = model
         self.provider = provider
         self.is_done = is_done
-
-
-@dataclass
-class TextContent:
-    text: str
-    type: Literal["text"] = "text"
-
-
-@dataclass
-class FileContent:
-    data: bytes
-    mime_type: str
-    filename: Optional[str] = None
-    type: Literal["file"] = "file"
 
 
 # Union type for all content types
@@ -212,6 +191,8 @@ class GeminiProvider(BaseLLMProvider):
             for fn in response.function_calls:
                 if fn.name and fn.args:
                     tool_calls.append(ToolCall(name=fn.name, args=dict(fn.args)))
+                elif fn.name == "STOP":
+                    tool_calls.append(ToolCall(name="stop", args={}))
 
         return LLMResponse(
             text=response.text or "",
@@ -266,18 +247,17 @@ class GeminiProvider(BaseLLMProvider):
         """Prepare Gemini messages format including history and new message with front-loading for caching"""
         messages: List[Content] = []
 
-        contents = []
         if file:
             formatted_file = self._convert_message_content([file])
-            contents.append(formatted_file)
+            messages.append(formatted_file)
 
         # Add history after file
         formatted_history = self._convert_chat_history_to_api_format(history)
-        contents.extend(formatted_history)
+        messages.extend(formatted_history)
 
         # Add the new message last
         converted_message = self._convert_message_content(new_message)
-        contents.append(converted_message)
+        messages.append(converted_message)
 
         return messages  # type: ignore
 

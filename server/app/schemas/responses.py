@@ -1,4 +1,5 @@
-from typing import List, Optional
+from dataclasses import dataclass
+from typing import Any, Dict, List, Literal, Optional
 
 from app.database.models import HighlightType
 from pydantic import BaseModel, Field
@@ -231,3 +232,27 @@ class HypothesisResearchResults(BaseModel):
     findings: HypothesisResearchResponse = Field(
         description="The overall findings from the hypothesis research, synthesizing the results from all steps."
     )
+
+
+# -----------------
+# LLM Base Schemas
+# -----------------
+
+
+class ToolCall(BaseModel):
+    """Standardized tool call format"""
+
+    name: str
+    args: Dict[str, Any]
+
+
+class TextContent(BaseModel):
+    text: str
+    type: Literal["text"] = "text"
+
+
+class FileContent(BaseModel):
+    data: bytes
+    mime_type: str
+    filename: Optional[str] = None
+    type: Literal["file"] = "file"

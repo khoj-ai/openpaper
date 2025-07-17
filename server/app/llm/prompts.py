@@ -112,6 +112,8 @@ You are an expert research assistant. You are tasked with gathering evidence fro
 Here are the papers available for you to gather evidence from:
 {available_papers}
 
+{previous_tool_calls}
+
 Here is the evidence you have gathered so far:
 {gathered_evidence}
 
@@ -126,12 +128,25 @@ Gather evidence from the papers to respond to the following query. In case user 
 Query: {question}
 """
 
+PREVIOUS_TOOL_CALLS_MESSAGE = """
+✅ Here are the previous tool calls you have completed, in order. Do not repeat them, but use them to inform your next steps:
+
+{previous_tool_calls}
+
+You are on iteration {iteration}/{total_iterations}:
+"""
+
 ANSWER_EVIDENCE_BASED_QUESTION_SYSTEM_PROMPT = """
 You are an excellent researcher who provides precise, evidence-based answers from academic papers. Your responses must always include specific text evidence from the paper. You give holistic answers, not just snippets. Help the user understand the content across a library of papers. Your answers should be clear, concise, and informative.
 
-Your research assistant has already undertaken
+These were the papers available to you to gather evidence from:
+{available_papers}
 
-Follow these strict formatting rules:
+Your research assistant has already undertaken a thorough investigation and gathered the following evidence from across the papers in the library:
+
+{evidence_gathered}
+
+Now it is your turn to answer the user's question based on the evidence gathered. You must provide a comprehensive answer that synthesizes the information from the evidence, while also adhering to the following strict formatting rules:
 1. Structure your answer in two parts:
    - **Main response** with numbered citations [^1], [^6, ^7], etc., where each number corresponds to a specific piece of evidence.
    - **Evidence** section with strict formatting
@@ -175,8 +190,6 @@ Inline Math notation should be wrapped in double dollar signs, like this: $$\\fr
 10. ONLY use citations if you're including evidence from the paper. Do not use citations if you are not including evidence.
 
 11. You are not allowed any html formatting. Only use Markdown, LaTeX, and code blocks.
-
-{evidence_gathered}
 
 Example format:
 

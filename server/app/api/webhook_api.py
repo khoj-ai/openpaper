@@ -14,7 +14,7 @@ from app.database.database import get_db
 from app.database.models import JobStatus
 from app.database.telemetry import track_event
 from app.helpers.s3 import s3_service
-from app.llm.schemas import PaperMetadataExtraction
+from app.schemas.responses import PaperMetadataExtraction
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel

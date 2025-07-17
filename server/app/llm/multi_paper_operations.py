@@ -12,6 +12,7 @@ from app.llm.prompts import (
     ANSWER_EVIDENCE_BASED_QUESTION_SYSTEM_PROMPT,
     EVIDENCE_GATHERING_MESSAGE,
     EVIDENCE_GATHERING_SYSTEM_PROMPT,
+    PREVIOUS_TOOL_CALLS_MESSAGE,
 )
 from app.llm.provider import LLMProvider, TextContent
 from app.llm.tools.file_tools import (
@@ -74,7 +75,7 @@ class MultiPaperOperations(BaseLLMClient):
         # We need to start off here with evidence gathering in order to answer this query that traverses the entire knowledge base arbitrarily. In order to do that, we need to setup an agent loop that will continue to gather evidence until we have enough to answer the question. Let it max out at 5 iterations before we force it to cancel, if it hasn't already provided a STOP signal.
 
         n_iterations = 0
-        max_iterations = 5
+        max_iterations = 4
 
         all_papers = paper_crud.get_all_available_papers(
             db,
@@ -104,8 +105,21 @@ class MultiPaperOperations(BaseLLMClient):
         while n_iterations < max_iterations:
             n_iterations += 1
 
+            prev_tool_calls_message = (
+                PREVIOUS_TOOL_CALLS_MESSAGE.format(
+                    previous_tool_calls=json.dumps(
+                        evidence_collection.get_previous_tool_calls_dict()
+                    ),
+                    iteration=n_iterations,
+                    total_iterations=max_iterations,
+                )
+                if evidence_collection.has_previous_tool_calls()
+                else ""
+            )
+
             evidence_gathering_prompt = EVIDENCE_GATHERING_SYSTEM_PROMPT.format(
                 available_papers=formatted_paper_options,
+                previous_tool_calls=prev_tool_calls_message,
                 gathered_evidence=json.dumps(evidence_collection.get_evidence_dict()),
             )
 
@@ -130,6 +144,8 @@ class MultiPaperOperations(BaseLLMClient):
                 fn_name = fn_selected.name
                 fn_args = fn_selected.args
 
+                evidence_collection.add_tool_call(fn_selected)
+
                 if fn_name == "stop":
                     logger.info("Received STOP signal from LLM.")
                     yield {"type": "stop", "content": "STOP signal received."}
@@ -137,16 +153,12 @@ class MultiPaperOperations(BaseLLMClient):
 
                 if fn_name in function_maps:
                     try:
+                        yield {"type": "status", "content": f"{fn_name}"}
                         result = function_maps[fn_name](
                             **fn_args,
                             current_user=current_user,
                             db=db,
                         )
-                        if isinstance(result, list):
-                            for item in result:
-                                yield {"type": "content", "content": item}
-                        else:
-                            yield {"type": "content", "content": result}
 
                         if fn_name == "search_all_files" and isinstance(result, dict):
                             # If the function is search_all_files, we expect a dictionary of results
@@ -167,10 +179,10 @@ class MultiPaperOperations(BaseLLMClient):
                     logger.warning(f"Unknown function called: {fn_name}")
                     yield {"type": "error", "content": f"Unknown function: {fn_name}"}
 
-            yield {
-                "type": "evidence_gathered",
-                "content": evidence_collection.get_evidence_dict(),
-            }
+        yield {
+            "type": "evidence_gathered",
+            "content": evidence_collection.get_evidence_dict(),
+        }
 
     async def chat_with_everything(
         self,
@@ -197,8 +209,18 @@ class MultiPaperOperations(BaseLLMClient):
             db, conversation_id=casted_conversation_id, current_user=current_user
         )
 
+        all_papers = paper_crud.get_all_available_papers(
+            db,
+            user=current_user,
+        )
+
+        formatted_paper_options = {
+            str(paper.id): str(paper.title) for paper in all_papers
+        }
+
         formatted_system_prompt = ANSWER_EVIDENCE_BASED_QUESTION_SYSTEM_PROMPT.format(
-            evidence_gathered=evidence_gathered,
+            evidence_gathered=evidence_gathered.get_evidence_dict(),
+            available_papers=formatted_paper_options,
         )
 
         formatted_prompt = ANSWER_EVIDENCE_BASED_QUESTION_MESSAGE.format(

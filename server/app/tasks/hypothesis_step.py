@@ -12,7 +12,7 @@ from app.helpers.paper_search import (
 )
 from app.helpers.scrape import scrape_web_page
 from app.llm.operations import operations
-from app.llm.schemas import (
+from app.schemas.responses import (
     HypothesisStep,
     MinimalPaperData,
     PapersForReference,

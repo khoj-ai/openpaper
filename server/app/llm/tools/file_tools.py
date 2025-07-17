@@ -156,10 +156,10 @@ def search_all_files(
     results = {}
 
     for paper in all_papers:
-        paper_id = paper.id
+        paper_id = str(paper.id)
         if not paper_id or not paper.raw_content:
             continue
-        matching_lines = search_file(str(paper_id), query, current_user, db)
+        matching_lines = search_file(paper_id, query, current_user, db)
         for line in matching_lines:
             if paper_id not in results:
                 results[paper_id] = []
@@ -174,7 +174,7 @@ def view_file(
     range_end: int,
     current_user: CurrentUser,
     db: Session,
-) -> list[str]:
+) -> str:
     """
     View a specific range of lines from the file content of a paper.
     """
@@ -191,7 +191,9 @@ def view_file(
     if range_start < 0 or range_end > len(lines) or range_start >= range_end:
         raise ValueError("Invalid range specified")
 
-    return lines[range_start:range_end]
+    all_lines = lines[range_start:range_end]
+
+    return "\n".join(all_lines)
 
 
 def read_abstract(paper_id: str, current_user: CurrentUser, db: Session) -> str:

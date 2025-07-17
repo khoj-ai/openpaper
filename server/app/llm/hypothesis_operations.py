@@ -11,7 +11,8 @@ from app.llm.prompts import (
     IMPROVE_QUESTION_TO_HYPOTHESIS,
     PICK_PAPERS_TO_READ,
 )
-from app.llm.schemas import (
+from app.llm.utils import retry_llm_operation
+from app.schemas.responses import (
     HypothesisFanOut,
     HypothesisResearchResponse,
     HypothesisStep,
@@ -19,7 +20,6 @@ from app.llm.schemas import (
     PapersForReference,
     WhatToScrape,
 )
-from app.llm.utils import retry_llm_operation
 
 logger = logging.getLogger(__name__)
 

@@ -18,7 +18,7 @@ from app.llm.operations import operations
 from app.schemas.message import EvidenceCollection, ResponseStyle
 from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -101,6 +101,8 @@ async def chat_message_everything(
                             ), "Chunk content must be a dictionary"
                             # Cast the chunk_content to EvidenceCollection
                             evidence_collection.load_from_dict(chunk_content)
+                        elif chunk_type == "status":
+                            yield f"{json.dumps({'type': 'status', 'content': chunk_content})}{END_DELIMITER}"
                         else:
                             logger.debug(f"received chunks: {chunk}")
 

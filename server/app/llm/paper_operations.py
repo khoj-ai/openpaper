@@ -18,9 +18,9 @@ from app.llm.prompts import (
     NORMAL_MODE_INSTRUCTIONS,
 )
 from app.llm.provider import FileContent, LLMProvider, TextContent
-from app.llm.schemas import AudioOverviewForLLM
 from app.llm.utils import retry_llm_operation
 from app.schemas.message import ResponseStyle
+from app.schemas.responses import AudioOverviewForLLM
 from app.schemas.user import CurrentUser
 from fastapi import Depends
 from sqlalchemy.orm import Session

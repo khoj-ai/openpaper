@@ -8,7 +8,11 @@ from app.database.database import SessionLocal
 from app.database.models import HypothesisStep as HypothesisStepDB
 from app.database.models import JobStatus
 from app.llm.operations import operations
-from app.llm.schemas import HypothesisFanOut, HypothesisResearchResponse, HypothesisStep
+from app.schemas.responses import (
+    HypothesisFanOut,
+    HypothesisResearchResponse,
+    HypothesisStep,
+)
 from app.tasks.hypothesis_step import process_hypothesis_step
 from sqlalchemy import func
 

@@ -114,7 +114,7 @@ class CitationHandler:
                     citations.append(current_citation)
 
                 # Start new citation
-                match = re.search(r"@cite\[(\d+)\|(\w+)\]", line)
+                match = re.search(r"@cite\[(\d+)\|([^]]+)\]", line)
                 if match:
                     number = int(match.group(1))
                     paper_id = match.group(2)

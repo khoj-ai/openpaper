@@ -17,7 +17,7 @@ from app.database.database import get_db
 from app.database.models import Paper, PaperStatus
 from app.database.telemetry import track_event
 from app.helpers.s3 import s3_service
-from app.llm.schemas import ResponseCitation
+from app.schemas.responses import ResponseCitation
 from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException, Request

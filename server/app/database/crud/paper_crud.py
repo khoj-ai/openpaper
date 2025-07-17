@@ -17,8 +17,8 @@ from app.database.models import (
     RoleType,
 )
 from app.helpers.parser import get_start_page_from_offset
-from app.llm.schemas import PaperMetadataExtraction, ResponseCitation
 from app.llm.utils import find_offsets
+from app.schemas.responses import PaperMetadataExtraction, ResponseCitation
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
 from sqlalchemy.orm import Session

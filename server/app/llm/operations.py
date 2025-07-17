@@ -20,6 +20,7 @@ __all__ = [
     "Operations",
     "HypothesisOperations",
     "PaperOperations",
+    "MultiPaperOperations",
     "CitationHandler",
     "JSONParser",
 ]
