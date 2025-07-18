@@ -56,6 +56,12 @@ const items = [
         requiresAuth: true,
     },
     {
+        title: "Understand",
+        url: "/understand",
+        icon: Route,
+        requiresAuth: true,
+    },
+    {
         title: "Feedback",
         url: "https://github.com/khoj-ai/openpaper/issues",
         icon: MessageCircleQuestion,

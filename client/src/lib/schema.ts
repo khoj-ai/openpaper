@@ -62,6 +62,7 @@ export interface Reference {
 
 export interface Citation {
     key: string;
+    paper_id?: string;
     reference: string;
 }
 
