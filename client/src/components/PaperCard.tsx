@@ -41,10 +41,10 @@ export default function PaperCard({ paper, handleDelete, setPaper, minimalist = 
     };
 
     return (
-        <Card key={paper.id} className={`overflow-hidden hover:shadow-md transition-shadow ${minimalist ? 'p-0 border-none shadow-none w-full' : 'pt-2 pb-0'}`}>
+        <Card key={paper.id} className={`overflow-hidden transition-shadow ${minimalist ? 'p-0 border-none shadow-none w-full rounded-none' : 'pt-2 pb-0 hover:shadow-md'}`}>
             <div className="flex h-fit flex-col md:flex-row">
                 {/* Metadata Section */}
-                <div className={`w-full ${minimalist ? 'p-2' : 'p-4'} flex flex-col justify-between`}>
+                <div className={`w-full ${minimalist ? 'p-0' : 'p-4'} flex flex-col justify-between`}>
                     {/* Header with status */}
                     <div>
                         <div className={`flex items-start justify-between ${minimalist ? 'mb-0' : 'mb-3'}`}>
@@ -153,7 +153,7 @@ export default function PaperCard({ paper, handleDelete, setPaper, minimalist = 
                         </div>
 
                         <a href={`/paper/${paper.id}`} className="block group">
-                            <h3 className={`font-semibold text-gray-900 dark:text-gray-100 line-clamp-2 text-sm leading-tight group-hover:underline ${minimalist ? 'p-0 mt-0 text-base' : 'text-lg mb-3'}`}>
+                            <h3 className={`font-semibold text-gray-900 dark:text-gray-100 line-clamp-2 text-sm leading-tight group-hover:underline ${minimalist ? 'p-0 mt-0 text-base rounded-none' : 'text-lg mb-3'}`}>
                                 {paper.title}
                             </h3>
                         </a>
@@ -211,14 +211,14 @@ export default function PaperCard({ paper, handleDelete, setPaper, minimalist = 
 
                 {/* Paper Preview Section */}
                 {
-                    !minimalist && paper.preview_url ? (
-                        <div className="md:w-1/5 bg-gray-100 dark:bg-gray-800 p-4 pb-0 flex items-center justify-center border-b border-gray-200 dark:border-gray-700 rounded-t-2xl rounded-b-none">
+                    paper.preview_url ? (
+                        <div className={`md:w-1/5 bg-gray-100 dark:bg-gray-800 ${minimalist ? 'pt-2 px-2 pb-0' : 'pt-4 px-4 pb-0'} flex items-end justify-center border-b border-gray-200 dark:border-gray-700 rounded-t-2xl rounded-b-none overflow-hidden`}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                                 src={paper.preview_url}
                                 title={paper.title}
                                 alt={paper.title}
-                                className="max-h-48 w-full object-cover object-top rounded-t-lg shadow-sm"
+                                className={`${minimalist ? 'max-h-24' : 'max-h-48'} w-full object-cover object-top shadow-sm`}
                             />
                         </div>
                     ) : !minimalist && (

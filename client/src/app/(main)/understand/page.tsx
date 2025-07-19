@@ -73,16 +73,14 @@ export default function UnderstandPage() {
     const END_DELIMITER = "END_OF_STREAM";
 
     const handleCitationClick = useCallback((key: string, messageIndex: number) => {
-        setActiveCitationKey(key);
-        setActiveCitationMessageIndex(messageIndex);
+        const citation = messages[messageIndex]?.references?.citations?.find(c => String(c.key) === key);
+        if (!citation || !citation.paper_id) return;
 
-        const element = document.getElementById(`citation-${key}-${messageIndex}`);
+        const element = document.getElementById(`reference-paper-card-${citation.paper_id}`);
         if (element) {
-            element.scrollIntoView({ behavior: 'smooth' });
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-
-        setTimeout(() => setActiveCitationKey(null), 3000);
-    }, []);
+    }, [messages]);
 
     useEffect(() => {
         if (!authLoading && !user) {
@@ -291,9 +289,9 @@ export default function UnderstandPage() {
             >
                 <div
                     data-message-index={index}
-                    className={`relative group prose dark:prose-invert p-2 !max-w-full rounded-lg ${msg.role === 'user'
-                        ? 'text-blue-800 dark:text-blue-200 text-lg w-fit animate-fade-in line-clamp-3'
-                        : 'w-full text-primary'
+                    className={`relative group prose dark:prose-invert !max-w-full ${msg.role === 'user'
+                        ? 'text-blue-800 dark:text-blue-200 text-lg w-fit animate-fade-in line-clamp-3 border-b-2 rounded-none'
+                        : 'w-full text-primary p-2'
                         }`}
                 >
                     <Markdown

@@ -32,10 +32,11 @@ export default function ReferencePaperCards({ citations, papers }: ReferencePape
                 const paper = papers.find(p => p.id === paperId);
                 if (!paper) return null;
                 const citationNumbers = paperCitations.map(c => parseInt(c.key));
+                console.log(`Paper ID: ${paper.id}, Citation Numbers: ${citationNumbers}`);
                 return (
-                    <div key={paper.id} className="flex items-start py-2 gap-2">
-                        <div className="flex flex-col items-center cursor-pointer" onClick={() => toggleExpanded(paper.id)}>
-                            <span className="text-xs font-bold text-gray-500">[{groupConsecutiveNumbers(citationNumbers)}]</span>
+                    <div key={paper.id} className="flex flex-col w-full items-start py-2 gap-2" id={`reference-paper-card-${paper.id}`}>
+                        <div className="flex flex-col items-center cursor-pointer bg-secondary rounded-lg p-1" onClick={() => toggleExpanded(paper.id)}>
+                            <span className="text-xs font-bold text-gray-500">{groupConsecutiveNumbers(citationNumbers)}</span>
                         </div>
                         <div className="w-full">
                             <PaperCard paper={paper} minimalist={true} />
