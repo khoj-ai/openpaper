@@ -152,3 +152,19 @@
 .animate-fade-in {
 	animation: fadeIn 0.5s ease-in-out;
 }
+
+.expand-height {
+  animation: expand-height 0.3s ease-in-out;
+  overflow: hidden;
+}
+
+@keyframes expand-height {
+  from {
+    max-height: 0;
+    opacity: 0;
+  }
+  to {
+    max-height: 500px; /* Adjust as needed */
+    opacity: 1;
+  }
+}

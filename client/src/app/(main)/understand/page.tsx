@@ -64,6 +64,7 @@ export default function UnderstandPage() {
     const [currentLoadingMessageIndex, setCurrentLoadingMessageIndex] = useState(0);
     const [displayedText, setDisplayedText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
+    const [statusMessage, setStatusMessage] = useState('');
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputMessageRef = useRef<HTMLTextAreaElement>(null);
@@ -244,6 +245,8 @@ export default function UnderstandPage() {
                         } else if (chunkType === 'references') {
                             references = chunkContent;
                             setStreamingReferences(chunkContent);
+                        } else if (chunkType === 'status') {
+                            setStatusMessage(chunkContent);
                         } else {
                             console.warn(`Unknown chunk type: ${chunkType}`);
                         }
@@ -268,6 +271,7 @@ export default function UnderstandPage() {
             toast.error("An error occurred while processing your request.");
         } finally {
             setIsStreaming(false);
+            setStatusMessage('');
         }
     }, [currentMessage, isStreaming, conversationId]);
 
@@ -301,24 +305,28 @@ export default function UnderstandPage() {
                                 handleCitationClick={handleCitationClick}
                                 messageIndex={index}
                                 citations={msg.references?.citations || []}
+                                papers={papers}
                             />,
                             li: (props) => <CustomCitationLink
                                 {...props}
                                 handleCitationClick={handleCitationClick}
                                 messageIndex={index}
                                 citations={msg.references?.citations || []}
+                                papers={papers}
                             />,
                             div: (props) => <CustomCitationLink
                                 {...props}
                                 handleCitationClick={handleCitationClick}
                                 messageIndex={index}
                                 citations={msg.references?.citations || []}
+                                papers={papers}
                             />,
                             td: (props) => <CustomCitationLink
                                 {...props}
                                 handleCitationClick={handleCitationClick}
                                 messageIndex={index}
                                 citations={msg.references?.citations || []}
+                                papers={papers}
                             />,
                             table: (props) => (
                                 <div className="overflow-x-auto">
@@ -334,32 +342,6 @@ export default function UnderstandPage() {
                             <div>
                                 <div className="mt-0 pt-0 border-t border-gray-300 dark:border-gray-700" id="references-section">
                                         <h4 className="text-sm font-semibold mb-2">References</h4>
-                                        <ul className="list-none p-0">
-                                            {Object.entries(msg.references.citations).map(([refIndex, value]) => (
-                                                <div
-                                                    key={refIndex}
-                                                    className={`flex flex-row gap-2 animate-fade-in ${matchesCurrentCitation(value.key, index) ? 'bg-blue-100 dark:bg-blue-900 rounded p-1 transition-colors duration-300' : ''}`}
-                                                    id={`citation-${value.key}-${index}`}
-                                                    onClick={() => handleCitationClick(value.key, index)}
-                                                >
-                                                    <div className={`text-xs ${msg.role === 'user'
-                                                        ? 'bg-blue-200 text-blue-800'
-                                                        : 'text-secondary-foreground'
-                                                        }`}>
-                                                        <a href={`#citation-ref-${value.key}`}>{value.key}</a>
-                                                    </div>
-                                                    <div
-                                                        id={`citation-ref-${value.key}-${index}`}
-                                                        className={`text-xs ${msg.role === 'user'
-                                                            ? 'bg-blue-200 text-blue-800 line-clamp-1'
-                                                            : 'text-secondary-foreground'
-                                                            }`}
-                                                    >
-                                                        {value.reference}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </ul>
                                     </div>
                                 <ReferencePaperCards citations={msg.references.citations} papers={papers} />
                             </div>
@@ -434,6 +416,7 @@ export default function UnderstandPage() {
                                 {isTyping && (
                                     <span className="animate-pulse">|</span>
                                 )}
+                                {statusMessage && <div className="text-xs text-gray-500">{statusMessage}</div>}
                             </div>
                         </div>
                     )

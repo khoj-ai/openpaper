@@ -1,7 +1,8 @@
-
+import { useState } from "react";
 import { Citation } from "@/lib/schema";
 import { PaperItem } from "./AppSidebar";
 import PaperCard from "./PaperCard";
+import { groupConsecutiveNumbers } from "@/lib/utils";
 
 interface ReferencePaperCardsProps {
     citations: Citation[];
@@ -9,22 +10,43 @@ interface ReferencePaperCardsProps {
 }
 
 export default function ReferencePaperCards({ citations, papers }: ReferencePaperCardsProps) {
-    const paperIds = [...new Set(citations.map(c => c.paper_id).filter(id => id !== undefined))];
+    const [expandedPaper, setExpandedPaper] = useState<string | null>(null);
+
+    const toggleExpanded = (paperId: string) => {
+        setExpandedPaper(expandedPaper === paperId ? null : paperId);
+    };
+
+    const paperCitationGroups = citations.reduce((acc, c) => {
+        if (c.paper_id) {
+            if (!acc[c.paper_id]) {
+                acc[c.paper_id] = [];
+            }
+            acc[c.paper_id].push(c);
+        }
+        return acc;
+    }, {} as Record<string, Citation[]>);
 
     return (
-        <div className="my-4">
-            {paperIds.map(paperId => {
+        <div className="my-0">
+            {Object.entries(paperCitationGroups).map(([paperId, paperCitations]) => {
                 const paper = papers.find(p => p.id === paperId);
                 if (!paper) return null;
-                const paperCitations = citations.filter(c => c.paper_id === paperId);
+                const citationNumbers = paperCitations.map(c => parseInt(c.key));
                 return (
-                    <div key={paper.id} className="flex items-start gap-2">
-                        <div className="flex flex-col items-center">
-                            {paperCitations.map(c => (
-                                <span key={c.key} className="text-xs font-bold text-gray-500">[{c.key}]</span>
-                            ))}
+                    <div key={paper.id} className="flex items-start py-2 gap-2">
+                        <div className="flex flex-col items-center cursor-pointer" onClick={() => toggleExpanded(paper.id)}>
+                            <span className="text-xs font-bold text-gray-500">[{groupConsecutiveNumbers(citationNumbers)}]</span>
                         </div>
-                        <PaperCard paper={paper} minimalist={true} />
+                        <div className="w-full">
+                            <PaperCard paper={paper} minimalist={true} />
+                            {expandedPaper === paper.id && (
+                                <div className="p-2 text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-b-lg expand-height">
+                                    {paperCitations.map(c => (
+                                        <p key={c.key} className="mb-2">[{c.key}] {c.reference}</p>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 );
             })}

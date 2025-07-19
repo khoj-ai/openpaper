@@ -41,13 +41,13 @@ export default function PaperCard({ paper, handleDelete, setPaper, minimalist = 
     };
 
     return (
-        <Card key={paper.id} className={`overflow-hidden hover:shadow-md transition-shadow ${minimalist ? 'p-2' : 'pt-2 pb-0'}`}>
+        <Card key={paper.id} className={`overflow-hidden hover:shadow-md transition-shadow ${minimalist ? 'p-0 border-none shadow-none w-full' : 'pt-2 pb-0'}`}>
             <div className="flex h-fit flex-col md:flex-row">
                 {/* Metadata Section */}
-                <div className={`md:w-4/5 ${minimalist ? 'p-2' : 'p-4'} flex flex-col justify-between`}>
+                <div className={`w-full ${minimalist ? 'p-2' : 'p-4'} flex flex-col justify-between`}>
                     {/* Header with status */}
                     <div>
-                        <div className="flex items-start justify-between mb-3">
+                        <div className={`flex items-start justify-between ${minimalist ? 'mb-0' : 'mb-3'}`}>
                             {paper.status && !minimalist && setPaper && (
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
@@ -153,7 +153,7 @@ export default function PaperCard({ paper, handleDelete, setPaper, minimalist = 
                         </div>
 
                         <a href={`/paper/${paper.id}`} className="block group">
-                            <h3 className="font-semibold text-gray-900 dark:text-gray-100 line-clamp-2 mb-3 text-sm leading-tight group-hover:underline">
+                            <h3 className={`font-semibold text-gray-900 dark:text-gray-100 line-clamp-2 text-sm leading-tight group-hover:underline ${minimalist ? 'p-0 mt-0 text-base' : 'text-lg mb-3'}`}>
                                 {paper.title}
                             </h3>
                         </a>
