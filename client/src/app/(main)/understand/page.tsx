@@ -332,36 +332,36 @@ export default function UnderstandPage() {
                     {
                         msg.references && msg.references['citations']?.length > 0 && (
                             <div>
-                                <ReferencePaperCards citations={msg.references.citations} papers={papers} />
                                 <div className="mt-0 pt-0 border-t border-gray-300 dark:border-gray-700" id="references-section">
-                                    <h4 className="text-sm font-semibold mb-2">References</h4>
-                                    <ul className="list-none p-0">
-                                        {Object.entries(msg.references.citations).map(([refIndex, value]) => (
-                                            <div
-                                                key={refIndex}
-                                                className={`flex flex-row gap-2 animate-fade-in ${matchesCurrentCitation(value.key, index) ? 'bg-blue-100 dark:bg-blue-900 rounded p-1 transition-colors duration-300' : ''}`}
-                                                id={`citation-${value.key}-${index}`}
-                                                onClick={() => handleCitationClick(value.key, index)}
-                                            >
-                                                <div className={`text-xs ${msg.role === 'user'
-                                                    ? 'bg-blue-200 text-blue-800'
-                                                    : 'text-secondary-foreground'
-                                                    }`}>
-                                                    <a href={`#citation-ref-${value.key}`}>{value.key}</a>
-                                                </div>
+                                        <h4 className="text-sm font-semibold mb-2">References</h4>
+                                        <ul className="list-none p-0">
+                                            {Object.entries(msg.references.citations).map(([refIndex, value]) => (
                                                 <div
-                                                    id={`citation-ref-${value.key}-${index}`}
-                                                    className={`text-xs ${msg.role === 'user'
-                                                        ? 'bg-blue-200 text-blue-800 line-clamp-1'
-                                                        : 'text-secondary-foreground'
-                                                        }`}
+                                                    key={refIndex}
+                                                    className={`flex flex-row gap-2 animate-fade-in ${matchesCurrentCitation(value.key, index) ? 'bg-blue-100 dark:bg-blue-900 rounded p-1 transition-colors duration-300' : ''}`}
+                                                    id={`citation-${value.key}-${index}`}
+                                                    onClick={() => handleCitationClick(value.key, index)}
                                                 >
-                                                    {value.reference}
+                                                    <div className={`text-xs ${msg.role === 'user'
+                                                        ? 'bg-blue-200 text-blue-800'
+                                                        : 'text-secondary-foreground'
+                                                        }`}>
+                                                        <a href={`#citation-ref-${value.key}`}>{value.key}</a>
+                                                    </div>
+                                                    <div
+                                                        id={`citation-ref-${value.key}-${index}`}
+                                                        className={`text-xs ${msg.role === 'user'
+                                                            ? 'bg-blue-200 text-blue-800 line-clamp-1'
+                                                            : 'text-secondary-foreground'
+                                                            }`}
+                                                    >
+                                                        {value.reference}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
-                                    </ul>
-                                </div>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                <ReferencePaperCards citations={msg.references.citations} papers={papers} />
                             </div>
                         )}
                 </div>

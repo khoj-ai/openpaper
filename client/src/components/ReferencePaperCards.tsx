@@ -16,7 +16,17 @@ export default function ReferencePaperCards({ citations, papers }: ReferencePape
             {paperIds.map(paperId => {
                 const paper = papers.find(p => p.id === paperId);
                 if (!paper) return null;
-                return <PaperCard key={paper.id} paper={paper} />;
+                const paperCitations = citations.filter(c => c.paper_id === paperId);
+                return (
+                    <div key={paper.id} className="flex items-start gap-2">
+                        <div className="flex flex-col items-center">
+                            {paperCitations.map(c => (
+                                <span key={c.key} className="text-xs font-bold text-gray-500">[{c.key}]</span>
+                            ))}
+                        </div>
+                        <PaperCard paper={paper} minimalist={true} />
+                    </div>
+                );
             })}
         </div>
     );
