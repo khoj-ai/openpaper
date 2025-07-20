@@ -1,6 +1,6 @@
 "use client"
 
-import { AlertTriangle, Clock, FileText, Globe2, Home, LogOut, MessageCircleQuestion, Moon, Route, Sun, User, X } from "lucide-react";
+import { AlertTriangle, Clock, FileText, Globe2, Home, LogOut, MessageCircleQuestion, Moon, Route, Sun, TelescopeIcon, User, X } from "lucide-react";
 
 import {
     Sidebar,
@@ -42,30 +42,35 @@ const items = [
         url: "/",
         icon: Home,
         requiresAuth: false,
+        beta: false,
     },
     {
         title: "Find Papers",
         url: "/finder",
         icon: Globe2,
         requiresAuth: false,
+        beta: false,
     },
     {
         title: "My Papers",
         url: "/papers",
         icon: FileText,
         requiresAuth: true,
+        beta: false,
     },
     {
-        title: "Understand",
+        title: "Ask",
         url: "/understand",
-        icon: Route,
+        icon: TelescopeIcon,
         requiresAuth: true,
+        beta: true,
     },
     {
         title: "Feedback",
         url: "https://github.com/khoj-ai/openpaper/issues",
         icon: MessageCircleQuestion,
         requiresAuth: false,
+        beta: false,
     }
 ]
 
@@ -193,6 +198,13 @@ export function AppSidebar() {
                                             <a href={item.requiresAuth && !user ? "/login" : item.url}>
                                                 <item.icon />
                                                 <span>{item.title}</span>
+                                                {
+                                                    item.beta && (
+                                                        <span className="ml-1 text-xs text-yellow-500 bg-yellow-100 dark:bg-yellow-800 dark:text-yellow-200 px-1 rounded">
+                                                            Beta
+                                                        </span>
+                                                    )
+                                                }
                                             </a>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>

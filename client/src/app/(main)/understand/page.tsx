@@ -378,6 +378,15 @@ export default function UnderstandPage() {
         <div className="flex flex-col w-full h-[calc(100vh-64px)]">
             <div className={`${isCentered ? 'flex-0' : 'flex-1'} w-full overflow-y-auto`} ref={messagesContainerRef}>
                 <div className="mx-auto max-w-3xl space-y-4 p-4 w-full">
+                    {papers.length === 0 && messages.length === 0 && !authLoading && (
+                        <div className="text-center p-8">
+                            <h2 className="text-xl font-semibold mb-2">No Papers Found</h2>
+                            <p className="text-gray-600 dark:text-gray-400 mb-4">
+                                You need to have at least one paper indexed to ask questions.
+                            </p>
+                            <Button onClick={() => window.location.href = '/'}>Index a Paper</Button>
+                        </div>
+                    )}
                     {messages.length > 0 && memoizedMessages}
                     {
                         isStreaming && streamingChunks.length > 0 && (
@@ -460,7 +469,7 @@ export default function UnderstandPage() {
                             ref={inputMessageRef}
                             placeholder={isCentered ? "Ask something..." : "Ask a follow-up"}
                             className="pr-16 resize-none w-full"
-                            disabled={isStreaming}
+                            disabled={isStreaming || papers.length === 0}
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter' && !e.shiftKey) {
                                     e.preventDefault();
@@ -472,7 +481,7 @@ export default function UnderstandPage() {
                             type="submit"
                             variant="ghost"
                             className="absolute top-1/2 right-2 -translate-y-1/2"
-                            disabled={isStreaming}
+                            disabled={isStreaming || papers.length === 0}
                         >
                             <ArrowUp className="h-5 w-5" />
                         </Button>
