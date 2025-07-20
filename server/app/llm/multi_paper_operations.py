@@ -262,7 +262,6 @@ class MultiPaperOperations(BaseLLMClient):
         message_content = [
             TextContent(text=formatted_prompt),
         ]
-
         # Chat with the paper using the LLM
         for chunk in self.send_message_stream(
             message=message_content,
@@ -334,5 +333,36 @@ class MultiPaperOperations(BaseLLMClient):
                     yield {"type": "content", "content": to_yield}
                     text_buffer = text_buffer[-len(START_DELIMITER) :]
 
+        # Handle case where stream ended while still in evidence section
+        if in_evidence_section and evidence_buffer:
+            # Process any remaining evidence even without END_DELIMITER
+            reconstructed_buffer = "".join(evidence_buffer + [text_buffer]).strip()
+            logger.warning(
+                "Stream ended while in evidence section without END_DELIMITER"
+            )
+
+            if reconstructed_buffer:
+                try:
+                    structured_evidence = (
+                        CitationHandler.parse_multi_paper_evidence_block(
+                            reconstructed_buffer
+                        )
+                    )
+
+                    yield {
+                        "type": "references",
+                        "content": {
+                            "citations": structured_evidence,
+                        },
+                    }
+                except Exception as e:
+                    logger.error(f"Failed to parse incomplete evidence block: {e}")
+                    # Fall back to yielding as regular content
+                    yield {"type": "content", "content": reconstructed_buffer}
+
+            # Clear the text buffer since we processed everything
+            text_buffer = ""
+
+        # Yield any remaining text buffer content
         if text_buffer:
             yield {"type": "content", "content": text_buffer}
