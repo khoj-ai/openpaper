@@ -57,8 +57,6 @@ export default function UnderstandPage() {
     const [currentMessage, setCurrentMessage] = useState('');
     const [isStreaming, setIsStreaming] = useState(false);
     const [conversationId, setConversationId] = useState<string | null>(null);
-    const [activeCitationKey, setActiveCitationKey] = useState<string | null>(null);
-    const [activeCitationMessageIndex, setActiveCitationMessageIndex] = useState<number | null>(null);
     const [streamingChunks, setStreamingChunks] = useState<string[]>([]);
     const [streamingReferences, setStreamingReferences] = useState<Reference | undefined>(undefined);
     const [currentLoadingMessageIndex, setCurrentLoadingMessageIndex] = useState(0);
@@ -273,10 +271,6 @@ export default function UnderstandPage() {
         }
     }, [currentMessage, isStreaming, conversationId]);
 
-    const matchesCurrentCitation = useCallback((key: string, messageIndex: number) => {
-        return activeCitationKey === key.toString() && activeCitationMessageIndex === messageIndex;
-    }, [activeCitationKey, activeCitationMessageIndex]);
-
     const handleTextareaChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setCurrentMessage(e.target.value);
     }, []);
@@ -347,88 +341,87 @@ export default function UnderstandPage() {
                 </div>
             </div>
         ));
-    }, [messages, user, handleCitationClick, matchesCurrentCitation]);
+    }, [messages, user, handleCitationClick]);
 
     return (
-        <div className="flex flex-col w-full h-[calc(100vh-64px)] max-w-3xl mx-auto">
-            <div
-                className="flex-1 overflow-y-auto space-y-4 p-4"
-                ref={messagesContainerRef}
-            >
-                {messages.length === 0 ? (
-                    <div className="text-center text-gray-500 my-4">
-                        Ask anything about your entire knowledge base.
-                    </div>
-                ) : (
-                    memoizedMessages
-                )}
-                {
-                    isStreaming && streamingChunks.length > 0 && (
-                        <div className="relative group prose dark:prose-invert p-2 !max-w-full rounded-lg w-full text-primary dark:text-primary-foreground">
-                            <AnimatedMarkdown
-                                content={streamingChunks.join('')}
-                                remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
-                                rehypePlugins={[rehypeKatex]}
-                                components={{
-                                    p: (props) => <CustomCitationLink
-                                        {...props}
-                                        handleCitationClick={handleCitationClick}
-                                        messageIndex={messages.length}
-                                        citations={streamingReferences?.citations || []}
-                                    />,
-                                    li: (props) => <CustomCitationLink
-                                        {...props}
-                                        handleCitationClick={handleCitationClick}
-                                        messageIndex={messages.length}
-                                        citations={streamingReferences?.citations || []}
-                                    />,
-                                    div: (props) => <CustomCitationLink
-                                        {...props}
-                                        handleCitationClick={handleCitationClick}
-                                        messageIndex={messages.length}
-                                        citations={streamingReferences?.citations || []}
-                                    />,
-                                    td: (props) => <CustomCitationLink
-                                        {...props}
-                                        handleCitationClick={handleCitationClick}
-                                        messageIndex={messages.length}
-                                        citations={streamingReferences?.citations || []}
-                                    />,
-                                    table: (props) => (
-                                        <div className="w-full overflow-x-auto">
-                                            <table {...props} className="min-w-full border-collapse" />
-                                        </div>
-                                    ),
-                                }}
-                            />
-                            <ChatMessageActions message={streamingChunks.join('')} references={streamingReferences} />
+        <div className="flex flex-col w-full h-[calc(100vh-64px)]">
+            <div className="flex-1 w-full overflow-y-auto" ref={messagesContainerRef}>
+                <div className="mx-auto max-w-3xl space-y-4 p-4 w-full">
+                    {messages.length === 0 ? (
+                        <div className="text-center text-gray-500 my-4">
+                            Ask anything about your entire knowledge base.
                         </div>
-                    )
-                }
-                {
-                    isStreaming && (
-                        <div className="flex items-center gap-3 p-2">
-                            <Loader className="animate-spin w-6 h-6 text-blue-500 flex-shrink-0" />
-                            <div className="text-sm text-secondary-foreground">
-                                {displayedText}
-                                {isTyping && (
-                                    <span className="animate-pulse">|</span>
-                                )}
-                                {statusMessage && <div className="text-xs text-gray-500">{statusMessage}</div>}
+                    ) : (
+                        memoizedMessages
+                    )}
+                    {
+                        isStreaming && streamingChunks.length > 0 && (
+                            <div className="relative group prose dark:prose-invert p-2 !max-w-full rounded-lg w-full text-primary dark:text-primary-foreground">
+                                <AnimatedMarkdown
+                                    content={streamingChunks.join('')}
+                                    remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
+                                    rehypePlugins={[rehypeKatex]}
+                                    components={{
+                                        p: (props) => <CustomCitationLink
+                                            {...props}
+                                            handleCitationClick={handleCitationClick}
+                                            messageIndex={messages.length}
+                                            citations={streamingReferences?.citations || []}
+                                        />,
+                                        li: (props) => <CustomCitationLink
+                                            {...props}
+                                            handleCitationClick={handleCitationClick}
+                                            messageIndex={messages.length}
+                                            citations={streamingReferences?.citations || []}
+                                        />,
+                                        div: (props) => <CustomCitationLink
+                                            {...props}
+                                            handleCitationClick={handleCitationClick}
+                                            messageIndex={messages.length}
+                                            citations={streamingReferences?.citations || []}
+                                        />,
+                                        td: (props) => <CustomCitationLink
+                                            {...props}
+                                            handleCitationClick={handleCitationClick}
+                                            messageIndex={messages.length}
+                                            citations={streamingReferences?.citations || []}
+                                        />,
+                                        table: (props) => (
+                                            <div className="w-full overflow-x-auto">
+                                                <table {...props} className="min-w-full border-collapse" />
+                                            </div>
+                                        ),
+                                    }}
+                                />
+                                <ChatMessageActions message={streamingChunks.join('')} references={streamingReferences} />
                             </div>
-                        </div>
-                    )
-                }
-                <div ref={messagesEndRef} />
+                        )
+                    }
+                    {
+                        isStreaming && (
+                            <div className="flex items-center gap-3 p-2">
+                                <Loader className="animate-spin w-6 h-6 text-blue-500 flex-shrink-0" />
+                                <div className="text-sm text-secondary-foreground">
+                                    {displayedText}
+                                    {isTyping && (
+                                        <span className="animate-pulse">|</span>
+                                    )}
+                                    {statusMessage && <div className="text-xs text-gray-500">{statusMessage}</div>}
+                                </div>
+                            </div>
+                        )
+                    }
+                    <div ref={messagesEndRef} />
+                </div>
             </div>
-            <form onSubmit={handleSubmit} className="p-4 border-t" ref={chatInputFormRef}>
-                <div className="relative">
+            <form onSubmit={handleSubmit} className="p-4" ref={chatInputFormRef}>
+                <div className="relative w-full md:max-w-3xl mx-auto">
                     <Textarea
                         value={currentMessage}
                         onChange={handleTextareaChange}
                         ref={inputMessageRef}
                         placeholder="Ask something..."
-                        className="pr-16 resize-none"
+                        className="pr-16 resize-none w-full"
                         disabled={isStreaming}
                         onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
