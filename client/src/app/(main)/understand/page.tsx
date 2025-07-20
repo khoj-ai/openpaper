@@ -71,10 +71,15 @@ export default function UnderstandPage() {
     const END_DELIMITER = "END_OF_STREAM";
 
     const handleCitationClick = useCallback((key: string, messageIndex: number) => {
-        const citation = messages[messageIndex]?.references?.citations?.find(c => String(c.key) === key);
+        const message = messages[messageIndex];
+        if (!message) return;
+
+        const citation = message.references?.citations?.find(c => String(c.key) === key);
         if (!citation || !citation.paper_id) return;
 
-        const element = document.getElementById(`reference-paper-card-${citation.paper_id}`);
+        const elementId = message.id ? `${message.id}-reference-paper-card-${citation.paper_id}` : `${messageIndex}-reference-paper-card-${citation.paper_id}`;
+        const element = document.getElementById(elementId);
+
         if (element) {
             element.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
@@ -175,6 +180,7 @@ export default function UnderstandPage() {
         setIsStreaming(true);
         setStreamingChunks([]);
         setStreamingReferences(undefined);
+        setError(null);
 
         let currentConversationId = conversationId;
 
@@ -188,7 +194,10 @@ export default function UnderstandPage() {
             } catch (error) {
                 console.error('Error creating conversation:', error);
                 toast.error("Failed to start a new conversation.");
+                setMessages(prev => prev.slice(0, -1));
+                setCurrentMessage(userMessage.content);
                 setIsStreaming(false);
+                setError('Failed to start a new conversation.');
                 return;
             }
         }
@@ -265,11 +274,21 @@ export default function UnderstandPage() {
         } catch (error) {
             console.error('Error during streaming:', error);
             toast.error("An error occurred while processing your request.");
+            setMessages(prev => prev.slice(0, -1));
+            setCurrentMessage(userMessage.content);
+            setError('An error occurred while processing your request.');
         } finally {
             setIsStreaming(false);
             setStatusMessage('');
         }
     }, [currentMessage, isStreaming, conversationId]);
+
+    const [error, setError] = useState<string | null>(null);
+
+    const handleRetry = useCallback(() => {
+        setError(null);
+        handleSubmit();
+    }, [handleSubmit]);
 
     const handleTextareaChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setCurrentMessage(e.target.value);
@@ -335,7 +354,7 @@ export default function UnderstandPage() {
                                 <div className="mt-0 pt-0 border-t border-gray-300 dark:border-gray-700" id="references-section">
                                         <h4 className="text-sm font-semibold mb-2">References</h4>
                                     </div>
-                                <ReferencePaperCards citations={msg.references.citations} papers={papers} />
+                                <ReferencePaperCards citations={msg.references.citations} papers={papers} messageId={msg.id} messageIndex={index} />
                             </div>
                         )}
                 </div>
@@ -343,21 +362,28 @@ export default function UnderstandPage() {
         ));
     }, [messages, user, handleCitationClick]);
 
+    const [isCentered, setIsCentered] = useState(true);
+
+    const handleNewSubmit = useCallback(async (e: FormEvent | null = null) => {
+        if (e) {
+            e.preventDefault();
+        }
+        if (isCentered) {
+            setIsCentered(false);
+        }
+        await handleSubmit(e);
+    }, [isCentered, handleSubmit]);
+
     return (
         <div className="flex flex-col w-full h-[calc(100vh-64px)]">
-            <div className="flex-1 w-full overflow-y-auto" ref={messagesContainerRef}>
+            <div className={`${isCentered ? 'flex-0' : 'flex-1'} w-full overflow-y-auto`} ref={messagesContainerRef}>
                 <div className="mx-auto max-w-3xl space-y-4 p-4 w-full">
-                    {messages.length === 0 ? (
-                        <div className="text-center text-gray-500 my-4">
-                            Ask anything about your entire knowledge base.
-                        </div>
-                    ) : (
-                        memoizedMessages
-                    )}
+                    {messages.length > 0 && memoizedMessages}
                     {
                         isStreaming && streamingChunks.length > 0 && (
-                            <div className="relative group prose dark:prose-invert p-2 !max-w-full rounded-lg w-full text-primary dark:text-primary-foreground">
+                            <div className="relative group prose dark:prose-invert !max-w-full rounded-lg w-full text-primary dark:text-primary-foreground">
                                 <AnimatedMarkdown
+                                    className='!p-0'
                                     content={streamingChunks.join('')}
                                     remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
                                     rehypePlugins={[rehypeKatex]}
@@ -412,34 +438,47 @@ export default function UnderstandPage() {
                         )
                     }
                     <div ref={messagesEndRef} />
+                    {error && (
+                        <div className="flex flex-col items-center gap-2 p-4 text-red-500">
+                            <p>{error}</p>
+                            <Button onClick={handleRetry} variant="outline">
+                                Retry
+                            </Button>
+                        </div>
+                    )}
                 </div>
             </div>
-            <form onSubmit={handleSubmit} className="p-4" ref={chatInputFormRef}>
-                <div className="relative w-full md:max-w-3xl mx-auto">
-                    <Textarea
-                        value={currentMessage}
-                        onChange={handleTextareaChange}
-                        ref={inputMessageRef}
-                        placeholder="Ask something..."
-                        className="pr-16 resize-none w-full"
-                        disabled={isStreaming}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleSubmit(e);
-                            }
-                        }}
-                    />
-                    <Button
-                        type="submit"
-                        variant="ghost"
-                        className="absolute top-1/2 right-2 -translate-y-1/2"
-                        disabled={isStreaming}
-                    >
-                        <ArrowUp className="h-5 w-5" />
-                    </Button>
-                </div>
-            </form>
+            <div className={`p-4 transition-all duration-500 ${isCentered ? 'flex-1 flex flex-col justify-center items-center my-au' : ''}`}>
+                {isCentered && (
+                    <h1 className="text-2xl font-bold mb-4">What are you looking for?</h1>
+                )}
+                <form onSubmit={handleNewSubmit} className="w-full" ref={chatInputFormRef}>
+                    <div className="relative w-full md:max-w-3xl mx-auto">
+                        <Textarea
+                            value={currentMessage}
+                            onChange={handleTextareaChange}
+                            ref={inputMessageRef}
+                            placeholder={isCentered ? "Ask something..." : "Ask a follow-up"}
+                            className="pr-16 resize-none w-full"
+                            disabled={isStreaming}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleNewSubmit(e);
+                                }
+                            }}
+                        />
+                        <Button
+                            type="submit"
+                            variant="ghost"
+                            className="absolute top-1/2 right-2 -translate-y-1/2"
+                            disabled={isStreaming}
+                        >
+                            <ArrowUp className="h-5 w-5" />
+                        </Button>
+                    </div>
+                </form>
+            </div>
         </div>
     );
 }

@@ -7,9 +7,11 @@ import { groupConsecutiveNumbers } from "@/lib/utils";
 interface ReferencePaperCardsProps {
     citations: Citation[];
     papers: PaperItem[];
+    messageId?: string;
+    messageIndex: number;
 }
 
-export default function ReferencePaperCards({ citations, papers }: ReferencePaperCardsProps) {
+export default function ReferencePaperCards({ citations, papers, messageId, messageIndex }: ReferencePaperCardsProps) {
     const [expandedPaper, setExpandedPaper] = useState<string | null>(null);
 
     const toggleExpanded = (paperId: string) => {
@@ -32,9 +34,9 @@ export default function ReferencePaperCards({ citations, papers }: ReferencePape
                 const paper = papers.find(p => p.id === paperId);
                 if (!paper) return null;
                 const citationNumbers = paperCitations.map(c => parseInt(c.key));
-                console.log(`Paper ID: ${paper.id}, Citation Numbers: ${citationNumbers}`);
+                const cardId = messageId ? `${messageId}-reference-paper-card-${paper.id}` : `${messageIndex}-reference-paper-card-${paper.id}`;
                 return (
-                    <div key={paper.id} className="flex flex-col w-full items-start py-2 gap-2" id={`reference-paper-card-${paper.id}`}>
+                    <div key={`${paper.id}-${messageId || messageIndex}`} className="flex flex-col w-full items-start py-2 gap-2" id={cardId}>
                         <div className="flex flex-col items-center cursor-pointer bg-secondary rounded-lg p-1" onClick={() => toggleExpanded(paper.id)}>
                             <span className="text-xs font-bold text-gray-500">{groupConsecutiveNumbers(citationNumbers)}</span>
                         </div>

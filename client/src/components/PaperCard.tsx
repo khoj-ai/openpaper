@@ -218,7 +218,7 @@ export default function PaperCard({ paper, handleDelete, setPaper, minimalist = 
                                 src={paper.preview_url}
                                 title={paper.title}
                                 alt={paper.title}
-                                className={`${minimalist ? 'max-h-24' : 'max-h-48'} w-full object-cover object-top shadow-sm`}
+                                className={`${minimalist ? 'max-h-24 !my-0' : 'max-h-48'} w-full object-cover object-top shadow-sm`}
                             />
                         </div>
                     ) : !minimalist && (
