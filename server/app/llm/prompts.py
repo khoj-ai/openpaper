@@ -161,7 +161,7 @@ Display Math notation, even in LaTeX syntax, MUST be in a math code block.
 
 Inline Math notation should be wrapped in double dollar signs, like this: $$\\frac{{a}}{{b}} = c$$ or this: $$d_v$$.
 
-3. Format the evidence section as follows:
+3. Format the evidence section as follows, including both the start and end delimiters:
    ---EVIDENCE---
    @cite[1|paper_id]
    "First piece of evidence"

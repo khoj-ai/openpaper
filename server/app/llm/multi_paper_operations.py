@@ -82,7 +82,7 @@ class MultiPaperOperations(BaseLLMClient):
             user=current_user,
         )
 
-        formatted_paper_options = {paper.id: paper.title for paper in all_papers}
+        formatted_paper_options = {str(paper.id): paper.title for paper in all_papers}
 
         function_declarations = [
             read_file_function,
@@ -153,24 +153,49 @@ class MultiPaperOperations(BaseLLMClient):
 
                 if fn_name in function_maps:
                     try:
-                        yield {"type": "status", "content": f"{fn_name}"}
+                        paper_id_arg = fn_args.get("paper_id")
+                        query_arg = fn_args.get("query")
+                        paper_name = (
+                            formatted_paper_options.get(
+                                str(paper_id_arg), "knowledge base"
+                            )
+                            if paper_id_arg
+                            else "knowledge base"
+                        )
+                        display_query = f" '{query_arg}'" if query_arg else ""
+                        yield {
+                            "type": "status",
+                            "content": f"{fn_name} - {paper_name}{display_query}",
+                        }
                         result = function_maps[fn_name](
                             **fn_args,
                             current_user=current_user,
                             db=db,
                         )
 
+                        # Determine if we should preserve line numbers based on function type
+                        preserve_line_numbers = fn_name in [
+                            "search_file",
+                            "search_all_files",
+                        ]
+
                         if fn_name == "search_all_files" and isinstance(result, dict):
                             # If the function is search_all_files, we expect a dictionary of results
                             for paper_id, lines in result.items():
-                                evidence_collection.add_evidence(paper_id, lines)
+                                evidence_collection.add_evidence(
+                                    paper_id, lines, preserve_line_numbers=True
+                                )
 
                         # Update the evidence_collection based on the result of the function call
                         paper_id = fn_args.get("paper_id")
                         if paper_id and (
                             isinstance(result, str) or isinstance(result, list)
                         ):
-                            evidence_collection.add_evidence(paper_id, result)
+                            evidence_collection.add_evidence(
+                                paper_id,
+                                result,
+                                preserve_line_numbers=preserve_line_numbers,
+                            )
 
                     except Exception as e:
                         logger.error(f"Error executing function {fn_name}: {e}")

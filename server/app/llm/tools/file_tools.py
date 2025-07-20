@@ -192,8 +192,12 @@ def view_file(
         raise ValueError("Invalid range specified")
 
     all_lines = lines[range_start:range_end]
+    total_chunk = "\n".join(all_lines)
+    total_chunk = (
+        f"File content from lines {range_start + 1} to {range_end}:\n\n{total_chunk}"
+    )
 
-    return "\n".join(all_lines)
+    return total_chunk
 
 
 def read_abstract(paper_id: str, current_user: CurrentUser, db: Session) -> str:

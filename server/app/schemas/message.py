@@ -1,3 +1,4 @@
+import re
 from enum import Enum
 from typing import Dict, List, Union
 
@@ -16,13 +17,36 @@ class Evidence(BaseModel):
 
     paper_id: str
     content: List[str]
+    metadata: Dict[str, List[str]] = {}  # Store line numbers and other metadata
 
-    def add_content(self, content: Union[str, List[str]]) -> None:
+    def add_content(
+        self, content: Union[str, List[str]], with_line_numbers: bool = False
+    ) -> None:
         """Add content to the evidence"""
         if isinstance(content, str):
             self.content.append(content)
+            if with_line_numbers:
+                # Extract line numbers from content like "123: some text"
+                line_match = re.match(r"^(\d+):\s*(.+)", content)
+                if line_match:
+                    line_num = line_match.group(1)
+                    clean_content = line_match.group(2)
+                    if "line_numbers" not in self.metadata:
+                        self.metadata["line_numbers"] = []
+                    self.metadata["line_numbers"].append(line_num)
+                    # Replace with clean content
+                    self.content[-1] = clean_content
         else:
-            self.content.extend(content)
+            for item in content:
+                self.add_content(item, with_line_numbers)
+
+    def get_clean_content(self) -> List[str]:
+        """Get content without line number prefixes"""
+        return self.content
+
+    def get_line_numbers(self) -> List[str]:
+        """Get associated line numbers"""
+        return self.metadata.get("line_numbers", [])
 
 
 class EvidenceCollection(BaseModel):
@@ -36,28 +60,36 @@ class EvidenceCollection(BaseModel):
         for paper_id, content in evidence_dict.items():
             self.evidence[paper_id] = Evidence(paper_id=paper_id, content=content)
 
-    def add_evidence(self, paper_id: str, content: Union[str, List[str]]) -> None:
+    def add_evidence(
+        self,
+        paper_id: str,
+        content: Union[str, List[str]],
+        preserve_line_numbers: bool = False,
+    ) -> None:
         """Add evidence for a specific paper"""
         if paper_id not in self.evidence:
             self.evidence[paper_id] = Evidence(paper_id=paper_id, content=[])
-        self.evidence[paper_id].add_content(content)
+        self.evidence[paper_id].add_content(
+            content, with_line_numbers=preserve_line_numbers
+        )
 
     def add_tool_call(self, tool_call: ToolCall) -> None:
         """Add a tool call to the collection"""
         self.previous_tool_calls.append(tool_call)
 
     def get_evidence_dict(self) -> Dict[str, List[str]]:
-        """Convert to dictionary format for backward compatibility"""
+        """Convert to dictionary format for backward compatibility - returns clean content without line numbers"""
         return {
-            paper_id: evidence.content for paper_id, evidence in self.evidence.items()
+            paper_id: evidence.get_clean_content()
+            for paper_id, evidence in self.evidence.items()
         }
 
-    def get_evidence_dict_pretty(
-        self, paper_id_to_title: Dict[str, str]
-    ) -> Dict[str, List[str]]:
-        """Convert to dictionary format with paper titles for pretty display"""
+    def get_evidence_dict_with_metadata(
+        self,
+    ) -> Dict[str, Dict[str, Union[List[str], Dict]]]:
+        """Get evidence with metadata for agent context"""
         return {
-            paper_id_to_title.get(paper_id, paper_id): evidence.content
+            paper_id: {"content": evidence.content, "metadata": evidence.metadata}
             for paper_id, evidence in self.evidence.items()
         }
 
