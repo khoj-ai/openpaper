@@ -89,6 +89,7 @@ class BaseLLMClient:
         function_declarations: Optional[List[Dict]] = None,
         model_type: ModelType = ModelType.DEFAULT,
         provider: Optional[LLMProvider] = None,
+        enable_thinking: bool = True,
         **kwargs,
     ) -> LLMResponse:
         """Generate content using the specified provider"""
@@ -99,6 +100,7 @@ class BaseLLMClient:
             system_prompt=system_prompt,
             function_declarations=function_declarations,
             history=history,
+            enable_thinking=enable_thinking,
             **kwargs,
         )
 

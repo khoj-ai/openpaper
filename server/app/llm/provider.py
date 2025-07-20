@@ -20,6 +20,8 @@ from google.genai.types import (
     FunctionCallingConfigMode,
     FunctionDeclaration,
     GenerateContentConfig,
+    GenerateContentResponse,
+    ThinkingConfig,
     Tool,
     ToolConfig,
 )
@@ -47,11 +49,13 @@ class LLMResponse:
         text: str,
         model: str,
         provider: LLMProvider,
+        thinking: Optional[str] = None,
         tool_calls: Optional[List[ToolCall]] = None,
     ):
         self.text = text
         self.model = model
         self.provider = provider
+        self.thinking = thinking
         self.tool_calls = tool_calls or []
 
 
@@ -146,9 +150,19 @@ class GeminiProvider(BaseLLMProvider):
         history: Optional[List[Message]] = None,
         system_prompt: str = "",
         function_declarations: Optional[List[Dict]] = None,
+        enable_thinking: bool = False,
         **kwargs,
     ) -> LLMResponse:
         tool_options: List[FunctionDeclaration] = []
+
+        def get_thought(response: GenerateContentResponse) -> str:
+            thoughts = ""
+            if response.candidates and response.candidates[0].content:
+                for part in response.candidates[0].content.parts or []:
+                    if part.thought:
+                        thoughts += str(part.text) + "\n"
+            return thoughts.strip()
+
         # Cast function declarations to Gemini's FunctionDeclaration type
         if function_declarations:
             tool_options = [
@@ -167,6 +181,11 @@ class GeminiProvider(BaseLLMProvider):
             )
             config.automatic_function_calling = AutomaticFunctionCallingConfig(
                 disable=True  # Disable automatic function calling
+            )
+
+        if enable_thinking:
+            config.thinking_config = ThinkingConfig(
+                include_thoughts=True,
             )
 
         if system_prompt:
@@ -194,10 +213,13 @@ class GeminiProvider(BaseLLMProvider):
                 elif fn.name == "STOP":
                     tool_calls.append(ToolCall(name="stop", args={}))
 
+        thinking = get_thought(response)
+
         return LLMResponse(
             text=response.text or "",
             model=model,
             provider=LLMProvider.GEMINI,
+            thinking=thinking,
             tool_calls=tool_calls,
         )
 

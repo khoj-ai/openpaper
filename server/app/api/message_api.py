@@ -15,7 +15,11 @@ from app.database.telemetry import track_event
 from app.llm.base import LLMProvider
 from app.llm.citation_handler import CitationHandler
 from app.llm.operations import operations
-from app.schemas.message import EvidenceCollection, ResponseStyle
+from app.schemas.message import (
+    EvidenceCleaningResponse,
+    EvidenceCollection,
+    ResponseStyle,
+)
 from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException
@@ -116,11 +120,17 @@ async def chat_message_everything(
                     yield f"{json_response}{END_DELIMITER}"
                     return
 
+                cleaned_evidence = await operations.clean_evidence(
+                    evidence_collection=evidence_collection,
+                    original_question=request.user_query,
+                    llm_provider=request.llm_provider,
+                )
+
                 async for chunk in operations.chat_with_everything(
                     question=request.user_query,
                     llm_provider=request.llm_provider,
                     user_references=request.user_references,
-                    evidence_gathered=evidence_collection,
+                    evidence_gathered=cleaned_evidence,
                     conversation_id=request.conversation_id,
                     current_user=current_user,
                     db=db,

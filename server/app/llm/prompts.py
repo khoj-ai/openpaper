@@ -136,13 +136,29 @@ PREVIOUS_TOOL_CALLS_MESSAGE = """
 You are on iteration {iteration}/{total_iterations}:
 """
 
+EVIDENCE_CLEANING_PROMPT = """You are tasked with filtering evidence snippets for relevance to a research question.
+
+Original Question: {question}
+
+For each paper's evidence snippets, classify each as:
+- KEEP: Directly relevant to answering the question
+- SUMMARIZE: Contains some relevant information but is verbose/redundant
+- DROP: Not relevant to the question
+
+Evidence to filter:
+{evidence}
+
+Respond with a JSON object structured as:
+{schema}
+"""
+
 ANSWER_EVIDENCE_BASED_QUESTION_SYSTEM_PROMPT = """
 You are an excellent researcher who provides precise, evidence-based answers from academic papers. Your responses must always include specific text evidence from the paper. You give holistic answers, not just snippets. Help the user understand the content across a library of papers. Your answers should be clear, concise, and informative.
 
 These were the papers available to you to gather evidence from:
 {available_papers}
 
-Your research assistant has already undertaken a thorough investigation and gathered the following evidence from across the papers in the library:
+Your research assistant has already undertaken a thorough investigation and gathered the following evidence from across the papers in the library. Bear in mind that these may be snippets of the papers, not the full text. Use this evidence to inform your answer to the user's question.
 
 {evidence_gathered}
 

@@ -7,9 +7,11 @@ from typing import AsyncGenerator, Dict, List, Optional, Sequence, Union
 from app.database.crud.paper_crud import paper_crud
 from app.llm.base import BaseLLMClient, ModelType
 from app.llm.citation_handler import CitationHandler
+from app.llm.json_parser import JSONParser
 from app.llm.prompts import (
     ANSWER_EVIDENCE_BASED_QUESTION_MESSAGE,
     ANSWER_EVIDENCE_BASED_QUESTION_SYSTEM_PROMPT,
+    EVIDENCE_CLEANING_PROMPT,
     EVIDENCE_GATHERING_MESSAGE,
     EVIDENCE_GATHERING_SYSTEM_PROMPT,
     PREVIOUS_TOOL_CALLS_MESSAGE,
@@ -28,7 +30,7 @@ from app.llm.tools.file_tools import (
     view_file_function,
 )
 from app.llm.tools.meta_tools import stop_function
-from app.schemas.message import EvidenceCollection
+from app.schemas.message import EvidenceCleaningResponse, EvidenceCollection
 from app.schemas.user import CurrentUser
 from fastapi import Depends
 from sqlalchemy.orm import Session
@@ -120,7 +122,9 @@ class MultiPaperOperations(BaseLLMClient):
             evidence_gathering_prompt = EVIDENCE_GATHERING_SYSTEM_PROMPT.format(
                 available_papers=formatted_paper_options,
                 previous_tool_calls=prev_tool_calls_message,
-                gathered_evidence=json.dumps(evidence_collection.get_evidence_dict()),
+                gathered_evidence=json.dumps(
+                    evidence_collection.get_evidence_dict_with_metadata()
+                ),
             )
 
             formatted_prompt = EVIDENCE_GATHERING_MESSAGE.format(
@@ -138,6 +142,7 @@ class MultiPaperOperations(BaseLLMClient):
                 model_type=ModelType.DEFAULT,
                 function_declarations=function_declarations,
                 provider=llm_provider,
+                enable_thinking=True,
             )
 
             for fn_selected in llm_response.tool_calls:
@@ -162,11 +167,24 @@ class MultiPaperOperations(BaseLLMClient):
                             if paper_id_arg
                             else "knowledge base"
                         )
+
+                        if paper_id_arg and paper_id_arg not in formatted_paper_options:
+                            logger.warning(
+                                f"Paper ID {paper_id_arg} not found in available papers."
+                            )
+                            continue
+
                         display_query = f" '{query_arg}'" if query_arg else ""
+
+                        pretty_fn_name = fn_name.replace("_", " ").title()
+
                         yield {
                             "type": "status",
-                            "content": f"{fn_name} - {paper_name}{display_query}",
+                            "content": f"{pretty_fn_name} - {paper_name}{display_query}",
                         }
+
+                        logger.debug(f"Thinking process - {llm_response.thinking}")
+
                         result = function_maps[fn_name](
                             **fn_args,
                             current_user=current_user,
@@ -209,6 +227,77 @@ class MultiPaperOperations(BaseLLMClient):
             "content": evidence_collection.get_evidence_dict(),
         }
 
+    async def clean_evidence(
+        self,
+        evidence_collection: EvidenceCollection,
+        original_question: str,
+        llm_provider: Optional[LLMProvider] = None,
+    ) -> EvidenceCollection:
+        """
+        Clean and filter evidence to remove irrelevant snippets before final answer generation
+        """
+        evidence_dict = evidence_collection.get_evidence_dict()
+
+        formatted_prompt = EVIDENCE_CLEANING_PROMPT.format(
+            question=original_question,
+            evidence=json.dumps(evidence_dict, indent=2),
+            schema=EvidenceCleaningResponse.model_json_schema(),
+        )
+
+        message_content = [TextContent(text=formatted_prompt)]
+
+        # Get LLM assessment of evidence relevance
+        llm_response = self.generate_content(
+            system_prompt="You are a research assistant that filters evidence for relevance.",
+            contents=message_content,
+            model_type=ModelType.DEFAULT,
+            provider=llm_provider,
+        )
+
+        try:
+            if llm_response and llm_response.text:
+                filtering_instructions = JSONParser.validate_and_extract_json(
+                    llm_response.text
+                )
+                filtering_instructions = EvidenceCleaningResponse.model_validate(
+                    filtering_instructions
+                )
+                cleaned_collection = EvidenceCollection()
+
+                # Apply filtering instructions
+                for paper_id, instructions in filtering_instructions.papers.items():
+                    if paper_id in evidence_dict:
+                        original_snippets = evidence_dict[paper_id]
+
+                        # Keep specified snippets
+                        for idx in instructions.keep:
+                            if 0 <= idx < len(original_snippets):
+                                cleaned_collection.add_evidence(
+                                    paper_id, [original_snippets[idx]]
+                                )
+
+                        # Add summary for snippets to be summarized
+                        if instructions.summarize and instructions.summary:
+                            cleaned_collection.add_evidence(
+                                paper_id, [instructions.summary]
+                            )
+
+                logger.info(
+                    f"Evidence cleaning complete. Original: {len(evidence_dict)} papers, "
+                    f"Cleaned: {len(cleaned_collection.get_evidence_dict())} papers"
+                )
+
+                return cleaned_collection
+            else:
+                logger.warning("Empty response from LLM during evidence cleaning.")
+                return evidence_collection
+
+        except Exception as e:
+            logger.warning(
+                f"Evidence cleaning failed: {e}. Returning original evidence."
+            )
+            return evidence_collection
+
     async def chat_with_everything(
         self,
         conversation_id: str,
@@ -242,6 +331,8 @@ class MultiPaperOperations(BaseLLMClient):
         formatted_paper_options = {
             str(paper.id): str(paper.title) for paper in all_papers
         }
+
+        logger.debug(f"Evidence gathered: {evidence_gathered.get_evidence_dict()}")
 
         formatted_system_prompt = ANSWER_EVIDENCE_BASED_QUESTION_SYSTEM_PROMPT.format(
             evidence_gathered=evidence_gathered.get_evidence_dict(),
