@@ -285,7 +285,7 @@ export default function UnderstandPage() {
                     data-message-index={index}
                     className={`relative group prose dark:prose-invert !max-w-full ${msg.role === 'user'
                         ? 'text-blue-800 dark:text-blue-200 text-lg w-fit animate-fade-in line-clamp-3 border-b-2 rounded-none'
-                        : 'w-full text-primary p-2'
+                        : 'w-full text-primary'
                         }`}
                 >
                     <Markdown
