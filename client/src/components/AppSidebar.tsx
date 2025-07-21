@@ -1,6 +1,6 @@
 "use client"
 
-import { AlertTriangle, Clock, FileText, Globe2, Home, LogOut, MessageCircleQuestion, Moon, Route, Sun, TelescopeIcon, User, X } from "lucide-react";
+import { AlertTriangle, ChevronDown, Clock, FileText, Globe2, Home, LogOut, MessageCircleQuestion, Moon, Route, Sun, TelescopeIcon, User, X } from "lucide-react";
 
 import {
     Sidebar,
@@ -34,6 +34,8 @@ import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isStorageNearL
 import Image from "next/image";
 import Link from "next/link";
 import { PaperStatus } from "@/components/utils/PdfStatus";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
+import { formatDate } from "@/lib/utils";
 
 // Menu items.
 const items = [
@@ -221,35 +223,48 @@ export function AppSidebar() {
                                     </SidebarMenuItem>
                                 </SidebarMenuItem>
                             ))}
-                            {
-                                allPapers && allPapers.length > 0 && (
-                                    <SidebarMenuItem>
-                                        <SidebarMenuButton>
-                                            <Clock size={16} />
-                                            <span>Queue</span>
-                                        </SidebarMenuButton>
-                                        <SidebarMenuSub>
-                                            {
-                                                allPapers.map((paper) => (
-                                                    <SidebarMenuSubItem key={paper.id}>
-                                                        <SidebarMenuSubButton asChild>
-                                                            <a
-                                                                href={`/paper/${paper.id}`}
-                                                                className="text-xs font-medium w-full h-fit my-1"
-                                                            >
-                                                                {paper.title}
-                                                            </a>
-                                                        </SidebarMenuSubButton>
-                                                    </SidebarMenuSubItem>
-                                                ))
-                                            }
-                                        </SidebarMenuSub>
-                                    </SidebarMenuItem>
-                                )
-                            }
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>
+                <Collapsible defaultOpen className="group/collapsible">
+                    <SidebarGroup>
+                        <SidebarGroupLabel asChild>
+                            <CollapsibleTrigger>
+                                Papers
+                                <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                            </CollapsibleTrigger>
+                        </SidebarGroupLabel>
+                        <CollapsibleContent>
+                            <SidebarGroupContent>
+                                {
+                                    allPapers && allPapers.length > 0 && (
+                                        <SidebarMenuItem>
+                                            <SidebarMenuSub>
+                                                {
+                                                    allPapers.map((paper) => (
+                                                        <SidebarMenuSubItem key={paper.id}>
+                                                            <SidebarMenuSubButton asChild>
+                                                                <a
+                                                                    href={`/paper/${paper.id}`}
+                                                                    className="text-xs font-medium w-full h-fit my-1 line-clamp-2"
+                                                                >
+                                                                    {paper.title}
+                                                                    <span className="text-xs text-muted-foreground">
+                                                                        {formatDate(paper.created_at || '')}
+                                                                    </span>
+                                                                </a>
+                                                            </SidebarMenuSubButton>
+                                                        </SidebarMenuSubItem>
+                                                    ))
+                                                }
+                                            </SidebarMenuSub>
+                                        </SidebarMenuItem>
+                                    )
+                                }
+                            </SidebarGroupContent>
+                        </CollapsibleContent>
+                    </SidebarGroup>
+                </Collapsible>
             </SidebarContent>
             <SidebarFooter>
                 {/* Subscription Warning */}
@@ -306,7 +321,7 @@ export function AppSidebar() {
                                 <SidebarMenuButton className="flex items-center gap-2">
                                     <Avatar className="h-6 w-6">
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        {user.picture ? (<img src={user.picture} alt={user.name} /> ) : ( <User size={16} /> )}
+                                        {user.picture ? (<img src={user.picture} alt={user.name} />) : (<User size={16} />)}
                                     </Avatar>
                                     <span className="truncate">{user.name}</span>
                                 </SidebarMenuButton>
@@ -316,7 +331,7 @@ export function AppSidebar() {
                                     <div className="flex items-center gap-3">
                                         <Avatar className="h-10 w-10">
                                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            {user.picture ? ( <img src={user.picture} alt={user.name} /> ) : ( <User size={24} />)}
+                                            {user.picture ? (<img src={user.picture} alt={user.name} />) : (<User size={24} />)}
                                         </Avatar>
                                         <div>
                                             <h3 className="font-medium">{user.name}</h3>
