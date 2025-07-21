@@ -1,6 +1,7 @@
 import logging
 
-from app.auth.dependencies import get_db, get_required_user
+from app.auth.dependencies import get_required_user
+from app.database.database import get_db
 from app.database.models import Annotation, Highlight, Paper
 from app.database.queries.search import search_knowledge_base
 from app.database.telemetry import track_event

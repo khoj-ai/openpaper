@@ -9,7 +9,15 @@ settings = Settings()
 
 SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    pool_size=20,  # default 5
+    max_overflow=30,  # default 10
+    pool_timeout=60,  # default 30s
+    pool_pre_ping=True,  # Validate connections before use
+    pool_recycle=3600,  # default 3600
+)
+
 SessionLocal: sessionmaker[Session] = sessionmaker(
     autocommit=False, autoflush=False, bind=engine
 )

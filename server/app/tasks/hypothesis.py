@@ -25,6 +25,7 @@ def process_hypothesis(job_id: UUID, user_id: UUID) -> None:
     TODO: Add retry logic for failed steps and papers
     """
     try:
+        # TODO change this to use the helper methods
         db = SessionLocal()
         logger.info(f"Starting hypothesis research for job {job_id} by user {user_id}")
 

@@ -13,6 +13,8 @@ import { fetchFromApi } from "@/lib/api";
 import { UserSubscription } from "@/lib/schema";
 import PricingTable from "./pricingTable";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
+import { useRouter } from "next/navigation";
 
 const monthlyPrice = 12;
 const annualPrice = 8;
@@ -26,6 +28,9 @@ export default function PricingPage() {
     const [isPortalLoading, setIsPortalLoading] = useState(false);
     const [isIntervalChangeLoading, setIsIntervalChangeLoading] = useState(false);
     const [isResubscribeLoading, setIsResubscribeLoading] = useState(false);
+    const { user } = useAuth();
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const router = useRouter();
 
     const annualSavings = (monthlyPrice - annualPrice) * 12;
 
@@ -50,8 +55,12 @@ export default function PricingPage() {
             }
         };
 
-        fetchSubscription();
-    }, []);
+        if (user) {
+            fetchSubscription();
+        } else {
+            setLoading(false);
+        }
+    }, [user]);
 
     const handleManageSubscription = async () => {
         setIsPortalLoading(true);
@@ -598,7 +607,9 @@ export default function PricingPage() {
                                     : "bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900"
                             )}
                             onClick={() => {
-                                if (canResubscribe) {
+                                if (!user) {
+                                    setIsModalOpen(true);
+                                } else if (canResubscribe) {
                                     handleResubscribe();
                                 } else {
                                     setIsCheckoutOpen(true);
@@ -702,6 +713,25 @@ export default function PricingPage() {
                     </DialogContent>
                 </Dialog>
             </div>
+
+            <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Please Log In</DialogTitle>
+                        <DialogDescription>
+                            You need to be logged in to view the pricing details.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex justify-end space-x-2">
+                        <Button variant="outline" onClick={() => setIsModalOpen(false)}>
+                            Close
+                        </Button>
+                        <Button onClick={() => router.push("/login")}>
+                            Log In
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
