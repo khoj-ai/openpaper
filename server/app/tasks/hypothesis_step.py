@@ -38,6 +38,7 @@ def process_hypothesis_step(
     Returns:
         bool: (success)
     """
+    # TODO change this to use the helper methods
     db = SessionLocal()
     logger.info(f"Processing hypothesis step {step_order + 1}: {step.question}")
 
