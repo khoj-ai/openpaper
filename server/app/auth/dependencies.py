@@ -19,7 +19,7 @@ SESSION_COOKIE_NAME = "session_token"
 api_key_header = APIKeyHeader(name="Authorization", auto_error=False)
 
 
-async def get_current_user(
+def get_current_user(
     request: Request,
     db: Session = Depends(get_db),
     authorization: str = Depends(api_key_header),
