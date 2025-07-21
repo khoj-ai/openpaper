@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/popover";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useIsDarkMode } from "@/hooks/useDarkMode";
-import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isStorageNearLimit, isPaperUploadNearLimit } from "@/hooks/useSubscription";
+import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isStorageNearLimit, isPaperUploadNearLimit, isChatCreditAtLimit, isChatCreditNearLimit } from "@/hooks/useSubscription";
 import Image from "next/image";
 import Link from "next/link";
 import { PaperStatus } from "@/components/utils/PdfStatus";
@@ -65,13 +65,6 @@ const items = [
         requiresAuth: true,
         beta: true,
     },
-    {
-        title: "Feedback",
-        url: "https://github.com/khoj-ai/openpaper/issues",
-        icon: MessageCircleQuestion,
-        requiresAuth: false,
-        beta: false,
-    }
 ]
 
 
@@ -160,6 +153,24 @@ export function AppSidebar() {
                 key: 'upload-near-limit',
                 title: 'Upload limit approaching',
                 description: 'Consider upgrading your plan.',
+            };
+        }
+
+        if (isChatCreditAtLimit(subscription)) {
+            return {
+                type: 'error' as const,
+                key: 'chat-credit-limit',
+                title: 'Chat credits exhausted',
+                description: 'Upgrade your plan to continue using chat features.',
+            }
+        }
+
+        if (isChatCreditNearLimit(subscription)) {
+            return {
+                type: 'warning' as const,
+                key: 'chat-credit-near-limit',
+                title: 'Chat credits nearly exhausted',
+                description: 'Consider upgrading your plan to avoid interruptions.',
             };
         }
 
@@ -312,6 +323,13 @@ export function AppSidebar() {
                                             <p className="text-sm text-muted-foreground">{user.email}</p>
                                         </div>
                                     </div>
+                                    {/* Feedback section */}
+                                    <Link href="https://github.com/khoj-ai/openpaper/issues" target="_blank" className="w-full">
+                                        <Button variant="outline" className="w-full justify-start">
+                                            <MessageCircleQuestion size={16} className="mr-2" />
+                                            Feedback
+                                        </Button>
+                                    </Link>
                                     <Link href="/pricing" className="w-full">
                                         <Button
                                             variant="outline"

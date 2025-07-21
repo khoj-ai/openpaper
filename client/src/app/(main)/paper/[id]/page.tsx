@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
 import { useParams } from 'next/navigation';
 import { useState, useEffect, FormEvent, useRef, useCallback, useMemo } from 'react';
-import { useSubscription, nextMonday } from '@/hooks/useSubscription';
+import { useSubscription, nextMonday, getChatCreditUsagePercentage, isChatCreditAtLimit, isChatCreditNearLimit } from '@/hooks/useSubscription';
 
 // Reference to react-markdown documents: https://github.com/remarkjs/react-markdown?tab=readme-ov-file
 import Markdown from 'react-markdown';
@@ -1141,9 +1141,9 @@ export default function PaperView() {
 
         const { chat_credits_used, chat_credits_remaining } = subscription.usage;
         const total = chat_credits_used + chat_credits_remaining;
-        const usagePercentage = total > 0 ? (chat_credits_used / total) * 100 : 0;
+        const usagePercentage = getChatCreditUsagePercentage(subscription);
 
-        if (usagePercentage >= 100) {
+        if (isChatCreditAtLimit(subscription)) {
             console.log("Chat credits exceeded 100% usage, showing upgrade toast.");
             toast.info('Nice! You have used your chat credits for the week. Feel free to upgrade your plan to use more.', {
                 duration: 5000,
@@ -1161,9 +1161,9 @@ export default function PaperView() {
             remaining: chat_credits_remaining,
             total,
             usagePercentage,
-            showWarning: usagePercentage > 75,
-            isNearLimit: usagePercentage > 75,
-            isCritical: usagePercentage > 95
+            showWarning: isChatCreditNearLimit(subscription),
+            isNearLimit: isChatCreditNearLimit(subscription),
+            isCritical: isChatCreditNearLimit(subscription, 95)
         });
     }, [subscription]);
 
