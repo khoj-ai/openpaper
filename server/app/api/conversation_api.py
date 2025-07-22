@@ -64,10 +64,17 @@ async def get_everything_conversations(
             conversable_type=ConversableType.EVERYTHING,
             user=current_user,
         )
-        result = [{"id": str(conv.id), "title": conv.title} for conv in conversations]
+        result = [
+            {
+                "id": str(conv.id),
+                "title": conv.title,
+                "updated_at": conv.updated_at.isoformat(),
+            }
+            for conv in conversations
+        ]
         return JSONResponse(status_code=200, content=result)
     except Exception as e:
-        logger.error(f"Error fetching EVERYTHING conversations: {e}")
+        logger.error(f"Error fetching EVERYTHING conversations: {e}", exc_info=True)
         return JSONResponse(
             status_code=400,
             content={"message": f"Failed to fetch conversations: {str(e)}"},
