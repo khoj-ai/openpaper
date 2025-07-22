@@ -316,3 +316,15 @@ Research Results:
 {steps_results}
 Response Schema: {schema}
 """
+
+RENAME_CONVERSATION_SYSTEM_PROMPT = """
+You are an expert at summarizing conversations. Your task is to generate a concise and descriptive title for the given chat history. The title should be no more than 5 words and should accurately reflect the main topic of the conversation.
+"""
+
+RENAME_CONVERSATION_USER_MESSAGE = """
+Given the following chat history, generate a new title for the conversation:
+
+{chat_history}
+
+New Title:
+"""

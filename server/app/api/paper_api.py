@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from app.auth.dependencies import get_current_user, get_required_user
 from app.database.crud.annotation_crud import annotation_crud
-from app.database.crud.coversation_crud import conversation_crud
+from app.database.crud.conversation_crud import conversation_crud
 from app.database.crud.highlight_crud import highlight_crud
 from app.database.crud.paper_crud import PaperUpdate, paper_crud
 from app.database.crud.paper_note_crud import (

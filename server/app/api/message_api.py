@@ -7,7 +7,7 @@ from typing import List, Optional, Union
 from app.auth.dependencies import get_required_user
 
 # Wow I just saw this spelling error. Might leave for proof of humanity. DATE: 2025-07-16.
-from app.database.crud.coversation_crud import conversation_crud
+from app.database.crud.conversation_crud import conversation_crud
 from app.database.crud.message_crud import MessageCreate, message_crud
 from app.database.database import get_db
 from app.database.models import ConversableType
@@ -212,6 +212,11 @@ async def chat_message_everything(
                         references=evidence if evidence else None,
                     ),
                     current_user=current_user,
+                )
+
+                # Rename the conversation based on the chat history
+                operations.rename_conversation(
+                    db=db, conversation_id=request.conversation_id, user=current_user
                 )
 
                 # Track chat message event

@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 from app.auth.dependencies import get_current_user, get_required_user
-from app.database.crud.coversation_crud import (
+from app.database.crud.conversation_crud import (
     ConversationCreate,
     ConversationUpdate,
     conversation_crud,
@@ -25,6 +25,53 @@ logger = logging.getLogger(__name__)
 
 # Create API router with prefix
 conversation_router = APIRouter()
+
+
+@conversation_router.post("/{conversation_id}/rename")
+async def rename_conversation(
+    conversation_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+) -> JSONResponse:
+    """Rename a conversation based on its chat history"""
+    try:
+        new_name = operations.rename_conversation(
+            db=db, conversation_id=conversation_id, user=current_user
+        )
+        if new_name:
+            return JSONResponse(status_code=200, content={"new_title": new_name})
+        else:
+            raise ValueError("Failed to rename conversation. No new title generated.")
+    except ValueError as e:
+        return JSONResponse(status_code=404, content={"message": str(e)})
+    except Exception as e:
+        logger.error(f"Error renaming conversation: {e}")
+        return JSONResponse(
+            status_code=400,
+            content={"message": f"Failed to rename conversation: {str(e)}"},
+        )
+
+
+@conversation_router.get("/everything")
+async def get_everything_conversations(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+) -> JSONResponse:
+    """Get all conversations with conversable_type EVERYTHING"""
+    try:
+        conversations = conversation_crud.get_multi_by(
+            db,
+            conversable_type=ConversableType.EVERYTHING,
+            user=current_user,
+        )
+        result = [{"id": str(conv.id), "title": conv.title} for conv in conversations]
+        return JSONResponse(status_code=200, content=result)
+    except Exception as e:
+        logger.error(f"Error fetching EVERYTHING conversations: {e}")
+        return JSONResponse(
+            status_code=400,
+            content={"message": f"Failed to fetch conversations: {str(e)}"},
+        )
 
 
 @conversation_router.get("/{conversation_id}")

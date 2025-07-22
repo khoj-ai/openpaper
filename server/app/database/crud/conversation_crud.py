@@ -40,6 +40,16 @@ class ConversationCRUD(CRUDBase[Conversation, ConversationCreate, ConversationUp
             .all()
         )
 
+    def get_conversation_by_id(
+        self, db: Session, *, conversation_id: UUID, user_id: UUID
+    ) -> Optional[Conversation]:
+        """Get a conversation by its ID"""
+        return (
+            db.query(Conversation)
+            .filter(Conversation.id == conversation_id, Conversation.user_id == user_id)
+            .first()
+        )
+
 
 # Create a single instance to use throughout the application
 conversation_crud = ConversationCRUD(Conversation)
