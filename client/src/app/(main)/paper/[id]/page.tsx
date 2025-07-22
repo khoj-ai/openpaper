@@ -1145,7 +1145,7 @@ export default function PaperView() {
 
         if (isChatCreditAtLimit(subscription)) {
             console.log("Chat credits exceeded 100% usage, showing upgrade toast.");
-            toast.info('Nice! You have used your chat credits for the week. Feel free to upgrade your plan to use more.', {
+            toast.info('Nice! You have used your chat credits for the week. Upgrade your plan to use more.', {
                 duration: 5000,
                 action: {
                     label: 'Upgrade',

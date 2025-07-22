@@ -293,7 +293,7 @@ export function AppSidebar() {
                             <CollapsibleTrigger>
                                 <SidebarMenuButton asChild>
                                     <span className="flex items-center gap-2 w-full">
-                                        Discover
+                                        Chats
                                         <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
                                     </span>
                                 </SidebarMenuButton>
@@ -307,7 +307,7 @@ export function AppSidebar() {
                                                     <SidebarMenuSubItem key={conversation.id}>
                                                         <SidebarMenuSubButton asChild>
                                                             <Link
-                                                                href={`/everything/${conversation.id}`}
+                                                                href={`/understand?id=${conversation.id}`}
                                                                 className="text-xs font-medium w-full h-fit my-1"
                                                             >
                                                                 <p className="line-clamp-3">
@@ -322,8 +322,8 @@ export function AppSidebar() {
                                         {everythingConversations.length > 7 && (
                                             <SidebarMenuItem>
                                                 <SidebarMenuButton asChild>
-                                                    <Link href="/ask" className="text-xs font-medium h-fit my-1">
-                                                        {everythingConversations.length} Explorations <ArrowRight className="inline h-3 w-3" />
+                                                    <Link href="/understand/past" className="text-xs font-medium h-fit my-1">
+                                                        {everythingConversations.length} Chats <ArrowRight className="inline h-3 w-3" />
                                                     </Link>
                                                 </SidebarMenuButton>
                                             </SidebarMenuItem>

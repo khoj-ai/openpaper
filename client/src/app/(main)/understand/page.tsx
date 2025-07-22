@@ -1,10 +1,12 @@
 
 'use client';
 
+import { useSubscription, isChatCreditAtLimit } from '@/hooks/useSubscription';
 import { AnimatedMarkdown } from '@/components/AnimatedMarkdown';
 import { Button } from '@/components/ui/button';
 import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
-import { useState, useEffect, FormEvent, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, FormEvent, useRef, useCallback, useMemo, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 // Reference to react-markdown documents: https://github.com/remarkjs/react-markdown?tab=readme-ov-file
 import Markdown from 'react-markdown';
@@ -31,6 +33,7 @@ import {
 import { useAuth } from '@/lib/auth';
 import { PaperItem } from '@/components/AppSidebar';
 import ReferencePaperCards from '@/components/ReferencePaperCards';
+import Link from 'next/link';
 
 interface ChatRequestBody {
     user_query: string;
@@ -48,7 +51,8 @@ const chatLoadingMessages = [
     "Synthesizing findings...",
 ]
 
-export default function UnderstandPage() {
+function UnderstandPageContent() {
+    const searchParams = useSearchParams();
     const { user, loading: authLoading } = useAuth();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [papers, setPapers] = useState<PaperItem[]>([]);
@@ -71,6 +75,20 @@ export default function UnderstandPage() {
 
     const END_DELIMITER = "END_OF_STREAM";
 
+    const { subscription, loading: subscriptionLoading } = useSubscription();
+    const chatCreditLimitReached = isChatCreditAtLimit(subscription);
+
+    useEffect(() => {
+        if (chatCreditLimitReached) {
+            toast.info("Nice! You have used your chat credits for the week. Upgrade your plan to use more.", {
+                action: {
+                    label: "See plans",
+                    onClick: () => window.location.href = "/pricing",
+                },
+            });
+        }
+    }, [chatCreditLimitReached]);
+
     const handleCitationClick = useCallback((key: string, messageIndex: number) => {
         const message = messages[messageIndex];
         if (!message) return;
@@ -91,6 +109,31 @@ export default function UnderstandPage() {
             window.location.href = `/login`;
         }
     }, [authLoading, user]);
+
+    const fetchMessages = useCallback(async (id: string) => {
+        try {
+            const response = await fetchFromApi(`/api/conversation/${id}`);
+            if (response && response.messages) {
+                setMessages(response.messages);
+                setConversationId(id);
+                setIsCentered(false);
+            }
+        } catch (error) {
+            console.error("Error fetching messages:", error);
+            toast.error("Failed to load conversation history.");
+        }
+    }, []);
+
+    useEffect(() => {
+        const id = searchParams.get('id');
+        if (id && user) {
+            fetchMessages(id);
+        } else if (!id) {
+            setMessages([]);
+            setConversationId(null);
+            setIsCentered(true);
+        }
+    }, [searchParams, user, fetchMessages]);
 
     useEffect(() => {
         const fetchPapers = async () => {
@@ -304,7 +347,7 @@ export default function UnderstandPage() {
                 <div
                     data-message-index={index}
                     className={`relative group prose dark:prose-invert !max-w-full ${msg.role === 'user'
-                        ? 'text-blue-800 dark:text-blue-200 text-lg w-fit animate-fade-in line-clamp-3 border-b-2 rounded-none'
+                        ? 'text-lg w-fit animate-fade-in line-clamp-3 mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-600 px-2 py-2 rounded-xl border border-blue-100 dark:border-gray-600'
                         : 'w-full text-primary'
                         }`}
                 >
@@ -469,9 +512,9 @@ export default function UnderstandPage() {
                             value={currentMessage}
                             onChange={handleTextareaChange}
                             ref={inputMessageRef}
-                            placeholder={isCentered ? "Ask something..." : "Ask a follow-up"}
+                            placeholder={isCentered ? "Discover something in your papers..." : "Ask a follow-up"}
                             className="pr-16 resize-none w-full"
-                            disabled={isStreaming || papers.length === 0}
+                            disabled={isStreaming || papers.length === 0 || chatCreditLimitReached}
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter' && !e.shiftKey) {
                                     e.preventDefault();
@@ -483,13 +526,25 @@ export default function UnderstandPage() {
                             type="submit"
                             variant="ghost"
                             className="absolute top-1/2 right-2 -translate-y-1/2"
-                            disabled={isStreaming || papers.length === 0}
-                        >
+                            disabled={isStreaming || papers.length === 0 || chatCreditLimitReached}>
                             <ArrowUp className="h-5 w-5" />
                         </Button>
                     </div>
+                    {chatCreditLimitReached && (
+                        <div className="text-center text-sm text-secondary-foreground mt-2">
+                            Nice! You have used your chat credits for the week. <Link href="/pricing" className='text-blue-500 hover:underline' >Upgrade your plan to use more.</Link>
+                        </div>
+                    )}
                 </form>
             </div>
         </div>
+    );
+}
+
+export default function UnderstandPage() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <UnderstandPageContent />
+        </Suspense>
     );
 }
