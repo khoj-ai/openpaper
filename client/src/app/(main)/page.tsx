@@ -427,7 +427,7 @@ export default function Home() {
 							</div>
 
 							{/* Papers grid */}
-							<div className="w-full space-y-4">
+							<div className="w-full space-y-4 pb-4">
 								{relevantPapers.map((paper) => (
 									<PaperCard
 										key={paper.id}

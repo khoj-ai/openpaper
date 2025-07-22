@@ -16,6 +16,7 @@ import 'katex/dist/katex.min.css' // `rehype-katex` does not import the CSS for 
 import {
     Loader,
     ArrowUp,
+    Recycle,
 } from 'lucide-react';
 
 import { Textarea } from '@/components/ui/textarea';
@@ -448,9 +449,10 @@ export default function UnderstandPage() {
                     }
                     <div ref={messagesEndRef} />
                     {error && (
-                        <div className="flex flex-col items-center gap-2 p-4 text-red-500">
+                        <div className="flex flex-col items-start gap-2 p-4 text-black dark:text-white">
                             <p>{error}</p>
                             <Button onClick={handleRetry} variant="outline">
+                                <Recycle className="mr-2 h-4 w-4" />
                                 Retry
                             </Button>
                         </div>

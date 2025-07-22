@@ -1,6 +1,6 @@
 "use client"
 
-import { AlertTriangle, ChevronDown, Clock, FileText, Globe2, Home, LogOut, MessageCircleQuestion, Moon, Route, Sun, TelescopeIcon, User, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, ChevronDown, ChevronsUpDown, Clock, FileText, Globe2, Home, LogOut, MessageCircleQuestion, Moon, Route, Sun, TelescopeIcon, User, X } from "lucide-react";
 
 import {
     Sidebar,
@@ -35,7 +35,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { PaperStatus } from "@/components/utils/PdfStatus";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
-import { formatDate } from "@/lib/utils";
+import { Conversation } from "@/lib/schema";
 
 // Menu items.
 const items = [
@@ -54,7 +54,7 @@ const items = [
         beta: false,
     },
     {
-        title: "My Papers",
+        title: "Library",
         url: "/papers",
         icon: FileText,
         requiresAuth: true,
@@ -87,7 +87,8 @@ export interface PaperItem {
 export function AppSidebar() {
     const router = useRouter();
     const { user, logout } = useAuth();
-    const [allPapers, setAllPapers] = useState<PaperItem[]>([])
+    const [allPapers, setAllPapers] = useState<PaperItem[]>([]);
+    const [everythingConversations, setEverythingConversations] = useState<Conversation[]>([]);
     const { darkMode, toggleDarkMode } = useIsDarkMode();
     const { subscription, loading: subscriptionLoading } = useSubscription();
     const [dismissedWarning, setDismissedWarning] = useState<string | null>(null);
@@ -107,9 +108,22 @@ export function AppSidebar() {
             }
         }
 
+        const fetchEverythingConversations = async () => {
+            try {
+                const response = await fetchFromApi("/api/conversation/everything");
+                setEverythingConversations(response);
+            } catch (error) {
+                console.error("Error fetching everything conversations");
+                setEverythingConversations([]);
+            }
+        }
+
         // Call the async function
+        if (!user) return;
         fetchPapers();
+        fetchEverythingConversations();
     }, [user]);
+
 
     const handleLogout = async () => {
         await logout();
@@ -208,7 +222,7 @@ export function AppSidebar() {
                                 <SidebarMenuItem key={item.title}>
                                     <SidebarMenuItem key={item.title}>
                                         <SidebarMenuButton asChild>
-                                            <a href={item.requiresAuth && !user ? "/login" : item.url}>
+                                            <Link href={item.requiresAuth && !user ? "/login" : item.url}>
                                                 <item.icon />
                                                 <span>{item.title}</span>
                                                 {
@@ -218,7 +232,7 @@ export function AppSidebar() {
                                                         </span>
                                                     )
                                                 }
-                                            </a>
+                                            </Link>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
                                 </SidebarMenuItem>
@@ -226,45 +240,100 @@ export function AppSidebar() {
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>
-                <Collapsible defaultOpen className="group/collapsible">
-                    <SidebarGroup>
-                        <SidebarGroupLabel asChild>
+                {allPapers.length > 0 && (
+                    <Collapsible defaultOpen className="group/collapsible">
+                        <SidebarGroup>
                             <CollapsibleTrigger>
-                                Papers
-                                <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                                <SidebarMenuButton asChild>
+                                    <span className="flex items-center gap-2 w-full">
+                                        Recent
+                                        <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                                    </span>
+                                </SidebarMenuButton>
                             </CollapsibleTrigger>
-                        </SidebarGroupLabel>
-                        <CollapsibleContent>
-                            <SidebarGroupContent>
-                                {
-                                    allPapers && allPapers.length > 0 && (
+                            <CollapsibleContent>
+                                <SidebarGroupContent>
+                                    <>
                                         <SidebarMenuItem>
                                             <SidebarMenuSub>
-                                                {
-                                                    allPapers.map((paper) => (
-                                                        <SidebarMenuSubItem key={paper.id}>
-                                                            <SidebarMenuSubButton asChild>
-                                                                <a
-                                                                    href={`/paper/${paper.id}`}
-                                                                    className="text-xs font-medium w-full h-fit my-1 line-clamp-2"
-                                                                >
+                                                {allPapers.slice(0, 7).map((paper) => (
+                                                    <SidebarMenuSubItem key={paper.id}>
+                                                        <SidebarMenuSubButton asChild>
+                                                            <Link
+                                                                href={`/paper/${paper.id}`}
+                                                                className="text-xs font-medium w-full h-fit my-1"
+                                                            >
+                                                                <p className="line-clamp-3">
                                                                     {paper.title}
-                                                                    <span className="text-xs text-muted-foreground">
-                                                                        {formatDate(paper.created_at || '')}
-                                                                    </span>
-                                                                </a>
-                                                            </SidebarMenuSubButton>
-                                                        </SidebarMenuSubItem>
-                                                    ))
-                                                }
+                                                                </p>
+                                                            </Link>
+                                                        </SidebarMenuSubButton>
+                                                    </SidebarMenuSubItem>
+                                                ))}
                                             </SidebarMenuSub>
                                         </SidebarMenuItem>
-                                    )
-                                }
-                            </SidebarGroupContent>
-                        </CollapsibleContent>
-                    </SidebarGroup>
-                </Collapsible>
+                                        {allPapers.length > 7 && (
+                                            <SidebarMenuItem>
+                                                <SidebarMenuButton asChild>
+                                                    <Link href="/papers" className="text-xs font-medium h-fit my-1">
+                                                        {allPapers.length} Papers <ArrowRight className="inline h-3 w-3 ml-1" />
+                                                    </Link>
+                                                </SidebarMenuButton>
+                                            </SidebarMenuItem>
+                                        )}
+                                    </>
+                                </SidebarGroupContent>
+                            </CollapsibleContent>
+                        </SidebarGroup>
+                    </Collapsible>
+                )}
+                {everythingConversations.length > 0 && (
+                    <Collapsible defaultOpen className="group/collapsible">
+                        <SidebarGroup>
+                            <CollapsibleTrigger>
+                                <SidebarMenuButton asChild>
+                                    <span className="flex items-center gap-2 w-full">
+                                        Discover
+                                        <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                                    </span>
+                                </SidebarMenuButton>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                                <SidebarGroupContent>
+                                    <>
+                                        <SidebarMenuItem>
+                                            <SidebarMenuSub>
+                                                {everythingConversations.filter(conversation => conversation.title).slice(0, 7).map((conversation) => (
+                                                    <SidebarMenuSubItem key={conversation.id}>
+                                                        <SidebarMenuSubButton asChild>
+                                                            <Link
+                                                                href={`/everything/${conversation.id}`}
+                                                                className="text-xs font-medium w-full h-fit my-1"
+                                                            >
+                                                                <p className="line-clamp-3">
+                                                                    {conversation.title}
+                                                                </p>
+                                                            </Link>
+                                                        </SidebarMenuSubButton>
+                                                    </SidebarMenuSubItem>
+                                                ))}
+                                            </SidebarMenuSub>
+                                        </SidebarMenuItem>
+                                        {everythingConversations.length > 7 && (
+                                            <SidebarMenuItem>
+                                                <SidebarMenuButton asChild>
+                                                    <Link href="/ask" className="text-xs font-medium h-fit my-1">
+                                                        {everythingConversations.length} Explorations <ArrowRight className="inline h-3 w-3" />
+                                                    </Link>
+                                                </SidebarMenuButton>
+                                            </SidebarMenuItem>
+                                        )}
+                                    </>
+                                </SidebarGroupContent>
+                            </CollapsibleContent>
+                        </SidebarGroup>
+                    </Collapsible>
+                )}
             </SidebarContent>
             <SidebarFooter>
                 {/* Subscription Warning */}
@@ -319,16 +388,19 @@ export function AppSidebar() {
                         <Popover>
                             <PopoverTrigger asChild>
                                 <SidebarMenuButton className="flex items-center gap-2">
-                                    <Avatar className="h-6 w-6">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        {user.picture ? (<img src={user.picture} alt={user.name} />) : (<User size={16} />)}
-                                    </Avatar>
-                                    <span className="truncate">{user.name}</span>
+                                    <span className="flex items-center gap-2 truncate">
+                                        <Avatar className="h-6 w-6">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            {user.picture ? (<img src={user.picture} alt={user.name} />) : (<User size={16} />)}
+                                        </Avatar>
+                                        <span className="truncate">{user.name}</span>
+                                    </span>
+                                    <ChevronsUpDown className="h-4 w-4 ml-auto" />
                                 </SidebarMenuButton>
                             </PopoverTrigger>
                             <PopoverContent className="w-60 p-4" align="start">
-                                <div className="flex flex-col gap-4">
-                                    <div className="flex items-center gap-3">
+                                <div className="flex flex-col gap-0">
+                                    <div className="flex items-center gap-3 pb-2">
                                         <Avatar className="h-10 w-10">
                                             {/* eslint-disable-next-line @next/next/no-img-element */}
                                             {user.picture ? (<img src={user.picture} alt={user.name} />) : (<User size={24} />)}
@@ -340,32 +412,33 @@ export function AppSidebar() {
                                     </div>
                                     {/* Feedback section */}
                                     <Link href="https://github.com/khoj-ai/openpaper/issues" target="_blank" className="w-full">
-                                        <Button variant="outline" className="w-full justify-start">
+                                        <Button variant="ghost" className="w-full justify-start">
                                             <MessageCircleQuestion size={16} className="mr-2" />
                                             Feedback
                                         </Button>
                                     </Link>
                                     <Link href="/pricing" className="w-full">
                                         <Button
-                                            variant="outline"
+                                            variant="ghost"
                                             className="w-full justify-start"
                                         >
                                             <Route size={16} className="mr-2" />
                                             Plans
                                         </Button>
                                     </Link>
-                                    {/* Dark Mode Toggle */}
-                                    <Button onClick={toggleDarkMode} className="w-full justify-start">
-                                        {darkMode ? <Sun size={16} className="mr-2" /> : <Moon size={16} className="mr-2" />}
-                                        {darkMode ? 'Light Mode' : 'Dark Mode'}
-                                    </Button>
+
                                     <Button
-                                        variant="outline"
+                                        variant="ghost"
                                         className="w-full justify-start"
                                         onClick={handleLogout}
                                     >
                                         <LogOut size={16} className="mr-2" />
                                         Sign out
+                                    </Button>
+                                    {/* Dark Mode Toggle */}
+                                    <Button onClick={toggleDarkMode} className="w-full justify-start">
+                                        {darkMode ? <Sun size={16} className="mr-2" /> : <Moon size={16} className="mr-2" />}
+                                        {darkMode ? 'Light Mode' : 'Dark Mode'}
                                     </Button>
                                 </div>
                             </PopoverContent>
@@ -388,6 +461,6 @@ export function AppSidebar() {
                     </SidebarMenuItem>
                 )}
             </SidebarFooter>
-        </Sidebar>
+        </Sidebar >
     )
 }

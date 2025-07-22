@@ -66,6 +66,11 @@ export interface Citation {
     reference: string;
 }
 
+export interface Conversation {
+    id: string;
+    title: string;
+}
+
 
 export enum ResponseStyle {
     Normal = 'normal',
