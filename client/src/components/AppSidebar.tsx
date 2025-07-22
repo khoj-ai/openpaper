@@ -288,7 +288,7 @@ export function AppSidebar() {
                     </Collapsible>
                 )}
                 {everythingConversations.length > 0 && (
-                    <Collapsible defaultOpen className="group/collapsible">
+                    <Collapsible className="group/collapsible">
                         <SidebarGroup>
                             <CollapsibleTrigger>
                                 <SidebarMenuButton asChild>
@@ -398,9 +398,9 @@ export function AppSidebar() {
                                     <ChevronsUpDown className="h-4 w-4 ml-auto" />
                                 </SidebarMenuButton>
                             </PopoverTrigger>
-                            <PopoverContent className="w-60 p-4" align="start">
-                                <div className="flex flex-col gap-0">
-                                    <div className="flex items-center gap-3 pb-2">
+                            <PopoverContent className="w-60 p-1" align="start">
+                                <div className="flex flex-col gap-1">
+                                    <div className="flex items-center gap-3 p-3">
                                         <Avatar className="h-10 w-10">
                                             {/* eslint-disable-next-line @next/next/no-img-element */}
                                             {user.picture ? (<img src={user.picture} alt={user.name} />) : (<User size={24} />)}
@@ -426,7 +426,11 @@ export function AppSidebar() {
                                             Plans
                                         </Button>
                                     </Link>
-
+                                    {/* Dark Mode Toggle */}
+                                    <Button onClick={toggleDarkMode} variant="ghost" className="w-full justify-start">
+                                        {darkMode ? <Sun size={16} className="mr-2" /> : <Moon size={16} className="mr-2" />}
+                                        {darkMode ? 'Light Mode' : 'Dark Mode'}
+                                    </Button>
                                     <Button
                                         variant="ghost"
                                         className="w-full justify-start"
@@ -434,11 +438,6 @@ export function AppSidebar() {
                                     >
                                         <LogOut size={16} className="mr-2" />
                                         Sign out
-                                    </Button>
-                                    {/* Dark Mode Toggle */}
-                                    <Button onClick={toggleDarkMode} className="w-full justify-start">
-                                        {darkMode ? <Sun size={16} className="mr-2" /> : <Moon size={16} className="mr-2" />}
-                                        {darkMode ? 'Light Mode' : 'Dark Mode'}
                                     </Button>
                                 </div>
                             </PopoverContent>
