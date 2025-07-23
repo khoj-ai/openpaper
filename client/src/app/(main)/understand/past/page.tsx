@@ -22,7 +22,7 @@ export default function PastConversationsPage() {
 				const response = await fetchFromApi("/api/conversation/everything");
 				setConversations(response);
 			} catch (error) {
-				console.error("Error fetching everything conversations");
+				console.error("Error fetching everything conversations", error);
 				setConversations([]);
 			}
 		};

@@ -1,6 +1,6 @@
 "use client"
 
-import { AlertTriangle, ArrowRight, ChevronDown, ChevronsUpDown, Clock, FileText, Globe2, Home, LogOut, MessageCircleQuestion, Moon, Route, Sun, TelescopeIcon, User, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, ChevronDown, ChevronsUpDown, FileText, Globe2, Home, LogOut, MessageCircleQuestion, Moon, Route, Sun, TelescopeIcon, User, X } from "lucide-react";
 
 import {
     Sidebar,
@@ -113,7 +113,7 @@ export function AppSidebar() {
                 const response = await fetchFromApi("/api/conversation/everything");
                 setEverythingConversations(response);
             } catch (error) {
-                console.error("Error fetching everything conversations");
+                console.error("Error fetching everything conversations", error);
                 setEverythingConversations([]);
             }
         }

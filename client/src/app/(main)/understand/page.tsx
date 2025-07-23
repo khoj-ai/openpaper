@@ -78,7 +78,7 @@ function UnderstandPageContent() {
 
     const END_DELIMITER = "END_OF_STREAM";
 
-    const { subscription, loading: subscriptionLoading, refetch: refetchSubscription } = useSubscription();
+    const { subscription, refetch: refetchSubscription } = useSubscription();
     const chatCreditLimitReached = isChatCreditAtLimit(subscription);
 
     useEffect(() => {
