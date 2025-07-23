@@ -4,7 +4,7 @@ from uuid import UUID
 
 from app.database.crud.base_crud import CRUDBase
 from app.database.models import AudioOverview, AudioOverviewJob, JobStatus
-from app.llm.schemas import ResponseCitation
+from app.schemas.responses import ResponseCitation
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
 from sqlalchemy.orm import Session

@@ -12,7 +12,8 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { FileText, Loader2, MessageCircleWarning } from "lucide-react";
+import { FileText, Loader2, MessageCircleWarning, Sparkles } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { PdfDropzone } from "@/components/PdfDropzone";
 import Link from "next/link";
@@ -367,9 +368,19 @@ export default function Home() {
 		<div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center h-[calc(100vh-64px)] p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
 			<main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start w-full max-w-6xl">
 
-				<header className="text-2xl font-bold mx-auto">
-					Open Paper
-				</header>
+				<div className="flex flex-col items-center gap-4 mx-auto">
+					{relevantPapers.length > 0 && (
+						<Badge asChild variant="outline" className="cursor-pointer bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white hover:text-primary">
+							<Link href="/understand" className="flex items-center gap-1">
+								<Sparkles className="h-3 w-3" />
+								Find answers across your documents
+							</Link>
+						</Badge>
+					)}
+					<header className="text-2xl font-bold">
+						Open Paper
+					</header>
+				</div>
 				{
 					isMobile && (
 						<Dialog open={true}>
@@ -384,11 +395,6 @@ export default function Home() {
 						</Dialog>
 					)
 				}
-				<div className="flex flex-col text-center space-y-8 mx-auto">
-					<p className="text-lg text-left text-muted-foreground max-w-2xl">
-						Upload a paper to get started.
-					</p>
-				</div>
 
 				{/* Replace buttons with PdfDropzone */}
 				<PdfDropzone
@@ -398,46 +404,48 @@ export default function Home() {
 				/>
 
 				{/* Section break and header for relevant papers */}
-				{relevantPapers.length > 0 && (
-					<>
-						{/* Visual separator */}
-						<div className="w-full border-t border-border/40 my-8"></div>
+				{
+					relevantPapers.length > 0 && (
+						<>
+							{/* Visual separator */}
+							<div className="w-full border-t border-border/40 my-8"></div>
 
-						{/* Jump back in section */}
-						<div className="w-full flex items-center justify-between">
-							<div className="flex flex-col gap-2">
-								<h2 className="text-xl font-semibold">Jump back in</h2>
-								<p className="text-sm text-muted-foreground">
-									Continue reading your recent papers
-								</p>
+							{/* Jump back in section */}
+							<div className="w-full flex items-center justify-between">
+								<div className="flex flex-col gap-2">
+									<h2 className="text-xl font-semibold">Jump back in</h2>
+									<p className="text-sm text-muted-foreground">
+										Continue reading your recent papers
+									</p>
+								</div>
+								<Button variant="ghost" size="sm" asChild>
+									<Link href="/papers" className="flex items-center gap-2">
+										<FileText className="h-4 w-4" />
+										View all papers
+									</Link>
+								</Button>
 							</div>
-							<Button variant="ghost" size="sm" asChild>
-								<Link href="/papers" className="flex items-center gap-2">
-									<FileText className="h-4 w-4" />
-									View all papers
-								</Link>
-							</Button>
-						</div>
 
-						{/* Papers grid */}
-						<div className="w-full space-y-4">
-							{relevantPapers.map((paper) => (
-								<PaperCard
-									key={paper.id}
-									paper={paper}
-									setPaper={(paperId: string, updatedPaper: PaperItem) => {
-										// Handle paper update logic here if needed
-										setRelevantPapers((prev) =>
-											prev.map((p) => (p.id === paperId ? { ...p, ...updatedPaper } : p))
-										);
-									}}
-								/>
-							))}
-						</div>
-					</>
-				)}
+							{/* Papers grid */}
+							<div className="w-full space-y-4 pb-4">
+								{relevantPapers.map((paper) => (
+									<PaperCard
+										key={paper.id}
+										paper={paper}
+										setPaper={(paperId: string, updatedPaper: PaperItem) => {
+											// Handle paper update logic here if needed
+											setRelevantPapers((prev) =>
+												prev.map((p) => (p.id === paperId ? { ...p, ...updatedPaper } : p))
+											);
+										}}
+									/>
+								))}
+							</div>
+						</>
+					)
+				}
 
-			</main>
+			</main >
 			{
 				relevantPapers.length === 0 && (
 					<footer className="row-start-3 grid gap-[24px] items-center justify-center justify-items-center">
@@ -462,26 +470,28 @@ export default function Home() {
 				)
 			}
 
-			{showErrorAlert && (
-				<Dialog open={showErrorAlert} onOpenChange={setShowErrorAlert}>
-					<DialogContent>
-						<DialogTitle>Upload Failed</DialogTitle>
-						<DialogDescription className="space-y-4 inline-flex items-center">
-							<MessageCircleWarning className="h-6 w-6 text-slate-500 mr-2 flex-shrink-0" />
-							{errorAlertMessage ?? DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE}
-						</DialogDescription>
-						<div className="flex justify-end mt-4">
-							{
-								showPricingOnError && (
-									<Button variant="default" asChild className="mr-2 bg-blue-500 hover:bg-blue-200 dark:bg-blue-600 dark:hover:bg-blue-700 text-white">
-										<Link href="/pricing">Upgrade</Link>
-									</Button>
-								)
-							}
-						</div>
-					</DialogContent>
-				</Dialog>
-			)}
+			{
+				showErrorAlert && (
+					<Dialog open={showErrorAlert} onOpenChange={setShowErrorAlert}>
+						<DialogContent>
+							<DialogTitle>Upload Failed</DialogTitle>
+							<DialogDescription className="space-y-4 inline-flex items-center">
+								<MessageCircleWarning className="h-6 w-6 text-slate-500 mr-2 flex-shrink-0" />
+								{errorAlertMessage ?? DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE}
+							</DialogDescription>
+							<div className="flex justify-end mt-4">
+								{
+									showPricingOnError && (
+										<Button variant="default" asChild className="mr-2 bg-blue-500 hover:bg-blue-200 dark:bg-blue-600 dark:hover:bg-blue-700 text-white">
+											<Link href="/pricing">Upgrade</Link>
+										</Button>
+									)
+								}
+							</div>
+						</DialogContent>
+					</Dialog>
+				)
+			}
 
 			{/* Dialog for PDF URL */}
 			<Dialog open={isUrlDialogOpen} onOpenChange={setIsUrlDialogOpen}>
@@ -538,6 +548,6 @@ export default function Home() {
 					</div>
 				</DialogContent>
 			</Dialog>
-		</div>
+		</div >
 	);
 }

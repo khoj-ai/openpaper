@@ -68,7 +68,7 @@ class ConversationAdmin(ModelView, model=Conversation):
     column_list = [
         Conversation.id,
         Conversation.user_id,
-        Conversation.paper_id,
+        Conversation.conversable_id,
         Conversation.title,
     ]
     column_searchable_list = [Conversation.title]

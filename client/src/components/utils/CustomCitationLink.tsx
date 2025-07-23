@@ -1,6 +1,7 @@
 import { Citation, ReferenceCitation } from "@/lib/schema";
 import { HTMLAttributes, ReactNode, createElement, Children } from "react";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { PaperItem } from "@/components/AppSidebar";
 
 // Interface for the CustomCitationLink component props
 interface CustomCitationLinkProps extends HTMLAttributes<HTMLElement> {
@@ -14,6 +15,7 @@ interface CustomCitationLinkProps extends HTMLAttributes<HTMLElement> {
     };
     className?: string;
     citations?: (Citation | ReferenceCitation)[];
+    papers?: PaperItem[];
 }
 
 interface CitationLinkProps {
@@ -21,6 +23,7 @@ interface CitationLinkProps {
     messageIndex: number;
     handleCitationClick: (key: string, messageIndex: number) => void;
     citations?: (Citation | ReferenceCitation)[];
+    papers?: PaperItem[];
 }
 
 function CitationLink({
@@ -28,8 +31,10 @@ function CitationLink({
     messageIndex,
     handleCitationClick,
     citations,
+    papers,
 }: CitationLinkProps) {
     const matchingCitation = citations?.find(citation => 'key' in citation ? String(citation.key) === citationKey : String(citation.index) === citationKey) || null;
+    const paper = matchingCitation && 'paper_id' in matchingCitation && papers ? papers.find(p => p.id === matchingCitation.paper_id) : null;
 
     const onClickCitation = (e: React.MouseEvent) => {
         e.preventDefault();
@@ -64,12 +69,13 @@ function CitationLink({
                 </span>
             </HoverCardTrigger>
             <HoverCardContent className="w-80 p-2 shadow-md bg-accent">
+                {paper && <p className="text-sm font-bold text-accent-foreground">{paper.title}</p>}
                 <p className="text-sm text-accent-foreground">{'reference' in matchingCitation ? matchingCitation.reference : matchingCitation.text}</p>
             </HoverCardContent>
         </HoverCard>
     );
 };
-export default function CustomCitationLink({ children, handleCitationClick, messageIndex, className, ...props }: CustomCitationLinkProps) {
+export default function CustomCitationLink({ children, handleCitationClick, messageIndex, className, papers, ...props }: CustomCitationLinkProps) {
     // Create a clone of props to avoid mutating the original
     const elementProps = {
         ...props,
@@ -120,6 +126,7 @@ export default function CustomCitationLink({ children, handleCitationClick, mess
                                         messageIndex={messageIndex}
                                         handleCitationClick={handleCitationClick}
                                         citations={props.citations}
+                                        papers={papers}
                                     />
                                 ))}
                             </span>

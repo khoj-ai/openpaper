@@ -80,6 +80,8 @@ class InstitutionsKeywords(BaseModel):
 
 
 # Extracted images are referenced here! Refer to parser.py to see how place holder IDs are generated and inserted. This logic is super convoluted unfortunately, but the best workaround for image understanding in the PDF + LLM flow.
+# Update (7/22/2025) - image extraction has some serious edge cases that need to be figured out. It's not extracting incredibly useful images, so let's remove the line to encourage inline image rendering for now. For posterity:
+# - You may include images of figures if they are helpful to the summary. You may reference them in markdown image format inline using the placeholder IDs. Example: ![Figure 1](IMG_placeholder_1)
 class SummaryAndCitations(BaseModel):
     """Schema for summary and citations extraction."""
     summary: str = Field(
@@ -97,7 +99,6 @@ Format guidelines:
 - Include relevant data points and metrics when available
 - Use plain language while preserving technical accuracy
 - Include inline citations to support claims that refer to the paper's content. This is especially important for claims about the findings, methodology, and results.
-- You may include images of figures if they are helpful to the summary. You may reference them in markdown image format inline using the placeholder IDs. Example: ![Figure 1](IMG_placeholder_1)
 
 Citation guidelines:
 - Use [^1], [^2], [^6, ^7] etc. for citations in the summary

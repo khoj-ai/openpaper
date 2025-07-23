@@ -5,6 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Avatar } from '@/components/ui/avatar';
 import { PaperHighlightAnnotation } from '@/lib/schema';
 import { User } from '@/lib/auth';
+import { formatDate } from '@/lib/utils';
 
 interface AnnotationProps {
     annotation: PaperHighlightAnnotation;
@@ -38,21 +39,6 @@ export default function Annotation({
         e.stopPropagation();
         setEditedContent(annotation.content);
         setIsEditing(false);
-    };
-
-    // Format date more elegantly
-    const formatDate = (dateString: string) => {
-        const date = new Date(dateString);
-        const now = new Date();
-        const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-
-        if (diffInHours < 24) {
-            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        } else if (diffInHours < 168) { // 7 days
-            return date.toLocaleDateString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
-        } else {
-            return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-        }
     };
 
     if (isEditing && !readonly) {

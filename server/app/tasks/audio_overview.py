@@ -14,8 +14,8 @@ from app.database.database import get_db
 from app.database.models import JobStatus
 from app.database.telemetry import track_event
 from app.llm.operations import operations
-from app.llm.schemas import AudioOverviewForLLM
 from app.llm.speech import speaker
+from app.schemas.responses import AudioOverviewForLLM
 from app.schemas.user import CurrentUser
 from fastapi import Depends
 from sqlalchemy.orm import Session

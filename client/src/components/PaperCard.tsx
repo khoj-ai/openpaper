@@ -16,10 +16,11 @@ import { citationStyles, handleStatusChange } from "./utils/paperUtils";
 interface PaperCardProps {
     paper: PaperItem;
     handleDelete?: (paperId: string) => void;
-    setPaper(paperId: string, paper: PaperItem): void;
+    setPaper?: (paperId: string, paper: PaperItem) => void;
+    minimalist?: boolean;
 }
 
-export default function PaperCard({ paper, handleDelete, setPaper }: PaperCardProps) {
+export default function PaperCard({ paper, handleDelete, setPaper, minimalist = false }: PaperCardProps) {
 
     // Function to copy text to clipboard
     const copyToClipboard = (text: string, styleName: string) => {
@@ -40,14 +41,14 @@ export default function PaperCard({ paper, handleDelete, setPaper }: PaperCardPr
     };
 
     return (
-        <Card key={paper.id} className="overflow-hidden hover:shadow-md transition-shadow pt-2 pb-0">
+        <Card key={paper.id} className={`overflow-hidden transition-shadow ${minimalist ? 'p-0 border-none shadow-none w-full rounded-none !bg-transparent' : 'pt-2 pb-0 hover:shadow-md'}`}>
             <div className="flex h-fit flex-col md:flex-row">
                 {/* Metadata Section */}
-                <div className="md:w-4/5 p-4 flex flex-col justify-between">
+                <div className={`w-full ${minimalist ? 'p-0' : 'p-4'} flex flex-col justify-between`}>
                     {/* Header with status */}
                     <div>
-                        <div className="flex items-start justify-between mb-3">
-                            {paper.status && (
+                        <div className={`flex items-start justify-between ${minimalist ? 'mb-0' : 'mb-3'}`}>
+                            {paper.status && !minimalist && setPaper && (
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <Button size="sm" variant="outline" className="h-6 px-2 text-xs">
@@ -76,52 +77,54 @@ export default function PaperCard({ paper, handleDelete, setPaper }: PaperCardPr
 
                             {/* Action buttons in top right */}
                             <div className="flex gap-1">
-                                <Dialog>
-                                    <DialogTrigger asChild>
-                                        <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
-                                            Cite
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="sm:max-w-[625px]">
-                                        <DialogHeader>
-                                            <DialogTitle>Cite Paper</DialogTitle>
-                                            <DialogDescription>
-                                                Copy the citation format you need for <b>{paper.title}</b>.
-                                            </DialogDescription>
-                                        </DialogHeader>
-                                        <ScrollArea className="h-[300px] w-full rounded-md border p-4">
-                                            <div className="grid gap-4 py-4">
-                                                {citationStyles.map((style) => {
-                                                    const citationText = style.generator(paper);
-                                                    return (
-                                                        <div key={style.name} className="flex items-start justify-between gap-2">
-                                                            <div className="flex-grow">
-                                                                <h4 className="font-semibold mb-1">{style.name}</h4>
-                                                                <p className="text-sm bg-muted p-2 rounded break-words">{citationText}</p>
+                                {!minimalist && (
+                                    <Dialog>
+                                        <DialogTrigger asChild>
+                                            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                                                Cite
+                                            </Button>
+                                        </DialogTrigger>
+                                        <DialogContent className="sm:max-w-[625px]">
+                                            <DialogHeader>
+                                                <DialogTitle>Cite Paper</DialogTitle>
+                                                <DialogDescription>
+                                                    Copy the citation format you need for <b>{paper.title}</b>.
+                                                </DialogDescription>
+                                            </DialogHeader>
+                                            <ScrollArea className="h-[300px] w-full rounded-md border p-4">
+                                                <div className="grid gap-4 py-4">
+                                                    {citationStyles.map((style) => {
+                                                        const citationText = style.generator(paper);
+                                                        return (
+                                                            <div key={style.name} className="flex items-start justify-between gap-2">
+                                                                <div className="flex-grow">
+                                                                    <h4 className="font-semibold mb-1">{style.name}</h4>
+                                                                    <p className="text-sm bg-muted p-2 rounded break-words">{citationText}</p>
+                                                                </div>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="mt-5 h-8 w-8 flex-shrink-0"
+                                                                    onClick={() => copyToClipboard(citationText, style.name)}
+                                                                    aria-label={`Copy ${style.name} citation`}
+                                                                >
+                                                                    <Copy className="h-4 w-4" />
+                                                                </Button>
                                                             </div>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="mt-5 h-8 w-8 flex-shrink-0"
-                                                                onClick={() => copyToClipboard(citationText, style.name)}
-                                                                aria-label={`Copy ${style.name} citation`}
-                                                            >
-                                                                <Copy className="h-4 w-4" />
-                                                            </Button>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </ScrollArea>
-                                        <DialogFooter>
-                                            <DialogClose asChild>
-                                                <Button type="button" variant="secondary">
-                                                    Close
-                                                </Button>
-                                            </DialogClose>
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </ScrollArea>
+                                            <DialogFooter>
+                                                <DialogClose asChild>
+                                                    <Button type="button" variant="secondary">
+                                                        Close
+                                                    </Button>
+                                                </DialogClose>
+                                            </DialogFooter>
+                                        </DialogContent>
+                                    </Dialog>
+                                )}
                                 {
                                     handleDelete && (
                                         <AlertDialog>
@@ -150,7 +153,7 @@ export default function PaperCard({ paper, handleDelete, setPaper }: PaperCardPr
                         </div>
 
                         <a href={`/paper/${paper.id}`} className="block group">
-                            <h3 className="font-semibold text-gray-900 dark:text-gray-100 line-clamp-2 mb-3 text-sm leading-tight group-hover:underline">
+                            <h3 className={`font-semibold text-gray-900 dark:text-gray-100 line-clamp-2 text-sm leading-tight group-hover:underline ${minimalist ? 'p-0 mt-0 text-base rounded-none' : 'text-lg mb-3'}`}>
                                 {paper.title}
                             </h3>
                         </a>
@@ -187,36 +190,38 @@ export default function PaperCard({ paper, handleDelete, setPaper }: PaperCardPr
                     </div>
 
                     {/* Footer */}
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
-                            <span>{new Date(paper.created_at || "").toLocaleDateString()}</span>
-                            {paper.size_in_kb && (
-                                <>
-                                    <span>•</span>
-                                    <span>{formatFileSize(paper.size_in_kb)}</span>
-                                </>
-                            )}
+                    {!minimalist && (
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+                                <span>{new Date(paper.created_at || "").toLocaleDateString()}</span>
+                                {paper.size_in_kb && (
+                                    <>
+                                        <span>•</span>
+                                        <span>{formatFileSize(paper.size_in_kb)}</span>
+                                    </>
+                                )}
+                            </div>
+                            <Link href={`/paper/${paper.id}`} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
+                                Read
+                                <Book className="inline ml-1 h-3 w-3" />
+                            </Link>
                         </div>
-                        <Link href={`/paper/${paper.id}`} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
-                            Read
-                            <Book className="inline ml-1 h-3 w-3" />
-                        </Link>
-                    </div>
+                    )}
                 </div>
 
                 {/* Paper Preview Section */}
                 {
                     paper.preview_url ? (
-                        <div className="md:w-1/5 bg-gray-100 dark:bg-gray-800 p-4 pb-0 flex items-center justify-center border-b border-gray-200 dark:border-gray-700 rounded-t-2xl rounded-b-none">
+                        <div className={`md:w-1/5 bg-gray-100 dark:bg-gray-800 ${minimalist ? 'pt-2 px-2 pb-0' : 'pt-4 px-4 pb-0'} flex items-end justify-center border-b border-gray-200 dark:border-gray-700 rounded-t-2xl rounded-b-none overflow-hidden`}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                                 src={paper.preview_url}
                                 title={paper.title}
                                 alt={paper.title}
-                                className="max-h-48 w-full object-cover object-top rounded-t-lg shadow-sm"
+                                className={`${minimalist ? 'max-h-24 !my-0' : 'max-h-48'} w-full object-cover object-top shadow-sm`}
                             />
                         </div>
-                    ) : (
+                    ) : !minimalist && (
                         <div className="md:w-1/5 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 p-4 flex flex-col justify-between border-r border-gray-200 dark:border-gray-700 rounded-t-2xl rounded-b-none">
                             {/* Abstract/Summary text overlay */}
                             <div className="mt-2">

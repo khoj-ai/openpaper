@@ -62,7 +62,14 @@ export interface Reference {
 
 export interface Citation {
     key: string;
+    paper_id?: string;
     reference: string;
+}
+
+export interface Conversation {
+    id: string;
+    title: string;
+    updated_at: string;
 }
 
 

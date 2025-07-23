@@ -84,13 +84,25 @@ class BaseLLMClient:
     def generate_content(
         self,
         contents: Any,
+        system_prompt: Optional[str] = None,
+        history: Optional[List[Message]] = None,
+        function_declarations: Optional[List[Dict]] = None,
         model_type: ModelType = ModelType.DEFAULT,
         provider: Optional[LLMProvider] = None,
+        enable_thinking: bool = True,
         **kwargs,
     ) -> LLMResponse:
         """Generate content using the specified provider"""
         model = self._get_model_for_type(model_type, provider)
-        return self._get_provider(provider).generate_content(model, contents, **kwargs)
+        return self._get_provider(provider).generate_content(
+            model,
+            contents,
+            system_prompt=system_prompt,
+            function_declarations=function_declarations,
+            history=history,
+            enable_thinking=enable_thinking,
+            **kwargs,
+        )
 
     def send_message_stream(
         self,

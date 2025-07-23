@@ -107,6 +107,24 @@ export const formatFileSize = (sizeInKb: number): string => {
     }
 };
 
+// Chat credit helper functions
+export const getChatCreditUsagePercentage = (subscription: SubscriptionData | null): number => {
+    if (!subscription) return 0;
+    const { chat_credits_used, chat_credits_remaining } = subscription.usage;
+    const total = chat_credits_used + chat_credits_remaining;
+    console.log("Chat credits used:", chat_credits_used, "remaining:", chat_credits_remaining, "total:", total);
+    if (total === 0) return 0;
+    return (chat_credits_used / total) * 100;
+};
+
+export const isChatCreditNearLimit = (subscription: SubscriptionData | null, threshold: number = 75): boolean => {
+    return getChatCreditUsagePercentage(subscription) >= threshold;
+};
+
+export const isChatCreditAtLimit = (subscription: SubscriptionData | null): boolean => {
+    return getChatCreditUsagePercentage(subscription) >= 100;
+};
+
 // Audio overview credit helper functions
 export const getAudioOverviewUsagePercentage = (subscription: SubscriptionData | null): number => {
     if (!subscription) return 0;
