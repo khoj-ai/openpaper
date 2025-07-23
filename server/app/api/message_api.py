@@ -2,7 +2,7 @@ import json
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Union
+from typing import AsyncGenerator, List, Optional, Union
 
 from app.auth.dependencies import get_required_user
 
@@ -36,6 +36,49 @@ logger.setLevel(logging.INFO)
 # Create API router with prefix
 message_router = APIRouter()
 
+END_DELIMITER = "END_OF_STREAM"
+
+
+async def _stream_chat_chunks(
+    chunk_generator: AsyncGenerator[Union[dict, str], None],
+    content_chunks: List[str],
+    evidence_container: dict,
+) -> AsyncGenerator[str, None]:
+    """Helper to stream chat chunks and handle common logic."""
+    async for chunk in chunk_generator:
+        if not isinstance(chunk, dict):
+            logger.warning(f"Received unexpected chunk format: {chunk}")
+            continue
+
+        chunk_type = chunk.get("type")
+        chunk_content = chunk.get("content", "")
+
+        if chunk_type == "content":
+            content_chunks.append(chunk_content)
+            try:
+                json_response = json.dumps(
+                    {"type": "content", "content": chunk_content}
+                )
+                yield f"{json_response}{END_DELIMITER}"
+            except (TypeError, ValueError) as json_error:
+                logger.warning(f"Failed to serialize chunk content: {json_error}")
+                safe_content = (
+                    str(chunk_content).encode("utf-8", errors="replace").decode("utf-8")
+                )
+                json_response = json.dumps({"type": "content", "content": safe_content})
+                yield f"{json_response}{END_DELIMITER}"
+
+        elif chunk_type == "references":
+            evidence_container["evidence"] = chunk_content
+            try:
+                json_response = json.dumps(
+                    {"type": "references", "content": chunk_content}
+                )
+                yield f"{json_response}{END_DELIMITER}"
+            except (TypeError, ValueError) as json_error:
+                logger.warning(f"Failed to serialize references: {json_error}")
+                yield f"{json.dumps({'type': 'error', 'content': 'Failed to serialize references'})}{END_DELIMITER}"
+
 
 @message_router.get("/models")
 async def get_available_models() -> dict:
@@ -62,13 +105,12 @@ async def chat_message_everything(
     The response includes both the content and any relevant evidence gathered.
     """
     try:
-        END_DELIMITER = "END_OF_STREAM"
 
         async def response_generator():
             try:
                 content_chunks = []
                 start_time = datetime.now(timezone.utc)
-                evidence: dict[str, list[dict[str, Union[str, int]]]] | None = None  # type: ignore
+                evidence_container = {"evidence": None}
                 evidence_collection: Optional[EvidenceCollection] = None
 
                 # Ensure conversation is type EVERYTHING
@@ -126,7 +168,7 @@ async def chat_message_everything(
                     llm_provider=request.llm_provider,
                 )
 
-                async for chunk in operations.chat_with_everything(
+                chat_generator = operations.chat_with_everything(
                     question=request.user_query,
                     llm_provider=request.llm_provider,
                     user_references=request.user_references,
@@ -134,50 +176,15 @@ async def chat_message_everything(
                     conversation_id=request.conversation_id,
                     current_user=current_user,
                     db=db,
+                )
+                async for stream_chunk in _stream_chat_chunks(
+                    chunk_generator=chat_generator,
+                    content_chunks=content_chunks,
+                    evidence_container=evidence_container,
                 ):
-                    # Parse the chunk as a dictionary
-                    if isinstance(chunk, dict):
-                        chunk_type = chunk.get("type")
-                        chunk_content = chunk.get("content", "")
+                    yield stream_chunk
 
-                        if chunk_type == "content":
-                            # Send the content as-is
-                            content_chunks.append(chunk_content)
-                            try:
-                                json_response = json.dumps(
-                                    {"type": "content", "content": chunk_content}
-                                )
-                                yield f"{json_response}{END_DELIMITER}"
-                            except (TypeError, ValueError) as json_error:
-                                logger.warning(
-                                    f"Failed to serialize chunk content: {json_error}"
-                                )
-                                # Send a safe fallback
-                                safe_content = (
-                                    str(chunk_content)
-                                    .encode("utf-8", errors="replace")
-                                    .decode("utf-8")
-                                )
-                                json_response = json.dumps(
-                                    {"type": "content", "content": safe_content}
-                                )
-                                yield f"{json_response}{END_DELIMITER}"
-
-                        elif chunk_type == "references":
-                            evidence = chunk_content
-                            # Stream evidence when received
-                            try:
-                                json_response = json.dumps(
-                                    {"type": "references", "content": evidence}
-                                )
-                                yield f"{json_response}{END_DELIMITER}"
-                            except (TypeError, ValueError) as json_error:
-                                logger.warning(
-                                    f"Failed to serialize references: {json_error}"
-                                )
-                                yield f"{json.dumps({'type': 'error', 'content': 'Failed to serialize references'})}{END_DELIMITER}"
-                    else:
-                        logger.warning(f"Received unexpected chunk format: {chunk}")
+                evidence = evidence_container["evidence"]
 
                 # Save the complete message to the database
                 full_content = "".join(content_chunks)
@@ -289,15 +296,13 @@ async def chat_message_stream(
     """
     try:
 
-        END_DELIMITER = "END_OF_STREAM"
-
         async def response_generator():
             try:
                 content_chunks = []
                 start_time = datetime.now(timezone.utc)
-                evidence: dict[str, list[dict[str, Union[str, int]]]] | None = None  # type: ignore
+                evidence_container = {"evidence": None}
 
-                async for chunk in operations.chat_with_paper(
+                chat_generator = operations.chat_with_paper(
                     paper_id=request.paper_id,
                     conversation_id=request.conversation_id,
                     question=request.user_query,
@@ -306,50 +311,16 @@ async def chat_message_stream(
                     user_references=request.user_references,
                     response_style=request.style,
                     db=db,
+                )
+
+                async for chunk in _stream_chat_chunks(
+                    chunk_generator=chat_generator,
+                    content_chunks=content_chunks,
+                    evidence_container=evidence_container,
                 ):
-                    # Parse the chunk as a dictionary
-                    if isinstance(chunk, dict):
-                        chunk_type = chunk.get("type")
-                        chunk_content = chunk.get("content", "")
+                    yield chunk
 
-                        if chunk_type == "content":
-                            # Send the content as-is
-                            content_chunks.append(chunk_content)
-                            try:
-                                json_response = json.dumps(
-                                    {"type": "content", "content": chunk_content}
-                                )
-                                yield f"{json_response}{END_DELIMITER}"
-                            except (TypeError, ValueError) as json_error:
-                                logger.warning(
-                                    f"Failed to serialize chunk content: {json_error}"
-                                )
-                                # Send a safe fallback
-                                safe_content = (
-                                    str(chunk_content)
-                                    .encode("utf-8", errors="replace")
-                                    .decode("utf-8")
-                                )
-                                json_response = json.dumps(
-                                    {"type": "content", "content": safe_content}
-                                )
-                                yield f"{json_response}{END_DELIMITER}"
-
-                        elif chunk_type == "references":
-                            evidence = chunk_content
-                            # Stream evidence when received
-                            try:
-                                json_response = json.dumps(
-                                    {"type": "references", "content": evidence}
-                                )
-                                yield f"{json_response}{END_DELIMITER}"
-                            except (TypeError, ValueError) as json_error:
-                                logger.warning(
-                                    f"Failed to serialize references: {json_error}"
-                                )
-                                yield f"{json.dumps({'type': 'error', 'content': 'Failed to serialize references'})}{END_DELIMITER}"
-                    else:
-                        logger.warning(f"Received unexpected chunk format: {chunk}")
+                evidence = evidence_container["evidence"]
 
                 # Save the complete message to the database
                 full_content = "".join(content_chunks)
