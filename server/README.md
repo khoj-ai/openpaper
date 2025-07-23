@@ -72,3 +72,16 @@ To downgrade the migration, run:
 ```bash
 alembic downgrade -1
 ```
+
+## Chat with Knowledge Base
+
+We have an `Ask` page, which allows you to ask questions across your entire knowledge base. AI-generated responses come with inline citations which will link to the original papers and show the text citation. Deep-linking is not yet available, but is planned.
+
+The response agent works by sending off an agent with access to a series of research tools:
+- `read_file`
+- `search_file`
+- `view_file`
+- `read_abstract`
+- `search_all_files`
+
+![knowledge base research diagram](./lr_research_diagram.png)
