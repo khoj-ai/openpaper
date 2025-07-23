@@ -33,6 +33,7 @@ import {
 import { useAuth } from '@/lib/auth';
 import { PaperItem } from '@/components/AppSidebar';
 import ReferencePaperCards from '@/components/ReferencePaperCards';
+import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 
 interface ChatRequestBody {
@@ -69,13 +70,15 @@ function UnderstandPageContent() {
     const [isTyping, setIsTyping] = useState(false);
     const [statusMessage, setStatusMessage] = useState('');
 
+    const [isConversationLoading, setIsConversationLoading] = useState(false);
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputMessageRef = useRef<HTMLTextAreaElement>(null);
     const chatInputFormRef = useRef<HTMLFormElement>(null);
 
     const END_DELIMITER = "END_OF_STREAM";
 
-    const { subscription, loading: subscriptionLoading } = useSubscription();
+    const { subscription, loading: subscriptionLoading, refetch: refetchSubscription } = useSubscription();
     const chatCreditLimitReached = isChatCreditAtLimit(subscription);
 
     useEffect(() => {
@@ -111,6 +114,7 @@ function UnderstandPageContent() {
     }, [authLoading, user]);
 
     const fetchMessages = useCallback(async (id: string) => {
+        setIsConversationLoading(true);
         try {
             const response = await fetchFromApi(`/api/conversation/${id}`);
             if (response && response.messages) {
@@ -121,6 +125,8 @@ function UnderstandPageContent() {
         } catch (error) {
             console.error("Error fetching messages:", error);
             toast.error("Failed to load conversation history.");
+        } finally {
+            setIsConversationLoading(false);
         }
     }, []);
 
@@ -324,6 +330,7 @@ function UnderstandPageContent() {
         } finally {
             setIsStreaming(false);
             setStatusMessage('');
+            refetchSubscription();
         }
     }, [currentMessage, isStreaming, conversationId]);
 
@@ -429,6 +436,13 @@ function UnderstandPageContent() {
                                 You need to have at least one paper indexed to ask questions.
                             </p>
                             <Button onClick={() => window.location.href = '/'}>Index a Paper</Button>
+                        </div>
+                    )}
+                    {isConversationLoading && (
+                        <div className="space-y-4">
+                            <Skeleton className="h-16 w-full" />
+                            <Skeleton className="h-16 w-full" />
+                            <Skeleton className="h-16 w-full" />
                         </div>
                     )}
                     {messages.length > 0 && memoizedMessages}

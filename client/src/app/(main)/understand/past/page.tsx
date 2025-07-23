@@ -39,8 +39,8 @@ export default function PastConversationsPage() {
 			<div className="flex justify-between items-center mb-4">
 				<h1 className="text-2xl font-bold">Past Conversations</h1>
 				<Link href="/understand">
-					<Button>
-						<Plus className="mr-2 h-4 w-4" /> New Conversation
+					<Button className="bg-blue-500 text-white hover:bg-blue-600 dark:*:bg-blue-600 dark:hover:bg-blue-700">
+						<Plus className="mr-1 h-4 w-4" /> New
 					</Button>
 				</Link>
 			</div>
