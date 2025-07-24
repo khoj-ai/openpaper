@@ -1381,14 +1381,14 @@ export default function PaperView() {
                                         </div>
                                     )
                                 }
-                                {
+                                {/* Paper Images Section - Disabled pending extraction improvements */}
+                                {/* {
                                     rightSideFunction === 'Figures' && (
                                         <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto">
-                                            {/* Paper Images Section */}
                                             <PaperImageView paperId={id} />
                                         </div>
                                     )
-                                }
+                                } */}
                                 {
                                     rightSideFunction === 'Overview' && paperData.summary && (
                                         <div className="flex flex-col h-[calc(100vh-64px)] px-2 overflow-y-auto m-2 relative animate-fade-in">
