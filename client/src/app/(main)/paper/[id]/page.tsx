@@ -79,7 +79,6 @@ import { Avatar } from '@/components/ui/avatar';
 import Link from 'next/link';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { ChatMessageActions } from '@/components/ChatMessageActions';
-import PaperImageView from '@/components/PaperImageView';
 import { PaperSidebar } from '@/components/PaperSidebar';
 
 interface ChatRequestBody {
