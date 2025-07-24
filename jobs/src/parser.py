@@ -157,13 +157,18 @@ def generate_pdf_preview(file_path: str) -> Tuple[str, str]:
         logger.error(f"Error generating PDF preview: {str(e)}")
         raise
 
-async def extract_text_and_images_combined(file_path: str, job_id: str) -> Tuple[str, List[PDFImage], Dict[str, str]]:
+async def extract_text_and_images_combined(
+    file_path: str,
+    job_id: str,
+    extract_images: bool = True
+) -> Tuple[str, List[PDFImage], Dict[str, str]]:
     """
     Extract text from PDF while replacing images with placeholder IDs.
 
     Args:
         file_path: Path to the PDF file
         job_id: Job identifier for organizing temporary files
+        extract_images: Whether to extract images or not
 
     Returns:
         Tuple[str, List[PDFImage], Dict[str, str]]:
@@ -171,6 +176,11 @@ async def extract_text_and_images_combined(file_path: str, job_id: str) -> Tuple
         - List of PDFImage objects
         - Mapping of placeholder IDs to local file paths
     """
+    if not extract_images:
+        # If image extraction is disabled, just extract text
+        md_text = extract_text_from_pdf(file_path)
+        return md_text, [], {}
+
     try:
         # Create temporary directory for this job
         temp_dir = os.path.join(tempfile.gettempdir(), f"pdf_images_{job_id}")

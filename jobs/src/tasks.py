@@ -84,6 +84,7 @@ async def process_pdf_file(
     s3_object_key: str,
     job_id: str,
     status_callback: Callable[[str], None],
+    extract_images: bool = True,
 ) -> PDFProcessingResult:
     """
     Process a PDF file by extracting metadata from bytes.
@@ -115,7 +116,11 @@ async def process_pdf_file(
         # Extract text and page offsets from PDF
         try:
             async with time_it("Extracting text, images, and page offsets from PDF", job_id=job_id):
-                pdf_text, extracted_images, placeholder_to_path = await extract_text_and_images_combined(temp_file_path, job_id)
+                pdf_text, extracted_images, placeholder_to_path = await extract_text_and_images_combined(
+                    temp_file_path,
+                    job_id,
+                    extract_images=extract_images
+                )
                 status_callback(f"Processed bits and bytes")
                 logger.info(f"Extracted {len(pdf_text)} characters of text from PDF")
                 page_offsets = map_pages_to_text_offsets(temp_file_path)
@@ -284,7 +289,13 @@ def upload_and_process_file(
         # Run the async processing function in a way that properly manages the event loop
         # This prevents "Event loop is closed" errors
         result = run_async_safely(
-            process_pdf_file(pdf_bytes, s3_object_key, task_id, status_callback=write_to_status)
+            process_pdf_file(
+                pdf_bytes,
+                s3_object_key,
+                task_id,
+                status_callback=write_to_status,
+                extract_images=False,
+            )
         )
 
         write_to_status("PDF processing complete!")
