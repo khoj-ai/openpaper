@@ -36,7 +36,6 @@ import {
     AudioLines,
     Route,
     User,
-    ChartBar,
 } from 'lucide-react';
 
 import { Textarea } from '@/components/ui/textarea';
