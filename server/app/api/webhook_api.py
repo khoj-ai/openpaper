@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from app.database.crud.paper_crud import PaperCreate, paper_crud
+from app.database.crud.paper_crud import PaperCreate, PaperUpdate, paper_crud
 from app.database.crud.paper_image_crud import PaperImageCreate, paper_image_crud
 from app.database.crud.paper_upload_crud import paper_upload_job_crud
 from app.database.database import get_db
@@ -135,12 +135,14 @@ async def handle_paper_processing_webhook(
 
             publish_date = metadata.publish_date if metadata.publish_date else None
 
+            existing_paper = paper_crud.get_by_upload_job_id(
+                db=db, upload_job_id=job_id, user=job_user
+            )
+
             # Create paper record
-            paper = paper_crud.create(
+            paper = paper_crud.update(
                 db=db,
-                obj_in=PaperCreate(
-                    file_url=file_url,
-                    s3_object_key=result.s3_object_key,
+                obj_in=PaperUpdate(
                     upload_job_id=job_id,
                     preview_url=preview_url,
                     title=metadata.title,
@@ -156,6 +158,7 @@ async def handle_paper_processing_webhook(
                     page_offset_map=result.page_offset_map,
                     size_in_kb=size_in_kb,
                 ),
+                db_obj=existing_paper,
                 user=job_user,
             )
 
