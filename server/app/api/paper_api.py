@@ -70,7 +70,6 @@ async def get_paper_ids(
                     "authors": paper.authors,
                     "institutions": paper.institutions,
                     "keywords": paper.keywords,
-                    "summary": paper.summary,
                     "status": paper.status,
                     "preview_url": paper.preview_url,
                     "size_in_kb": paper.size_in_kb,
@@ -108,7 +107,6 @@ async def get_active_paper_ids(
                     "authors": paper.authors,
                     "institutions": paper.institutions,
                     "keywords": paper.keywords,
-                    "summary": paper.summary,
                     "status": paper.status,
                 }
                 for paper in papers
@@ -253,7 +251,6 @@ async def get_relevant_papers(
                     "authors": paper.authors,
                     "institutions": paper.institutions,
                     "keywords": paper.keywords,
-                    "summary": paper.summary,
                     "status": paper.status,
                     "preview_url": paper.preview_url,
                     "size_in_kb": paper.size_in_kb,
