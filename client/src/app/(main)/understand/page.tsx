@@ -518,7 +518,7 @@ function UnderstandPageContent() {
             </div>
             <div className={`p-4 transition-all duration-500 ${isCentered ? 'flex-1 flex flex-col justify-center items-center my-au' : ''}`}>
                 {isCentered && (
-                    <h1 className="text-2xl font-bold mb-4">What are you looking for?</h1>
+                    <h1 className="text-2xl font-bold mb-4">What would you like to discover in your papers?</h1>
                 )}
                 <form onSubmit={handleNewSubmit} className="w-full" ref={chatInputFormRef}>
                     <div className="relative w-full md:max-w-3xl mx-auto">
