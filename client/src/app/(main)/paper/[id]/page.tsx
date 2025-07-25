@@ -98,7 +98,7 @@ const PaperToolset = {
         { name: "Annotations", icon: Highlighter },
         { name: "Share", icon: Share },
         { name: "Audio", icon: AudioLines },
-        { name: "Figures", icon: ChartBar },
+        // { name: "Figures", icon: ChartBar },
         { name: "Focus", icon: Focus },
     ],
 }
