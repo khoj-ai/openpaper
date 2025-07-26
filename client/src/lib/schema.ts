@@ -206,3 +206,14 @@ export interface PaperImage {
     image_index: number;
     caption: string | null;
 }
+
+export interface JobStatusResponse {
+	job_id: string;
+	status: JobStatusType;
+	started_at: string;
+	completed_at: string | null;
+	paper_id: string | null;
+	has_file_url: boolean;
+	has_metadata: boolean;
+	celery_progress_message: string | null;
+}

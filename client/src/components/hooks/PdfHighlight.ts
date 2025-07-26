@@ -58,7 +58,7 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
             setHighlights(readOnlyHighlights);
         }
         else {
-            loadHighlights();
+            fetchHighlights();
         }
     }, []);
 
@@ -253,14 +253,14 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
             const updatedHighlights = highlights.filter(h => h.id !== highlight.id);
             setHighlights(updatedHighlights);
             clearHighlightsFromDOM();
-            loadHighlights();
-        }
+            fetchHighlights();
+    }
         catch (error) {
             console.error('Error removing highlight from server:', error);
         }
     }
 
-    const loadHighlights = async () => {
+    const fetchHighlights = async () => {
         try {
             const data: PaperHighlight[] = await fetchFromApi(`/api/highlight/${paperId}`, {
                 method: 'GET',
@@ -292,6 +292,10 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
             console.error('Error loading highlights from server:', error);
         }
     }
+
+    const refreshHighlights = async () => {
+        await fetchHighlights();
+    };
 
     // Helper function to normalize selected text
     const normalizeSelectedText = (text: string): string => {
@@ -375,6 +379,7 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
         clearHighlights,
         addHighlight,
         removeHighlight,
-        loadHighlights,
+        fetchHighlights,
+        refreshHighlights,
     };
 }

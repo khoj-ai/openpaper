@@ -20,7 +20,7 @@ import Link from "next/link";
 import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience";
 import { PaperItem } from "@/components/AppSidebar";
 import PaperCard from "@/components/PaperCard";
-import { JobStatusType } from "@/lib/schema";
+import { JobStatusType, JobStatusResponse } from "@/lib/schema";
 import OpenPaperLanding from "@/components/OpenPaperLanding";
 import { toast } from "sonner";
 import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isPaperUploadNearLimit, isStorageNearLimit } from "@/hooks/useSubscription";
@@ -28,17 +28,6 @@ import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isPaperUploadN
 interface PdfUploadResponse {
 	message: string;
 	job_id: string;
-}
-
-interface JobStatusResponse {
-	job_id: string;
-	status: JobStatusType;
-	started_at: string;
-	completed_at: string | null;
-	paper_id: string | null;
-	has_file_url: boolean;
-	has_metadata: boolean;
-	celery_progress_message: string | null;
 }
 
 const DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE = "We encountered an error processing your request. Please check the file or URL and try again.";
@@ -197,14 +186,13 @@ export default function Home() {
 				setCeleryMessage(response.celery_progress_message);
 			}
 
-			if (response.status === 'completed' && response.paper_id) {
-
+			if (response.paper_id) {
 				// Success - redirect to paper
 				const redirectUrl = new URL(`/paper/${response.paper_id}`, window.location.origin);
+				redirectUrl.searchParams.append('job_id', jobId);
 				setTimeout(() => {
 					window.location.href = redirectUrl.toString();
 				}, 500);
-
 			} else if (response.status === 'failed') {
 				// Failed - show error
 				console.error('Upload job failed');
