@@ -182,6 +182,37 @@ export default function PaperView() {
 
     const [jobId, setJobId] = useState<string | null>(null);
     const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
+    const [sidePanelDisplayedText, setSidePanelDisplayedText] = useState('');
+    const [isSidePanelTyping, setIsSidePanelTyping] = useState(false);
+
+    useEffect(() => {
+        if (!jobId) {
+            setSidePanelDisplayedText('');
+            setIsSidePanelTyping(false);
+            return;
+        }
+        if (!loadingMessage) {
+            setSidePanelDisplayedText('Processing your paper...');
+            setIsSidePanelTyping(false);
+            return;
+        }
+
+        let charIndex = 0;
+        setSidePanelDisplayedText('');
+        setIsSidePanelTyping(true);
+
+        const typingInterval = setInterval(() => {
+            if (charIndex < loadingMessage.length) {
+                setSidePanelDisplayedText(loadingMessage.slice(0, charIndex + 1));
+                charIndex++;
+            } else {
+                setIsSidePanelTyping(false);
+                clearInterval(typingInterval);
+            }
+        }, 50); // 50ms per character for smooth typing
+
+        return () => clearInterval(typingInterval);
+    }, [loadingMessage, jobId]);
 
     useEffect(() => {
         const url = new URL(window.location.href);
@@ -1273,9 +1304,15 @@ export default function PaperView() {
                     style={rightSideFunction !== 'Focus' ? { width: `${100 - leftPanelWidth}%` } : { width: 'auto' }}
                 >
                     {jobId ? (
-                        <div className="flex flex-col items-center justify-center h-full w-full">
-                            <EnigmaticLoadingExperience />
-                            <p className="mt-4 text-lg">{loadingMessage || 'Processing your paper...'}</p>
+                        <div className="flex items-center justify-center h-full w-full">
+                            <div className="flex flex-col items-center">
+                                <EnigmaticLoadingExperience />
+                                <p className="mt-4 text-lg">{sidePanelDisplayedText}
+                                    {isSidePanelTyping && (
+                                        <span className="animate-pulse">|</span>
+                                    )}
+                                </p>
+                            </div>
                         </div>
                     ) : (
                         <>
