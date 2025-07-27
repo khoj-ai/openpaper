@@ -140,18 +140,22 @@ async def process_pdf_file(
                 return None, None
 
         async def extract_images_async():
-            status_callback("Extracting images from PDF")
-            logger.info(f"About to call extract_images_from_pdf for job {job_id}")
-            try:
-                result = await extract_captions_for_images(
-                    images=extracted_images,
-                    file_path=temp_file_path,
-                    image_id_to_location=placeholder_to_path,
-                )
-                logger.info(f"extract_images_from_pdf returned {len(result) if result else 0} images")
-                return result
-            except Exception as e:
-                logger.error(f"Failed to extract images from {safe_filename}: {str(e)}", exc_info=True)
+            if extract_images:
+                status_callback("Extracting images from PDF")
+                logger.info(f"About to call extract_images_from_pdf for job {job_id}")
+                try:
+                    result = await extract_captions_for_images(
+                        images=extracted_images,
+                        file_path=temp_file_path,
+                        image_id_to_location=placeholder_to_path,
+                    )
+                    logger.info(f"extract_images_from_pdf returned {len(result) if result else 0} images")
+                    return result
+                except Exception as e:
+                    logger.error(f"Failed to extract images from {safe_filename}: {str(e)}", exc_info=True)
+                    return []
+            else:
+                logger.info(f"Image extraction skipped for {safe_filename}")
                 return []
 
         # Run I/O-bound tasks and LLM extraction concurrently
