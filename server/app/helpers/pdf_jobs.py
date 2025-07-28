@@ -12,10 +12,14 @@ from io import BytesIO
 from typing import Any, Dict, Optional
 
 import requests
+from app.database.crud.paper_crud import PaperCreate, paper_crud
+from app.database.models import PaperUploadJob
 from app.database.telemetry import track_event
 from app.helpers.s3 import s3_service
+from app.schemas.user import CurrentUser
 from celery import Celery
 from dotenv import load_dotenv
+from sqlalchemy.orm import Session
 
 load_dotenv()
 
@@ -204,7 +208,11 @@ class PDFJobsClient:
             }
 
     async def submit_pdf_processing_job_with_upload(
-        self, pdf_bytes: bytes, job_id: str
+        self,
+        pdf_bytes: bytes,
+        paper_upload_job: PaperUploadJob,
+        db: Session,
+        user: CurrentUser,
     ) -> str:
         """
         Upload a PDF file to S3 and submit a processing job.
@@ -228,6 +236,8 @@ class PDFJobsClient:
             raise ValueError(f"pdf_bytes must be bytes, got {type(pdf_bytes)}")
         if len(pdf_bytes) == 0:
             raise ValueError("pdf_bytes cannot be empty")
+
+        job_id = str(paper_upload_job.id)
 
         # Generate filename based on job_id
         filename = f"{job_id}.pdf"
@@ -256,6 +266,18 @@ class PDFJobsClient:
                     "duration": upload_duration,
                 },
                 sync=True,
+            )
+
+            new_paper = PaperCreate(
+                file_url=file_url,
+                s3_object_key=s3_object_key,
+                upload_job_id=str(job_id),
+            )
+
+            paper_crud.create(
+                db=db,
+                obj_in=new_paper,
+                user=user,
             )
 
             # Submit processing job with S3 object key

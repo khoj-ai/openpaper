@@ -30,6 +30,7 @@ from app.database.database import get_db
 from app.database.models import PaperUploadJob
 from app.database.telemetry import track_event
 from app.helpers.pdf_jobs import pdf_jobs_client
+from app.helpers.s3 import s3_service
 from app.helpers.subscription_limits import (
     can_user_access_knowledge_base,
     can_user_upload_paper,
@@ -273,7 +274,10 @@ async def upload_file_from_url_microservice(
 
         # Submit to microservice
         task_id = await pdf_jobs_client.submit_pdf_processing_job_with_upload(
-            pdf_bytes=file_contents, job_id=str(paper_upload_job.id)
+            pdf_bytes=file_contents,
+            paper_upload_job=paper_upload_job,
+            db=db,
+            user=current_user,
         )
 
         # Update job with task_id
@@ -342,7 +346,10 @@ async def upload_raw_file_microservice(
     try:
         # Submit to microservice
         task_id = await pdf_jobs_client.submit_pdf_processing_job_with_upload(
-            pdf_bytes=file_contents, job_id=str(paper_upload_job.id)
+            pdf_bytes=file_contents,
+            paper_upload_job=paper_upload_job,
+            db=db,
+            user=current_user,
         )
 
         # Update job with task_id

@@ -68,7 +68,7 @@ export function useAnnotations(paperId: string) {
         }
     };
 
-    const loadAnnotationsFromServer = async () => {
+    const fetchAnnotations = async () => {
         try {
             const loadedAnnotations: PaperHighlightAnnotation[] = await fetchFromApi(`/api/annotation/${paperId}`, {
                 method: 'GET',
@@ -80,6 +80,10 @@ export function useAnnotations(paperId: string) {
             console.error('Error loading annotations:', error);
             throw error;
         }
+    };
+
+    const refreshAnnotations = async () => {
+        await fetchAnnotations();
     };
 
     const renderAnnotations = (highlights: PaperHighlightAnnotation[]) => {
@@ -110,7 +114,7 @@ export function useAnnotations(paperId: string) {
     };
 
     useEffect(() => {
-        loadAnnotationsFromServer();
+        fetchAnnotations();
     }, []);
 
     return {
@@ -119,7 +123,8 @@ export function useAnnotations(paperId: string) {
         addAnnotation,
         removeAnnotation,
         updateAnnotation,
-        loadAnnotationsFromServer,
+        fetchAnnotations,
+        refreshAnnotations,
         getAnnotationsForHighlight,
         renderAnnotations,
     };

@@ -50,7 +50,7 @@ class PaperBase(BaseModel):
 class PaperCreate(PaperBase):
     # Only mandate required fields for creation, others are optional
     file_url: str  # type: ignore
-    raw_content: str  # type: ignore
+    raw_content: Optional[str] = None  # type: ignore
     s3_object_key: Optional[str] = None
     upload_job_id: Optional[str] = None
     preview_url: Optional[str] = None
@@ -60,6 +60,8 @@ class PaperUpdate(PaperBase):
     status: Optional[PaperStatus] = PaperStatus.todo
     cached_presigned_url: Optional[str] = None
     presigned_url_expires_at: Optional[datetime] = None
+    preview_url: Optional[str] = None
+    raw_content: Optional[str] = None
     open_alex_id: Optional[str] = None
     doi: Optional[str] = None
     size_in_kb: Optional[int] = None
