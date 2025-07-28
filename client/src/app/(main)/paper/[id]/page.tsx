@@ -1104,11 +1104,11 @@ export default function PaperView() {
                         <ChatMessageActions message={msg.content} references={msg.references} />
                     )}
                     {
-                        msg.references && msg.references['citations'] && msg.references['citations']?.length > 0 && (
+                        msg.references && msg.references.citations && msg.references.citations.length > 0 && (
                             <div className="mt-0 pt-0 border-t border-gray-300 dark:border-gray-700" id="references-section">
                                 <h4 className="text-sm font-semibold mb-2">References</h4>
                                 <ul className="list-none p-0">
-                                    {Object.entries(msg.references.citations).map(([refIndex, value]) => (
+                                    {msg.references.citations.map((value, refIndex) => (
                                         <div
                                             key={refIndex}
                                             className={`flex flex-row gap-2 animate-fade-in ${matchesCurrentCitation(value.key, index) ? 'bg-blue-100 dark:bg-blue-900 rounded p-1 transition-colors duration-300' : ''}`}
