@@ -67,7 +67,6 @@ import {
     PaperHighlight,
     Reference,
     ResponseStyle,
-    JobStatusType,
     JobStatusResponse,
 } from '@/lib/schema';
 
