@@ -40,7 +40,7 @@ export function ChatMessageActions({ message, references }: ChatMessageActionsPr
 
 	const copyWithReferences = () => {
 		let textToCopy = message;
-		if (references && references.citations.length > 0) {
+		if (references && references.citations && references.citations.length > 0) {
 			const referenceText = references.citations
 				.map(citation => `[${citation.key}] ${citation.reference}`)
 				.join("\n");
@@ -75,7 +75,7 @@ export function ChatMessageActions({ message, references }: ChatMessageActionsPr
 						<DropdownMenuItem onClick={copyAsPlainText}>
 							As Plaintext
 						</DropdownMenuItem>
-						<DropdownMenuItem onClick={copyWithReferences} disabled={!references || references.citations.length === 0}>
+						<DropdownMenuItem onClick={copyWithReferences} disabled={!references || !references.citations || references.citations.length === 0}>
 							With References
 						</DropdownMenuItem>
 					</DropdownMenuContent>
