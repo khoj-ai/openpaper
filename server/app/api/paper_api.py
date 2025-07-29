@@ -73,6 +73,9 @@ async def get_paper_ids(
                     "status": paper.status,
                     "preview_url": paper.preview_url,
                     "size_in_kb": paper.size_in_kb,
+                    "publish_date": (
+                        str(paper.publish_date) if paper.publish_date else None
+                    ),
                 }
                 for paper in papers
             ]

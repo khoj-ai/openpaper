@@ -1,7 +1,7 @@
 import { Citation, ReferenceCitation } from "@/lib/schema";
 import { HTMLAttributes, ReactNode, createElement, Children } from "react";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { PaperItem } from "@/components/AppSidebar";
+import { PaperItem } from "@/lib/schema";
 
 // Interface for the CustomCitationLink component props
 interface CustomCitationLinkProps extends HTMLAttributes<HTMLElement> {

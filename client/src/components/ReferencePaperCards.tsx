@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Citation } from "@/lib/schema";
-import { PaperItem } from "./AppSidebar";
+import { PaperItem } from "@/lib/schema";
 import PaperCard from "./PaperCard";
 import { groupConsecutiveNumbers } from "@/lib/utils";
 

@@ -18,7 +18,7 @@ import {
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { formatDate, truncateText, handleStatusChange } from "./utils/paperUtils";
-import { PaperItem } from "./AppSidebar";
+import { PaperItem } from "@/lib/schema";
 import { getStatusIcon, PaperStatus, PaperStatusEnum } from "@/components/utils/PdfStatus";
 
 interface PaperSearchResultCardProps {

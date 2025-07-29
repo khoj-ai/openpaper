@@ -18,7 +18,7 @@ import { useAuth } from "@/lib/auth";
 import { PdfDropzone } from "@/components/PdfDropzone";
 import Link from "next/link";
 import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience";
-import { PaperItem } from "@/components/AppSidebar";
+import { PaperItem } from "@/lib/schema";
 import PaperCard from "@/components/PaperCard";
 import { JobStatusType, JobStatusResponse } from "@/lib/schema";
 import OpenPaperLanding from "@/components/OpenPaperLanding";

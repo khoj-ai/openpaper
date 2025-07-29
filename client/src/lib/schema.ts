@@ -217,3 +217,18 @@ export interface JobStatusResponse {
 	has_metadata: boolean;
 	celery_progress_message: string | null;
 }
+
+export interface PaperItem {
+    id: string
+    title: string
+    abstract?: string
+    authors?: string[]
+    keywords?: string[]
+    institutions?: string[]
+    summary?: string
+    created_at?: string
+    publish_date?: string
+    status?: PaperStatus
+    preview_url?: string
+    size_in_kb?: number
+}

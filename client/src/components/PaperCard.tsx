@@ -1,4 +1,4 @@
-import { PaperItem } from "@/components/AppSidebar";
+import { PaperItem } from "@/lib/schema";
 import { Card } from "@/components/ui/card"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
@@ -193,7 +193,7 @@ export default function PaperCard({ paper, handleDelete, setPaper, minimalist = 
                     {!minimalist && (
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
-                                <span>{new Date(paper.created_at || "").toLocaleDateString()}</span>
+                                <span>{new Date(paper.publish_date || paper.created_at || "").toLocaleDateString()}</span>
                                 {paper.size_in_kb && (
                                     <>
                                         <span>•</span>

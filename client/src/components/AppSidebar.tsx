@@ -33,9 +33,8 @@ import { useIsDarkMode } from "@/hooks/useDarkMode";
 import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isStorageNearLimit, isPaperUploadNearLimit, isChatCreditAtLimit, isChatCreditNearLimit } from "@/hooks/useSubscription";
 import Image from "next/image";
 import Link from "next/link";
-import { PaperStatus } from "@/components/utils/PdfStatus";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
-import { Conversation } from "@/lib/schema";
+import { Conversation, PaperItem } from "@/lib/schema";
 
 // Menu items.
 const items = [
@@ -69,20 +68,6 @@ const items = [
     },
 ]
 
-
-export interface PaperItem {
-    id: string
-    title: string
-    abstract?: string
-    authors?: string[]
-    keywords?: string[]
-    institutions?: string[]
-    summary?: string
-    created_at?: string
-    status?: PaperStatus
-    preview_url?: string
-    size_in_kb?: number
-}
 
 export function AppSidebar() {
     const router = useRouter();

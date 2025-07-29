@@ -23,6 +23,10 @@ async def search_knowledge_base_endpoint(
         50, ge=1, le=100, description="Maximum number of papers to return"
     ),
     offset: int = Query(0, ge=0, description="Number of papers to skip for pagination"),
+    papers_filter: str = Query(
+        None,
+        description="Comma-separated list of paper IDs to filter results by specific papers",
+    ),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_required_user),
 ):
@@ -46,9 +50,16 @@ async def search_knowledge_base_endpoint(
                 detail="Search query must be at least 2 characters long",
             )
 
+        kb_papers_filter = papers_filter.split(",") if papers_filter else None
+
         # Perform the search
         results = search_knowledge_base(
-            db=db, user=current_user, query=q.strip(), limit=limit, offset=offset
+            db=db,
+            user=current_user,
+            query=q.strip(),
+            limit=limit,
+            offset=offset,
+            papers_filter=kb_papers_filter,
         )
 
         # Track the search event for analytics

@@ -57,7 +57,12 @@ class SearchResults(BaseModel):
 
 
 def search_knowledge_base(
-    db: Session, user: CurrentUser, query: str, limit: int = 50, offset: int = 0
+    db: Session,
+    user: CurrentUser,
+    query: str,
+    limit: int = 50,
+    offset: int = 0,
+    papers_filter: Optional[List[str]] = None,
 ) -> SearchResults:
     """
     Search across papers, annotations, and highlights in a user's knowledge base.
@@ -69,6 +74,7 @@ def search_knowledge_base(
         query: Search query string
         limit: Maximum number of papers to return
         offset: Number of papers to skip (for pagination)
+        papers_filter: Optional list of paper IDs to filter results
 
     Returns:
         SearchResults with hierarchical data structure
@@ -82,6 +88,7 @@ def search_knowledge_base(
     paper_query = (
         db.query(Paper)
         .filter(Paper.user_id == user.id)
+        .filter(Paper.id.in_(papers_filter) if papers_filter else True)
         .filter(
             or_(
                 func.lower(Paper.title).like(search_pattern),

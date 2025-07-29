@@ -31,7 +31,7 @@ import {
     Reference,
 } from '@/lib/schema';
 import { useAuth } from '@/lib/auth';
-import { PaperItem } from '@/components/AppSidebar';
+import { PaperItem } from "@/lib/schema";
 import ReferencePaperCards from '@/components/ReferencePaperCards';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';

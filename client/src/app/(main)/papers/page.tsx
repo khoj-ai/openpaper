@@ -2,7 +2,7 @@
 
 import { fetchFromApi } from "@/lib/api";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { PaperItem } from "@/components/AppSidebar";
+import { PaperItem, SearchResults, PaperResult } from "@/lib/schema";
 import { PaperStatus } from "@/components/utils/PdfStatus";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,10 +13,11 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/lib/auth";
 import { useSubscription, getStorageUsagePercentage, isStorageNearLimit, isStorageAtLimit, formatFileSize } from "@/hooks/useSubscription";
-import { FileText, Upload, Search, AlertTriangle, AlertCircle, HardDrive } from "lucide-react";
+import { FileText, Upload, Search, AlertTriangle, AlertCircle, HardDrive, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { SearchResults, PaperResult } from "@/lib/schema";
 import { toast } from "sonner";
+import { PaperFiltering, Filter, Sort } from "@/components/PaperFiltering";
 
 // TODO: We could add a search look-up for the paper journal name to avoid placeholders
 
@@ -31,6 +32,8 @@ export default function PapersPage() {
     const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
     const { user, loading: authLoading } = useAuth();
     const { subscription, loading: subscriptionLoading } = useSubscription();
+    const [filters, setFilters] = useState<Filter[]>([]);
+    const [sort, setSort] = useState<Sort>({ type: "publish_date", order: "desc" });
 
     useEffect(() => {
         const fetchPapers = async () => {
@@ -77,6 +80,43 @@ export default function PapersPage() {
         }
     }, [searchResults, filteredPapers, searching, searchTerm]);
 
+    useEffect(() => {
+        let papersToFilter = papers;
+
+        // Apply filters
+        if (filters.length > 0) {
+            papersToFilter = papersToFilter.filter(paper => {
+                return filters.every(filter => {
+                    if (filter.type === "author") {
+                        return paper.authors?.includes(filter.value);
+                    }
+                    if (filter.type === "keyword") {
+                        return paper.keywords?.includes(filter.value);
+                    }
+                    return true;
+                });
+            });
+        }
+
+        // Apply sorting
+        papersToFilter.sort((a, b) => {
+            const aDate = a.publish_date ? new Date(a.publish_date) : null;
+            const bDate = b.publish_date ? new Date(b.publish_date) : null;
+
+            if (aDate && bDate) {
+                return sort.order === "desc" ? aDate.getTime() - bDate.getTime() : bDate.getTime() - aDate.getTime();
+            } else if (aDate) {
+                return -1;
+            } else if (bDate) {
+                return 1;
+            } else {
+                return 0;
+            }
+        });
+
+        setFilteredPapers(papersToFilter);
+    }, [filters, sort, papers]);
+
     const deletePaper = async (paperId: string) => {
         try {
             await fetchFromApi(`/api/paper?id=${paperId}`, {
@@ -108,18 +148,24 @@ export default function PapersPage() {
         if (!term.trim()) {
             setFilteredPapers(papers)
             setSearchResults(null)
+            setFilters([])
             return
         }
 
         setSearching(true)
         try {
-            const response: SearchResults = await fetchFromApi(`/api/search/local?q=${encodeURIComponent(term)}`);
+            let url = `/api/search/local?q=${encodeURIComponent(term)}`;
+            if (filteredPapers.length > 0) {
+                const paperIds = filteredPapers.map(p => p.id).join(',');
+                url += `&papers_filter=${paperIds}`;
+            }
+            const response: SearchResults = await fetchFromApi(url);
 
             // Store the complete search results
             setSearchResults(response);
 
             // Convert PaperResult to PaperItem format for compatibility with existing UI
-            const searchResultsPapers = response.papers.map((paper: PaperResult): PaperItem => ({
+            let searchResultsPapers = response.papers.map((paper: PaperResult): PaperItem => ({
                 id: paper.id,
                 title: paper.title || "Untitled", // PaperItem expects non-nullable title
                 authors: paper.authors || undefined,
@@ -131,6 +177,22 @@ export default function PapersPage() {
                 institutions: [], // API doesn't return institutions, so default to empty
                 summary: paper.abstract || undefined // Use abstract as summary fallback
             }))
+
+            // Apply explicit filters to search results
+            if (filters.length > 0) {
+                searchResultsPapers = searchResultsPapers.filter(paper => {
+                    return filters.every(filter => {
+                        if (filter.type === "author") {
+                            return paper.authors?.includes(filter.value);
+                        }
+                        if (filter.type === "keyword") {
+                            return paper.keywords?.includes(filter.value);
+                        }
+                        return true;
+                    });
+                });
+            }
+
             setFilteredPapers(searchResultsPapers)
         } catch (error) {
             console.log("Error performing search:", error);
@@ -149,7 +211,7 @@ export default function PapersPage() {
         } finally {
             setSearching(false)
         }
-    }, [papers])
+    }, [papers, filteredPapers, filters])
 
     const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
         const term = event.target.value
@@ -247,6 +309,8 @@ export default function PapersPage() {
             return null;
         }
 
+        const filteredOutCount = searchResults.total_papers - filteredPapers.length;
+
         return (
             <div className="mb-4 p-3 bg-muted/50 rounded-lg border">
                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
@@ -264,6 +328,11 @@ export default function PapersPage() {
                         </span>
                     )}
                 </div>
+                {filters.length > 0 && filteredOutCount > 0 && (
+                    <div className="text-sm text-muted-foreground mt-2">
+                        <strong>{filteredOutCount}</strong> papers filtered out
+                    </div>
+                )}
             </div>
         );
     };
@@ -336,21 +405,47 @@ export default function PapersPage() {
             <StorageUsageDisplay />
 
             {papers.length > 0 && (
-                <div className="mb-6 relative">
-                    <Input
-                        type="text"
-                        placeholder="Search your paper bank (including annotations and highlights)"
-                        value={searchTerm}
-                        ref={searchInputRef}
-                        onChange={handleSearch}
-                        className="w-full"
-                        disabled={searching}
-                    />
-                    {searching && (
-                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
+                <div>
+                    <div className="flex gap-2 mb-6">
+                        <div className="relative flex-grow">
+                            <Input
+                                type="text"
+                                placeholder="Search your paper bank (including annotations and highlights)"
+                                value={searchTerm}
+                                ref={searchInputRef}
+                                onChange={handleSearch}
+                                className="w-full"
+                                disabled={searching}
+                            />
+                            {searching && (
+                                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
+                                </div>
+                            )}
                         </div>
-                    )}
+                        <PaperFiltering
+                            papers={papers}
+                            onFilterChange={setFilters}
+                            onSortChange={setSort}
+                            filters={filters}
+                            sort={sort}
+                        />
+                    </div>
+                    <div className="flex flex-wrap gap-2 mb-6">
+                        {filters.map(filter => (
+                            <Badge key={`${filter.type}-${filter.value}`} variant="secondary" className="flex items-center gap-1">
+                                {filter.value}
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-4 w-4 p-0"
+                                    onClick={() => setFilters(filters.filter(f => f.value !== filter.value))}
+                                >
+                                    <X className="h-3 w-3" />
+                                </Button>
+                            </Badge>
+                        ))}
+                    </div>
                 </div>
             )}
 
