@@ -562,7 +562,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
     };
 
     return (
-        <div className="rounded-lg py-2 h-full w-full">
+        <div className="rounded-lg py-2 h-full w-full px-2 md:px-0">
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
                     <FileAudio className="w-5 h-5" />
@@ -627,7 +627,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
             {/* No audio overview exists or showing generation form */}
             {((!audioOverview && !jobStatus && isInitialLoadDone) || showGenerationForm) && (
                 <div className="text-center py-8">
-                    <div className="bg-blue-50 dark:bg-blue-950 rounded-xl p-8 max-w-lg mx-auto">
+                    <div className="bg-blue-50 dark:bg-blue-950 rounded-xl p-4 md:p-8 max-w-lg mx-auto">
                         <Mic className="w-16 h-16 text-blue-500 mx-auto mb-4" />
                         <h3 className="text-xl font-semibold text-foreground mb-2">
                             Audio Overview
@@ -641,7 +641,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                             <Label className="block text-sm font-medium text-foreground mb-3">
                                 Summary Focus
                             </Label>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                 <Button
                                     variant={'outline'}
                                     onClick={() => {
@@ -748,7 +748,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
             {/* Job in progress */}
             {jobStatus && !audioOverview && (
                 <div className="text-center py-8">
-                    <div className="bg-blue-50 dark:bg-blue-950 rounded-xl p-8">
+                    <div className="bg-blue-50 dark:bg-blue-950 rounded-xl p-4 md:p-8">
                         <div className="inline-flex items-center space-x-2 mb-6">
                             {(jobStatus.status === 'pending' || jobStatus.status === 'running') && (
                                 <EnigmaticLoadingExperience />
@@ -843,7 +843,7 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                     </div>
 
                     {/* Enhanced Audio Player */}
-                    <div className="bg-secondary rounded-xl p-6 shadow-sm">
+                    <div className="bg-secondary rounded-xl p-4 md:p-6 shadow-sm">
                         <audio
                             ref={audioRef}
                             src={audioOverview.audio_url}
@@ -852,29 +852,29 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
 
 
                         {/* Main Controls */}
-                        <div className="flex items-center space-x-4 mb-4">
+                        <div className="flex items-center space-x-2 md:space-x-4 mb-4">
                             <button
                                 onClick={togglePlayback}
                                 disabled={!isLoaded}
-                                className="bg-blue-500 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-200"
+                                className="bg-blue-500 text-white p-3 md:p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-200"
                             >
                                 {isPlaying ? (
-                                    <Pause className="w-6 h-6" fill="currentColor" />
+                                    <Pause className="w-5 h-5 md:w-6 md:h-6" fill="currentColor" />
                                 ) : (
-                                    <Play className="w-6 h-6" fill="currentColor" />
+                                    <Play className="w-5 h-5 md:w-6 md:h-6" fill="currentColor" />
                                 )}
                             </button>
 
-                            <div className="flex-1">
-                                <div className="text-lg font-semibold text-secondary-foreground mb-1">
+                            <div className="flex-1 min-w-0">
+                                <div className="text-base md:text-lg font-semibold text-secondary-foreground mb-1 truncate">
                                     {audioOverview.title || paper_title || 'Audio Overview'}
                                 </div>
-                                <div className="text-sm text-secondary-foreground">
+                                <div className="text-xs md:text-sm text-secondary-foreground">
                                     {formatTime(currentTime)} / {formatTime(duration)}
                                 </div>
                             </div>
 
-                            <div className="flex items-center space-x-2">
+                            <div className="hidden md:flex items-center space-x-2">
                                 <Volume2 className="w-4 h-4 text-secondary-foreground" />
                                 <input
                                     type="range"
@@ -904,33 +904,33 @@ export function AudioOverview({ paper_id, paper_title, setExplicitSearchTerm }: 
                         </div>
 
                         {/* Secondary Controls */}
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col md:flex-row items-center justify-center md:justify-between gap-4 mt-4">
                             <div className="flex items-center space-x-2">
                                 <button
                                     onClick={skipBackward}
-                                    className="text-accent-foreground p-2 rounded-lg hover:bg-gray-200 transition-colors"
+                                    className="text-accent-foreground p-2 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-1"
                                     title="Skip back 10s"
                                 >
-                                    <span className="text-xs">10s</span>
                                     <RotateCcw className="w-4 h-4" />
+                                    <span className="text-xs font-medium">10s</span>
                                 </button>
                                 <button
                                     onClick={skipForward}
-                                    className="text-accent-foreground p-2 rounded-lg hover:bg-gray-200 transition-colors"
+                                    className="text-accent-foreground p-2 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-1"
                                     title="Skip forward 10s"
                                 >
-                                    <span className="text-xs">10s</span>
                                     <RotateCcw className="w-4 h-4 scale-x-[-1]" />
+                                    <span className="text-xs font-medium">10s</span>
                                 </button>
                             </div>
 
-                            <div className="flex items-center space-x-1">
+                            <div className="flex items-center space-x-1 flex-wrap justify-center">
                                 <span className="text-sm text-accent-foreground mr-2">Speed:</span>
                                 {[0.75, 1, 1.25, 1.5, 2].map((speed) => (
                                     <button
                                         key={speed}
                                         onClick={() => handleSpeedChange(speed)}
-                                        className={`px-2 py-1 text-xs rounded ${playbackRate === speed
+                                        className={`px-3 py-1 text-xs rounded-full ${playbackRate === speed
                                             ? 'bg-blue-600 text-white'
                                             : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                                             } transition-colors`}

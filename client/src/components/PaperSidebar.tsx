@@ -28,12 +28,12 @@ export function PaperSidebar({ rightSideFunction, setRightSideFunction, PaperToo
 
     return (
         <div
-            className={`hidden md:flex flex-col h-[calc(100vh-64px)] absolute right-0 top-0 bg-background z-20 transition-all duration-300 ease-in-out`}
+            className={`flex flex-col h-[calc(100vh-128px)] md:h-[calc(100vh-64px)] absolute right-0 top-0 bg-background z-20 transition-all duration-300 ease-in-out`}
             onMouseEnter={() => setIsSidebarHovered(true)}
             onMouseLeave={() => setIsSidebarHovered(false)}
         >
-            <SidebarProvider className="items-start h-[calc(100vh-64px)] min-h-fit">
-                <Sidebar collapsible="none" className="hidden md:flex transition-all duration-300 ease-in-out" style={{ width: isSidebarHovered ? '180px' : '60px' }}>
+            <SidebarProvider className="items-start h-[calc(100vh-128px)] md:h-[calc(100vh-64px)] min-h-fit">
+                <Sidebar collapsible="none" className="flex transition-all duration-300 ease-in-out" style={{ width: isSidebarHovered ? '180px' : '60px' }}>
                     <SidebarContent>
                         <SidebarGroup>
                             <SidebarGroupLabel className={`transition-opacity duration-300 ${isSidebarHovered ? 'opacity-100' : 'opacity-50'}`}>Tools</SidebarGroupLabel>

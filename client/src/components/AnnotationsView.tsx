@@ -353,7 +353,7 @@ export function AnnotationsView(
 			/>
 
 			<div className="flex-1 overflow-auto" ref={scrollContainerRef}>
-				<div className="space-y-6 p-4">
+				<div className="md:space-y-6 md:p-4">
 					{filteredHighlights.length === 0 ? (
 						<div className="text-center text-muted-foreground text-sm py-8">
 							No highlights match the current filters.
