@@ -24,6 +24,7 @@ import {
     Eye,
     Edit,
     Loader,
+    Loader2,
     HelpCircle,
     ArrowUp,
     Feather,
@@ -81,6 +82,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 import { ChatMessageActions } from '@/components/ChatMessageActions';
 import { PaperSidebar } from '@/components/PaperSidebar';
 import EnigmaticLoadingExperience from '@/components/EnigmaticLoadingExperience';
+import PaperViewSkeleton from '@/components/PaperViewSkeleton';
 
 interface ChatRequestBody {
     user_query: string;
@@ -183,6 +185,18 @@ export default function PaperView() {
     const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
     const [sidePanelDisplayedText, setSidePanelDisplayedText] = useState('');
     const [isSidePanelTyping, setIsSidePanelTyping] = useState(false);
+    const [elapsedTime, setElapsedTime] = useState(0);
+
+    useEffect(() => {
+        if (jobId) {
+            const timer = setInterval(() => {
+                setElapsedTime(prevTime => prevTime + 1);
+            }, 1000);
+            return () => clearInterval(timer);
+        } else {
+            setElapsedTime(0); // Reset timer when job is done
+        }
+    }, [jobId]);
 
     useEffect(() => {
         if (!jobId) {
@@ -1241,7 +1255,7 @@ export default function PaperView() {
 
 
 
-    if (loading) return <div>Loading paper data...</div>;
+        if (loading) return <PaperViewSkeleton />;
 
     if (!paperData) return <div>Paper not found</div>;
 
@@ -1306,11 +1320,15 @@ export default function PaperView() {
                         <div className="flex items-center justify-center h-full w-full">
                             <div className="flex flex-col items-center">
                                 <EnigmaticLoadingExperience />
-                                <p className="mt-4 text-lg">{sidePanelDisplayedText}
-                                    {isSidePanelTyping && (
-                                        <span className="animate-pulse">|</span>
-                                    )}
-                                </p>
+                                <div className="flex items-center justify-center gap-1 font-mono text-lg w-full">
+                                    <div className="flex items-center gap-1 w-14">
+                                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                        <p className="text-gray-400 w-12">
+                                            {elapsedTime}s
+                                        </p>
+                                    </div>
+                                    <p className="text-primary text-right flex-1">{sidePanelDisplayedText}</p>
+                                </div>
                             </div>
                         </div>
                     ) : (
