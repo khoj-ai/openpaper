@@ -348,14 +348,6 @@ export function SidePanelContent({
         }
     };
 
-    const scrollToBottom = () => {
-        if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-        } else if (messagesContainerRef.current) {
-            messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-        }
-    };
-
     const transformReferencesToFormat = useCallback((references: string[]) => {
         const citations = references.map((ref, index) => ({
             key: `${index + 1}`,

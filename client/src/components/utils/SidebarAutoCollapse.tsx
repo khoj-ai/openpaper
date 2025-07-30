@@ -12,19 +12,15 @@ export function SidebarController({ children }: { children: React.ReactNode }) {
     const hasInitialized = useRef(false);
 
     useEffect(() => {
-        // Set initial state on first render for paper pages
         if (!hasInitialized.current) {
             if (pathname.includes('/paper/')) {
-                // Set initial state without triggering transition
                 setOpen(false);
-                setOpenMobile(false);
             } else if (pathname === '/' && !user) {
-                // If on the home page and not logged in, collapse sidebar
                 setOpen(false);
-                setOpenMobile(false);
             }
             hasInitialized.current = true;
         }
+        setOpenMobile(false);
     }, [pathname, setOpen, setOpenMobile, user]);
 
     return <>{children}</>;

@@ -90,7 +90,7 @@ export default function PaperSearchResultCard({ paper, searchTerm, setPaper, han
             onClick={handleCardClick}
         >
             <CardHeader className="pb-2">
-                <div className="flex gap-4">
+                <div className="flex flex-col sm:flex-row gap-4">
                     {/* Main content - left side */}
                     <div className="flex-1 min-w-0">
                         <Link href={`/paper/${paper.id}`} onClick={(e) => e.stopPropagation()} className="hover:underline">
@@ -103,17 +103,17 @@ export default function PaperSearchResultCard({ paper, searchTerm, setPaper, han
                         </Link>
 
                         {/* Compact metadata row */}
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground mb-2">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-3 text-xs text-muted-foreground mb-2">
                             {paper.authors && paper.authors.length > 0 && (
                                 <>
                                     <div className="flex items-center gap-1">
                                         <User className="h-3 w-3" />
-                                        <span className="truncate max-w-[200px]">
+                                        <span className="truncate max-w-[250px] sm:max-w-[150px] md:max-w-[200px]">
                                             {paper.authors.slice(0, 2).join(", ")}
                                             {paper.authors.length > 2 && ` +${paper.authors.length - 2}`}
                                         </span>
                                     </div>
-                                    <span>•</span>
+                                    <span className="hidden sm:inline">•</span>
                                 </>
                             )}
                             {paper.publish_date && (
@@ -122,7 +122,7 @@ export default function PaperSearchResultCard({ paper, searchTerm, setPaper, han
                                         <Calendar className="h-3 w-3" />
                                         <span>{formatDate(paper.publish_date)}</span>
                                     </div>
-                                    <span>•</span>
+                                    <span className="hidden sm:inline">•</span>
                                 </>
                             )}
                             <div className="flex items-center gap-1">
@@ -164,9 +164,9 @@ export default function PaperSearchResultCard({ paper, searchTerm, setPaper, han
                     </div>
 
                     {/* Preview image and controls - right side */}
-                    <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                    <div className="flex flex-col items-end gap-2 flex-shrink-0 sm:w-auto w-full">
                         {/* Preview image */}
-                        <div className="w-20 h-24 bg-muted rounded border overflow-hidden relative">
+                        <div className="w-full sm:w-20 h-auto sm:h-24 bg-muted rounded border overflow-hidden relative">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                                 src={paper.preview_url || ''}

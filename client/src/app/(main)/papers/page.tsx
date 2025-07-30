@@ -13,7 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/lib/auth";
 import { useSubscription, getStorageUsagePercentage, isStorageNearLimit, isStorageAtLimit, formatFileSize } from "@/hooks/useSubscription";
-import { FileText, Upload, Search, AlertTriangle, AlertCircle, HardDrive, X } from "lucide-react";
+import { FileText, Upload, Search, AlertTriangle, AlertCircle, HardDrive, X, ArrowDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -34,6 +34,7 @@ export default function PapersPage() {
     const { subscription, loading: subscriptionLoading } = useSubscription();
     const [filters, setFilters] = useState<Filter[]>([]);
     const [sort, setSort] = useState<Sort>({ type: "publish_date", order: "desc" });
+    const SHOW_STORAGE_USAGE_THRESHOLD = 60; // Show storage usage alert if usage is above 60%
 
     useEffect(() => {
         const fetchPapers = async () => {
@@ -253,6 +254,8 @@ export default function PapersPage() {
     };
 
     const StorageUsageDisplay = () => {
+        const [isExpanded, setIsExpanded] = useState(false);
+
         if (subscriptionLoading) {
             return <Skeleton className="h-20 w-full mb-6" />;
         }
@@ -264,42 +267,62 @@ export default function PapersPage() {
         const usagePercentage = getUsagePercentage();
         const alertType = getUsageAlert();
 
+        if (usagePercentage < SHOW_STORAGE_USAGE_THRESHOLD) {
+            return null; // Don't show if usage is below 60%
+        }
+
         return (
-            <div className="mb-6 p-4 border rounded-lg bg-card">
-                <div className="flex items-center gap-2 mb-2">
-                    <HardDrive className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Storage Usage</span>
-                </div>
-
-                <div className="space-y-2">
-                    <div className="flex justify-between text-sm text-muted-foreground">
-                        <span>{formatFileSize(subscription.usage.knowledge_base_size)} used</span>
-                        <span>{formatFileSize(subscription.limits.knowledge_base_size)} total</span>
+            <div
+                className="mb-6 p-4 border rounded-lg bg-card cursor-pointer transition-all"
+                onClick={() => setIsExpanded(!isExpanded)}
+            >
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <HardDrive className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">
+                            Storage: {usagePercentage.toFixed(0)}%
+                        </span>
                     </div>
-
-                    <Progress
-                        value={usagePercentage}
-                        className="h-2"
-                    />
-
-                    {alertType && (
-                        <Alert variant={alertType === "error" ? "destructive" : "default"} className="mt-3">
-                            <div className="flex items-center gap-2">
-                                {alertType === "error" ? (
-                                    <AlertCircle className="h-4 w-4" />
-                                ) : (
-                                    <AlertTriangle className="h-4 w-4" />
-                                )}
-                                <AlertDescription>
-                                    {alertType === "error"
-                                        ? "You've reached your storage limit. Please delete some papers to upload new ones."
-                                        : "You're approaching your storage limit. Consider reviewing your papers."
-                                    }
-                                </AlertDescription>
-                            </div>
-                        </Alert>
-                    )}
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                        {isExpanded ? (
+                            <X className="h-4 w-4" />
+                        ) : (
+                            <ArrowDown className="h-4 w-4" />
+                        )}
+                    </Button>
                 </div>
+
+                {isExpanded && (
+                    <div className="mt-4 space-y-2">
+                        <div className="flex justify-between text-sm text-muted-foreground">
+                            <span>{formatFileSize(subscription.usage.knowledge_base_size)} used</span>
+                            <span>{formatFileSize(subscription.limits.knowledge_base_size)} total</span>
+                        </div>
+
+                        <Progress
+                            value={usagePercentage}
+                            className="h-2"
+                        />
+
+                        {alertType && (
+                            <Alert variant={alertType === "error" ? "destructive" : "default"} className="mt-3">
+                                <div className="flex items-center gap-2">
+                                    {alertType === "error" ? (
+                                        <AlertCircle className="h-4 w-4" />
+                                    ) : (
+                                        <AlertTriangle className="h-4 w-4" />
+                                    )}
+                                    <AlertDescription>
+                                        {alertType === "error"
+                                            ? "You've reached your storage limit. Please delete some papers to upload new ones."
+                                            : "You're approaching your storage limit. Consider reviewing your papers."
+                                        }
+                                    </AlertDescription>
+                                </div>
+                            </Alert>
+                        )}
+                    </div>
+                )}
             </div>
         );
     };
@@ -406,7 +429,7 @@ export default function PapersPage() {
 
             {papers.length > 0 && (
                 <div>
-                    <div className="flex gap-2 mb-6">
+                    <div className="flex flex-col sm:flex-row gap-2 mb-6">
                         <div className="relative flex-grow">
                             <Input
                                 type="text"

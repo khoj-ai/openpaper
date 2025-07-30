@@ -1,6 +1,22 @@
 "use client"
 
-import { AlertTriangle, ArrowRight, ChevronDown, ChevronsUpDown, FileText, Globe2, Home, LogOut, MessageCircleQuestion, Moon, Route, Sun, TelescopeIcon, User, X } from "lucide-react";
+import {
+    AlertTriangle,
+    ArrowRight,
+    ChevronDown,
+    ChevronsUpDown,
+    FileText,
+    Globe2,
+    Home,
+    LogOut,
+    MessageCircleQuestion,
+    Moon,
+    Route,
+    Sun,
+    TelescopeIcon,
+    User as UserIcon,
+    X
+} from "lucide-react";
 
 import {
     Sidebar,
@@ -19,7 +35,7 @@ import {
 import { useEffect, useState } from "react";
 import { fetchFromApi } from "@/lib/api";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth";
+import { useAuth, User} from "@/lib/auth";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +44,11 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+    Sheet,
+    SheetContent,
+    SheetTrigger,
+} from "@/components/ui/sheet";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useIsDarkMode } from "@/hooks/useDarkMode";
 import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isStorageNearLimit, isPaperUploadNearLimit, isChatCreditAtLimit, isChatCreditNearLimit } from "@/hooks/useSubscription";
@@ -35,6 +56,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 import { Conversation, PaperItem } from "@/lib/schema";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // Menu items.
 const items = [
@@ -68,6 +90,60 @@ const items = [
     },
 ]
 
+const UserMenuContent = ({
+    user,
+    handleLogout,
+    toggleDarkMode,
+    darkMode,
+}: {
+    user: User,
+    handleLogout: () => void,
+    toggleDarkMode: () => void,
+    darkMode: boolean
+}) => (
+    <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-3 p-3">
+            <Avatar className="h-10 w-10">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {user.picture ? (<img src={user.picture} alt={user.name} />) : (<UserIcon size={24} />)}
+            </Avatar>
+            <div>
+                <h3 className="font-medium">{user.name}</h3>
+                <p className="text-sm text-muted-foreground">{user.email}</p>
+            </div>
+        </div>
+        {/* Feedback section */}
+        <Link href="https://github.com/khoj-ai/openpaper/issues" target="_blank" className="w-full">
+            <Button variant="ghost" className="w-full justify-start">
+                <MessageCircleQuestion size={16} className="mr-2" />
+                Feedback
+            </Button>
+        </Link>
+        <Link href="/pricing" className="w-full">
+            <Button
+                variant="ghost"
+                className="w-full justify-start"
+            >
+                <Route size={16} className="mr-2" />
+                Plans
+            </Button>
+        </Link>
+        {/* Dark Mode Toggle */}
+        <Button onClick={toggleDarkMode} variant="ghost" className="w-full justify-start">
+            {darkMode ? <Sun size={16} className="mr-2" /> : <Moon size={16} className="mr-2" />}
+            {darkMode ? 'Light Mode' : 'Dark Mode'}
+        </Button>
+        <Button
+            variant="ghost"
+            className="w-full justify-start"
+            onClick={handleLogout}
+        >
+            <LogOut size={16} className="mr-2" />
+            Sign out
+        </Button>
+    </div>
+)
+
 
 export function AppSidebar() {
     const router = useRouter();
@@ -77,6 +153,7 @@ export function AppSidebar() {
     const { darkMode, toggleDarkMode } = useIsDarkMode();
     const { subscription, loading: subscriptionLoading } = useSubscription();
     const [dismissedWarning, setDismissedWarning] = useState<string | null>(null);
+    const isMobile = useIsMobile();
 
     useEffect(() => {
         // Define an async function inside useEffect
@@ -370,63 +447,43 @@ export function AppSidebar() {
                 {/* User Profile (if logged in) */}
                 {user && (
                     <SidebarMenuItem className="mb-2">
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <SidebarMenuButton className="flex items-center gap-2">
-                                    <span className="flex items-center gap-2 truncate">
-                                        <Avatar className="h-6 w-6">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            {user.picture ? (<img src={user.picture} alt={user.name} />) : (<User size={16} />)}
-                                        </Avatar>
-                                        <span className="truncate">{user.name}</span>
-                                    </span>
-                                    <ChevronsUpDown className="h-4 w-4 ml-auto" />
-                                </SidebarMenuButton>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-60 p-1" align="start">
-                                <div className="flex flex-col gap-1">
-                                    <div className="flex items-center gap-3 p-3">
-                                        <Avatar className="h-10 w-10">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            {user.picture ? (<img src={user.picture} alt={user.name} />) : (<User size={24} />)}
-                                        </Avatar>
-                                        <div>
-                                            <h3 className="font-medium">{user.name}</h3>
-                                            <p className="text-sm text-muted-foreground">{user.email}</p>
-                                        </div>
-                                    </div>
-                                    {/* Feedback section */}
-                                    <Link href="https://github.com/khoj-ai/openpaper/issues" target="_blank" className="w-full">
-                                        <Button variant="ghost" className="w-full justify-start">
-                                            <MessageCircleQuestion size={16} className="mr-2" />
-                                            Feedback
-                                        </Button>
-                                    </Link>
-                                    <Link href="/pricing" className="w-full">
-                                        <Button
-                                            variant="ghost"
-                                            className="w-full justify-start"
-                                        >
-                                            <Route size={16} className="mr-2" />
-                                            Plans
-                                        </Button>
-                                    </Link>
-                                    {/* Dark Mode Toggle */}
-                                    <Button onClick={toggleDarkMode} variant="ghost" className="w-full justify-start">
-                                        {darkMode ? <Sun size={16} className="mr-2" /> : <Moon size={16} className="mr-2" />}
-                                        {darkMode ? 'Light Mode' : 'Dark Mode'}
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        className="w-full justify-start"
-                                        onClick={handleLogout}
-                                    >
-                                        <LogOut size={16} className="mr-2" />
-                                        Sign out
-                                    </Button>
-                                </div>
-                            </PopoverContent>
-                        </Popover>
+                        {isMobile ? (
+                            <Sheet>
+                                <SheetTrigger asChild>
+                                    <SidebarMenuButton className="flex items-center gap-2">
+                                        <span className="flex items-center gap-2 truncate">
+                                            <Avatar className="h-6 w-6">
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                {user.picture ? <img src={user.picture} alt={user.name} /> : <UserIcon size={16} />}
+                                            </Avatar>
+                                            <span className="truncate">{user.name}</span>
+                                        </span>
+                                        <ChevronsUpDown className="h-4 w-4 ml-auto" />
+                                    </SidebarMenuButton>
+                                </SheetTrigger>
+                                <SheetContent side="bottom">
+                                    <UserMenuContent user={user} handleLogout={handleLogout} toggleDarkMode={toggleDarkMode} darkMode={darkMode} />
+                                </SheetContent>
+                            </Sheet>
+                        ) : (
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <SidebarMenuButton className="flex items-center gap-2">
+                                        <span className="flex items-center gap-2 truncate">
+                                            <Avatar className="h-6 w-6">
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                {user.picture ? (<img src={user.picture} alt={user.name} />) : (<UserIcon size={16} />)}
+                                            </Avatar>
+                                            <span className="truncate">{user.name}</span>
+                                        </span>
+                                        <ChevronsUpDown className="h-4 w-4 ml-auto" />
+                                    </SidebarMenuButton>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-60 p-1" align="start">
+                                    <UserMenuContent user={user} handleLogout={handleLogout} toggleDarkMode={toggleDarkMode} darkMode={darkMode} />
+                                </PopoverContent>
+                            </Popover>
+                        )}
                     </SidebarMenuItem>
                 )}
 
@@ -438,7 +495,7 @@ export function AppSidebar() {
                                 href="/login"
                                 className="w-full flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 px-3 py-2 rounded-md transition-colors"
                             >
-                                <User size={16} />
+                                <UserIcon size={16} />
                                 <span className="font-medium">Sign In</span>
                             </a>
                         </SidebarMenuButton>
