@@ -40,7 +40,7 @@ import { Toggle } from "@/components/ui/toggle";
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { AnnotationsView } from '@/components/AnnotationsView';
-import { AudioOverview } from '@/components/AudioOverview';
+import { AudioOverviewPanel } from '@/components/AudioOverview';
 import PaperMetadata from '@/components/PaperMetadata';
 import { ChatMessageActions } from '@/components/ChatMessageActions';
 import { AnimatedMarkdown } from '@/components/AnimatedMarkdown';
@@ -937,7 +937,7 @@ export function SidePanelContent({
                                         </div>
                                     ) : (
                                         <div className="space-y-3">
-                                            <p className="text-sm text-muted-foreground">Make this paper public to share it with others via a unique link. All of your highlights and annotations will be visible to anyone with the link. Your chat and notes remain private.</p>
+                                            <p className="text-sm text-muted-foreground">Make this paper public to share it with others via a unique link. All of your annotations, chats, and audio overviews will be visible to anyone with the link.</p>
                                             <Button
                                                 onClick={handleShare}
                                                 disabled={isSharing}
@@ -1013,7 +1013,7 @@ export function SidePanelContent({
                         {
                             rightSideFunction === 'Audio' && (
                                 <div className={`flex flex-col ${heightClass} md:px-2 overflow-y-auto`}>
-                                    <AudioOverview
+                                    <AudioOverviewPanel
                                         paper_id={id}
                                         paper_title={paperData.title}
                                         setExplicitSearchTerm={setExplicitSearchTerm} />

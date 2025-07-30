@@ -205,4 +205,3 @@ export default function SharedPaperView() {
         </div>
     );
 }
-''

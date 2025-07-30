@@ -242,3 +242,15 @@ export interface CreditUsage {
     isNearLimit: boolean;
     isCritical: boolean;
 }
+
+export interface AudioOverview {
+    id: string;
+    paper_id: string;
+    audio_url: string;
+    transcript: string;
+    title: string;
+    citations: ReferenceCitation[];
+    created_at: string;
+    updated_at: string;
+    job_id: string;
+}
