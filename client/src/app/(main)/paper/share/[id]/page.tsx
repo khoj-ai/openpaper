@@ -8,6 +8,9 @@ import { fetchFromApi } from '@/lib/api';
 import { PaperData, PaperHighlight, PaperHighlightAnnotation } from '@/lib/schema';
 import { useHighlights } from '@/components/hooks/PdfHighlight';
 import PaperMetadata from '@/components/PaperMetadata';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Book, Box } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 // Define the expected structure of the response from the share endpoint
 interface SharedPaperResponse {
@@ -29,6 +32,9 @@ export default function SharedPaperView() {
         activeHighlight,
         setActiveHighlight,
     } = useHighlights(shareId);
+    const isMobile = useIsMobile();
+    const [mobileView, setMobileView] = useState<'reader' | 'panel'>('reader');
+
 
     useEffect(() => {
         if (!shareId) {
@@ -74,6 +80,73 @@ export default function SharedPaperView() {
 
     if (!paperData) {
         return <div className="flex justify-center items-center h-screen">Shared paper data not found.</div>;
+    }
+
+
+    if (isMobile) {
+        return (
+            <div className="flex flex-col w-full h-[calc(100vh-64px)]">
+                <div className="flex-grow overflow-auto min-h-0">
+                    {mobileView === 'reader' ? (
+                        <div className="w-full h-full">
+                            {paperData.file_url ? (
+                                <PdfViewer
+                                    pdfUrl={paperData.file_url}
+                                    highlights={highlights}
+                                    activeHighlight={activeHighlight}
+                                    setUserMessageReferences={() => { }}
+                                    setSelectedText={() => { }}
+                                    setTooltipPosition={() => { }}
+                                    setIsAnnotating={() => { }}
+                                    setIsHighlightInteraction={() => { }}
+                                    isHighlightInteraction={false}
+                                    setHighlights={() => { }}
+                                    selectedText={''}
+                                    tooltipPosition={null}
+                                    setActiveHighlight={setActiveHighlight}
+                                    addHighlight={async () => { throw new Error("Read-only"); }}
+                                    loadHighlights={async () => { }}
+                                    removeHighlight={() => { }}
+                                    handleTextSelection={() => { }}
+                                    renderAnnotations={() => { }}
+                                    annotations={[]}
+                                    setAddedContentForPaperNote={() => { }}
+                                />
+                            ) : (
+                                <div className="flex justify-center items-center h-full">PDF could not be loaded.</div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="w-full h-full overflow-y-auto p-4">
+                            <PaperMetadata
+                                paperData={paperData}
+                                hasMessages={false}
+                                readonly={true}
+                            />
+                            <AnnotationsView
+                                highlights={highlights}
+                                annotations={annotations}
+                                onHighlightClick={handleHighlightClick}
+                                activeHighlight={activeHighlight}
+                                readonly={true}
+                            />
+                        </div>
+                    )}
+                </div>
+                <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-800">
+                    <div className="flex justify-around items-center h-16">
+                        <Button variant="ghost" onClick={() => setMobileView('reader')} className={`flex flex-col items-center gap-1 ${mobileView === 'reader' ? 'text-blue-500' : ''}`}>
+                            <Book size={24} />
+                            <span className="text-xs">Reader</span>
+                        </Button>
+                        <Button variant="ghost" onClick={() => setMobileView('panel')} className={`flex flex-col items-center gap-1 ${mobileView === 'panel' ? 'text-blue-500' : ''}`}>
+                            <Box size={24} />
+                            <span className="text-xs">Panel</span>
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -132,3 +205,4 @@ export default function SharedPaperView() {
         </div>
     );
 }
+''
