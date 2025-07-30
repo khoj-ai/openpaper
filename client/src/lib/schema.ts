@@ -232,3 +232,13 @@ export interface PaperItem {
     preview_url?: string
     size_in_kb?: number
 }
+
+export interface CreditUsage {
+    used: number;
+    remaining: number;
+    total: number;
+    usagePercentage: number;
+    showWarning: boolean;
+    isNearLimit: boolean;
+    isCritical: boolean;
+}

@@ -39,6 +39,7 @@ import {
     Reference,
     ResponseStyle,
     JobStatusResponse,
+    CreditUsage,
 } from '@/lib/schema';
 
 import { PaperStatus, PaperStatusEnum } from '@/components/utils/PdfStatus';
@@ -219,19 +220,11 @@ export default function PaperView() {
     };
 
     // Chat credit usage state
-    const [creditUsage, setCreditUsage] = useState<{
-        used: number;
-        remaining: number;
-        total: number;
-        usagePercentage: number;
-        showWarning: boolean;
-        isNearLimit: boolean;
-        isCritical: boolean;
-    } | null>(null);
+    const [creditUsage, setCreditUsage] = useState<CreditUsage | null>(null);
 
     const [rightSideFunction, setRightSideFunction] = useState<string>('Overview');
     const [leftPanelWidth, setLeftPanelWidth] = useState(60); // percentage
-        const [isDragging, setIsDragging] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
     const isMobile = useIsMobile();
     const [mobileView, setMobileView] = useState<'reader' | 'panel'>('reader');
 

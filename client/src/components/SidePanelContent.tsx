@@ -6,6 +6,7 @@ import {
     Reference,
     ResponseStyle,
     PaperHighlightAnnotation,
+    CreditUsage
 } from '@/lib/schema';
 import {
     X,
@@ -51,16 +52,6 @@ import Link from 'next/link';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 
 import { toast } from "sonner";
-
-interface CreditUsage {
-    used: number;
-    remaining: number;
-    total: number;
-    usagePercentage: number;
-    showWarning: boolean;
-    isNearLimit: boolean;
-    isCritical: boolean;
-}
 
 interface SidePanelContentProps {
     rightSideFunction: string;

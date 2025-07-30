@@ -3,7 +3,6 @@
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { fetchFromApi } from "@/lib/api";
-import { useIsMobile } from "@/lib/useMobile";;
 import {
 	Dialog,
 	DialogContent,
@@ -47,7 +46,6 @@ export default function Home() {
 
 	const { user, loading: authLoading } = useAuth();
 	const { subscription, loading: subscriptionLoading } = useSubscription();
-	const isMobile = useIsMobile();
 
 	// Toast notifications for subscription limits
 	useEffect(() => {
@@ -369,20 +367,6 @@ export default function Home() {
 						Open Paper
 					</header>
 				</div>
-				{
-					isMobile && (
-						<Dialog open={true}>
-							<DialogContent>
-								<DialogHeader>
-									<DialogTitle>Open Paper</DialogTitle>
-									<DialogDescription>
-										This application is not optimized for mobile devices. Please use a desktop or tablet for the best experience.
-									</DialogDescription>
-								</DialogHeader>
-							</DialogContent>
-						</Dialog>
-					)
-				}
 
 				{/* Replace buttons with PdfDropzone */}
 				<PdfDropzone
