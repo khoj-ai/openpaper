@@ -139,7 +139,7 @@ class MultiPaperOperations(BaseLLMClient):
                 system_prompt=evidence_gathering_prompt,
                 history=conversation_history,
                 contents=message_content,
-                model_type=ModelType.DEFAULT,
+                model_type=ModelType.FAST,
                 function_declarations=function_declarations,
                 provider=llm_provider,
                 enable_thinking=True,
@@ -250,7 +250,7 @@ class MultiPaperOperations(BaseLLMClient):
         llm_response = self.generate_content(
             system_prompt="You are a research assistant that filters evidence for relevance.",
             contents=message_content,
-            model_type=ModelType.DEFAULT,
+            model_type=ModelType.FAST,
             provider=llm_provider,
         )
 

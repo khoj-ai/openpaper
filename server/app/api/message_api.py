@@ -15,11 +15,7 @@ from app.database.telemetry import track_event
 from app.llm.base import LLMProvider
 from app.llm.citation_handler import CitationHandler
 from app.llm.operations import operations
-from app.schemas.message import (
-    EvidenceCleaningResponse,
-    EvidenceCollection,
-    ResponseStyle,
-)
+from app.schemas.message import EvidenceCollection, ResponseStyle
 from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException
