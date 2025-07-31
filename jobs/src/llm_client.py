@@ -9,7 +9,7 @@ import io
 import asyncio
 from google import genai
 from google.genai import types
-from typing import Optional, Type, TypeVar, Dict, Any, Callable
+from typing import Optional, Type, TypeVar, Callable
 
 from pydantic import BaseModel
 
@@ -37,18 +37,16 @@ T = TypeVar("T", bound=BaseModel)
 SYSTEM_INSTRUCTIONS_CACHE = """
 You are a metadata extraction assistant. Your task is to extract specific information from the provided academic paper content. Pay special attention ot the details and ensure accuracy in the extracted metadata.
 
-Always think step-by-step when making a determination with respect to the contents of the paper. If you are unsure about a specific field, provide a best guess based on the content available.
+Always think deeply and step-by-step when making a determination with respect to the contents of the paper. If you are unsure about a specific field, provide a best guess based on the content available.
 
 You will be rewarded for your accuracy and attention to detail. You are helping to facilitate humanity's understanding of scientific knowledge by delivering accurate and reliable metadata extraction.
 """
 
 # LLM Prompts
 EXTRACT_METADATA_PROMPT_TEMPLATE = """
-You are a metadata extraction assistant. Your task is to extract specific information from the provided academic paper content.
+You are a metadata extraction assistant. Your task is to extract specific information from the provided academic paper content. You must be thorough in your approach and ensure that all relevant metadata is captured accurately.
 
 Please extract the following fields and structure them in a JSON format according to the provided schema.
-
-Schema: {schema}
 """
 
 SYSTEM_INSTRUCTIONS_IMAGE_CAPTION_CACHE = """
@@ -213,7 +211,8 @@ class AsyncLLMClient:
         image_bytes: Optional[bytes] = None,
         image_mime_type: Optional[str] = None,
         cache_key: Optional[str] = None,
-        model: Optional[str] = None
+        model: Optional[str] = None,
+        schema: Optional[Type[BaseModel]] = None,
     ) -> str:
         """
         Generate content using the LLM.
@@ -237,15 +236,21 @@ class AsyncLLMClient:
 
         parts.append(types.Part.from_text(text=prompt))
 
+        config = types.GenerateContentConfig(
+            cached_content=cache_key
+        )
+
+        if schema:
+            config.response_mime_type = 'application/json'
+            config.response_schema = schema.model_json_schema()
+
         response = await self.client.aio.models.generate_content(
             model=model,
             contents=types.Content(
                 role='user',
                 parts=parts
             ),
-            config=types.GenerateContentConfig(
-                cached_content=cache_key,
-            )
+            config=config
         )
 
         if response and response.text:
@@ -269,8 +274,9 @@ class PaperOperations(AsyncLLMClient):
         self,
         model: Type[T],
         paper_content: str,
+        schema: Type[BaseModel],
         status_callback: Callable[[str], None],
-        cache_key: Optional[str] = None,
+        cache_key: Optional[str] = None
     ) -> T:
         """
         Helper function to extract a single metadata field.
@@ -284,13 +290,12 @@ class PaperOperations(AsyncLLMClient):
             An instance of the provided Pydantic model.
         """
         prompt = EXTRACT_METADATA_PROMPT_TEMPLATE.format(
-            schema=model.model_json_schema()
         )
 
         if paper_content and not cache_key:
             prompt = f"Paper Content:\n\n{paper_content}\n\n{prompt}"
 
-        response = await self.generate_content(prompt, cache_key=cache_key)
+        response = await self.generate_content(prompt, cache_key=cache_key, schema=schema)
         response_json = JSONParser.validate_and_extract_json(response)
         instance = model.model_validate(response_json)
 
@@ -349,6 +354,7 @@ class PaperOperations(AsyncLLMClient):
         result = await self._extract_single_metadata_field(
             model=TitleAuthorsAbstract,
             cache_key=cache_key,
+            schema=TitleAuthorsAbstract,
             paper_content=paper_content,
             status_callback=status_callback,
         )
@@ -364,6 +370,7 @@ class PaperOperations(AsyncLLMClient):
         return await self._extract_single_metadata_field(
             model=InstitutionsKeywords,
             cache_key=cache_key,
+            schema=InstitutionsKeywords,
             paper_content=paper_content,
             status_callback=status_callback,
         )
@@ -378,6 +385,7 @@ class PaperOperations(AsyncLLMClient):
         result = await self._extract_single_metadata_field(
             model=SummaryAndCitations,
             cache_key=cache_key,
+            schema=SummaryAndCitations,
             paper_content=paper_content,
             status_callback=status_callback,
         )
@@ -393,6 +401,7 @@ class PaperOperations(AsyncLLMClient):
         return await self._extract_single_metadata_field(
             model=StarterQuestions,
             cache_key=cache_key,
+            schema=StarterQuestions,
             paper_content=paper_content,
             status_callback=status_callback,
         )
@@ -409,6 +418,7 @@ class PaperOperations(AsyncLLMClient):
             paper_content=paper_content,
             status_callback=status_callback,
             cache_key=cache_key,
+            schema=Highlights,
         )
 
     async def extract_paper_metadata(

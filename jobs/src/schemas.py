@@ -86,27 +86,36 @@ class SummaryAndCitations(BaseModel):
     """Schema for summary and citations extraction."""
     summary: str = Field(
         description="""
-A concise, well-structured summary of the paper in markdown format. Include:
-1. Key findings and contributions
-2. Research methodology
-3. Results and implications
-4. Potential applications or impact
+    Generate a comprehensive yet concise summary of the research paper in markdown format that captures the essential contributions and findings for readers with basic domain knowledge.
 
-Format guidelines:
-- Optional opening title (under 10 words)
-- First paragraph: 2-4 sentence overview of the paper
-- Use clear headings, bullet points, and tables for organization
-- Include relevant data points and metrics when available
-- Use plain language while preserving technical accuracy
-- Include inline citations to support claims that refer to the paper's content. This is especially important for claims about the findings, methodology, and results.
+    ## Content Requirements:
+    - **Opening overview**: 2-4 sentences establishing the research problem, approach, and primary contribution
+    - **Core sections**: Organize using clear headings such as:
+    - **Background/Motivation**: Why this research matters
+    - **Methodology**: Key experimental design, datasets, models, or theoretical approaches
+    - **Key Findings**: Primary results with specific metrics, performance improvements, or discoveries
+    - **Implications**: Significance for the field, limitations, and future directions
 
-Citation guidelines:
-- Use [^1], [^2], [^6, ^7] etc. for citations in the summary
-- Always increase the index of the citation sequentially, starting from 1
-- You will separately provide a list of citations in the `summary_citations` field with the raw text and index
+    ## Technical Specifications:
+    - **Length**: 400-800 words (prioritize clarity over brevity)
+    - **Precision**: Include quantitative results (accuracy scores, effect sizes, sample sizes) when available
+    - **Accessibility**: Use plain language explanations for technical concepts while preserving scientific accuracy
+    - **Structure**: Use markdown headers (##, ###), bullet points, and tables to enhance readability
 
-The summary should be accessible to readers with basic domain knowledge while maintaining scientific integrity.
-                         """,
+    ## Citation Integration:
+    - Embed inline citations [^1], [^2], [^6, ^7] to support all factual claims about methodology, results, and conclusions
+    - Use sequential numbering starting from [^1]
+    - Cite particularly important findings, novel methodologies, and key numerical results
+    - Ensure every major claim can be traced back to specific paper content
+
+    ## Quality Standards:
+    - **Completeness**: Address all major contributions mentioned in the abstract/conclusion
+    - **Balance**: Give appropriate weight to different sections based on their importance to the paper's contribution
+    - **Objectivity**: Present findings neutrally, including limitations or negative results when discussed
+    - **Coherence**: Ensure logical flow between sections that tells a complete research story
+
+    Do not include a title or repeat the paper's title in the summary.
+    """,
     )
     summary_citations: List[ResponseCitation] = Field(
         description="List of citations that are relevant to the summary. These should be direct quotes or paraphrases from the paper that support the summary provided. Remember to include the citation index (e.g., [^1], [^2]) in the summary.",
@@ -129,7 +138,39 @@ class Highlights(BaseModel):
     """Schema for highlights extraction."""
     highlights: List[AIHighlight] = Field(
         default=[],
-        description="List of key highlights from the paper. These should be significant quotes that are must-reads of the paper's findings and contributions. Each highlight should include the text of the highlight and an annotation explaining its significance or relevance to the paper's content. Particularly drill into interesting, novel findings, methodologies, or implications that are worth noting. Pay special attention to tables, figures, and diagrams that may contain important information.",
+        description="""
+Extract 5-10 standout highlights that capture the most compelling and unique aspects of this research paper. Focus on what makes this paper distinctive rather than summarizing standard content.
+
+## Selection Criteria:
+**Prioritize highlights that are:**
+- **Novel or surprising**: Unexpected findings, counterintuitive results, or breakthrough discoveries
+- **Methodologically innovative**: New techniques, creative experimental designs, or unique approaches
+- **High-impact insights**: Findings that could change how the field thinks about a problem
+- **Quantitatively significant**: Impressive performance gains, large effect sizes, or notable statistical findings
+- **Practically valuable**: Real-world applications, actionable implications, or scalable solutions
+
+## Content Sources:
+- **Key results from tables/figures**: Extract specific metrics, comparisons, or visual insights
+- **Critical methodology details**: Novel algorithms, experimental setups, or analytical approaches
+- **Standout conclusions**: Bold claims, important limitations, or paradigm-shifting implications
+- **Notable observations**: Interesting patterns, unexpected behaviors, or important caveats
+
+## Quality Guidelines:
+- **Selectivity**: Choose only the most essential "must-read" elements—what would experts in the field find most noteworthy?
+- **Specificity**: Prefer concrete findings over general statements
+- **Diversity**: Ensure highlights span different aspects (methods, results, implications) and types
+- **Authenticity**: Use direct quotes or faithful paraphrases from the source material
+- **Context**: Each annotation should explain *why* this highlight matters to the broader research landscape
+
+## What to Avoid:
+- Generic background information or literature review content
+- Standard methodology descriptions unless truly innovative
+- Routine experimental procedures or common practices
+- Abstract-level summaries that don't reveal paper specifics
+- Redundant highlights that convey similar information
+
+Think: "If I could only share 5-10 insights from this paper with a colleague, what would make them most excited to read the full work?"
+""",
     )
 
 
