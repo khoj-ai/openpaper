@@ -293,7 +293,7 @@ export function PdfViewer(props: PdfViewerProps) {
 
 
 	return (
-		<div ref={containerRef} className="flex flex-col items-center gap-4 w-full h-[calc(100vh-100px)] overflow-y-auto" id="pdf-container">
+		<div ref={containerRef} className="flex flex-col gap-4 w-full h-[calc(100vh-100px)] overflow-y-auto" id="pdf-container">
 			{/* Toolbar */}
 			<div className="sticky top-0 z-10 flex items-center justify-between bg-white/80 dark:bg-black/80 backdrop-blur-sm p-2 rounded-none w-full border-b border-gray-300">
 				<div className="flex items-center gap-2 flex-grow max-w-md">
@@ -444,22 +444,23 @@ export function PdfViewer(props: PdfViewerProps) {
 					)
 				}
 			</div>
-
-			<Document
-				file={pdfUrl}
-				onLoadSuccess={(pdf) => {
-					onDocumentLoadSuccess(pdf);
-				}}
-				onLoadProgress={({ loaded, total }) => {
-					// Handle loading progress if needed
-					console.log(`Loading PDF: ${Math.round((loaded / total) * 100)}%`);
-				}}
-				onMouseUp={handleTextSelection}
-				onLoadError={(error) => console.error("Error loading PDF:", error)}
-				onContextMenu={handleTextSelection}
-				loading={<EnigmaticLoadingExperience />}
-			>
-				{/* <Outline
+			<div className="overflow-x-auto w-full">
+				<div className="flex justify-center">
+					<Document
+						file={pdfUrl}
+						onLoadSuccess={(pdf) => {
+							onDocumentLoadSuccess(pdf);
+						}}
+						onLoadProgress={({ loaded, total }) => {
+							// Handle loading progress if needed
+							console.log(`Loading PDF: ${Math.round((loaded / total) * 100)}%`);
+						}}
+						onMouseUp={handleTextSelection}
+						onLoadError={(error) => console.error("Error loading PDF:", error)}
+						onContextMenu={handleTextSelection}
+						loading={<EnigmaticLoadingExperience />}
+					>
+						{/* <Outline
 					onItemClick={(item) => {
 						if (item.dest) {
 							const pageIndex = item.pageNumber - 1;
@@ -468,27 +469,29 @@ export function PdfViewer(props: PdfViewerProps) {
 						}
 					}}
 				/> */}
-				{Array.from(new Array(numPages || 0), (_, index) => (
-					<div
-						ref={(el) => {
-							pagesRef.current[index] = el;
-						}}
-						key={`page_container_${index + 1}`}
-					>
-						<Page
-							key={`page_${index + 1}`}
-							pageNumber={index + 1}
-							className="mb-8 border-b border-gray-300"
-							renderTextLayer={true}
-							onLoadSuccess={() => handlePageLoadSuccess(index)}
-							renderAnnotationLayer={false}
-							scale={scale}
-							loading={<EnigmaticLoadingExperience />}
-							width={width > 0 ? width : undefined}
-						/>
-					</div>
-				))}
-			</Document>
+						{Array.from(new Array(numPages || 0), (_, index) => (
+							<div
+								ref={(el) => {
+									pagesRef.current[index] = el;
+								}}
+								key={`page_container_${index + 1}`}
+							>
+								<Page
+									key={`page_${index + 1}`}
+									pageNumber={index + 1}
+									className="mb-8 border-b border-gray-300"
+									renderTextLayer={true}
+									onLoadSuccess={() => handlePageLoadSuccess(index)}
+									renderAnnotationLayer={false}
+									scale={scale}
+									loading={<EnigmaticLoadingExperience />}
+									width={width > 0 ? width : undefined}
+								/>
+							</div>
+						))}
+					</Document>
+				</div>
+			</div>
 
 			{/* Replace the fixed position div with a tooltip */}
 			{tooltipPosition && (

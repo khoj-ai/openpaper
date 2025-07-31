@@ -32,8 +32,9 @@ import {
 import { PaperStatus, PaperStatusEnum } from '@/components/utils/PdfStatus';
 import { useAuth } from '@/lib/auth';
 import { PaperSidebar } from '@/components/PaperSidebar';
-import EnigmaticLoadingExperience from '@/components/EnigmaticLoadingExperience';
+
 import PaperViewSkeleton from '@/components/PaperViewSkeleton';
+import ReportSkeleton from '@/components/ReportSkeleton';
 
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Book, Box } from 'lucide-react';
@@ -485,19 +486,17 @@ export default function PaperView() {
                                 className={`flex flex-row h-full relative ${!jobId ? "pr-[60px]" : ""}`}
                             >
                                 {jobId ? (
-                                    <div className="flex items-center justify-center h-full w-full">
-                                        <div className="flex flex-col items-center">
-                                            <EnigmaticLoadingExperience />
-                                            <div className="flex items-center justify-center gap-1 font-mono text-lg w-full">
-                                                <div className="flex items-center gap-1 w-14">
-                                                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                                                    <p className="text-gray-400 w-12">
-                                                        {elapsedTime}s
-                                                    </p>
-                                                </div>
-                                                <p className="text-primary text-right flex-1">{sidePanelDisplayedText}</p>
+                                    <div className="flex flex-col h-full w-full">
+                                        <div className="flex items-center justify-center gap-1 font-mono text-lg w-full p-4 border-b dark:border-gray-800 border-gray-200">
+                                            <div className="flex items-center gap-1 w-14">
+                                                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                                <p className="text-gray-400 w-12">
+                                                    {elapsedTime}s
+                                                </p>
                                             </div>
+                                            <p className="text-primary text-right flex-1">{sidePanelDisplayedText}</p>
                                         </div>
+                                        <ReportSkeleton />
                                     </div>
                                 ) : (
                                     <>
@@ -587,19 +586,17 @@ export default function PaperView() {
                     style={rightSideFunction !== 'Focus' ? { width: `${100 - leftPanelWidth}%` } : { width: 'auto' }}
                 >
                     {jobId ? (
-                        <div className="flex items-center justify-center h-full w-full">
-                            <div className="flex flex-col items-center">
-                                <EnigmaticLoadingExperience />
-                                <div className="flex items-center justify-center gap-1 font-mono text-lg w-full">
-                                    <div className="flex items-center gap-1 w-14">
-                                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                                        <p className="text-gray-400 w-12">
-                                            {elapsedTime}s
-                                        </p>
-                                    </div>
-                                    <p className="text-primary text-right flex-1">{sidePanelDisplayedText}</p>
+                        <div className="flex flex-col h-full w-full">
+                            <div className="flex items-center justify-center gap-1 font-mono text-lg w-full p-4 border-b dark:border-gray-800 border-gray-200">
+                                <div className="flex items-center gap-1 w-14">
+                                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                    <p className="text-gray-400 w-12">
+                                        {elapsedTime}s
+                                    </p>
                                 </div>
+                                <p className="text-primary text-right flex-1">{sidePanelDisplayedText}</p>
                             </div>
+                            <ReportSkeleton />
                         </div>
                     ) : (
                         <>
