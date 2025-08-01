@@ -130,16 +130,19 @@ function UnderstandPageContent() {
         }
     }, []);
 
+    // We don't want to refetch the conversation history or reset the chat state
+    // while an answer is being streamed, as this can cause jarring UI updates
+    // (e.g., showing the loading skeleton unnecessarily).
     useEffect(() => {
         const id = searchParams.get('id');
-        if (id && user) {
+        if (id && user && !isStreaming) {
             fetchMessages(id);
-        } else if (!id) {
+        } else if (!id && !isStreaming) {
             setMessages([]);
             setConversationId(null);
             setIsCentered(true);
         }
-    }, [searchParams, user, fetchMessages]);
+    }, [searchParams, user, fetchMessages, isStreaming]);
 
     useEffect(() => {
         const fetchPapers = async () => {
@@ -241,6 +244,7 @@ function UnderstandPageContent() {
                 });
                 currentConversationId = newConversationResponse.id;
                 setConversationId(currentConversationId);
+                window.history.pushState(null, '', `/understand?id=${currentConversationId}`);
             } catch (error) {
                 console.error('Error creating conversation:', error);
                 toast.error("Failed to start a new conversation.");
