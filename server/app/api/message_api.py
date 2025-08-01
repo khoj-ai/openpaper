@@ -158,11 +158,15 @@ async def chat_message_everything(
                     yield f"{json_response}{END_DELIMITER}"
                     return
 
+                yield f"{json.dumps({'type': 'status', 'content': 'Cleaning and filtering evidence...'})}{END_DELIMITER}"
+
                 cleaned_evidence = await operations.clean_evidence(
                     evidence_collection=evidence_collection,
                     original_question=request.user_query,
                     llm_provider=LLMProvider.OPENAI,
                 )
+
+                yield f"{json.dumps({'type': 'status', 'content': 'Generating response...'})}{END_DELIMITER}"
 
                 chat_generator = operations.chat_with_everything(
                     question=request.user_query,
