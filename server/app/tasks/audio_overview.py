@@ -56,8 +56,8 @@ def generate_audio_overview(
         db: Database session
     """
 
+    start_time = datetime.now(timezone.utc)
     try:
-        start_time = datetime.now(timezone.utc)
 
         # Update job status to running
         audio_overview_job_crud.update_status(
