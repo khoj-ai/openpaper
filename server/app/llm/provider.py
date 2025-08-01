@@ -147,8 +147,8 @@ class GeminiProvider(BaseLLMProvider):
         self,
         model: str,
         contents: Union[str, MessageParam],
+        system_prompt: Optional[str] = None,
         history: Optional[List[Message]] = None,
-        system_prompt: str = "",
         function_declarations: Optional[List[Dict]] = None,
         enable_thinking: bool = False,
         **kwargs,
@@ -369,22 +369,16 @@ class OpenAIProvider(BaseLLMProvider):
         self,
         model: str,
         contents: Union[str, MessageParam],
+        system_prompt: Optional[str] = None,
         history: Optional[List[Message]] = None,
         function_declarations: Optional[List[Dict]] = None,
-        system_prompt: Optional[str] = None,
+        enable_thinking: bool = True,
         **kwargs,
     ) -> LLMResponse:
         # Convert to OpenAI format
-        if isinstance(contents, str):
-            content = contents
-        else:
-            content = self._convert_message_content(
-                contents, system_instructions=system_prompt
-            )
-
         all_messages = self._prepare_openai_messages(
             history=history or [],
-            new_message=content,
+            new_message=contents,
             system_prompt=system_prompt or "",
         )
 
@@ -400,11 +394,16 @@ class OpenAIProvider(BaseLLMProvider):
         if tools:
             kwargs["tools"] = tools
 
+        if enable_thinking:
+            logger.debug(
+                "Thinking requested, but reasoning models not yet enabled for OpenAI provider"
+            )
+
         response = self.client.chat.completions.create(
             model=model, messages=all_messages, **kwargs
         )
 
-        if not response.choices or not response.choices[0].message.content:
+        if not response.choices or not response.choices[0].message:
             raise ValueError("Empty response from OpenAI API")
 
         message = response.choices[0].message

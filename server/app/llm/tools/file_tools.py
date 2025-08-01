@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 read_file_function = {
     "name": "read_file",
-    "description": "Read the complete content of a file associated with a paper.",
+    "description": "Use this tool when you need to read the entire content of a single paper. It's best for when you need a complete overview of the paper's text. If you're looking for specific information, consider using 'search_file' first.",
     "parameters": {
         "type": "object",
         "properties": {
@@ -27,7 +27,7 @@ read_file_function = {
 
 search_file_function = {
     "name": "search_file",
-    "description": "Search for a specific query (as regex) in the file content of a paper. Returns matching lines with line numbers.",
+    "description": "Use this tool to find specific information within a single paper. You can use a regular expression for powerful searches. It returns the lines that match your query, along with their line numbers. This is useful for pinpointing exact details without reading the whole paper.",
     "parameters": {
         "type": "object",
         "properties": {
@@ -46,7 +46,7 @@ search_file_function = {
 
 view_file_function = {
     "name": "view_file",
-    "description": "View a specific range of lines from the file content of a paper.",
+    "description": "Use this tool when you want to look at a specific part of a paper. You can specify a range of lines to view. This is helpful when you already have an idea of where the information is, for example, after using 'search_file' and getting a line number. It helps you see the context around a specific line or section.",
     "parameters": {
         "type": "object",
         "properties": {
@@ -69,7 +69,7 @@ view_file_function = {
 
 read_abstract_function = {
     "name": "read_abstract",
-    "description": "Read the abstract of a paper.",
+    "description": "Use this tool to get a quick summary of a paper. The abstract provides a concise overview of the paper's main points. It's a great starting point to understand what the paper is about before diving into the full text.",
     "parameters": {
         "type": "object",
         "properties": {
@@ -84,13 +84,13 @@ read_abstract_function = {
 
 search_all_files_function = {
     "name": "search_all_files",
-    "description": "Search for a specific query (as regex) in the file content of all papers. Returns a list of matching lines with paper IDs and line numbers.",
+    "description": "Search for a specific query (as regex) across all available papers. This is useful for broad, exploratory searches when you're not sure which paper contains the information you need. It returns a list of matching lines with their corresponding paper IDs and line numbers. If you already know which paper to search in, `search_file` is a more targeted and efficient option.",
     "parameters": {
         "type": "object",
         "properties": {
             "query": {
                 "type": "string",
-                "description": "The regex pattern to search for in the file content of all papers.",
+                "description": "The regex pattern to search for in the file content of all papers. This should not be a complex query, but rather a simple regex pattern that matches lines in the file content. This can include keywords, phrases, or specific patterns you are looking for. It will help you zero in on the relevant target lines across all papers.",
             },
         },
         "required": ["query"],
@@ -152,18 +152,31 @@ def search_all_files(
     Search for a specific query (as regex) in the file content of all papers.
     Returns a list of matching lines with paper IDs and line numbers.
     """
-    all_papers = paper_crud.get_all_available_papers(db, user=current_user)
+    all_papers = paper_crud.get_all_available_papers(db, user=current_user, query=query)
     results = {}
 
     for paper in all_papers:
         paper_id = str(paper.id)
         if not paper_id or not paper.raw_content:
             continue
-        matching_lines = search_file(paper_id, query, current_user, db)
-        for line in matching_lines:
-            if paper_id not in results:
-                results[paper_id] = []
-            results[paper_id].append(line)
+
+        # Since the paper itself was matched, we can now search for the lines
+        lines = paper.raw_content.splitlines()
+        matching_lines = []
+        try:
+            pattern = re.compile(query, re.IGNORECASE)
+            for line_num, line in enumerate(lines, 1):
+                if pattern.search(line):
+                    matching_lines.append(f"{line_num}: {line}")
+        except re.error as e:
+            # This should ideally be handled before calling the function
+            # but as a safeguard, we'll raise a ValueError.
+            raise ValueError(f"Invalid regex pattern: {e}")
+
+        if matching_lines:
+            results[paper_id] = matching_lines
+
+    return results
 
     return results
 

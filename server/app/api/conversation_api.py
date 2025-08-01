@@ -64,6 +64,9 @@ async def get_everything_conversations(
             conversable_type=ConversableType.EVERYTHING,
             user=current_user,
         )
+        conversations = sorted(
+            conversations, key=lambda x: x.updated_at, reverse=True  # type: ignore
+        )
         result = [
             {
                 "id": str(conv.id),

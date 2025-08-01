@@ -123,7 +123,7 @@ async def chat_message_everything(
                     conversation_id=request.conversation_id,
                     question=request.user_query,
                     current_user=current_user,
-                    llm_provider=request.llm_provider,
+                    llm_provider=LLMProvider.OPENAI,
                     user_references=request.user_references,
                     db=db,
                 ):
@@ -161,7 +161,7 @@ async def chat_message_everything(
                 cleaned_evidence = await operations.clean_evidence(
                     evidence_collection=evidence_collection,
                     original_question=request.user_query,
-                    llm_provider=request.llm_provider,
+                    llm_provider=LLMProvider.OPENAI,
                 )
 
                 chat_generator = operations.chat_with_everything(

@@ -420,18 +420,19 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
         return image_placeholders
 
     def get_all_available_papers(
-        self, db: Session, *, user: CurrentUser
+        self, db: Session, *, user: CurrentUser, query: Optional[str] = None
     ) -> List[Paper]:
         """
         Get all papers available to the user, regardless of status.
         This includes papers with 'todo', 'reading', and 'completed' statuses.
+        If a query is provided, it will filter papers by raw_content.
         """
-        return (
-            db.query(Paper)
-            .filter(Paper.user_id == user.id)
-            .order_by(Paper.updated_at.desc())
-            .all()
-        )
+        db_query = db.query(Paper).filter(Paper.user_id == user.id)
+
+        if query:
+            db_query = db_query.filter(Paper.raw_content.ilike(f"%{query}%"))
+
+        return db_query.order_by(Paper.updated_at.desc()).all()
 
 
 # Create a single instance to use throughout the application
