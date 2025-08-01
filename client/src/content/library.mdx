@@ -1,0 +1,60 @@
+import Image from 'next/image'
+
+export const metadata = {
+    title: "Your Library, Supercharged",
+    description: "Unlock the power of your research library with Open Paper, the AI tool built for researchers. Go beyond simple citation management in Zotero and use AI to find, understand, and connect ideas across all your papers.",
+    date: "07-19-2025",
+    image: "https://assets.khoj.dev/blue_bubbles_abstract.png",
+}
+
+For decades, researchers have relied on tools like Zotero, EndNote, and Mendeley to manage their libraries. These tools are the digital equivalent of a well-organized filing cabinet. They are essential for storing papers, managing citations, and keeping track of your reading list. We love them and have used them for years.
+
+But a filing cabinet is passive. It holds information, but it doesn't help you use it. The connections between papers, the serendipitous discoveries, and the synthesis of ideas still rely entirely on the researcher's memory and manual effort. How many times have you downloaded a paper, only to forget its key findings months later? How often do you struggle to recall where you read a specific concept that's crucial for your current work?
+
+This is where the static library model falls short. In an age of information overload, we need tools that do more than just store PDFs. We need tools that help us think.
+
+# From Filing Cabinet to Knowledge Engine
+
+Open Paper reimagines the research library as a dynamic, intelligent partner in your research process. Our goal is to augment your ability to find, understand, and connect information across your entire body of work. We believe that AI can help bridge the gap between simply storing information and truly leveraging it.
+
+## Unlocking Your Library's Potential
+
+Here’s how Open Paper helps you manage larger research projects more effectively:
+
+**1. Find What You Know, Instantly:** Traditional search is limited to titles, authors, and keywords. Open Paper lets you search the full content of your library using natural language. You can ask complex questions like, "Which of my papers discuss the limitations of transformer models for time-series analysis?" and get precise answers, complete with citations from your own library.
+
+**2. Connect the Dots:** The most profound insights often come from connecting disparate ideas. Open Paper helps you surface thematic links and hidden relationships between papers. By understanding the content, it can suggest relevant papers from your library that you might not have thought to connect, helping you build a more comprehensive understanding of your field.
+
+**3. Effortless Recall and Citation:** No more "citation amnesia." Your highlights and annotations become part of your searchable knowledge base. When you're writing, you can instantly recall not just *what* a paper said, but *what you thought about it*. This makes building on your prior reading and citing your sources a seamless, integrated part of your workflow.
+
+## Technical Details
+
+When you add a paper to your [library](https://openpaper.ai/library), it doesn't just sit in a folder. Our system reads the paper, analyzes its content, and makes it searchable. Earlier this month, we released [Ask](https://openpaper.ai/understand), a powerful interface that lets you search across your entire library in a way that goes beyond simple keyword matching. This transforms your library from a collection of documents into a queryable knowledge base.
+
+<div className="my-8 mx-auto">
+<a href="/lr_research_diagram.png" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity">
+<Image
+  src="/lr_research_diagram.png"
+  alt="A diagram illustrating how the Open Paper research agent finds information for the user by utilizing a series of tools."
+  width={1000}
+  height={600}
+  className="mx-auto my-8 cursor-pointer rounded-lg"
+/>
+</a>
+<p className="text-sm text-gray-600 text-center mt-2 italic">Click the diagram to view full size</p>
+</div>
+
+When you use our `Ask` page, you're interacting with a sophisticated research agent. This agent is designed to help you find the most relevant information from your library. It does this by using a set of tools to search and read your documents. These tools include:
+- `read_file`
+- `search_file`
+- `view_file`
+- `read_abstract`
+- `search_all_files`
+
+The agent intelligently decides which tool to use based on your query, ensuring that you get the most accurate and relevant results. The AI-generated responses come with inline citations that link to the original papers and show the text citation, so you can easily verify the information. While deep-linking to the exact location in the document is not yet available, it is a feature we are actively working on.
+
+# The Future is an Active Library
+
+Managing a large research project is a challenge of knowledge management. The tools of the past were designed for a different era of research. With the power of AI, we can create a new kind of library—one that actively helps you make sense of the information you've gathered.
+
+Open Paper is our first step toward this vision. It’s a tool designed to help you think better, remember more, and accelerate your research by transforming your static library into a living, breathing knowledge engine. Stop just managing your papers; it's time to start a conversation with them.
