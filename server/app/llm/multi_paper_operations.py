@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import time
 import uuid
 from typing import AsyncGenerator, Dict, List, Optional, Sequence, Union
 
@@ -39,6 +40,7 @@ logger = logging.getLogger(__name__)
 
 from app.database.crud.message_crud import message_crud
 from app.database.database import get_db
+from app.database.telemetry import track_event
 
 
 class MultiPaperOperations(BaseLLMClient):
@@ -146,6 +148,7 @@ class MultiPaperOperations(BaseLLMClient):
             )
 
             for fn_selected in llm_response.tool_calls:
+                start_time = time.time()
                 fn_name = fn_selected.name
                 fn_args = fn_selected.args
 
@@ -221,6 +224,15 @@ class MultiPaperOperations(BaseLLMClient):
                 else:
                     logger.warning(f"Unknown function called: {fn_name}")
                     yield {"type": "error", "content": f"Unknown function: {fn_name}"}
+                end_time = time.time()
+                track_event(
+                    "function_call",
+                    {
+                        "function_name": fn_name,
+                        "duration_ms": (end_time - start_time) * 1000,
+                    },
+                    user_id=str(current_user.id),
+                )
 
         yield {
             "type": "evidence_gathered",
@@ -250,7 +262,7 @@ class MultiPaperOperations(BaseLLMClient):
         llm_response = self.generate_content(
             system_prompt="You are a research assistant that filters evidence for relevance.",
             contents=message_content,
-            model_type=ModelType.FAST,
+            model_type=ModelType.DEFAULT,
             provider=llm_provider,
         )
 
