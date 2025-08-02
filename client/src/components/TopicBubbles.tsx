@@ -4,8 +4,6 @@ import { fetchFromApi } from '@/lib/api';
 import { Marquee } from "@/components/magicui/marquee";
 import { cn } from '@/lib/utils';
 
-interface TopicBubblesProps {}
-
 const TopicCard = ({ topic }: { topic: string }) => {
     return (
         <figure
@@ -22,7 +20,7 @@ const TopicCard = ({ topic }: { topic: string }) => {
     );
 };
 
-export function TopicBubbles({}: TopicBubblesProps) {
+export function TopicBubbles() {
     const [topics, setTopics] = useState<string[]>([]);
 
     useEffect(() => {
