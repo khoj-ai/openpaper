@@ -144,6 +144,76 @@ const UserMenuContent = ({
     </div>
 )
 
+const CollapsibleResourceList = ({
+    title,
+    items,
+    viewAllLink,
+    viewAllText,
+    itemLinkBuilder,
+    defaultOpen = false,
+}: {
+    title: string;
+    items: { id: string; title: string | null }[];
+    viewAllLink: string;
+    viewAllText: string;
+    itemLinkBuilder: (id: string) => string;
+    defaultOpen?: boolean;
+}) => {
+    const visibleItems = items.filter(item => item.title).slice(0, 7);
+
+    if (items.length === 0) {
+        return null;
+    }
+
+    return (
+        <Collapsible defaultOpen={defaultOpen} className="group/collapsible">
+            <SidebarGroup>
+                <CollapsibleTrigger>
+                    <SidebarMenuButton asChild>
+                        <span className="flex items-center gap-2 w-full">
+                            {title}
+                            <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                        </span>
+                    </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                    <SidebarGroupContent>
+                        <>
+                            <SidebarMenuItem>
+                                <SidebarMenuSub>
+                                    {visibleItems.map((item) => (
+                                        <SidebarMenuSubItem key={item.id}>
+                                            <SidebarMenuSubButton asChild>
+                                                <Link
+                                                    href={itemLinkBuilder(item.id)}
+                                                    className="text-xs font-medium w-full h-fit my-1"
+                                                >
+                                                    <p className="line-clamp-3">
+                                                        {item.title}
+                                                    </p>
+                                                </Link>
+                                            </SidebarMenuSubButton>
+                                        </SidebarMenuSubItem>
+                                    ))}
+                                </SidebarMenuSub>
+                            </SidebarMenuItem>
+                            {items.length > 7 && (
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton asChild>
+                                        <Link href={viewAllLink} className="text-xs font-medium h-fit my-1">
+                                            {viewAllText} <ArrowRight className="inline h-3 w-3 ml-1" />
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            )}
+                        </>
+                    </SidebarGroupContent>
+                </CollapsibleContent>
+            </SidebarGroup>
+        </Collapsible>
+    );
+};
+
 
 export function AppSidebar() {
     const router = useRouter();
@@ -156,34 +226,36 @@ export function AppSidebar() {
     const isMobile = useIsMobile();
 
     useEffect(() => {
-        // Define an async function inside useEffect
-        const fetchPapers = async () => {
-            try {
-                const response = await fetchFromApi("/api/paper/active");
-                const sortedPapers = response.papers.sort((a: PaperItem, b: PaperItem) => {
-                    return new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime();
-                });
-                setAllPapers(sortedPapers);
-            } catch (error) {
-                console.error("Error fetching papers:", error);
-                setAllPapers([]);
-            }
+        if (!user) {
+            setAllPapers([]);
+            setEverythingConversations([]);
+            return;
         }
 
-        const fetchEverythingConversations = async () => {
+        const fetchData = async () => {
             try {
-                const response = await fetchFromApi("/api/conversation/everything");
-                setEverythingConversations(response);
+                const [papersResponse, conversationsResponse] = await Promise.all([
+                    fetchFromApi("/api/paper/active"),
+                    fetchFromApi("/api/conversation/everything"),
+                ]);
+
+                if (papersResponse.papers) {
+                    const sortedPapers = papersResponse.papers.sort((a: PaperItem, b: PaperItem) => {
+                        return new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime();
+                    });
+                    setAllPapers(sortedPapers);
+                } else {
+                    setAllPapers([]);
+                }
+                setEverythingConversations(conversationsResponse || []);
             } catch (error) {
-                console.error("Error fetching everything conversations", error);
+                console.error("Error fetching sidebar data:", error);
+                setAllPapers([]);
                 setEverythingConversations([]);
             }
-        }
+        };
 
-        // Call the async function
-        if (!user) return;
-        fetchPapers();
-        fetchEverythingConversations();
+        fetchData();
     }, [user]);
 
 
@@ -302,100 +374,21 @@ export function AppSidebar() {
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>
-                {allPapers.length > 0 && (
-                    <Collapsible defaultOpen className="group/collapsible">
-                        <SidebarGroup>
-                            <CollapsibleTrigger>
-                                <SidebarMenuButton asChild>
-                                    <span className="flex items-center gap-2 w-full">
-                                        Recent
-                                        <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                                    </span>
-                                </SidebarMenuButton>
-                            </CollapsibleTrigger>
-                            <CollapsibleContent>
-                                <SidebarGroupContent>
-                                    <>
-                                        <SidebarMenuItem>
-                                            <SidebarMenuSub>
-                                                {allPapers.slice(0, 7).map((paper) => (
-                                                    <SidebarMenuSubItem key={paper.id}>
-                                                        <SidebarMenuSubButton asChild>
-                                                            <Link
-                                                                href={`/paper/${paper.id}`}
-                                                                className="text-xs font-medium w-full h-fit my-1"
-                                                            >
-                                                                <p className="line-clamp-3">
-                                                                    {paper.title}
-                                                                </p>
-                                                            </Link>
-                                                        </SidebarMenuSubButton>
-                                                    </SidebarMenuSubItem>
-                                                ))}
-                                            </SidebarMenuSub>
-                                        </SidebarMenuItem>
-                                        {allPapers.length > 7 && (
-                                            <SidebarMenuItem>
-                                                <SidebarMenuButton asChild>
-                                                    <Link href="/papers" className="text-xs font-medium h-fit my-1">
-                                                        {allPapers.length} Papers <ArrowRight className="inline h-3 w-3 ml-1" />
-                                                    </Link>
-                                                </SidebarMenuButton>
-                                            </SidebarMenuItem>
-                                        )}
-                                    </>
-                                </SidebarGroupContent>
-                            </CollapsibleContent>
-                        </SidebarGroup>
-                    </Collapsible>
-                )}
-                {everythingConversations.length > 0 && (
-                    <Collapsible className="group/collapsible">
-                        <SidebarGroup>
-                            <CollapsibleTrigger>
-                                <SidebarMenuButton asChild>
-                                    <span className="flex items-center gap-2 w-full">
-                                        Chats
-                                        <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                                    </span>
-                                </SidebarMenuButton>
-                            </CollapsibleTrigger>
-                            <CollapsibleContent>
-                                <SidebarGroupContent>
-                                    <>
-                                        <SidebarMenuItem>
-                                            <SidebarMenuSub>
-                                                {everythingConversations.filter(conversation => conversation.title).slice(0, 7).map((conversation) => (
-                                                    <SidebarMenuSubItem key={conversation.id}>
-                                                        <SidebarMenuSubButton asChild>
-                                                            <Link
-                                                                href={`/understand?id=${conversation.id}`}
-                                                                className="text-xs font-medium w-full h-fit my-1"
-                                                            >
-                                                                <p className="line-clamp-3">
-                                                                    {conversation.title}
-                                                                </p>
-                                                            </Link>
-                                                        </SidebarMenuSubButton>
-                                                    </SidebarMenuSubItem>
-                                                ))}
-                                            </SidebarMenuSub>
-                                        </SidebarMenuItem>
-                                        {everythingConversations.length > 7 && (
-                                            <SidebarMenuItem>
-                                                <SidebarMenuButton asChild>
-                                                    <Link href="/understand/past" className="text-xs font-medium h-fit my-1">
-                                                        {everythingConversations.length} Chats <ArrowRight className="inline h-3 w-3" />
-                                                    </Link>
-                                                </SidebarMenuButton>
-                                            </SidebarMenuItem>
-                                        )}
-                                    </>
-                                </SidebarGroupContent>
-                            </CollapsibleContent>
-                        </SidebarGroup>
-                    </Collapsible>
-                )}
+                <CollapsibleResourceList
+                    title="Recent"
+                    items={allPapers}
+                    viewAllLink="/papers"
+                    viewAllText={`${allPapers.length} Papers`}
+                    itemLinkBuilder={(id) => `/paper/${id}`}
+                    defaultOpen
+                />
+                <CollapsibleResourceList
+                    title="Chats"
+                    items={everythingConversations}
+                    viewAllLink="/understand/past"
+                    viewAllText={`${everythingConversations.length} Chats`}
+                    itemLinkBuilder={(id) => `/understand?id=${id}`}
+                />
             </SidebarContent>
             <SidebarFooter>
                 {/* Subscription Warning */}

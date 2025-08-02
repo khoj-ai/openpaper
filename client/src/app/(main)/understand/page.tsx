@@ -559,7 +559,7 @@ function UnderstandPageContent() {
                     )}
                 </form>
                 {
-                    !currentMessage && (
+                    isCentered && !currentMessage && (
                         <div className="absolute bottom-0 left-0 w-full">
                             <TopicBubbles />
                         </div>
