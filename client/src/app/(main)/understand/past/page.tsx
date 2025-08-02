@@ -35,12 +35,17 @@ export default function PastConversationsPage() {
 	);
 
 	return (
-		<div className="p-4 md:w-1/2 mx-auto">
-			<div className="flex justify-between items-center mb-4">
-				<h1 className="text-2xl font-bold">Past Conversations</h1>
+		<div className="p-4 md:p-6 lg:w-2/3 mx-auto">
+			<div className="flex justify-between items-start mb-6">
+				<div>
+					<h1 className="text-3xl font-bold">Past Conversations</h1>
+					<p className="text-muted-foreground mt-1">
+						Browse and manage your previous conversations.
+					</p>
+				</div>
 				<Link href="/understand">
-					<Button className="bg-blue-500 text-white hover:bg-blue-600 dark:*:bg-blue-600 dark:hover:bg-blue-700">
-						<Plus className="mr-1 h-4 w-4" /> New
+					<Button variant="outline">
+						<Plus className="mr-2 h-4 w-4" /> New Chat
 					</Button>
 				</Link>
 			</div>
@@ -49,21 +54,30 @@ export default function PastConversationsPage() {
 					placeholder="Search conversations..."
 					value={searchTerm}
 					onChange={(e) => setSearchTerm(e.target.value)}
+					className="max-w-sm"
 				/>
 			</div>
-			<div className="flex flex-col gap-2">
-				{filteredConversations.map((conversation) => (
-					<Link href={`/understand?id=${conversation.id}`} key={conversation.id}>
-						<Card className="p-4 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer border-0">
-							<div className="flex justify-between">
-								<h2 className="text-lg font-semibold">{conversation.title}</h2>
-								<p className="text-sm text-gray-500">
-									{formatDate(conversation.updated_at)}
-								</p>
-							</div>
-						</Card>
-					</Link>
-				))}
+			<div className="flex flex-col gap-3">
+				{filteredConversations.length > 0 ? (
+					filteredConversations.map((conversation) => (
+						<Link href={`/understand?id=${conversation.id}`} key={conversation.id}>
+							<Card className="p-4 transition-all hover:bg-muted/80 cursor-pointer border-border hover:border-primary/50">
+								<div className="flex justify-between items-center">
+									<h2 className="text-lg font-semibold truncate pr-4">{conversation.title}</h2>
+									<p className="text-sm text-muted-foreground flex-shrink-0">
+										{formatDate(conversation.updated_at)}
+									</p>
+								</div>
+							</Card>
+						</Link>
+					))
+				) : (
+					<div className="text-center py-12">
+						<p className="text-muted-foreground">
+							No conversations found. Start a new one!
+						</p>
+					</div>
+				)}
 			</div>
 		</div>
 	);
