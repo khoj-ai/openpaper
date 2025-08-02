@@ -434,6 +434,26 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
 
         return db_query.order_by(Paper.updated_at.desc()).all()
 
+    def get_topics(
+        self,
+        db: Session,
+        *,
+        user: CurrentUser,
+    ) -> List[str]:
+        """
+        Get a list of unique topics from all available papers.
+        """
+        papers = self.get_all_available_papers(db, user=user)
+        topics = set()
+
+        for paper in papers:
+            if paper.keywords:
+                for keyword in paper.keywords:
+                    if keyword:
+                        topics.add(str(keyword).strip())
+
+        return list(topics)
+
 
 # Create a single instance to use throughout the application
 paper_crud = PaperCRUD(Paper)

@@ -35,6 +35,8 @@ import { PaperItem } from "@/lib/schema";
 import ReferencePaperCards from '@/components/ReferencePaperCards';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
+import { TopicBubbles } from '@/components/TopicBubbles';
+import { AnimatedGradientText } from "@/components/magicui/animated-gradient-text";
 
 interface ChatRequestBody {
     user_query: string;
@@ -407,8 +409,8 @@ function UnderstandPageContent() {
                         msg.references && msg.references['citations']?.length > 0 && (
                             <div>
                                 <div className="mt-0 pt-0 border-t border-gray-300 dark:border-gray-700" id="references-section">
-                                        <h4 className="text-sm font-semibold mb-2">References</h4>
-                                    </div>
+                                    <h4 className="text-sm font-semibold mb-2">References</h4>
+                                </div>
                                 <ReferencePaperCards citations={msg.references.citations} papers={papers} messageId={msg.id} messageIndex={index} />
                             </div>
                         )}
@@ -522,7 +524,9 @@ function UnderstandPageContent() {
             </div>
             <div className={`p-4 transition-all duration-500 ${isCentered ? 'flex-1 flex flex-col justify-center items-center my-au' : ''}`}>
                 {isCentered && (
-                    <h1 className="text-2xl font-bold mb-4">What would you like to discover in your papers?</h1>
+                    <AnimatedGradientText className="text-2xl font-bold mb-4" colorFrom="#6366f1" colorTo="#3b82f6">
+                        What would you like to discover in your papers?
+                    </AnimatedGradientText>
                 )}
                 <form onSubmit={handleNewSubmit} className="w-full" ref={chatInputFormRef}>
                     <div className="relative w-full md:max-w-3xl mx-auto">
@@ -531,7 +535,7 @@ function UnderstandPageContent() {
                             onChange={handleTextareaChange}
                             ref={inputMessageRef}
                             placeholder={isCentered ? "Discover something in your papers..." : "Ask a follow-up"}
-                            className="pr-16 resize-none w-full"
+                            className="pr-16 resize-none w-full bg-secondary"
                             disabled={isStreaming || papers.length === 0 || chatCreditLimitReached}
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -554,6 +558,13 @@ function UnderstandPageContent() {
                         </div>
                     )}
                 </form>
+                {
+                    !currentMessage && (
+                        <div className="absolute bottom-0 left-0 w-full">
+                            <TopicBubbles />
+                        </div>
+                    )
+                }
             </div>
         </div>
     );

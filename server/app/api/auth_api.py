@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import random
 import secrets
 from typing import Optional
 
@@ -88,6 +89,26 @@ async def get_onboarding_status(
 
     return Response(
         content=json.dumps(onboarding_status),
+        status_code=200,
+        media_type="application/json",
+    )
+
+
+@auth_router.get("/topics")
+async def get_topics(
+    current_user: CurrentUser = Depends(get_required_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get the list of topics for the current user.
+    This can be used to fetch user-specific topics or general topics.
+    """
+    topics = paper_crud.get_topics(db, user=current_user)
+    # randomly shuffle the topics
+    random.shuffle(topics)
+
+    return Response(
+        content=json.dumps(topics),
         status_code=200,
         media_type="application/json",
     )
