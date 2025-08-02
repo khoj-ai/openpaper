@@ -94,6 +94,9 @@ export default function PapersPage() {
                     if (filter.type === "keyword") {
                         return paper.keywords?.includes(filter.value);
                     }
+                    if (filter.type === "status") {
+                        return paper.status === filter.value;
+                    }
                     return true;
                 });
             });
@@ -188,6 +191,9 @@ export default function PapersPage() {
                         }
                         if (filter.type === "keyword") {
                             return paper.keywords?.includes(filter.value);
+                        }
+                        if (filter.type === "status") {
+                            return paper.status === filter.value;
                         }
                         return true;
                     });

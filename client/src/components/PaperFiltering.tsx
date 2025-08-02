@@ -23,9 +23,10 @@ import {
 import { Button } from "@/components/ui/button"
 import { ChevronsUpDown, Check } from "lucide-react"
 import { PaperItem } from "@/lib/schema";
+import { PaperStatusEnum } from "@/components/utils/PdfStatus";
 
 export type Filter = {
-    type: "author" | "keyword"
+    type: "author" | "keyword" | "status"
     value: string
 }
 
@@ -140,6 +141,27 @@ export function PaperFiltering({ papers, onFilterChange, onSortChange, filters, 
                                                 >
                                                     {isFilterActive({ type: "keyword", value: keyword }) && <Check className="mr-2 h-4 w-4" />}
                                                     {keyword}
+                                                </CommandItem>
+                                            ))}
+                                        </CommandGroup>
+                                    </CommandList>
+                                </Command>
+                            </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                    <DropdownMenuSub>
+                            <DropdownMenuSubTrigger>Status</DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent className="p-0">
+                                <Command>
+                                    <CommandList>
+                                        <CommandGroup>
+                                            {Object.values(PaperStatusEnum).map(status => (
+                                                <CommandItem
+                                                    key={status}
+                                                    value={status}
+                                                    onSelect={() => handleSelectFilter({ type: "status", value: status })}
+                                                >
+                                                    {isFilterActive({ type: "status", value: status }) && <Check className="mr-2 h-4 w-4" />}
+                                                    {status}
                                                 </CommandItem>
                                             ))}
                                         </CommandGroup>
