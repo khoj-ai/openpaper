@@ -53,7 +53,7 @@ function Welcome() {
 							<Loader2 className="h-12 w-12 animate-spin text-primary" />
 						</div>
 						<h2 className="text-xl font-medium">Before we get started...</h2>
-						<p className="text-muted-foreground">Let's get you set up with a few quick questions.</p>
+						<p className="text-muted-foreground">Let&apos;s get you set up with a few quick questions.</p>
 					</div>
 				</div>
 			)}
