@@ -937,7 +937,7 @@ export function SidePanelContent({
                                         </div>
                                     ) : (
                                         <div className="space-y-3">
-                                            <p className="text-sm text-muted-foreground">Make this paper public to share it with others via a unique link. All of your annotations, chats, and audio overviews will be visible to anyone with the link.</p>
+                                            <p className="text-sm text-muted-foreground">Make this paper public to share it with others via a unique link. All of your <b>annotations and chats</b> will be visible to anyone with the link.</p>
                                             <Button
                                                 onClick={handleShare}
                                                 disabled={isSharing}

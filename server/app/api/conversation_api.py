@@ -84,6 +84,55 @@ async def get_everything_conversations(
         )
 
 
+@conversation_router.get("/share/{share_paper_id}")
+async def get_shared_paper_conversation(
+    share_paper_id: str,
+    page: int = 1,
+    page_size: int = 10,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+) -> JSONResponse:
+    """Get conversation for a shared paper"""
+    try:
+        conversation = conversation_crud.get_by_share_paper_id(
+            db,
+            share_paper_id=share_paper_id,
+        )
+        if not conversation:
+            raise ValueError(
+                f"Conversation for share paper ID {share_paper_id} not found."
+            )
+
+        # Fetch messages for the conversation
+
+        messages = message_crud.get_shared_conversation_messages(
+            db,
+            conversation_id=conversation.id,  # type: ignore
+            share_paper_id=share_paper_id,
+            page=page,
+            page_size=page_size,
+        )
+
+        formatted_messages = message_crud.messages_to_dict(messages)
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "id": str(conversation.id),
+                "title": conversation.title,
+                "messages": formatted_messages,
+            },
+        )
+    except ValueError as e:
+        return JSONResponse(status_code=404, content={"message": str(e)})
+    except Exception as e:
+        logger.error(f"Error fetching shared paper conversation: {e}")
+        return JSONResponse(
+            status_code=400,
+            content={"message": f"Failed to fetch conversation: {str(e)}"},
+        )
+
+
 @conversation_router.get("/{conversation_id}")
 async def get_conversation(
     conversation_id: str,

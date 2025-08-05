@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional
 from uuid import UUID
 
 from app.database.crud.base_crud import CRUDBase
-from app.database.models import Message
+from app.database.models import Conversation, Message, Paper
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
 from sqlalchemy import desc, func
@@ -33,7 +33,7 @@ class MessageCRUD(CRUDBase[Message, MessageCreate, MessageUpdate]):
     """CRUD operations specifically for Message model"""
 
     def create(
-        self, db: Session, *, obj_in: MessageCreate, current_user: CurrentUser
+        self, db: Session, *, obj_in: MessageCreate, user: CurrentUser
     ) -> Message:
         """Create a new message with auto-incrementing sequence number"""
         # Get the next sequence number for this conversation
@@ -41,7 +41,7 @@ class MessageCRUD(CRUDBase[Message, MessageCreate, MessageUpdate]):
             db.query(func.max(Message.sequence))
             .filter(
                 Message.conversation_id == obj_in.conversation_id,
-                Message.user_id == current_user.id,
+                Message.user_id == user.id,
             )
             .scalar()
         )
@@ -49,7 +49,7 @@ class MessageCRUD(CRUDBase[Message, MessageCreate, MessageUpdate]):
 
         # Convert Pydantic model to dict and add sequence
         obj_in_data = obj_in.model_dump(exclude_unset=True)
-        db_obj = Message(**obj_in_data, sequence=next_sequence, user_id=current_user.id)
+        db_obj = Message(**obj_in_data, sequence=next_sequence, user_id=user.id)
 
         db.add(db_obj)
         db.commit()
@@ -76,6 +76,52 @@ class MessageCRUD(CRUDBase[Message, MessageCreate, MessageUpdate]):
             .filter(
                 Message.conversation_id == conversation_id,
                 Message.user_id == current_user.id,
+            )
+            .order_by(desc(Message.sequence))  # newest first for pagination
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+            .all()
+        )
+
+        # Reverse the results to get chronological order
+        return list(reversed(messages))
+
+    def get_shared_conversation_messages(
+        self,
+        db: Session,
+        *,
+        conversation_id: UUID,
+        share_paper_id: str,
+        page: int = 1,
+        page_size: int = 10
+    ) -> list[Message]:
+        """
+        Get messages for a shared conversation:
+        1. Order by sequence DESC for correct pagination (most recent first)
+        2. Apply offset and limit
+        3. Reverse final results for chronological display
+        """
+        # First, let's verify the conversation exists and get its details
+        conversation = (
+            db.query(Conversation).filter(Conversation.id == conversation_id).first()
+        )
+        if not conversation:
+            return []
+
+        # Check if there's a paper with the given share_id
+        paper = db.query(Paper).filter(Paper.share_id == share_paper_id).first()
+        if not paper:
+            return []
+
+        # Verify the relationship between conversation and paper
+        if conversation.conversable_id != paper.id:
+            return []
+
+        messages = (
+            db.query(Message)
+            .filter(
+                Message.conversation_id == conversation_id,
+                # Remove the joins and just check the conversation directly
             )
             .order_by(desc(Message.sequence))  # newest first for pagination
             .offset((page - 1) * page_size)

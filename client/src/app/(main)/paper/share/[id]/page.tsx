@@ -5,11 +5,11 @@ import { useParams } from 'next/navigation';
 import { PdfViewer } from '@/components/PdfViewer';
 import { AnnotationsView } from '@/components/AnnotationsView';
 import { fetchFromApi } from '@/lib/api';
-import { PaperData, PaperHighlight, PaperHighlightAnnotation } from '@/lib/schema';
+import { PaperData, PaperHighlight, PaperHighlightAnnotation, PaperMessage, Citation } from '@/lib/schema';
 import { useHighlights } from '@/components/hooks/PdfHighlight';
 import PaperMetadata from '@/components/PaperMetadata';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Book, Box } from 'lucide-react';
+import { Book, Box, UserIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
@@ -17,9 +17,11 @@ import remarkMath from 'remark-math';
 import 'katex/dist/katex.min.css' // `rehype-katex` does not import the CSS for you
 
 import { PaperSidebar } from '@/components/PaperSidebar';
-import { Lightbulb, Highlighter } from 'lucide-react';
+import { Lightbulb, Highlighter, MessageCircle } from 'lucide-react';
 import Markdown from 'react-markdown';
 import CustomCitationLink from '@/components/utils/CustomCitationLink';
+import { Avatar } from '@/components/ui/avatar';
+import { ChatMessageActions } from '@/components/ChatMessageActions';
 
 // Define the expected structure of the response from the share endpoint
 interface SharedPaperResponse {
@@ -31,6 +33,7 @@ interface SharedPaperResponse {
 const SharedPaperToolset = {
     nav: [
         { name: 'Overview', icon: Lightbulb },
+        { name: 'Chat', icon: MessageCircle },
         { name: 'Annotations', icon: Highlighter },
     ],
 };
@@ -42,6 +45,7 @@ export default function SharedPaperView() {
     const [paperData, setPaperData] = useState<PaperData | null>(null);
     const [highlights, setHighlights] = useState<PaperHighlight[]>([]);
     const [annotations, setAnnotations] = useState<PaperHighlightAnnotation[]>([]);
+    const [messages, setMessages] = useState<PaperMessage[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const {
@@ -50,7 +54,7 @@ export default function SharedPaperView() {
     } = useHighlights(shareId);
     const isMobile = useIsMobile();
     const [mobileView, setMobileView] = useState<'reader' | 'panel'>('reader');
-    const [rightSideFunction, setRightSideFunction] = useState('Annotations');
+    const [rightSideFunction, setRightSideFunction] = useState('Overview');
     const [activeCitationKey, setActiveCitationKey] = useState<string | null>(null);
     const [activeCitationMessageIndex, setActiveCitationMessageIndex] = useState<number | null>(null);
     const [explicitSearchTerm, setExplicitSearchTerm] = useState<string>();
@@ -76,6 +80,29 @@ export default function SharedPaperView() {
         // Clear the highlight after a few seconds
         setTimeout(() => setActiveCitationKey(null), 3000);
     }, [paperData?.summary_citations]);
+
+    const handleCitationClick = useCallback((key: string, messageIndex: number) => {
+        setActiveCitationKey(key);
+        setActiveCitationMessageIndex(messageIndex);
+
+        // Scroll to the citation
+        const element = document.getElementById(`citation-${key}-${messageIndex}`);
+        if (element) {
+
+            const refValueElement = document.getElementById(`citation-ref-${key}-${messageIndex}`);
+            if (refValueElement) {
+                const refValueText = refValueElement.innerText;
+                const refValue = refValueText.replace(/^\[\^(\d+|[a-zA-Z]+)\]/, '').trim();
+
+                // since the first and last terms are quotes, remove them
+                const searchTerm = refValue.substring(1, refValue.length - 1);
+                setExplicitSearchTerm(searchTerm);
+            }
+        }
+
+        // Clear the highlight after a few seconds
+        setTimeout(() => setActiveCitationKey(null), 3000);
+    }, []);
 
     // Memoize expensive markdown components to prevent re-renders
     const memoizedOverviewContent = useMemo(() => {
@@ -144,6 +171,101 @@ export default function SharedPaperView() {
         );
     }, [paperData?.summary, paperData?.summary_citations, handleCitationClickFromSummary]);
 
+    const memoizedMessages = useMemo(() => {
+        return messages.map((msg, index) => (
+            <div
+                key={`${msg.id || `msg-${index}`}-${index}-${msg.role}-${msg.content.slice(0, 20).replace(/\s+/g, '')}`} // Use a stable and unique key
+                className='flex flex-row gap-2 items-end'
+            >
+                {
+                    msg.role === 'user' && (
+                        <UserIcon className="h-6 w-6" />
+                    )
+                }
+                <div
+                    data-message-index={index}
+                    className={`relative group prose dark:prose-invert p-2 !max-w-full rounded-lg ${msg.role === 'user'
+                        ? 'bg-blue-200 text-blue-800 w-fit animate-fade-in'
+                        : 'w-full text-primary'
+                        }`}
+                >
+                    <Markdown
+                        remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
+                        rehypePlugins={[rehypeKatex]}
+                        components={{
+                            // Apply the custom component to text nodes
+                            p: (props) => <CustomCitationLink
+                                {...props}
+                                handleCitationClick={handleCitationClick}
+                                messageIndex={index}
+                                citations={msg.references?.citations || []}
+                            />,
+                            li: (props) => <CustomCitationLink
+                                {...props}
+                                handleCitationClick={handleCitationClick}
+                                messageIndex={index}
+                                citations={msg.references?.citations || []}
+                            />,
+                            div: (props) => <CustomCitationLink
+                                {...props}
+                                handleCitationClick={handleCitationClick}
+                                messageIndex={index}
+                                citations={msg.references?.citations || []}
+                            />,
+                            td: (props) => <CustomCitationLink
+                                {...props}
+                                handleCitationClick={handleCitationClickFromSummary}
+                                messageIndex={0}
+                                citations={msg.references?.citations || []}
+                            />,
+                            table: (props) => (
+                                <div className="overflow-x-auto">
+                                    <table {...props} className="min-w-full border-collapse" />
+                                </div>
+                            ),
+                        }}>
+                        {msg.content}
+                    </Markdown>
+                    {msg.role === 'assistant' && (
+                        <ChatMessageActions message={msg.content} references={msg.references} />
+                    )}
+                    {
+                        msg.references && msg.references.citations && msg.references.citations.length > 0 && (
+                            <div className="mt-0 pt-0 border-t border-gray-300 dark:border-gray-700" id="references-section">
+                                <h4 className="text-sm font-semibold mb-2">References</h4>
+                                <ul className="list-none p-0">
+                                    {msg.references.citations.map((value: Citation, refIndex: number) => (
+                                        <div
+                                            key={refIndex}
+                                            className={`flex flex-row gap-2 animate-fade-in ${matchesCurrentCitation(value.key, index) ? 'bg-blue-100 dark:bg-blue-900 rounded p-1 transition-colors duration-300' : ''}`}
+                                            id={`citation-${value.key}-${index}`}
+                                            onClick={() => handleCitationClick(value.key, index)}
+                                        >
+                                            <div className={`text-xs ${msg.role === 'user'
+                                                ? 'bg-blue-200 text-blue-800'
+                                                : 'text-secondary-foreground'
+                                                }`}>
+                                                <a href={`#citation-ref-${value.key}`}>{value.key}</a>
+                                            </div>
+                                            <div
+                                                id={`citation-ref-${value.key}-${index}`}
+                                                className={`text-xs ${msg.role === 'user'
+                                                    ? 'bg-blue-200 text-blue-800 line-clamp-1'
+                                                    : 'text-secondary-foreground'
+                                                    }`}
+                                            >
+                                                {value.reference}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                </div>
+            </div>
+        ));
+    }, [messages, handleCitationClick, matchesCurrentCitation]);
+
     useEffect(() => {
         if (!shareId) {
             setError("Share ID is missing.");
@@ -170,7 +292,19 @@ export default function SharedPaperView() {
             }
         };
 
+        const fetchConversation = async () => {
+            try {
+                const response = await fetchFromApi(`/api/conversation/share/${shareId}`);
+                console.log("Fetched shared conversation messages:", response);
+                setMessages(response.messages || []);
+            } catch (err) {
+                console.error("Error fetching shared conversation data:", err);
+                setMessages([]);
+            }
+        };
+
         fetchSharedData();
+        fetchConversation();
     }, [shareId]);
 
 
@@ -275,6 +409,11 @@ export default function SharedPaperView() {
                                                 )}
                                             </div>
                                         )}
+                                    </div>
+                                )}
+                                {rightSideFunction === 'Chat' && (
+                                    <div className={`flex flex-col ${heightClass} md:px-2 overflow-y-auto m-2 relative animate-fade-in`}>
+                                        {memoizedMessages}
                                     </div>
                                 )}
                             </div>
@@ -394,6 +533,16 @@ export default function SharedPaperView() {
                                             </div>
                                         )}
                                 </div>
+                            </div>
+                        )}
+                        {rightSideFunction === 'Conversation' && (
+                            <div className={`flex flex-col ${heightClass} md:px-2 overflow-y-auto m-2 relative animate-fade-in`}>
+                                {memoizedMessages}
+                            </div>
+                        )}
+                        {rightSideFunction === 'Conversation' && (
+                            <div className={`flex flex-col ${heightClass} md:px-2 overflow-y-auto m-2 relative animate-fade-in`}>
+                                {memoizedMessages}
                             </div>
                         )}
                     </div>
