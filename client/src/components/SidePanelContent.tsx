@@ -219,7 +219,7 @@ export function SidePanelContent({
     }, [paperNoteContent, debouncedSaveNote]);
 
     const fetchMoreMessages = async () => {
-        if (!hasMoreMessages || isLoadingMoreMessages) return;
+        if (!hasMoreMessages || isLoadingMoreMessages || !conversationId) return;
 
         setIsLoadingMoreMessages(true);
         try {
