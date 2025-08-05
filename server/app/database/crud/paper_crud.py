@@ -15,6 +15,7 @@ from app.database.models import (
     PaperStatus,
     PaperUploadJob,
     RoleType,
+    User,
 )
 from app.helpers.parser import get_start_page_from_offset
 from app.llm.utils import find_offsets
@@ -418,6 +419,41 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
         )
 
         return image_placeholders
+
+    def get_summary_replace_image_placeholders_shared_paper(
+        self, db: Session, *, paper_id: str
+    ) -> str:
+        """Replace image placeholders with actual images in a shared paper.
+
+        Args:
+            db (Session): Database session.
+            paper_id (str): ID of the paper to update.
+        """
+        # Get the paper without a user context first
+        paper = db.query(Paper).filter(Paper.id == paper_id).first()
+
+        if not paper:
+            raise ValueError(f"Paper with ID {paper_id} not found")
+
+        # Verify the paper is public
+        if not paper.is_public:
+            raise ValueError(f"Paper with ID {paper_id} is not a shared paper")
+
+        # Create a CurrentUser object from the paper's user_id
+        user_id = db.query(Paper.user_id).filter(Paper.id == paper_id).first()
+        if not user_id:
+            raise ValueError(f"User for paper with ID {paper_id} not found")
+
+        user = db.query(User).filter(User.id == user_id[0]).first()
+        if not user:
+            raise ValueError(f"User for paper with ID {paper_id} not found")
+
+        current_user = CurrentUser(id=user.id, email=user.email)
+
+        # Call the original method with the created user
+        return self.get_summary_replace_image_placeholders(
+            db, paper_id=paper_id, current_user=current_user
+        )
 
     def get_all_available_papers(
         self, db: Session, *, user: CurrentUser, query: Optional[str] = None

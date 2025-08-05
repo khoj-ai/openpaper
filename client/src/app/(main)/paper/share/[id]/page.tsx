@@ -11,6 +11,7 @@ import PaperMetadata from '@/components/PaperMetadata';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Book, Box } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import remarkGfm from 'remark-gfm';
 
 // Define the expected structure of the response from the share endpoint
 interface SharedPaperResponse {

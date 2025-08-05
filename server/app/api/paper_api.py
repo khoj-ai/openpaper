@@ -511,7 +511,15 @@ async def get_shared_pdf(
     highlights = highlight_crud.get_public_highlights_data_by_paper_id(db, share_id=id)
 
     paper_data["file_url"] = signed_url
-
+    paper_data["summary_citations"] = [  # type: ignore
+        ResponseCitation.model_validate(citation).model_dump()
+        for citation in paper.summary_citations or []
+    ]
+    paper_data["summary"] = (
+        paper_crud.get_summary_replace_image_placeholders_shared_paper(
+            db, paper_id=str(paper.id)
+        )
+    )
     response["paper"] = paper_data
     response["highlights"] = [highlight.to_dict() for highlight in highlights]
     response["annotations"] = [annotation.to_dict() for annotation in annotations]
