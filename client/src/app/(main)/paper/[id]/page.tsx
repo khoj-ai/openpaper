@@ -102,6 +102,7 @@ export default function PaperView() {
         tooltipPosition,
         setTooltipPosition,
         setIsAnnotating,
+        isAnnotating,
         isHighlightInteraction,
         setIsHighlightInteraction,
         activeHighlight,
@@ -154,6 +155,12 @@ export default function PaperView() {
             setElapsedTime(0); // Reset timer when job is done
         }
     }, [jobId]);
+
+    useEffect(() => {
+        if (isAnnotating) {
+            setRightSideFunction('Annotations');
+        }
+    }, [isAnnotating]);
 
     useEffect(() => {
         if (!jobId) {
