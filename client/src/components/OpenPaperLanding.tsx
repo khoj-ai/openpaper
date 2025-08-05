@@ -62,7 +62,7 @@ export default function OpenPaperLanding() {
                     >
                         Open Source
                     </Link>
-                    <Link href="#about" className="text-sm font-medium hover:text-primary transition-colors text-muted-foreground">
+                    <Link href="/about" className="text-sm font-medium hover:text-primary transition-colors text-muted-foreground">
                         About
                     </Link>
                     <Link href="/pricing" className="text-sm font-medium hover:text-primary transition-colors text-muted-foreground">
@@ -119,6 +119,13 @@ export default function OpenPaperLanding() {
                             >
                                 <Link href="/login" onClick={() => setMobileMenuOpen(false)}>Sign In</Link>
                             </Button>
+                            <Link
+                                href="/pricing"
+                                className="text-lg font-medium hover:text-primary transition-colors text-muted-foreground"
+                                onClick={() => setMobileMenuOpen(false)}
+                            >
+                                Pricing
+                            </Link>
                         </nav>
                     </SheetContent>
                 </Sheet>
@@ -150,7 +157,7 @@ export default function OpenPaperLanding() {
                                     <Button size="lg" className="bg-blue-500 hover:bg-blue-600 w-full min-[400px]:w-auto" asChild>
                                         <Link href="/login">
                                             <Upload className="w-4 h-4 mr-2" />
-                                            Start Free Trial
+                                            Upload a Paper
                                         </Link>
                                     </Button>
                                     <Button
