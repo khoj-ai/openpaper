@@ -225,20 +225,63 @@ export default function SharedPaperView() {
                             )}
                         </div>
                     ) : (
-                        <div
-                            className={`flex flex-row h-full relative pr-[60px]`}
-                        >
-                            <PaperMetadata
-                                paperData={paperData}
-                                hasMessages={false}
-                                readonly={true}
-                            />
-                            <AnnotationsView
-                                highlights={highlights}
-                                annotations={annotations}
-                                onHighlightClick={handleHighlightClick}
-                                activeHighlight={activeHighlight}
-                                readonly={true}
+                        <div className="w-full h-full flex flex-row relative pr-[60px]">
+                            <div className="flex-grow overflow-y-auto">
+                                {rightSideFunction === 'Annotations' && (
+                                    <>
+                                        <PaperMetadata
+                                            paperData={paperData}
+                                            hasMessages={false}
+                                            readonly={true}
+                                        />
+                                        <AnnotationsView
+                                            highlights={highlights}
+                                            annotations={annotations}
+                                            onHighlightClick={handleHighlightClick}
+                                            activeHighlight={activeHighlight}
+                                            readonly={true}
+                                        />
+                                    </>
+                                )}
+                                {rightSideFunction === 'Overview' && (
+                                    <div className={'flex flex-col md:px-2 m-2 relative animate-fade-in'}>
+                                        {paperData.summary && (
+                                            <div className="prose dark:prose-invert !max-w-full text-sm mt-4">
+                                                {memoizedOverviewContent}
+                                                {paperData.summary_citations && paperData.summary_citations.length > 0 && (
+                                                    <div className="mt-0 pt-0 border-t border-gray-300 dark:border-gray-700" id="references-section">
+                                                        <h4 className="text-sm font-semibold mb-2">References</h4>
+                                                        <ul className="list-none p-0">
+                                                            {paperData.summary_citations.map((citation, index) => (
+                                                                <div
+                                                                    key={index}
+                                                                    className={`flex flex-row gap-2 ${matchesCurrentCitation(`${citation.index}`, 0) ? 'bg-blue-100 dark:bg-blue-900 rounded p-1 transition-colors duration-300' : ''}`}
+                                                                    id={`citation-${citation.index}-${index}`}
+                                                                    onClick={() => handleCitationClickFromSummary(`${citation.index}`, 0)}
+                                                                >
+                                                                    <div className={'text-xs text-secondary-foreground'}>
+                                                                        <span>{citation.index}</span>
+                                                                    </div>
+                                                                    <div
+                                                                        id={`citation-ref-${citation.index}-${index}`}
+                                                                        className={'text-xs text-secondary-foreground'}
+                                                                    >
+                                                                        {citation.text}
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                            <PaperSidebar
+                                rightSideFunction={rightSideFunction}
+                                setRightSideFunction={setRightSideFunction}
+                                PaperToolset={SharedPaperToolset}
                             />
                         </div>
                     )}
@@ -301,13 +344,20 @@ export default function SharedPaperView() {
                 <div className="w-2/5 h-full flex flex-row relative pr-[60px]">
                     <div className="flex-grow">
                         {rightSideFunction === 'Annotations' && (
-                            <AnnotationsView
-                                highlights={highlights}
-                                annotations={annotations}
-                                onHighlightClick={handleHighlightClick}
-                                activeHighlight={activeHighlight}
-                                readonly={true}
-                            />
+                            <>
+                                <PaperMetadata
+                                    paperData={paperData}
+                                    hasMessages={false}
+                                    readonly={true}
+                                />
+                                <AnnotationsView
+                                    highlights={highlights}
+                                    annotations={annotations}
+                                    onHighlightClick={handleHighlightClick}
+                                    activeHighlight={activeHighlight}
+                                    readonly={true}
+                                />
+                            </>
                         )}
                         {rightSideFunction === 'Overview' && paperData.summary && (
                             <div className={`flex flex-col ${heightClass} md:px-2 overflow-y-auto m-2 relative animate-fade-in`}>

@@ -201,6 +201,7 @@ interface AnnotationsToolbarProps {
 	selectedHighlightType: string;
 	showJustMine: boolean;
 	highlightTypes: string[];
+	readonly: boolean;
 }
 
 function AnnotationsToolbar({
@@ -208,7 +209,8 @@ function AnnotationsToolbar({
 	onShowJustMine,
 	selectedHighlightType,
 	showJustMine,
-	highlightTypes
+	highlightTypes,
+	readonly,
 }: AnnotationsToolbarProps) {
 	return (
 		<div className="flex items-center gap-3 p-3 border-b border-border bg-muted/20">
@@ -225,18 +227,21 @@ function AnnotationsToolbar({
 					))}
 				</SelectContent>
 			</Select>
-
-			<div className="flex items-center gap-2">
-				<Switch
-					checked={showJustMine}
-					onCheckedChange={onShowJustMine}
-					id="just-mine"
-				/>
-				<label htmlFor="just-mine" className="text-sm font-medium text-foreground cursor-pointer flex items-center gap-1">
-					<UserIcon size={14} />
-					Just mine
-				</label>
-			</div>
+			{
+				!readonly && (
+					<div className="flex items-center gap-2">
+						<Switch
+							checked={showJustMine}
+							onCheckedChange={onShowJustMine}
+							id="just-mine"
+						/>
+						<label htmlFor="just-mine" className="text-sm font-medium text-foreground cursor-pointer flex items-center gap-1">
+							<UserIcon size={14} />
+							Just mine
+						</label>
+					</div>
+				)
+			}
 		</div>
 	);
 }
@@ -350,6 +355,7 @@ export function AnnotationsView(
 				selectedHighlightType={selectedHighlightType}
 				showJustMine={showJustMine}
 				highlightTypes={uniqueHighlightTypes}
+				readonly={readonly}
 			/>
 
 			<div className="flex-1 overflow-auto" ref={scrollContainerRef}>

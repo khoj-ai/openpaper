@@ -97,7 +97,7 @@ function PaperMetadata({ paperData, onClickStarterQuestion, hasMessages, readonl
         <Collapsible
             open={isOpen}
             onOpenChange={setIsOpen}
-            className="mb-4 border-b-2 border-secondary"
+            className="border-b-2 border-secondary"
         >
             <div className="p-2">
                 <CollapsibleTrigger className="flex flex-row w-full items-center justify-between">
