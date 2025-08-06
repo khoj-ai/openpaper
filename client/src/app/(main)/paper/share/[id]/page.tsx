@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { PdfViewer } from '@/components/PdfViewer';
 import { AnnotationsView } from '@/components/AnnotationsView';
 import { fetchFromApi } from '@/lib/api';
-import { PaperData, PaperHighlight, PaperHighlightAnnotation, PaperMessage, Citation } from '@/lib/schema';
+import { PaperData, PaperHighlight, PaperHighlightAnnotation, ChatMessage } from '@/lib/schema';
 import { useHighlights } from '@/components/hooks/PdfHighlight';
 import PaperMetadata from '@/components/PaperMetadata';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -20,7 +20,6 @@ import { PaperSidebar } from '@/components/PaperSidebar';
 import { Lightbulb, Highlighter, MessageCircle } from 'lucide-react';
 import Markdown from 'react-markdown';
 import CustomCitationLink from '@/components/utils/CustomCitationLink';
-import { Avatar } from '@/components/ui/avatar';
 import { ChatMessageActions } from '@/components/ChatMessageActions';
 
 // Define the expected structure of the response from the share endpoint
@@ -45,7 +44,7 @@ export default function SharedPaperView() {
     const [paperData, setPaperData] = useState<PaperData | null>(null);
     const [highlights, setHighlights] = useState<PaperHighlight[]>([]);
     const [annotations, setAnnotations] = useState<PaperHighlightAnnotation[]>([]);
-    const [messages, setMessages] = useState<PaperMessage[]>([]);
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const {
@@ -234,7 +233,7 @@ export default function SharedPaperView() {
                             <div className="mt-0 pt-0 border-t border-gray-300 dark:border-gray-700" id="references-section">
                                 <h4 className="text-sm font-semibold mb-2">References</h4>
                                 <ul className="list-none p-0">
-                                    {msg.references.citations.map((value: Citation, refIndex: number) => (
+                                    {msg.references.citations.map((value, refIndex) => (
                                         <div
                                             key={refIndex}
                                             className={`flex flex-row gap-2 animate-fade-in ${matchesCurrentCitation(value.key, index) ? 'bg-blue-100 dark:bg-blue-900 rounded p-1 transition-colors duration-300' : ''}`}
@@ -363,11 +362,6 @@ export default function SharedPaperView() {
                             <div className="flex-grow overflow-y-auto">
                                 {rightSideFunction === 'Annotations' && (
                                     <>
-                                        <PaperMetadata
-                                            paperData={paperData}
-                                            hasMessages={false}
-                                            readonly={true}
-                                        />
                                         <AnnotationsView
                                             highlights={highlights}
                                             annotations={annotations}
@@ -379,6 +373,11 @@ export default function SharedPaperView() {
                                 )}
                                 {rightSideFunction === 'Overview' && (
                                     <div className={'flex flex-col md:px-2 m-2 relative animate-fade-in'}>
+                                        <PaperMetadata
+                                            paperData={paperData}
+                                            hasMessages={false}
+                                            readonly={true}
+                                        />
                                         {paperData.summary && (
                                             <div className="prose dark:prose-invert !max-w-full text-sm mt-4">
                                                 {memoizedOverviewContent}
@@ -501,10 +500,12 @@ export default function SharedPaperView() {
                         {rightSideFunction === 'Overview' && paperData.summary && (
                             <div className={`flex flex-col ${heightClass} md:px-2 overflow-y-auto m-2 relative animate-fade-in`}>
                                 {/* Paper Metadata Section */}
+                                <PaperMetadata
+                                    paperData={paperData}
+                                    hasMessages={false}
+                                    readonly={true}
+                                />
                                 <div className="prose dark:prose-invert !max-w-full text-sm">
-                                    {paperData.title && (
-                                        <h1 className="text-2xl font-bold">{paperData.title}</h1>
-                                    )}
                                     {memoizedOverviewContent}
                                     {
                                         paperData.summary_citations && paperData.summary_citations.length > 0 && (
@@ -535,12 +536,7 @@ export default function SharedPaperView() {
                                 </div>
                             </div>
                         )}
-                        {rightSideFunction === 'Conversation' && (
-                            <div className={`flex flex-col ${heightClass} md:px-2 overflow-y-auto m-2 relative animate-fade-in`}>
-                                {memoizedMessages}
-                            </div>
-                        )}
-                        {rightSideFunction === 'Conversation' && (
+                        {rightSideFunction === 'Chat' && (
                             <div className={`flex flex-col ${heightClass} md:px-2 overflow-y-auto m-2 relative animate-fade-in`}>
                                 {memoizedMessages}
                             </div>
