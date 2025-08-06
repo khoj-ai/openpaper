@@ -2,7 +2,7 @@ from typing import Optional
 from uuid import UUID
 
 from app.database.crud.base_crud import CRUDBase
-from app.database.models import ConversableType, Conversation, Paper
+from app.database.models import ConversableType, Conversation, Message, Paper
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -66,9 +66,10 @@ class ConversationCRUD(CRUDBase[Conversation, ConversationCreate, ConversationUp
         if not paper:
             return None
 
-        # Get the conversation that specifically references this paper
+        # Get the first conversation for that shared paper that has any associated `Message` objects
         return (
             db.query(Conversation)
+            .join(Message)
             .filter(
                 Conversation.conversable_id == paper.id,
                 Conversation.conversable_type == ConversableType.PAPER,
