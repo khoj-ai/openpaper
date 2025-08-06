@@ -12,6 +12,7 @@ from app.database.crud.conversation_crud import (
 from app.database.crud.message_crud import message_crud
 from app.database.database import get_db
 from app.database.models import ConversableType, Conversation
+from app.database.telemetry import track_event
 from app.llm.operations import operations
 from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
@@ -90,7 +91,7 @@ async def get_shared_paper_conversation(
     page: int = 1,
     page_size: int = 10,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_required_user),
+    current_user: Optional[CurrentUser] = Depends(get_current_user),
 ) -> JSONResponse:
     """Get conversation for a shared paper"""
     try:
@@ -103,8 +104,13 @@ async def get_shared_paper_conversation(
                 f"Conversation for share paper ID {share_paper_id} not found."
             )
 
-        # Fetch messages for the conversation
+        track_event(
+            "viewed_shared_paper_conversation",
+            properties={"share_paper_id": share_paper_id},
+            user_id=str(current_user.id) if current_user else None,
+        )
 
+        # Fetch messages for the conversation
         messages = message_crud.get_shared_conversation_messages(
             db,
             conversation_id=conversation.id,  # type: ignore
