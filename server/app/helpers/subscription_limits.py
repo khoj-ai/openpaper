@@ -15,6 +15,7 @@ from app.database.crud.message_crud import message_crud
 from app.database.crud.paper_crud import paper_crud
 from app.database.crud.subscription_crud import subscription_crud
 from app.database.models import SubscriptionPlan, SubscriptionStatus
+from app.database.telemetry import track_event
 from app.schemas.user import CurrentUser
 from sqlalchemy.orm import Session
 
@@ -124,6 +125,16 @@ def can_user_upload_paper(db: Session, user: CurrentUser) -> tuple[bool, Optiona
 
     # If the user has reached their paper upload limit
     if current_paper_count >= paper_limit:
+        track_event(
+            "action_blocked_limit_reached",
+            user_id=str(user.id),
+            properties={
+                "current_paper_count": current_paper_count,
+                "paper_limit": paper_limit,
+                "type": "paper_uploads",
+                "plan": plan.value,
+            },
+        )
         plan_name = {
             SubscriptionPlan.BASIC: "Basic",
             SubscriptionPlan.RESEARCHER: "Researcher",
@@ -157,6 +168,16 @@ def can_user_access_knowledge_base(
 
     # If the user has exceeded their knowledge base size limit
     if current_size_mb >= kb_limit:
+        track_event(
+            "action_blocked_limit_reached",
+            user_id=str(user.id),
+            properties={
+                "current_size_mb": current_size_mb,
+                "kb_limit": kb_limit,
+                "type": "knowledge_base_size",
+                "plan": plan.value,
+            },
+        )
         plan_name = {
             SubscriptionPlan.BASIC: "Basic",
             SubscriptionPlan.RESEARCHER: "Researcher",
@@ -203,6 +224,72 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
 
     audio_overviews_allowed = limits[AUDIO_OVERVIEWS_KEY]
     audio_overviews_used_this_month = get_user_audio_overviews_used_this_month(db, user)
+
+    # Calculate usage percentages
+    paper_usage_percentage = (
+        (current_paper_count / paper_limit) * 100 if paper_limit != float("inf") else 0
+    )
+    kb_usage_percentage = (
+        (total_size / total_size_allowed) * 100
+        if total_size_allowed != float("inf")
+        else 0
+    )
+    chat_credits_usage_percentage = (
+        (chat_credits_used / chat_credits_allowed) * 100
+        if chat_credits_allowed != float("inf")
+        else 0
+    )
+    audio_overviews_usage_percentage = (
+        (audio_overviews_used_this_month / audio_overviews_allowed) * 100
+        if audio_overviews_allowed != float("inf")
+        else 0
+    )
+
+    # Track event if usage is > 75%
+    if paper_usage_percentage > 75:
+        track_event(
+            "high_usage_limit",
+            user_id=str(user.id),
+            properties={
+                "metric": "paper_uploads",
+                "usage": current_paper_count,
+                "limit": paper_limit,
+                "plan": plan.value,
+            },
+        )
+    if kb_usage_percentage > 75:
+        track_event(
+            "high_usage_limit",
+            user_id=str(user.id),
+            properties={
+                "metric": "knowledge_base_size",
+                "usage": total_size,
+                "limit": total_size_allowed,
+                "plan": plan.value,
+            },
+        )
+    if chat_credits_usage_percentage > 75:
+        track_event(
+            "high_usage_limit",
+            user_id=str(user.id),
+            properties={
+                "metric": "chat_credits",
+                "usage": chat_credits_used,
+                "limit": chat_credits_allowed,
+                "plan": plan.value,
+            },
+        )
+    if audio_overviews_usage_percentage > 75:
+        track_event(
+            "high_usage_limit",
+            user_id=str(user.id),
+            properties={
+                "metric": "audio_overviews",
+                "usage": audio_overviews_used_this_month,
+                "limit": audio_overviews_allowed,
+                "plan": plan.value,
+            },
+        )
 
     chat_credits_remaining = (
         None
