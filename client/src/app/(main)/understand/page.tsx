@@ -72,7 +72,6 @@ function UnderstandPageContent() {
     const [isTyping, setIsTyping] = useState(false);
     const [statusMessage, setStatusMessage] = useState('');
 
-    const [isConversationLoading, setIsConversationLoading] = useState(false);
     const [isSessionLoading, setIsSessionLoading] = useState(true);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -117,7 +116,6 @@ function UnderstandPageContent() {
     }, [authLoading, user]);
 
     const fetchMessages = useCallback(async (id: string) => {
-        setIsConversationLoading(true);
         try {
             const response = await fetchFromApi(`/api/conversation/${id}`);
             if (response && response.messages) {
@@ -129,7 +127,6 @@ function UnderstandPageContent() {
             console.error("Error fetching messages:", error);
             toast.error("Failed to load conversation history.");
         } finally {
-            setIsConversationLoading(false);
             setIsSessionLoading(false); // New line
         }
     }, []);
