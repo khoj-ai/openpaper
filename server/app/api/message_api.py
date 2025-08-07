@@ -206,7 +206,7 @@ async def chat_message_everything(
                         content=request.user_query,
                         references=formatted_references,
                     ),
-                    current_user=current_user,
+                    user=current_user,
                 )
 
                 # Save assistant message with both content and evidence
@@ -218,7 +218,7 @@ async def chat_message_everything(
                         content=full_content,
                         references=evidence if evidence else None,
                     ),
-                    current_user=current_user,
+                    user=current_user,
                 )
 
                 # Rename the conversation based on the chat history
@@ -342,7 +342,7 @@ async def chat_message_stream(
                         content=request.user_query,
                         references=formatted_references,
                     ),
-                    current_user=current_user,
+                    user=current_user,
                 )
 
                 # Save assistant message with both content and evidence
@@ -354,7 +354,7 @@ async def chat_message_stream(
                         content=full_content,
                         references=evidence if evidence else None,
                     ),
-                    current_user=current_user,
+                    user=current_user,
                 )
 
                 # Track chat message event
