@@ -17,7 +17,7 @@ import remarkMath from 'remark-math';
 import 'katex/dist/katex.min.css' // `rehype-katex` does not import the CSS for you
 
 import { PaperSidebar } from '@/components/PaperSidebar';
-import { Lightbulb, Highlighter, MessageCircle, MessageSquareDashed } from 'lucide-react';
+import { Lightbulb, Highlighter, MessageCircle } from 'lucide-react';
 import Markdown from 'react-markdown';
 import CustomCitationLink from '@/components/utils/CustomCitationLink';
 import { ChatMessageActions } from '@/components/ChatMessageActions';
