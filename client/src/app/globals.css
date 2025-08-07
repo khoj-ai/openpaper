@@ -191,17 +191,6 @@
   animation: float 3s ease-in-out infinite;
 }
 
-.horizontal-scroll-container {
-  overflow-x: auto;
-  white-space: nowrap;
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
-}
-
-.horizontal-scroll-container::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, and Opera */
-}
-
 .relative.w-full.max-w-2xl::after {
     content: '';
     position: absolute;
@@ -211,4 +200,38 @@
     height: 100%;
     background: linear-gradient(to left, var(--background), transparent);
     pointer-events: none;
+}
+
+.animate-marquee {
+  animation: marquee var(--duration) linear infinite;
+}
+
+.animate-marquee-vertical {
+  animation: marquee-vertical var(--duration) linear infinite;
+}
+
+.animation-direction-reverse {
+  animation-direction: reverse;
+}
+
+.group:hover .group-hover-paused {
+    animation-play-state: paused;
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-100% - var(--gap)));
+  }
+}
+
+@keyframes marquee-vertical {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(calc(-100% - var(--gap)));
+  }
 }

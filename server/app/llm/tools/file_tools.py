@@ -224,8 +224,6 @@ def read_abstract(paper_id: str, current_user: CurrentUser, db: Session) -> str:
 
     abstract = paper.abstract
     if not abstract:
-        raise ValueError("Abstract not found")
+        return f"Abstract for {paper.title} not found"
 
-    return (
-        f"Abstract:\n\n{abstract.strip()}\n\n" if abstract else "No abstract available."
-    )
+    return f"Abstract:\n\n{abstract.strip()}\n\n"

@@ -33,10 +33,10 @@ import {
 import { useAuth } from '@/lib/auth';
 import { PaperItem } from "@/lib/schema";
 import ReferencePaperCards from '@/components/ReferencePaperCards';
-import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { TopicBubbles } from '@/components/TopicBubbles';
 import { AnimatedGradientText } from "@/components/magicui/animated-gradient-text";
+import { ChatHistorySkeleton } from "@/components/ChatHistorySkeleton";
 
 interface ChatRequestBody {
     user_query: string;
@@ -73,6 +73,7 @@ function UnderstandPageContent() {
     const [statusMessage, setStatusMessage] = useState('');
 
     const [isConversationLoading, setIsConversationLoading] = useState(false);
+    const [isSessionLoading, setIsSessionLoading] = useState(true);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputMessageRef = useRef<HTMLTextAreaElement>(null);
@@ -129,6 +130,7 @@ function UnderstandPageContent() {
             toast.error("Failed to load conversation history.");
         } finally {
             setIsConversationLoading(false);
+            setIsSessionLoading(false); // New line
         }
     }, []);
 
@@ -143,6 +145,7 @@ function UnderstandPageContent() {
             setMessages([]);
             setConversationId(null);
             setIsCentered(true);
+            setIsSessionLoading(false);
         }
     }, [searchParams, user, fetchMessages, isStreaming]);
 
@@ -297,19 +300,24 @@ function UnderstandPageContent() {
 
                     try {
                         const parsedChunk = JSON.parse(event.trim());
-                        const chunkType = parsedChunk.type;
-                        const chunkContent = parsedChunk.content;
 
-                        if (chunkType === 'content') {
-                            accumulatedContent += chunkContent;
-                            setStreamingChunks(prev => [...prev, chunkContent]);
-                        } else if (chunkType === 'references') {
-                            references = chunkContent;
-                            setStreamingReferences(chunkContent);
-                        } else if (chunkType === 'status') {
-                            setStatusMessage(chunkContent);
-                        } else {
-                            console.warn(`Unknown chunk type: ${chunkType}`);
+                        if (parsedChunk && typeof parsedChunk === 'object' && 'type' in parsedChunk) {
+                            const chunkType = parsedChunk.type;
+                            const chunkContent = parsedChunk.content;
+
+                            if (chunkType === 'content') {
+                                accumulatedContent += chunkContent;
+                                setStreamingChunks(prev => [...prev, chunkContent]);
+                            } else if (chunkType === 'references') {
+                                references = chunkContent;
+                                setStreamingReferences(chunkContent);
+                            } else if (chunkType === 'status') {
+                                setStatusMessage(chunkContent);
+                            } else {
+                                console.warn(`Unknown chunk type: ${chunkType}`);
+                            }
+                        } else if (parsedChunk) {
+                            console.warn('Received unexpected chunk:', parsedChunk);
                         }
                     } catch (error) {
                         console.error('Error processing event:', error, 'Raw event:', event);
@@ -350,6 +358,22 @@ function UnderstandPageContent() {
     const handleTextareaChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setCurrentMessage(e.target.value);
     }, []);
+
+    useEffect(() => {
+        const focusInput = () => {
+            if (inputMessageRef.current &&
+                !isStreaming &&
+                papers.length > 0 &&
+                !chatCreditLimitReached) {
+                // Small delay to ensure DOM is ready
+                setTimeout(() => {
+                    inputMessageRef.current?.focus();
+                }, 100);
+            }
+        };
+
+        focusInput();
+    }, [papers.length, isStreaming, chatCreditLimitReached]); // Dependencies that affect focusability
 
     const memoizedMessages = useMemo(() => {
         return messages.map((msg, index) => (
@@ -417,7 +441,7 @@ function UnderstandPageContent() {
                 </div>
             </div>
         ));
-    }, [messages, user, handleCitationClick]);
+    }, [messages, user, handleCitationClick, papers]);
 
     const [isCentered, setIsCentered] = useState(true);
 
@@ -435,23 +459,23 @@ function UnderstandPageContent() {
         <div className="flex flex-col w-full h-[calc(100vh-64px)]">
             <div className={`${isCentered ? 'flex-0' : 'flex-1'} w-full overflow-y-auto`} ref={messagesContainerRef}>
                 <div className="mx-auto max-w-3xl space-y-4 p-4 w-full">
-                    {papers.length === 0 && messages.length === 0 && !authLoading && (
-                        <div className="text-center p-8">
-                            <h2 className="text-xl font-semibold mb-2">No Papers Found</h2>
-                            <p className="text-gray-600 dark:text-gray-400 mb-4">
-                                You need to have at least one paper indexed to ask questions.
-                            </p>
-                            <Button onClick={() => window.location.href = '/'}>Index a Paper</Button>
-                        </div>
+                    {isSessionLoading ? (
+                        <ChatHistorySkeleton />
+                    ) : (
+                        <>
+                            {papers.length === 0 && messages.length === 0 && !authLoading && (
+                                <div className="text-center p-8">
+                                    <h2 className="text-xl font-semibold mb-2">No Papers Found</h2>
+                                    <p className="text-gray-600 dark:text-gray-400 mb-4">
+                                        You need to have at least one paper indexed to ask questions.
+                                    </p>
+                                    <Button onClick={() => window.location.href = '/'}>Index a Paper</Button>
+                                </div>
+                            )}
+
+                            {messages.length > 0 && memoizedMessages}
+                        </>
                     )}
-                    {isConversationLoading && (
-                        <div className="space-y-4">
-                            <Skeleton className="h-16 w-full" />
-                            <Skeleton className="h-16 w-full" />
-                            <Skeleton className="h-16 w-full" />
-                        </div>
-                    )}
-                    {messages.length > 0 && memoizedMessages}
                     {
                         isStreaming && streamingChunks.length > 0 && (
                             <div className="relative group prose dark:prose-invert !max-w-full rounded-lg w-full text-primary dark:text-primary-foreground">
@@ -559,9 +583,9 @@ function UnderstandPageContent() {
                     )}
                 </form>
                 {
-                    isCentered && !currentMessage && (
+                    isCentered && (
                         <div className="absolute bottom-0 left-0 w-full">
-                            <TopicBubbles />
+                            <TopicBubbles isVisible={currentMessage.length === 0} />
                         </div>
                     )
                 }

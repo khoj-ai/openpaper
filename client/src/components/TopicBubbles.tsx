@@ -20,7 +20,7 @@ const TopicCard = ({ topic }: { topic: string }) => {
     );
 };
 
-export function TopicBubbles() {
+export function TopicBubbles({ isVisible }: { isVisible: boolean }) {
     const [topics, setTopics] = useState<string[]>([]);
 
     useEffect(() => {
@@ -40,13 +40,16 @@ export function TopicBubbles() {
     const secondRow = topics.slice(topics.length / 2);
 
     return (
-        <div className="relative flex h-full flex-col items-center justify-center overflow-hidden rounded-lg bg-background py-2">
-            <Marquee pauseOnHover className="[--duration:20s]">
+        <div className={cn(
+            "relative flex h-full flex-col items-center justify-center overflow-hidden rounded-lg bg-background py-2 transition-opacity duration-500",
+            isVisible ? "opacity-100" : "opacity-0"
+        )}>
+            <Marquee pauseOnHover className="[--duration:80s]">
                 {firstRow.map((topic) => (
                     <TopicCard topic={topic} key={topic} />
                 ))}
             </Marquee>
-            <Marquee reverse pauseOnHover className="[--duration:20s]">
+            <Marquee pauseOnHover reverse className="[--duration:80s]">
                 {secondRow.map((topic) => (
                     <TopicCard topic={topic} key={topic} />
                 ))}
