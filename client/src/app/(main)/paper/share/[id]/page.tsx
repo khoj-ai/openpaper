@@ -23,6 +23,7 @@ import CustomCitationLink from '@/components/utils/CustomCitationLink';
 import { ChatMessageActions } from '@/components/ChatMessageActions';
 import { BasicUser } from '@/lib/auth';
 import { Avatar } from '@/components/ui/avatar';
+import EmptyConversationState from './EmptyConversationState';
 
 // Define the expected structure of the response from the share endpoint
 interface SharedPaperResponse {
@@ -423,12 +424,7 @@ export default function SharedPaperView() {
                                 {rightSideFunction === 'Chat' && (
                                     <div className={`flex flex-col ${heightClass} md:px-2 overflow-y-auto m-2 relative animate-fade-in`}>
                                         {messages.length === 0 ? (
-                                            <div className="flex flex-col justify-center items-center h-full">
-                                                <MessageSquareDashed className="w-16 h-16 text-gray-400 mb-4" />
-                                                <p className="text-center text-gray-500">
-                                                    This conversation is pretty quiet. Tell {owner?.name} to share some thoughts!
-                                                </p>
-                                            </div>
+                                            <EmptyConversationState owner={owner} />
                                         ) : (
                                             memoizedMessages
                                         )}
@@ -559,12 +555,7 @@ export default function SharedPaperView() {
                         {rightSideFunction === 'Chat' && (
                             <div className={`flex flex-col ${heightClass} md:px-2 overflow-y-auto m-2 relative animate-fade-in`}>
                                 {messages.length === 0 ? (
-                                    <div className="flex flex-col justify-center items-center h-full">
-                                        <MessageSquareDashed className="w-16 h-16 text-gray-400 mb-4" />
-                                        <p className="text-center text-gray-500">
-                                            This conversation is pretty quiet. Tell {owner?.name} to share some thoughts!
-                                        </p>
-                                    </div>
+                                    <EmptyConversationState owner={owner} />
                                 ) : (
                                     memoizedMessages
                                 )}
