@@ -25,17 +25,17 @@ export default function EmptyConversationState({ owner }: EmptyConversationState
             <p className="text-gray-600 dark:text-gray-400 mb-4 max-w-sm leading-relaxed">
                 {owner?.name ? (
                     <>
-                        <span className="font-medium text-gray-800 dark:text-gray-200">{owner.name}</span> hasn't started chatting with this paper yet.
+                        <span className="font-medium text-gray-800 dark:text-gray-200">{owner.name}</span> hasn&apos;t started chatting with this paper yet.
                     </>
                 ) : (
-                    'The owner hasn\'t started chatting with this paper yet.'
+                    'The owner hasn&apos;t started chatting with this paper yet.'
                 )}
             </p>
 
             {/* What to expect section */}
             <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
                 <p className="text-sm text-gray-700 dark:text-gray-300 mb-3 font-medium">
-                    When they do, you'll see:
+                    When they do, you&apos;ll see:
                 </p>
                 <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
                     <div className="flex items-center gap-2">
