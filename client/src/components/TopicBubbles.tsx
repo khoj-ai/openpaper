@@ -39,20 +39,20 @@ export function TopicBubbles({ isVisible }: { isVisible: boolean }) {
     const firstRow = topics.slice(0, topics.length / 2);
     const secondRow = topics.slice(topics.length / 2);
 
-    // Scale duration based on number of topics (e.g., 4 seconds per topic)
-    const duration = Math.max(20, topics.length * 4); // minimum 20s, 4s per topic
+    // Scale duration based on number of topics.
+    const duration = topics.length > 0 ? Math.max(20, topics.length * 2) : 40; // Ensure a minimum duration
 
     return (
         <div className={cn(
             "relative flex h-full flex-col items-center justify-center overflow-hidden rounded-lg bg-background py-2 transition-opacity duration-500",
             isVisible ? "opacity-100" : "opacity-0"
         )}>
-            <Marquee pauseOnHover className={`[--duration:${duration}s]`}>
+            <Marquee pauseOnHover style={{ '--duration': `${duration}s` } as React.CSSProperties}>
                 {firstRow.map((topic) => (
                     <TopicCard topic={topic} key={topic} />
                 ))}
             </Marquee>
-            <Marquee pauseOnHover reverse className={`[--duration:${duration}s]`}>
+            <Marquee pauseOnHover reverse style={{ '--duration': `${duration}s` } as React.CSSProperties}>
                 {secondRow.map((topic) => (
                     <TopicCard topic={topic} key={topic} />
                 ))}
