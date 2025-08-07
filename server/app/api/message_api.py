@@ -5,8 +5,6 @@ from datetime import datetime, timezone
 from typing import AsyncGenerator, List, Optional, Union
 
 from app.auth.dependencies import get_required_user
-
-# Wow I just saw this spelling error. Might leave for proof of humanity. DATE: 2025-07-16.
 from app.database.crud.conversation_crud import conversation_crud
 from app.database.crud.message_crud import MessageCreate, message_crud
 from app.database.database import get_db

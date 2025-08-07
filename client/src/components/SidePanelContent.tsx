@@ -1022,7 +1022,7 @@ export function SidePanelContent({
                         }
                         {
                             rightSideFunction === 'Chat' && (
-                                <div className={`flex flex-col ${heightClass} md:px-2 overflow-y-auto`}>
+                                <div className={`flex flex-col ${heightClass} overflow-y-auto`}>
                                     {/* Paper Metadata Section */}
                                     {paperData && (
                                         <PaperMetadata
@@ -1042,7 +1042,7 @@ export function SidePanelContent({
                                     )}
 
                                     <div
-                                        className={`flex-1 overflow-y-auto space-y-2 transition-all duration-300 ease-in-out ${isStreaming ? 'pb-24' : ''}`}
+                                        className={`flex-1 overflow-y-auto space-y-2 transition-all duration-300 mt-2 ease-in-out ${isStreaming ? 'pb-24' : ''}`}
                                         ref={messagesContainerRef}
                                         onScroll={handleScroll}
                                     >
