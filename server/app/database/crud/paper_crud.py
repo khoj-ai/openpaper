@@ -226,6 +226,7 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
         """Get a paper by its share_id if it's public"""
         return (
             db.query(Paper)
+            .join(User, Paper.user_id == User.id)
             .filter(Paper.share_id == share_id, Paper.is_public == True)
             .first()
         )

@@ -887,11 +887,12 @@ export function SidePanelContent({
                             )
                         }
                         {
-                            rightSideFunction === 'Annotations' && (
+                            rightSideFunction === 'Annotations' && user && (
                                 <div className={`flex flex-col ${heightClass} md:px-2 overflow-y-auto`}>
                                     <AnnotationsView
                                         annotations={annotations}
                                         highlights={highlights}
+                                        user={user}
                                         onHighlightClick={handleHighlightClick}
                                         addAnnotation={addAnnotation}
                                         activeHighlight={activeHighlight}

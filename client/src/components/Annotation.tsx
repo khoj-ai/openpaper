@@ -4,12 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar } from '@/components/ui/avatar';
 import { PaperHighlightAnnotation } from '@/lib/schema';
-import { User } from '@/lib/auth';
+import { BasicUser } from '@/lib/auth';
 import { formatDate } from '@/lib/utils';
 
 interface AnnotationProps {
     annotation: PaperHighlightAnnotation;
-    user?: User;
+    user?: BasicUser;
     removeAnnotation?: (annotationId: string) => void;
     updateAnnotation?: (annotationId: string, content: string) => void;
     readonly?: boolean;

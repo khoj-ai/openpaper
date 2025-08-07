@@ -3,11 +3,14 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { fetchFromApi } from './api';
 
-export interface User {
+export interface BasicUser {
+	name: string;
+	picture: string;
+}
+
+export interface User extends BasicUser {
 	id: string;
 	email: string;
-	name: string;
-	picture?: string;
 	is_active: boolean;
 }
 

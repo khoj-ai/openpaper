@@ -9,7 +9,7 @@ import { PaperData, PaperHighlight, PaperHighlightAnnotation, ChatMessage } from
 import { useHighlights } from '@/components/hooks/PdfHighlight';
 import PaperMetadata from '@/components/PaperMetadata';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Book, Box, UserIcon } from 'lucide-react';
+import { Book, Box, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
@@ -17,16 +17,19 @@ import remarkMath from 'remark-math';
 import 'katex/dist/katex.min.css' // `rehype-katex` does not import the CSS for you
 
 import { PaperSidebar } from '@/components/PaperSidebar';
-import { Lightbulb, Highlighter, MessageCircle } from 'lucide-react';
+import { Lightbulb, Highlighter, MessageCircle, MessageSquareDashed } from 'lucide-react';
 import Markdown from 'react-markdown';
 import CustomCitationLink from '@/components/utils/CustomCitationLink';
 import { ChatMessageActions } from '@/components/ChatMessageActions';
+import { BasicUser } from '@/lib/auth';
+import { Avatar } from '@/components/ui/avatar';
 
 // Define the expected structure of the response from the share endpoint
 interface SharedPaperResponse {
     paper: PaperData;
     highlights: PaperHighlight[];
     annotations: PaperHighlightAnnotation[];
+    owner: BasicUser;
 }
 
 const SharedPaperToolset = {
@@ -44,6 +47,7 @@ export default function SharedPaperView() {
     const [paperData, setPaperData] = useState<PaperData | null>(null);
     const [highlights, setHighlights] = useState<PaperHighlight[]>([]);
     const [annotations, setAnnotations] = useState<PaperHighlightAnnotation[]>([]);
+    const [owner, setOwner] = useState<BasicUser | undefined>(undefined);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -177,8 +181,11 @@ export default function SharedPaperView() {
                 className='flex flex-row gap-2 items-end'
             >
                 {
-                    msg.role === 'user' && (
-                        <UserIcon className="h-6 w-6" />
+                    msg.role === 'user' && owner && (
+                        <Avatar className="h-6 w-6">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            {owner.picture ? (<img src={owner.picture} alt={owner.name} />) : (<User size={16} />)}
+                        </Avatar>
                     )
                 }
                 <div
@@ -280,12 +287,14 @@ export default function SharedPaperView() {
                 setPaperData(response.paper);
                 setHighlights(response.highlights || []);
                 setAnnotations(response.annotations || []);
+                setOwner(response.owner);
             } catch (err) {
                 console.error("Error fetching shared paper data:", err);
                 setError("Failed to load shared paper. The link might be invalid or expired.");
                 setPaperData(null);
                 setHighlights([]);
                 setAnnotations([]);
+                setOwner(undefined);
             } finally {
                 setLoading(false);
             }
@@ -360,13 +369,14 @@ export default function SharedPaperView() {
                     ) : (
                         <div className="w-full h-full flex flex-row relative pr-[60px]">
                             <div className="flex-grow overflow-y-auto">
-                                {rightSideFunction === 'Annotations' && (
+                                {rightSideFunction === 'Annotations' && owner && (
                                     <>
                                         <AnnotationsView
                                             highlights={highlights}
                                             annotations={annotations}
                                             onHighlightClick={handleHighlightClick}
                                             activeHighlight={activeHighlight}
+                                            user={owner}
                                             readonly={true}
                                         />
                                     </>
@@ -412,7 +422,16 @@ export default function SharedPaperView() {
                                 )}
                                 {rightSideFunction === 'Chat' && (
                                     <div className={`flex flex-col ${heightClass} md:px-2 overflow-y-auto m-2 relative animate-fade-in`}>
-                                        {memoizedMessages}
+                                        {messages.length === 0 ? (
+                                            <div className="flex flex-col justify-center items-center h-full">
+                                                <MessageSquareDashed className="w-16 h-16 text-gray-400 mb-4" />
+                                                <p className="text-center text-gray-500">
+                                                    This conversation is pretty quiet. Tell {owner?.name} to share some thoughts!
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            memoizedMessages
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -481,7 +500,7 @@ export default function SharedPaperView() {
                 {/* Right Side: Sidebar and Content */}
                 <div className="w-2/5 h-full flex flex-row relative pr-[60px]">
                     <div className="flex-grow">
-                        {rightSideFunction === 'Annotations' && (
+                        {rightSideFunction === 'Annotations' && owner && (
                             <>
                                 <PaperMetadata
                                     paperData={paperData}
@@ -494,6 +513,7 @@ export default function SharedPaperView() {
                                     onHighlightClick={handleHighlightClick}
                                     activeHighlight={activeHighlight}
                                     readonly={true}
+                                    user={owner}
                                 />
                             </>
                         )}
@@ -538,7 +558,16 @@ export default function SharedPaperView() {
                         )}
                         {rightSideFunction === 'Chat' && (
                             <div className={`flex flex-col ${heightClass} md:px-2 overflow-y-auto m-2 relative animate-fade-in`}>
-                                {memoizedMessages}
+                                {messages.length === 0 ? (
+                                    <div className="flex flex-col justify-center items-center h-full">
+                                        <MessageSquareDashed className="w-16 h-16 text-gray-400 mb-4" />
+                                        <p className="text-center text-gray-500">
+                                            This conversation is pretty quiet. Tell {owner?.name} to share some thoughts!
+                                        </p>
+                                    </div>
+                                ) : (
+                                    memoizedMessages
+                                )}
                             </div>
                         )}
                     </div>

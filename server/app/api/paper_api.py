@@ -523,6 +523,7 @@ async def get_shared_pdf(
     response["paper"] = paper_data
     response["highlights"] = [highlight.to_dict() for highlight in highlights]
     response["annotations"] = [annotation.to_dict() for annotation in annotations]
+    response["owner"] = {"name": paper.user.name, "picture": paper.user.picture}
 
     track_event(
         "paper_shared_view",

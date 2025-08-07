@@ -11,7 +11,7 @@ import { Card, CardContent } from './ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { useAuth, User } from "@/lib/auth";
+import { BasicUser } from "@/lib/auth";
 import { User as UserIcon } from 'lucide-react';
 import { smoothScrollTo } from '@/lib/animation';
 import Annotation from './Annotation';
@@ -107,7 +107,7 @@ interface HighlightThreadProps {
 	addAnnotation?: (highlightId: string, content: string) => Promise<PaperHighlightAnnotation>;
 	removeAnnotation?: (annotationId: string) => void;
 	updateAnnotation?: (annotationId: string, content: string) => void;
-	user?: User;
+	user?: BasicUser
 	readonly?: boolean;
 }
 
@@ -192,6 +192,7 @@ interface AnnotationsViewProps {
 	addAnnotation?: (highlightId: string, content: string) => Promise<PaperHighlightAnnotation>;
 	removeAnnotation?: (annotationId: string) => void;
 	updateAnnotation?: (annotationId: string, content: string) => void;
+	user: BasicUser;
 	readonly?: boolean;
 }
 
@@ -255,6 +256,7 @@ export function AnnotationsView(
 		activeHighlight,
 		removeAnnotation,
 		updateAnnotation,
+		user,
 		readonly = false
 	}: AnnotationsViewProps
 ) {
@@ -266,7 +268,6 @@ export function AnnotationsView(
 	const [showJustMine, setShowJustMine] = React.useState<boolean>(false);
 	const highlightRefs = useRef<Record<string, HTMLDivElement | null>>({});
 	const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-	const { user } = useAuth();
 
 	// Get unique highlight types for filter dropdown
 	const uniqueHighlightTypes = React.useMemo(() => {

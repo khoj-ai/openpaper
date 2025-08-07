@@ -461,14 +461,14 @@ export function PdfViewer(props: PdfViewerProps) {
 						loading={<EnigmaticLoadingExperience />}
 					>
 						{/* <Outline
-					onItemClick={(item) => {
-						if (item.dest) {
-							const pageIndex = item.pageNumber - 1;
-							setCurrentPage(pageIndex + 1);
-							pagesRef.current[pageIndex]?.scrollIntoView({ behavior: 'smooth' });
-						}
-					}}
-				/> */}
+						onItemClick={(item) => {
+							if (item.dest) {
+								const pageIndex = item.pageNumber - 1;
+								setCurrentPage(pageIndex + 1);
+								pagesRef.current[pageIndex]?.scrollIntoView({ behavior: 'smooth' });
+							}
+						}}
+					/> */}
 						{Array.from(new Array(numPages || 0), (_, index) => (
 							<div
 								ref={(el) => {
