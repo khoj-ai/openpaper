@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/lib/auth";
-import { useSubscription, getStorageUsagePercentage, isStorageNearLimit, isStorageAtLimit, formatFileSize } from "@/hooks/useSubscription";
+import { useSubscription, getStorageUsagePercentage, isStorageNearLimit, isStorageAtLimit, formatFileSize, getPaperUploadPercentage, isPaperUploadNearLimit, isPaperUploadAtLimit } from "@/hooks/useSubscription";
 import { FileText, Upload, Search, AlertTriangle, AlertCircle, HardDrive, X, ArrowDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
@@ -246,20 +246,7 @@ export default function PapersPage() {
         )
     }
 
-    const getUsagePercentage = () => {
-        return getStorageUsagePercentage(subscription);
-    };
-
-    const getUsageAlert = () => {
-        if (isStorageAtLimit(subscription)) {
-            return "error";
-        } else if (isStorageNearLimit(subscription)) {
-            return "warning";
-        }
-        return null;
-    };
-
-    const StorageUsageDisplay = () => {
+    const UsageDisplay = () => {
         const [isExpanded, setIsExpanded] = useState(false);
 
         if (subscriptionLoading) {
@@ -270,12 +257,15 @@ export default function PapersPage() {
             return null;
         }
 
-        const usagePercentage = getUsagePercentage();
-        const alertType = getUsageAlert();
+        const storageUsagePercentage = getStorageUsagePercentage(subscription);
+        const paperUploadUsagePercentage = getPaperUploadPercentage(subscription);
 
-        if (usagePercentage < SHOW_STORAGE_USAGE_THRESHOLD) {
-            return null; // Don't show if usage is below 60%
+        if (storageUsagePercentage < SHOW_STORAGE_USAGE_THRESHOLD && paperUploadUsagePercentage < SHOW_STORAGE_USAGE_THRESHOLD) {
+            return null;
         }
+
+        const storageAlertType = isStorageAtLimit(subscription) ? "error" : (isStorageNearLimit(subscription) ? "warning" : null);
+        const paperUploadAlertType = isPaperUploadAtLimit(subscription) ? "error" : (isPaperUploadNearLimit(subscription) ? "warning" : null);
 
         return (
             <div
@@ -283,49 +273,73 @@ export default function PapersPage() {
                 onClick={() => setIsExpanded(!isExpanded)}
             >
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <HardDrive className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">
-                            Storage: {usagePercentage.toFixed(0)}%
-                        </span>
+                    <div className="flex items-center gap-4">
+                        {storageUsagePercentage >= SHOW_STORAGE_USAGE_THRESHOLD && (
+                            <div className="flex items-center gap-2">
+                                <HardDrive className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm font-medium">
+                                    Storage: {storageUsagePercentage.toFixed(0)}%
+                                </span>
+                            </div>
+                        )}
+                        {paperUploadUsagePercentage >= SHOW_STORAGE_USAGE_THRESHOLD && (
+                            <div className="flex items-center gap-2">
+                                <FileText className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm font-medium">
+                                    Papers: {paperUploadUsagePercentage.toFixed(0)}%
+                                </span>
+                            </div>
+                        )}
                     </div>
                     <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                        {isExpanded ? (
-                            <X className="h-4 w-4" />
-                        ) : (
-                            <ArrowDown className="h-4 w-4" />
-                        )}
+                        {isExpanded ? <X className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
                     </Button>
                 </div>
 
                 {isExpanded && (
-                    <div className="mt-4 space-y-2">
-                        <div className="flex justify-between text-sm text-muted-foreground">
-                            <span>{formatFileSize(subscription.usage.knowledge_base_size)} used</span>
-                            <span>{formatFileSize(subscription.limits.knowledge_base_size)} total</span>
-                        </div>
-
-                        <Progress
-                            value={usagePercentage}
-                            className="h-2"
-                        />
-
-                        {alertType && (
-                            <Alert variant={alertType === "error" ? "destructive" : "default"} className="mt-3">
-                                <div className="flex items-center gap-2">
-                                    {alertType === "error" ? (
-                                        <AlertCircle className="h-4 w-4" />
-                                    ) : (
-                                        <AlertTriangle className="h-4 w-4" />
-                                    )}
-                                    <AlertDescription>
-                                        {alertType === "error"
-                                            ? "You've reached your storage limit. Please delete some papers to upload new ones."
-                                            : "You're approaching your storage limit. Consider reviewing your papers."
-                                        }
-                                    </AlertDescription>
+                    <div className="mt-4 space-y-4">
+                        {storageUsagePercentage >= SHOW_STORAGE_USAGE_THRESHOLD && (
+                            <div>
+                                <div className="flex justify-between text-sm text-muted-foreground">
+                                    <span>{formatFileSize(subscription.usage.knowledge_base_size)} used</span>
+                                    <span>{formatFileSize(subscription.limits.knowledge_base_size)} total</span>
                                 </div>
-                            </Alert>
+                                <Progress value={storageUsagePercentage} className="h-2 mt-1" />
+                                {storageAlertType && (
+                                    <Alert variant={storageAlertType === "error" ? "destructive" : "default"} className="mt-3">
+                                        <div className="flex items-center gap-2">
+                                            {storageAlertType === "error" ? <AlertCircle className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                                            <AlertDescription>
+                                                {storageAlertType === "error"
+                                                    ? "You've reached your storage limit. Please delete some papers to upload new ones."
+                                                    : "You're approaching your storage limit. Consider reviewing your papers."}
+                                            </AlertDescription>
+                                        </div>
+                                    </Alert>
+                                )}
+                            </div>
+                        )}
+
+                        {paperUploadUsagePercentage >= SHOW_STORAGE_USAGE_THRESHOLD && (
+                            <div>
+                                <div className="flex justify-between text-sm text-muted-foreground">
+                                    <span>{subscription.usage.paper_uploads} used</span>
+                                    <span>{subscription.limits.paper_uploads} total</span>
+                                </div>
+                                <Progress value={paperUploadUsagePercentage} className="h-2 mt-1" />
+                                {paperUploadAlertType && (
+                                    <Alert variant={paperUploadAlertType === "error" ? "destructive" : "default"} className="mt-3">
+                                        <div className="flex items-center gap-2">
+                                            {paperUploadAlertType === "error" ? <AlertCircle className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                                            <AlertDescription>
+                                                {paperUploadAlertType === "error"
+                                                    ? "You've reached your paper upload limit. Please upgrade for more uploads."
+                                                    : "You're approaching your paper upload limit."}
+                                            </AlertDescription>
+                                        </div>
+                                    </Alert>
+                                )}
+                            </div>
                         )}
                     </div>
                 )}
@@ -431,7 +445,7 @@ export default function PapersPage() {
 
     return (
         <div className="container mx-auto sm:w-2/3 p-8">
-            <StorageUsageDisplay />
+            <UsageDisplay />
 
             {papers.length > 0 && (
                 <div>
