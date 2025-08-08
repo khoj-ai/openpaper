@@ -94,12 +94,16 @@ function UnderstandPageContent() {
         }
     }, [chatCreditLimitReached]);
 
+    const [highlightedInfo, setHighlightedInfo] = useState<{ paperId: string; messageIndex: number } | null>(null);
+
     const handleCitationClick = useCallback((key: string, messageIndex: number) => {
         const message = messages[messageIndex];
         if (!message) return;
 
         const citation = message.references?.citations?.find(c => String(c.key) === key);
         if (!citation || !citation.paper_id) return;
+
+        setHighlightedInfo({ paperId: citation.paper_id, messageIndex });
 
         const elementId = message.id ? `${message.id}-reference-paper-card-${citation.paper_id}` : `${messageIndex}-reference-paper-card-${citation.paper_id}`;
         const element = document.getElementById(elementId);
@@ -432,13 +436,20 @@ function UnderstandPageContent() {
                                 <div className="mt-0 pt-0 border-t border-gray-300 dark:border-gray-700" id="references-section">
                                     <h4 className="text-sm font-semibold mb-2">References</h4>
                                 </div>
-                                <ReferencePaperCards citations={msg.references.citations} papers={papers} messageId={msg.id} messageIndex={index} />
+                                <ReferencePaperCards
+                                    citations={msg.references.citations}
+                                    papers={papers}
+                                    messageId={msg.id}
+                                    messageIndex={index}
+                                    highlightedPaper={highlightedInfo && highlightedInfo.messageIndex === index ? highlightedInfo.paperId : null}
+                                    onHighlightClear={() => setHighlightedInfo(null)}
+                                />
                             </div>
                         )}
                 </div>
             </div>
         ));
-    }, [messages, user, handleCitationClick, papers]);
+    }, [messages, user, handleCitationClick, papers, highlightedInfo]);
 
     const [isCentered, setIsCentered] = useState(true);
 
