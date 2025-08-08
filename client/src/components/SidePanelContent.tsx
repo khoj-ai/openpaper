@@ -813,9 +813,6 @@ export function SidePanelContent({
                                 <div className='p-2 w-full h-full flex flex-col'>
                                     <div className="flex justify-between items-center mb-2 flex-shrink-0">
                                         <div className="flex items-center gap-2">
-                                            <div className="text-xs text-gray">
-                                                Length: {paperNoteContent?.length} characters
-                                            </div>
                                             <TooltipProvider>
                                                 <Tooltip>
                                                     <TooltipTrigger>
