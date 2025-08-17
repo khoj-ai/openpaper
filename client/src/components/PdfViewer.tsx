@@ -33,7 +33,6 @@ interface PdfViewerProps {
 	tooltipPosition: { x: number; y: number } | null;
 	setTooltipPosition: (position: { x: number; y: number } | null) => void;
 	setIsAnnotating: (isAnnotating: boolean) => void;
-	isAnnotating: boolean;
 	isHighlightInteraction: boolean;
 	setIsHighlightInteraction: (isHighlightInteraction: boolean) => void;
 	activeHighlight: PaperHighlight | null;
@@ -61,7 +60,6 @@ export function PdfViewer(props: PdfViewerProps) {
 		tooltipPosition,
 		setTooltipPosition,
 		setIsAnnotating,
-		isAnnotating,
 		isHighlightInteraction,
 		setIsHighlightInteraction,
 		activeHighlight,
@@ -503,7 +501,6 @@ export function PdfViewer(props: PdfViewerProps) {
 					setSelectedText={setSelectedText}
 					setTooltipPosition={setTooltipPosition}
 					setIsAnnotating={setIsAnnotating}
-					isAnnotating={isAnnotating}
 					highlights={highlights}
 					setHighlights={setHighlights}
 					isHighlightInteraction={isHighlightInteraction}

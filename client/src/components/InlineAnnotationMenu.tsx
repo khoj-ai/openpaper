@@ -6,7 +6,7 @@ import { getSelectionOffsets } from "./utils/PdfTextUtils";
 import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { CommandShortcut, localizeCommandToOS } from "./ui/command";
-import { Bookmark, Copy, Highlighter, MessageCircle, Minus, NotebookText, X } from "lucide-react";
+import { Bookmark, Copy, Highlighter, MessageCircle, Minus, X } from "lucide-react";
 
 interface InlineAnnotationMenuProps {
     selectedText: string;
@@ -14,7 +14,6 @@ interface InlineAnnotationMenuProps {
     setSelectedText: (text: string) => void;
     setTooltipPosition: (position: { x: number; y: number } | null) => void;
     setIsAnnotating: (isAnnotating: boolean) => void;
-    isAnnotating: boolean;
     highlights: Array<PaperHighlight>;
     setHighlights: (highlights: Array<PaperHighlight>) => void;
     isHighlightInteraction: boolean;
@@ -32,7 +31,6 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
         setSelectedText,
         setTooltipPosition,
         setIsAnnotating,
-        isAnnotating,
         isHighlightInteraction,
         activeHighlight,
         addHighlight,

@@ -474,7 +474,6 @@ export default function PaperView() {
                                     setSelectedText={setSelectedText}
                                     setTooltipPosition={setTooltipPosition}
                                     setIsAnnotating={setIsAnnotating}
-                                    isAnnotating={isAnnotating}
                                     setIsHighlightInteraction={setIsHighlightInteraction}
                                     isHighlightInteraction={isHighlightInteraction}
                                     highlights={highlights}
@@ -562,7 +561,6 @@ export default function PaperView() {
                                 setSelectedText={setSelectedText}
                                 setTooltipPosition={setTooltipPosition}
                                 setIsAnnotating={setIsAnnotating}
-                                isAnnotating={isAnnotating}
                                 setIsHighlightInteraction={setIsHighlightInteraction}
                                 isHighlightInteraction={isHighlightInteraction}
                                 highlights={highlights}
