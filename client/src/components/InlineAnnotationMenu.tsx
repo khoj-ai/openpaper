@@ -6,7 +6,7 @@ import { getSelectionOffsets } from "./utils/PdfTextUtils";
 import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { CommandShortcut, localizeCommandToOS } from "./ui/command";
-import { Copy, Highlighter, MessageCircle, Minus, NotebookText, X } from "lucide-react";
+import { Bookmark, Copy, Highlighter, MessageCircle, Minus, NotebookText, X } from "lucide-react";
 
 interface InlineAnnotationMenuProps {
     selectedText: string;
@@ -14,11 +14,12 @@ interface InlineAnnotationMenuProps {
     setSelectedText: (text: string) => void;
     setTooltipPosition: (position: { x: number; y: number } | null) => void;
     setIsAnnotating: (isAnnotating: boolean) => void;
+    isAnnotating: boolean;
     highlights: Array<PaperHighlight>;
     setHighlights: (highlights: Array<PaperHighlight>) => void;
     isHighlightInteraction: boolean;
     activeHighlight: PaperHighlight | null;
-    addHighlight: (selectedText: string, startOffset?: number, endOffset?: number, pageNumber?: number) => void;
+    addHighlight: (selectedText: string, startOffset?: number, endOffset?: number, pageNumber?: number, doAnnotate?: boolean) => void;
     removeHighlight: (highlight: PaperHighlight) => void;
     setUserMessageReferences: React.Dispatch<React.SetStateAction<string[]>>;
     setAddedContentForPaperNote: (content: string) => void;
@@ -31,6 +32,7 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
         setSelectedText,
         setTooltipPosition,
         setIsAnnotating,
+        isAnnotating,
         isHighlightInteraction,
         activeHighlight,
         addHighlight,
@@ -134,12 +136,12 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={(e) => {
                                 e.stopPropagation();
-                                addHighlight(selectedText, offsets?.start, offsets?.end, offsets?.pageNumber);
+                                addHighlight(selectedText, offsets?.start, offsets?.end, offsets?.pageNumber, false);
                             }}
                         >
                             <div className="flex items-center gap-2">
-                                <Highlighter size={14} />
-                                Highlight
+                                <Bookmark size={14} />
+                                Save
                             </div>
                             <CommandShortcut className="text-muted-foreground">
                                 {localizeCommandToOS('H')}
@@ -150,52 +152,29 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
 
                 {/* Annotate Button */}
                 {
-                    isHighlightInteraction && (
-                        <Button
-                            variant="ghost"
-                            className="w-full flex items-center justify-between text-sm font-normal h-9 px-2"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setIsAnnotating(true);
-                                setTooltipPosition(null);
-                                setSelectedText("");
-                            }}
-                        >
-                            <div className="flex items-center gap-2">
-                                <Highlighter size={14} />
-                                Annotate
-                            </div>
-                            <CommandShortcut className="text-muted-foreground">
-                                {localizeCommandToOS('E')}
-                            </CommandShortcut>
-                        </Button>
-                    )
+                    <Button
+                        variant="ghost"
+                        className="w-full flex items-center justify-between text-sm font-normal h-9 px-2"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setIsAnnotating(true);
+                            setTooltipPosition(null);
+                            setSelectedText("");
+                            if (!isHighlightInteraction) {
+                                addHighlight(selectedText, offsets?.start, offsets?.end, offsets?.pageNumber, true);
+                            }
+                        }}
+                    >
+                        <div className="flex items-center gap-2">
+                            <Highlighter size={14} />
+                            Annotate
+                        </div>
+                        <CommandShortcut className="text-muted-foreground">
+                            {localizeCommandToOS('E')}
+                        </CommandShortcut>
+                    </Button>
                 }
-
-                {/* Add Note Button */}
-                <Button
-                    variant="ghost"
-                    className="w-full flex items-center justify-between text-sm font-normal h-9 px-2"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setAddedContentForPaperNote(selectedText);
-                        setSelectedText("");
-                        setTooltipPosition(null);
-                        setIsAnnotating(false);
-                    }}
-                >
-                    <div className="flex items-center gap-2">
-                        <NotebookText size={14} />
-                        Add to Note
-                    </div>
-                    <CommandShortcut className="text-muted-foreground">
-                        {localizeCommandToOS('I')}
-                    </CommandShortcut>
-                </Button>
-
 
                 {/* Add to Chat Button */}
                 <Button
@@ -212,7 +191,7 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                 >
                     <div className="flex items-center gap-2">
                         <MessageCircle size={14} />
-                        Add to Chat
+                        Ask
                     </div>
                     <CommandShortcut className="text-muted-foreground">
                         {localizeCommandToOS('A')}

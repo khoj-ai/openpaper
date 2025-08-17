@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
     PaperHighlight,
 } from '@/lib/schema';
@@ -14,6 +14,7 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
     const [isAnnotating, setIsAnnotating] = useState(false);
     const [isHighlightInteraction, setIsHighlightInteraction] = useState(false);
     const [activeHighlight, setActiveHighlight] = useState<PaperHighlight | null>(null);
+    const blockScrollOnNextHighlight = useRef(false);
 
     const highlightsStorageName = `highlights-${paperId}`;
 
@@ -132,6 +133,10 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
     useEffect(() => {
         // Scroll to the active highlight.
         if (activeHighlight) {
+            if (blockScrollOnNextHighlight.current) {
+                blockScrollOnNextHighlight.current = false;
+                return;
+            }
             scrollToHighlightAndPositionTooltip(
                 `.react-pdf__Page__textContent span[data-highlight-id="${activeHighlight.id}"]`,
                 setTooltipPosition
@@ -321,7 +326,9 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
         selectedText: string,
         startOffset: number | undefined,
         endOffset: number | undefined,
-        pageNumber: number | undefined) => {
+        pageNumber: number | undefined,
+        doAnnotate: boolean | undefined
+    ) => {
         // Get offsets from the current selection
         let offsets;
         if (!startOffset || !endOffset || !pageNumber) {
@@ -348,8 +355,13 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
                 role: 'user',
             });
 
-            const updatedHighlights = [...highlights, newHighlight];
+            if (doAnnotate) {
+                blockScrollOnNextHighlight.current = true;
+                setActiveHighlight(newHighlight);
+                setIsAnnotating(true);
+            }
 
+            const updatedHighlights = [...highlights, newHighlight];
 
             setHighlights(updatedHighlights);
         } catch (error) {
@@ -359,7 +371,9 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
         // Reset states
         setSelectedText("");
         setTooltipPosition(null);
-        setIsAnnotating(false);
+        if (!doAnnotate) {
+            setIsAnnotating(false);
+        }
     };
 
     return {

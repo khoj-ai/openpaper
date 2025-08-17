@@ -360,9 +360,16 @@ export default function PaperView() {
         fetchHighlights();
     }, [id, jobId]);
 
+    useEffect(() => {
+        if (userMessageReferences.length > 0) {
+            setRightSideFunction('Chat');
+        }
+    }, [userMessageReferences]);
+
     const matchesCurrentCitation = useCallback((key: string, messageIndex: number) => {
         return activeCitationKey === key.toString() && activeCitationMessageIndex === messageIndex;
     }, [activeCitationKey, activeCitationMessageIndex]);
+
 
     const handleShare = useCallback(async () => {
         if (!id || !paperData || isSharing) return;
@@ -467,6 +474,7 @@ export default function PaperView() {
                                     setSelectedText={setSelectedText}
                                     setTooltipPosition={setTooltipPosition}
                                     setIsAnnotating={setIsAnnotating}
+                                    isAnnotating={isAnnotating}
                                     setIsHighlightInteraction={setIsHighlightInteraction}
                                     isHighlightInteraction={isHighlightInteraction}
                                     highlights={highlights}
@@ -554,6 +562,7 @@ export default function PaperView() {
                                 setSelectedText={setSelectedText}
                                 setTooltipPosition={setTooltipPosition}
                                 setIsAnnotating={setIsAnnotating}
+                                isAnnotating={isAnnotating}
                                 setIsHighlightInteraction={setIsHighlightInteraction}
                                 isHighlightInteraction={isHighlightInteraction}
                                 highlights={highlights}

@@ -33,11 +33,12 @@ interface PdfViewerProps {
 	tooltipPosition: { x: number; y: number } | null;
 	setTooltipPosition: (position: { x: number; y: number } | null) => void;
 	setIsAnnotating: (isAnnotating: boolean) => void;
+	isAnnotating: boolean;
 	isHighlightInteraction: boolean;
 	setIsHighlightInteraction: (isHighlightInteraction: boolean) => void;
 	activeHighlight: PaperHighlight | null;
 	setActiveHighlight: (highlight: PaperHighlight | null) => void;
-	addHighlight: (selectedText: string, startOffset?: number, endOffset?: number, pageNumber?: number) => void;
+	addHighlight: (selectedText: string, startOffset?: number, endOffset?: number, pageNumber?: number, doAnnotate?: boolean) => void;
 	removeHighlight: (highlight: PaperHighlight) => void;
 	loadHighlights: () => Promise<void>;
 	handleTextSelection: (e: React.MouseEvent) => void;
@@ -60,6 +61,7 @@ export function PdfViewer(props: PdfViewerProps) {
 		tooltipPosition,
 		setTooltipPosition,
 		setIsAnnotating,
+		isAnnotating,
 		isHighlightInteraction,
 		setIsHighlightInteraction,
 		activeHighlight,
@@ -501,6 +503,7 @@ export function PdfViewer(props: PdfViewerProps) {
 					setSelectedText={setSelectedText}
 					setTooltipPosition={setTooltipPosition}
 					setIsAnnotating={setIsAnnotating}
+					isAnnotating={isAnnotating}
 					highlights={highlights}
 					setHighlights={setHighlights}
 					isHighlightInteraction={isHighlightInteraction}
