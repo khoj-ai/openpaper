@@ -94,6 +94,10 @@ class SubscriptionStatus(str, Enum):
     UNPAID = "unpaid"
 
 
+class ProjectRoles(str, Enum):
+    ADMIN = "admin"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -223,6 +227,7 @@ class Message(Base):
 
 class ConversableType(str, Enum):
     PAPER = "paper"
+    PROJECT = "project"
     EVERYTHING = (
         "everything"  # For conversations that are across the user's entire library
     )
@@ -369,6 +374,54 @@ class Paper(Base):
     )
     paper_images = relationship(
         "PaperImage", back_populates="paper", cascade="all, delete-orphan"
+    )
+
+
+class Project(Base):
+    __tablename__ = "project"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    title = Column(String, nullable=True)
+    description = Column(Text, nullable=True)
+    admin_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+
+
+class ProjectRole(Base):
+    __tablename__ = "project_role"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id = Column(UUID(as_uuid=True), ForeignKey("project.id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    role = Column(String, nullable=False, default=ProjectRoles.ADMIN)
+
+
+class ProjectPaper(Base):
+    """
+    Association table for linking papers and projects. This is because projects can have many papers and papers can belong to many projects.
+    """
+
+    __tablename__ = "project_paper"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    paper_id = Column(
+        UUID(as_uuid=True), ForeignKey("papers.id", ondelete="CASCADE"), nullable=False
+    )
+    project_id = Column(
+        UUID(as_uuid=True), ForeignKey("project.id", ondelete="CASCADE"), nullable=False
+    )
+
+
+class ProjectAudioOverview(Base):
+    __tablename__ = "project_audio_overview"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id = Column(
+        UUID(as_uuid=True), ForeignKey("project.id", ondelete="CASCADE"), nullable=False
+    )
+    audio_overview_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("audio_overviews.id", ondelete="CASCADE"),
+        nullable=False,
     )
 
 
