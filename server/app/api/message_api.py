@@ -7,6 +7,7 @@ from typing import AsyncGenerator, List, Optional, Union
 from app.auth.dependencies import get_required_user
 from app.database.crud.conversation_crud import conversation_crud
 from app.database.crud.message_crud import MessageCreate, message_crud
+from app.database.crud.paper_crud import paper_crud
 from app.database.database import get_db
 from app.database.models import ConversableType
 from app.database.telemetry import track_event
@@ -166,13 +167,19 @@ async def chat_message_everything(
 
                 yield f"{json.dumps({'type': 'status', 'content': 'Generating response...'})}{END_DELIMITER}"
 
-                chat_generator = operations.chat_with_everything(
+                all_papers = paper_crud.get_all_available_papers(
+                    db,
+                    user=current_user,
+                )
+
+                chat_generator = operations.chat_with_papers(
                     question=request.user_query,
                     llm_provider=request.llm_provider,
                     user_references=request.user_references,
                     evidence_gathered=cleaned_evidence,
                     conversation_id=request.conversation_id,
                     current_user=current_user,
+                    all_papers=all_papers,
                     db=db,
                 )
                 async for stream_chunk in _stream_chat_chunks(

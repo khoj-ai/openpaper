@@ -6,6 +6,7 @@ import uuid
 from typing import AsyncGenerator, Dict, List, Optional, Sequence, Union
 
 from app.database.crud.paper_crud import paper_crud
+from app.database.models import Paper
 from app.llm.base import BaseLLMClient, ModelType
 from app.llm.citation_handler import CitationHandler
 from app.llm.json_parser import JSONParser
@@ -310,11 +311,12 @@ class MultiPaperOperations(BaseLLMClient):
             )
             return evidence_collection
 
-    async def chat_with_everything(
+    async def chat_with_papers(
         self,
         conversation_id: str,
         question: str,
         current_user: CurrentUser,
+        all_papers: List[Paper],
         evidence_gathered: EvidenceCollection,
         llm_provider: Optional[LLMProvider] = None,
         user_references: Optional[Sequence[str]] = None,
@@ -333,11 +335,6 @@ class MultiPaperOperations(BaseLLMClient):
 
         conversation_history = message_crud.get_conversation_messages(
             db, conversation_id=casted_conversation_id, current_user=current_user
-        )
-
-        all_papers = paper_crud.get_all_available_papers(
-            db,
-            user=current_user,
         )
 
         formatted_paper_options = {
