@@ -250,18 +250,18 @@ export function LibraryTable({
 										/>
 									</TableCell>
 								)}
-								<TableCell className="py-4 pr-4 max-w-0">
-									<div className="font-medium text-sm leading-relaxed break-words hyphens-auto overflow-hidden">
+								<TableCell className="py-4 pr-4 whitespace-normal">
+									<div className="font-medium text-sm leading-relaxed break-words hyphens-auto line-clamp-3">
 										{paper.title || 'Untitled'}
 									</div>
 								</TableCell>
-								<TableCell className="py-4 pr-4 max-w-0">
-									<div className="text-sm text-muted-foreground leading-relaxed break-words hyphens-auto overflow-hidden">
+								<TableCell className="py-4 pr-4 whitespace-normal">
+									<div className="text-sm text-muted-foreground leading-relaxed break-words hyphens-auto line-clamp-2">
 										{paper.authors?.length ? paper.authors.join(", ") : 'No authors'}
 									</div>
 								</TableCell>
-								<TableCell className="py-4 pr-4 max-w-0">
-									<div className="text-sm text-muted-foreground leading-relaxed break-words hyphens-auto overflow-hidden">
+								<TableCell className="py-4 pr-4 whitespace-normal">
+									<div className="text-sm text-muted-foreground leading-relaxed break-words hyphens-auto line-clamp-2">
 										{paper.institutions?.length ? paper.institutions.join(", ") : 'No organizations'}
 									</div>
 								</TableCell>
@@ -293,7 +293,7 @@ export function LibraryTable({
 										{paper.created_at ? new Date(paper.created_at).toLocaleDateString('en-US', {
 											month: 'short',
 											day: 'numeric',
-											year: '2-digit'
+											year: 'numeric'
 										}) : 'N/A'}
 									</div>
 								</TableCell>
@@ -302,7 +302,7 @@ export function LibraryTable({
 										{paper.publish_date ? new Date(paper.publish_date).toLocaleDateString('en-US', {
 											month: 'short',
 											day: 'numeric',
-											year: '2-digit'
+											year: 'numeric'
 										}) : 'N/A'}
 									</div>
 								</TableCell>
@@ -321,8 +321,8 @@ export function LibraryTable({
 			{selectable && (
 				<div
 					className={`flex items-center gap-3 p-4 rounded-lg bg-muted/50 border transition-all duration-200 ${selectedPapers.size > 0
-							? "opacity-100 translate-y-0"
-							: "opacity-0 translate-y-2 pointer-events-none"
+						? "opacity-100 translate-y-0"
+						: "opacity-0 translate-y-2 pointer-events-none"
 						}`}
 				>
 					<div className="flex items-center gap-2">
