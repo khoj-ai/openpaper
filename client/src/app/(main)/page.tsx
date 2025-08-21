@@ -230,7 +230,11 @@ export default function Home() {
 	}, [user]);
 
 
-	const handleFileUpload = async (file: File) => {
+	const handleFileUpload = async (files: File[]) => {
+		// Handle only the first file if multiple files are selected
+		const file = files[0];
+		if (!file) return;
+
 		setIsUploading(true);
 		setFileSize(file.size);
 		setCeleryMessage(null); // Reset celery message
@@ -302,7 +306,7 @@ export default function Home() {
 			const blob = await response.blob();
 			const file = new File([blob], filename, { type: 'application/pdf' });
 
-			await handleFileUpload(file);
+			await handleFileUpload([file]); // Pass as array
 		} catch (error) {
 			console.log('Client-side fetch failed, trying server-side fetch...', error);
 
