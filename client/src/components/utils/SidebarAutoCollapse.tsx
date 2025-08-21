@@ -13,7 +13,7 @@ export function SidebarController({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         if (!hasInitialized.current) {
-            if (pathname.includes('/paper/')) {
+            if (pathname.includes('/paper/') || pathname.includes('/projects/')) {
                 setOpen(false);
             } else if (pathname === '/' && !user) {
                 setOpen(false);
