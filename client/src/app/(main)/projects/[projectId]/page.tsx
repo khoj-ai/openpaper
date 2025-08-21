@@ -153,12 +153,11 @@ export default function ProjectPage() {
 	if (isEmpty) {
 		return (
 			<div className="container mx-auto p-4">
-				<h1 className="text-3xl font-bold mb-2 text-gray-800 p-2 rounded-lg">{project.title}</h1>
+				<h1 className="text-3xl font-bold mb-2 text-gray-800 rounded-lg">{project.title}</h1>
 				<p className="text-lg text-gray-600 mb-8">{project.description}</p>
 				<div className="mt-4">
-					<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} />
-					{uploadError && <p className="text-red-500 mt-4">{uploadError}</p>}
-					<PdfUploadTracker initialJobs={initialJobs} onComplete={handleUploadComplete} />
+					<h2 className="text-2xl font-bold mb-4">Add Papers to Your Project</h2>
+					<AddFromLibrary projectId={projectId} onPapersAdded={getProjectPapers} />
 					<div className="my-4">
 						<div className="relative">
 							<div className="absolute inset-0 flex items-center">
@@ -171,7 +170,10 @@ export default function ProjectPage() {
 							</div>
 						</div>
 					</div>
-					<AddFromLibrary projectId={projectId} onPapersAdded={getProjectPapers} />
+					<h3 className="text-lg font-semibold mb-2">Upload New Papers</h3>
+					<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} />
+					{uploadError && <p className="text-red-500 mt-4">{uploadError}</p>}
+					<PdfUploadTracker initialJobs={initialJobs} onComplete={handleUploadComplete} />
 				</div>
 				<Dialog open={isUrlDialogOpen} onOpenChange={setIsUrlDialogOpen}>
 					<DialogContent>
