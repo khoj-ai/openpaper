@@ -99,5 +99,34 @@ class ProjectConversationCRUD(
             .all()
         )
 
+    def get_by_conversation_id(
+        self,
+        db: Session,
+        *,
+        project_id: uuid.UUID,
+        conversation_id: uuid.UUID,
+        user: CurrentUser,
+    ) -> Optional[Conversation]:
+        # First, check if the user has access to the project.
+        project_role = (
+            db.query(ProjectRole)
+            .filter(
+                ProjectRole.project_id == project_id,
+                ProjectRole.user_id == user.id,
+            )
+            .first()
+        )
+        if not project_role:
+            return None
+
+        return (
+            db.query(self.model)
+            .filter(
+                self.model.id == conversation_id,
+                self.model.conversable_type == ConversableType.PROJECT,
+            )
+            .first()
+        )
+
 
 project_conversation_crud = ProjectConversationCRUD(Conversation)

@@ -6,6 +6,8 @@ import uuid
 from typing import AsyncGenerator, Dict, List, Optional, Sequence, Union
 
 from app.database.crud.paper_crud import paper_crud
+from app.database.crud.projects.project_crud import project_crud
+from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.models import Paper
 from app.llm.base import BaseLLMClient, ModelType
 from app.llm.citation_handler import CitationHandler
@@ -54,6 +56,7 @@ class MultiPaperOperations(BaseLLMClient):
         current_user: CurrentUser,
         llm_provider: Optional[LLMProvider] = None,
         user_references: Optional[Sequence[str]] = None,
+        project_id: Optional[str] = None,
         db: Session = Depends(get_db),
     ) -> AsyncGenerator[Dict[str, Union[str, Dict[str, List[str]]]], None]:
         """
@@ -82,10 +85,18 @@ class MultiPaperOperations(BaseLLMClient):
         n_iterations = 0
         max_iterations = 4
 
-        all_papers = paper_crud.get_all_available_papers(
-            db,
-            user=current_user,
-        )
+        if project_id:
+            project = project_crud.get(db, id=project_id, user=current_user)
+            if not project:
+                raise ValueError("Project not found.")
+            all_papers = project_paper_crud.get_all_papers_by_project_id(
+                db, project_id=uuid.UUID(project_id), user=current_user
+            )
+        else:
+            all_papers = paper_crud.get_all_available_papers(
+                db,
+                user=current_user,
+            )
 
         formatted_paper_options = {str(paper.id): paper.title for paper in all_papers}
 
@@ -192,6 +203,7 @@ class MultiPaperOperations(BaseLLMClient):
                         result = function_maps[fn_name](
                             **fn_args,
                             current_user=current_user,
+                            project_id=project_id,
                             db=db,
                         )
 

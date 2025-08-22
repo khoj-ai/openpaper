@@ -75,12 +75,9 @@ async def get_project_papers(
 ) -> JSONResponse:
     """Get all papers for a specific project"""
     try:
-        project_papers = project_paper_crud.get_by_project_id(
+        papers = project_paper_crud.get_all_papers_by_project_id(
             db, project_id=uuid.UUID(project_id), user=current_user
         )
-
-        paper_ids = [pp.paper_id for pp in project_papers]
-        papers = db.query(Paper).filter(Paper.id.in_(paper_ids)).all()
 
         return JSONResponse(
             status_code=200,

@@ -98,9 +98,42 @@ class ProjectPaperCRUD(
             )
             return None
 
-    def get_by_project_id(
+    def get_paper_by_project(
+        self,
+        db: Session,
+        *,
+        paper_id: uuid.UUID,
+        project_id: uuid.UUID,
+        user: CurrentUser,
+    ) -> Optional[Paper]:
+        # First, check if the user has access to the project.
+        project_role = (
+            db.query(ProjectRole)
+            .filter(
+                ProjectRole.project_id == project_id,
+                ProjectRole.user_id == user.id,
+            )
+            .first()
+        )
+        if not project_role:
+            return None
+
+        project_paper = (
+            db.query(self.model)
+            .filter(
+                self.model.project_id == project_id, self.model.paper_id == paper_id
+            )
+            .first()
+        )
+
+        if not project_paper:
+            return None
+
+        return db.query(Paper).filter(Paper.id == project_paper.paper_id).first()
+
+    def get_all_papers_by_project_id(
         self, db: Session, *, project_id: uuid.UUID, user: CurrentUser
-    ) -> List[ProjectPaper]:
+    ) -> List[Paper]:
         # First, check if the user has access to the project.
         project_role = (
             db.query(ProjectRole)
@@ -113,7 +146,12 @@ class ProjectPaperCRUD(
         if not project_role:
             return []
 
-        return db.query(self.model).filter(self.model.project_id == project_id).all()
+        project_papers = (
+            db.query(self.model).filter(self.model.project_id == project_id).all()
+        )
+        paper_ids = [pp.paper_id for pp in project_papers]
+        papers = db.query(Paper).filter(Paper.id.in_(paper_ids)).all()
+        return papers
 
 
 project_paper_crud = ProjectPaperCRUD(ProjectPaper)
