@@ -115,11 +115,13 @@ function ProjectConversationPageContent() {
             }
         } catch (error) {
             console.error("Error fetching messages:", error);
+            // Go back to the project page
+            router.push(`/projects/${projectId}`);
             toast.error("Failed to load conversation history.");
         } finally {
             setIsSessionLoading(false);
         }
-    }, [projectId]);
+    }, [projectId, router]);
 
     useEffect(() => {
         if (!conversationIdFromUrl) {

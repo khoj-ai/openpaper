@@ -9,18 +9,26 @@ import { PdfDropzone } from "@/components/PdfDropzone";
 import PaperCard from "@/components/PaperCard";
 import PdfUploadTracker, { MinimalJob } from "@/components/PdfUploadTracker";
 import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogHeader,
-	DialogTitle,
-	DialogTrigger,
-} from "@/components/ui/dialog";
+	Sheet,
+	SheetContent,
+	SheetDescription,
+	SheetHeader,
+	SheetTitle,
+	SheetTrigger,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import AddFromLibrary from "@/components/AddFromLibrary";
 import { formatDate } from "@/lib/utils";
+import {
+	Dialog,
+	DialogHeader,
+	DialogContent,
+	DialogTitle,
+	DialogTrigger,
+	DialogDescription
+} from "@/components/ui/dialog";
 
 interface PdfUploadResponse {
 	message: string;
@@ -297,18 +305,18 @@ export default function ProjectPage() {
 				<div className="w-1/3 px-4">
 					<div className="flex justify-between items-center mb-4">
 						<h2 className="text-2xl font-bold">Papers</h2>
-						<Dialog>
-							<DialogTrigger asChild>
+						<Sheet>
+							<SheetTrigger asChild>
 								<Button variant="outline">
 									<PlusCircle className="mr-2 h-4 w-4" />
 									Add
 								</Button>
-							</DialogTrigger>
-							<DialogContent className="w-[90vw] min-w-6xl">
-								<DialogHeader>
-									<DialogTitle>Add Papers to Project</DialogTitle>
-								</DialogHeader>
-								<div className="mt-4">
+							</SheetTrigger>
+							<SheetContent className="sm:max-w-[90vw]! w-[90vw] overflow-y-auto">
+								<SheetHeader className="px-6">
+									<SheetTitle>Add Papers to Project</SheetTitle>
+								</SheetHeader>
+								<div className="mt-4 px-6">
 									<h3 className="text-lg font-semibold mb-2">Upload New Papers</h3>
 									<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} />
 									{uploadError && <p className="text-red-500 mt-4">{uploadError}</p>}
@@ -316,8 +324,8 @@ export default function ProjectPage() {
 									<h3 className="text-lg font-semibold mb-2">Add from Library</h3>
 									<AddFromLibrary projectId={projectId} onPapersAdded={getProjectPapers} projectPaperIds={papers.map(p => p.id)} />
 								</div>
-							</DialogContent>
-						</Dialog>
+							</SheetContent>
+						</Sheet>
 					</div>
 
 					{papers && papers.length > 0 ? (
