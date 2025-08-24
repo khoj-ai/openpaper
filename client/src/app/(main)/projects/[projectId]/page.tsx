@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, MessageCircle, PlusCircle, Send, Sparkles } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { fetchFromApi } from "@/lib/api";
@@ -18,7 +18,9 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import AddFromLibrary from "@/components/AddFromLibrary";
+import { formatDate } from "@/lib/utils";
 
 interface PdfUploadResponse {
 	message: string;
@@ -39,6 +41,7 @@ export default function ProjectPage() {
 	const [isUrlDialogOpen, setIsUrlDialogOpen] = useState(false);
 	const [pdfUrl, setPdfUrl] = useState("");
 	const [isUploading, setIsUploading] = useState(false);
+	const [newQuery, setNewQuery] = useState("");
 
 	const getProject = useCallback(async () => {
 		try {
@@ -142,12 +145,18 @@ export default function ProjectPage() {
 		setPdfUrl("");
 	};
 
-	const handleNewConversation = async () => {
+
+
+	const handleNewQuerySubmit = async (e: React.FormEvent) => {
+		e.preventDefault();
+		if (!newQuery.trim()) return;
+
 		try {
 			const newConversation = await fetchFromApi(`/api/projects/conversations/${projectId}`, {
 				method: "POST",
 				body: JSON.stringify({ title: "New Conversation" }),
 			});
+			localStorage.setItem(`pending-query-${newConversation.id}`, newQuery);
 			router.push(`/projects/${projectId}/conversations/${newConversation.id}`);
 		} catch (err) {
 			setError("Failed to create a new conversation. Please try again.");
@@ -178,7 +187,7 @@ export default function ProjectPage() {
 				<div className="mt-4">
 					<div className="flex justify-between items-center mb-4">
 						<h2 className="text-2xl font-bold">Add Papers to Your Project</h2>
-.						<Dialog>
+						<Dialog>
 							<DialogTrigger asChild>
 								<Button variant="outline">Upload New Papers</Button>
 							</DialogTrigger>
@@ -191,7 +200,7 @@ export default function ProjectPage() {
 							</DialogContent>
 						</Dialog>
 					</div>
-					<AddFromLibrary projectId={projectId} onPapersAdded={getProjectPapers} />
+					<AddFromLibrary projectId={projectId} onPapersAdded={getProjectPapers} projectPaperIds={papers.map(p => p.id)} />
 					<PdfUploadTracker initialJobs={initialJobs} onComplete={handleUploadComplete} />
 				</div>
 				<Dialog open={isUrlDialogOpen} onOpenChange={setIsUrlDialogOpen}>
@@ -226,23 +235,56 @@ export default function ProjectPage() {
 
 	return (
 		<div className="container mx-auto p-4">
-			<h1 className="text-3xl font-bold mb-2 text-gray-800 p-2 rounded-lg px-0">{project.title}</h1>
-			<p className="text-lg text-gray-600 mb-8">{project.description}</p>
+			<h1 className="text-3xl font-bold mb-2 text-gray-800 dark:text-gray-200 p-2 rounded-lg px-0">{project.title}</h1>
+			<p className="text-lg text-gray-600 mb-6">{project.description}</p>
 
-			<div className="flex -mx-4">
-				<div className={papers.length > 0 ? "w-2/3 px-4" : "w-full px-4"}>
+			<div className="flex gap-6 -mx-4">
+				{/* Left side - Conversations */}
+				<div className="w-2/3 px-4">
+					{/* Conversation Input */}
+					{papers.length > 0 ? (
+						<div className="mb-6">
+							<form onSubmit={handleNewQuerySubmit} className="relative">
+								<Textarea
+									placeholder="Ask a question about your papers, analyze findings, or explore new ideas..."
+									value={newQuery}
+									onChange={(e) => setNewQuery(e.target.value)}
+									className="min-h-[80px] resize-none pr-12 border-gray-200 dark:border-gray-700 focus:border-blue-400 focus:ring-blue-200 bg-blue-50 dark:bg-accent text-primary"
+								/>
+								<Button
+									type="submit"
+									disabled={!newQuery.trim()}
+									size="sm"
+									className="absolute bottom-3 right-3 h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+								>
+									<Send className="w-4 h-4" />
+								</Button>
+							</form>
+						</div>
+					) : (
+						<div className="mb-6 text-center p-8 border-dashed border-2 border-gray-300 rounded-xl bg-gray-50">
+							<div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+								<MessageCircle className="w-8 h-8 text-gray-400" />
+							</div>
+							<h3 className="text-lg font-semibold text-gray-600 mb-2">Ready to Start Conversations</h3>
+							<p className="text-gray-500">Add papers to your project to begin discussing and analyzing them.</p>
+						</div>
+					)}
+
 					<div className="flex justify-between items-center mb-4">
-						<h2 className="text-2xl font-bold">Created Assets</h2>
-						{papers.length > 0 && <Button onClick={handleNewConversation}>New Conversation</Button>}
+						<h2 className="text-2xl font-bold">Conversations</h2>
 					</div>
+
+					{/* Conversations List */}
 					<div>
 						{conversations.length > 0 ? (
 							conversations.map((convo, index) => (
-								<a href={`/projects/${projectId}/conversations/${convo.id}`} key={convo.id} className="block p-4 mb-4 border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
-									<div className="font-semibold text-blue-600 flex items-center justify-between">
+								<a href={`/projects/${projectId}/conversations/${convo.id}`} key={convo.id} className="block p-4 mb-4 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-shadow animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
+									<div className="font-semibold text-blue-600 dark:text-blue-400 flex items-center justify-between">
 										{convo.title}
 										<ArrowRight className="w-4 h-4 text-gray-400 transform transition-transform group-hover:translate-x-1" />
 									</div>
+									<p>{formatDate(convo.updated_at)}</p>
 								</a>
 							))
 						) : (
@@ -251,15 +293,18 @@ export default function ProjectPage() {
 					</div>
 				</div>
 
-				{papers.length > 0 && (
+				{/* Right side - Papers */}
 				<div className="w-1/3 px-4">
 					<div className="flex justify-between items-center mb-4">
 						<h2 className="text-2xl font-bold">Papers</h2>
 						<Dialog>
 							<DialogTrigger asChild>
-								<Button variant="outline">Add more</Button>
+								<Button variant="outline">
+									<PlusCircle className="mr-2 h-4 w-4" />
+									Add
+								</Button>
 							</DialogTrigger>
-							<DialogContent className="max-w-5xl w-[90vw] min-w-4xl">
+							<DialogContent className="w-[90vw] min-w-6xl">
 								<DialogHeader>
 									<DialogTitle>Add Papers to Project</DialogTitle>
 								</DialogHeader>
@@ -269,24 +314,44 @@ export default function ProjectPage() {
 									{uploadError && <p className="text-red-500 mt-4">{uploadError}</p>}
 									<PdfUploadTracker initialJobs={initialJobs} onComplete={handleUploadComplete} />
 									<h3 className="text-lg font-semibold mb-2">Add from Library</h3>
-									<AddFromLibrary projectId={projectId} onPapersAdded={getProjectPapers} />
+									<AddFromLibrary projectId={projectId} onPapersAdded={getProjectPapers} projectPaperIds={papers.map(p => p.id)} />
 								</div>
 							</DialogContent>
 						</Dialog>
 					</div>
 
-					{papers && papers.length > 0 && (
+					{papers && papers.length > 0 ? (
 						<div className="grid grid-cols-1 gap-4">
 							{papers.map((paper, index) => (
 								<div key={paper.id} className="animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
-									<PaperCard paper={paper} minimalist={true} />
+									<PaperCard paper={paper} minimalist={true} projectId={projectId} onUnlink={getProjectPapers} />
 								</div>
 							))}
 						</div>
+					) : (
+						<div className="text-center p-8 border-dashed border-2 border-gray-300 rounded-xl bg-gray-50">
+							<div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+								<Sparkles className="w-8 h-8 text-gray-400" />
+							</div>
+							<h3 className="text-lg font-semibold text-gray-600 mb-2">No Papers Yet</h3>
+							<p className="text-gray-500 mb-4">Add papers to start analyzing and discussing them.</p>
+							<Dialog>
+								<DialogTrigger asChild>
+									<Button variant="outline">Upload Papers</Button>
+								</DialogTrigger>
+								<DialogContent>
+									<DialogHeader>
+										<DialogTitle>Upload New Papers</DialogTitle>
+									</DialogHeader>
+									<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} />
+									{uploadError && <p className="text-red-500 mt-4">{uploadError}</p>}
+								</DialogContent>
+							</Dialog>
+						</div>
 					)}
 				</div>
-				)}
 			</div>
+
 			<Dialog open={isUrlDialogOpen} onOpenChange={setIsUrlDialogOpen}>
 				<DialogContent>
 					<DialogHeader>
