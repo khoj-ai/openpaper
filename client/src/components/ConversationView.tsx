@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useMemo, useRef } from "react";
 import { AnimatedMarkdown } from "@/components/AnimatedMarkdown";
 import { Button } from "@/components/ui/button";
 import Markdown from "react-markdown";
@@ -183,7 +183,7 @@ export const ConversationView = ({
 				</div>
 			</div>
 		));
-	}, [messages, handleCitationClick, papers, highlightedInfo, setHighlightedInfo]);
+	}, [messages, papers, highlightedInfo, setHighlightedInfo]);
 
 	return (
 		<div className="flex flex-col w-full h-[calc(100vh-64px)]">

@@ -74,21 +74,30 @@ function ProjectConversationPageContent() {
     const [highlightedInfo, setHighlightedInfo] = useState<{ paperId: string; messageIndex: number } | null>(null);
 
     const handleCitationClick = useCallback((key: string, messageIndex: number) => {
-        const message = messages[messageIndex];
-        if (!message) return;
+        // Use a function to get the latest messages instead of relying on the closure
+        setHighlightedInfo((prevHighlight) => {
+            // Get the current messages from the component's props
+            const message = messages[messageIndex];
+            if (!message) return prevHighlight;
 
-        const citation = message.references?.citations?.find(c => String(c.key) === key);
-        if (!citation || !citation.paper_id) return;
+            const citation = message.references?.citations?.find(c => String(c.key) === key);
+            if (!citation || !citation.paper_id) return prevHighlight;
 
-        setHighlightedInfo({ paperId: citation.paper_id, messageIndex });
+            const newHighlight = { paperId: citation.paper_id, messageIndex };
 
-        const elementId = message.id ? `${message.id}-reference-paper-card-${citation.paper_id}` : `${messageIndex}-reference-paper-card-${citation.paper_id}`;
-        const element = document.getElementById(elementId);
+            // Scroll to element
+            setTimeout(() => {
+                const elementId = message.id ? `${message.id}-reference-paper-card-${citation.paper_id}` : `${messageIndex}-reference-paper-card-${citation.paper_id}`;
+                const element = document.getElementById(elementId);
 
-        if (element) {
-            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-    }, [messages]);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 0);
+
+            return newHighlight;
+        });
+    }, []);
 
     useEffect(() => {
         if (!authLoading && !user) {
@@ -118,15 +127,24 @@ function ProjectConversationPageContent() {
             return;
         }
 
-        if (user && !isStreaming) {
-            fetchMessages(conversationIdFromUrl);
-        } else if (!isStreaming) {
+        if (user) {
+
+            const pendingQuery = localStorage.getItem(`pending-query-${conversationIdFromUrl}`);
+            if (pendingQuery) {
+                localStorage.removeItem(`pending-query-${conversationIdFromUrl}`);
+                handleSubmit(null, pendingQuery);
+                setIsSessionLoading(false);
+            } else if (!isStreaming && messages.length === 0) {
+                fetchMessages(conversationIdFromUrl);
+            }
+
+        } else {
             setMessages([]);
             setConversationId(null);
             setIsCentered(true);
             setIsSessionLoading(false);
         }
-    }, [conversationIdFromUrl, user, fetchMessages, isStreaming, router, projectId]);
+    }, [conversationIdFromUrl, user, fetchMessages, router, projectId]);
 
     useEffect(() => {
         const fetchPapers = async () => {
@@ -199,16 +217,25 @@ function ProjectConversationPageContent() {
         }
     }, [isStreaming]);
 
-    const handleSubmit = useCallback(async (e: FormEvent | null = null) => {
+    const handleSubmit = useCallback(async (e: FormEvent | null = null, message?: string) => {
         if (e) {
             e.preventDefault();
         }
 
-        if (!currentMessage.trim() || isStreaming || !conversationId) return;
+        const query = message || currentMessage;
 
-        const userMessage: ChatMessage = { role: 'user', content: currentMessage };
-        setMessages(prev => [...prev, userMessage]);
-        setCurrentMessage('');
+        if (!query.trim() || isStreaming || !conversationId) return;
+
+        const userMessage: ChatMessage = { role: 'user', content: query };
+        // Use functional update to ensure we get the latest state
+        setMessages(prev => {
+            const newMessages = [...prev, userMessage];
+            return newMessages;
+        });
+
+        if (!message) {
+            setCurrentMessage('');
+        }
 
         setIsStreaming(true);
         setStreamingChunks([]);
@@ -216,7 +243,7 @@ function ProjectConversationPageContent() {
         setError(null);
 
         const requestBody: ChatRequestBody = {
-            user_query: userMessage.content,
+            user_query: query,
             conversation_id: conversationId,
             project_id: projectId,
         };
@@ -287,21 +314,24 @@ function ProjectConversationPageContent() {
                     content: accumulatedContent,
                     references: references,
                 };
-                setMessages(prev => [...prev, finalMessage]);
+                setMessages(prev => {
+                    const newMessages = [...prev, finalMessage];
+                    return newMessages;
+                });
             }
 
         } catch (error) {
             console.error('Error during streaming:', error);
             toast.error("An error occurred while processing your request.");
             setMessages(prev => prev.slice(0, -1));
-            setCurrentMessage(userMessage.content);
+            setCurrentMessage(query);
             setError('An error occurred while processing your request.');
         } finally {
             setIsStreaming(false);
             setStatusMessage('');
             refetchSubscription();
         }
-    }, [currentMessage, isStreaming, conversationId, projectId, router]);
+    }, [currentMessage, isStreaming, conversationId, projectId, router, refetchSubscription]);
 
     const [error, setError] = useState<string | null>(null);
 
@@ -310,7 +340,7 @@ function ProjectConversationPageContent() {
         handleSubmit();
     }, [handleSubmit]);
 
-    const [isCentered, setIsCentered] = useState(true);
+    const [isCentered, setIsCentered] = useState(false);
 
     return (
         <ConversationView
