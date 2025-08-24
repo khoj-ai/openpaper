@@ -116,8 +116,13 @@ async def remove_paper_from_project(
     """Remove a paper from a project"""
     try:
         # The id passed here is the id of the ProjectPaper association
-        removed_project_paper: ProjectPaper = project_paper_crud.remove(
-            db, id=uuid.UUID(project_paper_id), user=current_user
+        removed_project_paper: ProjectPaper = (
+            project_paper_crud.remove_by_paper_and_project(
+                db,
+                paper_id=uuid.UUID(project_paper_id),
+                project_id=uuid.UUID(project_id),
+                user=current_user,
+            )
         )
 
         if not removed_project_paper:

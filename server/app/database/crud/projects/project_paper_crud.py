@@ -153,5 +153,40 @@ class ProjectPaperCRUD(
         papers = db.query(Paper).filter(Paper.id.in_(paper_ids)).all()
         return papers
 
+    def remove_by_paper_and_project(
+        self,
+        db: Session,
+        *,
+        paper_id: uuid.UUID,
+        project_id: uuid.UUID,
+        user: CurrentUser,
+    ) -> Optional[ProjectPaper]:
+        # First, check if the user has access to the project.
+        project_role = (
+            db.query(ProjectRole)
+            .filter(
+                ProjectRole.project_id == project_id,
+                ProjectRole.user_id == user.id,
+            )
+            .first()
+        )
+        if not project_role:
+            return None
+
+        project_paper = (
+            db.query(self.model)
+            .filter(
+                self.model.project_id == project_id, self.model.paper_id == paper_id
+            )
+            .first()
+        )
+
+        if not project_paper:
+            return None
+
+        db.delete(project_paper)
+        db.commit()
+        return project_paper
+
 
 project_paper_crud = ProjectPaperCRUD(ProjectPaper)
