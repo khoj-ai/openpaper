@@ -3,7 +3,7 @@
 
 import { useSubscription, isChatCreditAtLimit } from '@/hooks/useSubscription';
 import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
-import { useState, useEffect, FormEvent, useRef, useCallback, useMemo, Suspense } from 'react';
+import { useState, useEffect, FormEvent, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
 import { toast } from "sonner";
@@ -55,7 +55,6 @@ function UnderstandPageContent() {
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputMessageRef = useRef<HTMLTextAreaElement>(null);
-    const chatInputFormRef = useRef<HTMLFormElement>(null);
 
     const END_DELIMITER = "END_OF_STREAM";
 
