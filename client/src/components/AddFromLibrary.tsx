@@ -9,9 +9,10 @@ import { LibraryTable } from "./LibraryTable";
 interface AddFromLibraryProps {
     projectId: string;
     onPapersAdded: () => void;
+    projectPaperIds?: string[];
 }
 
-export default function AddFromLibrary({ projectId, onPapersAdded }: AddFromLibraryProps) {
+export default function AddFromLibrary({ projectId, onPapersAdded, projectPaperIds }: AddFromLibraryProps) {
 
     const handleAddPapers = (papers: PaperItem[], action: string) => {
         if (action !== "Add") return;
@@ -37,6 +38,7 @@ export default function AddFromLibrary({ projectId, onPapersAdded }: AddFromLibr
             selectable={true}
             actionOptions={["Add"]}
             onSelectFiles={handleAddPapers}
+            projectPaperIds={projectPaperIds}
         />
     );
 }
