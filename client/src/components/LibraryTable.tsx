@@ -15,18 +15,20 @@ import { PaperItem } from "@/lib/schema";
 import { Checkbox } from "./ui/checkbox";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, CheckCheck } from "lucide-react";
 
 interface LibraryTableProps {
 	selectable?: boolean;
 	onSelectFiles?: (papers: PaperItem[], action: string) => void;
 	actionOptions?: string[];
+	projectPaperIds?: string[];
 }
 
 export function LibraryTable({
 	selectable = false,
 	onSelectFiles,
 	actionOptions = [],
+	projectPaperIds = [],
 }: LibraryTableProps) {
 	const [papers, setPapers] = useState<PaperItem[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -95,6 +97,10 @@ export function LibraryTable({
 		return filteredPapers;
 	}, [papers, filter, sortConfig]);
 
+	const availablePapers = useMemo(() => {
+		return processedPapers.filter(p => !projectPaperIds.includes(p.id));
+	}, [processedPapers, projectPaperIds]);
+
 	const requestSort = (key: SortKey) => {
 		let direction: 'ascending' | 'descending' = 'ascending';
 		if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
@@ -105,7 +111,7 @@ export function LibraryTable({
 
 	const handleSelectAll = (checked: boolean) => {
 		if (checked) {
-			setSelectedPapers(new Set(processedPapers.map((p) => p.id)));
+			setSelectedPapers(new Set(availablePapers.map((p) => p.id)));
 		} else {
 			setSelectedPapers(new Set());
 		}
@@ -129,6 +135,7 @@ export function LibraryTable({
 		if (onSelectFiles) {
 			const selectedItems = papers.filter((p) => selectedPapers.has(p.id));
 			onSelectFiles(selectedItems, action);
+			setSelectedPapers(new Set());
 		}
 	};
 
@@ -149,6 +156,8 @@ export function LibraryTable({
 	}
 
 	const numCols = 6 + (selectable ? 1 : 0);
+	const allAvailableSelected = availablePapers.length > 0 && selectedPapers.size === availablePapers.length;
+
 
 	return (
 		<div className="space-y-4">
@@ -175,10 +184,9 @@ export function LibraryTable({
 								{selectable && (
 									<TableHead className="w-12 text-center">
 										<Checkbox
-											checked={
-												processedPapers.length > 0 && selectedPapers.size === processedPapers.length
-											}
+											checked={allAvailableSelected}
 											onCheckedChange={handleSelectAll}
+											disabled={availablePapers.length === 0}
 										/>
 									</TableHead>
 								)}
@@ -240,87 +248,95 @@ export function LibraryTable({
 						</TableHeader>
 						<TableBody>
 							{processedPapers.length > 0 ? (
-								processedPapers.map((paper, index) => (
-									<TableRow
-										key={paper.id}
-										onClick={() => selectable && handleSelect(paper.id)}
-										className={`
-									border-b transition-colors hover:bg-muted/50
-									${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'}
-									${selectable ? 'cursor-pointer' : ''}
-								`}
-									>
-										{selectable && (
-											<TableCell
-												className="text-center py-4"
-												onClick={(e) => e.stopPropagation()}
-											>
-												<Checkbox
-													checked={selectedPapers.has(paper.id)}
-													onCheckedChange={(checked) =>
-														handleSelect(paper.id, !!checked)
-													}
-												/>
+								processedPapers.map((paper, index) => {
+									const isAlreadyInProject = projectPaperIds.includes(paper.id);
+									return (
+										<TableRow
+											key={paper.id}
+											onClick={() => selectable && !isAlreadyInProject && handleSelect(paper.id)}
+											className={`
+										border-b transition-colors hover:bg-muted/50
+										${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'}
+										${selectable && !isAlreadyInProject ? 'cursor-pointer' : ''}
+										${isAlreadyInProject ? 'opacity-60' : ''}
+									`}
+										>
+											{selectable && (
+												<TableCell
+													className="text-center py-4"
+													onClick={(e) => e.stopPropagation()}
+												>
+													{isAlreadyInProject ? (
+														<CheckCheck className="h-5 w-5 text-green-500 mx-auto" />
+													) : (
+														<Checkbox
+															checked={selectedPapers.has(paper.id)}
+															onCheckedChange={(checked) =>
+																handleSelect(paper.id, !!checked)
+															}
+														/>
+													)}
+												</TableCell>
+											)}
+											<TableCell className="py-4 pr-4 whitespace-normal">
+												<div className="font-medium text-sm leading-relaxed break-words hyphens-auto line-clamp-3">
+													{paper.title || 'Untitled'}
+												</div>
 											</TableCell>
-										)}
-										<TableCell className="py-4 pr-4 whitespace-normal">
-											<div className="font-medium text-sm leading-relaxed break-words hyphens-auto line-clamp-3">
-												{paper.title || 'Untitled'}
-											</div>
-										</TableCell>
-										<TableCell className="py-4 pr-4 whitespace-normal">
-											<div className="text-sm text-muted-foreground leading-relaxed break-words hyphens-auto line-clamp-2">
-												{paper.authors?.length ? paper.authors.join(", ") : 'No authors'}
-											</div>
-										</TableCell>
-										<TableCell className="py-4 pr-4 whitespace-normal">
-											<div className="text-sm text-muted-foreground leading-relaxed break-words hyphens-auto line-clamp-2">
-												{paper.institutions?.length ? paper.institutions.join(", ") : 'No organizations'}
-											</div>
-										</TableCell>
-										<TableCell className="py-4 pr-4">
-											<div className="text-xs leading-relaxed">
-												{paper.keywords?.length ? (
-													<div className="flex flex-wrap gap-1">
-														{paper.keywords.slice(0, 3).map((keyword, i) => (
-															<span
-																key={i}
-																className="inline-block px-2 py-1 bg-secondary text-secondary-foreground rounded-sm"
-															>
-																{keyword}
-															</span>
-														))}
-														{paper.keywords.length > 3 && (
-															<span className="text-muted-foreground text-xs">
-																+{paper.keywords.length - 3} more
-															</span>
-														)}
-													</div>
-												) : (
-													<span className="text-muted-foreground">No keywords</span>
-												)}
-											</div>
-										</TableCell>
-										<TableCell className="py-4 pr-4">
-											<div className="text-sm text-muted-foreground whitespace-nowrap">
-												{paper.created_at ? new Date(paper.created_at).toLocaleDateString('en-US', {
-													month: 'short',
-													day: 'numeric',
-													year: 'numeric'
-												}) : 'N/A'}
-											</div>
-										</TableCell>
-										<TableCell className="py-4">
-											<div className="text-sm text-muted-foreground whitespace-nowrap">
-												{paper.publish_date ? new Date(paper.publish_date).toLocaleDateString('en-US', {
-													month: 'short',
-													day: 'numeric',
-													year: 'numeric'
-												}) : 'N/A'}
-											</div>
-										</TableCell>
-									</TableRow>
-								))
+											<TableCell className="py-4 pr-4 whitespace-normal">
+												<div className="text-sm text-muted-foreground leading-relaxed break-words hyphens-auto line-clamp-2">
+													{paper.authors?.length ? paper.authors.join(", ") : 'No authors'}
+												</div>
+											</TableCell>
+											<TableCell className="py-4 pr-4 whitespace-normal">
+												<div className="text-sm text-muted-foreground leading-relaxed break-words hyphens-auto line-clamp-2">
+													{paper.institutions?.length ? paper.institutions.join(", ") : 'No organizations'}
+												</div>
+											</TableCell>
+											<TableCell className="py-4 pr-4">
+												<div className="text-xs leading-relaxed">
+													{paper.keywords?.length ? (
+														<div className="flex flex-wrap gap-1">
+															{paper.keywords.slice(0, 3).map((keyword, i) => (
+																<span
+																	key={i}
+																	className="inline-block px-2 py-1 bg-secondary text-secondary-foreground rounded-sm"
+																>
+																	{keyword}
+																</span>
+															))}
+															{paper.keywords.length > 3 && (
+																<span className="text-muted-foreground text-xs">
+																	+{paper.keywords.length - 3} more
+																</span>
+															)}
+														</div>
+													) : (
+														<span className="text-muted-foreground">No keywords</span>
+													)}
+												</div>
+											</TableCell>
+											<TableCell className="py-4 pr-4">
+												<div className="text-sm text-muted-foreground whitespace-nowrap">
+													{paper.created_at ? new Date(paper.created_at).toLocaleDateString('en-US', {
+														month: 'short',
+														day: 'numeric',
+														year: 'numeric'
+													}) : 'N/A'}
+												</div>
+											</TableCell>
+											<TableCell className="py-4">
+												<div className="text-sm text-muted-foreground whitespace-nowrap">
+													{paper.publish_date ? new Date(paper.publish_date).toLocaleDateString('en-US', {
+														month: 'short',
+														day: 'numeric',
+														year: 'numeric'
+													}) : 'N/A'}
+												</div>
+											</TableCell>
+										</TableRow>
+									)
+								})
 							) : (
 								<TableRow>
 									<TableCell colSpan={numCols} className="h-24 text-center">
