@@ -28,6 +28,21 @@ import { useIsDarkMode } from "@/hooks/useDarkMode";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+import {Marquee} from "@/components/magicui/marquee";
+
+const logos = [
+    { src: "/logos/stanford_logo.svg", alt: "Stanford University", width: 60, height: 40 },
+    { src: "/logos/yale_logo.svg", alt: "Yale University", width: 60, height: 40 },
+    { src: "/logos/google.svg", alt: "Google", width: 60, height: 40 },
+    { src: "/logos/rice_logo.svg", alt: "Rice University", width: 60, height: 40 },
+    { src: "/logos/umich_logo.svg", alt: "University of Michigan", width: 60, height: 40 },
+    { src: "/logos/harvard_logo.svg", alt: "Harvard University", width: 60, height: 40 },
+    { src: "/logos/uiuc_logo.svg", alt: "University of Illinois Urbana-Champaign", width: 60, height: 40 },
+    { src: "/logos/mit_logo.svg", alt: "Massachusetts Institute of Technology", width: 60, height: 40 },
+    { src: "/logos/jhu_logo.svg", alt: "Johns Hopkins University", width: 60, height: 40 },
+    { src: "/logos/waterloo_logo.svg", alt: "University of Waterloo", width: 40, height: 36 },
+    { src: "/logos/nih_logo.svg", alt: "National Institutes of Health", width: 40, height: 36 },
+];
 
 export default function OpenPaperLanding() {
     const isMobile = useIsMobile();
@@ -228,122 +243,28 @@ export default function OpenPaperLanding() {
                             </p>
                         </div>
 
-                        {/* Institution Logos Grid */}
-                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-10 gap-8 items-center justify-items-center opacity-60 dark:opacity-90 hover:opacity-100 transition-opacity duration-300">
-                            {/* Stanford */}
-                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
-                                <Image
-                                    src="/logos/stanford_logo.svg"
-                                    alt="Stanford University"
-                                    width={60}
-                                    height={40}
-                                    className="object-contain"
-                                />
-                            </div>
-
-                            {/* Yale */}
-                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
-                                <Image
-                                    src="/logos/yale_logo.svg"
-                                    alt="Yale University"
-                                    width={60}
-                                    height={40}
-                                    className="object-contain"
-                                />
-                            </div>
-
-                            {/* Google */}
-                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
-                                <Image
-                                    src="/logos/google.svg"
-                                    alt="Google"
-                                    width={60}
-                                    height={40}
-                                    className="object-contain"
-                                />
-                            </div>
-
-                            {/* Rice University */}
-                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
-                                <Image
-                                    src="/logos/rice_logo.svg"
-                                    alt="Rice University"
-                                    width={60}
-                                    height={40}
-                                    className="object-contain"
-                                />
-                            </div>
-
-                            {/* University of Michigan */}
-                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
-                                <Image
-                                    src="/logos/umich_logo.svg"
-                                    alt="University of Michigan"
-                                    width={60}
-                                    height={40}
-                                    className="object-contain"
-                                />
-                            </div>
-
-                            {/* UIUC */}
-                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
-                                <Image
-                                    src="/logos/uiuc_logo.svg"
-                                    alt="University of Illinois Urbana-Champaign"
-                                    width={60}
-                                    height={40}
-                                    className="object-contain"
-                                />
-                            </div>
-
-                            {/* MIT */}
-                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
-                                <Image
-                                    src="/logos/mit_logo.svg"
-                                    alt="Massachusetts Institute of Technology"
-                                    width={60}
-                                    height={40}
-                                    className="object-contain"
-                                />
-                            </div>
-
-                            {/* Johns Hopkins */}
-                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
-                                <Image
-                                    src="/logos/jhu_logo.svg"
-                                    alt="Johns Hopkins University"
-                                    width={60}
-                                    height={40}
-                                    className="object-contain"
-                                />
-                            </div>
-
-                            {/* Waterloo */}
-                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
-                                <Image
-                                    src="/logos/waterloo_logo.svg"
-                                    alt="University of Waterloo"
-                                    width={40}
-                                    height={36}
-                                    className="object-contain"
-                                />
-                            </div>
-
-                            {/* NIH */}
-                            <div className={`flex items-center justify-center h-12 w-20 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300`}>
-                                <Image
-                                    src="/logos/nih_logo.svg"
-                                    alt="National Institutes of Health"
-                                    width={40}
-                                    height={36}
-                                    className="object-contain"
-                                />
-                            </div>
+                        {/* Institution Logos Marquee */}
+                        <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden rounded-lg bg-none">
+                            <Marquee pauseOnHover className="[--duration:20s]">
+                                {logos.map((logo, index) => (
+                                    <div key={index} className={`flex items-center justify-center h-12 w-28 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300 mx-4`}>
+                                        <Image
+                                            src={logo.src}
+                                            alt={logo.alt}
+                                            width={logo.width}
+                                            height={logo.height}
+                                            className="object-contain"
+                                        />
+                                    </div>
+                                ))}
+                            </Marquee>
+                            <div className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-white dark:from-background"></div>
+                            <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-white dark:from-background"></div>
                         </div>
 
                         <div className="mt-12 text-center">
                             <p className="text-sm text-muted-foreground italic">
-                                Join hundreds of researchers accelerating their work with Open Paper
+                                Join thousands of researchers accelerating their work with Open Paper
                             </p>
                         </div>
                     </div>
