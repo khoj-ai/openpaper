@@ -61,7 +61,7 @@ const features: PricingFeature[] = [
         teams: "unlimited"
     },
     {
-        name: "Literature review (monthly)",
+        name: "Projects",
         basic: "2",
         researcher: "100",
         teams: "500"
@@ -208,7 +208,7 @@ export default function PricingTable({
                         </thead>
                         <tbody>
                             {features.map((feature, index) => {
-                                const isComingSoon = feature.name === "Literature review (monthly)";
+                                const isComingSoon = feature.name === "Projects";
                                 const isTeamsOnly = feature.name === "Team annotations" || feature.name === "Team chat";
 
                                 return (
@@ -268,7 +268,7 @@ export default function PricingTable({
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {features.map((feature, index) => {
-                                const isComingSoon = feature.name === "Literature review (monthly)";
+                                const isComingSoon = feature.name === "Projects";
                                 const isTeamsOnly = feature.name === "Team annotations" || feature.name === "Team chat";
                                 const featureValue = getFeatureValueForPlan(feature, selectedPlan);
 

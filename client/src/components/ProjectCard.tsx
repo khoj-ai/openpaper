@@ -15,17 +15,29 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { fetchFromApi } from "@/lib/api";
+import { formatDate } from "@/lib/utils";
 
-export function ProjectCard({ project }: { project: Project }) {
+export function ProjectCard({ project, onProjectUpdate }: {
+	project: Project;
+	onProjectUpdate?: () => void;
+}) {
 	const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+	const [showEditAlert, setShowEditAlert] = useState(false);
+	const [currentTitle, setCurrentTitle] = useState(project.title);
+	const [currentDescription, setCurrentDescription] = useState(project.description || '');
+	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
 	const deleteProject = async () => {
 		try {
-			const response = await fetch(`/api/projects/${project.id}`, {
+			const response = await fetchFromApi(`/api/projects/${project.id}`, {
 				method: 'DELETE',
 			});
 			if (response.ok) {
-				window.location.reload();
+				setShowDeleteAlert(false);
+				onProjectUpdate?.();
 			} else {
 				console.error('Failed to delete project');
 			}
@@ -34,56 +46,96 @@ export function ProjectCard({ project }: { project: Project }) {
 		}
 	};
 
-	const handleEditClick = (e: React.MouseEvent) => {
-		e.preventDefault();
-		e.stopPropagation();
-		// TODO: Implement edit functionality
-		console.log('Edit clicked for project:', project.id);
+	const handleUpdateProject = async () => {
+		try {
+			const response = await fetchFromApi(`/api/projects/${project.id}`, {
+				method: 'PATCH',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					title: currentTitle,
+					description: currentDescription,
+				}),
+			});
+			if (response.ok) {
+				setShowEditAlert(false);
+				onProjectUpdate?.();
+			} else {
+				console.error('Failed to update project');
+			}
+		} catch (error) {
+			console.error('An error occurred while updating the project:', error);
+		}
 	};
 
-	const handleDeleteClick = (e: React.MouseEvent) => {
-		e.preventDefault();
-		e.stopPropagation();
+	const handleEditClick = () => {
+		setCurrentTitle(project.title);
+		setCurrentDescription(project.description || '');
+		setShowEditAlert(true);
+		setIsDropdownOpen(false);
+	};
+
+	const handleDeleteClick = () => {
 		setShowDeleteAlert(true);
+		setIsDropdownOpen(false);
+	};
+
+	const handleCardClick = (e: React.MouseEvent) => {
+		// Prevent navigation if dropdown is open or if clicking on dropdown area
+		if (isDropdownOpen) {
+			e.preventDefault();
+		}
 	};
 
 	return (
-		<div className="relative">
-			<Link href={`/projects/${project.id}`} className="block">
-				<Card className="hover:shadow-lg transition-shadow duration-200">
-					<CardHeader>
-						<CardTitle>{project.title}</CardTitle>
-						<CardDescription>{project.description}</CardDescription>
+		<div className="relative group">
+			<Link href={`/projects/${project.id}`} className="block" onClick={handleCardClick}>
+				<Card className="h-full hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-border/50 hover:border-border bg-card/50 backdrop-blur-sm">
+					<CardHeader className="pb-3">
+						<CardTitle className="text-lg font-semibold text-foreground line-clamp-2 min-h-[3.5rem] flex items-center">
+							{currentTitle}
+						</CardTitle>
+						{currentDescription && (
+							<CardDescription className="text-muted-foreground line-clamp-3 min-h-[4.5rem] text-sm leading-relaxed">
+								{currentDescription}
+							</CardDescription>
+						)}
 					</CardHeader>
-					<CardContent>
-						<p className="text-sm text-gray-500">
-							Created: {new Date(project.created_at).toLocaleDateString()}
-						</p>
-					</CardContent>
-					<CardFooter>
-						<p className="text-sm text-gray-500">
-							Updated: {new Date(project.updated_at).toLocaleDateString()}
-						</p>
+					<CardFooter className="pt-0 mt-auto">
+						<div className="flex items-center justify-between w-full">
+							<p className="text-xs text-muted-foreground/70 font-medium">
+								Updated {formatDate(project.updated_at)}
+							</p>
+							<div className="w-2 h-2 rounded-full bg-primary/20"></div>
+						</div>
 					</CardFooter>
 				</Card>
 			</Link>
-			<div className="absolute top-2 right-2">
-				<DropdownMenu>
+
+			{/* Hover-only dropdown menu */}
+			<div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-all duration-200 ease-in-out transform translate-y-1 group-hover:translate-y-0 z-20">
+				<DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
 					<DropdownMenuTrigger asChild>
 						<Button
 							variant="ghost"
 							size="icon"
-							onClick={(e) => {
-								e.preventDefault();
-								e.stopPropagation();
-							}}
+							className="h-8 w-8 bg-background/80 backdrop-blur-sm border border-border/50 hover:bg-background/90 shadow-sm"
 						>
 							<MoreHorizontal className="h-4 w-4" />
 						</Button>
 					</DropdownMenuTrigger>
-					<DropdownMenuContent>
-						<DropdownMenuItem onClick={handleEditClick}>Edit</DropdownMenuItem>
-						<DropdownMenuItem onClick={handleDeleteClick}>
+					<DropdownMenuContent align="end" className="w-32">
+						<DropdownMenuItem
+							onClick={handleEditClick}
+							className="cursor-pointer"
+						>
+							Edit
+						</DropdownMenuItem>
+						<DropdownMenuItem
+							onClick={handleDeleteClick}
+							className="cursor-pointer text-destructive focus:text-destructive"
+						>
 							Delete
 						</DropdownMenuItem>
 					</DropdownMenuContent>
@@ -101,6 +153,51 @@ export function ProjectCard({ project }: { project: Project }) {
 					<AlertDialogFooter>
 						<AlertDialogCancel>Cancel</AlertDialogCancel>
 						<AlertDialogAction onClick={deleteProject}>Continue</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			<AlertDialog open={showEditAlert} onOpenChange={(isOpen) => {
+				setShowEditAlert(isOpen);
+				if (!isOpen) {
+					setCurrentTitle(project.title);
+					setCurrentDescription(project.description || '');
+				}
+			}}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Edit Project</AlertDialogTitle>
+						<AlertDialogDescription>
+							Update the title and description for your project.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<div className="grid gap-4 py-4">
+						<div className="grid grid-cols-4 items-center gap-4">
+							<Label htmlFor="title" className="text-right">
+								Title
+							</Label>
+							<Input
+								id="title"
+								value={currentTitle}
+								onChange={(e) => setCurrentTitle(e.target.value)}
+								className="col-span-3"
+							/>
+						</div>
+						<div className="grid grid-cols-4 items-center gap-4">
+							<Label htmlFor="description" className="text-right">
+								Description
+							</Label>
+							<Input
+								id="description"
+								value={currentDescription}
+								onChange={(e) => setCurrentDescription(e.target.value)}
+								className="col-span-3"
+							/>
+						</div>
+					</div>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction onClick={handleUpdateProject}>Save</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
 			</AlertDialog>

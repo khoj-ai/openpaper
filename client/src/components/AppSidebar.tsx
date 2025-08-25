@@ -12,7 +12,6 @@ import {
     LogOut,
     MessageCircleQuestion,
     Moon,
-    PlusSquare,
     Route,
     Sun,
     TelescopeIcon,
@@ -26,7 +25,6 @@ import {
     SidebarFooter,
     SidebarGroup,
     SidebarGroupContent,
-    SidebarGroupLabel,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
@@ -54,7 +52,6 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useIsDarkMode } from "@/hooks/useDarkMode";
 import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isStorageNearLimit, isPaperUploadNearLimit, isChatCreditAtLimit, isChatCreditNearLimit } from "@/hooks/useSubscription";
-import Image from "next/image";
 import Link from "next/link";
 import OnboardingChecklist from "@/components/OnboardingChecklist";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
@@ -81,13 +78,6 @@ const items = [
         title: "Library",
         url: "/papers",
         icon: FileText,
-        requiresAuth: true,
-        beta: false,
-    },
-    {
-        title: "New Project",
-        url: "/projects/create",
-        icon: PlusSquare,
         requiresAuth: true,
         beta: false,
     },
