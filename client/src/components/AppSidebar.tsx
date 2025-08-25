@@ -82,16 +82,16 @@ const items = [
         beta: false,
     },
     {
-        title: "Projects",
-        url: "/projects",
-        icon: FolderCodeIcon,
-        requiresAuth: true,
-        beta: false,
-    },
-    {
         title: "Ask",
         url: "/understand",
         icon: TelescopeIcon,
+        requiresAuth: true,
+        beta: true,
+    },
+    {
+        title: "Projects",
+        url: "/projects",
+        icon: FolderCodeIcon,
         requiresAuth: true,
         beta: true,
     },

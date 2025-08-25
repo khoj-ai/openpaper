@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Loader2, MessageCircle, PlusCircle, Send, Sparkles } from "lucide-react";
+import { ArrowRight, Loader2, MessageCircle, Pencil, PlusCircle, Send, Sparkles } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { fetchFromApi } from "@/lib/api";
@@ -28,6 +28,17 @@ import {
 	DialogTrigger,
 	DialogDescription
 } from "@/components/ui/dialog";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Label } from "@/components/ui/label";
 
 interface PdfUploadResponse {
 	message: string;
@@ -49,6 +60,9 @@ export default function ProjectPage() {
 	const [pdfUrl, setPdfUrl] = useState("");
 	const [isUploading, setIsUploading] = useState(false);
 	const [newQuery, setNewQuery] = useState("");
+	const [showEditAlert, setShowEditAlert] = useState(false);
+	const [currentTitle, setCurrentTitle] = useState("");
+	const [currentDescription, setCurrentDescription] = useState("");
 
 	const getProject = useCallback(async () => {
 		try {
@@ -171,6 +185,37 @@ export default function ProjectPage() {
 		}
 	};
 
+	const handleUpdateProject = async () => {
+		if (!project) return;
+		try {
+			const response = await fetchFromApi(`/api/projects/${project.id}`, {
+				method: 'PATCH',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					title: currentTitle,
+					description: currentDescription,
+				}),
+			});
+			if (response) {
+				setProject(response);
+				setShowEditAlert(false);
+			} else {
+				console.error('Failed to update project');
+			}
+		} catch (error) {
+			console.error('An error occurred while updating the project:', error);
+		}
+	};
+
+	const handleEditClick = () => {
+		if (!project) return;
+		setCurrentTitle(project.title);
+		setCurrentDescription(project.description || '');
+		setShowEditAlert(true);
+	};
+
 
 	if (isLoading) {
 		return <div className="container mx-auto p-4">Loading project...</div>;
@@ -189,8 +234,20 @@ export default function ProjectPage() {
 	if (isEmpty) {
 		return (
 			<div className="container mx-auto p-4">
-				<h1 className="text-3xl font-bold mb-2 text-gray-800 rounded-lg px-0">{project.title}</h1>
-				<p className="text-lg text-gray-600 mb-8">{project.description}</p>
+				<div className="group relative">
+					<div className="flex items-center">
+						<h1 className="text-3xl font-bold text-gray-800 rounded-lg px-0">{project.title}</h1>
+						<Button
+							variant="ghost"
+							size="icon"
+							className="opacity-0 group-hover:opacity-100 ml-2"
+							onClick={handleEditClick}
+						>
+							<Pencil className="h-4 w-4" />
+						</Button>
+					</div>
+					<p className="text-lg text-gray-600 mb-8">{project.description}</p>
+				</div>
 				<div className="mt-4">
 					<div className="flex justify-between items-center mb-4">
 						<h2 className="text-2xl font-bold">Add Papers to Your Project</h2>
@@ -236,14 +293,64 @@ export default function ProjectPage() {
 						</div>
 					</DialogContent>
 				</Dialog>
+				<AlertDialog open={showEditAlert} onOpenChange={setShowEditAlert}>
+					<AlertDialogContent>
+						<AlertDialogHeader>
+							<AlertDialogTitle>Edit Project</AlertDialogTitle>
+							<AlertDialogDescription>
+								Update the title and description for your project.
+							</AlertDialogDescription>
+						</AlertDialogHeader>
+						<div className="grid gap-4 py-4">
+							<div className="grid grid-cols-4 items-center gap-4">
+								<Label htmlFor="title" className="text-right">
+									Title
+								</Label>
+								<Input
+									id="title"
+									value={currentTitle}
+									onChange={(e) => setCurrentTitle(e.target.value)}
+									className="col-span-3"
+								/>
+							</div>
+							<div className="grid grid-cols-4 items-center gap-4">
+								<Label htmlFor="description" className="text-right">
+									Description
+								</Label>
+								<Input
+									id="description"
+									value={currentDescription}
+									onChange={(e) => setCurrentDescription(e.target.value)}
+									className="col-span-3"
+								/>
+							</div>
+						</div>
+						<AlertDialogFooter>
+							<AlertDialogCancel>Cancel</AlertDialogCancel>
+							<AlertDialogAction onClick={handleUpdateProject}>Save</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
 			</div>
 		)
 	}
 
 	return (
 		<div className="container mx-auto p-4">
-			<h1 className="text-3xl font-bold mb-2 text-gray-800 dark:text-gray-200 p-2 rounded-lg px-0">{project.title}</h1>
-			<p className="text-lg text-gray-600 mb-6">{project.description}</p>
+			<div className="group relative">
+				<div className="flex items-center">
+					<h1 className="text-3xl font-bold text-gray-800 dark:text-gray-200 p-2 rounded-lg px-0">{project.title}</h1>
+					<Button
+						variant="ghost"
+						size="icon"
+						className="opacity-0 group-hover:opacity-100 ml-2"
+						onClick={handleEditClick}
+					>
+						<Pencil className="h-4 w-4" />
+					</Button>
+				</div>
+				<p className="text-lg text-gray-600 mb-6">{project.description}</p>
+			</div>
 
 			<div className="flex gap-6 -mx-4">
 				{/* Left side - Conversations */}
@@ -279,7 +386,7 @@ export default function ProjectPage() {
 					)}
 
 					<div className="flex justify-between items-center mb-4">
-						<h2 className="text-2xl font-bold">Conversations</h2>
+						<h2 className="text-2xl font-bold">Chats</h2>
 					</div>
 
 					{/* Conversations List */}
@@ -287,7 +394,7 @@ export default function ProjectPage() {
 						{conversations.length > 0 ? (
 							conversations.map((convo, index) => (
 								<a href={`/projects/${projectId}/conversations/${convo.id}`} key={convo.id} className="block p-4 mb-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
-									<div className="font-semibold text-blue-600 dark:text-blue-400 flex items-center justify-between">
+									<div className="font-semibold text-accent-foreground flex items-center justify-between">
 										{convo.title}
 										<ArrowRight className="w-4 h-4 text-gray-400 transform transition-transform group-hover:translate-x-1" />
 									</div>
@@ -385,6 +492,45 @@ export default function ProjectPage() {
 					)}
 				</div>
 			</div>
+
+			<AlertDialog open={showEditAlert} onOpenChange={setShowEditAlert}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Edit Project</AlertDialogTitle>
+						<AlertDialogDescription>
+							Update the title and description for your project.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<div className="grid gap-4 py-4">
+						<div className="grid grid-cols-4 items-center gap-4">
+							<Label htmlFor="title" className="text-right">
+								Title
+							</Label>
+							<Input
+								id="title"
+								value={currentTitle}
+								onChange={(e) => setCurrentTitle(e.target.value)}
+								className="col-span-3"
+							/>
+						</div>
+						<div className="grid grid-cols-4 items-center gap-4">
+							<Label htmlFor="description" className="text-right">
+								Description
+							</Label>
+							<Input
+								id="description"
+								value={currentDescription}
+								onChange={(e) => setCurrentDescription(e.target.value)}
+								className="col-span-3"
+							/>
+						</div>
+					</div>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction onClick={handleUpdateProject}>Save</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 
 			<Dialog open={isUrlDialogOpen} onOpenChange={setIsUrlDialogOpen}>
 				<DialogContent>
