@@ -11,7 +11,6 @@ import PdfUploadTracker, { MinimalJob } from "@/components/PdfUploadTracker";
 import {
 	Sheet,
 	SheetContent,
-	SheetDescription,
 	SheetHeader,
 	SheetTitle,
 	SheetTrigger,
@@ -257,7 +256,7 @@ export default function ProjectPage() {
 									placeholder="Ask a question about your papers, analyze findings, or explore new ideas..."
 									value={newQuery}
 									onChange={(e) => setNewQuery(e.target.value)}
-									className="min-h-[80px] resize-none pr-12 border-gray-200 dark:border-gray-700 focus:border-blue-400 focus:ring-blue-200 bg-blue-50 dark:bg-accent text-primary"
+									className="min-h-[80px] resize-none pr-12 border-none dark:border-none focus:border-blue-400 focus:ring-transparent bg-secondary dark:bg-accent text-primary"
 								/>
 								<Button
 									type="submit"
@@ -287,7 +286,7 @@ export default function ProjectPage() {
 					<div>
 						{conversations.length > 0 ? (
 							conversations.map((convo, index) => (
-								<a href={`/projects/${projectId}/conversations/${convo.id}`} key={convo.id} className="block p-4 mb-4 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-shadow animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
+								<a href={`/projects/${projectId}/conversations/${convo.id}`} key={convo.id} className="block p-4 mb-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
 									<div className="font-semibold text-blue-600 dark:text-blue-400 flex items-center justify-between">
 										{convo.title}
 										<ArrowRight className="w-4 h-4 text-gray-400 transform transition-transform group-hover:translate-x-1" />
@@ -296,7 +295,34 @@ export default function ProjectPage() {
 								</a>
 							))
 						) : (
-							<p>No conversations yet. Start a new one!</p>
+							<div className="text-center p-8 border-dashed border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+								<div className="p-4 bg-blue-100 dark:bg-blue-900/30 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+									<MessageCircle className="w-8 h-8 text-blue-400" />
+								</div>
+								<h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">No Conversations Yet</h3>
+								<p className="text-gray-500 dark:text-gray-400 mb-4">
+									{papers.length > 0
+										? "Start discussing your papers by asking questions about findings, methodologies, or connections between studies."
+										: "Add papers to your project first, then start conversations to analyze and explore them."
+									}
+								</p>
+								{papers.length > 0 && (
+									<div className="flex flex-col sm:flex-row gap-2 justify-center items-center text-sm text-gray-600 dark:text-gray-400">
+										<div className="flex items-center gap-2">
+											<div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+											<span>Ask about specific findings</span>
+										</div>
+										<div className="flex items-center gap-2">
+											<div className="w-2 h-2 bg-green-400 rounded-full"></div>
+											<span>Compare methodologies</span>
+										</div>
+										<div className="flex items-center gap-2">
+											<div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+											<span>Explore connections</span>
+										</div>
+									</div>
+								)}
+							</div>
 						)}
 					</div>
 				</div>

@@ -36,7 +36,7 @@ export default function CreateProjectPage() {
 
 	return (
 		<div className="container mx-auto p-4 max-w-2xl">
-			<h1 className="text-2xl font-bold mb-4">Create New Project</h1>
+			<h1 className="text-2xl font-bold mb-4">New Project</h1>
 			<form onSubmit={handleSubmit}>
 				<div className="grid w-full items-center gap-4">
 					<div className="flex flex-col space-y-1.5">
@@ -64,7 +64,7 @@ export default function CreateProjectPage() {
 							<Link href="/projects">Cancel</Link>
 						</Button>
 						<Button type="submit" disabled={isLoading}>
-							{isLoading ? "Creating..." : "Create Project"}
+							{isLoading ? "Creating..." : "Create"}
 						</Button>
 					</div>
 				</div>

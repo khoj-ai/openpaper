@@ -43,11 +43,6 @@
 	--radius-lg: var(--radius);
 	--radius-xl: calc(var(--radius) + 4px);
 	--animate-gradient: gradient 8s linear infinite;
-  @keyframes gradient {
-  to {
-    background-position: var(--bg-size, 300%) 0;
-		}
-	}
 }
 
 :root {
@@ -141,10 +136,6 @@
 	}
 }
 
-.animate-glow-3x {
-	animation: glow-limited 2s ease-in-out 1;
-}
-
 @keyframes fadeIn {
 	from {
 		opacity: 0;
@@ -160,78 +151,84 @@
 }
 
 .expand-height {
-  animation: expand-height 0.3s ease-in-out;
-  overflow: hidden;
+	animation: expand-height 0.3s ease-in-out;
+	overflow: hidden;
 }
 
 @keyframes expand-height {
-  from {
-    max-height: 0;
-    opacity: 0;
-  }
-  to {
-    max-height: 500px; /* Adjust as needed */
-    opacity: 1;
-  }
+	from {
+		max-height: 0;
+		opacity: 0;
+	}
+
+	to {
+		max-height: 500px;
+		/* Adjust as needed */
+		opacity: 1;
+	}
 }
 
 @keyframes float {
-  0% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-  100% {
-    transform: translateY(0px);
-  }
+	0% {
+		transform: translateY(0px);
+	}
+
+	50% {
+		transform: translateY(-10px);
+	}
+
+	100% {
+		transform: translateY(0px);
+	}
 }
 
 .animate-float {
-  animation: float 3s ease-in-out infinite;
+	animation: float 3s ease-in-out infinite;
 }
 
 .relative.w-full.max-w-2xl::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 50px;
-    height: 100%;
-    background: linear-gradient(to left, var(--background), transparent);
-    pointer-events: none;
+	content: '';
+	position: absolute;
+	top: 0;
+	right: 0;
+	width: 50px;
+	height: 100%;
+	background: linear-gradient(to left, var(--background), transparent);
+	pointer-events: none;
 }
 
 .animate-marquee {
-  animation: marquee var(--duration) linear infinite;
+	animation: marquee var(--duration) linear infinite;
 }
 
 .animate-marquee-vertical {
-  animation: marquee-vertical var(--duration) linear infinite;
+	animation: marquee-vertical var(--duration) linear infinite;
 }
 
 .animation-direction-reverse {
-  animation-direction: reverse;
+	animation-direction: reverse;
 }
 
 .group:hover .group-hover-paused {
-    animation-play-state: paused;
+	animation-play-state: paused;
 }
 
 @keyframes marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(calc(-100% - var(--gap)));
-  }
+	from {
+		transform: translateX(0);
+	}
+
+	to {
+		transform: translateX(calc(-100% - var(--gap)));
+	}
 }
 
 @keyframes marquee-vertical {
-  from {
-    transform: translateY(0);
-  }
-  to {
-    transform: translateY(calc(-100% - var(--gap)));
-  }
+	from {
+		transform: translateY(0);
+	}
+
+	to {
+		transform: translateY(calc(-100% - var(--gap)));
+	}
 }

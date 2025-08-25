@@ -7,6 +7,7 @@ import { ProjectCard } from "@/components/ProjectCard";
 import { Button } from "@/components/ui/button";
 import { Project } from "@/lib/schema";
 import { fetchFromApi } from "@/lib/api";
+import { PlusCircle } from "lucide-react";
 
 export default function Projects() {
 	const [projects, setProjects] = useState<Project[]>([]);
@@ -33,8 +34,11 @@ export default function Projects() {
 		<div className="container mx-auto p-4">
 			<div className="flex justify-between items-center mb-4">
 				<h1 className="text-2xl font-bold">Projects</h1>
-				<Button asChild>
-					<Link href="/projects/create">Create New Project</Link>
+				<Button asChild className="bg-gradient-to-br from-blue-500 to-cyan-500">
+					<Link href="/projects/create">
+						<PlusCircle className="mr-2" />
+						New Project
+					</Link>
 				</Button>
 			</div>
 			{isLoading ? (
