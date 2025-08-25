@@ -56,6 +56,7 @@ import { useIsDarkMode } from "@/hooks/useDarkMode";
 import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isStorageNearLimit, isPaperUploadNearLimit, isChatCreditAtLimit, isChatCreditNearLimit } from "@/hooks/useSubscription";
 import Image from "next/image";
 import Link from "next/link";
+import OnboardingChecklist from "@/components/OnboardingChecklist";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 import { Conversation, PaperItem } from "@/lib/schema";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -357,15 +358,6 @@ export function AppSidebar() {
         <Sidebar variant="floating">
             <SidebarContent>
                 <SidebarGroup>
-                    <SidebarGroupLabel className="flex items-center gap-2">
-                        <Image
-                            src="/openpaper.svg"
-                            width={24}
-                            height={24}
-                            alt="Open Paper Logo"
-                        />
-                        <span className="text-sm font-semibold">Open Paper</span>
-                    </SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu>
                             {items.map((item) => (
@@ -440,6 +432,8 @@ export function AppSidebar() {
                         </Alert>
                     </div>
                 )}
+
+                <OnboardingChecklist />
 
                 {/* User Status Badge */}
                 {user && (
