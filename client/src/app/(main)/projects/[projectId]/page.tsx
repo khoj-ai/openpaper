@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 
+
 interface PdfUploadResponse {
 	message: string;
 	job_id: string;
@@ -168,8 +169,7 @@ export default function ProjectPage() {
 
 
 
-	const handleNewQuerySubmit = async (e: React.FormEvent) => {
-		e.preventDefault();
+	const handleNewQuery = async () => {
 		if (!newQuery.trim()) return;
 
 		try {
@@ -182,6 +182,18 @@ export default function ProjectPage() {
 		} catch (err) {
 			setError("Failed to create a new conversation. Please try again.");
 			console.error(err);
+		}
+	};
+
+	const handleNewQuerySubmit = async (e: React.FormEvent) => {
+		e.preventDefault();
+		handleNewQuery();
+	};
+
+	const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault();
+			handleNewQuery();
 		}
 	};
 
@@ -234,6 +246,7 @@ export default function ProjectPage() {
 	if (isEmpty) {
 		return (
 			<div className="container mx-auto p-4">
+
 				<div className="group relative">
 					<div className="flex items-center">
 						<h1 className="text-3xl font-bold text-gray-800 rounded-lg px-0">{project.title}</h1>
@@ -248,6 +261,7 @@ export default function ProjectPage() {
 					</div>
 					<p className="text-lg text-gray-600 mb-8">{project.description}</p>
 				</div>
+
 				<div className="mt-4">
 					<div className="flex justify-between items-center mb-4">
 						<h2 className="text-2xl font-bold">Add Papers to Your Project</h2>
@@ -258,6 +272,7 @@ export default function ProjectPage() {
 							<DialogContent>
 								<DialogHeader>
 									<DialogTitle>Upload New Papers</DialogTitle>
+									<DialogDescription>You can upload any additional papers to your library here. They will automatically be added to the project.</DialogDescription>
 								</DialogHeader>
 								<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} />
 								{uploadError && <p className="text-red-500 mt-4">{uploadError}</p>}
@@ -337,6 +352,8 @@ export default function ProjectPage() {
 
 	return (
 		<div className="container mx-auto p-4">
+
+
 			<div className="group relative">
 				<div className="flex items-center">
 					<h1 className="text-3xl font-bold text-gray-800 dark:text-gray-200 p-2 rounded-lg px-0">{project.title}</h1>
@@ -352,6 +369,7 @@ export default function ProjectPage() {
 				<p className="text-lg text-gray-600 mb-6">{project.description}</p>
 			</div>
 
+
 			<div className="flex gap-6 -mx-4">
 				{/* Left side - Conversations */}
 				<div className="w-2/3 px-4">
@@ -362,7 +380,10 @@ export default function ProjectPage() {
 								<Textarea
 									placeholder="Ask a question about your papers, analyze findings, or explore new ideas..."
 									value={newQuery}
-									onChange={(e) => setNewQuery(e.target.value)}
+									onChange={(e) => {
+										setNewQuery(e.target.value)
+									}}
+									onKeyDown={handleKeyDown}
 									className="min-h-[80px] resize-none pr-12 border-none dark:border-none focus:border-blue-400 focus:ring-transparent bg-secondary dark:bg-accent text-primary"
 								/>
 								<Button
@@ -451,6 +472,7 @@ export default function ProjectPage() {
 								</SheetHeader>
 								<div className="mt-4 px-6">
 									<h3 className="text-lg font-semibold mb-2">Upload New Papers</h3>
+									<h2>You can upload any additional papers to your library here. They will automatically be added to the project.</h2>
 									<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} />
 									{uploadError && <p className="text-red-500 mt-4">{uploadError}</p>}
 									<PdfUploadTracker initialJobs={initialJobs} onComplete={handleUploadComplete} />
@@ -483,6 +505,7 @@ export default function ProjectPage() {
 								<DialogContent>
 									<DialogHeader>
 										<DialogTitle>Upload New Papers</DialogTitle>
+										<DialogDescription>You can upload any additional papers to your library here. They will automatically be added to the project.</DialogDescription>
 									</DialogHeader>
 									<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} />
 									{uploadError && <p className="text-red-500 mt-4">{uploadError}</p>}

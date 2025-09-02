@@ -161,16 +161,45 @@ export function LibraryTable({
 
 	return (
 		<div className="space-y-4">
-			<div className="flex items-center gap-4">
-				<Input
-					placeholder="Filter papers by title, authors, organizations, or keywords..."
-					value={filter}
-					onChange={(e) => setFilter(e.target.value)}
-					className="max-w-lg"
-				/>
-				{processedPapers.length !== papers.length && (
-					<div className="text-sm text-muted-foreground">
-						Showing {processedPapers.length} of {papers.length} papers
+			<div className="flex items-center justify-between gap-4">
+				<div className="flex items-center gap-4">
+					<Input
+						placeholder="Filter papers by title, authors, organizations, or keywords..."
+						value={filter}
+						onChange={(e) => setFilter(e.target.value)}
+						className="max-w-lg"
+					/>
+					{processedPapers.length !== papers.length && (
+						<div className="text-sm text-muted-foreground">
+							Showing {processedPapers.length} of {papers.length} papers
+						</div>
+					)}
+				</div>
+				{selectable && (
+					<div
+						className={`flex items-center gap-3 transition-all duration-200 ${selectedPapers.size > 0
+								? "opacity-100 translate-y-0"
+								: "opacity-0 translate-y-2 pointer-events-none"
+							}`}
+					>
+						{selectedPapers.size > 0 && (
+							<span className="text-sm font-medium text-muted-foreground">
+								{selectedPapers.size} paper{selectedPapers.size !== 1 ? 's' : ''} selected
+							</span>
+						)}
+						<div className="flex items-center gap-2">
+							{actionOptions.map((action) => (
+								<Button
+									key={action}
+									variant="default"
+									size="sm"
+									onClick={() => handleAction(action)}
+									className="font-medium"
+								>
+									{action}
+								</Button>
+							))}
+						</div>
 					</div>
 				)}
 			</div>
@@ -348,34 +377,6 @@ export function LibraryTable({
 					</Table>
 				</div>
 			</div>
-
-			{selectable && (
-				<div
-					className={`flex items-center gap-3 p-4 rounded-lg bg-muted/50 border transition-all duration-200 ${selectedPapers.size > 0
-						? "opacity-100 translate-y-0"
-						: "opacity-0 translate-y-2 pointer-events-none"
-						}`}
-				>
-					<div className="flex items-center gap-2">
-						{actionOptions.map((action) => (
-							<Button
-								key={action}
-								variant="default"
-								size="sm"
-								onClick={() => handleAction(action)}
-								className="font-medium"
-							>
-								{action}
-							</Button>
-						))}
-					</div>
-					{selectedPapers.size > 0 && (
-						<span className="text-sm font-medium text-muted-foreground">
-							{selectedPapers.size} paper{selectedPapers.size !== 1 ? 's' : ''} selected
-						</span>
-					)}
-				</div>
-			)}
 		</div>
 	);
 }
