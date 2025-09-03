@@ -230,6 +230,7 @@ export interface PaperItem {
     publish_date?: string
     status?: PaperStatus
     preview_url?: string
+    file_url?: string
     size_in_kb?: number
 }
 

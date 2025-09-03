@@ -373,7 +373,7 @@ function ProjectConversationPageContent() {
     const [isCentered, setIsCentered] = useState(false);
 
     return (
-        <div className="container mx-auto p-4">
+        <div className="container mx-auto p-4 flex flex-col h-[calc(100vh-64px)]">
             <Breadcrumb>
                 <BreadcrumbList>
                     <BreadcrumbItem>
@@ -389,29 +389,31 @@ function ProjectConversationPageContent() {
                     </BreadcrumbItem>
                 </BreadcrumbList>
             </Breadcrumb>
-            <ConversationView
-                messages={messages}
-                papers={papers}
-                isStreaming={isStreaming}
-                streamingChunks={streamingChunks}
-                streamingReferences={streamingReferences}
-                statusMessage={statusMessage}
-                error={error}
-                isSessionLoading={isSessionLoading}
-                chatCreditLimitReached={chatCreditLimitReached}
-                currentMessage={currentMessage}
-                onCurrentMessageChange={setCurrentMessage}
-                onSubmit={handleSubmit}
-                onRetry={handleRetry}
-                isCentered={isCentered}
-                setIsCentered={setIsCentered}
-                displayedText={displayedText}
-                isTyping={isTyping}
-                handleCitationClick={handleCitationClick}
-                highlightedInfo={highlightedInfo}
-                setHighlightedInfo={setHighlightedInfo}
-                authLoading={authLoading}
-            />
+            <div className="flex-1 min-h-0 pt-4">
+                <ConversationView
+                    messages={messages}
+                    papers={papers}
+                    isStreaming={isStreaming}
+                    streamingChunks={streamingChunks}
+                    streamingReferences={streamingReferences}
+                    statusMessage={statusMessage}
+                    error={error}
+                    isSessionLoading={isSessionLoading}
+                    chatCreditLimitReached={chatCreditLimitReached}
+                    currentMessage={currentMessage}
+                    onCurrentMessageChange={setCurrentMessage}
+                    onSubmit={handleSubmit}
+                    onRetry={handleRetry}
+                    isCentered={isCentered}
+                    setIsCentered={setIsCentered}
+                    displayedText={displayedText}
+                    isTyping={isTyping}
+                    handleCitationClick={handleCitationClick}
+                    highlightedInfo={highlightedInfo}
+                    setHighlightedInfo={setHighlightedInfo}
+                    authLoading={authLoading}
+                />
+            </div>
         </div>
     );
 }

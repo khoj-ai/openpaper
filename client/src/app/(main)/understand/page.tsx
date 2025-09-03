@@ -353,29 +353,31 @@ function UnderstandPageContent() {
     const [isCentered, setIsCentered] = useState(true);
 
     return (
-        <ConversationView
-            messages={messages}
-            papers={papers}
-            isStreaming={isStreaming}
-            streamingChunks={streamingChunks}
-            streamingReferences={streamingReferences}
-            statusMessage={statusMessage}
-            error={error}
-            isSessionLoading={isSessionLoading}
-            chatCreditLimitReached={chatCreditLimitReached}
-            currentMessage={currentMessage}
-            onCurrentMessageChange={setCurrentMessage}
-            onSubmit={handleSubmit}
-            onRetry={handleRetry}
-            isCentered={isCentered}
-            setIsCentered={setIsCentered}
-            displayedText={displayedText}
-            isTyping={isTyping}
-            handleCitationClick={handleCitationClick}
-            highlightedInfo={highlightedInfo}
-            setHighlightedInfo={setHighlightedInfo}
-            authLoading={authLoading}
-        />
+        <div className="h-[calc(100vh-64px)]">
+            <ConversationView
+                messages={messages}
+                papers={papers}
+                isStreaming={isStreaming}
+                streamingChunks={streamingChunks}
+                streamingReferences={streamingReferences}
+                statusMessage={statusMessage}
+                error={error}
+                isSessionLoading={isSessionLoading}
+                chatCreditLimitReached={chatCreditLimitReached}
+                currentMessage={currentMessage}
+                onCurrentMessageChange={setCurrentMessage}
+                onSubmit={handleSubmit}
+                onRetry={handleRetry}
+                isCentered={isCentered}
+                setIsCentered={setIsCentered}
+                displayedText={displayedText}
+                isTyping={isTyping}
+                handleCitationClick={handleCitationClick}
+                highlightedInfo={highlightedInfo}
+                setHighlightedInfo={setHighlightedInfo}
+                authLoading={authLoading}
+            />
+        </div>
     );
 }
 

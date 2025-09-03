@@ -186,7 +186,7 @@ export const ConversationView = ({
 	}, [messages, papers, highlightedInfo, setHighlightedInfo]);
 
 	return (
-		<div className="flex flex-col w-full h-[calc(100vh-64px)]">
+		<div className="flex flex-col w-full h-full">
 			<div
 				className={`${isCentered ? "flex-0" : "flex-1"} w-full overflow-y-auto`}
 				ref={messagesContainerRef}
