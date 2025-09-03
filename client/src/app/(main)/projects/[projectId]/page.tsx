@@ -167,8 +167,6 @@ export default function ProjectPage() {
 		setPdfUrl("");
 	};
 
-
-
 	const handleNewQuery = async () => {
 		if (!newQuery.trim()) return;
 

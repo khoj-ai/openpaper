@@ -3,7 +3,7 @@ import { Project } from "@/lib/schema";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, ArrowRight } from "lucide-react";
 import { useState } from "react";
 import {
 	AlertDialog,
@@ -91,13 +91,13 @@ export function ProjectCard({ project, onProjectUpdate }: {
 	return (
 		<div className="relative group">
 			<Link href={`/projects/${project.id}`} className="block" onClick={handleCardClick}>
-				<Card className="h-full hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-border/50 hover:border-border bg-card/50 backdrop-blur-sm">
+				<Card className="h-64 hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-border/50 hover:border-border bg-card/50 backdrop-blur-sm">
 					<CardHeader className="pb-3">
-						<CardTitle className="text-lg font-semibold text-foreground line-clamp-2 min-h-[3.5rem] flex items-center">
+						<CardTitle className="text-lg font-semibold text-foreground line-clamp-2 flex items-center">
 							{currentTitle}
 						</CardTitle>
 						{currentDescription && (
-							<CardDescription className="text-muted-foreground line-clamp-3 min-h-[4.5rem] text-sm leading-relaxed">
+							<CardDescription className="text-muted-foreground line-clamp-3 text-sm leading-relaxed">
 								{currentDescription}
 							</CardDescription>
 						)}
@@ -107,7 +107,7 @@ export function ProjectCard({ project, onProjectUpdate }: {
 							<p className="text-xs text-muted-foreground/70 font-medium">
 								Updated {formatDate(project.updated_at)}
 							</p>
-							<div className="w-2 h-2 rounded-full bg-primary/20"></div>
+							<ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 						</div>
 					</CardFooter>
 				</Card>
@@ -120,7 +120,7 @@ export function ProjectCard({ project, onProjectUpdate }: {
 						<Button
 							variant="ghost"
 							size="icon"
-							className="h-8 w-8 bg-background/80 backdrop-blur-sm border border-border/50 hover:bg-background/90 shadow-sm"
+							className="h-8 w-8 bg-background/80 backdrop-blur-sm border-none hover:border-none shadow-none"
 						>
 							<MoreHorizontal className="h-4 w-4" />
 						</Button>

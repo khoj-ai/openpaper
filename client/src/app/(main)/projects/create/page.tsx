@@ -25,7 +25,7 @@ export default function CreateProjectPage() {
 				method: "POST",
 				body: JSON.stringify({ title, description }),
 			});
-			            router.push(`/projects/${project.id}`);
+			router.push(`/projects/${project.id}`);
 		} catch (err) {
 			setError("Failed to create project. Please try again.");
 			console.error(err);

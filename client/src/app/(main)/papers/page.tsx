@@ -13,11 +13,13 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/lib/auth";
 import { useSubscription, getStorageUsagePercentage, isStorageNearLimit, isStorageAtLimit, formatFileSize, getPaperUploadPercentage, isPaperUploadNearLimit, isPaperUploadAtLimit } from "@/hooks/useSubscription";
-import { FileText, Upload, Search, AlertTriangle, AlertCircle, HardDrive, X, ArrowDown } from "lucide-react";
+import { FileText, Upload, Search, AlertTriangle, AlertCircle, HardDrive, X, ArrowDown, Grid, List } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { toast } from "sonner";
 import { PaperFiltering, Filter, Sort } from "@/components/PaperFiltering";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LibraryTable } from "@/components/LibraryTable";
 
 // TODO: We could add a search look-up for the paper journal name to avoid placeholders
 
@@ -34,7 +36,15 @@ export default function PapersPage() {
     const { subscription, loading: subscriptionLoading } = useSubscription();
     const [filters, setFilters] = useState<Filter[]>([]);
     const [sort, setSort] = useState<Sort>({ type: "publish_date", order: "desc" });
+    const [viewMode, setViewMode] = useState("card");
     const SHOW_STORAGE_USAGE_THRESHOLD = 60; // Show storage usage alert if usage is above 60%
+
+    useEffect(() => {
+        const savedViewMode = localStorage.getItem("papersViewMode");
+        if (savedViewMode) {
+            setViewMode(savedViewMode);
+        }
+    }, []);
 
     useEffect(() => {
         const fetchPapers = async () => {
@@ -432,9 +442,9 @@ export default function PapersPage() {
 
     if (loading) {
         return (
-            <div className="container mx-auto sm:w-2/3 p-8">
+            <div className="w-full max-w-6xl mx-auto p-4">
                 <Skeleton className="h-10 w-full mb-4" />
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {Array.from({ length: 6 }).map((_, index) => (
                         <Skeleton key={index} className="h-24 w-full" />
                     ))}
@@ -444,84 +454,103 @@ export default function PapersPage() {
     }
 
     return (
-        <div className="container mx-auto sm:w-2/3 p-8">
+        <div className="w-full mx-auto p-4">
             <UsageDisplay />
-
-            {papers.length > 0 && (
-                <div>
-                    <div className="flex flex-col sm:flex-row gap-2 mb-6">
-                        <div className="relative flex-grow">
-                            <Input
-                                type="text"
-                                placeholder="Search your paper bank (including annotations and highlights)"
-                                value={searchTerm}
-                                ref={searchInputRef}
-                                onChange={handleSearch}
-                                className="w-full"
-                                disabled={searching}
-                            />
-                            {searching && (
-                                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
+            <Tabs value={viewMode} onValueChange={setViewMode} className="w-full">
+                <div className="flex items-center justify-between mb-4">
+                    <h1 className="text-3xl font-bold tracking-tight">Library</h1>
+                    <TabsList>
+                        <TabsTrigger value="card" onClick={() => localStorage.setItem('papersViewMode', 'card')}>
+                            <Grid className="h-4 w-4 mr-2" />
+                            Card
+                        </TabsTrigger>
+                        <TabsTrigger value="table" onClick={() => localStorage.setItem('papersViewMode', 'table')}>
+                            <List className="h-4 w-4 mr-2" />
+                            Table
+                        </TabsTrigger>
+                    </TabsList>
+                </div>
+                <TabsContent value="card">
+                    {papers.length > 0 && (
+                        <div>
+                            <div className="flex flex-col sm:flex-row gap-2 mb-6">
+                                <div className="relative flex-grow">
+                                    <Input
+                                        type="text"
+                                        placeholder="Search your paper bank (including annotations and highlights)"
+                                        value={searchTerm}
+                                        ref={searchInputRef}
+                                        onChange={handleSearch}
+                                        className="w-full"
+                                        disabled={searching}
+                                    />
+                                    {searching && (
+                                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
+                                        </div>
+                                    )}
                                 </div>
+                                <PaperFiltering
+                                    papers={papers}
+                                    onFilterChange={setFilters}
+                                    onSortChange={setSort}
+                                    filters={filters}
+                                    sort={sort}
+                                />
+                            </div>
+                            <div className="flex flex-wrap gap-2 mb-6">
+                                {filters.map(filter => (
+                                    <Badge key={`${filter.type}-${filter.value}`} variant="secondary" className="flex items-center gap-1">
+                                        {filter.value}
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-4 w-4 p-0"
+                                            onClick={() => setFilters(filters.filter(f => f.value !== filter.value))}
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </Button>
+                                    </Badge>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <SearchStatsDisplay />
+
+                    {filteredPapers.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {searchResults && searchTerm.trim() ? (
+                                // Use PaperSearchResultCard for search results
+                                searchResults.papers.map((paper) => (
+                                    <PaperSearchResultCard
+                                        key={paper.id}
+                                        paper={paper}
+                                        searchTerm={searchTerm}
+                                        handleDelete={deletePaper}
+                                        setPaper={handlePaperSet}
+                                    />
+                                ))
+                            ) : (
+                                // Use regular PaperCard for normal view
+                                filteredPapers.map((paper) => (
+                                    <PaperCard
+                                        key={paper.id}
+                                        paper={paper}
+                                        handleDelete={deletePaper}
+                                        setPaper={handlePaperSet}
+                                    />
+                                ))
                             )}
                         </div>
-                        <PaperFiltering
-                            papers={papers}
-                            onFilterChange={setFilters}
-                            onSortChange={setSort}
-                            filters={filters}
-                            sort={sort}
-                        />
-                    </div>
-                    <div className="flex flex-wrap gap-2 mb-6">
-                        {filters.map(filter => (
-                            <Badge key={`${filter.type}-${filter.value}`} variant="secondary" className="flex items-center gap-1">
-                                {filter.value}
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-4 w-4 p-0"
-                                    onClick={() => setFilters(filters.filter(f => f.value !== filter.value))}
-                                >
-                                    <X className="h-3 w-3" />
-                                </Button>
-                            </Badge>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            <SearchStatsDisplay />
-
-            {filteredPapers.length > 0 ? (
-                <div className="grid grid-cols-1 gap-4">
-                    {searchResults && searchTerm.trim() ? (
-                        // Use PaperSearchResultCard for search results
-                        searchResults.papers.map((paper) => (
-                            <PaperSearchResultCard
-                                key={paper.id}
-                                paper={paper}
-                                searchTerm={searchTerm}
-                                handleDelete={deletePaper}
-                                setPaper={handlePaperSet}
-                            />
-                        ))
                     ) : (
-                        // Use regular PaperCard for normal view
-                        filteredPapers.map((paper) => (
-                            <PaperCard
-                                key={paper.id}
-                                paper={paper}
-                                handleDelete={deletePaper}
-                                setPaper={handlePaperSet}
-                            />
-                        ))
+                        <EmptyState />
                     )}
-                </div>
-            ) : (
-                <EmptyState />
-            )}
+                </TabsContent>
+                <TabsContent value="table">
+                    <LibraryTable setPapers={setPapers} handleDelete={deletePaper} />
+                </TabsContent>
+            </Tabs>
         </div>
     )
 }

@@ -15,34 +15,45 @@ import { PaperItem } from "@/lib/schema";
 import { Checkbox } from "./ui/checkbox";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { ArrowUpDown, CheckCheck } from "lucide-react";
+import { ArrowUpDown, CheckCheck, Trash2, Plus } from "lucide-react";
+import { CreateProjectDialog } from "./CreateProjectDialog";
+import { useRouter } from "next/navigation";
 
 interface LibraryTableProps {
 	selectable?: boolean;
 	onSelectFiles?: (papers: PaperItem[], action: string) => void;
 	actionOptions?: string[];
 	projectPaperIds?: string[];
+	handleDelete?: (paperId: string) => Promise<void>;
+	setPapers?: (papers: PaperItem[]) => void;
 }
 
 export function LibraryTable({
-	selectable = false,
 	onSelectFiles,
 	actionOptions = [],
 	projectPaperIds = [],
+	handleDelete,
+	setPapers,
 }: LibraryTableProps) {
-	const [papers, setPapers] = useState<PaperItem[]>([]);
+	const selectable = onSelectFiles ? false : true;
+	const [internalPapers, setInternalPapers] = useState<PaperItem[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [selectedPapers, setSelectedPapers] = useState<Set<string>>(new Set());
 	const [filter, setFilter] = useState('');
 	type SortKey = keyof PaperItem;
 	const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' } | null>({ key: 'created_at', direction: 'descending' });
+	const [showCreateProjectDialog, setShowCreateProjectDialog] = useState(false);
+	const router = useRouter();
 
 	useEffect(() => {
 		const getPapers = async () => {
 			try {
 				const data = await fetchFromApi("/api/paper/all");
-				setPapers(data.papers);
+				setInternalPapers(data.papers);
+				if (setPapers) {
+					setPapers(data.papers);
+				}
 			} catch (error) {
 				setError("Failed to fetch papers.");
 				console.error(error);
@@ -55,7 +66,7 @@ export function LibraryTable({
 	}, []);
 
 	const processedPapers = useMemo(() => {
-		let filteredPapers = [...papers];
+		let filteredPapers = [...internalPapers];
 
 		if (filter) {
 			filteredPapers = filteredPapers.filter(paper => {
@@ -95,7 +106,7 @@ export function LibraryTable({
 		}
 
 		return filteredPapers;
-	}, [papers, filter, sortConfig]);
+	}, [internalPapers, filter, sortConfig]);
 
 	const availablePapers = useMemo(() => {
 		return processedPapers.filter(p => !projectPaperIds.includes(p.id));
@@ -133,9 +144,40 @@ export function LibraryTable({
 
 	const handleAction = (action: string) => {
 		if (onSelectFiles) {
-			const selectedItems = papers.filter((p) => selectedPapers.has(p.id));
+			const selectedItems = internalPapers.filter((p) => selectedPapers.has(p.id));
 			onSelectFiles(selectedItems, action);
 			setSelectedPapers(new Set());
+		}
+	};
+
+	const handleDeletePapers = async () => {
+		if (!handleDelete) return;
+
+		const paperIdsToDelete = Array.from(selectedPapers);
+		for (const paperId of paperIdsToDelete) {
+			await handleDelete(paperId);
+		}
+		setSelectedPapers(new Set());
+	};
+
+	const handleMakeProject = async (title: string, description: string) => {
+		try {
+			const response = await fetchFromApi("/api/projects", {
+				method: "POST",
+				body: JSON.stringify({ title, description }),
+			});
+
+			const project = await response;
+			const projectId = project.id;
+
+			await fetchFromApi(`/api/projects/papers/${projectId}`, {
+				method: "POST",
+				body: JSON.stringify({ paper_ids: Array.from(selectedPapers) }),
+			});
+
+			router.push(`/projects/${projectId}`);
+		} catch (error) {
+			console.error("Error creating project:", error);
 		}
 	};
 
@@ -162,24 +204,46 @@ export function LibraryTable({
 	return (
 		<div className="space-y-4">
 			<div className="flex items-center justify-between gap-4">
-				<div className="flex items-center gap-4">
+				<div className="flex items-center gap-4 w-full">
 					<Input
 						placeholder="Filter papers by title, authors, organizations, or keywords..."
 						value={filter}
 						onChange={(e) => setFilter(e.target.value)}
-						className="max-w-lg"
+						className="max-w-xl"
 					/>
-					{processedPapers.length !== papers.length && (
+					{processedPapers.length !== internalPapers.length && (
 						<div className="text-sm text-muted-foreground">
-							Showing {processedPapers.length} of {papers.length} papers
+							Showing {processedPapers.length} of {internalPapers.length} papers
 						</div>
 					)}
 				</div>
-				{selectable && (
+				<div className={`flex items-center gap-2 transition-all duration-200 ${selectedPapers.size > 0 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+					{selectable && handleDelete && (
+						<Button
+							variant="destructive"
+							onClick={handleDeletePapers}
+							disabled={selectedPapers.size === 0}
+						>
+							<Trash2 className="h-4 w-4 mr-2" />
+							Delete ({selectedPapers.size})
+						</Button>
+					)}
+					{selectable && (
+						<Button
+							onClick={() => setShowCreateProjectDialog(true)}
+							disabled={selectedPapers.size === 0}
+							className="bg-blue-500"
+						>
+							<Plus className="h-4 w-4 mr-2" />
+							Make Project
+						</Button>
+					)}
+				</div>
+				{selectable && onSelectFiles && (
 					<div
 						className={`flex items-center gap-3 transition-all duration-200 ${selectedPapers.size > 0
-								? "opacity-100 translate-y-0"
-								: "opacity-0 translate-y-2 pointer-events-none"
+							? "opacity-100 translate-y-0"
+							: "opacity-0 translate-y-2 pointer-events-none"
 							}`}
 					>
 						{selectedPapers.size > 0 && (
@@ -282,11 +346,16 @@ export function LibraryTable({
 									return (
 										<TableRow
 											key={paper.id}
-											onClick={() => selectable && !isAlreadyInProject && handleSelect(paper.id)}
+											onClick={() => {
+												if (selectable && !isAlreadyInProject) {
+													handleSelect(paper.id)
+												}
+											}}
 											className={`
 										border-b transition-colors hover:bg-muted/50
 										${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'}
 										${selectable && !isAlreadyInProject ? 'cursor-pointer' : ''}
+										${!selectable ? 'cursor-pointer' : ''}
 										${isAlreadyInProject ? 'opacity-60' : ''}
 									`}
 										>
@@ -377,6 +446,11 @@ export function LibraryTable({
 					</Table>
 				</div>
 			</div>
+		<CreateProjectDialog
+                open={showCreateProjectDialog}
+                onOpenChange={setShowCreateProjectDialog}
+                onSubmit={handleMakeProject}
+            />
 		</div>
 	);
 }
