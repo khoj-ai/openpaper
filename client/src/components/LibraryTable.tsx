@@ -15,9 +15,7 @@ import { PaperItem } from "@/lib/schema";
 import { Checkbox } from "./ui/checkbox";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { ArrowUpDown, CheckCheck, Trash2, Plus } from "lucide-react";
-import { CreateProjectDialog } from "./CreateProjectDialog";
-import { useRouter } from "next/navigation";
+import { ArrowUpDown, CheckCheck, Trash2 } from "lucide-react";
 
 interface LibraryTableProps {
 	selectable?: boolean;
@@ -29,13 +27,14 @@ interface LibraryTableProps {
 }
 
 export function LibraryTable({
+	selectable: selectableProp,
 	onSelectFiles,
 	actionOptions = [],
 	projectPaperIds = [],
 	handleDelete,
 	setPapers,
 }: LibraryTableProps) {
-	const selectable = onSelectFiles ? false : true;
+	const selectable = selectableProp ?? (onSelectFiles ? true : false);
 	const [internalPapers, setInternalPapers] = useState<PaperItem[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -43,8 +42,6 @@ export function LibraryTable({
 	const [filter, setFilter] = useState('');
 	type SortKey = keyof PaperItem;
 	const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' } | null>({ key: 'created_at', direction: 'descending' });
-	const [showCreateProjectDialog, setShowCreateProjectDialog] = useState(false);
-	const router = useRouter();
 
 	useEffect(() => {
 		const getPapers = async () => {
@@ -160,27 +157,6 @@ export function LibraryTable({
 		setSelectedPapers(new Set());
 	};
 
-	const handleMakeProject = async (title: string, description: string) => {
-		try {
-			const response = await fetchFromApi("/api/projects", {
-				method: "POST",
-				body: JSON.stringify({ title, description }),
-			});
-
-			const project = await response;
-			const projectId = project.id;
-
-			await fetchFromApi(`/api/projects/papers/${projectId}`, {
-				method: "POST",
-				body: JSON.stringify({ paper_ids: Array.from(selectedPapers) }),
-			});
-
-			router.push(`/projects/${projectId}`);
-		} catch (error) {
-			console.error("Error creating project:", error);
-		}
-	};
-
 	if (loading) {
 		return (
 			<div className="flex items-center justify-center py-12">
@@ -226,16 +202,6 @@ export function LibraryTable({
 						>
 							<Trash2 className="h-4 w-4 mr-2" />
 							Delete ({selectedPapers.size})
-						</Button>
-					)}
-					{selectable && (
-						<Button
-							onClick={() => setShowCreateProjectDialog(true)}
-							disabled={selectedPapers.size === 0}
-							className="bg-blue-500"
-						>
-							<Plus className="h-4 w-4 mr-2" />
-							Make Project
 						</Button>
 					)}
 				</div>
@@ -446,11 +412,6 @@ export function LibraryTable({
 					</Table>
 				</div>
 			</div>
-		<CreateProjectDialog
-                open={showCreateProjectDialog}
-                onOpenChange={setShowCreateProjectDialog}
-                onSubmit={handleMakeProject}
-            />
 		</div>
 	);
 }

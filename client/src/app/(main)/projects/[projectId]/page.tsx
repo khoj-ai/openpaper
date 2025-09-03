@@ -39,7 +39,14 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
-
+import {
+	Breadcrumb,
+	BreadcrumbItem,
+	BreadcrumbLink,
+	BreadcrumbList,
+	BreadcrumbPage,
+	BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 
 interface PdfUploadResponse {
 	message: string;
@@ -68,6 +75,7 @@ export default function ProjectPage() {
 	const getProject = useCallback(async () => {
 		try {
 			const fetchedProject = await fetchFromApi(`/api/projects/${projectId}`);
+			console.log("Fetched project:", fetchedProject);
 			setProject(fetchedProject);
 		} catch (err) {
 			setError("Failed to fetch project. Please try again.");
@@ -166,6 +174,8 @@ export default function ProjectPage() {
 		setIsUrlDialogOpen(false);
 		setPdfUrl("");
 	};
+
+
 
 	const handleNewQuery = async () => {
 		if (!newQuery.trim()) return;
@@ -350,6 +360,17 @@ export default function ProjectPage() {
 
 	return (
 		<div className="container mx-auto p-4">
+			<Breadcrumb className="mb-4">
+				<BreadcrumbList>
+					<BreadcrumbItem>
+						<BreadcrumbLink href="/projects">Projects</BreadcrumbLink>
+					</BreadcrumbItem>
+					<BreadcrumbSeparator />
+					<BreadcrumbItem>
+						<BreadcrumbPage>{project.title}</BreadcrumbPage>
+					</BreadcrumbItem>
+				</BreadcrumbList>
+			</Breadcrumb>
 
 
 			<div className="group relative">

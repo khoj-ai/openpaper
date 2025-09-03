@@ -35,7 +35,7 @@ import {
 import { useEffect, useState } from "react";
 import { fetchFromApi } from "@/lib/api";
 import { useRouter } from "next/navigation";
-import { useAuth, User} from "@/lib/auth";
+import { useAuth, User } from "@/lib/auth";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -68,13 +68,6 @@ const items = [
         beta: false,
     },
     {
-        title: "Find Papers",
-        url: "/finder",
-        icon: Globe2,
-        requiresAuth: false,
-        beta: false,
-    },
-    {
         title: "Library",
         url: "/papers",
         icon: FileText,
@@ -94,6 +87,13 @@ const items = [
         icon: FolderCodeIcon,
         requiresAuth: true,
         beta: true,
+    },
+    {
+        title: "Find Papers",
+        url: "/finder",
+        icon: Globe2,
+        requiresAuth: false,
+        beta: false,
     },
 ]
 

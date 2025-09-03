@@ -4,22 +4,21 @@ import { fetchFromApi } from "@/lib/api";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { PaperItem, SearchResults, PaperResult } from "@/lib/schema";
 import { PaperStatus } from "@/components/utils/PdfStatus";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import PaperCard from "@/components/PaperCard";
-import PaperSearchResultCard from "@/components/PaperSearchResultCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/lib/auth";
 import { useSubscription, getStorageUsagePercentage, isStorageNearLimit, isStorageAtLimit, formatFileSize, getPaperUploadPercentage, isPaperUploadNearLimit, isPaperUploadAtLimit } from "@/hooks/useSubscription";
 import { FileText, Upload, Search, AlertTriangle, AlertCircle, HardDrive, X, ArrowDown, Grid, List } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { toast } from "sonner";
-import { PaperFiltering, Filter, Sort } from "@/components/PaperFiltering";
+import { Filter, Sort } from "@/components/PaperFiltering";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LibraryTable } from "@/components/LibraryTable";
+import { CreateProjectDialog } from "@/components/CreateProjectDialog";
+import { useRouter } from "next/navigation";
+import { LibraryGrid } from "@/components/LibraryGrid";
 
 // TODO: We could add a search look-up for the paper journal name to avoid placeholders
 
@@ -37,6 +36,9 @@ export default function PapersPage() {
     const [filters, setFilters] = useState<Filter[]>([]);
     const [sort, setSort] = useState<Sort>({ type: "publish_date", order: "desc" });
     const [viewMode, setViewMode] = useState("card");
+    const router = useRouter();
+    const [isCreateProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
+    const [papersForNewProject, setPapersForNewProject] = useState<PaperItem[]>([]);
     const SHOW_STORAGE_USAGE_THRESHOLD = 60; // Show storage usage alert if usage is above 60%
 
     useEffect(() => {
@@ -157,6 +159,35 @@ export default function PapersPage() {
             // TODO Could also try to handle this by re-fetching papers
         }
     }
+
+    const handleMakeProject = (papers: PaperItem[], action: string) => {
+        if (action !== "Make Project") return;
+        if (papers.length === 0) {
+            toast.info("Please select at least one paper to create a project.");
+            return;
+        }
+        setPapersForNewProject(papers);
+        setCreateProjectDialogOpen(true);
+    };
+
+    const handleCreateProjectSubmit = async (title: string, description: string) => {
+        const paperIds = papersForNewProject.map(p => p.id);
+
+        try {
+            const project = await fetchFromApi("/api/projects", {
+                method: "POST",
+                body: JSON.stringify({ title, description, paper_ids: paperIds }),
+            });
+            toast.success("Project created successfully!");
+            router.push(`/projects/${project.id}`);
+        } catch (error) {
+            console.error("Failed to create project", error);
+            toast.error("Failed to create project.");
+        } finally {
+            setCreateProjectDialogOpen(false);
+            setPapersForNewProject([]);
+        }
+    };
 
     const performSearch = useCallback(async (term: string) => {
         if (!term.trim()) {
@@ -455,6 +486,11 @@ export default function PapersPage() {
 
     return (
         <div className="w-full mx-auto p-4">
+            <CreateProjectDialog
+                open={isCreateProjectDialogOpen}
+                onOpenChange={setCreateProjectDialogOpen}
+                onSubmit={handleCreateProjectSubmit}
+            />
             <UsageDisplay />
             <Tabs value={viewMode} onValueChange={setViewMode} className="w-full">
                 <div className="flex items-center justify-between mb-4">
@@ -471,84 +507,32 @@ export default function PapersPage() {
                     </TabsList>
                 </div>
                 <TabsContent value="card">
-                    {papers.length > 0 && (
-                        <div>
-                            <div className="flex flex-col sm:flex-row gap-2 mb-6">
-                                <div className="relative flex-grow">
-                                    <Input
-                                        type="text"
-                                        placeholder="Search your paper bank (including annotations and highlights)"
-                                        value={searchTerm}
-                                        ref={searchInputRef}
-                                        onChange={handleSearch}
-                                        className="w-full"
-                                        disabled={searching}
-                                    />
-                                    {searching && (
-                                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
-                                        </div>
-                                    )}
-                                </div>
-                                <PaperFiltering
-                                    papers={papers}
-                                    onFilterChange={setFilters}
-                                    onSortChange={setSort}
-                                    filters={filters}
-                                    sort={sort}
-                                />
-                            </div>
-                            <div className="flex flex-wrap gap-2 mb-6">
-                                {filters.map(filter => (
-                                    <Badge key={`${filter.type}-${filter.value}`} variant="secondary" className="flex items-center gap-1">
-                                        {filter.value}
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-4 w-4 p-0"
-                                            onClick={() => setFilters(filters.filter(f => f.value !== filter.value))}
-                                        >
-                                            <X className="h-3 w-3" />
-                                        </Button>
-                                    </Badge>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    <SearchStatsDisplay />
-
-                    {filteredPapers.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {searchResults && searchTerm.trim() ? (
-                                // Use PaperSearchResultCard for search results
-                                searchResults.papers.map((paper) => (
-                                    <PaperSearchResultCard
-                                        key={paper.id}
-                                        paper={paper}
-                                        searchTerm={searchTerm}
-                                        handleDelete={deletePaper}
-                                        setPaper={handlePaperSet}
-                                    />
-                                ))
-                            ) : (
-                                // Use regular PaperCard for normal view
-                                filteredPapers.map((paper) => (
-                                    <PaperCard
-                                        key={paper.id}
-                                        paper={paper}
-                                        handleDelete={deletePaper}
-                                        setPaper={handlePaperSet}
-                                    />
-                                ))
-                            )}
-                        </div>
-                    ) : (
-                        <EmptyState />
-                    )}
+                    <LibraryGrid
+                        papers={papers}
+                        filteredPapers={filteredPapers}
+                        searchResults={searchResults}
+                        searchTerm={searchTerm}
+                        searching={searching}
+                        searchInputRef={searchInputRef}
+                        handleSearch={handleSearch}
+                        setFilters={setFilters}
+                        setSort={setSort}
+                        filters={filters}
+                        sort={sort}
+                        deletePaper={deletePaper}
+                        handlePaperSet={handlePaperSet}
+                        SearchStatsDisplay={SearchStatsDisplay}
+                        EmptyState={EmptyState}
+                    />
                 </TabsContent>
                 <TabsContent value="table">
-                    <LibraryTable setPapers={setPapers} handleDelete={deletePaper} />
+                    <LibraryTable
+                        setPapers={setPapers}
+                        handleDelete={deletePaper}
+                        selectable={true}
+                        actionOptions={["Make Project"]}
+                        onSelectFiles={handleMakeProject}
+                    />
                 </TabsContent>
             </Tabs>
         </div>

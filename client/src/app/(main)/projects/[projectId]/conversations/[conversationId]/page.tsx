@@ -4,9 +4,17 @@ import { useSubscription, isChatCreditAtLimit } from '@/hooks/useSubscription';
 import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
 import { useState, useEffect, FormEvent, useRef, useCallback, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-
+import {
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbLink,
+    BreadcrumbList,
+    BreadcrumbPage,
+    BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
 import {
     ChatMessage,
+    Conversation,
     Reference,
 } from '@/lib/schema';
 import { useAuth } from '@/lib/auth';
@@ -50,8 +58,11 @@ function ProjectConversationPageContent() {
     const [displayedText, setDisplayedText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const [statusMessage, setStatusMessage] = useState('');
+    const [highlightedInfo, setHighlightedInfo] = useState<{ paperId: string; messageIndex: number } | null>(null);
 
     const [isSessionLoading, setIsSessionLoading] = useState(true);
+    const [projectName, setProjectName] = useState<string>('');
+    const [conversationName, setConversationName] = useState<string>('');
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -59,6 +70,25 @@ function ProjectConversationPageContent() {
 
     const { subscription, refetch: refetchSubscription } = useSubscription();
     const chatCreditLimitReached = isChatCreditAtLimit(subscription);
+
+    useEffect(() => {
+        if (projectId) {
+            fetchFromApi(`/api/projects/${projectId}`)
+                .then(data => {
+                    setProjectName(data.title);
+                })
+                .catch(err => console.error("Failed to fetch project name", err));
+
+            fetchFromApi(`/api/projects/conversations/${projectId}`)
+                .then(data => {
+                    const conversation: Conversation = data.find((c: Conversation) => c.id === conversationIdFromUrl);
+                    if (conversation) {
+                        setConversationName(conversation.title);
+                    }
+                })
+                .catch(err => console.error("Failed to fetch conversation name", err));
+        }
+    }, [projectId, conversationIdFromUrl]);
 
     useEffect(() => {
         if (chatCreditLimitReached) {
@@ -70,8 +100,6 @@ function ProjectConversationPageContent() {
             });
         }
     }, [chatCreditLimitReached]);
-
-    const [highlightedInfo, setHighlightedInfo] = useState<{ paperId: string; messageIndex: number } | null>(null);
 
     const handleCitationClick = useCallback((key: string, messageIndex: number) => {
         // Use a function to get the latest messages instead of relying on the closure
@@ -345,29 +373,46 @@ function ProjectConversationPageContent() {
     const [isCentered, setIsCentered] = useState(false);
 
     return (
-        <ConversationView
-            messages={messages}
-            papers={papers}
-            isStreaming={isStreaming}
-            streamingChunks={streamingChunks}
-            streamingReferences={streamingReferences}
-            statusMessage={statusMessage}
-            error={error}
-            isSessionLoading={isSessionLoading}
-            chatCreditLimitReached={chatCreditLimitReached}
-            currentMessage={currentMessage}
-            onCurrentMessageChange={setCurrentMessage}
-            onSubmit={handleSubmit}
-            onRetry={handleRetry}
-            isCentered={isCentered}
-            setIsCentered={setIsCentered}
-            displayedText={displayedText}
-            isTyping={isTyping}
-            handleCitationClick={handleCitationClick}
-            highlightedInfo={highlightedInfo}
-            setHighlightedInfo={setHighlightedInfo}
-            authLoading={authLoading}
-        />
+        <div className="container mx-auto p-4">
+            <Breadcrumb>
+                <BreadcrumbList>
+                    <BreadcrumbItem>
+                        <BreadcrumbLink href="/projects">Projects</BreadcrumbLink>
+                    </BreadcrumbItem>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                        <BreadcrumbLink href={`/projects/${projectId}`}>{projectName}</BreadcrumbLink>
+                    </BreadcrumbItem>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                        <BreadcrumbPage>{conversationName}</BreadcrumbPage>
+                    </BreadcrumbItem>
+                </BreadcrumbList>
+            </Breadcrumb>
+            <ConversationView
+                messages={messages}
+                papers={papers}
+                isStreaming={isStreaming}
+                streamingChunks={streamingChunks}
+                streamingReferences={streamingReferences}
+                statusMessage={statusMessage}
+                error={error}
+                isSessionLoading={isSessionLoading}
+                chatCreditLimitReached={chatCreditLimitReached}
+                currentMessage={currentMessage}
+                onCurrentMessageChange={setCurrentMessage}
+                onSubmit={handleSubmit}
+                onRetry={handleRetry}
+                isCentered={isCentered}
+                setIsCentered={setIsCentered}
+                displayedText={displayedText}
+                isTyping={isTyping}
+                handleCitationClick={handleCitationClick}
+                highlightedInfo={highlightedInfo}
+                setHighlightedInfo={setHighlightedInfo}
+                authLoading={authLoading}
+            />
+        </div>
     );
 }
 
