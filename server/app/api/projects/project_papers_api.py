@@ -3,14 +3,14 @@ import uuid
 from typing import List
 
 from app.auth.dependencies import get_required_user
-from app.database.crud.projects.project_crud import project_crud
 from app.database.crud.projects.project_paper_crud import (
     ProjectPaperCreate,
     project_paper_crud,
 )
 from app.database.database import get_db
-from app.database.models import Paper, ProjectPaper
+from app.database.models import ProjectPaper
 from app.database.telemetry import track_event
+from app.helpers.s3 import s3_service
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
@@ -92,6 +92,13 @@ async def get_project_papers(
                         "institutions": paper.institutions,
                         "keywords": paper.keywords,
                         "status": paper.status,
+                        "file_url": s3_service.get_cached_presigned_url_by_project(
+                            db,
+                            str(paper.id),
+                            str(paper.s3_object_key),
+                            project_id,
+                            current_user,
+                        ),
                     }
                     for paper in papers
                 ]
@@ -99,7 +106,7 @@ async def get_project_papers(
         )
 
     except Exception as e:
-        logger.error(f"Error fetching project papers: {e}")
+        logger.error(f"Error fetching project papers: {e}", exc_info=True)
         return JSONResponse(
             status_code=400,
             content={"message": f"Failed to fetch project papers: {str(e)}"},

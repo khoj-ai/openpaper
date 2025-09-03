@@ -75,6 +75,12 @@ async def get_paper_ids(
                     "publish_date": (
                         str(paper.publish_date) if paper.publish_date else None
                     ),
+                    "file_url": s3_service.get_cached_presigned_url_by_owner(
+                        db,
+                        str(paper.id),
+                        str(paper.s3_object_key),
+                        str(current_user.id),
+                    ),
                 }
                 for paper in papers
             ]
