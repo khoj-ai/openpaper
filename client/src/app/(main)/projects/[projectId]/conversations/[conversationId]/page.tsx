@@ -158,10 +158,11 @@ function ProjectConversationPageContent() {
         }
 
         if (user) {
-
             const pendingQuery = localStorage.getItem(`pending-query-${conversationIdFromUrl}`);
             if (pendingQuery) {
                 localStorage.removeItem(`pending-query-${conversationIdFromUrl}`);
+                const userMessage: ChatMessage = { role: 'user', content: pendingQuery };
+                setMessages([userMessage]);
                 handleSubmit(null, pendingQuery);
                 setIsSessionLoading(false);
             } else if (!isStreaming && messages.length === 0) {
@@ -256,14 +257,13 @@ function ProjectConversationPageContent() {
 
         if (!query.trim() || isStreaming || !conversationId) return;
 
-        const userMessage: ChatMessage = { role: 'user', content: query };
-        // Use functional update to ensure we get the latest state
-        setMessages(prev => {
-            const newMessages = [...prev, userMessage];
-            return newMessages;
-        });
-
         if (!message) {
+            const userMessage: ChatMessage = { role: 'user', content: query };
+            // Use functional update to ensure we get the latest state
+            setMessages(prev => {
+                const newMessages = [...prev, userMessage];
+                return newMessages;
+            });
             setCurrentMessage('');
         }
 
