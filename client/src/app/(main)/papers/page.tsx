@@ -176,9 +176,18 @@ export default function PapersPage() {
         try {
             const project = await fetchFromApi("/api/projects", {
                 method: "POST",
-                body: JSON.stringify({ title, description, paper_ids: paperIds }),
+                body: JSON.stringify({ title, description }),
             });
             toast.success("Project created successfully!");
+
+            if (paperIds.length > 0) {
+                await fetchFromApi(`/api/projects/papers/${project.id}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ paper_ids: paperIds })
+                });
+                toast.success("Papers added to project successfully!");
+            }
+
             router.push(`/projects/${project.id}`);
         } catch (error) {
             console.error("Failed to create project", error);
