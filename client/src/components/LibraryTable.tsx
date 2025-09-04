@@ -15,7 +15,15 @@ import { PaperItem } from "@/lib/schema";
 import { Checkbox } from "./ui/checkbox";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { ArrowUpDown, CheckCheck, Trash2 } from "lucide-react";
+import { ArrowUpDown, CheckCheck, Trash2, X, ExternalLink, Copy, ChevronDown } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { getStatusIcon, PaperStatusEnum } from "@/components/utils/PdfStatus";
+import { handleStatusChange } from "@/components/utils/paperUtils";
+import { citationStyles } from "@/components/utils/paperUtils";
+import Link from "next/link";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { toast } from "sonner";
 
 interface LibraryTableProps {
 	selectable?: boolean;
@@ -42,6 +50,7 @@ export function LibraryTable({
 	const [filter, setFilter] = useState('');
 	type SortKey = keyof PaperItem;
 	const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' } | null>({ key: 'created_at', direction: 'descending' });
+	const [selectedPaperForPreview, setSelectedPaperForPreview] = useState<PaperItem | null>(null);
 
 	useEffect(() => {
 		const getPapers = async () => {
@@ -61,6 +70,15 @@ export function LibraryTable({
 
 		getPapers();
 	}, []);
+
+	const setPaper = (paperId: string, updatedPaper: PaperItem) => {
+		setInternalPapers(prevPapers =>
+			prevPapers.map(p => (p.id === paperId ? updatedPaper : p))
+		);
+		if (selectedPaperForPreview && selectedPaperForPreview.id === paperId) {
+			setSelectedPaperForPreview(updatedPaper);
+		}
+	};
 
 	const processedPapers = useMemo(() => {
 		let filteredPapers = [...internalPapers];
@@ -157,6 +175,23 @@ export function LibraryTable({
 		setSelectedPapers(new Set());
 	};
 
+	const copyToClipboard = (text: string, styleName: string) => {
+		navigator.clipboard.writeText(text).then(() => {
+			// Success feedback using toast
+			toast("Copied!", {
+				description: `${styleName} citation copied to clipboard.`,
+				richColors: true,
+			});
+		}).catch(err => {
+			console.error('Failed to copy text: ', err);
+			// Error feedback using toast
+			toast("Copy failed", {
+				description: "Could not copy citation to clipboard.",
+				richColors: true,
+			});
+		});
+	};
+
 	if (loading) {
 		return (
 			<div className="flex items-center justify-center py-12">
@@ -193,18 +228,6 @@ export function LibraryTable({
 						</div>
 					)}
 				</div>
-				<div className={`flex items-center gap-2 transition-all duration-200 ${selectedPapers.size > 0 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-					{selectable && handleDelete && (
-						<Button
-							variant="destructive"
-							onClick={handleDeletePapers}
-							disabled={selectedPapers.size === 0}
-						>
-							<Trash2 className="h-4 w-4 mr-2" />
-							Delete ({selectedPapers.size})
-						</Button>
-					)}
-				</div>
 				{selectable && onSelectFiles && (
 					<div
 						className={`flex items-center gap-3 transition-all duration-200 ${selectedPapers.size > 0
@@ -224,7 +247,7 @@ export function LibraryTable({
 									variant="default"
 									size="sm"
 									onClick={() => handleAction(action)}
-									className="font-medium"
+									className="font-medium bg-blue-500 text-white hover:bg-blue-600 dark:hover:bg-blue-400 cursor-pointer"
 								>
 									{action}
 								</Button>
@@ -232,184 +255,321 @@ export function LibraryTable({
 						</div>
 					</div>
 				)}
+				<div className={`flex items-center gap-2 transition-all duration-200 ${selectedPapers.size > 0 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+					{selectable && handleDelete && (
+						<DropdownMenu>
+							<DropdownMenuTrigger asChild>
+								<Button variant="outline">
+									Actions <ChevronDown className="h-4 w-4 ml-2" />
+								</Button>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent>
+								<DropdownMenuItem
+									onClick={handleDeletePapers}
+									disabled={selectedPapers.size === 0}
+									className="text-red-500"
+								>
+									<Trash2 className="h-4 w-4 mr-2" />
+									Delete ({selectedPapers.size})
+								</DropdownMenuItem>
+							</DropdownMenuContent>
+						</DropdownMenu>
+					)}
+				</div>
 			</div>
 
-			<div className="rounded-lg border bg-card">
-				<div className="max-h-[70vh] overflow-y-auto">
-					<Table className="table-fixed w-full" noWrapperOverflow>
-						<TableCaption className="mt-4 mb-2">Your research library</TableCaption>
-						<TableHeader className="sticky top-0 bg-card z-10">
-							<TableRow className="hover:bg-transparent border-b-2">
-								{selectable && (
-									<TableHead className="w-12 text-center">
-										<Checkbox
-											checked={allAvailableSelected}
-											onCheckedChange={handleSelectAll}
-											disabled={availablePapers.length === 0}
-										/>
-									</TableHead>
-								)}
-								<TableHead className="w-[35%]">
-									<Button
-										variant="ghost"
-										onClick={() => requestSort('title')}
-										className="h-auto p-0 font-semibold hover:bg-transparent hover:text-primary"
-									>
-										Title
-										<ArrowUpDown className="ml-2 h-4 w-4" />
-									</Button>
-								</TableHead>
-								<TableHead className="w-[20%]">
-									<Button
-										variant="ghost"
-										className="h-auto p-0 font-semibold hover:bg-transparent"
-									>
-										Authors
-									</Button>
-								</TableHead>
-								<TableHead className="w-[15%]">
-									<Button
-										variant="ghost"
-										className="h-auto p-0 font-semibold hover:bg-transparent"
-									>
-										Organizations
-									</Button>
-								</TableHead>
-								<TableHead className="w-[12%]">
-									<Button
-										variant="ghost"
-										className="h-auto p-0 font-semibold hover:bg-transparent"
-									>
-										Keywords
-									</Button>
-								</TableHead>
-								<TableHead className="w-[9%]">
-									<Button
-										variant="ghost"
-										onClick={() => requestSort('created_at')}
-										className="h-auto p-0 font-semibold hover:bg-transparent hover:text-primary"
-									>
-										Added
-										<ArrowUpDown className="ml-1 h-4 w-4" />
-									</Button>
-								</TableHead>
-								<TableHead className="w-[9%]">
-									<Button
-										variant="ghost"
-										onClick={() => requestSort('publish_date')}
-										className="h-auto p-0 font-semibold hover:bg-transparent hover:text-primary"
-									>
-										Published
-										<ArrowUpDown className="ml-1 h-4 w-4" />
-									</Button>
-								</TableHead>
-							</TableRow>
-						</TableHeader>
-						<TableBody>
-							{processedPapers.length > 0 ? (
-								processedPapers.map((paper, index) => {
-									const isAlreadyInProject = projectPaperIds.includes(paper.id);
-									return (
-										<TableRow
-											key={paper.id}
-											onClick={() => {
-												if (selectable && !isAlreadyInProject) {
-													handleSelect(paper.id)
-												}
-											}}
-											className={`
-										border-b transition-colors hover:bg-muted/50
-										${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'}
-										${selectable && !isAlreadyInProject ? 'cursor-pointer' : ''}
-										${!selectable ? 'cursor-pointer' : ''}
-										${isAlreadyInProject ? 'opacity-60' : ''}
-									`}
+			<div className="flex gap-4">
+				<div
+					className={`rounded-lg border bg-card transition-all duration-300 ease-in-out ${selectedPaperForPreview ? 'w-3/5' : 'w-full'
+						}`}
+				>
+					<div className="max-h-[70vh] overflow-y-auto">
+						<Table className="table-fixed w-full" noWrapperOverflow>
+							<TableHeader className="sticky top-0 bg-card z-10">
+								<TableRow className="hover:bg-transparent border-b-2">
+									{selectable && (
+										<TableHead className="w-12 text-center">
+											<Checkbox
+												checked={allAvailableSelected}
+												onCheckedChange={handleSelectAll}
+												disabled={availablePapers.length === 0}
+											/>
+										</TableHead>
+									)}
+									<TableHead className="w-[35%]">
+										<Button
+											variant="ghost"
+											onClick={() => requestSort('title')}
+											className="h-auto p-0 font-semibold hover:bg-transparent hover:text-primary"
 										>
-											{selectable && (
-												<TableCell
-													className="text-center py-4"
-													onClick={(e) => e.stopPropagation()}
-												>
-													{isAlreadyInProject ? (
-														<CheckCheck className="h-5 w-5 text-green-500 mx-auto" />
-													) : (
-														<Checkbox
-															checked={selectedPapers.has(paper.id)}
-															onCheckedChange={(checked) =>
-																handleSelect(paper.id, !!checked)
-															}
-														/>
-													)}
-												</TableCell>
-											)}
-											<TableCell className="py-4 pr-4 whitespace-normal">
-												<div className="font-medium text-sm leading-relaxed break-words hyphens-auto line-clamp-3">
-													{paper.title || 'Untitled'}
-												</div>
-											</TableCell>
-											<TableCell className="py-4 pr-4 whitespace-normal">
-												<div className="text-sm text-muted-foreground leading-relaxed break-words hyphens-auto line-clamp-2">
-													{paper.authors?.length ? paper.authors.join(", ") : 'No authors'}
-												</div>
-											</TableCell>
-											<TableCell className="py-4 pr-4 whitespace-normal">
-												<div className="text-sm text-muted-foreground leading-relaxed break-words hyphens-auto line-clamp-2">
-													{paper.institutions?.length ? paper.institutions.join(", ") : 'No organizations'}
-												</div>
-											</TableCell>
-											<TableCell className="py-4 pr-4">
-												<div className="text-xs leading-relaxed">
-													{paper.keywords?.length ? (
-														<div className="flex flex-wrap gap-1">
-															{paper.keywords.slice(0, 3).map((keyword, i) => (
-																<span
-																	key={i}
-																	className="inline-block px-2 py-1 bg-secondary text-secondary-foreground rounded-sm"
-																>
-																	{keyword}
-																</span>
-															))}
-															{paper.keywords.length > 3 && (
-																<span className="text-muted-foreground text-xs">
-																	+{paper.keywords.length - 3} more
-																</span>
-															)}
-														</div>
-													) : (
-														<span className="text-muted-foreground">No keywords</span>
-													)}
-												</div>
-											</TableCell>
-											<TableCell className="py-4 pr-4">
-												<div className="text-sm text-muted-foreground whitespace-nowrap">
-													{paper.created_at ? new Date(paper.created_at).toLocaleDateString('en-US', {
-														month: 'short',
-														day: 'numeric',
-														year: 'numeric'
-													}) : 'N/A'}
-												</div>
-											</TableCell>
-											<TableCell className="py-4">
-												<div className="text-sm text-muted-foreground whitespace-nowrap">
-													{paper.publish_date ? new Date(paper.publish_date).toLocaleDateString('en-US', {
-														month: 'short',
-														day: 'numeric',
-														year: 'numeric'
-													}) : 'N/A'}
-												</div>
-											</TableCell>
-										</TableRow>
-									)
-								})
-							) : (
-								<TableRow>
-									<TableCell colSpan={numCols} className="h-24 text-center">
-										{filter ? "No papers match your search criteria." : "No papers in your library yet."}
-									</TableCell>
+											Title
+											<ArrowUpDown className="ml-2 h-4 w-4" />
+										</Button>
+									</TableHead>
+									<TableHead className="w-[20%]">
+										<Button
+											variant="ghost"
+											className="h-auto p-0 font-semibold hover:bg-transparent"
+										>
+											Authors
+										</Button>
+									</TableHead>
+									<TableHead className="w-[15%]">
+										<Button
+											variant="ghost"
+											className="h-auto p-0 font-semibold hover:bg-transparent"
+										>
+											Organizations
+										</Button>
+									</TableHead>
+									<TableHead className="w-[12%]">
+										<Button
+											variant="ghost"
+											className="h-auto p-0 font-semibold hover:bg-transparent"
+										>
+											Keywords
+										</Button>
+									</TableHead>
+									<TableHead className="w-[9%]">
+										<Button
+											variant="ghost"
+											onClick={() => requestSort('created_at')}
+											className="h-auto p-0 font-semibold hover:bg-transparent hover:text-primary"
+										>
+											Added
+											<ArrowUpDown className="ml-1 h-4 w-4" />
+										</Button>
+									</TableHead>
+									<TableHead className="w-[9%]">
+										<Button
+											variant="ghost"
+											onClick={() => requestSort('publish_date')}
+											className="h-auto p-0 font-semibold hover:bg-transparent hover:text-primary"
+										>
+											Published
+											<ArrowUpDown className="ml-1 h-4 w-4" />
+										</Button>
+									</TableHead>
 								</TableRow>
-							)}
-						</TableBody>
-					</Table>
+							</TableHeader>
+							<TableBody>
+								{processedPapers.length > 0 ? (
+									processedPapers.map((paper, index) => {
+										const isAlreadyInProject = projectPaperIds.includes(paper.id);
+										return (
+											<TableRow
+												key={paper.id}
+												onClick={() => {
+													if (selectable && !isAlreadyInProject) {
+														handleSelect(paper.id)
+													}
+												}}
+												className={`
+											border-b transition-colors hover:bg-muted/50
+											${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'}
+											${selectable && !isAlreadyInProject ? 'cursor-pointer' : ''}
+											${!selectable ? 'cursor-pointer' : ''}
+											${isAlreadyInProject ? 'opacity-60' : ''}
+										`}
+											>
+												{selectable && (
+													<TableCell
+														className="text-center py-4"
+														onClick={(e) => e.stopPropagation()}
+													>
+														{isAlreadyInProject ? (
+															<CheckCheck className="h-5 w-5 text-green-500 mx-auto" />
+														) : (
+															<Checkbox
+																checked={selectedPapers.has(paper.id)}
+																onCheckedChange={(checked) =>
+																	handleSelect(paper.id, !!checked)
+																}
+															/>
+														)}
+													</TableCell>
+												)}
+												<TableCell className="py-4 pr-4 whitespace-normal">
+													<div
+														className="font-medium text-sm leading-relaxed break-words hyphens-auto line-clamp-3 underline cursor-pointer"
+														onClick={() => setSelectedPaperForPreview(paper)}
+													>
+														{paper.title || 'Untitled'}
+													</div>
+												</TableCell>
+												<TableCell className="py-4 pr-4 whitespace-normal">
+													<div className="text-sm text-muted-foreground leading-relaxed break-words hyphens-auto line-clamp-2">
+														{paper.authors?.length ? paper.authors.join(", ") : 'No authors'}
+													</div>
+												</TableCell>
+												<TableCell className="py-4 pr-4 whitespace-normal">
+													<div className="text-sm text-muted-foreground leading-relaxed break-words hyphens-auto line-clamp-2">
+														{paper.institutions?.length ? paper.institutions.join(", ") : 'No organizations'}
+													</div>
+												</TableCell>
+												<TableCell className="py-4 pr-4">
+													<div className="text-xs leading-relaxed">
+														{paper.keywords?.length ? (
+															<div className="flex flex-wrap gap-1">
+																{paper.keywords.slice(0, 3).map((keyword, i) => (
+																	<span
+																		key={i}
+																		className="inline-block px-2 py-1 bg-secondary text-secondary-foreground rounded-sm"
+																	>
+																		{keyword}
+																	</span>
+																))}
+																{paper.keywords.length > 3 && (
+																	<span className="text-muted-foreground text-xs">
+																		+{paper.keywords.length - 3} more
+																	</span>
+																)}
+															</div>
+														) : (
+															<span className="text-muted-foreground">No keywords</span>
+														)}
+													</div>
+												</TableCell>
+												<TableCell className="py-4 pr-4">
+													<div className="text-sm text-muted-foreground whitespace-nowrap">
+														{paper.created_at ? new Date(paper.created_at).toLocaleDateString('en-US', {
+															month: 'short',
+															day: 'numeric',
+															year: 'numeric'
+														}) : 'N/A'}
+													</div>
+												</TableCell>
+												<TableCell className="py-4">
+													<div className="text-sm text-muted-foreground whitespace-nowrap">
+														{paper.publish_date ? new Date(paper.publish_date).toLocaleDateString('en-US', {
+															month: 'short',
+															day: 'numeric',
+															year: 'numeric'
+														}) : 'N/A'}
+													</div>
+												</TableCell>
+											</TableRow>
+										)
+									})
+								) : (
+									<TableRow>
+										<TableCell colSpan={numCols} className="h-24 text-center">
+											{filter ? "No papers match your search criteria." : "No papers in your library yet."}
+										</TableCell>
+									</TableRow>
+								)}
+							</TableBody>
+						</Table>
+					</div>
+				</div>
+				<div
+					className={`transition-all duration-300 ease-in-out ${selectedPaperForPreview
+						? 'w-2/5 opacity-100'
+						: 'w-0 opacity-0 pointer-events-none'
+						}`}
+				>
+					{selectedPaperForPreview && (
+						<div className="rounded-lg border bg-card">
+							<div className="p-4 relative max-h-[70vh] overflow-y-auto">
+								<Button
+									variant="ghost"
+									size="icon"
+									className="absolute top-2 right-2"
+									onClick={() => setSelectedPaperForPreview(null)}
+								>
+									<X className="h-4 w-4" />
+								</Button>
+								<Link href={`/paper/${selectedPaperForPreview.id}`} passHref>
+									<h3 className="font-bold text-lg mb-2 pr-8 hover:underline cursor-pointer flex items-center gap-2">
+										{selectedPaperForPreview.title}
+										<ExternalLink className="h-4 w-4" />
+									</h3>
+								</Link>
+								{selectedPaperForPreview.preview_url && (
+									<img
+										src={selectedPaperForPreview.preview_url}
+										alt="Paper preview"
+										className="w-full h-auto my-4 rounded-md"
+									/>
+								)}
+								<div className="flex items-center gap-2">
+									{selectedPaperForPreview.status && (
+										<DropdownMenu>
+											<DropdownMenuTrigger asChild>
+												<Button size="sm" variant="outline" className="h-8 px-3 text-xs capitalize">
+													<span className="flex items-center gap-2">
+														{getStatusIcon(selectedPaperForPreview.status)}
+														{selectedPaperForPreview.status}
+													</span>
+												</Button>
+											</DropdownMenuTrigger>
+											<DropdownMenuContent align="end">
+												<DropdownMenuItem onClick={() => handleStatusChange(selectedPaperForPreview, PaperStatusEnum.TODO, setPaper)}>
+													{getStatusIcon(PaperStatusEnum.TODO)}
+													Todo
+												</DropdownMenuItem>
+												<DropdownMenuItem onClick={() => handleStatusChange(selectedPaperForPreview, PaperStatusEnum.READING, setPaper)}>
+													{getStatusIcon(PaperStatusEnum.READING)}
+													Reading
+												</DropdownMenuItem>
+												<DropdownMenuItem onClick={() => handleStatusChange(selectedPaperForPreview, PaperStatusEnum.COMPLETED, setPaper)}>
+													{getStatusIcon(PaperStatusEnum.COMPLETED)}
+													Completed
+												</DropdownMenuItem>
+											</DropdownMenuContent>
+										</DropdownMenu>
+									)}
+									<Dialog>
+										<DialogTrigger asChild>
+											<Button variant="outline" size="sm" className="h-8 px-3 text-xs">
+												Cite
+											</Button>
+										</DialogTrigger>
+										<DialogContent className="sm:max-w-[625px]">
+											<DialogHeader>
+												<DialogTitle>Cite Paper</DialogTitle>
+												<DialogDescription>
+													Copy the citation format you need for <b>{selectedPaperForPreview.title}</b>.
+												</DialogDescription>
+											</DialogHeader>
+											<ScrollArea className="h-[300px] w-full rounded-md border p-4">
+												<div className="grid gap-4 py-4">
+													{citationStyles.map((style) => {
+														const citationText = style.generator(selectedPaperForPreview);
+														return (
+															<div key={style.name} className="flex items-start justify-between gap-2">
+																<div className="flex-grow">
+																	<h4 className="font-semibold mb-1">{style.name}</h4>
+																	<p className="text-sm bg-muted p-2 rounded break-words">{citationText}</p>
+																</div>
+																<Button
+																	variant="ghost"
+																	size="icon"
+																	className="mt-5 h-8 w-8 flex-shrink-0"
+																	onClick={() => copyToClipboard(citationText, style.name)}
+																	aria-label={`Copy ${style.name} citation`}
+																>
+																	<Copy className="h-4 w-4" />
+																</Button>
+															</div>
+														);
+													})}
+												</div>
+											</ScrollArea>
+											<DialogFooter>
+												<DialogClose asChild>
+													<Button type="button" variant="secondary">
+														Close
+													</Button>
+												</DialogClose>
+											</DialogFooter>
+										</DialogContent>
+									</Dialog>
+								</div>
+								<p className="text-sm mt-4">{selectedPaperForPreview.abstract}</p>
+							</div>
+						</div>
+					)}
 				</div>
 			</div>
 		</div>

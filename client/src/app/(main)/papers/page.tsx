@@ -35,7 +35,7 @@ export default function PapersPage() {
     const { subscription, loading: subscriptionLoading } = useSubscription();
     const [filters, setFilters] = useState<Filter[]>([]);
     const [sort, setSort] = useState<Sort>({ type: "publish_date", order: "desc" });
-    const [viewMode, setViewMode] = useState("card");
+    const [viewMode, setViewMode] = useState("table");
     const router = useRouter();
     const [isCreateProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
     const [papersForNewProject, setPapersForNewProject] = useState<PaperItem[]>([]);
@@ -505,13 +505,13 @@ export default function PapersPage() {
                 <div className="flex items-center justify-between mb-4">
                     <h1 className="text-3xl font-bold tracking-tight">Library</h1>
                     <TabsList>
-                        <TabsTrigger value="card" onClick={() => localStorage.setItem('papersViewMode', 'card')}>
-                            <Grid className="h-4 w-4 mr-2" />
-                            Card
-                        </TabsTrigger>
                         <TabsTrigger value="table" onClick={() => localStorage.setItem('papersViewMode', 'table')}>
                             <List className="h-4 w-4 mr-2" />
                             Table
+                        </TabsTrigger>
+                        <TabsTrigger value="card" onClick={() => localStorage.setItem('papersViewMode', 'card')}>
+                            <Grid className="h-4 w-4 mr-2" />
+                            Card
                         </TabsTrigger>
                     </TabsList>
                 </div>

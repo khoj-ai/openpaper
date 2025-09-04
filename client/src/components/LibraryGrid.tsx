@@ -96,7 +96,7 @@ export function LibraryGrid({
             <SearchStatsDisplay />
 
             {filteredPapers.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                     {searchResults && searchTerm.trim() ? (
                         // Use PaperSearchResultCard for search results
                         searchResults.papers.map((paper) => (
