@@ -494,7 +494,7 @@ export default function PapersPage() {
     }
 
     return (
-        <div className="w-full mx-auto p-4 flex flex-col" style={{ height: 'calc(100vh - 5rem)' }}>
+        <div className="w-full mx-auto p-4 flex flex-col flex-1 min-w-0" style={{ height: 'calc(100vh - 5rem)' }}>
             <CreateProjectDialog
                 open={isCreateProjectDialogOpen}
                 onOpenChange={setCreateProjectDialogOpen}

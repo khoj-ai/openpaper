@@ -15,6 +15,7 @@ import { PaperItem } from "@/lib/schema";
 import { Checkbox } from "./ui/checkbox";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import { useSidebar } from "./ui/sidebar";
 import { ArrowUpDown, CheckCheck, Trash2, X, ExternalLink, Copy, ChevronDown } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getStatusIcon, PaperStatusEnum } from "@/components/utils/PdfStatus";
@@ -46,6 +47,7 @@ export function LibraryTable({
 	setPapers,
 }: LibraryTableProps) {
 	const selectable = selectableProp ?? (onSelectFiles ? true : false);
+	const { state: sidebarState } = useSidebar();
 	const [internalPapers, setInternalPapers] = useState<PaperItem[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -235,7 +237,7 @@ export function LibraryTable({
 
 
 	return (
-		<div className="space-y-4">
+		<div className="space-y-4 w-full max-w-full overflow-hidden">
 			<div className="flex items-center justify-between gap-4">
 				<div className="flex items-center gap-4 w-full">
 					<Input
@@ -324,11 +326,14 @@ export function LibraryTable({
 				))}
 			</div>
 
-			<div className="flex gap-4">
-				<div
-					className={`border bg-card transition-all duration-300 ease-in-out ${selectedPaperForPreview ? 'w-3/5' : 'w-full'
-						}`}
-				>
+			<div className="grid grid-cols-1 gap-4 min-h-0" style={{
+				gridTemplateColumns: selectedPaperForPreview
+					? sidebarState === 'expanded'
+						? '1fr 320px'
+						: '1fr 384px'
+					: '1fr'
+			}}>
+				<div className="border bg-card transition-all duration-300 ease-in-out min-w-0 overflow-hidden">
 					<div className="max-h-[70vh] overflow-y-auto">
 						<Table>
 							<TableHeader className="sticky top-0 bg-card z-10">
@@ -511,19 +516,14 @@ export function LibraryTable({
 						</Table>
 					</div>
 				</div>
-				<div
-					className={`transition-all duration-300 ease-in-out ${selectedPaperForPreview
-						? 'w-2/5 opacity-100'
-						: 'w-0 opacity-0 pointer-events-none'
-						}`}
-				>
-					{selectedPaperForPreview && (
-						<div className="rounded-lg border bg-card">
+				{selectedPaperForPreview && (
+					<div className="border bg-card rounded-lg transition-all duration-300 ease-in-out min-w-0 overflow-hidden">
+						<div className="h-full">
 							<div className="p-4 relative max-h-[70vh] overflow-y-auto">
 								<Button
 									variant="ghost"
 									size="icon"
-									className="absolute top-2 right-2"
+									className="absolute top-2 right-2 z-10"
 									onClick={() => setSelectedPaperForPreview(null)}
 								>
 									<X className="h-4 w-4" />
@@ -541,7 +541,7 @@ export function LibraryTable({
 										className="w-full h-auto my-4 rounded-md"
 									/>
 								)}
-								<div className="flex items-center gap-2">
+								<div className="flex items-center gap-2 flex-wrap">
 									{selectedPaperForPreview.status && (
 										<DropdownMenu>
 											<DropdownMenuTrigger asChild>
@@ -587,7 +587,7 @@ export function LibraryTable({
 														const citationText = style.generator(selectedPaperForPreview);
 														return (
 															<div key={style.name} className="flex items-start justify-between gap-2">
-																<div className="flex-grow">
+																<div className="flex-grow min-w-0">
 																	<h4 className="font-semibold mb-1">{style.name}</h4>
 																	<p className="text-sm bg-muted p-2 rounded break-words">{citationText}</p>
 																</div>
@@ -615,11 +615,11 @@ export function LibraryTable({
 										</DialogContent>
 									</Dialog>
 								</div>
-								<p className="text-sm mt-4">{selectedPaperForPreview.abstract}</p>
+								<p className="text-sm mt-4 break-words">{selectedPaperForPreview.abstract}</p>
 							</div>
 						</div>
-					)}
-				</div>
+					</div>
+				)}
 			</div>
 		</div>
 	);
