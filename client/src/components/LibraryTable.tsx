@@ -24,6 +24,9 @@ import Link from "next/link";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
+import { PaperFiltering, Filter, Sort } from "@/components/PaperFiltering";
+import { Badge } from "@/components/ui/badge";
+
 
 interface LibraryTableProps {
 	selectable?: boolean;
@@ -47,7 +50,9 @@ export function LibraryTable({
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [selectedPapers, setSelectedPapers] = useState<Set<string>>(new Set());
-	const [filter, setFilter] = useState('');
+	const [searchTerm, setSearchTerm] = useState('');
+	const [filters, setFilters] = useState<Filter[]>([]);
+	const [sort, setSort] = useState<Sort>({ type: "publish_date", order: "desc" });
 	type SortKey = keyof PaperItem;
 	const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' } | null>({ key: 'created_at', direction: 'descending' });
 	const [selectedPaperForPreview, setSelectedPaperForPreview] = useState<PaperItem | null>(null);
@@ -83,15 +88,32 @@ export function LibraryTable({
 	const processedPapers = useMemo(() => {
 		let filteredPapers = [...internalPapers];
 
-		if (filter) {
+		if (searchTerm) {
 			filteredPapers = filteredPapers.filter(paper => {
-				const searchTerm = filter.toLowerCase();
+				const term = searchTerm.toLowerCase();
 				return (
-					paper.title?.toLowerCase().includes(searchTerm) ||
-					paper.authors?.join(', ').toLowerCase().includes(searchTerm) ||
-					paper.institutions?.join(', ').toLowerCase().includes(searchTerm) ||
-					paper.keywords?.join(', ').toLowerCase().includes(searchTerm)
+					paper.title?.toLowerCase().includes(term) ||
+					paper.authors?.join(', ').toLowerCase().includes(term) ||
+					paper.institutions?.join(', ').toLowerCase().includes(term) ||
+					paper.keywords?.join(', ').toLowerCase().includes(term)
 				);
+			});
+		}
+
+		if (filters.length > 0) {
+			filteredPapers = filteredPapers.filter(paper => {
+				return filters.every(filter => {
+					if (filter.type === 'author') {
+						return paper.authors?.includes(filter.value);
+					}
+					if (filter.type === 'keyword') {
+						return paper.keywords?.includes(filter.value);
+					}
+					if (filter.type === 'status') {
+						return paper.status === filter.value;
+					}
+					return true;
+				});
 			});
 		}
 
@@ -121,7 +143,7 @@ export function LibraryTable({
 		}
 
 		return filteredPapers;
-	}, [internalPapers, filter, sortConfig]);
+	}, [internalPapers, searchTerm, filters, sortConfig]);
 
 	const availablePapers = useMemo(() => {
 		return processedPapers.filter(p => !projectPaperIds.includes(p.id));
@@ -218,9 +240,17 @@ export function LibraryTable({
 				<div className="flex items-center gap-4 w-full">
 					<Input
 						placeholder="Filter papers by title, authors, organizations, or keywords..."
-						value={filter}
-						onChange={(e) => setFilter(e.target.value)}
+						value={searchTerm}
+						onChange={(e) => setSearchTerm(e.target.value)}
 						className="max-w-xl"
+					/>
+					<PaperFiltering
+						papers={internalPapers}
+						onFilterChange={setFilters}
+						onSortChange={() => { }}
+						filters={filters}
+						sort={sort}
+						showSort={false}
 					/>
 					{processedPapers.length !== internalPapers.length && (
 						<div className="text-sm text-muted-foreground">
@@ -278,13 +308,29 @@ export function LibraryTable({
 				</div>
 			</div>
 
+			<div className="flex flex-wrap gap-2 mb-4">
+				{filters.map(filter => (
+					<Badge key={`${filter.type}-${filter.value}`} variant="secondary" className="flex items-center gap-1">
+						{filter.value}
+						<Button
+							variant="ghost"
+							size="sm"
+							className="h-4 w-4 p-0"
+							onClick={() => setFilters(filters.filter(f => f.value !== filter.value))}
+						>
+							<X className="h-3 w-3" />
+						</Button>
+					</Badge>
+				))}
+			</div>
+
 			<div className="flex gap-4">
 				<div
-					className={`rounded-lg border bg-card transition-all duration-300 ease-in-out ${selectedPaperForPreview ? 'w-3/5' : 'w-full'
+					className={`border bg-card transition-all duration-300 ease-in-out ${selectedPaperForPreview ? 'w-3/5' : 'w-full'
 						}`}
 				>
 					<div className="max-h-[70vh] overflow-y-auto">
-						<Table className="table-fixed w-full" noWrapperOverflow>
+						<Table>
 							<TableHeader className="sticky top-0 bg-card z-10">
 								<TableRow className="hover:bg-transparent border-b-2">
 									{selectable && (
@@ -296,7 +342,7 @@ export function LibraryTable({
 											/>
 										</TableHead>
 									)}
-									<TableHead className="w-[35%]">
+									<TableHead className="min-w-[24rem]">
 										<Button
 											variant="ghost"
 											onClick={() => requestSort('title')}
@@ -306,7 +352,7 @@ export function LibraryTable({
 											<ArrowUpDown className="ml-2 h-4 w-4" />
 										</Button>
 									</TableHead>
-									<TableHead className="w-[20%]">
+									<TableHead className="min-w-[12rem]">
 										<Button
 											variant="ghost"
 											className="h-auto p-0 font-semibold hover:bg-transparent"
@@ -314,7 +360,7 @@ export function LibraryTable({
 											Authors
 										</Button>
 									</TableHead>
-									<TableHead className="w-[15%]">
+									<TableHead className="min-w-[12rem]">
 										<Button
 											variant="ghost"
 											className="h-auto p-0 font-semibold hover:bg-transparent"
@@ -322,7 +368,7 @@ export function LibraryTable({
 											Organizations
 										</Button>
 									</TableHead>
-									<TableHead className="w-[12%]">
+									<TableHead className="min-w-[10rem]">
 										<Button
 											variant="ghost"
 											className="h-auto p-0 font-semibold hover:bg-transparent"
@@ -330,7 +376,7 @@ export function LibraryTable({
 											Keywords
 										</Button>
 									</TableHead>
-									<TableHead className="w-[9%]">
+									<TableHead className="min-w-[8rem]">
 										<Button
 											variant="ghost"
 											onClick={() => requestSort('created_at')}
@@ -340,7 +386,7 @@ export function LibraryTable({
 											<ArrowUpDown className="ml-1 h-4 w-4" />
 										</Button>
 									</TableHead>
-									<TableHead className="w-[9%]">
+									<TableHead className="min-w-[8rem]">
 										<Button
 											variant="ghost"
 											onClick={() => requestSort('publish_date')}
@@ -392,7 +438,10 @@ export function LibraryTable({
 												<TableCell className="py-4 pr-4 whitespace-normal">
 													<div
 														className="font-medium text-sm leading-relaxed break-words hyphens-auto line-clamp-3 underline cursor-pointer"
-														onClick={() => setSelectedPaperForPreview(paper)}
+														onClick={(e: React.MouseEvent<HTMLDivElement>) => {
+															e.stopPropagation();
+															setSelectedPaperForPreview(paper);
+														}}
 													>
 														{paper.title || 'Untitled'}
 													</div>
@@ -454,7 +503,7 @@ export function LibraryTable({
 								) : (
 									<TableRow>
 										<TableCell colSpan={numCols} className="h-24 text-center">
-											{filter ? "No papers match your search criteria." : "No papers in your library yet."}
+											{searchTerm || filters.length > 0 ? "No papers match your search criteria." : "No papers in your library yet."}
 										</TableCell>
 									</TableRow>
 								)}

@@ -494,14 +494,14 @@ export default function PapersPage() {
     }
 
     return (
-        <div className="w-full mx-auto p-4">
+        <div className="w-full mx-auto p-4 flex flex-col" style={{ height: 'calc(100vh - 5rem)' }}>
             <CreateProjectDialog
                 open={isCreateProjectDialogOpen}
                 onOpenChange={setCreateProjectDialogOpen}
                 onSubmit={handleCreateProjectSubmit}
             />
             <UsageDisplay />
-            <Tabs value={viewMode} onValueChange={setViewMode} className="w-full">
+            <Tabs value={viewMode} onValueChange={setViewMode} className="w-full flex flex-col">
                 <div className="flex items-center justify-between mb-4">
                     <h1 className="text-3xl font-bold tracking-tight">Library</h1>
                     <TabsList>
@@ -534,7 +534,7 @@ export default function PapersPage() {
                         EmptyState={EmptyState}
                     />
                 </TabsContent>
-                <TabsContent value="table">
+                <TabsContent value="table" className="flex-grow">
                     <LibraryTable
                         setPapers={setPapers}
                         handleDelete={deletePaper}
