@@ -71,11 +71,12 @@ export default function ProjectPage() {
 	const [showEditAlert, setShowEditAlert] = useState(false);
 	const [currentTitle, setCurrentTitle] = useState("");
 	const [currentDescription, setCurrentDescription] = useState("");
+	const [isAddPapersSheetOpen, setIsAddPapersSheetOpen] = useState(false);
+	const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
 
 	const getProject = useCallback(async () => {
 		try {
 			const fetchedProject = await fetchFromApi(`/api/projects/${projectId}`);
-			console.log("Fetched project:", fetchedProject);
 			setProject(fetchedProject);
 		} catch (err) {
 			setError("Failed to fetch project. Please try again.");
@@ -116,6 +117,10 @@ export default function ProjectPage() {
 	const handleFileSelect = async (files: File[]) => {
 		setUploadError(null);
 		const newJobs: MinimalJob[] = [];
+		if (files.length > 0) {
+			setIsAddPapersSheetOpen(false);
+			setIsUploadDialogOpen(false);
+		}
 		for (const file of files) {
 			const formData = new FormData();
 			formData.append("file", file);
@@ -135,7 +140,7 @@ export default function ProjectPage() {
 	};
 
 	const handleUploadComplete = useCallback(async (paperId: string) => {
-		await fetchFromApi(`/api/project/${projectId}/papers`, {
+		await fetchFromApi(`/api/projects/papers/${projectId}`, {
 			method: "POST",
 			body: JSON.stringify({ paper_ids: [paperId] }),
 		});
@@ -273,7 +278,7 @@ export default function ProjectPage() {
 				<div className="mt-4">
 					<div className="flex justify-between items-center mb-4">
 						<h2 className="text-2xl font-bold">Add Papers to Your Project</h2>
-						<Dialog>
+						<Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
 							<DialogTrigger asChild>
 								<Button variant="outline">Upload New Papers</Button>
 							</DialogTrigger>
@@ -284,11 +289,11 @@ export default function ProjectPage() {
 								</DialogHeader>
 								<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} />
 								{uploadError && <p className="text-red-500 mt-4">{uploadError}</p>}
+								<PdfUploadTracker initialJobs={initialJobs} onComplete={handleUploadComplete} />
 							</DialogContent>
 						</Dialog>
 					</div>
 					<AddFromLibrary projectId={projectId} onPapersAdded={getProjectPapers} projectPaperIds={papers.map(p => p.id)} />
-					<PdfUploadTracker initialJobs={initialJobs} onComplete={handleUploadComplete} />
 				</div>
 				<Dialog open={isUrlDialogOpen} onOpenChange={setIsUrlDialogOpen}>
 					<DialogContent>
@@ -371,6 +376,7 @@ export default function ProjectPage() {
 					</BreadcrumbItem>
 				</BreadcrumbList>
 			</Breadcrumb>
+			<PdfUploadTracker initialJobs={initialJobs} onComplete={handleUploadComplete} />
 
 
 			<div className="group relative">
@@ -478,7 +484,7 @@ export default function ProjectPage() {
 				<div className="w-1/3 px-4">
 					<div className="flex justify-between items-center mb-4">
 						<h2 className="text-2xl font-bold">Papers</h2>
-						<Sheet>
+						<Sheet open={isAddPapersSheetOpen} onOpenChange={setIsAddPapersSheetOpen}>
 							<SheetTrigger asChild>
 								<Button variant="outline">
 									<PlusCircle className="mr-2 h-4 w-4" />
@@ -494,7 +500,6 @@ export default function ProjectPage() {
 									<h2>You can upload any additional papers to your library here. They will automatically be added to the project.</h2>
 									<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} />
 									{uploadError && <p className="text-red-500 mt-4">{uploadError}</p>}
-									<PdfUploadTracker initialJobs={initialJobs} onComplete={handleUploadComplete} />
 									<h3 className="text-lg font-semibold mb-2">Add from Library</h3>
 									<AddFromLibrary projectId={projectId} onPapersAdded={getProjectPapers} projectPaperIds={papers.map(p => p.id)} />
 								</div>
