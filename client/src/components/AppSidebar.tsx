@@ -81,13 +81,13 @@ const items = [
         requiresAuth: true,
         beta: true,
     },
-    {
-        title: "Projects",
-        url: "/projects",
-        icon: FolderCodeIcon,
-        requiresAuth: true,
-        beta: true,
-    },
+    // {
+    //     title: "Projects",
+    //     url: "/projects",
+    //     icon: FolderCodeIcon,
+    //     requiresAuth: true,
+    //     beta: true,
+    // },
     {
         title: "Find Papers",
         url: "/finder",
@@ -151,75 +151,7 @@ const UserMenuContent = ({
     </div>
 )
 
-const CollapsibleResourceList = ({
-    title,
-    items,
-    viewAllLink,
-    viewAllText,
-    itemLinkBuilder,
-    defaultOpen = false,
-}: {
-    title: string;
-    items: { id: string; title: string | null }[];
-    viewAllLink: string;
-    viewAllText: string;
-    itemLinkBuilder: (id: string) => string;
-    defaultOpen?: boolean;
-}) => {
-    const visibleItems = items.filter(item => item.title).slice(0, 7);
 
-    if (items.length === 0) {
-        return null;
-    }
-
-    return (
-        <Collapsible defaultOpen={defaultOpen} className="group/collapsible">
-            <SidebarGroup>
-                <CollapsibleTrigger>
-                    <SidebarMenuButton asChild>
-                        <span className="flex items-center gap-2 w-full">
-                            {title}
-                            <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                        </span>
-                    </SidebarMenuButton>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                    <SidebarGroupContent>
-                        <>
-                            <SidebarMenuItem>
-                                <SidebarMenuSub>
-                                    {visibleItems.map((item) => (
-                                        <SidebarMenuSubItem key={item.id}>
-                                            <SidebarMenuSubButton asChild>
-                                                <Link
-                                                    href={itemLinkBuilder(item.id)}
-                                                    className="text-xs font-medium w-full h-fit my-1"
-                                                >
-                                                    <p className="line-clamp-3">
-                                                        {item.title}
-                                                    </p>
-                                                </Link>
-                                            </SidebarMenuSubButton>
-                                        </SidebarMenuSubItem>
-                                    ))}
-                                </SidebarMenuSub>
-                            </SidebarMenuItem>
-                            {items.length > 7 && (
-                                <SidebarMenuItem>
-                                    <SidebarMenuButton asChild>
-                                        <Link href={viewAllLink} className="text-xs font-medium h-fit my-1">
-                                            {viewAllText} <ArrowRight className="inline h-3 w-3 ml-1" />
-                                        </Link>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
-                            )}
-                        </>
-                    </SidebarGroupContent>
-                </CollapsibleContent>
-            </SidebarGroup>
-        </Collapsible>
-    );
-};
 
 
 export function AppSidebar() {
@@ -350,43 +282,104 @@ export function AppSidebar() {
                 <SidebarGroup>
                     <SidebarGroupContent>
                         <SidebarMenu>
-                            {items.map((item) => (
-                                <SidebarMenuItem key={item.title}>
+                            {items.map((item) => {
+                                if (item.title === "Library") {
+                                    return (
+                                        <Collapsible key={item.title} asChild defaultOpen={true} className="group/collapsible">
+                                            <SidebarMenuItem>
+                                                <CollapsibleTrigger asChild>
+                                                    <Link href='/papers'>
+                                                        <SidebarMenuButton>
+                                                            <item.icon />
+                                                            <span>{item.title}</span>
+                                                            <ChevronDown className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                                                        </SidebarMenuButton>
+                                                    </Link>
+                                                </CollapsibleTrigger>
+                                                <CollapsibleContent>
+                                                    <SidebarMenuSub>
+                                                        {allPapers.slice(0, 7).map((paper) => (
+                                                            <SidebarMenuSubItem key={paper.id}>
+                                                                <SidebarMenuSubButton asChild>
+                                                                    <Link href={`/paper/${paper.id}`} className="text-xs font-medium w-full h-fit my-1">
+                                                                        <p className="line-clamp-3">{paper.title}</p>
+                                                                    </Link>
+                                                                </SidebarMenuSubButton>
+                                                            </SidebarMenuSubItem>
+                                                        ))}
+                                                        {allPapers.length > 7 && (
+                                                            <SidebarMenuSubItem>
+                                                                <SidebarMenuSubButton asChild>
+                                                                    <Link href="/papers" className="text-xs font-medium h-fit my-1">
+                                                                        View all papers <ArrowRight className="inline h-3 w-3 ml-1" />
+                                                                    </Link>
+                                                                </SidebarMenuSubButton>
+                                                            </SidebarMenuSubItem>
+                                                        )}
+                                                    </SidebarMenuSub>
+                                                </CollapsibleContent>
+                                            </SidebarMenuItem>
+                                        </Collapsible>
+                                    )
+                                }
+                                if (item.title === "Ask") {
+                                    return (
+                                        <Collapsible key={item.title} asChild defaultOpen={false} className="group/collapsible">
+                                            <SidebarMenuItem>
+                                                <CollapsibleTrigger asChild>
+                                                    <Link href='/understand'>
+                                                        <SidebarMenuButton>
+                                                            <item.icon />
+                                                            <span>{item.title}</span>
+                                                            <ChevronDown className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                                                        </SidebarMenuButton>
+                                                    </Link>
+                                                </CollapsibleTrigger>
+                                                <CollapsibleContent>
+                                                    <SidebarMenuSub>
+                                                        {everythingConversations.slice(0, 7).map((convo) => (
+                                                            <SidebarMenuSubItem key={convo.id}>
+                                                                <SidebarMenuSubButton asChild>
+                                                                    <Link href={`/understand?id=${convo.id}`} className="text-xs font-medium w-full h-fit my-1">
+                                                                        <p className="line-clamp-3">{convo.title}</p>
+                                                                    </Link>
+                                                                </SidebarMenuSubButton>
+                                                            </SidebarMenuSubItem>
+                                                        ))}
+                                                        {everythingConversations.length > 7 && (
+                                                            <SidebarMenuSubItem>
+                                                                <SidebarMenuSubButton asChild>
+                                                                    <Link href="/understand/past" className="text-xs font-medium h-fit my-1">
+                                                                        View all chats <ArrowRight className="inline h-3 w-3 ml-1" />
+                                                                    </Link>
+                                                                </SidebarMenuSubButton>
+                                                            </SidebarMenuSubItem>
+                                                        )}
+                                                    </SidebarMenuSub>
+                                                </CollapsibleContent>
+                                            </SidebarMenuItem>
+                                        </Collapsible>
+                                    )
+                                }
+                                return (
                                     <SidebarMenuItem key={item.title}>
                                         <SidebarMenuButton asChild>
                                             <Link href={item.requiresAuth && !user ? "/login" : item.url}>
                                                 <item.icon />
                                                 <span>{item.title}</span>
-                                                {
-                                                    item.beta && (
-                                                        <span className="ml-1 text-xs text-yellow-500 bg-yellow-100 dark:bg-yellow-800 dark:text-yellow-200 px-1 rounded">
-                                                            Beta
-                                                        </span>
-                                                    )
-                                                }
+                                                {item.beta && (
+                                                    <span className="ml-1 text-xs text-yellow-500 bg-yellow-100 dark:bg-yellow-800 dark:text-yellow-200 px-1 rounded">
+                                                        Beta
+                                                    </span>
+                                                )}
                                             </Link>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
-                                </SidebarMenuItem>
-                            ))}
+                                )
+                            })}
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>
-                <CollapsibleResourceList
-                    title="Recent"
-                    items={allPapers}
-                    viewAllLink="/papers"
-                    viewAllText={`${allPapers.length} Papers`}
-                    itemLinkBuilder={(id) => `/paper/${id}`}
-                    defaultOpen
-                />
-                <CollapsibleResourceList
-                    title="Chats"
-                    items={everythingConversations}
-                    viewAllLink="/understand/past"
-                    viewAllText={`${everythingConversations.length} Chats`}
-                    itemLinkBuilder={(id) => `/understand?id=${id}`}
-                />
             </SidebarContent>
             <SidebarFooter>
                 {/* Subscription Warning */}
