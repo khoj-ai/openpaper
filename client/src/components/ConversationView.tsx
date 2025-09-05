@@ -119,11 +119,11 @@ export const ConversationView = ({
 		return messages.map((msg, index) => (
 			<div
 				key={`${msg.id || `msg-${index}`}-${index}-${msg.role}-${msg.content.slice(0, 20).replace(/\s+/g, '')}`} // Use a stable and unique key
-				className="flex flex-row gap-2 items-end"
+				className="flex flex-row gap-2 items-end transition-all duration-300 ease-in-out"
 			>
 				<div
 					data-message-index={index}
-					className={`relative group prose dark:prose-invert !max-w-full ${msg.role === "user"
+					className={`relative group prose dark:prose-invert !max-w-full transition-all duration-300 ease-in-out ${msg.role === "user"
 						? "text-lg w-fit animate-fade-in line-clamp-3 mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-600 px-2 py-2 rounded-xl border border-blue-100 dark:border-gray-600"
 						: "w-full text-primary"
 						}`}
@@ -209,12 +209,12 @@ export const ConversationView = ({
 
 	return (
 		<div className="flex flex-row w-full h-full">
-			<div className={`flex flex-col h-full transition-all duration-300 ${isPdfVisible ? 'w-1/3' : 'w-full md:w-1/2 mx-auto'}`}>
+			<div className={`flex flex-col h-full transition-all duration-500 ease-in-out ${isPdfVisible ? 'w-1/3' : 'w-full md:w-1/2 mx-auto'}`}>
 				<div
-					className={`${isCentered ? "flex-0" : "flex-1"} w-full overflow-y-auto`}
+					className={`${isCentered ? "flex-0" : "flex-1"} w-full overflow-y-auto transition-all duration-300 ease-in-out`}
 					ref={messagesContainerRef}
 				>
-					<div className={`space-y-4 w-full ${isPdfVisible ? 'p-2' : 'p-4'}`}>
+					<div className={`space-y-4 w-full transition-all duration-300 ease-in-out ${isPdfVisible ? 'p-2' : 'p-4'}`}>
 						{isSessionLoading ? (
 							<ChatHistorySkeleton />
 						) : (
@@ -235,7 +235,7 @@ export const ConversationView = ({
 							</>
 						)}
 						{isStreaming && streamingChunks.length > 0 && (
-							<div className="relative group prose dark:prose-invert !max-w-full rounded-lg w-full text-primary dark:text-primary-foreground">
+							<div className="relative group prose dark:prose-invert !max-w-full rounded-lg w-full text-primary dark:text-primary-foreground transition-all duration-300 ease-in-out">
 								<AnimatedMarkdown
 									className="!p-0"
 									content={streamingChunks.join("")}
@@ -315,7 +315,7 @@ export const ConversationView = ({
 					className={`transition-all duration-300 ${isCentered
 						? "flex-1 flex flex-col justify-center items-center my-au"
 						: ""
-						} ${isPdfVisible ? 'p-2' : 'p-4'}`}
+						} ${isPdfVisible ? 'p-2' : 'p-4'} ease-in-out`}
 				>
 					{isCentered && (
 						<AnimatedGradientText
@@ -326,8 +326,8 @@ export const ConversationView = ({
 							What would you like to discover in your papers?
 						</AnimatedGradientText>
 					)}
-					<form onSubmit={handleNewSubmit} className="w-full" ref={chatInputFormRef}>
-						<div className="relative w-full">
+					<form onSubmit={handleNewSubmit} className="w-full transition-all duration-300 ease-in-out" ref={chatInputFormRef}>
+						<div className="relative w-full transition-all duration-300 ease-in-out">
 							<Textarea
 								value={currentMessage}
 								onChange={handleTextareaChange}
@@ -372,8 +372,8 @@ export const ConversationView = ({
 				</div>
 			</div>
 			{isPdfVisible && (
-				<div className="w-2/3 flex flex-col border-l-2">
-					<div className="flex-grow">
+				<div className="w-2/3 flex flex-col border-l-2 animate-in slide-in-from-right-5 duration-500 ease-in-out">
+					<div className="flex-grow transition-all duration-300 ease-in-out">
 						{pdfUrl && (
 							<PdfViewer
 								pdfUrl={pdfUrl}

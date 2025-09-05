@@ -373,7 +373,7 @@ function ProjectConversationPageContent() {
     const [isCentered, setIsCentered] = useState(false);
 
     return (
-        <div className="container mx-auto p-4 flex flex-col h-[calc(100vh-64px)]">
+        <div className="mx-none w-full p-4 flex flex-col h-[calc(100vh-64px)]">
             <Breadcrumb>
                 <BreadcrumbList>
                     <BreadcrumbItem>
