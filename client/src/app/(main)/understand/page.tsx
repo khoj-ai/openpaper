@@ -353,7 +353,7 @@ function UnderstandPageContent() {
     const [isCentered, setIsCentered] = useState(true);
 
     return (
-        <div className="h-[calc(100vh-64px)]">
+        <div className="h-[calc(100vh-64px)] mx-2">
             <ConversationView
                 messages={messages}
                 papers={papers}

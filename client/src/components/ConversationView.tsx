@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useMemo, useRef } from "react";
+import { FormEvent, useCallback, useMemo, useRef, useState } from "react";
 import { AnimatedMarkdown } from "@/components/AnimatedMarkdown";
 import { Button } from "@/components/ui/button";
 import Markdown from "react-markdown";
@@ -8,7 +8,7 @@ import remarkGfm from "remark-gfm";
 import rehypeKatex from "rehype-katex";
 import remarkMath from "remark-math";
 import "katex/dist/katex.min.css";
-import { Loader, ArrowUp, Recycle } from "lucide-react";
+import { Loader, ArrowUp, Recycle, X } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import CustomCitationLink from "@/components/utils/CustomCitationLink";
 import { ChatMessageActions } from "@/components/ChatMessageActions";
@@ -18,6 +18,7 @@ import Link from "next/link";
 import { TopicBubbles } from "@/components/TopicBubbles";
 import { AnimatedGradientText } from "@/components/magicui/animated-gradient-text";
 import { ChatHistorySkeleton } from "@/components/ChatHistorySkeleton";
+import { PdfViewer } from "@/components/PdfViewer";
 
 interface ConversationViewProps {
 	messages: ChatMessage[];
@@ -61,7 +62,7 @@ export const ConversationView = ({
 	setIsCentered,
 	displayedText,
 	isTyping,
-	handleCitationClick,
+	handleCitationClick: originalHandleCitationClick,
 	highlightedInfo,
 	setHighlightedInfo,
 	authLoading,
@@ -70,6 +71,27 @@ export const ConversationView = ({
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 	const inputMessageRef = useRef<HTMLTextAreaElement>(null);
 	const chatInputFormRef = useRef<HTMLFormElement>(null);
+
+	const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+	const [searchTerm, setSearchTerm] = useState<string | null>(null);
+	const [isPdfVisible, setIsPdfVisible] = useState(false);
+
+	const handleCitationClick = (key: string, messageIndex: number) => {
+		originalHandleCitationClick(key, messageIndex);
+		const message = messages[messageIndex];
+		if (!message || !message.references) return;
+
+		const citation = message.references.citations.find(c => String(c.key) === key);
+		if (!citation) return;
+
+		const paper = papers.find(p => p.id === citation.paper_id);
+
+		if (paper && paper.file_url) {
+			setPdfUrl(paper.file_url);
+			setSearchTerm(citation.reference);
+			setIsPdfVisible(true);
+		}
+	};
 
 	const handleTextareaChange = useCallback(
 		(e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -186,167 +208,200 @@ export const ConversationView = ({
 	}, [messages, papers, highlightedInfo, setHighlightedInfo]);
 
 	return (
-		<div className="flex flex-col w-full h-full">
-			<div
-				className={`${isCentered ? "flex-0" : "flex-1"} w-full overflow-y-auto`}
-				ref={messagesContainerRef}
-			>
-				<div className="mx-auto max-w-3xl space-y-4 p-4 w-full">
-					{isSessionLoading ? (
-						<ChatHistorySkeleton />
-					) : (
-						<>
-							{papers.length === 0 && messages.length === 0 && !authLoading && (
-								<div className="text-center p-8">
-									<h2 className="text-xl font-semibold mb-2">No Papers Found</h2>
-									<p className="text-gray-600 dark:text-gray-400 mb-4">
-										You need to have at least one paper indexed to ask questions.
-									</p>
-									<Button onClick={() => (window.location.href = "/")}>
-										Index a Paper
-									</Button>
-								</div>
-							)}
+		<div className="flex flex-row w-full h-full">
+			<div className={`flex flex-col h-full transition-all duration-300 ${isPdfVisible ? 'w-1/3' : 'w-full md:w-1/2 mx-auto'}`}>
+				<div
+					className={`${isCentered ? "flex-0" : "flex-1"} w-full overflow-y-auto`}
+					ref={messagesContainerRef}
+				>
+					<div className={`space-y-4 w-full ${isPdfVisible ? 'p-2' : 'p-4'}`}>
+						{isSessionLoading ? (
+							<ChatHistorySkeleton />
+						) : (
+							<>
+								{papers.length === 0 && messages.length === 0 && !authLoading && (
+									<div className="text-center p-8">
+										<h2 className="text-xl font-semibold mb-2">No Papers Found</h2>
+										<p className="text-gray-600 dark:text-gray-400 mb-4">
+											You need to have at least one paper indexed to ask questions.
+										</p>
+										<Button onClick={() => (window.location.href = "/")}>
+											Index a Paper
+										</Button>
+									</div>
+								)}
 
-							{messages.length > 0 && memoizedMessages}
-						</>
+								{messages.length > 0 && memoizedMessages}
+							</>
+						)}
+						{isStreaming && streamingChunks.length > 0 && (
+							<div className="relative group prose dark:prose-invert !max-w-full rounded-lg w-full text-primary dark:text-primary-foreground">
+								<AnimatedMarkdown
+									className="!p-0"
+									content={streamingChunks.join("")}
+									remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
+									rehypePlugins={[rehypeKatex]}
+									components={{
+										p: (props) => (
+											<CustomCitationLink
+												{...props}
+												handleCitationClick={handleCitationClick}
+												messageIndex={messages.length}
+												citations={streamingReferences?.citations || []}
+											/>
+										),
+										li: (props) => (
+											<CustomCitationLink
+												{...props}
+												handleCitationClick={handleCitationClick}
+												messageIndex={messages.length}
+												citations={streamingReferences?.citations || []}
+											/>
+										),
+										div: (props) => (
+											<CustomCitationLink
+												{...props}
+												handleCitationClick={handleCitationClick}
+												messageIndex={messages.length}
+												citations={streamingReferences?.citations || []}
+											/>
+										),
+										td: (props) => (
+											<CustomCitationLink
+												{...props}
+												handleCitationClick={handleCitationClick}
+												messageIndex={messages.length}
+												citations={streamingReferences?.citations || []}
+											/>
+										),
+										table: (props) => (
+											<div className="w-full overflow-x-auto">
+												<table {...props} className="min-w-full border-collapse" />
+											</div>
+										),
+									}}
+								/>
+								<ChatMessageActions
+									message={streamingChunks.join("")}
+									references={streamingReferences}
+								/>
+							</div>
+						)}
+						{isStreaming && (
+							<div className="flex items-center gap-3 p-2">
+								<Loader className="animate-spin w-6 h-6 text-blue-500 flex-shrink-0" />
+								<div className="text-sm text-secondary-foreground">
+									{displayedText}
+									{isTyping && <span className="animate-pulse">|</span>}
+									{statusMessage && (
+										<div className="text-xs text-gray-500">{statusMessage}</div>
+									)}
+								</div>
+							</div>
+						)}
+						<div ref={messagesEndRef} />
+						{error && (
+							<div className="flex flex-col items-start gap-2 p-4 text-black dark:text-white">
+								<p>{error}</p>
+								<Button onClick={onRetry} variant="outline">
+									<Recycle className="mr-2 h-4 w-4" />
+									Retry
+								</Button>
+							</div>
+						)}
+					</div>
+				</div>
+				<div
+					className={`transition-all duration-300 ${isCentered
+						? "flex-1 flex flex-col justify-center items-center my-au"
+						: ""
+						} ${isPdfVisible ? 'p-2' : 'p-4'}`}
+				>
+					{isCentered && (
+						<AnimatedGradientText
+							className="text-2xl font-bold mb-4"
+							colorFrom="#6366f1"
+							colorTo="#3b82f6"
+						>
+							What would you like to discover in your papers?
+						</AnimatedGradientText>
 					)}
-					{isStreaming && streamingChunks.length > 0 && (
-						<div className="relative group prose dark:prose-invert !max-w-full rounded-lg w-full text-primary dark:text-primary-foreground">
-							<AnimatedMarkdown
-								className="!p-0"
-								content={streamingChunks.join("")}
-								remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
-								rehypePlugins={[rehypeKatex]}
-								components={{
-									p: (props) => (
-										<CustomCitationLink
-											{...props}
-											handleCitationClick={handleCitationClick}
-											messageIndex={messages.length}
-											citations={streamingReferences?.citations || []}
-										/>
-									),
-									li: (props) => (
-										<CustomCitationLink
-											{...props}
-											handleCitationClick={handleCitationClick}
-											messageIndex={messages.length}
-											citations={streamingReferences?.citations || []}
-										/>
-									),
-									div: (props) => (
-										<CustomCitationLink
-											{...props}
-											handleCitationClick={handleCitationClick}
-											messageIndex={messages.length}
-											citations={streamingReferences?.citations || []}
-										/>
-									),
-									td: (props) => (
-										<CustomCitationLink
-											{...props}
-											handleCitationClick={handleCitationClick}
-											messageIndex={messages.length}
-											citations={streamingReferences?.citations || []}
-										/>
-									),
-									table: (props) => (
-										<div className="w-full overflow-x-auto">
-											<table {...props} className="min-w-full border-collapse" />
-										</div>
-									),
+					<form onSubmit={handleNewSubmit} className="w-full" ref={chatInputFormRef}>
+						<div className="relative w-full">
+							<Textarea
+								value={currentMessage}
+								onChange={handleTextareaChange}
+								ref={inputMessageRef}
+								placeholder={
+									isCentered
+										? "Discover something in your papers..."
+										: "Ask a follow-up"
+								}
+								className="pr-16 resize-none w-full bg-secondary"
+								disabled={isStreaming || papers.length === 0 || chatCreditLimitReached}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" && !e.shiftKey) {
+										e.preventDefault();
+										handleNewSubmit(e);
+									}
 								}}
 							/>
-							<ChatMessageActions
-								message={streamingChunks.join("")}
-								references={streamingReferences}
-							/>
-						</div>
-					)}
-					{isStreaming && (
-						<div className="flex items-center gap-3 p-2">
-							<Loader className="animate-spin w-6 h-6 text-blue-500 flex-shrink-0" />
-							<div className="text-sm text-secondary-foreground">
-								{displayedText}
-								{isTyping && <span className="animate-pulse">|</span>}
-								{statusMessage && (
-									<div className="text-xs text-gray-500">{statusMessage}</div>
-								)}
-							</div>
-						</div>
-					)}
-					<div ref={messagesEndRef} />
-					{error && (
-						<div className="flex flex-col items-start gap-2 p-4 text-black dark:text-white">
-							<p>{error}</p>
-							<Button onClick={onRetry} variant="outline">
-								<Recycle className="mr-2 h-4 w-4" />
-								Retry
+							<Button
+								type="submit"
+								variant="ghost"
+								className="absolute top-1/2 right-2 -translate-y-1/2"
+								disabled={isStreaming || papers.length === 0 || chatCreditLimitReached}
+							>
+								<ArrowUp className="h-5 w-5" />
 							</Button>
+						</div>
+						{chatCreditLimitReached && (
+							<div className="text-center text-sm text-secondary-foreground mt-2">
+								Nice! You have used your chat credits for the week.{" "}
+								<Link href="/pricing" className="text-blue-500 hover:underline">
+									Upgrade your plan to use more.
+								</Link>
+							</div>
+						)}
+					</form>
+					{isCentered && (
+						<div className="absolute bottom-0 left-0 w-full">
+							<TopicBubbles isVisible={currentMessage.length === 0} />
 						</div>
 					)}
 				</div>
 			</div>
-			<div
-				className={`p-4 transition-all duration-500 ${isCentered
-					? "flex-1 flex flex-col justify-center items-center my-au"
-					: ""
-					}`}
-			>
-				{isCentered && (
-					<AnimatedGradientText
-						className="text-2xl font-bold mb-4"
-						colorFrom="#6366f1"
-						colorTo="#3b82f6"
-					>
-						What would you like to discover in your papers?
-					</AnimatedGradientText>
-				)}
-				<form onSubmit={handleNewSubmit} className="w-full" ref={chatInputFormRef}>
-					<div className="relative w-full md:max-w-3xl mx-auto">
-						<Textarea
-							value={currentMessage}
-							onChange={handleTextareaChange}
-							ref={inputMessageRef}
-							placeholder={
-								isCentered
-									? "Discover something in your papers..."
-									: "Ask a follow-up"
-							}
-							className="pr-16 resize-none w-full bg-secondary"
-							disabled={isStreaming || papers.length === 0 || chatCreditLimitReached}
-							onKeyDown={(e) => {
-								if (e.key === "Enter" && !e.shiftKey) {
-									e.preventDefault();
-									handleNewSubmit(e);
-								}
-							}}
-						/>
-						<Button
-							type="submit"
-							variant="ghost"
-							className="absolute top-1/2 right-2 -translate-y-1/2"
-							disabled={isStreaming || papers.length === 0 || chatCreditLimitReached}
-						>
-							<ArrowUp className="h-5 w-5" />
-						</Button>
+			{isPdfVisible && (
+				<div className="w-2/3 flex flex-col border-l-2">
+					<div className="flex-grow">
+						{pdfUrl && (
+							<PdfViewer
+								pdfUrl={pdfUrl}
+								explicitSearchTerm={searchTerm || undefined}
+								highlights={[]}
+								activeHighlight={null}
+								setUserMessageReferences={() => { }}
+								setSelectedText={() => { }}
+								setTooltipPosition={() => { }}
+								setIsAnnotating={() => { }}
+								setIsHighlightInteraction={() => { }}
+								isHighlightInteraction={false}
+								setHighlights={() => { }}
+								selectedText={''}
+								tooltipPosition={null}
+								setActiveHighlight={() => { }}
+								addHighlight={async () => { throw new Error("Read-only"); }}
+								loadHighlights={async () => { }}
+								removeHighlight={() => { }}
+								handleTextSelection={() => { }}
+								renderAnnotations={() => { }}
+								annotations={[]}
+								setAddedContentForPaperNote={() => { }}
+							/>
+						)}
 					</div>
-					{chatCreditLimitReached && (
-						<div className="text-center text-sm text-secondary-foreground mt-2">
-							Nice! You have used your chat credits for the week.{" "}
-							<Link href="/pricing" className="text-blue-500 hover:underline">
-								Upgrade your plan to use more.
-							</Link>
-						</div>
-					)}
-				</form>
-				{isCentered && (
-					<div className="absolute bottom-0 left-0 w-full">
-						<TopicBubbles isVisible={currentMessage.length === 0} />
-					</div>
-				)}
-			</div>
+				</div>
+			)}
 		</div>
 	);
 };
