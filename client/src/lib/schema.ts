@@ -260,6 +260,8 @@ export interface Project {
     id: string;
     title: string;
     description: string;
+    num_papers?: number;
+    num_conversations?: number;
     created_at: string;
     updated_at: string;
 }

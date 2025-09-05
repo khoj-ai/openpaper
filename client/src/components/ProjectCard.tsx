@@ -3,7 +3,7 @@ import { Project } from "@/lib/schema";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, ArrowRight } from "lucide-react";
+import { MoreHorizontal, ArrowRight, FileText, MessageCircle } from "lucide-react";
 import { useState } from "react";
 import {
 	AlertDialog,
@@ -97,22 +97,31 @@ export function ProjectCard({ project, onProjectUpdate }: {
 							{currentTitle}
 						</CardTitle>
 						{currentDescription && (
-							<CardDescription className="text-muted-foreground line-clamp-3 text-sm leading-relaxed">
+							<CardDescription className="text-muted-foreground line-clamp-2 text-sm leading-relaxed">
 								{currentDescription}
 							</CardDescription>
 						)}
 					</CardHeader>
 					<CardFooter className="pt-0 mt-auto">
 						<div className="flex items-center justify-between w-full">
-							<p className="text-xs text-muted-foreground/70 font-medium">
-								Updated {formatDate(project.updated_at)}
-							</p>
+							<div className="flex items-center gap-4 text-xs text-muted-foreground/70">
+								<span>Updated {formatDate(project.updated_at)}</span>
+								<div className="flex items-center gap-3">
+									<div className="flex items-center gap-1">
+										<FileText className="h-3 w-3" />
+										<span>{project.num_papers ?? 0}</span>
+									</div>
+									<div className="flex items-center gap-1">
+										<MessageCircle className="h-3 w-3" />
+										<span>{project.num_conversations ?? 0}</span>
+									</div>
+								</div>
+							</div>
 							<ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 						</div>
 					</CardFooter>
 				</Card>
 			</Link>
-
 			{/* Hover-only dropdown menu */}
 			<div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-all duration-200 ease-in-out transform translate-y-1 group-hover:translate-y-0 z-20">
 				<DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>

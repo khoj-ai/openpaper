@@ -16,7 +16,7 @@ export default function Projects() {
 
 	const getProjects = async () => {
 		try {
-			const fetchedProjects = await fetchFromApi("/api/projects");
+			const fetchedProjects = await fetchFromApi("/api/projects?detailed=true");
 			setProjects(fetchedProjects);
 		} catch (err) {
 			setError("Failed to fetch projects. Please try again.");
