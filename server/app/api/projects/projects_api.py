@@ -67,14 +67,25 @@ async def create_project(
 @projects_router.get("")
 async def get_projects(
     db: Session = Depends(get_db),
+    detailed: bool = False,
     current_user: CurrentUser = Depends(get_required_user),
 ) -> JSONResponse:
     """Get all projects for the current user"""
     try:
-        projects = project_crud.get_multi_by_user(db, user=current_user)
+        response_data = []
+
+        if detailed:
+            annotated_projects = project_crud.get_all_projects_by_user_with_metadata(
+                db, user=current_user
+            )
+            response_data = [project.model_dump() for project in annotated_projects]
+        else:
+            projects = project_crud.get_multi_by_user(db, user=current_user)
+            response_data = [project.to_dict() for project in projects]
+
         return JSONResponse(
             status_code=200,
-            content=[project.to_dict() for project in projects],
+            content=response_data,
         )
     except Exception as e:
         logger.error(f"Error fetching projects: {e}")
