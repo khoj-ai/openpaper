@@ -283,7 +283,19 @@ function ProjectConversationPageContent() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestBody),
+            }).catch(fetchError => {
+                console.error('Fetch error details:', {
+                    name: fetchError.name,
+                    message: fetchError.message,
+                    stack: fetchError.stack,
+                    cause: fetchError.cause
+                });
+                throw fetchError;
             });
+
+            if (!stream) {
+                throw new Error('No stream received from server');
+            }
 
             const reader = stream.getReader();
             const decoder = new TextDecoder();
@@ -291,50 +303,90 @@ function ProjectConversationPageContent() {
             let references: Reference | undefined = undefined;
             let buffer = '';
 
-            while (true) {
-                const { done, value } = await reader.read();
-
-                if (done) {
-                    if (buffer.trim()) {
-                        console.warn('Unprocessed buffer at end of stream:', buffer);
-                    }
-                    break;
-                }
-
-                const chunk = decoder.decode(value, { stream: true });
-                buffer += chunk;
-
-                const parts = buffer.split(END_DELIMITER);
-                buffer = parts.pop() || '';
-
-                for (const event of parts) {
-                    if (!event.trim()) continue;
-
+            try {
+                while (true) {
+                    let result;
                     try {
-                        const parsedChunk = JSON.parse(event.trim());
+                        result = await reader.read();
+                    } catch (readerError) {
+                        console.error('Stream reader error:', {
+                            name: readerError instanceof Error ? readerError.name : 'Unknown',
+                            message: readerError instanceof Error ? readerError.message : String(readerError),
+                            stack: readerError instanceof Error ? readerError.stack : 'No stack',
+                        });
+                        throw readerError;
+                    }
 
-                        if (parsedChunk && typeof parsedChunk === 'object' && 'type' in parsedChunk) {
-                            const chunkType = parsedChunk.type;
-                            const chunkContent = parsedChunk.content;
+                    const { done, value } = result;
 
-                            if (chunkType === 'content') {
-                                accumulatedContent += chunkContent;
-                                setStreamingChunks(prev => [...prev, chunkContent]);
-                            } else if (chunkType === 'references') {
-                                references = chunkContent;
-                                setStreamingReferences(chunkContent);
-                            } else if (chunkType === 'status') {
-                                setStatusMessage(chunkContent);
-                            } else {
-                                console.warn(`Unknown chunk type: ${chunkType}`);
-                            }
-                        } else if (parsedChunk) {
-                            console.warn('Received unexpected chunk:', parsedChunk);
+                    if (done) {
+                        if (buffer.trim()) {
+                            console.warn('Unprocessed buffer at end of stream:', buffer);
                         }
-                    } catch (error) {
-                        console.error('Error processing event:', error, 'Raw event:', event);
+                        break;
+                    }
+
+                    if (!value) {
+                        console.warn('Received empty value from stream');
                         continue;
                     }
+
+                    let chunk;
+                    try {
+                        chunk = decoder.decode(value, { stream: true });
+                    } catch (decodeError) {
+                        console.error('Error decoding chunk:', decodeError);
+                        console.error('Raw chunk value:', value);
+                        continue;
+                    }
+
+                    buffer += chunk;
+
+                    const parts = buffer.split(END_DELIMITER);
+                    buffer = parts.pop() || '';
+
+                    for (const event of parts) {
+                        if (!event.trim()) continue;
+
+                        try {
+                            const parsedChunk = JSON.parse(event.trim());
+
+                            if (parsedChunk && typeof parsedChunk === 'object' && 'type' in parsedChunk) {
+                                const chunkType = parsedChunk.type;
+                                const chunkContent = parsedChunk.content;
+
+                                if (chunkType === 'content') {
+                                    accumulatedContent += chunkContent;
+                                    setStreamingChunks(prev => [...prev, chunkContent]);
+                                } else if (chunkType === 'references') {
+                                    references = chunkContent;
+                                    setStreamingReferences(chunkContent);
+                                } else if (chunkType === 'status') {
+                                    setStatusMessage(chunkContent);
+                                } else if (chunkType === 'error') {
+                                    console.error('Server error in stream:', chunkContent);
+                                    throw new Error(`Server error: ${chunkContent}`);
+                                } else {
+                                    console.warn(`Unknown chunk type: ${chunkType}`, parsedChunk);
+                                }
+                            } else if (parsedChunk) {
+                                console.warn('Received unexpected chunk format:', parsedChunk);
+                            }
+                        } catch (parseError) {
+                            console.error('Error parsing JSON event:', parseError);
+                            console.error('Raw event that failed to parse:', JSON.stringify(event));
+                            console.error('Event length:', event.length);
+                            console.error('Event preview (first 200 chars):', event.substring(0, 200));
+                            continue;
+                        }
+                    }
+                }
+            } finally {
+                // Always release the reader
+                try {
+                    reader.releaseLock();
+                } catch (lockError) {
+                    console.warn('Error releasing reader lock:', lockError);
                 }
             }
 
@@ -352,10 +404,44 @@ function ProjectConversationPageContent() {
 
         } catch (error) {
             console.error('Error during streaming:', error);
-            toast.error("An error occurred while processing your request.");
+
+            // Enhanced error logging
+            if (error instanceof Error) {
+                console.error('Error details:', {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack,
+                    cause: error.cause
+                });
+            }
+
+            // Check for specific error types
+            if (error instanceof TypeError) {
+                if (error.message.includes('input stream') || error.message.includes('stream')) {
+                    console.error('Stream-specific TypeError detected');
+                    toast.error("Connection interrupted. Please try again.");
+                } else if (error.message.includes('fetch')) {
+                    console.error('Fetch-related TypeError detected');
+                    toast.error("Network error: Please check your connection and try again.");
+                } else {
+                    console.error('Generic TypeError detected');
+                    toast.error(`Type error: ${error.message}`);
+                }
+            } else if (error instanceof Error && error.name === 'AbortError') {
+                console.error('Request was aborted');
+                toast.error("Request was cancelled. Please try again.");
+            } else if (error instanceof Error && error.message.includes('Server error:')) {
+                // Server-sent error, don't wrap it
+                toast.error(error.message);
+            } else {
+                // Generic error handling
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+                toast.error(`An error occurred: ${errorMessage}`);
+            }
+
             setMessages(prev => prev.slice(0, -1));
             setCurrentMessage(query);
-            setError('An error occurred while processing your request.');
+            setError(`Streaming error: ${error instanceof Error ? error.message : 'Unknown error'}`);
         } finally {
             setIsStreaming(false);
             setStatusMessage('');
