@@ -115,10 +115,9 @@ export const ConversationView = ({
 		[isCentered, onSubmit, setIsCentered]
 	);
 
-	const memoizedMessages = useMemo(() => {
-		return messages.map((msg, index) => (
+	const memoizedMessages = messages.map((msg, index) => (
 			<div
-				key={`${msg.id || `msg-${index}`}-${index}-${msg.role}-${msg.content.slice(0, 20).replace(/\s+/g, '')}`} // Use a stable and unique key
+				key={`${msg.id || `msg-${index}`}-${msg.role}`} // Use a stable and unique key
 				className="flex flex-row gap-2 items-end transition-all duration-300 ease-in-out"
 			>
 				<div
@@ -205,7 +204,6 @@ export const ConversationView = ({
 				</div>
 			</div>
 		));
-	}, [messages, papers, highlightedInfo, setHighlightedInfo]);
 
 	return (
 		<div className="flex flex-row w-full h-full">
