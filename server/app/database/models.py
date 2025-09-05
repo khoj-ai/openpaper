@@ -404,7 +404,7 @@ class ProjectPaper(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     paper_id = Column(
-        UUID(as_uuid=True), ForeignKey("papers.id", ondelete="CASCADE"), nullable=False
+        UUID(as_uuid=True), ForeignKey("papers.id", ondelete="RESTRICT"), nullable=False
     )
     project_id = Column(
         UUID(as_uuid=True), ForeignKey("project.id", ondelete="CASCADE"), nullable=False

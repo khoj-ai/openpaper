@@ -1,8 +1,8 @@
 """add projects
 
-Revision ID: a232ffe072a1
+Revision ID: 32921fd74f14
 Revises: 410d489451b5
-Create Date: 2025-08-20 22:42:32.498342+00:00
+Create Date: 2025-09-05 23:21:39.577022+00:00
 
 """
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "a232ffe072a1"
+revision: str = "32921fd74f14"
 down_revision: Union[str, None] = "410d489451b5"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -90,7 +90,7 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=True,
         ),
-        sa.ForeignKeyConstraint(["paper_id"], ["papers.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["paper_id"], ["papers.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["project_id"], ["project.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
