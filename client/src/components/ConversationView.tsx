@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useMemo, useRef, useState } from "react";
+import { useIsMobile } from "@/lib/useMobile";
 import { AnimatedMarkdown } from "@/components/AnimatedMarkdown";
 import { Button } from "@/components/ui/button";
 import Markdown from "react-markdown";
@@ -75,6 +76,7 @@ export const ConversationView = ({
 	const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 	const [searchTerm, setSearchTerm] = useState<string | null>(null);
 	const [isPdfVisible, setIsPdfVisible] = useState(false);
+	const isMobile = useIsMobile();
 
 	const handleCitationClick = (key: string, messageIndex: number) => {
 		originalHandleCitationClick(key, messageIndex);
@@ -207,7 +209,7 @@ export const ConversationView = ({
 
 	return (
 		<div className="flex flex-row w-full h-full">
-			<div className={`flex flex-col h-full transition-all duration-500 ease-in-out ${isPdfVisible ? 'w-1/3' : 'w-full md:w-1/2 mx-auto'}`}>
+			<div className={`flex flex-col h-full transition-all duration-500 ease-in-out ${isMobile ? (isPdfVisible ? 'hidden' : 'w-full') : (isPdfVisible ? 'w-1/3' : 'w-full md:w-1/2 mx-auto')}`}>
 				<div
 					className={`${isCentered ? "flex-0" : "flex-1"} w-full overflow-y-auto transition-all duration-300 ease-in-out`}
 					ref={messagesContainerRef}
@@ -370,7 +372,12 @@ export const ConversationView = ({
 				</div>
 			</div>
 			{isPdfVisible && (
-				<div className="w-2/3 flex flex-col border-l-2 animate-in slide-in-from-right-5 duration-500 ease-in-out">
+				<div className={`${isMobile ? 'w-full relative' : 'w-2/3 border-l-2'} flex flex-col animate-in slide-in-from-right-5 duration-500 ease-in-out`}>
+					{isMobile && (
+						<Button onClick={() => setIsPdfVisible(false)} variant="ghost" size="icon" className="absolute top-2 right-2 z-20 bg-background rounded-full">
+							<X className="h-6 w-6" />
+						</Button>
+					)}
 					<div className="flex-grow transition-all duration-300 ease-in-out">
 						{pdfUrl && (
 							<PdfViewer
