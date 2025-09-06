@@ -4,7 +4,6 @@ import {
     AlertTriangle,
     ChevronsUpDown,
     FileText,
-    FolderCodeIcon,
     Globe2,
     Home,
     LogOut,
@@ -26,9 +25,6 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-    SidebarMenuSub,
-    SidebarMenuSubButton,
-    SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
 import { useEffect, useState } from "react";
 import { fetchFromApi } from "@/lib/api";

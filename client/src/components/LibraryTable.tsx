@@ -3,7 +3,6 @@
 import {
 	Table,
 	TableBody,
-	TableCaption,
 	TableCell,
 	TableHead,
 	TableHeader,
@@ -54,7 +53,7 @@ export function LibraryTable({
 	const [selectedPapers, setSelectedPapers] = useState<Set<string>>(new Set());
 	const [searchTerm, setSearchTerm] = useState('');
 	const [filters, setFilters] = useState<Filter[]>([]);
-	const [sort, setSort] = useState<Sort>({ type: "publish_date", order: "desc" });
+	const [sort] = useState<Sort>({ type: "publish_date", order: "desc" });
 	type SortKey = keyof PaperItem;
 	const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' } | null>({ key: 'created_at', direction: 'descending' });
 	const [selectedPaperForPreview, setSelectedPaperForPreview] = useState<PaperItem | null>(null);
@@ -535,11 +534,13 @@ export function LibraryTable({
 									</h3>
 								</Link>
 								{selectedPaperForPreview.preview_url && (
-									<img
-										src={selectedPaperForPreview.preview_url}
-										alt="Paper preview"
-										className="w-full h-auto my-4 rounded-md"
-									/>
+									<>
+										{/* eslint-disable-next-line @next/next/no-img-element */}
+										<img src={selectedPaperForPreview.preview_url}
+											alt="Paper preview"
+											className="w-full h-auto my-4 rounded-md"
+										/>
+									</>
 								)}
 								<div className="flex items-center gap-2 flex-wrap">
 									{selectedPaperForPreview.status && (

@@ -6,7 +6,7 @@ import { ProjectCard } from "@/components/ProjectCard";
 import { Button } from "@/components/ui/button";
 import { Project } from "@/lib/schema";
 import { fetchFromApi } from "@/lib/api";
-import { PlusCircle, FolderOpen, Sparkles, Target, BookOpen, FileText, AlertTriangle } from "lucide-react";
+import { PlusCircle, FolderOpen, Target, BookOpen, FileText, AlertTriangle } from "lucide-react";
 import { useSubscription, isProjectNearLimit, isProjectAtLimit } from "@/hooks/useSubscription";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";

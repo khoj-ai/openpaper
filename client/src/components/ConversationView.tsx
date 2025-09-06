@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useRef, useState } from "react";
 import { useIsMobile } from "@/lib/useMobile";
 import { AnimatedMarkdown } from "@/components/AnimatedMarkdown";
 import { Button } from "@/components/ui/button";
