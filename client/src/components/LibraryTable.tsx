@@ -53,10 +53,11 @@ export function LibraryTable({
 	const [selectedPapers, setSelectedPapers] = useState<Set<string>>(new Set());
 	const [searchTerm, setSearchTerm] = useState('');
 	const [filters, setFilters] = useState<Filter[]>([]);
-	const [sort] = useState<Sort>({ type: "publish_date", order: "desc" });
 	type SortKey = keyof PaperItem;
 	const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' } | null>({ key: 'created_at', direction: 'descending' });
 	const [selectedPaperForPreview, setSelectedPaperForPreview] = useState<PaperItem | null>(null);
+
+	const sort = { type: "publish_date", order: "desc" };
 
 	useEffect(() => {
 		const getPapers = async () => {
