@@ -2,8 +2,6 @@
 
 import {
     AlertTriangle,
-    ArrowRight,
-    ChevronDown,
     ChevronsUpDown,
     FileText,
     FolderCodeIcon,
@@ -54,9 +52,9 @@ import { useIsDarkMode } from "@/hooks/useDarkMode";
 import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isStorageNearLimit, isPaperUploadNearLimit, isChatCreditAtLimit, isChatCreditNearLimit } from "@/hooks/useSubscription";
 import Link from "next/link";
 import OnboardingChecklist from "@/components/OnboardingChecklist";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 import { Conversation, PaperItem } from "@/lib/schema";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { CollapsibleSidebarMenu } from "./CollapsibleSidebarMenu";
 
 // Menu items.
 const items = [
@@ -285,80 +283,32 @@ export function AppSidebar() {
                             {items.map((item) => {
                                 if (item.title === "Library") {
                                     return (
-                                        <Collapsible key={item.title} asChild defaultOpen={true} className="group/collapsible">
-                                            <SidebarMenuItem>
-                                                <CollapsibleTrigger asChild>
-                                                    <Link href='/papers'>
-                                                        <SidebarMenuButton>
-                                                            <item.icon />
-                                                            <span>{item.title}</span>
-                                                            <ChevronDown className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
-                                                        </SidebarMenuButton>
-                                                    </Link>
-                                                </CollapsibleTrigger>
-                                                <CollapsibleContent>
-                                                    <SidebarMenuSub>
-                                                        {allPapers.slice(0, 7).map((paper) => (
-                                                            <SidebarMenuSubItem key={paper.id}>
-                                                                <SidebarMenuSubButton asChild>
-                                                                    <Link href={`/paper/${paper.id}`} className="text-xs font-medium w-full h-fit my-1">
-                                                                        <p className="line-clamp-3">{paper.title}</p>
-                                                                    </Link>
-                                                                </SidebarMenuSubButton>
-                                                            </SidebarMenuSubItem>
-                                                        ))}
-                                                        {allPapers.length > 7 && (
-                                                            <SidebarMenuSubItem>
-                                                                <SidebarMenuSubButton asChild>
-                                                                    <Link href="/papers" className="text-xs font-medium h-fit my-1">
-                                                                        View all papers <ArrowRight className="inline h-3 w-3 ml-1" />
-                                                                    </Link>
-                                                                </SidebarMenuSubButton>
-                                                            </SidebarMenuSubItem>
-                                                        )}
-                                                    </SidebarMenuSub>
-                                                </CollapsibleContent>
-                                            </SidebarMenuItem>
-                                        </Collapsible>
+                                        <CollapsibleSidebarMenu
+                                            key={item.title}
+                                            title={item.title}
+                                            icon={item.icon}
+                                            url={item.url}
+                                            items={allPapers}
+                                            getItemUrl={(paper) => `/paper/${paper.id}`}
+                                            viewAllUrl="/papers"
+                                            viewAllText="View all papers"
+                                            defaultOpen={true}
+                                        />
                                     )
                                 }
                                 if (item.title === "Ask") {
                                     return (
-                                        <Collapsible key={item.title} asChild defaultOpen={false} className="group/collapsible">
-                                            <SidebarMenuItem>
-                                                <CollapsibleTrigger asChild>
-                                                    <Link href='/understand'>
-                                                        <SidebarMenuButton>
-                                                            <item.icon />
-                                                            <span>{item.title}</span>
-                                                            <ChevronDown className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
-                                                        </SidebarMenuButton>
-                                                    </Link>
-                                                </CollapsibleTrigger>
-                                                <CollapsibleContent>
-                                                    <SidebarMenuSub>
-                                                        {everythingConversations.slice(0, 7).map((convo) => (
-                                                            <SidebarMenuSubItem key={convo.id}>
-                                                                <SidebarMenuSubButton asChild>
-                                                                    <Link href={`/understand?id=${convo.id}`} className="text-xs font-medium w-full h-fit my-1">
-                                                                        <p className="line-clamp-3">{convo.title}</p>
-                                                                    </Link>
-                                                                </SidebarMenuSubButton>
-                                                            </SidebarMenuSubItem>
-                                                        ))}
-                                                        {everythingConversations.length > 7 && (
-                                                            <SidebarMenuSubItem>
-                                                                <SidebarMenuSubButton asChild>
-                                                                    <Link href="/understand/past" className="text-xs font-medium h-fit my-1">
-                                                                        View all chats <ArrowRight className="inline h-3 w-3 ml-1" />
-                                                                    </Link>
-                                                                </SidebarMenuSubButton>
-                                                            </SidebarMenuSubItem>
-                                                        )}
-                                                    </SidebarMenuSub>
-                                                </CollapsibleContent>
-                                            </SidebarMenuItem>
-                                        </Collapsible>
+                                        <CollapsibleSidebarMenu
+                                            key={item.title}
+                                            title={item.title}
+                                            icon={item.icon}
+                                            url={item.url}
+                                            items={everythingConversations}
+                                            getItemUrl={(convo) => `/understand?id=${convo.id}`}
+                                            viewAllUrl="/understand/past"
+                                            viewAllText="View all chats"
+                                            defaultOpen={false}
+                                        />
                                     )
                                 }
                                 return (
