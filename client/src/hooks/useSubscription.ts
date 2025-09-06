@@ -18,6 +18,8 @@ export interface SubscriptionUsage {
     chat_credits_remaining: number;
     audio_overviews_used: number;
     audio_overviews_remaining: number;
+    projects: number;
+    projects_remaining: number;
 }
 
 export interface SubscriptionData {
@@ -140,6 +142,23 @@ export const isAudioOverviewNearLimit = (subscription: SubscriptionData | null, 
 
 export const isAudioOverviewAtLimit = (subscription: SubscriptionData | null): boolean => {
     return getAudioOverviewUsagePercentage(subscription) >= 100;
+};
+
+// Project usage helper functions
+export const getProjectUsagePercentage = (subscription: SubscriptionData | null): number => {
+    if (!subscription) return 0;
+    const { projects, projects_remaining } = subscription.usage;
+    const total = projects + projects_remaining;
+    if (total === 0) return 0;
+    return (projects / total) * 100;
+};
+
+export const isProjectNearLimit = (subscription: SubscriptionData | null, threshold: number = 75): boolean => {
+    return getProjectUsagePercentage(subscription) >= threshold;
+};
+
+export const isProjectAtLimit = (subscription: SubscriptionData | null): boolean => {
+    return getProjectUsagePercentage(subscription) >= 100;
 };
 
 // Calculate next Monday at 12 AM UTC for credit reset

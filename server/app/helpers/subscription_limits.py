@@ -13,6 +13,7 @@ from typing import Dict, Optional
 from app.database.crud.audio_overview_crud import audio_overview_crud
 from app.database.crud.message_crud import message_crud
 from app.database.crud.paper_crud import paper_crud
+from app.database.crud.projects.project_crud import project_crud
 from app.database.crud.subscription_crud import subscription_crud
 from app.database.models import SubscriptionPlan, SubscriptionStatus
 from app.database.telemetry import track_event
@@ -25,6 +26,7 @@ PAPER_UPLOAD_KEY = "paper_uploads"
 KB_SIZE_KEY = "knowledge_base_size"
 CHAT_CREDITS_KEY = "chat_credits_weekly"
 AUDIO_OVERVIEWS_KEY = "audio_overviews_weekly"
+PROJECTS_KEY = "projects"
 
 # Define subscription plan limits
 SUBSCRIPTION_LIMITS = {
@@ -33,12 +35,14 @@ SUBSCRIPTION_LIMITS = {
         KB_SIZE_KEY: 500 * 1024,  # 500 MB in KB
         CHAT_CREDITS_KEY: 5000,
         AUDIO_OVERVIEWS_KEY: 5,
+        PROJECTS_KEY: 2,
     },
     SubscriptionPlan.RESEARCHER: {
         PAPER_UPLOAD_KEY: 500,
         KB_SIZE_KEY: 3 * 1024 * 1024,  # 3 GB in KB
         CHAT_CREDITS_KEY: 100000,
         AUDIO_OVERVIEWS_KEY: 100,
+        PROJECTS_KEY: 100,
     },
 }
 
@@ -147,6 +151,51 @@ def can_user_upload_paper(db: Session, user: CurrentUser) -> tuple[bool, Optiona
     return True, None
 
 
+def can_user_create_project(
+    db: Session, user: CurrentUser
+) -> tuple[bool, Optional[str]]:
+    """
+    Check if a user can create a new project based on their subscription limits.
+
+    Returns:
+        tuple: (can_create: bool, error_message: Optional[str])
+    """
+    plan = get_user_subscription_plan(db, user)
+    limits = get_plan_limits(plan)
+
+    current_project_count = len(
+        project_crud.get_all_projects_by_user_with_metadata(db=db, user=user)
+    )
+    project_limit = limits[PROJECTS_KEY]
+
+    # Handle unlimited plans
+    if project_limit == float("inf"):
+        return True, None
+
+    # If the user has reached their project limit
+    if current_project_count >= project_limit:
+        track_event(
+            "action_blocked_limit_reached",
+            user_id=str(user.id),
+            properties={
+                "current_project_count": current_project_count,
+                "project_limit": project_limit,
+                "type": "projects",
+                "plan": plan.value,
+            },
+        )
+        plan_name = {
+            SubscriptionPlan.BASIC: "Basic",
+            SubscriptionPlan.RESEARCHER: "Researcher",
+        }.get(plan, "Basic")
+        return (
+            False,
+            f"You have reached your project limit ({int(project_limit)} projects) for the {plan_name} plan. Please upgrade your subscription to create more projects.",
+        )
+
+    return True, None
+
+
 def can_user_access_knowledge_base(
     db: Session, user: CurrentUser
 ) -> tuple[bool, Optional[str]]:
@@ -225,6 +274,11 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
     audio_overviews_allowed = limits[AUDIO_OVERVIEWS_KEY]
     audio_overviews_used_this_month = get_user_audio_overviews_used_this_month(db, user)
 
+    current_project_count = len(
+        project_crud.get_all_projects_by_user_with_metadata(db=db, user=user)
+    )
+    project_limit = limits[PROJECTS_KEY]
+
     # Calculate usage percentages
     paper_usage_percentage = (
         (current_paper_count / paper_limit) * 100 if paper_limit != float("inf") else 0
@@ -242,6 +296,11 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
     audio_overviews_usage_percentage = (
         (audio_overviews_used_this_month / audio_overviews_allowed) * 100
         if audio_overviews_allowed != float("inf")
+        else 0
+    )
+    project_usage_percentage = (
+        (current_project_count / project_limit) * 100
+        if project_limit != float("inf")
         else 0
     )
 
@@ -290,6 +349,17 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
                 "plan": plan.value,
             },
         )
+    if project_usage_percentage > 75:
+        track_event(
+            "high_usage_limit",
+            user_id=str(user.id),
+            properties={
+                "metric": "projects",
+                "usage": current_project_count,
+                "limit": project_limit,
+                "plan": plan.value,
+            },
+        )
 
     chat_credits_remaining = (
         None
@@ -316,6 +386,12 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
         else max(0, int(total_size_allowed) - total_size)
     )
 
+    projects_remaining = (
+        None
+        if project_limit == float("inf")
+        else max(0, int(project_limit) - current_project_count)
+    )
+
     return {
         "plan": plan.value,
         "limits": {
@@ -330,5 +406,7 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
             "chat_credits_remaining": chat_credits_remaining,
             "audio_overviews_used": audio_overviews_used_this_month,
             "audio_overviews_remaining": audio_overviews_remaining,
+            "projects": current_project_count,
+            "projects_remaining": projects_remaining,
         },
     }

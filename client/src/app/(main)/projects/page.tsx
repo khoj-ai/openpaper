@@ -1,16 +1,25 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ProjectCard } from "@/components/ProjectCard";
 import { Button } from "@/components/ui/button";
 import { Project } from "@/lib/schema";
 import { fetchFromApi } from "@/lib/api";
-import { PlusCircle, FolderOpen, Sparkles, Target, BookOpen, FileText } from "lucide-react";
+import { PlusCircle, FolderOpen, Sparkles, Target, BookOpen, FileText, AlertTriangle } from "lucide-react";
+import { useSubscription, isProjectNearLimit, isProjectAtLimit } from "@/hooks/useSubscription";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { toast } from "sonner";
 
 export default function Projects() {
 	const [projects, setProjects] = useState<Project[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const { subscription } = useSubscription();
+	const router = useRouter();
+
+	const atProjectLimit = subscription ? isProjectAtLimit(subscription) : false;
+	const nearProjectLimit = subscription ? isProjectNearLimit(subscription) : false;
 
 	const getProjects = async () => {
 		try {
@@ -27,6 +36,30 @@ export default function Projects() {
 	useEffect(() => {
 		getProjects();
 	}, []);
+
+	useEffect(() => {
+		if (subscription) {
+			if (atProjectLimit) {
+				toast.error("Project Limit Reached", {
+					description: "You have used all of your available projects. Upgrade your plan to create more.",
+					action: {
+						label: "View Plans",
+						onClick: () => router.push("/settings/billing"),
+					},
+				});
+			} else if (nearProjectLimit) {
+				toast.warning("Approaching Project Limit", {
+					description: `You have used ${subscription.usage.projects} of ${
+						subscription.usage.projects + subscription.usage.projects_remaining
+					} projects. Consider upgrading soon.`,
+					action: {
+						label: "View Plans",
+						onClick: () => router.push("/settings/billing"),
+					},
+				});
+			}
+		}
+	}, [atProjectLimit, nearProjectLimit, subscription, router]);
 
 	// Enhanced empty state component
 	const EmptyState = () => (
@@ -87,15 +120,38 @@ export default function Projects() {
 		<div className="container mx-auto p-4">
 			<div className="flex justify-between items-center mb-4">
 				<h1 className="text-2xl font-bold">Projects</h1>
-				{projects.length > 0 && (
-					<Button asChild className="bg-gradient-to-br from-blue-500 to-cyan-500">
-						<Link href="/projects/create">
+				{projects.length > 0 &&
+					(atProjectLimit ? (
+						<Button disabled className="bg-gradient-to-br from-blue-500 to-cyan-500">
 							<PlusCircle className="mr-2" />
 							New Project
-						</Link>
-					</Button>
-				)}
+						</Button>
+					) : (
+						<Button asChild className="bg-gradient-to-br from-blue-500 to-cyan-500">
+							<Link href="/projects/create">
+								<PlusCircle className="mr-2" />
+								New Project
+							</Link>
+						</Button>
+					))}
 			</div>
+
+			{(nearProjectLimit || atProjectLimit) && subscription && (
+				<Alert variant={atProjectLimit ? "destructive" : "default"} className="mb-4 border-none">
+					<AlertTriangle className="h-4 w-4" />
+					<AlertTitle>{atProjectLimit ? "Project Limit Reached" : "Approaching Project Limit"}</AlertTitle>
+					<AlertDescription className="text-muted-foreground">
+						{atProjectLimit
+							? `You have used all of your available projects. Upgrade your plan to create more.`
+							: `You have used ${subscription.usage.projects} of ${
+									subscription.usage.projects + subscription.usage.projects_remaining
+							  } projects. Consider upgrading soon.`}
+						<Link href="/settings/billing" className="font-semibold underline ml-2 text-primary">
+							View Plans
+						</Link>
+					</AlertDescription>
+				</Alert>
+			)}
 
 			{isLoading ? (
 				<div className="flex items-center justify-center py-12">

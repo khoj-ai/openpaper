@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { fetchFromApi } from "@/lib/api";
+import { Loader2 } from "lucide-react";
 
 export default function CreateProjectPage() {
 	const [title, setTitle] = useState("");
@@ -64,7 +65,14 @@ export default function CreateProjectPage() {
 							<Link href="/projects">Cancel</Link>
 						</Button>
 						<Button type="submit" disabled={isLoading}>
-							{isLoading ? "Creating..." : "Create"}
+							{isLoading ? (
+								<>
+									<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+									Creating...
+								</>
+							) : (
+								"Create"
+							)}
 						</Button>
 					</div>
 				</div>
