@@ -16,7 +16,8 @@ The client can poll the job status using the same job_id throughout the process.
 
 import logging
 from datetime import datetime, timezone
-from typing import Union
+from typing import Optional, Union
+from uuid import UUID
 
 import requests
 from app.auth.dependencies import get_required_user
@@ -124,6 +125,7 @@ async def upload_pdf_from_url(
     background_tasks: BackgroundTasks,
     current_user: CurrentUser = Depends(get_required_user),
     db: Session = Depends(get_db),
+    project_id: Optional[str] = None,
 ):
     """
     Upload a document from a given URL, rather than the raw file.
@@ -162,12 +164,15 @@ async def upload_pdf_from_url(
             content={"message": "Failed to create paper upload job"},
         )
 
+    casted_project_id = UUID(str(project_id)) if project_id else None
+
     background_tasks.add_task(
         upload_file_from_url_microservice,
         url=url,
         paper_upload_job=paper_upload_job,
         current_user=current_user,
         db=db,
+        project_id=casted_project_id,
     )
 
     return JSONResponse(
@@ -186,6 +191,7 @@ async def upload_pdf(
     file: UploadFile = File(...),
     current_user: CurrentUser = Depends(get_required_user),
     db: Session = Depends(get_db),
+    project_id: Optional[str] = None,
 ):
     """
     Upload a PDF file
@@ -231,6 +237,8 @@ async def upload_pdf(
             content={"message": "Failed to create paper upload job"},
         )
 
+    casted_project_id = UUID(str(project_id)) if project_id else None
+
     # Pass file contents and filename instead of the UploadFile object
     background_tasks.add_task(
         upload_raw_file_microservice,
@@ -239,6 +247,7 @@ async def upload_pdf(
         paper_upload_job=paper_upload_job,
         current_user=current_user,
         db=db,
+        project_id=casted_project_id,
     )
 
     return JSONResponse(
@@ -255,6 +264,7 @@ async def upload_file_from_url_microservice(
     paper_upload_job: PaperUploadJob,
     current_user: CurrentUser,
     db: Session,
+    project_id: Optional[UUID] = None,
 ) -> None:
     """
     Helper function to upload a file from a URL using the microservice.
@@ -278,6 +288,7 @@ async def upload_file_from_url_microservice(
             paper_upload_job=paper_upload_job,
             db=db,
             user=current_user,
+            project_id=project_id,
         )
 
         # Update job with task_id
@@ -324,6 +335,7 @@ async def upload_raw_file_microservice(
     paper_upload_job: PaperUploadJob,
     current_user: CurrentUser,
     db: Session,
+    project_id: Optional[UUID] = None,
 ) -> None:
     """
     Helper function to upload a raw file using the microservice.
@@ -350,6 +362,7 @@ async def upload_raw_file_microservice(
             paper_upload_job=paper_upload_job,
             db=db,
             user=current_user,
+            project_id=project_id,
         )
 
         # Update job with task_id

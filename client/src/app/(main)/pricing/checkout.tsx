@@ -70,7 +70,7 @@ export default function CheckoutSheet({ open, onOpenChange, interval, planName, 
                         {planName && ` - ${planName}`}
                     </SheetTitle>
                     <SheetDescription>
-                        Secure checkout powered by Stripe. Your subscription will be billed {interval === 'month' ? 'monthly' : 'annually'}.
+                        Your subscription will be billed {interval === 'month' ? 'monthly' : 'annually'}.
                         {interval === 'year' ? ` You are saving $${annualSavings} with annual billing!` : ` Save $${annualSavings} with annual billing!`}
                         {isResubscription && " Your subscription will be reactivated immediately upon successful payment."}
                     </SheetDescription>

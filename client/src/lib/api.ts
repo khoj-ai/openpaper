@@ -64,3 +64,7 @@ export async function fetchStreamFromApi(
 
     return response.body;
 }
+
+export async function getAllPapers() {
+    return fetchFromApi('/api/paper/all');
+}

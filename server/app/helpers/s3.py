@@ -8,6 +8,8 @@ from urllib.parse import urlparse
 
 import boto3
 import requests
+from app.database.crud.projects.project_paper_crud import project_paper_crud
+from app.database.models import Paper
 from app.schemas.user import CurrentUser
 from botocore.exceptions import ClientError
 from sqlalchemy.orm import Session
@@ -374,6 +376,31 @@ class S3Service:
         except Exception as e:
             logger.error(f"Error getting cached presigned URL by owner: {e}")
             return None
+
+    def get_cached_presigned_url_by_project(
+        self,
+        db: Session,
+        paper_id: str,
+        object_key: str,
+        project_id: str,
+        current_user: CurrentUser,
+        expiration: int = 28800,
+    ) -> Optional[str]:
+        """
+        Get a cached presigned URL for a paper that's member of a specific project id, verifying that the user has access to the project.
+        """
+        paper: Paper = project_paper_crud.get_paper_by_project(
+            db=db,
+            paper_id=uuid.UUID(paper_id),
+            project_id=uuid.UUID(project_id),
+            user=current_user,
+        )
+
+        if not paper:
+            return None
+
+        # Generate and return the presigned URL
+        return self.generate_presigned_url(object_key, expiration)
 
 
 # Create a single instance to use throughout the application

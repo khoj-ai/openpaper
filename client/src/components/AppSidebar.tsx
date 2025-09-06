@@ -2,10 +2,9 @@
 
 import {
     AlertTriangle,
-    ArrowRight,
-    ChevronDown,
     ChevronsUpDown,
     FileText,
+    FolderCodeIcon,
     Globe2,
     Home,
     LogOut,
@@ -24,7 +23,6 @@ import {
     SidebarFooter,
     SidebarGroup,
     SidebarGroupContent,
-    SidebarGroupLabel,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
@@ -35,7 +33,7 @@ import {
 import { useEffect, useState } from "react";
 import { fetchFromApi } from "@/lib/api";
 import { useRouter } from "next/navigation";
-import { useAuth, User} from "@/lib/auth";
+import { useAuth, User } from "@/lib/auth";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,11 +50,11 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useIsDarkMode } from "@/hooks/useDarkMode";
 import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isStorageNearLimit, isPaperUploadNearLimit, isChatCreditAtLimit, isChatCreditNearLimit } from "@/hooks/useSubscription";
-import Image from "next/image";
 import Link from "next/link";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
+import OnboardingChecklist from "@/components/OnboardingChecklist";
 import { Conversation, PaperItem } from "@/lib/schema";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { CollapsibleSidebarMenu } from "./CollapsibleSidebarMenu";
 
 // Menu items.
 const items = [
@@ -64,13 +62,6 @@ const items = [
         title: "Home",
         url: "/",
         icon: Home,
-        requiresAuth: false,
-        beta: false,
-    },
-    {
-        title: "Find Papers",
-        url: "/finder",
-        icon: Globe2,
         requiresAuth: false,
         beta: false,
     },
@@ -87,6 +78,20 @@ const items = [
         icon: TelescopeIcon,
         requiresAuth: true,
         beta: true,
+    },
+    // {
+    //     title: "Projects",
+    //     url: "/projects",
+    //     icon: FolderCodeIcon,
+    //     requiresAuth: true,
+    //     beta: true,
+    // },
+    {
+        title: "Find Papers",
+        url: "/finder",
+        icon: Globe2,
+        requiresAuth: false,
+        beta: false,
     },
 ]
 
@@ -144,75 +149,7 @@ const UserMenuContent = ({
     </div>
 )
 
-const CollapsibleResourceList = ({
-    title,
-    items,
-    viewAllLink,
-    viewAllText,
-    itemLinkBuilder,
-    defaultOpen = false,
-}: {
-    title: string;
-    items: { id: string; title: string | null }[];
-    viewAllLink: string;
-    viewAllText: string;
-    itemLinkBuilder: (id: string) => string;
-    defaultOpen?: boolean;
-}) => {
-    const visibleItems = items.filter(item => item.title).slice(0, 7);
 
-    if (items.length === 0) {
-        return null;
-    }
-
-    return (
-        <Collapsible defaultOpen={defaultOpen} className="group/collapsible">
-            <SidebarGroup>
-                <CollapsibleTrigger>
-                    <SidebarMenuButton asChild>
-                        <span className="flex items-center gap-2 w-full">
-                            {title}
-                            <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                        </span>
-                    </SidebarMenuButton>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                    <SidebarGroupContent>
-                        <>
-                            <SidebarMenuItem>
-                                <SidebarMenuSub>
-                                    {visibleItems.map((item) => (
-                                        <SidebarMenuSubItem key={item.id}>
-                                            <SidebarMenuSubButton asChild>
-                                                <Link
-                                                    href={itemLinkBuilder(item.id)}
-                                                    className="text-xs font-medium w-full h-fit my-1"
-                                                >
-                                                    <p className="line-clamp-3">
-                                                        {item.title}
-                                                    </p>
-                                                </Link>
-                                            </SidebarMenuSubButton>
-                                        </SidebarMenuSubItem>
-                                    ))}
-                                </SidebarMenuSub>
-                            </SidebarMenuItem>
-                            {items.length > 7 && (
-                                <SidebarMenuItem>
-                                    <SidebarMenuButton asChild>
-                                        <Link href={viewAllLink} className="text-xs font-medium h-fit my-1">
-                                            {viewAllText} <ArrowRight className="inline h-3 w-3 ml-1" />
-                                        </Link>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
-                            )}
-                        </>
-                    </SidebarGroupContent>
-                </CollapsibleContent>
-            </SidebarGroup>
-        </Collapsible>
-    );
-};
 
 
 export function AppSidebar() {
@@ -341,54 +278,58 @@ export function AppSidebar() {
         <Sidebar variant="floating">
             <SidebarContent>
                 <SidebarGroup>
-                    <SidebarGroupLabel className="flex items-center gap-2">
-                        <Image
-                            src="/openpaper.svg"
-                            width={24}
-                            height={24}
-                            alt="Open Paper Logo"
-                        />
-                        <span className="text-sm font-semibold">Open Paper</span>
-                    </SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu>
-                            {items.map((item) => (
-                                <SidebarMenuItem key={item.title}>
+                            {items.map((item) => {
+                                if (item.title === "Library") {
+                                    return (
+                                        <CollapsibleSidebarMenu
+                                            key={item.title}
+                                            title={item.title}
+                                            icon={item.icon}
+                                            url={item.url}
+                                            items={allPapers}
+                                            getItemUrl={(paper) => `/paper/${paper.id}`}
+                                            viewAllUrl="/papers"
+                                            viewAllText="View all papers"
+                                            defaultOpen={true}
+                                        />
+                                    )
+                                }
+                                if (item.title === "Ask") {
+                                    return (
+                                        <CollapsibleSidebarMenu
+                                            key={item.title}
+                                            title={item.title}
+                                            icon={item.icon}
+                                            url={item.url}
+                                            items={everythingConversations}
+                                            getItemUrl={(convo) => `/understand?id=${convo.id}`}
+                                            viewAllUrl="/understand/past"
+                                            viewAllText="View all chats"
+                                            defaultOpen={false}
+                                        />
+                                    )
+                                }
+                                return (
                                     <SidebarMenuItem key={item.title}>
                                         <SidebarMenuButton asChild>
                                             <Link href={item.requiresAuth && !user ? "/login" : item.url}>
                                                 <item.icon />
                                                 <span>{item.title}</span>
-                                                {
-                                                    item.beta && (
-                                                        <span className="ml-1 text-xs text-yellow-500 bg-yellow-100 dark:bg-yellow-800 dark:text-yellow-200 px-1 rounded">
-                                                            Beta
-                                                        </span>
-                                                    )
-                                                }
+                                                {item.beta && (
+                                                    <span className="ml-1 text-xs text-yellow-500 bg-yellow-100 dark:bg-yellow-800 dark:text-yellow-200 px-1 rounded">
+                                                        Beta
+                                                    </span>
+                                                )}
                                             </Link>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
-                                </SidebarMenuItem>
-                            ))}
+                                )
+                            })}
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>
-                <CollapsibleResourceList
-                    title="Recent"
-                    items={allPapers}
-                    viewAllLink="/papers"
-                    viewAllText={`${allPapers.length} Papers`}
-                    itemLinkBuilder={(id) => `/paper/${id}`}
-                    defaultOpen
-                />
-                <CollapsibleResourceList
-                    title="Chats"
-                    items={everythingConversations}
-                    viewAllLink="/understand/past"
-                    viewAllText={`${everythingConversations.length} Chats`}
-                    itemLinkBuilder={(id) => `/understand?id=${id}`}
-                />
             </SidebarContent>
             <SidebarFooter>
                 {/* Subscription Warning */}
@@ -424,6 +365,8 @@ export function AppSidebar() {
                         </Alert>
                     </div>
                 )}
+
+                <OnboardingChecklist />
 
                 {/* User Status Badge */}
                 {user && (

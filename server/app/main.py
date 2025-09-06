@@ -13,6 +13,9 @@ from app.api.paper_audio_api import paper_audio_router
 from app.api.paper_image_api import paper_image_router
 from app.api.paper_search_api import paper_search_router
 from app.api.paper_upload_api import paper_upload_router
+from app.api.projects.project_conversations_api import project_conversations_router
+from app.api.projects.project_papers_api import project_papers_router
+from app.api.projects.projects_api import projects_router
 from app.api.search_api import search_router
 from app.api.subscription_api import subscription_router
 from app.api.webhook_api import webhook_router
@@ -57,6 +60,9 @@ app.include_router(conversation_router, prefix="/api/conversation")
 app.include_router(message_router, prefix="/api/message")
 app.include_router(highlight_router, prefix="/api/highlight")
 app.include_router(annotation_router, prefix="/api/annotation")
+app.include_router(projects_router, prefix="/api/projects")
+app.include_router(project_papers_router, prefix="/api/projects/papers")
+app.include_router(project_conversations_router, prefix="/api/projects/conversations")
 app.include_router(paper_search_router, prefix="/api/search/global")
 app.include_router(search_router, prefix="/api/search/local")
 app.include_router(paper_audio_router, prefix="/api/paper/audio")

@@ -7,6 +7,12 @@ from typing import AsyncGenerator, List, Optional, Union
 from app.auth.dependencies import get_required_user
 from app.database.crud.conversation_crud import conversation_crud
 from app.database.crud.message_crud import MessageCreate, message_crud
+from app.database.crud.paper_crud import paper_crud
+from app.database.crud.projects.project_conversation_crud import (
+    project_conversation_crud,
+)
+from app.database.crud.projects.project_crud import project_crud
+from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
 from app.database.models import ConversableType
 from app.database.telemetry import track_event
@@ -79,16 +85,17 @@ async def get_available_models() -> dict:
     return {"models": operations.get_chat_model_options()}
 
 
-class EverythingChatRequest(BaseModel):
+class MultiPaperChatRequest(BaseModel):
     conversation_id: str
     user_query: str
     user_references: Optional[List[str]] = None
     llm_provider: Optional[LLMProvider] = None
+    project_id: Optional[str] = None
 
 
 @message_router.post("/chat/everything")
-async def chat_message_everything(
-    request: EverythingChatRequest,
+async def chat_message_multipaper(
+    request: MultiPaperChatRequest,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_required_user),
 ) -> StreamingResponse:
@@ -107,15 +114,44 @@ async def chat_message_everything(
                 evidence_container = {"evidence": None}
                 evidence_collection: Optional[EvidenceCollection] = None
 
-                # Ensure conversation is type EVERYTHING
-                conversation = conversation_crud.get(
-                    db, request.conversation_id, user=current_user
-                )
+                # Ensure conversation is valid
+                if request.project_id:
+                    project = project_crud.get(
+                        db, id=request.project_id, user=current_user
+                    )
+
+                    if not project:
+                        raise ValueError("Project not found.")
+
+                    conversation = project_conversation_crud.get_by_conversation_id(
+                        db,
+                        project_id=uuid.UUID(request.project_id),
+                        conversation_id=uuid.UUID(request.conversation_id),
+                        user=current_user,
+                    )
+                else:
+                    conversation = conversation_crud.get(
+                        db, request.conversation_id, user=current_user
+                    )
+
+                # Multi-paper conversation must either be of type EVERYTHING or PROJECT. If it is a PROJECT conversation, naturally we need a `project_id`.
+
+                if not conversation:
+                    raise HTTPException(
+                        status_code=404, detail="Conversation not found."
+                    )
+
                 if (
-                    conversation
-                    and conversation.conversable_type != ConversableType.EVERYTHING
+                    conversation.conversable_type != ConversableType.EVERYTHING
+                    and not request.project_id
                 ):
                     raise ValueError("Conversation is not of type EVERYTHING.")
+
+                if (
+                    request.project_id
+                    and conversation.conversable_type != ConversableType.PROJECT
+                ):
+                    raise ValueError("Conversation is not of type PROJECT.")
 
                 async for chunk in operations.gather_evidence(
                     conversation_id=request.conversation_id,
@@ -124,6 +160,7 @@ async def chat_message_everything(
                     llm_provider=LLMProvider.OPENAI,
                     user_references=request.user_references,
                     db=db,
+                    project_id=request.project_id,
                 ):
                     # Parse the chunk as a dictionary
                     if isinstance(chunk, dict):
@@ -166,13 +203,24 @@ async def chat_message_everything(
 
                 yield f"{json.dumps({'type': 'status', 'content': 'Generating response...'})}{END_DELIMITER}"
 
-                chat_generator = operations.chat_with_everything(
+                if request.project_id:
+                    all_papers = project_paper_crud.get_all_papers_by_project_id(
+                        db, project_id=uuid.UUID(request.project_id), user=current_user
+                    )
+                else:
+                    all_papers = paper_crud.get_all_available_papers(
+                        db,
+                        user=current_user,
+                    )
+
+                chat_generator = operations.chat_with_papers(
                     question=request.user_query,
                     llm_provider=request.llm_provider,
                     user_references=request.user_references,
                     evidence_gathered=cleaned_evidence,
                     conversation_id=request.conversation_id,
                     current_user=current_user,
+                    all_papers=all_papers,
                     db=db,
                 )
                 async for stream_chunk in _stream_chat_chunks(
@@ -238,7 +286,8 @@ async def chat_message_everything(
                         "time_taken": (
                             datetime.now(timezone.utc) - start_time
                         ).total_seconds(),
-                        "type": "everything",
+                        "type": conversation.conversable_type,
+                        "project_id": request.project_id,
                     },
                     user_id=str(current_user.id),
                 )

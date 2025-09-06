@@ -249,6 +249,8 @@ Inline Math notation should be wrapped in double dollar signs, like this: $$\\fr
 
 11. You are not allowed any html formatting. Only use Markdown, LaTeX, and code blocks.
 
+12. In the response you present to the user, do not include the paper ID when referencing particular papers.
+
 Example format:
 
 The study found that machine learning models can effectively detect spam emails [^1]. However, their performance decreases when dealing with sophisticated phishing attempts [^2].

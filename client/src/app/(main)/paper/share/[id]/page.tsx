@@ -304,7 +304,6 @@ export default function SharedPaperView() {
         const fetchConversation = async () => {
             try {
                 const response = await fetchFromApi(`/api/conversation/share/${shareId}`);
-                console.log("Fetched shared conversation messages:", response);
                 setMessages(response.messages || []);
             } catch (err) {
                 console.error("Error fetching shared conversation data:", err);

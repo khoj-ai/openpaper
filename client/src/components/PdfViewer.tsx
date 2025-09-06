@@ -197,67 +197,58 @@ export function PdfViewer(props: PdfViewerProps) {
 		return () => containerRef.current?.removeEventListener('scroll', handleScroll);
 	}, [currentPage]);
 
+	const [textReadyPages, setTextReadyPages] = useState<Set<number>>(new Set());
+	const allTextPagesReady = numPages && numPages > 0 && textReadyPages.size === numPages;
+
+	const handleTextReady = (pageIndex: number) => {
+		setTextReadyPages(prev => {
+			const newSet = new Set(prev);
+			newSet.add(pageIndex);
+			return newSet;
+		});
+	};
+
+	const handleTextLayerError = () => {
+		setTextLayerExtractionFailed(true);
+	};
+
 	useEffect(() => {
-		if (allPagesLoaded) {
-			let attempts = 0;
-			const MAX_ATTEMPTS = 50; // 10 seconds total (50 * 200ms)
+		if (allTextPagesReady) {
+			console.log("Text layers are ready, applying highlights");
+			loadHighlights();
+			renderAnnotations(annotations);
 
-			// Create a timer that repeatedly checks if text layers are ready
-			const checkInterval = setInterval(() => {
-				attempts++;
+			// Highlighting logic
+			setTimeout(() => {
+				if (highlights.length > 0) {
+					const userHighlights = highlights.filter(h => h.role === 'user');
+					const aiHighlights = highlights.filter(h => h.role === 'assistant');
 
-				if (checkTextLayersReady()) {
-					console.log("Text layers are ready, applying highlights");
-					clearInterval(checkInterval);
+					const allMatches = findAllHighlightedPassages(userHighlights);
 
-					loadHighlights();
-					renderAnnotations(annotations);
+					const handlers = {
+						setIsHighlightInteraction,
+						setSelectedText,
+						setTooltipPosition,
+						setIsAnnotating,
+						setActiveHighlight
+					};
 
-					// Highlighting logic
-					setTimeout(() => {
-						if (highlights.length > 0) {
-							const userHighlights = highlights.filter(h => h.role === 'user');
-							const aiHighlights = highlights.filter(h => h.role === 'assistant');
+					for (const match of allMatches) {
+						addHighlightToNodes(match.nodes, match.sourceHighlight, handlers);
+					}
 
-							const allMatches = findAllHighlightedPassages(userHighlights);
-
-							const handlers = {
-								setIsHighlightInteraction,
-								setSelectedText,
-								setTooltipPosition,
-								setIsAnnotating,
-								setActiveHighlight
-							};
-
-							for (const match of allMatches) {
-								addHighlightToNodes(match.nodes, match.sourceHighlight, handlers);
-							}
-
-							for (const aiHighlight of aiHighlights || []) {
-								addAIHighlightToNodes(aiHighlight, handlers);
-							}
-						}
-					}, 100);
-				} else {
-					console.log(`Text layers not ready yet, attempt ${attempts}/${MAX_ATTEMPTS}`);
-
-					// Force proceed after max attempts
-					if (attempts >= MAX_ATTEMPTS) {
-						console.warn("Text layers failed to load completely, proceeding anyway");
-						clearInterval(checkInterval);
-
-						setTextLayerExtractionFailed(true);
-
-						// Try to work with whatever text layers are available
-						loadHighlights();
-						renderAnnotations(annotations);
+					for (const aiHighlight of aiHighlights || []) {
+						addAIHighlightToNodes(aiHighlight, handlers);
 					}
 				}
-			}, 200);
 
-			return () => clearInterval(checkInterval);
+				if (explicitSearchTerm) {
+					performSearch(explicitSearchTerm);
+				}
+			}, 100);
 		}
-	}, [allPagesLoaded]);
+	}, [allTextPagesReady]);
 
 	// Add this effect to reset isHighlightInteraction when selectedText becomes empty
 	useEffect(() => {
@@ -270,26 +261,6 @@ export function PdfViewer(props: PdfViewerProps) {
 	useEffect(() => {
 		renderAnnotations(annotations);
 	}, [annotations]);
-
-	const checkTextLayersReady = () => {
-		const textLayers = document.querySelectorAll('.react-pdf__Page__textContent');
-		let allReady = true;
-
-		// A page's text layer is ready if it contains span elements
-		textLayers.forEach(layer => {
-			const textNodes = layer.querySelectorAll('span');
-			if (textNodes.length === 0) {
-				allReady = false;
-			}
-		});
-
-		// Make sure we have the expected number of text layers
-		if (textLayers.length !== numPages) {
-			allReady = false;
-		}
-
-		return allReady && textLayers.length > 0;
-	};
 
 
 	return (
@@ -482,6 +453,8 @@ export function PdfViewer(props: PdfViewerProps) {
 									className="mb-8 border-b border-gray-300"
 									renderTextLayer={true}
 									onLoadSuccess={() => handlePageLoadSuccess(index)}
+									onGetTextSuccess={() => handleTextReady(index)}
+									onGetTextError={handleTextLayerError}
 									renderAnnotationLayer={false}
 									scale={scale}
 									loading={<EnigmaticLoadingExperience />}

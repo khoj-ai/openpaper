@@ -41,9 +41,10 @@ interface PaperFilteringProps {
     onSortChange: (sort: Sort) => void
     filters: Filter[]
     sort: Sort
+    showSort?: boolean
 }
 
-export function PaperFiltering({ papers, onFilterChange, onSortChange, filters, sort }: PaperFilteringProps) {
+export function PaperFiltering({ papers, onFilterChange, onSortChange, filters, sort, showSort = true }: PaperFilteringProps) {
     const authors = Array.from(new Set(papers.flatMap(p => p.authors || [])))
     const keywords = Array.from(new Set(papers.flatMap(p => p.keywords || [])))
 
@@ -74,24 +75,28 @@ export function PaperFiltering({ papers, onFilterChange, onSortChange, filters, 
                         variant="outline"
                         className="w-[200px] justify-between"
                     >
-                        Filter & Sort
+                        {showSort ? "Filter & Sort" : "Filter"}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56">
-                    <DropdownMenuLabel>Sort by</DropdownMenuLabel>
-                    <DropdownMenuGroup>
-                        <DropdownMenuItem onSelect={() => handleSelectSort({ type: "publish_date", order: "desc" })}>
-                            Publish Date (Newest)
-                            {isSortActive({ type: "publish_date", order: "desc" }) && <Check className="ml-auto h-4 w-4" />}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => handleSelectSort({ type: "publish_date", order: "asc" })}>
-                            Publish Date (Oldest)
-                            {isSortActive({ type: "publish_date", order: "asc" }) && <Check className="ml-auto h-4 w-4" />}
-                        </DropdownMenuItem>
+                    {showSort &&
+                        <>
+                            <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+                            <DropdownMenuGroup>
+                                <DropdownMenuItem onSelect={() => handleSelectSort({ type: "publish_date", order: "desc" })}>
+                                    Publish Date (Newest)
+                                    {isSortActive({ type: "publish_date", order: "desc" }) && <Check className="ml-auto h-4 w-4" />}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => handleSelectSort({ type: "publish_date", order: "asc" })}>
+                                    Publish Date (Oldest)
+                                    {isSortActive({ type: "publish_date", order: "asc" }) && <Check className="ml-auto h-4 w-4" />}
+                                </DropdownMenuItem>
 
-                    </DropdownMenuGroup>
-                    <DropdownMenuSeparator />
+                            </DropdownMenuGroup>
+                            <DropdownMenuSeparator />
+                        </>
+                    }
                     <DropdownMenuLabel>Filter by</DropdownMenuLabel>
                     <DropdownMenuGroup>
                         <DropdownMenuSub>
@@ -148,7 +153,7 @@ export function PaperFiltering({ papers, onFilterChange, onSortChange, filters, 
                                 </Command>
                             </DropdownMenuSubContent>
                         </DropdownMenuSub>
-                    <DropdownMenuSub>
+                        <DropdownMenuSub>
                             <DropdownMenuSubTrigger>Status</DropdownMenuSubTrigger>
                             <DropdownMenuSubContent className="p-0">
                                 <Command>

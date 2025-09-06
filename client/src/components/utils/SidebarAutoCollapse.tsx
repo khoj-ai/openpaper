@@ -9,18 +9,22 @@ export function SidebarController({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const { setOpenMobile, setOpen } = useSidebar();
     const { user } = useAuth();
-    const hasInitialized = useRef(false);
+    const previousPathname = useRef<string | null>(null);
 
     useEffect(() => {
-        if (!hasInitialized.current) {
-            if (pathname.includes('/paper/')) {
+        // Always close mobile sidebar on navigation
+        setOpenMobile(false);
+
+        // Only auto-collapse desktop sidebar if pathname actually changed
+        if (previousPathname.current !== pathname) {
+            if (pathname.includes('/paper/') || pathname.includes('/projects/') || pathname.endsWith('/papers')) {
                 setOpen(false);
             } else if (pathname === '/' && !user) {
                 setOpen(false);
             }
-            hasInitialized.current = true;
+
+            previousPathname.current = pathname;
         }
-        setOpenMobile(false);
     }, [pathname, setOpen, setOpenMobile, user]);
 
     return <>{children}</>;

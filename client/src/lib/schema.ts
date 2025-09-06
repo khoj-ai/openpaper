@@ -230,6 +230,7 @@ export interface PaperItem {
     publish_date?: string
     status?: PaperStatus
     preview_url?: string
+    file_url?: string
     size_in_kb?: number
 }
 
@@ -253,4 +254,14 @@ export interface AudioOverview {
     created_at: string;
     updated_at: string;
     job_id: string;
+}
+
+export interface Project {
+    id: string;
+    title: string;
+    description: string;
+    num_papers?: number;
+    num_conversations?: number;
+    created_at: string;
+    updated_at: string;
 }

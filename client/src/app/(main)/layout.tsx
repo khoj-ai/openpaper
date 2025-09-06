@@ -5,10 +5,11 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { AuthProvider } from "@/lib/auth";
-import OnboardingChecklist from "@/components/OnboardingChecklist";
+
 import { Toaster } from "@/components/ui/sonner";
 import { PostHogProvider, ThemeProvider } from "@/lib/providers";
 import { SidebarController } from "@/components/utils/SidebarAutoCollapse";
+import Image from "next/image";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -85,7 +86,13 @@ export default function RootLayout({
 										<SidebarTrigger className="-ml-1" />
 										<Separator orientation="vertical" className="mr-2 h-4" />
 										<header className="flex flex-1 items-center gap-2">
-											<OnboardingChecklist />
+											<Image
+												src="/openpaper.svg"
+												width={24}
+												height={24}
+												alt="Open Paper Logo"
+											/>
+											<span className="text-sm font-semibold">Open Paper</span>
 										</header>
 									</header>
 									<SidebarController>

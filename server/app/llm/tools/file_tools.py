@@ -1,7 +1,9 @@
 import re
-from typing import Dict
+import uuid
+from typing import Dict, List, Optional
 
 from app.database.crud.paper_crud import paper_crud
+from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.models import Paper
 from app.schemas.user import CurrentUser
 from sqlalchemy.orm import Session
@@ -98,11 +100,25 @@ search_all_files_function = {
 }
 
 
-def read_file(paper_id: str, current_user: CurrentUser, db: Session) -> str:
+def read_file(
+    paper_id: str,
+    current_user: CurrentUser,
+    db: Session,
+    project_id: Optional[str] = None,
+) -> str:
     """
     Read the content of a file associated with a paper.
     """
-    paper: Paper = paper_crud.get(db, id=paper_id, user=current_user)
+    paper: Optional[Paper] = None
+    if project_id:
+        paper = project_paper_crud.get_paper_by_project(
+            db,
+            paper_id=uuid.UUID(paper_id),
+            project_id=uuid.UUID(project_id),
+            user=current_user,
+        )
+    else:
+        paper = paper_crud.get(db, id=paper_id, user=current_user)
 
     if not paper:
         raise ValueError("Paper not found or access denied")
@@ -115,13 +131,26 @@ def read_file(paper_id: str, current_user: CurrentUser, db: Session) -> str:
 
 
 def search_file(
-    paper_id: str, query: str, current_user: CurrentUser, db: Session
+    paper_id: str,
+    query: str,
+    current_user: CurrentUser,
+    db: Session,
+    project_id: Optional[str] = None,
 ) -> list[str]:
     """
     Search for a specific query (as regex) in the file content of a paper.
     Returns matching lines with line numbers.
     """
-    paper: Paper = paper_crud.get(db, id=paper_id, user=current_user)
+    paper: Optional[Paper] = None
+    if project_id:
+        paper = project_paper_crud.get_paper_by_project(
+            db,
+            paper_id=uuid.UUID(paper_id),
+            project_id=uuid.UUID(project_id),
+            user=current_user,
+        )
+    else:
+        paper = paper_crud.get(db, id=paper_id, user=current_user)
 
     if not paper:
         raise ValueError("Paper not found or access denied")
@@ -146,13 +175,24 @@ def search_file(
 
 
 def search_all_files(
-    query: str, current_user: CurrentUser, db: Session
+    query: str,
+    current_user: CurrentUser,
+    db: Session,
+    project_id: Optional[str] = None,
 ) -> Dict[str, list[str]]:
     """
     Search for a specific query (as regex) in the file content of all papers.
     Returns a list of matching lines with paper IDs and line numbers.
     """
-    all_papers = paper_crud.get_all_available_papers(db, user=current_user, query=query)
+    all_papers: List[Paper] = []
+    if project_id:
+        all_papers = project_paper_crud.get_all_papers_by_project_id(
+            db, project_id=uuid.UUID(project_id), user=current_user
+        )
+    else:
+        all_papers = paper_crud.get_all_available_papers(
+            db, user=current_user, query=query
+        )
     results = {}
 
     for paper in all_papers:
@@ -178,8 +218,6 @@ def search_all_files(
 
     return results
 
-    return results
-
 
 def view_file(
     paper_id: str,
@@ -187,11 +225,21 @@ def view_file(
     range_end: int,
     current_user: CurrentUser,
     db: Session,
+    project_id: Optional[str] = None,
 ) -> str:
     """
     View a specific range of lines from the file content of a paper.
     """
-    paper: Paper = paper_crud.get(db, id=paper_id, user=current_user)
+    paper: Optional[Paper] = None
+    if project_id:
+        paper = project_paper_crud.get_paper_by_project(
+            db,
+            paper_id=uuid.UUID(paper_id),
+            project_id=uuid.UUID(project_id),
+            user=current_user,
+        )
+    else:
+        paper = paper_crud.get(db, id=paper_id, user=current_user)
 
     if not paper:
         raise ValueError("Paper not found or access denied")
@@ -213,11 +261,25 @@ def view_file(
     return total_chunk
 
 
-def read_abstract(paper_id: str, current_user: CurrentUser, db: Session) -> str:
+def read_abstract(
+    paper_id: str,
+    current_user: CurrentUser,
+    db: Session,
+    project_id: Optional[str] = None,
+) -> str:
     """
     Read the abstract of a paper.
     """
-    paper: Paper = paper_crud.get(db, id=paper_id, user=current_user)
+    paper: Optional[Paper] = None
+    if project_id:
+        paper = project_paper_crud.get_paper_by_project(
+            db,
+            paper_id=uuid.UUID(paper_id),
+            project_id=uuid.UUID(project_id),
+            user=current_user,
+        )
+    else:
+        paper = paper_crud.get(db, id=paper_id, user=current_user)
 
     if not paper:
         raise ValueError("Paper not found or access denied")

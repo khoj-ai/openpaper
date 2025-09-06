@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { UploadCloud } from 'lucide-react';
 
 interface PdfDropzoneProps {
-    onFileSelect: (file: File) => void;
+    onFileSelect: (files: File[]) => void;
     onUrlClick: () => void;
     maxSizeMb?: number;
 }
@@ -16,11 +16,7 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 5 }: PdfDrop
     const fileInputRef = useRef<HTMLInputElement>(null);
     const maxSize = maxSizeMb * 1024 * 1024; // Convert MB to bytes
 
-    const handleFileValidation = (file: File | null): boolean => {
-        setError(null); // Reset error
-        if (!file) {
-            return false;
-        }
+    const handleFileValidation = (file: File): boolean => {
         if (file.type !== 'application/pdf') {
             setError('Invalid file type. Please upload a PDF.');
             return false;
@@ -41,19 +37,17 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 5 }: PdfDrop
     const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
         e.stopPropagation();
-        // Only set isDragging to false if the leave event is not triggered by entering a child element
         if (e.relatedTarget && !(e.currentTarget.contains(e.relatedTarget as Node))) {
             setIsDragging(false);
         } else if (!e.relatedTarget) {
-             // Handle leaving the browser window while dragging
-             setIsDragging(false);
+            setIsDragging(false);
         }
     };
 
     const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault(); // Necessary to allow dropping
+        e.preventDefault();
         e.stopPropagation();
-        setIsDragging(true); // Keep highlighting while dragging over
+        setIsDragging(true);
     };
 
     const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -62,30 +56,29 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 5 }: PdfDrop
         setIsDragging(false);
         setError(null);
 
-        const files = e.dataTransfer.files;
-        if (files && files.length > 0) {
-            const file = files[0];
-            if (handleFileValidation(file)) {
-                onFileSelect(file);
-            }
-             // Clear the data transfer buffer
-            if (e.dataTransfer) {
-                e.dataTransfer.items.clear();
-            }
+        const files = Array.from(e.dataTransfer.files);
+        const validFiles = files.filter(handleFileValidation);
+
+        if (validFiles.length > 0) {
+            onFileSelect(validFiles);
+        }
+
+        if (e.dataTransfer) {
+            e.dataTransfer.items.clear();
         }
     }, [onFileSelect, maxSize, maxSizeMb]);
 
     const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (handleFileValidation(file || null)) {
-             if (file) {
-                onFileSelect(file);
-             }
+        const files = Array.from(e.target.files || []);
+        const validFiles = files.filter(handleFileValidation);
+
+        if (validFiles.length > 0) {
+            onFileSelect(validFiles);
         }
-         // Reset file input value to allow uploading the same file again
-         if (e.target) {
+
+        if (e.target) {
             e.target.value = '';
-         }
+        }
     };
 
     const handleClick = () => {
@@ -104,7 +97,7 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 5 }: PdfDrop
                     ${isDragging ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50 hover:bg-secondary/50'}
                     ${error ? 'border-destructive' : ''}
                 `}
-                style={{ minHeight: '200px' }} // Ensure minimum height
+                style={{ minHeight: '200px' }}
             >
                 <input
                     type="file"
@@ -112,6 +105,7 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 5 }: PdfDrop
                     accept=".pdf"
                     className="hidden"
                     onChange={handleFileInputChange}
+                    multiple
                 />
                 <UploadCloud className={`h-12 w-12 mb-4 ${isDragging ? 'text-primary' : 'text-muted-foreground'}`} />
                 <p className="text-center text-lg font-medium">

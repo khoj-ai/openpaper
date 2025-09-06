@@ -10,9 +10,14 @@ import os
 import time
 from io import BytesIO
 from typing import Any, Dict, Optional
+from uuid import UUID
 
 import requests
 from app.database.crud.paper_crud import PaperCreate, paper_crud
+from app.database.crud.projects.project_paper_crud import (
+    ProjectPaperCreate,
+    project_paper_crud,
+)
 from app.database.models import PaperUploadJob
 from app.database.telemetry import track_event
 from app.helpers.s3 import s3_service
@@ -213,6 +218,7 @@ class PDFJobsClient:
         paper_upload_job: PaperUploadJob,
         db: Session,
         user: CurrentUser,
+        project_id: Optional[UUID] = None,
     ) -> str:
         """
         Upload a PDF file to S3 and submit a processing job.
@@ -274,11 +280,32 @@ class PDFJobsClient:
                 upload_job_id=str(job_id),
             )
 
-            paper_crud.create(
+            created_paper = paper_crud.create(
                 db=db,
                 obj_in=new_paper,
                 user=user,
             )
+
+            if not created_paper:
+                raise Exception(
+                    "Failed to create paper record after S3 upload. Check permissions or if the paper already exists."
+                )
+
+            if project_id and created_paper.id:
+                casted_uuid = UUID(str(created_paper.id))
+
+                # Create project paper association if project_id is provided
+                project_paper = project_paper_crud.create(
+                    db=db,
+                    obj_in=ProjectPaperCreate(paper_id=casted_uuid),
+                    user=user,
+                    project_id=project_id,
+                )
+
+                if not project_paper:
+                    raise Exception(
+                        "Failed to associate paper with project. Check permissions or if the paper already exists in the project."
+                    )
 
             # Submit processing job with S3 object key
             task_id = self.submit_pdf_processing_job(s3_object_key, job_id)
