@@ -395,9 +395,9 @@ export default function ProjectPage() {
 			</div>
 
 
-			<div className="flex gap-6 -mx-4">
+			<div className="flex flex-col lg:flex-row gap-6 -mx-4">
 				{/* Left side - Conversations */}
-				<div className="w-2/3 px-4">
+				<div className="w-full lg:w-2/3 px-4">
 					{/* Conversation Input */}
 					{papers.length > 0 ? (
 						<div className="mb-6">
@@ -481,7 +481,7 @@ export default function ProjectPage() {
 				</div>
 
 				{/* Right side - Papers */}
-				<div className="w-1/3 px-4">
+				<div className="w-full lg:w-1/3 px-4">
 					<div className="flex justify-between items-center mb-4">
 						<h2 className="text-2xl font-bold">Papers</h2>
 						<Sheet open={isAddPapersSheetOpen} onOpenChange={setIsAddPapersSheetOpen}>
