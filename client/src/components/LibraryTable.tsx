@@ -57,7 +57,7 @@ export function LibraryTable({
 	const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' } | null>({ key: 'created_at', direction: 'descending' });
 	const [selectedPaperForPreview, setSelectedPaperForPreview] = useState<PaperItem | null>(null);
 
-	const sort = { type: "publish_date", order: "desc" };
+	const sort: Sort = { type: "publish_date", order: "desc" };
 
 	useEffect(() => {
 		const getPapers = async () => {
