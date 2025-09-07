@@ -10,10 +10,12 @@ import { PlusCircle, FolderOpen, Target, BookOpen, FileText, AlertTriangle } fro
 import { useSubscription, isProjectNearLimit, isProjectAtLimit } from "@/hooks/useSubscription";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
 
 export default function Projects() {
 	const [projects, setProjects] = useState<Project[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
+	const { user, loading: userLoading } = useAuth();
 	const [error, setError] = useState<string | null>(null);
 	const { subscription } = useSubscription();
 	const router = useRouter();
@@ -34,8 +36,12 @@ export default function Projects() {
 	};
 
 	useEffect(() => {
+		if (userLoading) return;
+		if (!user) {
+			router.push("/login");
+		}
 		getProjects();
-	}, []);
+	}, [userLoading, user, router]);
 
 	useEffect(() => {
 		if (subscription) {
