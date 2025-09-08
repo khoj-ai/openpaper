@@ -152,6 +152,13 @@ class User(Base):
         cascade="all, delete-orphan",
     )
 
+    onboarding = relationship(
+        "Onboarding",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
 
 class Session(Base):
     __tablename__ = "sessions"
@@ -749,3 +756,33 @@ class Subscription(Base):
 
     # Relationship with User
     user = relationship("User", back_populates="subscription")
+
+
+class Onboarding(Base):
+    __tablename__ = "onboarding"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    # Basic user information
+    name = Column(String, nullable=True)
+    email = Column(String, nullable=True)
+    company = Column(String, nullable=True)
+
+    # Research fields (stored as comma-separated string)
+    research_fields = Column(String, nullable=True)
+    research_fields_other = Column(String, nullable=True)
+
+    # Job titles (stored as comma-separated string)
+    job_titles = Column(String, nullable=True)
+    job_titles_other = Column(String, nullable=True)
+
+    # Reading frequency
+    reading_frequency = Column(String, nullable=True)
+
+    # Referral source
+    referral_source = Column(String, nullable=True)
+    referral_source_other = Column(String, nullable=True)
+
+    user = relationship("User", back_populates="onboarding")

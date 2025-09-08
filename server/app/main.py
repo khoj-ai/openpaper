@@ -8,6 +8,7 @@ from app.api.auth_api import auth_router
 from app.api.conversation_api import conversation_router
 from app.api.highlight_api import highlight_router
 from app.api.message_api import message_router
+from app.api.onboarding_api import onboarding_router
 from app.api.paper_api import paper_router
 from app.api.paper_audio_api import paper_audio_router
 from app.api.paper_image_api import paper_image_router
@@ -72,6 +73,7 @@ app.include_router(
     subscription_router, prefix="/api/subscription"
 )  # Subscription routes
 app.include_router(webhook_router, prefix="/api/webhooks")  # Webhook routes
+app.include_router(onboarding_router, prefix="/api/onboarding")
 
 setup_admin(app)  # Setup admin interface
 

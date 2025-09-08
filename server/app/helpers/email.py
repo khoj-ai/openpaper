@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Union
 
 import resend
+from app.database.models import Onboarding
 
 logger = logging.getLogger(__name__)
 
@@ -203,3 +204,46 @@ def send_subscription_welcome_email(
 
     except Exception as e:
         logger.error(f"Failed to send subscription welcome email: {e}", exc_info=True)
+
+
+def send_profile_email(
+    profile: Onboarding,
+):
+    """
+    An internal email to send the developer with the user profile information
+    """
+    try:
+        # Format profile data with alternating background colors
+        profile_dict = profile.to_dict()
+        formatted_data = ""
+
+        excluded_keys = ["id", "created_at", "updated_at"]
+        for i, (key, value) in enumerate(profile_dict.items()):
+            if key in excluded_keys:
+                continue
+            # Alternate between light and white backgrounds
+            bg_color = "#ffffff" if i % 2 == 0 else "#f8f9fa"
+
+            formatted_data += f"""
+            <div style="background-color:{bg_color};padding:12px;margin:2px 0;border-radius:6px">
+                <div style="font-weight:600;color:#2c3e50;margin-bottom:4px">{key.replace('_', ' ').title()}:</div>
+                <div style="color:#34495e;word-wrap:break-word">{value}</div>
+            </div>
+            """
+
+        html_content = load_email_template("profile.html").replace(
+            "{{profile_data}}", formatted_data
+        )
+
+        payload = resend.Emails.SendParams = {  # type: ignore
+            "from": "Open Paper <support@updates.openpaper.ai>",
+            "reply_to": REPLY_TO_DEFAULT_EMAIL,
+            "to": "saba@openpaper.ai",
+            "subject": f"OP Onboarding",
+            "html": html_content,
+        }
+
+        resend.Emails.send(payload)  # type: ignore
+
+    except Exception as e:
+        logger.error(f"Failed to send profile email: {e}", exc_info=True)
