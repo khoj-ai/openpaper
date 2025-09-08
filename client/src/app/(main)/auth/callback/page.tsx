@@ -6,64 +6,52 @@ import { Suspense, useEffect, useState } from "react";
 import confetti from 'canvas-confetti';
 
 function Welcome() {
-	const [isLoading, setIsLoading] = useState(true);
+	const router = useRouter();
 
 	useEffect(() => {
-		const timer = setTimeout(() => setIsLoading(false), 2000); // Simulate loading
-		return () => clearTimeout(timer);
-	}, []);
+		const duration = 1.5 * 1000;
+		const animationEnd = Date.now() + duration;
+		const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 100 };
 
-	useEffect(() => {
-		if (!isLoading) {
-			const duration = 1.5 * 1000;
-			const animationEnd = Date.now() + duration;
-			const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 100 };
+		const randomInRange = (min: number, max: number) =>
+			Math.random() * (max - min) + min;
 
-			const randomInRange = (min: number, max: number) =>
-				Math.random() * (max - min) + min;
+		const interval = window.setInterval(() => {
+			const timeLeft = animationEnd - Date.now();
 
-			const interval = window.setInterval(() => {
-				const timeLeft = animationEnd - Date.now();
+			if (timeLeft <= 0) {
+				return clearInterval(interval);
+			}
 
-				if (timeLeft <= 0) {
-					return clearInterval(interval);
-				}
+			const particleCount = 50 * (timeLeft / duration);
+			confetti({
+				...defaults,
+				particleCount,
+				origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
+			});
+			confetti({
+				...defaults,
+				particleCount,
+				origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
+			});
+		}, 250);
 
-				const particleCount = 50 * (timeLeft / duration);
-				confetti({
-					...defaults,
-					particleCount,
-					origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
-				});
-				confetti({
-					...defaults,
-					particleCount,
-					origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
-				});
-			}, 250);
-		}
-	}, [isLoading]);
+		const redirectTimer = setTimeout(() => {
+			router.push('/');
+		}, duration);
+
+		return () => {
+			clearInterval(interval);
+			clearTimeout(redirectTimer);
+		};
+	}, [router]);
 
 	return (
 		<div className="relative flex items-center justify-center min-h-[calc(100vh-64px)]">
-			{isLoading && (
-				<div className="absolute inset-0 flex items-center justify-center bg-background z-10">
-					<div className="text-center">
-						<div className="h-full flex flex-col items-center justify-center py-8 space-y-6">
-							<Loader2 className="h-12 w-12 animate-spin text-primary" />
-						</div>
-						<h2 className="text-xl font-medium">Before we get started...</h2>
-						<p className="text-muted-foreground">Let&apos;s get you set up with a few quick questions.</p>
-					</div>
-				</div>
-			)}
-			<iframe
-				src="https://airtable.com/embed/appsoVzfoZWtdO8bA/pagAX3R0B2lBJxuTS/form?backgroundColor=transparent&prefill_source=embed_form"
-				width="100%"
-				height="100%"
-				className="bg-transparent border-none"
-				onLoad={() => setIsLoading(false)}
-			></iframe>
+			<div className="text-center">
+				<h2 className="text-2xl font-bold text-primary">Welcome to Open Paper</h2>
+				<p className="text-muted-foreground">Redirecting you to the dashboard...</p>
+			</div>
 		</div>
 	);
 }
