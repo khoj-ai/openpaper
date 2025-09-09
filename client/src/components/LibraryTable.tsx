@@ -193,9 +193,23 @@ export function LibraryTable({
 		if (!handleDelete) return;
 
 		const paperIdsToDelete = Array.from(selectedPapers);
+		const successfullyDeletedIds: string[] = [];
 		for (const paperId of paperIdsToDelete) {
-			await handleDelete(paperId);
+			try {
+				await handleDelete(paperId);
+				successfullyDeletedIds.push(paperId);
+			} catch (error) {
+				console.error(`Failed to delete paper ${paperId}:`, error);
+				toast.error("Failed to delete a paper.");
+			}
 		}
+
+		if (successfullyDeletedIds.length > 0) {
+			setInternalPapers(prevPapers =>
+				prevPapers.filter(p => !successfullyDeletedIds.includes(p.id))
+			);
+		}
+
 		setSelectedPapers(new Set());
 	};
 
