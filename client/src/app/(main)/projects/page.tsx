@@ -11,6 +11,7 @@ import { useSubscription, isProjectNearLimit, isProjectAtLimit } from "@/hooks/u
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
+import LoadingIndicator from "@/components/utils/Loading";
 
 export default function Projects() {
 	const [projects, setProjects] = useState<Project[]>([]);
@@ -161,8 +162,8 @@ export default function Projects() {
 
 			{isLoading ? (
 				<div className="flex items-center justify-center py-12">
-					<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-					<span className="ml-3 text-gray-600">Loading projects...</span>
+					<LoadingIndicator />
+					<span className="ml-3 text-gray-600">Retrieving your projects...</span>
 				</div>
 			) : error ? (
 				<div className="flex flex-col items-center justify-center py-12">
