@@ -153,7 +153,7 @@ export default function Projects() {
 							: `You have used ${subscription.usage.projects} of ${
 									subscription.usage.projects + subscription.usage.projects_remaining
 							  } projects. Consider upgrading soon.`}
-						<Link href="/settings/billing" className="font-semibold underline ml-2 text-primary">
+						<Link href="/pricing" className="font-semibold underline ml-2 text-primary">
 							View Plans
 						</Link>
 					</AlertDescription>
