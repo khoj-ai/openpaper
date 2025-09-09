@@ -79,12 +79,12 @@ async def create_onboarding(
 
         job_titles_str = request.job_titles or ""
         prepared_onboarding["job_titles"] = [
-            s.strip() for s in job_titles_str.split(",") if s.strip()
+            s.strip() for s in job_titles_str.lower().split(",") if s.strip()
         ]
 
         research_fields_str = request.research_fields or ""
         prepared_onboarding["research_fields"] = [
-            s.strip() for s in research_fields_str.split(",") if s.strip()
+            s.strip() for s in research_fields_str.lower().split(",") if s.strip()
         ]
 
         track_event(
