@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { fetchFromApi } from "@/lib/api";
 import {
 	Dialog,
@@ -20,7 +21,6 @@ import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience"
 import { PaperItem } from "@/lib/schema";
 import PaperCard from "@/components/PaperCard";
 import { JobStatusType, JobStatusResponse } from "@/lib/schema";
-import OpenPaperLanding from "@/components/OpenPaperLanding";
 import { toast } from "sonner";
 import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isPaperUploadNearLimit, isStorageNearLimit } from "@/hooks/useSubscription";
 
@@ -46,6 +46,7 @@ export default function Home() {
 
 	const { user, loading: authLoading } = useAuth();
 	const { subscription, loading: subscriptionLoading } = useSubscription();
+	const router = useRouter();
 
 	// Toast notifications for subscription limits
 	useEffect(() => {
@@ -349,9 +350,8 @@ export default function Home() {
 	}
 
 	if (!user && !authLoading) {
-		return (
-			<OpenPaperLanding />
-		);
+		router.push('/home');
+		return null;
 	}
 
 	return (
