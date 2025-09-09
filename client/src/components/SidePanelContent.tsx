@@ -142,6 +142,7 @@ export function SidePanelContent({
     const [displayedText, setDisplayedText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const [currentLoadingMessageIndex, setCurrentLoadingMessageIndex] = useState(0);
+    const [errorState, setErrorState] = useState<{ failedUserMessage: string } | null>(null);
 
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const chatInputFormRef = useRef<HTMLFormElement | null>(null);
@@ -462,9 +463,13 @@ export function SidePanelContent({
 
         if (!currentMessage.trim() || isStreaming) return;
 
+        setErrorState(null);
+
         // Add user message to chat
         const userMessage: ChatMessage = { role: 'user', content: currentMessage, references: transformReferencesToFormat(userMessageReferences) };
         setMessages(prev => [...prev, userMessage]);
+
+        const failedUserMessage = currentMessage;
 
         // Clear input field
         setCurrentMessage('');
@@ -604,14 +609,7 @@ export function SidePanelContent({
 
         } catch (error) {
             console.error('Error during streaming:', error);
-            setMessages(prev => {
-                const updatedMessages = [...prev];
-                updatedMessages[updatedMessages.length - 1] = {
-                    ...updatedMessages[updatedMessages.length - 1],
-                    content: "An error occurred while processing your request.",
-                };
-                return updatedMessages;
-            });
+            setErrorState({ failedUserMessage });
         } finally {
             setIsStreaming(false);
         }
@@ -1088,6 +1086,28 @@ export function SidePanelContent({
                                             </div>
                                         ) : (
                                             memoizedMessages
+                                        )}
+                                        {errorState && !isStreaming && (
+                                            <div className="relative group prose dark:prose-invert p-2 !max-w-full rounded-lg w-full text-primary dark:text-primary-foreground">
+                                                <div className="text-red-500">
+                                                    <p>An error occurred while processing your request.</p>
+                                                    <Button
+                                                        variant="outline"
+                                                        className="mt-2"
+                                                        onClick={() => {
+                                                            const lastUserMessageIndex = messages.findLastIndex(m => m.role === 'user');
+                                                            if (lastUserMessageIndex !== -1) {
+                                                                setMessages(prev => prev.slice(0, lastUserMessageIndex));
+                                                            }
+                                                            setCurrentMessage(errorState.failedUserMessage);
+                                                            setErrorState(null);
+                                                            inputMessageRef.current?.focus();
+                                                        }}
+                                                    >
+                                                        Try Again
+                                                    </Button>
+                                                </div>
+                                            </div>
                                         )}
                                         {
                                             isStreaming && streamingChunks.length > 0 && (
