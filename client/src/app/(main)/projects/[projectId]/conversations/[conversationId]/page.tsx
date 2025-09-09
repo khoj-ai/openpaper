@@ -102,9 +102,7 @@ function ProjectConversationPageContent() {
     }, [chatCreditLimitReached]);
 
     const handleCitationClick = useCallback((key: string, messageIndex: number) => {
-        // Use a function to get the latest messages instead of relying on the closure
         setHighlightedInfo((prevHighlight) => {
-            // Get the current messages from the component's props
             const message = messages[messageIndex];
             if (!message) return prevHighlight;
 
@@ -125,7 +123,7 @@ function ProjectConversationPageContent() {
 
             return newHighlight;
         });
-    }, []);
+    }, [messages]);
 
     useEffect(() => {
         if (!authLoading && !user) {
@@ -161,8 +159,6 @@ function ProjectConversationPageContent() {
             const pendingQuery = localStorage.getItem(`pending-query-${conversationIdFromUrl}`);
             if (pendingQuery) {
                 localStorage.removeItem(`pending-query-${conversationIdFromUrl}`);
-                const userMessage: ChatMessage = { role: 'user', content: pendingQuery };
-                setMessages([userMessage]);
                 handleSubmit(null, pendingQuery);
                 setIsSessionLoading(false);
             } else if (!isStreaming && messages.length === 0) {
@@ -257,13 +253,10 @@ function ProjectConversationPageContent() {
 
         if (!query.trim() || isStreaming || !conversationId) return;
 
+        const userMessage: ChatMessage = { role: 'user', content: query };
+        setMessages(prev => [...prev, userMessage]);
+
         if (!message) {
-            const userMessage: ChatMessage = { role: 'user', content: query };
-            // Use functional update to ensure we get the latest state
-            setMessages(prev => {
-                const newMessages = [...prev, userMessage];
-                return newMessages;
-            });
             setCurrentMessage('');
         }
 
