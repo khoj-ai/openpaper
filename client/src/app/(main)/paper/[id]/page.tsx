@@ -3,7 +3,7 @@
 import { PdfViewer } from '@/components/PdfViewer';
 import { Button } from '@/components/ui/button';
 import { fetchFromApi } from '@/lib/api';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
 
 
@@ -89,6 +89,8 @@ const PaperToolset = {
 
 export default function PaperView() {
     const params = useParams();
+    const router = useRouter();
+    const searchParams = useSearchParams();
     const id = params.id as string;
     const { user, loading: authLoading } = useAuth();
     const [paperData, setPaperData] = useState<PaperData | null>(null);
@@ -135,7 +137,21 @@ export default function PaperView() {
     const [sidePanelDisplayedText, setSidePanelDisplayedText] = useState('');
     const [elapsedTime, setElapsedTime] = useState(0);
 
-    const [rightSideFunction, setRightSideFunction] = useState<string>('Overview');
+    const [rightSideFunction, setRightSideFunction] = useState<string>(() => {
+        const rsf = searchParams.get('rsf')?.toLowerCase();
+        const validTools = PaperToolset.nav.map(tool => tool.name.toLowerCase());
+        if (rsf && validTools.includes(rsf)) {
+            const toolName = PaperToolset.nav.find(tool => tool.name.toLowerCase() === rsf);
+            return toolName ? toolName.name : 'Overview';
+        }
+        return 'Overview';
+    });
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        params.set('rsf', rightSideFunction.toLowerCase());
+        router.replace(`${window.location.pathname}?${params.toString()}`);
+    }, [rightSideFunction, router]);
     const [leftPanelWidth, setLeftPanelWidth] = useState(60); // percentage
     const [isDragging, setIsDragging] = useState(false);
     const isMobile = useIsMobile();
