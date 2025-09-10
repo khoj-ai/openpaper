@@ -96,6 +96,7 @@ class ProjectConversationCRUD(
                 self.model.conversable_id == project_id,
                 self.model.conversable_type == ConversableType.PROJECT,
             )
+            .order_by(self.model.updated_at.desc())
             .all()
         )
 
