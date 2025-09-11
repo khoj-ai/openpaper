@@ -47,6 +47,7 @@ import {
 	BreadcrumbPage,
 	BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { useSubscription, isPaperUploadAtLimit } from "@/hooks/useSubscription";
 
 interface PdfUploadResponse {
 	message: string;
@@ -73,6 +74,8 @@ export default function ProjectPage() {
 	const [currentDescription, setCurrentDescription] = useState("");
 	const [isAddPapersSheetOpen, setIsAddPapersSheetOpen] = useState(false);
 	const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+	const { subscription } = useSubscription();
+
 
 	const getProject = useCallback(async () => {
 		try {
@@ -115,6 +118,10 @@ export default function ProjectPage() {
 	}, [projectId, getProject, getProjectPapers, getProjectConversations]);
 
 	const handleFileSelect = async (files: File[]) => {
+		if (isPaperUploadAtLimit(subscription)) {
+			setUploadError("You have reached your paper upload limit. Please upgrade your plan to upload more papers.");
+			return;
+		}
 		setUploadError(null);
 		const newJobs: MinimalJob[] = [];
 		if (files.length > 0) {
@@ -148,6 +155,11 @@ export default function ProjectPage() {
 	}, [projectId, getProjectPapers]);
 
 	const handlePdfUrl = async (url: string) => {
+		if (isPaperUploadAtLimit(subscription)) {
+			setUploadError("You have reached your paper upload limit. Please upgrade your plan to upload more papers.");
+			setIsUrlDialogOpen(false);
+			return;
+		}
 		setIsUploading(true);
 		try {
 			// Fallback to server-side fetch
@@ -498,7 +510,7 @@ export default function ProjectPage() {
 								<div className="mt-4 px-6">
 									<h3 className="text-lg font-semibold mb-2">Upload New Papers</h3>
 									<h2>You can upload any additional papers to your library here. They will automatically be added to the project.</h2>
-									<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} />
+									<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} disabled={isPaperUploadAtLimit(subscription)} />
 									{uploadError && <p className="text-red-500 mt-4">{uploadError}</p>}
 									<h3 className="text-lg font-semibold mb-2">Add from Library</h3>
 									<AddFromLibrary projectId={projectId} onPapersAdded={getProjectPapers} projectPaperIds={papers.map(p => p.id)} />
