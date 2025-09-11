@@ -8,9 +8,10 @@ interface PdfDropzoneProps {
     onFileSelect: (files: File[]) => void;
     onUrlClick: () => void;
     maxSizeMb?: number;
+    disabled?: boolean;
 }
 
-export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 5 }: PdfDropzoneProps) {
+export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 5, disabled = false }: PdfDropzoneProps) {
     const [isDragging, setIsDragging] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -29,12 +30,14 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 5 }: PdfDrop
     };
 
     const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+        if (disabled) return;
         e.preventDefault();
         e.stopPropagation();
         setIsDragging(true);
     };
 
     const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+        if (disabled) return;
         e.preventDefault();
         e.stopPropagation();
         if (e.relatedTarget && !(e.currentTarget.contains(e.relatedTarget as Node))) {
@@ -45,12 +48,14 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 5 }: PdfDrop
     };
 
     const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        if (disabled) return;
         e.preventDefault();
         e.stopPropagation();
         setIsDragging(true);
     };
 
     const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+        if (disabled) return;
         e.preventDefault();
         e.stopPropagation();
         setIsDragging(false);
@@ -66,9 +71,10 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 5 }: PdfDrop
         if (e.dataTransfer) {
             e.dataTransfer.items.clear();
         }
-    }, [onFileSelect, maxSize, maxSizeMb]);
+    }, [onFileSelect, maxSize, maxSizeMb, disabled]);
 
     const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (disabled) return;
         const files = Array.from(e.target.files || []);
         const validFiles = files.filter(handleFileValidation);
 
@@ -82,6 +88,7 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 5 }: PdfDrop
     };
 
     const handleClick = () => {
+        if (disabled) return;
         fileInputRef.current?.click();
     };
 
@@ -93,9 +100,10 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 5 }: PdfDrop
                 onDragOver={handleDragOver}
                 onDragEnter={handleDragEnter}
                 onDragLeave={handleDragLeave}
-                className={`flex flex-col items-center justify-center w-full p-8 border-2 border-dashed rounded-lg cursor-pointer transition-colors duration-200 ease-in-out
-                    ${isDragging ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50 hover:bg-secondary/50'}
+                className={`flex flex-col items-center justify-center w-full p-8 border-2 border-dashed rounded-lg transition-colors duration-200 ease-in-out
+                    ${isDragging && !disabled ? 'border-primary bg-primary/10' : 'border-border'}
                     ${error ? 'border-destructive' : ''}
+                    ${disabled ? 'cursor-not-allowed bg-secondary/50' : 'cursor-pointer hover:border-primary/50 hover:bg-secondary/50'}
                 `}
                 style={{ minHeight: '200px' }}
             >
@@ -106,8 +114,9 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 5 }: PdfDrop
                     className="hidden"
                     onChange={handleFileInputChange}
                     multiple
+                    disabled={disabled}
                 />
-                <UploadCloud className={`h-12 w-12 mb-4 ${isDragging ? 'text-primary' : 'text-muted-foreground'}`} />
+                <UploadCloud className={`h-12 w-12 mb-4 ${isDragging && !disabled ? 'text-primary' : 'text-muted-foreground'}`} />
                 <p className="text-center text-lg font-medium">
                     Click to upload, or drag and drop
                 </p>
@@ -121,7 +130,7 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 5 }: PdfDrop
                 <span className="flex-shrink mx-4 text-muted-foreground text-sm">or</span>
                 <div className="flex-grow border-t border-border"></div>
             </div>
-            <Button variant="outline" onClick={onUrlClick}>
+            <Button variant="outline" onClick={onUrlClick} disabled={disabled}>
                 Import from URL
             </Button>
         </div>
