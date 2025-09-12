@@ -49,7 +49,8 @@ import {
 	BreadcrumbPage,
 	BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { useSubscription, isPaperUploadAtLimit } from "@/hooks/useSubscription";
+import { useSubscription, isPaperUploadAtLimit, isChatCreditAtLimit } from "@/hooks/useSubscription";
+import { toast } from "sonner";
 
 interface PdfUploadResponse {
 	message: string;
@@ -77,6 +78,20 @@ export default function ProjectPage() {
 	const [isAddPapersSheetOpen, setIsAddPapersSheetOpen] = useState(false);
 	const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
 	const { subscription } = useSubscription();
+
+	const chatDisabled = isChatCreditAtLimit(subscription);
+
+	useEffect(() => {
+		if (chatDisabled) {
+			toast.error("You have run out of chat credits for the day.", {
+				description: "Please upgrade your plan or wait until tomorrow for more credits.",
+				action: {
+					label: "Upgrade",
+					onClick: () => router.push("/pricing"),
+				},
+			});
+		}
+	}, [chatDisabled, router]);
 
 
 	const getProject = useCallback(async () => {
@@ -430,17 +445,18 @@ export default function ProjectPage() {
 						<div className="mb-6">
 							<form onSubmit={handleNewQuerySubmit} className="relative">
 								<Textarea
-									placeholder="Ask a question about your papers, analyze findings, or explore new ideas..."
+									placeholder={chatDisabled ? "You have run out of chat credits for the day." : "Ask a question about your papers, analyze findings, or explore new ideas..."}
 									value={newQuery}
 									onChange={(e) => {
 										setNewQuery(e.target.value)
 									}}
 									onKeyDown={handleKeyDown}
 									className="min-h-[80px] resize-none pr-12 border-none dark:border-none focus:border-blue-400 focus:ring-transparent bg-secondary dark:bg-accent text-primary"
+									disabled={chatDisabled}
 								/>
 								<Button
 									type="submit"
-									disabled={!newQuery.trim()}
+									disabled={!newQuery.trim() || chatDisabled}
 									size="sm"
 									className="absolute bottom-3 right-3 h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
 								>
@@ -466,7 +482,7 @@ export default function ProjectPage() {
 					<div>
 						{conversations.length > 0 ? (
 							conversations.map((convo, index) => (
-								<a href={`/projects/${projectId}/conversations/${convo.id}`} key={convo.id} className="block p-4 mb-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
+								<a key={index} href={`/projects/${projectId}/conversations/${convo.id}`} className="block p-4 mb-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow animate-fade-in">
 									<div className="font-semibold text-accent-foreground flex items-center justify-between">
 										{convo.title}
 										<ArrowRight className="w-4 h-4 text-gray-400 transform transition-transform group-hover:translate-x-1" />
@@ -624,7 +640,7 @@ export default function ProjectPage() {
 								className="col-span-3"
 							/>
 						</div>
-					</div>
+.					</div>
 					<AlertDialogFooter>
 						<AlertDialogCancel>Cancel</AlertDialogCancel>
 						<AlertDialogAction onClick={handleUpdateProject}>Save</AlertDialogAction>
