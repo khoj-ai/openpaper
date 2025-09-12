@@ -397,7 +397,9 @@ class ProjectRole(Base):
     __tablename__ = "project_role"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id = Column(UUID(as_uuid=True), ForeignKey("project.id"), nullable=False)
+    project_id = Column(
+        UUID(as_uuid=True), ForeignKey("project.id", ondelete="CASCADE"), nullable=False
+    )
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     role = Column(String, nullable=False, default=ProjectRoles.ADMIN)
 
