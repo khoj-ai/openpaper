@@ -83,8 +83,7 @@ export default function ProjectPage() {
 
 	useEffect(() => {
 		if (chatDisabled) {
-			toast.error("You have run out of chat credits for the day.", {
-				description: "Please upgrade your plan or wait until tomorrow for more credits.",
+			toast.info("Nice! You have used your chat credits for the week. Upgrade your plan to use more.", {
 				action: {
 					label: "Upgrade",
 					onClick: () => router.push("/pricing"),
@@ -445,7 +444,7 @@ export default function ProjectPage() {
 						<div className="mb-6">
 							<form onSubmit={handleNewQuerySubmit} className="relative">
 								<Textarea
-									placeholder={chatDisabled ? "You have run out of chat credits for the day." : "Ask a question about your papers, analyze findings, or explore new ideas..."}
+									placeholder={chatDisabled ? "Nice! You have used your chat credits for the week. Upgrade your plan to use more." : "Ask a question about your papers, analyze findings, or explore new ideas..."}
 									value={newQuery}
 									onChange={(e) => {
 										setNewQuery(e.target.value)
