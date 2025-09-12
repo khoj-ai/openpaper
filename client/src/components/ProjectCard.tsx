@@ -19,6 +19,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { fetchFromApi } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
+import { toast } from "sonner";
+
 
 export function ProjectCard({ project, onProjectUpdate }: {
 	project: Project;
@@ -35,14 +37,15 @@ export function ProjectCard({ project, onProjectUpdate }: {
 			const response = await fetchFromApi(`/api/projects/${project.id}`, {
 				method: 'DELETE',
 			});
-			if (response.ok) {
+			if (response) {
 				setShowDeleteAlert(false);
 				onProjectUpdate?.();
 			} else {
-				console.error('Failed to delete project');
+				toast.error('Failed to delete project. Please try again.');
 			}
 		} catch (error) {
 			console.error('An error occurred while deleting the project:', error);
+			toast.error('An unexpected error occurred. Please try again.');
 		}
 	};
 
@@ -62,10 +65,11 @@ export function ProjectCard({ project, onProjectUpdate }: {
 				setShowEditAlert(false);
 				onProjectUpdate?.();
 			} else {
-				console.error('Failed to update project');
+				toast.error('Failed to update project. Please try again.');
 			}
 		} catch (error) {
 			console.error('An error occurred while updating the project:', error);
+			toast.error('An unexpected error occurred. Please try again.');
 		}
 	};
 

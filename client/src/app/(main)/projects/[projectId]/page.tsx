@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Loader2, MessageCircle, Pencil, PlusCircle, Send, Sparkles } from "lucide-react";
+import { AlertCircle, ArrowRight, Loader2, MessageCircle, Pencil, PlusCircle, Send, Sparkles } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { fetchFromApi } from "@/lib/api";
@@ -38,6 +38,8 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import Link from "next/link";
 import { Label } from "@/components/ui/label";
 import {
 	Breadcrumb,
@@ -299,7 +301,20 @@ export default function ProjectPage() {
 									<DialogTitle>Upload New Papers</DialogTitle>
 									<DialogDescription>You can upload any additional papers to your library here. They will automatically be added to the project.</DialogDescription>
 								</DialogHeader>
-								<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} />
+								<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} disabled={isPaperUploadAtLimit(subscription)} />
+								{isPaperUploadAtLimit(subscription) && (
+									<Alert variant="destructive" className="mt-4">
+										<AlertCircle className="h-4 w-4" />
+										<AlertTitle>Upload Limit Reached</AlertTitle>
+										<AlertDescription>
+											You have reached your paper upload limit. Please{" "}
+											<Link href="/pricing" className="font-bold underline">
+												upgrade your plan
+											</Link>{" "}
+											to upload more papers.
+										</AlertDescription>
+									</Alert>
+								)}
 								{uploadError && <p className="text-red-500 mt-4">{uploadError}</p>}
 								<PdfUploadTracker initialJobs={initialJobs} onComplete={handleUploadComplete} />
 							</DialogContent>
@@ -511,6 +526,19 @@ export default function ProjectPage() {
 									<h3 className="text-lg font-semibold mb-2">Upload New Papers</h3>
 									<h2>You can upload any additional papers to your library here. They will automatically be added to the project.</h2>
 									<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} disabled={isPaperUploadAtLimit(subscription)} />
+									{isPaperUploadAtLimit(subscription) && (
+										<Alert variant="destructive" className="mt-4">
+											<AlertCircle className="h-4 w-4" />
+											<AlertTitle>Upload Limit Reached</AlertTitle>
+											<AlertDescription>
+												You have reached your paper upload limit. Please{" "}
+												<Link href="/pricing" className="font-bold underline">
+													upgrade your plan
+												</Link>{" "}
+												to upload more papers.
+											</AlertDescription>
+										</Alert>
+									)}
 									{uploadError && <p className="text-red-500 mt-4">{uploadError}</p>}
 									<h3 className="text-lg font-semibold mb-2">Add from Library</h3>
 									<AddFromLibrary projectId={projectId} onPapersAdded={getProjectPapers} projectPaperIds={papers.map(p => p.id)} />
@@ -543,7 +571,20 @@ export default function ProjectPage() {
 										<DialogTitle>Upload New Papers</DialogTitle>
 										<DialogDescription>You can upload any additional papers to your library here. They will automatically be added to the project.</DialogDescription>
 									</DialogHeader>
-									<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} />
+									<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} disabled={isPaperUploadAtLimit(subscription)} />
+									{isPaperUploadAtLimit(subscription) && (
+										<Alert variant="destructive" className="mt-4">
+											<AlertCircle className="h-4 w-4" />
+											<AlertTitle>Upload Limit Reached</AlertTitle>
+											<AlertDescription>
+												You have reached your paper upload limit. Please{" "}
+												<Link href="/pricing" className="font-bold underline">
+													upgrade your plan
+												</Link>{" "}
+												to upload more papers.
+											</AlertDescription>
+										</Alert>
+									)}
 									{uploadError && <p className="text-red-500 mt-4">{uploadError}</p>}
 								</DialogContent>
 							</Dialog>
