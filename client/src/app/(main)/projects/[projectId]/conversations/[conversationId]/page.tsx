@@ -161,17 +161,18 @@ function ProjectConversationPageContent() {
                 localStorage.removeItem(`pending-query-${conversationIdFromUrl}`);
                 handleSubmit(null, pendingQuery);
                 setIsSessionLoading(false);
-            } else if (!isStreaming && messages.length === 0) {
+            } else if (messages.length === 0 && isSessionLoading) {
                 fetchMessages(conversationIdFromUrl);
             }
 
-        } else {
+        } else if (!authLoading) {
+            // Only clear messages if we're not loading auth and definitely have no user
             setMessages([]);
             setConversationId(null);
             setIsCentered(true);
             setIsSessionLoading(false);
         }
-    }, [conversationIdFromUrl, user, fetchMessages, router, projectId]);
+    }, [conversationIdFromUrl, user, fetchMessages, router, projectId, authLoading, isSessionLoading]);
 
     useEffect(() => {
         const fetchPapers = async () => {
@@ -393,6 +394,10 @@ function ProjectConversationPageContent() {
                     const newMessages = [...prev, finalMessage];
                     return newMessages;
                 });
+
+                // Clear streaming state immediately after adding final message
+                setStreamingChunks([]);
+                setStreamingReferences(undefined);
             }
 
         } catch (error) {
@@ -437,6 +442,8 @@ function ProjectConversationPageContent() {
             setError(`Streaming error: ${error instanceof Error ? error.message : 'Unknown error'}`);
         } finally {
             setIsStreaming(false);
+            setStreamingChunks([]);
+            setStreamingReferences(undefined);
             setStatusMessage('');
             refetchSubscription();
         }
