@@ -8,8 +8,18 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useAuth } from "@/lib/auth";
-import { useSubscription, getStorageUsagePercentage, isStorageNearLimit, isStorageAtLimit, formatFileSize, getPaperUploadPercentage, isPaperUploadNearLimit, isPaperUploadAtLimit } from "@/hooks/useSubscription";
+import { useSubscription, getStorageUsagePercentage, isStorageNearLimit, isStorageAtLimit, formatFileSize, getPaperUploadPercentage, isPaperUploadNearLimit, isPaperUploadAtLimit, isProjectAtLimit } from "@/hooks/useSubscription";
 import { FileText, Upload, Search, AlertTriangle, AlertCircle, HardDrive, X, ArrowDown, Grid, List } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -38,6 +48,7 @@ export default function PapersPage() {
     const [viewMode, setViewMode] = useState("table");
     const router = useRouter();
     const [isCreateProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
+    const [isProjectLimitDialogOpen, setProjectLimitDialogOpen] = useState(false);
     const [papersForNewProject, setPapersForNewProject] = useState<PaperItem[]>([]);
     const SHOW_STORAGE_USAGE_THRESHOLD = 60; // Show storage usage alert if usage is above 60%
 
@@ -162,6 +173,12 @@ export default function PapersPage() {
 
     const handleMakeProject = (papers: PaperItem[], action: string) => {
         if (action !== "Make Project") return;
+
+        if (isProjectAtLimit(subscription)) {
+            setProjectLimitDialogOpen(true);
+            return;
+        }
+
         if (papers.length === 0) {
             toast.info("Please select at least one paper to create a project.");
             return;
@@ -495,6 +512,22 @@ export default function PapersPage() {
 
     return (
         <div className="w-full mx-auto p-4 flex flex-col flex-1 min-w-0" style={{ height: 'calc(100vh - 5rem)' }}>
+            <AlertDialog open={isProjectLimitDialogOpen} onOpenChange={setProjectLimitDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Project Limit Reached</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            You have reached the maximum number of projects for your current plan. Please upgrade your plan to create more projects.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <Link href="/pricing">
+                            <AlertDialogAction>Upgrade</AlertDialogAction>
+                        </Link>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
             <CreateProjectDialog
                 open={isCreateProjectDialogOpen}
                 onOpenChange={setCreateProjectDialogOpen}
