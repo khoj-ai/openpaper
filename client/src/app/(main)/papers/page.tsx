@@ -166,7 +166,7 @@ export default function PapersPage() {
             toast.success("Paper deleted successfully");
         } catch (error) {
             console.error("Error deleting paper:", error)
-            toast.error("Failed to delete paper. Please try again.");
+            toast.error("Failed to remove this paper. Make sure it's not part of a project.");
             // TODO Could also try to handle this by re-fetching papers
         }
     }

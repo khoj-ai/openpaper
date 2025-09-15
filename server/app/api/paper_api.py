@@ -567,7 +567,11 @@ async def delete_pdf(
             s3_service.delete_file(str(paper.s3_object_key))
             logger.info(f"Deleted S3 object: {paper.s3_object_key}")
 
-        paper_crud.remove(db, id=id, user=current_user)
+        removed_paper = paper_crud.remove(db, id=id, user=current_user)
+        if not removed_paper:
+            return JSONResponse(
+                status_code=500, content={"message": "Failed to delete document"}
+            )
         return JSONResponse(status_code=200, content={"message": "Document deleted"})
     except Exception as e:
         logger.error(f"Error deleting document: {str(e)}")
