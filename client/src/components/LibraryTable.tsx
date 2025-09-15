@@ -15,6 +15,11 @@ import { Checkbox } from "./ui/checkbox";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { useSidebar } from "./ui/sidebar";
+import {
+	Sheet,
+	SheetContent,
+} from "@/components/ui/sheet";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { ArrowUpDown, CheckCheck, Trash2, X, ExternalLink, Copy, ChevronDown } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getStatusIcon, PaperStatusEnum } from "@/components/utils/PdfStatus";
@@ -47,6 +52,7 @@ export function LibraryTable({
 }: LibraryTableProps) {
 	const selectable = selectableProp ?? (onSelectFiles ? true : false);
 	const { state: sidebarState } = useSidebar();
+	const isMobile = useIsMobile();
 	const [internalPapers, setInternalPapers] = useState<PaperItem[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -252,13 +258,13 @@ export function LibraryTable({
 
 	return (
 		<div className="space-y-4 w-full max-w-full overflow-hidden">
-			<div className="flex items-center justify-between gap-4">
-				<div className="flex items-center gap-4 w-full">
+			<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+				<div className="flex flex-col md:flex-row items-start md:items-center gap-4 w-full">
 					<Input
 						placeholder="Filter papers by title, authors, organizations, or keywords..."
 						value={searchTerm}
 						onChange={(e) => setSearchTerm(e.target.value)}
-						className="max-w-xl"
+						className="w-full md:max-w-xl"
 					/>
 					<PaperFiltering
 						papers={internalPapers}
@@ -274,53 +280,57 @@ export function LibraryTable({
 						</div>
 					)}
 				</div>
-				{selectable && onSelectFiles && (
-					<div
-						className={`flex items-center gap-3 transition-all duration-200 ${selectedPapers.size > 0
-							? "opacity-100 translate-y-0"
-							: "opacity-0 translate-y-2 pointer-events-none"
-							}`}
-					>
-						{selectedPapers.size > 0 && (
-							<span className="text-sm font-medium text-muted-foreground">
-								{selectedPapers.size} paper{selectedPapers.size !== 1 ? 's' : ''} selected
-							</span>
+				<div className="fixed md:relative bottom-4 md:bottom-auto right-4 md:right-auto z-50 md:z-auto bg-background md:bg-transparent p-4 md:p-0 rounded-lg md:rounded-none shadow-lg md:shadow-none border md:border-none">
+					<div className="flex flex-col md:flex-row md:items-center gap-4">
+						{selectable && onSelectFiles && (
+							<div
+								className={`flex flex-col md:flex-row items-start md:items-center gap-3 transition-all duration-200 ${selectedPapers.size > 0
+									? "opacity-100 translate-y-0"
+									: "opacity-0 translate-y-2 pointer-events-none"
+									}`}
+							>
+								{selectedPapers.size > 0 && (
+									<span className="text-sm font-medium text-muted-foreground">
+										{selectedPapers.size} paper{selectedPapers.size !== 1 ? 's' : ''} selected
+									</span>
+								)}
+								<div className="flex items-center gap-2">
+									{actionOptions.map((action) => (
+										<Button
+											key={action}
+											variant="default"
+											size="sm"
+											onClick={() => handleAction(action)}
+											className="font-medium bg-blue-500 text-white hover:bg-blue-600 dark:hover:bg-blue-400 cursor-pointer"
+										>
+											{action}
+										</Button>
+									))}
+								</div>
+							</div>
 						)}
-						<div className="flex items-center gap-2">
-							{actionOptions.map((action) => (
-								<Button
-									key={action}
-									variant="default"
-									size="sm"
-									onClick={() => handleAction(action)}
-									className="font-medium bg-blue-500 text-white hover:bg-blue-600 dark:hover:bg-blue-400 cursor-pointer"
-								>
-									{action}
-								</Button>
-							))}
+						<div className={`flex items-center gap-2 transition-all duration-200 ${selectedPapers.size > 0 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+							{selectable && handleDelete && (
+								<DropdownMenu>
+									<DropdownMenuTrigger asChild>
+										<Button variant="outline">
+											Actions <ChevronDown className="h-4 w-4 ml-2" />
+										</Button>
+									</DropdownMenuTrigger>
+									<DropdownMenuContent>
+										<DropdownMenuItem
+											onClick={handleDeletePapers}
+											disabled={selectedPapers.size === 0}
+											className="text-red-500"
+										>
+											<Trash2 className="h-4 w-4 mr-2" />
+											Delete ({selectedPapers.size})
+										</DropdownMenuItem>
+									</DropdownMenuContent>
+								</DropdownMenu>
+							)}
 						</div>
 					</div>
-				)}
-				<div className={`flex items-center gap-2 transition-all duration-200 ${selectedPapers.size > 0 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-					{selectable && handleDelete && (
-						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<Button variant="outline">
-									Actions <ChevronDown className="h-4 w-4 ml-2" />
-								</Button>
-							</DropdownMenuTrigger>
-							<DropdownMenuContent>
-								<DropdownMenuItem
-									onClick={handleDeletePapers}
-									disabled={selectedPapers.size === 0}
-									className="text-red-500"
-								>
-									<Trash2 className="h-4 w-4 mr-2" />
-									Delete ({selectedPapers.size})
-								</DropdownMenuItem>
-							</DropdownMenuContent>
-						</DropdownMenu>
-					)}
 				</div>
 			</div>
 
@@ -341,7 +351,7 @@ export function LibraryTable({
 			</div>
 
 			<div className="grid grid-cols-1 gap-4 min-h-0" style={{
-				gridTemplateColumns: selectedPaperForPreview
+				gridTemplateColumns: selectedPaperForPreview && !isMobile
 					? sidebarState === 'expanded'
 						? '1fr 320px'
 						: '1fr 384px'
@@ -531,110 +541,209 @@ export function LibraryTable({
 					</div>
 				</div>
 				{selectedPaperForPreview && (
-					<div className="border bg-card rounded-lg transition-all duration-300 ease-in-out min-w-0 overflow-hidden">
-						<div className="h-full">
-							<div className="p-4 relative max-h-[70vh] overflow-y-auto">
-								<Button
-									variant="ghost"
-									size="icon"
-									className="absolute top-2 right-2 z-10"
-									onClick={() => setSelectedPaperForPreview(null)}
-								>
-									<X className="h-4 w-4" />
-								</Button>
-								<Link href={`/paper/${selectedPaperForPreview.id}`} passHref>
-									<h3 className="font-bold text-lg mb-2 pr-8 hover:underline cursor-pointer flex items-center gap-2">
-										{selectedPaperForPreview.title}
-										<ExternalLink className="h-4 w-4" />
-									</h3>
-								</Link>
-								{selectedPaperForPreview.preview_url && (
-									<>
-										{/* eslint-disable-next-line @next/next/no-img-element */}
-										<img src={selectedPaperForPreview.preview_url}
-											alt="Paper preview"
-											className="w-full h-auto my-4 rounded-md"
-										/>
-									</>
-								)}
-								<div className="flex items-center gap-2 flex-wrap">
-									{selectedPaperForPreview.status && (
-										<DropdownMenu>
-											<DropdownMenuTrigger asChild>
-												<Button size="sm" variant="outline" className="h-8 px-3 text-xs capitalize">
-													<span className="flex items-center gap-2">
-														{getStatusIcon(selectedPaperForPreview.status)}
-														{selectedPaperForPreview.status}
-													</span>
-												</Button>
-											</DropdownMenuTrigger>
-											<DropdownMenuContent align="end">
-												<DropdownMenuItem onClick={() => handleStatusChange(selectedPaperForPreview, PaperStatusEnum.TODO, setPaper)}>
-													{getStatusIcon(PaperStatusEnum.TODO)}
-													Todo
-												</DropdownMenuItem>
-												<DropdownMenuItem onClick={() => handleStatusChange(selectedPaperForPreview, PaperStatusEnum.READING, setPaper)}>
-													{getStatusIcon(PaperStatusEnum.READING)}
-													Reading
-												</DropdownMenuItem>
-												<DropdownMenuItem onClick={() => handleStatusChange(selectedPaperForPreview, PaperStatusEnum.COMPLETED, setPaper)}>
-													{getStatusIcon(PaperStatusEnum.COMPLETED)}
-													Completed
-												</DropdownMenuItem>
-											</DropdownMenuContent>
-										</DropdownMenu>
+					isMobile ? (
+						<Sheet open={!!selectedPaperForPreview} onOpenChange={(open) => { if (!open) setSelectedPaperForPreview(null); }}>
+							<SheetContent side="bottom" className="h-full w-full flex flex-col p-0">
+								<div className="p-4 relative flex-grow overflow-y-auto">
+									<Link href={`/paper/${selectedPaperForPreview.id}`} passHref>
+										<h3 className="font-bold text-lg mb-2 pr-8 hover:underline cursor-pointer flex items-center gap-2">
+											{selectedPaperForPreview.title}
+											<ExternalLink className="h-4 w-4" />
+										</h3>
+									</Link>
+									{selectedPaperForPreview.preview_url && (
+										<>
+											{/* eslint-disable-next-line @next/next/no-img-element */}
+											<img src={selectedPaperForPreview.preview_url}
+												alt="Paper preview"
+												className="w-full h-auto my-4 rounded-md"
+											/>
+										</>
 									)}
-									<Dialog>
-										<DialogTrigger asChild>
-											<Button variant="outline" size="sm" className="h-8 px-3 text-xs">
-												Cite
-											</Button>
-										</DialogTrigger>
-										<DialogContent className="sm:max-w-[625px]">
-											<DialogHeader>
-												<DialogTitle>Cite Paper</DialogTitle>
-												<DialogDescription>
-													Copy the citation format you need for <b>{selectedPaperForPreview.title}</b>.
-												</DialogDescription>
-											</DialogHeader>
-											<ScrollArea className="h-[300px] w-full rounded-md border p-4">
-												<div className="grid gap-4 py-4">
-													{citationStyles.map((style) => {
-														const citationText = style.generator(selectedPaperForPreview);
-														return (
-															<div key={style.name} className="flex items-start justify-between gap-2">
-																<div className="flex-grow min-w-0">
-																	<h4 className="font-semibold mb-1">{style.name}</h4>
-																	<p className="text-sm bg-muted p-2 rounded break-words">{citationText}</p>
-																</div>
-																<Button
-																	variant="ghost"
-																	size="icon"
-																	className="mt-5 h-8 w-8 flex-shrink-0"
-																	onClick={() => copyToClipboard(citationText, style.name)}
-																	aria-label={`Copy ${style.name} citation`}
-																>
-																	<Copy className="h-4 w-4" />
-																</Button>
-															</div>
-														);
-													})}
-												</div>
-											</ScrollArea>
-											<DialogFooter>
-												<DialogClose asChild>
-													<Button type="button" variant="secondary">
-														Close
+									<div className="flex items-center gap-2 flex-wrap">
+										{selectedPaperForPreview.status && (
+											<DropdownMenu>
+												<DropdownMenuTrigger asChild>
+													<Button size="sm" variant="outline" className="h-8 px-3 text-xs capitalize">
+														<span className="flex items-center gap-2">
+															{getStatusIcon(selectedPaperForPreview.status)}
+															{selectedPaperForPreview.status}
+														</span>
 													</Button>
-												</DialogClose>
-											</DialogFooter>
-										</DialogContent>
-									</Dialog>
+												</DropdownMenuTrigger>
+												<DropdownMenuContent align="end">
+													<DropdownMenuItem onClick={() => handleStatusChange(selectedPaperForPreview, PaperStatusEnum.TODO, setPaper)}>
+														{getStatusIcon(PaperStatusEnum.TODO)}
+														Todo
+													</DropdownMenuItem>
+													<DropdownMenuItem onClick={() => handleStatusChange(selectedPaperForPreview, PaperStatusEnum.READING, setPaper)}>
+														{getStatusIcon(PaperStatusEnum.READING)}
+														Reading
+													</DropdownMenuItem>
+													<DropdownMenuItem onClick={() => handleStatusChange(selectedPaperForPreview, PaperStatusEnum.COMPLETED, setPaper)}>
+														{getStatusIcon(PaperStatusEnum.COMPLETED)}
+														Completed
+													</DropdownMenuItem>
+												</DropdownMenuContent>
+											</DropdownMenu>
+										)}
+										<Dialog>
+											<DialogTrigger asChild>
+												<Button variant="outline" size="sm" className="h-8 px-3 text-xs">
+													Cite
+												</Button>
+											</DialogTrigger>
+											<DialogContent className="sm:max-w-[625px]">
+												<DialogHeader>
+													<DialogTitle>Cite Paper</DialogTitle>
+													<DialogDescription>
+														Copy the citation format you need for <b>{selectedPaperForPreview.title}</b>.
+													</DialogDescription>
+												</DialogHeader>
+												<ScrollArea className="h-[300px] w-full rounded-md border p-4">
+													<div className="grid gap-4 py-4">
+														{citationStyles.map((style) => {
+															const citationText = style.generator(selectedPaperForPreview);
+															return (
+																<div key={style.name} className="flex items-start justify-between gap-2">
+																	<div className="flex-grow min-w-0">
+																		<h4 className="font-semibold mb-1">{style.name}</h4>
+																		<p className="text-sm bg-muted p-2 rounded break-words">{citationText}</p>
+																	</div>
+																	<Button
+																		variant="ghost"
+																		size="icon"
+																		className="mt-5 h-8 w-8 flex-shrink-0"
+																		onClick={() => copyToClipboard(citationText, style.name)}
+																		aria-label={`Copy ${style.name} citation`}
+																	>
+																		<Copy className="h-4 w-4" />
+																	</Button>
+																</div>
+															);
+														})}
+													</div>
+												</ScrollArea>
+												<DialogFooter>
+													<DialogClose asChild>
+														<Button type="button" variant="secondary">
+															Close
+														</Button>
+													</DialogClose>
+												</DialogFooter>
+											</DialogContent>
+										</Dialog>
+									</div>
+									<p className="text-sm mt-4 break-words">{selectedPaperForPreview.abstract}</p>
 								</div>
-								<p className="text-sm mt-4 break-words">{selectedPaperForPreview.abstract}</p>
+							</SheetContent>
+						</Sheet>
+					) : (
+						<div className="border bg-card rounded-lg transition-all duration-300 ease-in-out min-w-0 overflow-hidden">
+							<div className="h-full">
+								<div className="p-4 relative max-h-[70vh] overflow-y-auto">
+									<Button
+										variant="ghost"
+										size="icon"
+										className="absolute top-2 right-2 z-10"
+										onClick={() => setSelectedPaperForPreview(null)}
+									>
+										<X className="h-4 w-4" />
+									</Button>
+									<Link href={`/paper/${selectedPaperForPreview.id}`} passHref>
+										<h3 className="font-bold text-lg mb-2 pr-8 hover:underline cursor-pointer flex items-center gap-2">
+											{selectedPaperForPreview.title}
+											<ExternalLink className="h-4 w-4" />
+										</h3>
+									</Link>
+									{selectedPaperForPreview.preview_url && (
+										<>
+											{/* eslint-disable-next-line @next/next/no-img-element */}
+											<img src={selectedPaperForPreview.preview_url}
+												alt="Paper preview"
+												className="w-full h-auto my-4 rounded-md"
+											/>
+										</>
+									)}
+									<div className="flex items-center gap-2 flex-wrap">
+										{selectedPaperForPreview.status && (
+											<DropdownMenu>
+												<DropdownMenuTrigger asChild>
+													<Button size="sm" variant="outline" className="h-8 px-3 text-xs capitalize">
+														<span className="flex items-center gap-2">
+															{getStatusIcon(selectedPaperForPreview.status)}
+															{selectedPaperForPreview.status}
+														</span>
+													</Button>
+												</DropdownMenuTrigger>
+												<DropdownMenuContent align="end">
+													<DropdownMenuItem onClick={() => handleStatusChange(selectedPaperForPreview, PaperStatusEnum.TODO, setPaper)}>
+														{getStatusIcon(PaperStatusEnum.TODO)}
+														Todo
+													</DropdownMenuItem>
+													<DropdownMenuItem onClick={() => handleStatusChange(selectedPaperForPreview, PaperStatusEnum.READING, setPaper)}>
+														{getStatusIcon(PaperStatusEnum.READING)}
+														Reading
+													</DropdownMenuItem>
+													<DropdownMenuItem onClick={() => handleStatusChange(selectedPaperForPreview, PaperStatusEnum.COMPLETED, setPaper)}>
+														{getStatusIcon(PaperStatusEnum.COMPLETED)}
+														Completed
+													</DropdownMenuItem>
+												</DropdownMenuContent>
+											</DropdownMenu>
+										)}
+										<Dialog>
+											<DialogTrigger asChild>
+												<Button variant="outline" size="sm" className="h-8 px-3 text-xs">
+													Cite
+												</Button>
+											</DialogTrigger>
+											<DialogContent className="sm:max-w-[625px]">
+												<DialogHeader>
+													<DialogTitle>Cite Paper</DialogTitle>
+													<DialogDescription>
+														Copy the citation format you need for <b>{selectedPaperForPreview.title}</b>.
+													</DialogDescription>
+												</DialogHeader>
+												<ScrollArea className="h-[300px] w-full rounded-md border p-4">
+													<div className="grid gap-4 py-4">
+														{citationStyles.map((style) => {
+															const citationText = style.generator(selectedPaperForPreview);
+															return (
+																<div key={style.name} className="flex items-start justify-between gap-2">
+																	<div className="flex-grow min-w-0">
+																		<h4 className="font-semibold mb-1">{style.name}</h4>
+																		<p className="text-sm bg-muted p-2 rounded break-words">{citationText}</p>
+																	</div>
+																	<Button
+																		variant="ghost"
+																		size="icon"
+																		className="mt-5 h-8 w-8 flex-shrink-0"
+																		onClick={() => copyToClipboard(citationText, style.name)}
+																		aria-label={`Copy ${style.name} citation`}
+																	>
+																		<Copy className="h-4 w-4" />
+																	</Button>
+																</div>
+															);
+														})}
+													</div>
+												</ScrollArea>
+												<DialogFooter>
+													<DialogClose asChild>
+														<Button type="button" variant="secondary">
+															Close
+														</Button>
+													</DialogClose>
+												</DialogFooter>
+											</DialogContent>
+										</Dialog>
+									</div>
+									<p className="text-sm mt-4 break-words">{selectedPaperForPreview.abstract}</p>
+								</div>
 							</div>
 						</div>
-					</div>
+					)
 				)}
 			</div>
 		</div>
