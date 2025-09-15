@@ -56,9 +56,8 @@ export default function Projects() {
 				});
 			} else if (nearProjectLimit) {
 				toast.warning("Approaching Project Limit", {
-					description: `You have used ${subscription.usage.projects} of ${
-						subscription.usage.projects + subscription.usage.projects_remaining
-					} projects. Consider upgrading soon.`,
+					description: `You have used ${subscription.usage.projects} of ${subscription.usage.projects + subscription.usage.projects_remaining
+						} projects. Consider upgrading soon.`,
 					action: {
 						label: "View Plans",
 						onClick: () => router.push("/settings/billing"),
@@ -128,19 +127,13 @@ export default function Projects() {
 			<div className="flex justify-between items-center mb-4">
 				<h1 className="text-2xl font-bold">Projects</h1>
 				{projects.length > 0 &&
-					(atProjectLimit ? (
-						<Button disabled className="bg-gradient-to-br from-blue-500 to-cyan-500">
+					<Button asChild className="bg-blue-500 hover:bg-blue-600 dark:hover:bg-blue-400" disabled={atProjectLimit}>
+						<Link href="/projects/create">
 							<PlusCircle className="mr-2" />
 							New Project
-						</Button>
-					) : (
-						<Button asChild className="bg-gradient-to-br from-blue-500 to-cyan-500">
-							<Link href="/projects/create">
-								<PlusCircle className="mr-2" />
-								New Project
-							</Link>
-						</Button>
-					))}
+						</Link>
+					</Button>
+				}
 			</div>
 
 			{(nearProjectLimit || atProjectLimit) && subscription && (
@@ -150,9 +143,8 @@ export default function Projects() {
 					<AlertDescription className="text-muted-foreground">
 						{atProjectLimit
 							? `You have used all of your available projects. Upgrade your plan to create more.`
-							: `You have used ${subscription.usage.projects} of ${
-									subscription.usage.projects + subscription.usage.projects_remaining
-							  } projects. Consider upgrading soon.`}
+							: `You have used ${subscription.usage.projects} of ${subscription.usage.projects + subscription.usage.projects_remaining
+							} projects. Consider upgrading soon.`}
 						<Link href="/pricing" className="font-semibold underline ml-2 text-primary">
 							View Plans
 						</Link>
