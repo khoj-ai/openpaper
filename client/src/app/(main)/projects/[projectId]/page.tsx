@@ -304,6 +304,7 @@ export default function ProjectPage() {
 				</div>
 
 				<div className="mt-4">
+					<PdfUploadTracker initialJobs={initialJobs} onComplete={handleUploadComplete} />
 					<div className="flex justify-between items-center mb-4">
 						<h2 className="text-2xl font-bold">Add Papers to Your Project</h2>
 						<Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
@@ -330,7 +331,6 @@ export default function ProjectPage() {
 									</Alert>
 								)}
 								{uploadError && <p className="text-red-500 mt-4">{uploadError}</p>}
-								<PdfUploadTracker initialJobs={initialJobs} onComplete={handleUploadComplete} />
 							</DialogContent>
 						</Dialog>
 					</div>
