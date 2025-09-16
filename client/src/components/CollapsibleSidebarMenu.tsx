@@ -23,6 +23,7 @@ interface CollapsibleSidebarMenuProps<T extends { id: string; title?: string; }>
     getItemName?: (item: T) => string;
     defaultOpen?: boolean;
     maxItems?: number;
+    tag?: string;
 }
 
 export function CollapsibleSidebarMenu<T extends { id: string; title?: string; }>({
@@ -36,6 +37,7 @@ export function CollapsibleSidebarMenu<T extends { id: string; title?: string; }
     getItemName,
     defaultOpen = false,
     maxItems = 7,
+    tag,
 }: CollapsibleSidebarMenuProps<T>) {
     return (
         <Collapsible asChild defaultOpen={defaultOpen} className="group/collapsible">
@@ -45,6 +47,11 @@ export function CollapsibleSidebarMenu<T extends { id: string; title?: string; }
                         <SidebarMenuButton>
                             <Icon />
                             <span>{title}</span>
+                            {tag && (
+                                <span className="ml-1 text-xs text-yellow-500 bg-yellow-100 dark:bg-yellow-800 dark:text-yellow-200 px-1 rounded">
+                                    {tag}
+                                </span>
+                            )}
                             <ChevronDown className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
                         </SidebarMenuButton>
                     </Link>

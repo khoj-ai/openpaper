@@ -60,35 +60,31 @@ const items = [
         url: "/",
         icon: Home,
         requiresAuth: false,
-        beta: false,
     },
     {
         title: "Library",
         url: "/papers",
         icon: FileText,
         requiresAuth: true,
-        beta: false,
-    },
-    {
-        title: "Ask",
-        url: "/understand",
-        icon: TelescopeIcon,
-        requiresAuth: true,
-        beta: true,
     },
     {
         title: "Projects",
         url: "/projects",
         icon: FolderKanban,
         requiresAuth: true,
-        beta: true,
+        tag: "New",
+    },
+    {
+        title: "Ask",
+        url: "/understand",
+        icon: TelescopeIcon,
+        requiresAuth: true,
     },
     {
         title: "Find Papers",
         url: "/finder",
         icon: Globe2,
         requiresAuth: false,
-        beta: false,
     },
 ]
 
@@ -309,6 +305,7 @@ export function AppSidebar() {
                                             viewAllUrl="/understand/past"
                                             viewAllText="View all chats"
                                             defaultOpen={false}
+                                            tag={item.tag}
                                         />
                                     )
                                 }
@@ -326,6 +323,7 @@ export function AppSidebar() {
                                             viewAllText="View all projects"
                                             defaultOpen={false}
                                             maxItems={3}
+                                            tag={item.tag}
                                         />
                                     )
                                 }
@@ -335,9 +333,9 @@ export function AppSidebar() {
                                             <Link href={item.requiresAuth && !user ? "/login" : item.url}>
                                                 <item.icon />
                                                 <span>{item.title}</span>
-                                                {item.beta && (
+                                                {item.tag && (
                                                     <span className="ml-1 text-xs text-yellow-500 bg-yellow-100 dark:bg-yellow-800 dark:text-yellow-200 px-1 rounded">
-                                                        Beta
+                                                        {item.tag}
                                                     </span>
                                                 )}
                                             </Link>
