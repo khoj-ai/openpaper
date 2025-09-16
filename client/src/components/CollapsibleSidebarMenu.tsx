@@ -12,7 +12,7 @@ import Link from "next/link";
 import { ArrowRight, ChevronDown } from "lucide-react";
 import React from "react";
 
-interface CollapsibleSidebarMenuProps<T extends { id: string; title: string; }> {
+interface CollapsibleSidebarMenuProps<T extends { id: string; title?: string; }> {
     icon: React.ElementType;
     title: string;
     url: string;
@@ -20,10 +20,12 @@ interface CollapsibleSidebarMenuProps<T extends { id: string; title: string; }> 
     viewAllUrl: string;
     viewAllText: string;
     getItemUrl: (item: T) => string;
+    getItemName?: (item: T) => string;
     defaultOpen?: boolean;
+    maxItems?: number;
 }
 
-export function CollapsibleSidebarMenu<T extends { id: string; title: string; }>({
+export function CollapsibleSidebarMenu<T extends { id: string; title?: string; }>({
     icon: Icon,
     title,
     url,
@@ -31,7 +33,9 @@ export function CollapsibleSidebarMenu<T extends { id: string; title: string; }>
     viewAllUrl,
     viewAllText,
     getItemUrl,
+    getItemName,
     defaultOpen = false,
+    maxItems = 7,
 }: CollapsibleSidebarMenuProps<T>) {
     return (
         <Collapsible asChild defaultOpen={defaultOpen} className="group/collapsible">
@@ -47,16 +51,16 @@ export function CollapsibleSidebarMenu<T extends { id: string; title: string; }>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                     <SidebarMenuSub>
-                        {items.slice(0, 7).map((item) => (
+                        {items.slice(0, maxItems).map((item) => (
                             <SidebarMenuSubItem key={item.id}>
                                 <SidebarMenuSubButton asChild>
                                     <Link href={getItemUrl(item)} className="text-xs font-medium w-full h-fit my-1">
-                                        <p className="line-clamp-3">{item.title}</p>
+                                        <p className="line-clamp-3">{getItemName ? getItemName(item) : item.title}</p>
                                     </Link>
                                 </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
                         ))}
-                        {items.length > 7 && (
+                        {items.length > maxItems && (
                             <SidebarMenuSubItem>
                                 <SidebarMenuSubButton asChild>
                                     <Link href={viewAllUrl} className="text-xs font-medium h-fit my-1">

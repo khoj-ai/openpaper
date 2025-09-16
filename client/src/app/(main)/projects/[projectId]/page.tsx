@@ -632,14 +632,14 @@ export default function ProjectPage() {
 							<Label htmlFor="description" className="text-right">
 								Description
 							</Label>
-							<Input
+							<Textarea
 								id="description"
 								value={currentDescription}
 								onChange={(e) => setCurrentDescription(e.target.value)}
 								className="col-span-3"
 							/>
 						</div>
-.					</div>
+					</div>
 					<AlertDialogFooter>
 						<AlertDialogCancel>Cancel</AlertDialogCancel>
 						<AlertDialogAction onClick={handleUpdateProject}>Save</AlertDialogAction>

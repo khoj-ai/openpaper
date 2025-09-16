@@ -4,6 +4,7 @@ import {
     AlertTriangle,
     ChevronsUpDown,
     FileText,
+    FolderKanban,
     Globe2,
     Home,
     LogOut,
@@ -48,7 +49,7 @@ import { useIsDarkMode } from "@/hooks/useDarkMode";
 import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isStorageNearLimit, isPaperUploadNearLimit, isChatCreditAtLimit, isChatCreditNearLimit } from "@/hooks/useSubscription";
 import Link from "next/link";
 import OnboardingChecklist from "@/components/OnboardingChecklist";
-import { Conversation, PaperItem } from "@/lib/schema";
+import { Conversation, PaperItem, Project } from "@/lib/schema";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { CollapsibleSidebarMenu } from "./CollapsibleSidebarMenu";
 
@@ -75,13 +76,13 @@ const items = [
         requiresAuth: true,
         beta: true,
     },
-    // {
-    //     title: "Projects",
-    //     url: "/projects",
-    //     icon: FolderCodeIcon,
-    //     requiresAuth: true,
-    //     beta: true,
-    // },
+    {
+        title: "Projects",
+        url: "/projects",
+        icon: FolderKanban,
+        requiresAuth: true,
+        beta: true,
+    },
     {
         title: "Find Papers",
         url: "/finder",
@@ -152,6 +153,7 @@ export function AppSidebar() {
     const router = useRouter();
     const { user, logout } = useAuth();
     const [allPapers, setAllPapers] = useState<PaperItem[]>([]);
+    const [projects, setProjects] = useState<Project[]>([]);
     const [everythingConversations, setEverythingConversations] = useState<Conversation[]>([]);
     const { darkMode, toggleDarkMode } = useIsDarkMode();
     const { subscription, loading: subscriptionLoading } = useSubscription();
@@ -167,9 +169,10 @@ export function AppSidebar() {
 
         const fetchData = async () => {
             try {
-                const [papersResponse, conversationsResponse] = await Promise.all([
+                const [papersResponse, conversationsResponse, projectsResponse] = await Promise.all([
                     fetchFromApi("/api/paper/active"),
                     fetchFromApi("/api/conversation/everything"),
+                    fetchFromApi("/api/projects"),
                 ]);
 
                 if (papersResponse.papers) {
@@ -181,10 +184,12 @@ export function AppSidebar() {
                     setAllPapers([]);
                 }
                 setEverythingConversations(conversationsResponse || []);
+                setProjects(projectsResponse || []);
             } catch (error) {
                 console.error("Error fetching sidebar data:", error);
                 setAllPapers([]);
                 setEverythingConversations([]);
+                setProjects([]);
             }
         };
 
@@ -304,6 +309,23 @@ export function AppSidebar() {
                                             viewAllUrl="/understand/past"
                                             viewAllText="View all chats"
                                             defaultOpen={false}
+                                        />
+                                    )
+                                }
+                                if (item.title === "Projects") {
+                                    return (
+                                        <CollapsibleSidebarMenu
+                                            key={item.title}
+                                            title={item.title}
+                                            icon={item.icon}
+                                            url={item.url}
+                                            items={projects}
+                                            getItemUrl={(project) => `/projects/${project.id}`}
+                                            getItemName={(project) => project.title}
+                                            viewAllUrl="/projects"
+                                            viewAllText="View all projects"
+                                            defaultOpen={false}
+                                            maxItems={3}
                                         />
                                     )
                                 }
