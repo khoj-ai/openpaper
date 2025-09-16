@@ -515,9 +515,9 @@ export default function PapersPage() {
             <AlertDialog open={isProjectLimitDialogOpen} onOpenChange={setProjectLimitDialogOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Project Limit Reached</AlertDialogTitle>
+                        <AlertDialogTitle>You're on a roll!</AlertDialogTitle>
                         <AlertDialogDescription>
-                            You have reached the maximum number of projects for your current plan. Please upgrade your plan to create more projects.
+                            You've created a lot of great projects. To create more, please upgrade your plan.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

@@ -47,7 +47,7 @@ export default function Projects() {
 	useEffect(() => {
 		if (subscription) {
 			if (atProjectLimit) {
-				toast.error("Project Limit Reached", {
+				toast.info("You've built some great projects! Upgrade to create more.", {
 					description: "You have used all of your available projects. Upgrade your plan to create more.",
 					action: {
 						label: "View Plans",
@@ -137,9 +137,9 @@ export default function Projects() {
 			</div>
 
 			{(nearProjectLimit || atProjectLimit) && subscription && (
-				<Alert variant={atProjectLimit ? "destructive" : "default"} className="mb-4 border-none">
-					<AlertTriangle className="h-4 w-4" />
-					<AlertTitle>{atProjectLimit ? "Project Limit Reached" : "Approaching Project Limit"}</AlertTitle>
+				<Alert variant={'default'} className="mb-4 border-blue-500 border-l-4">
+					<AlertTriangle className="h-4 w-4 text-blue-500" />
+					<AlertTitle className={atProjectLimit ? "text-blue-500" : ""}>{atProjectLimit ? "You've built some great projects!" : "Approaching Project Limit"}</AlertTitle>
 					<AlertDescription className="text-muted-foreground">
 						{atProjectLimit
 							? `You have used all of your available projects. Upgrade your plan to create more.`
