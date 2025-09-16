@@ -1,4 +1,3 @@
-
 import {
     ChatMessage,
     PaperData,
@@ -7,7 +6,8 @@ import {
     PaperHighlightAnnotation,
     CreditUsage,
     PaperNoteData,
-    Reference
+    Reference,
+    Project,
 } from '@/lib/schema';
 import {
     X,
@@ -23,6 +23,7 @@ import {
     Check,
     Route,
     User,
+    ArrowRight,
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -53,11 +54,23 @@ import CustomCitationLink from '@/components/utils/CustomCitationLink';
 import Link from 'next/link';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import React, { useState, useRef, useEffect, useMemo, useCallback, FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from "sonner";
-import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
+import { fetchFromApi, fetchStreamFromApi, getProjectsForPaper } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { useSubscription, getChatCreditUsagePercentage, isChatCreditAtLimit, isChatCreditNearLimit } from '@/hooks/useSubscription';
+import { useSubscription, getChatCreditUsagePercentage, isChatCreditAtLimit, isChatCreditNearLimit, isProjectAtLimit } from '@/hooks/useSubscription';
 import { Avatar } from './ui/avatar';
+import { CreateProjectDialog } from '@/components/CreateProjectDialog';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface SidePanelContentProps {
     rightSideFunction: string;
@@ -143,6 +156,10 @@ export function SidePanelContent({
     const [isTyping, setIsTyping] = useState(false);
     const [currentLoadingMessageIndex, setCurrentLoadingMessageIndex] = useState(0);
     const [errorState, setErrorState] = useState<{ failedUserMessage: string } | null>(null);
+    const [projects, setProjects] = useState<Project[]>([]);
+    const [isCreateProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
+    const [isProjectLimitDialogOpen, setProjectLimitDialogOpen] = useState(false);
+    const router = useRouter();
 
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const chatInputFormRef = useRef<HTMLFormElement | null>(null);
@@ -164,6 +181,42 @@ export function SidePanelContent({
         "Crafting insights...",
         "Synthesizing findings...",
     ]
+
+    useEffect(() => {
+        if (rightSideFunction === 'Projects' && id) {
+            getProjectsForPaper(id)
+                .then(setProjects)
+                .catch(err => {
+                    console.error("Error fetching projects for paper", err);
+                    toast.error("Error fetching projects for paper");
+                });
+        }
+    }, [rightSideFunction, id]);
+
+    const handleCreateProjectSubmit = async (title: string, description: string) => {
+        try {
+            const project = await fetchFromApi("/api/projects", {
+                method: "POST",
+                body: JSON.stringify({ title, description }),
+            });
+            toast.success("Project created successfully!");
+
+            await fetchFromApi(`/api/projects/papers/${project.id}`,
+                {
+                    method: 'POST',
+                    body: JSON.stringify({ paper_ids: [id] })
+                });
+            toast.success("Paper added to project successfully!");
+
+
+            router.push(`/projects/${project.id}`);
+        } catch (error) {
+            console.error("Failed to create project", error);
+            toast.error("Failed to create project.");
+        } finally {
+            setCreateProjectDialogOpen(false);
+        }
+    };
 
     const updateNote = useCallback(async (note: string) => {
         if (!id) return;
@@ -941,6 +994,65 @@ export function SidePanelContent({
                                             >
                                                 {isSharing ? <Loader className="animate-spin mr-2 h-4 w-4" /> : null}
                                                 <Share2Icon /> Share
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        }
+                        {
+                            rightSideFunction === 'Projects' && (
+                                <div className={`flex flex-col ${heightClass} p-4 space-y-4`}>
+                                    <AlertDialog open={isProjectLimitDialogOpen} onOpenChange={setProjectLimitDialogOpen}>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Project Limit Reached</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    You have reached the maximum number of projects for your current plan. Please upgrade your plan to create more projects.
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                <Link href="/pricing">
+                                                    <AlertDialogAction>Upgrade</AlertDialogAction>
+                                                </Link>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                    <CreateProjectDialog
+                                        open={isCreateProjectDialogOpen}
+                                        onOpenChange={setCreateProjectDialogOpen}
+                                        onSubmit={handleCreateProjectSubmit}
+                                    />
+                                    <h3 className="text-lg font-semibold">Projects</h3>
+                                    {projects.length > 0 ? (
+                                        <>
+                                            <p className="text-sm text-muted-foreground">This paper is a member of the following projects.</p>
+                                            <div className="space-y-2">
+                                                {projects.map(project => (
+                                                    <Link key={project.id} href={`/projects/${project.id}`} className="block p-2 border rounded-md hover:bg-secondary">
+                                                        <div className="font-semibold">{project.title}</div>
+                                                        <div className="text-sm text-muted-foreground">{project.description}</div>
+                                                    </Link>
+                                                ))}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="text-left">
+                                            <p className="text-sm text-muted-foreground">Projects help you organize your research. Group papers together to analyze them as a collection.
+                                            </p>
+                                            <Link href="/projects" className="block underline">View all projects {" "} <ArrowRight className='inline w-4 h-4' /></Link>
+                                            <Button
+                                                onClick={() => {
+                                                    if (isProjectAtLimit(subscription)) {
+                                                        setProjectLimitDialogOpen(true);
+                                                    } else {
+                                                        setCreateProjectDialogOpen(true);
+                                                    }
+                                                }}
+                                                className="mt-4 w-full"
+                                            >
+                                                Create a Project with this Paper
                                             </Button>
                                         </div>
                                     )}

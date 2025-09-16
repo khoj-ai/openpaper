@@ -16,6 +16,7 @@ import {
     Lightbulb,
     Share,
     AudioLines,
+    FolderCode,
 } from 'lucide-react';
 import { toast } from "sonner";
 
@@ -75,6 +76,11 @@ const AudioTool = {
     icon: AudioLines,
 }
 
+const ProjectTool = {
+    name: "Projects",
+    icon: FolderCode,
+}
+
 const PaperToolset = {
     nav: [
         OverviewTool,
@@ -83,6 +89,7 @@ const PaperToolset = {
         AnnotationsTool,
         NotesTool,
         ShareTool,
+        ProjectTool,
         FocusTool,
     ],
 }

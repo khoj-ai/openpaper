@@ -3,7 +3,7 @@ import uuid
 from typing import List, Optional
 
 from app.database.crud.projects.project_base_crud import ProjectBaseCRUD
-from app.database.models import Paper, ProjectPaper, ProjectRole, ProjectRoles
+from app.database.models import Paper, Project, ProjectPaper, ProjectRole, ProjectRoles
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -187,6 +187,31 @@ class ProjectPaperCRUD(
         db.delete(project_paper)
         db.commit()
         return project_paper
+
+    def get_projects_by_paper_id(
+        self, db: Session, *, paper_id: uuid.UUID, user: CurrentUser
+    ) -> List[Project]:
+        # First, find all project-paper associations for the given paper_id
+        project_papers: List[ProjectPaper] = (
+            db.query(ProjectPaper).filter(ProjectPaper.paper_id == paper_id).all()
+        )
+        project_ids = [pp.project_id for pp in project_papers]
+
+        if not project_ids:
+            return []
+
+        # Now, fetch all projects that match these IDs and that the user has access to
+        projects = (
+            db.query(Project)
+            .join(ProjectRole, Project.id == ProjectRole.project_id)
+            .filter(
+                Project.id.in_(project_ids),
+                ProjectRole.user_id == user.id,
+            )
+            .all()
+        )
+
+        return projects
 
 
 project_paper_crud = ProjectPaperCRUD(ProjectPaper)

@@ -113,6 +113,31 @@ async def get_project_papers(
         )
 
 
+@project_papers_router.get("/from/{paper_id}")
+async def get_projects_from_paper_id(
+    paper_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+) -> JSONResponse:
+    """Get all projects associated with a specific paper"""
+    try:
+        projects = project_paper_crud.get_projects_by_paper_id(
+            db, paper_id=uuid.UUID(paper_id), user=current_user
+        )
+
+        return JSONResponse(
+            status_code=200,
+            content=[project.to_dict() for project in projects],
+        )
+
+    except Exception as e:
+        logger.error(f"Error fetching projects for paper: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=400,
+            content={"message": f"Failed to fetch projects for paper: {str(e)}"},
+        )
+
+
 @project_papers_router.delete("/{project_id}/{project_paper_id}")
 async def remove_paper_from_project(
     project_id: str,
