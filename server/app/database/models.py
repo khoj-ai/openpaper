@@ -159,6 +159,8 @@ class User(Base):
         cascade="all, delete-orphan",
     )
 
+    project_roles = relationship("ProjectRole", back_populates="user")
+
 
 class Session(Base):
     __tablename__ = "sessions"
@@ -383,6 +385,8 @@ class Paper(Base):
         "PaperImage", back_populates="paper", cascade="all, delete-orphan"
     )
 
+    project_papers = relationship("ProjectPaper", back_populates="paper")
+
 
 class Project(Base):
     __tablename__ = "project"
@@ -391,6 +395,9 @@ class Project(Base):
     title = Column(String, nullable=True)
     description = Column(Text, nullable=True)
     admin_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+
+    project_roles = relationship("ProjectRole", back_populates="project")
+    project_papers = relationship("ProjectPaper", back_populates="project")
 
 
 class ProjectRole(Base):
@@ -402,6 +409,9 @@ class ProjectRole(Base):
     )
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     role = Column(String, nullable=False, default=ProjectRoles.ADMIN)
+
+    project = relationship("Project", back_populates="project_roles")
+    user = relationship("User", back_populates="project_roles")
 
 
 class ProjectPaper(Base):
@@ -418,6 +428,9 @@ class ProjectPaper(Base):
     project_id = Column(
         UUID(as_uuid=True), ForeignKey("project.id", ondelete="CASCADE"), nullable=False
     )
+
+    project = relationship("Project", back_populates="project_papers")
+    paper = relationship("Paper", back_populates="project_papers")
 
 
 class ProjectAudioOverview(Base):
