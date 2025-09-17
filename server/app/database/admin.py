@@ -51,8 +51,8 @@ class ProjectRoleAdmin(ModelView, model=ProjectRole):
     ]
     column_searchable_list = [
         ProjectRole.role,
-        str(ProjectRole.project_id),
-        str(ProjectRole.user_id),
+        ProjectRole.project_id,
+        ProjectRole.user_id,
     ]
     column_sortable_list = [ProjectRole.role]
 
@@ -63,7 +63,7 @@ class ProjectPaperAdmin(ModelView, model=ProjectPaper):
         ProjectPaper.project_id,
         ProjectPaper.paper_id,
     ]
-    column_searchable_list = [str(ProjectPaper.project_id), str(ProjectPaper.paper_id)]
+    column_searchable_list = [ProjectPaper.project_id, ProjectPaper.paper_id]
 
 
 class HighlightAdmin(ModelView, model=Highlight):
