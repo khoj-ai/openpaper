@@ -1223,7 +1223,7 @@ export function SidePanelContent({
                                         )}
                                         {
                                             isStreaming && streamingChunks.length > 0 && (
-                                                <div className="relative group prose dark:prose-invert p-2 !max-w-full rounded-lg w-full text-primary dark:text-primary-foreground">
+                                                <div className="relative group prose dark:prose-invert p-2 !max-w-full rounded-lg w-full text-primary">
                                                     <AnimatedMarkdown
                                                         content={streamingChunks.join('')}
                                                         remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
@@ -1267,9 +1267,9 @@ export function SidePanelContent({
                                         }
                                         {
                                             isStreaming && (
-                                                <div className="flex items-center gap-3 p-2">
+                                                <div className="flex items-center gap-3 p-0">
                                                     <Loader className="animate-spin w-6 h-6 text-blue-500 flex-shrink-0" />
-                                                    <div className="text-sm text-secondary-foreground">
+                                                    <div className="text-sm text-secondary-foreground p-0">
                                                         {displayedText}
                                                         {isTyping && (
                                                             <span className="animate-pulse">|</span>
