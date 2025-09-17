@@ -10,6 +10,9 @@ from app.database.models import (
     Message,
     Paper,
     PaperNote,
+    Project,
+    ProjectPaper,
+    ProjectRole,
     User,
 )
 from fastapi import FastAPI, Request
@@ -27,6 +30,40 @@ class UserAdmin(ModelView, model=User):
         User.is_admin,
     ]
     column_searchable_list = [User.email, User.name]
+
+
+class ProjectAdmin(ModelView, model=Project):
+    column_list = [
+        Project.id,
+        Project.title,
+        Project.description,
+    ]
+
+    column_searchable_list = [Project.title]
+
+
+class ProjectRoleAdmin(ModelView, model=ProjectRole):
+    column_list = [
+        ProjectRole.id,
+        ProjectRole.project_id,
+        ProjectRole.user_id,
+        ProjectRole.role,
+    ]
+    column_searchable_list = [
+        ProjectRole.role,
+        str(ProjectRole.project_id),
+        str(ProjectRole.user_id),
+    ]
+    column_sortable_list = [ProjectRole.role]
+
+
+class ProjectPaperAdmin(ModelView, model=ProjectPaper):
+    column_list = [
+        ProjectPaper.id,
+        ProjectPaper.project_id,
+        ProjectPaper.paper_id,
+    ]
+    column_searchable_list = [str(ProjectPaper.project_id), str(ProjectPaper.paper_id)]
 
 
 class HighlightAdmin(ModelView, model=Highlight):
@@ -174,3 +211,6 @@ def setup_admin(app: FastAPI):
     admin.add_view(PaperNoteAdmin)
     admin.add_view(ConversationAdmin)
     admin.add_view(MessageAdmin)
+    admin.add_view(ProjectAdmin)
+    admin.add_view(ProjectRoleAdmin)
+    admin.add_view(ProjectPaperAdmin)
