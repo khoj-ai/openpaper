@@ -113,17 +113,9 @@ class EvidenceCleaningInstructions(BaseModel):
         default_factory=list,
         description="List of indices to keep from the paper's evidence",
     )
-    summarize: List[int] = Field(
-        default_factory=list,
-        description="List of indices to summarize from the paper's evidence",
-    )
     drop: List[int] = Field(
         default_factory=list,
         description="List of indices to drop from the paper's evidence",
-    )
-    summary: Optional[str] = Field(
-        default=None,
-        description="Brief summary of the paper's evidence, if any",
     )
 
 
@@ -138,13 +130,3 @@ class EvidenceCleaningResponse(BaseModel):
         default_factory=dict,
         description="Mapping of paper IDs to their respective cleaning instructions",
     )
-
-    def get_instructions_for_paper(
-        self, paper_id: str
-    ) -> Optional[EvidenceCleaningInstructions]:
-        """Get cleaning instructions for a specific paper"""
-        return self.papers.get(paper_id)
-
-    def get_all_paper_ids(self) -> List[str]:
-        """Get all paper IDs that have cleaning instructions"""
-        return list(self.papers.keys())

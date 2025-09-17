@@ -301,12 +301,6 @@ class MultiPaperOperations(BaseLLMClient):
                                     paper_id, [original_snippets[idx]]
                                 )
 
-                        # Add summary for snippets to be summarized
-                        if instructions.summarize and instructions.summary:
-                            cleaned_collection.add_evidence(
-                                paper_id, [instructions.summary]
-                            )
-
                 logger.info(
                     f"Evidence cleaning complete. Original: {len(evidence_dict)} papers, "
                     f"Cleaned: {len(cleaned_collection.get_evidence_dict())} papers"
