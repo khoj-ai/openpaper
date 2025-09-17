@@ -34,6 +34,7 @@ import { useAuth, User } from "@/lib/auth";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import {
     Popover,
     PopoverContent,
@@ -46,7 +47,7 @@ import {
 } from "@/components/ui/sheet";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useIsDarkMode } from "@/hooks/useDarkMode";
-import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isStorageNearLimit, isPaperUploadNearLimit, isChatCreditAtLimit, isChatCreditNearLimit } from "@/hooks/useSubscription";
+import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isStorageNearLimit, isPaperUploadNearLimit, isChatCreditAtLimit, isChatCreditNearLimit, formatFileSize, getStorageUsagePercentage, getPaperUploadPercentage, getChatCreditUsagePercentage, getAudioOverviewUsagePercentage, getProjectUsagePercentage } from "@/hooks/useSubscription";
 import Link from "next/link";
 import OnboardingChecklist from "@/components/OnboardingChecklist";
 import { Conversation, PaperItem, Project } from "@/lib/schema";
@@ -141,6 +142,123 @@ const UserMenuContent = ({
         </Button>
     </div>
 )
+
+const UsageLimitCard = ({
+    subscription,
+    loading
+}: {
+    subscription: any,
+    loading: boolean
+}) => {
+    if (loading || !subscription) {
+        return (
+            <div className="p-4 space-y-3">
+                <div className="text-sm font-medium">Loading usage data...</div>
+            </div>
+        );
+    }
+
+    const formatUsage = (used: number, total: number, unit: string = "") => {
+        return `${used}${unit} / ${total}${unit}`;
+    };
+
+    const getProgressColor = (percentage: number) => {
+        if (percentage >= 90) return "bg-red-500";
+        if (percentage >= 75) return "bg-yellow-500";
+        return "bg-blue-500";
+    };
+
+    const UsageItem = ({
+        label,
+        used,
+        total,
+        unit = "",
+        percentage,
+        formatValue
+    }: {
+        label: string,
+        used: number,
+        total: number,
+        unit?: string,
+        percentage: number,
+        formatValue?: (value: number) => string
+    }) => (
+        <div className="space-y-2">
+            <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">{label}</span>
+                <span className="text-sm text-muted-foreground">
+                    {formatValue ?
+                        `${formatValue(used)} / ${formatValue(total)}` :
+                        formatUsage(used, total, unit)
+                    }
+                </span>
+            </div>
+            <div className="relative">
+                <Progress value={Math.min(percentage, 100)} className="h-2" />
+            </div>
+            <div className="text-xs text-muted-foreground">
+                {percentage.toFixed(1)}% used
+            </div>
+        </div>
+    );
+
+    return (
+        <div className="p-4 space-y-4">
+            <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold">Usage Limits</h3>
+                <Badge variant={subscription.plan === 'researcher' ? "default" : "secondary"}>
+                    {subscription.plan === 'researcher' ? 'Researcher' : 'Basic'}
+                </Badge>
+            </div>
+
+            <div className="space-y-4">
+                <UsageItem
+                    label="Paper Uploads"
+                    used={subscription.usage.paper_uploads}
+                    total={subscription.usage.paper_uploads + subscription.usage.paper_uploads_remaining}
+                    percentage={getPaperUploadPercentage(subscription)}
+                />
+
+                <UsageItem
+                    label="Storage"
+                    used={subscription.usage.knowledge_base_size}
+                    total={subscription.usage.knowledge_base_size + subscription.usage.knowledge_base_size_remaining}
+                    percentage={getStorageUsagePercentage(subscription)}
+                    formatValue={formatFileSize}
+                />
+
+                <UsageItem
+                    label="Weekly Chat Credits"
+                    used={subscription.usage.chat_credits_used}
+                    total={subscription.usage.chat_credits_used + subscription.usage.chat_credits_remaining}
+                    percentage={getChatCreditUsagePercentage(subscription)}
+                />
+
+                <UsageItem
+                    label="Monthly Audio Overviews"
+                    used={subscription.usage.audio_overviews_used}
+                    total={subscription.usage.audio_overviews_used + subscription.usage.audio_overviews_remaining}
+                    percentage={getAudioOverviewUsagePercentage(subscription)}
+                />
+
+                <UsageItem
+                    label="Projects"
+                    used={subscription.usage.projects}
+                    total={subscription.usage.projects + subscription.usage.projects_remaining}
+                    percentage={getProjectUsagePercentage(subscription)}
+                />
+            </div>
+
+            <div className="pt-2 border-t">
+                <Link href="/pricing" className="w-full">
+                    <Button size="sm" className="w-full">
+                        {subscription.plan === 'researcher' ? 'Manage' : 'Upgrade'}
+                    </Button>
+                </Link>
+            </div>
+        </div>
+    );
+}
 
 
 
@@ -387,12 +505,19 @@ export function AppSidebar() {
                 {/* User Status Badge */}
                 {user && (
                     <div className="px-2 py-1">
-                        <Badge
-                            variant={user.is_active ? "default" : "secondary"}
-                            className={`w-fit justify-center ${user.is_active ? "bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-200" : "bg-gray-100 text-gray-800"}`}
-                        >
-                            {user.is_active ? "Researcher" : "Basic"}
-                        </Badge>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Badge
+                                    variant={user.is_active ? "default" : "secondary"}
+                                    className={`w-fit justify-center cursor-pointer hover:opacity-80 transition-opacity ${user.is_active ? "bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-200" : "bg-gray-100 text-gray-800"}`}
+                                >
+                                    {user.is_active ? "Researcher" : "Basic"}
+                                </Badge>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80 p-0" align="start">
+                                <UsageLimitCard subscription={subscription} loading={subscriptionLoading} />
+                            </PopoverContent>
+                        </Popover>
                     </div>
                 )}
 
