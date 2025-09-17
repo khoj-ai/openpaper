@@ -1355,24 +1355,24 @@ export function SidePanelContent({
                                                                     <span>Model {selectedModel ? `(${availableModels[selectedModel]})` : ''}</span>
                                                                 </DropdownMenuSubTrigger>
                                                                 <DropdownMenuSubContent>
-                                                                    {Object.entries({
-                                                                        'claude-3-5-sonnet-20240620': 'Claude 3.5 Sonnet',
-                                                                        'gpt-4o': 'GPT-4o',
-                                                                    }).map(([key, value]) => (
-                                                                        <DropdownMenuItem
-                                                                            key={key}
-                                                                            onClick={() => setSelectedModel(key)}
-                                                                            className="flex items-center justify-between"
-                                                                        >
-                                                                            <span>{value}</span>
-                                                                            {selectedModel === key && (
-                                                                                <Check className="h-4 w-4 text-green-500" />
-                                                                            )}
-                                                                        </DropdownMenuItem>
-                                                                    ))}
+                                                                    {
+                                                                        Object.entries(availableModels).map(([modelKey, modelName]) => (
+                                                                            <DropdownMenuItem
+                                                                                key={modelKey}
+                                                                                onClick={() => {
+                                                                                    setSelectedModel(modelKey);
+                                                                                    setRightSideFunction('Chat');
+                                                                                }}
+                                                                                className="flex items-center justify-between"
+                                                                            >
+                                                                                <span>{modelName}</span>
+                                                                                {modelKey === selectedModel && (
+                                                                                    <Check className="h-4 w-4 text-green-500" />
+                                                                                )}
+                                                                            </DropdownMenuItem>
+                                                                        ))}
                                                                 </DropdownMenuSubContent>
                                                             </DropdownMenuSub>
-
                                                             <DropdownMenuSub>
                                                                 <DropdownMenuSubTrigger className="flex items-center">
                                                                     <Feather className="mr-2 h-4 w-4" />
