@@ -8,6 +8,7 @@ from app.database.models import (
     Conversation,
     Highlight,
     Message,
+    Onboarding,
     Paper,
     PaperNote,
     Project,
@@ -30,6 +31,18 @@ class UserAdmin(ModelView, model=User):
         User.is_admin,
     ]
     column_searchable_list = [User.email, User.name]
+
+
+class OnboardingAdmin(ModelView, model=Onboarding):
+    column_list = [
+        Onboarding.id,
+        Onboarding.user_id,
+    ]
+    column_searchable_list = [
+        Onboarding.user_id,
+        Onboarding.research_fields,
+        Onboarding.job_titles,
+    ]
 
 
 class ProjectAdmin(ModelView, model=Project):
@@ -214,3 +227,4 @@ def setup_admin(app: FastAPI):
     admin.add_view(ProjectAdmin)
     admin.add_view(ProjectRoleAdmin)
     admin.add_view(ProjectPaperAdmin)
+    admin.add_view(OnboardingAdmin)
