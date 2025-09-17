@@ -239,7 +239,7 @@ def can_user_access_knowledge_base(
     return True, None
 
 
-def get_user_chat_credits_used_today(db: Session, user: CurrentUser) -> int:
+def get_user_chat_credits_used_this_week(db: Session, user: CurrentUser) -> int:
     """
     Get the number of chat credits used by the user today.
     """
@@ -269,7 +269,7 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
     total_size_allowed = limits[KB_SIZE_KEY]
 
     chat_credits_allowed = limits[CHAT_CREDITS_KEY]
-    chat_credits_used = get_user_chat_credits_used_today(db, user)
+    chat_credits_used = get_user_chat_credits_used_this_week(db, user)
 
     audio_overviews_allowed = limits[AUDIO_OVERVIEWS_KEY]
     audio_overviews_used_this_month = get_user_audio_overviews_used_this_month(db, user)
