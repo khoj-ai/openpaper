@@ -515,9 +515,9 @@ export default function PapersPage() {
             <AlertDialog open={isProjectLimitDialogOpen} onOpenChange={setProjectLimitDialogOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>You're on a roll!</AlertDialogTitle>
+                        <AlertDialogTitle>You&apos;re on a roll!</AlertDialogTitle>
                         <AlertDialogDescription>
-                            You've created a lot of great projects. To create more, please upgrade your plan.
+                            You&apos;ve created a lot of great projects. To create more, please upgrade your plan.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

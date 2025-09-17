@@ -47,7 +47,7 @@ import {
 } from "@/components/ui/sheet";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useIsDarkMode } from "@/hooks/useDarkMode";
-import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isStorageNearLimit, isPaperUploadNearLimit, isChatCreditAtLimit, isChatCreditNearLimit, formatFileSize, getStorageUsagePercentage, getPaperUploadPercentage, getChatCreditUsagePercentage, getAudioOverviewUsagePercentage, getProjectUsagePercentage } from "@/hooks/useSubscription";
+import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isStorageNearLimit, isPaperUploadNearLimit, isChatCreditAtLimit, isChatCreditNearLimit, formatFileSize, getStorageUsagePercentage, getPaperUploadPercentage, getChatCreditUsagePercentage, getAudioOverviewUsagePercentage, getProjectUsagePercentage, type SubscriptionData } from "@/hooks/useSubscription";
 import Link from "next/link";
 import OnboardingChecklist from "@/components/OnboardingChecklist";
 import { Conversation, PaperItem, Project } from "@/lib/schema";
@@ -147,7 +147,7 @@ const UsageLimitCard = ({
     subscription,
     loading
 }: {
-    subscription: any,
+    subscription: SubscriptionData | null,
     loading: boolean
 }) => {
     if (loading || !subscription) {
@@ -160,12 +160,6 @@ const UsageLimitCard = ({
 
     const formatUsage = (used: number, total: number, unit: string = "") => {
         return `${used}${unit} / ${total}${unit}`;
-    };
-
-    const getProgressColor = (percentage: number) => {
-        if (percentage >= 90) return "bg-red-500";
-        if (percentage >= 75) return "bg-yellow-500";
-        return "bg-blue-500";
     };
 
     const UsageItem = ({
