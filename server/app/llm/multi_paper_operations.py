@@ -1,8 +1,10 @@
+import asyncio
 import json
 import logging
 import re
 import time
 import uuid
+from contextlib import suppress
 from typing import AsyncGenerator, Dict, List, Optional, Sequence, Union
 
 from app.database.crud.paper_crud import paper_crud
@@ -20,7 +22,7 @@ from app.llm.prompts import (
     EVIDENCE_GATHERING_SYSTEM_PROMPT,
     PREVIOUS_TOOL_CALLS_MESSAGE,
 )
-from app.llm.provider import LLMProvider, TextContent
+from app.llm.provider import LLMProvider, StreamChunk, TextContent
 from app.llm.tools.file_tools import (
     read_abstract,
     read_abstract_function,
@@ -380,76 +382,120 @@ class MultiPaperOperations(BaseLLMClient):
         message_content = [
             TextContent(text=formatted_prompt),
         ]
-        # Chat with the paper using the LLM
-        for chunk in self.send_message_stream(
-            message=message_content,
-            system_prompt=formatted_system_prompt,
-            history=conversation_history,
-            provider=llm_provider,
-        ):
-            text = chunk.text
 
-            logger.debug(f"Received chunk: {text}")
+        queue = asyncio.Queue()
 
-            if not text:
-                continue
+        async def pinger():
+            """Yields a status message every 5 seconds to keep the connection alive."""
+            with suppress(asyncio.CancelledError):
+                while True:
+                    await queue.put({"type": "status", "content": "Thinking..."})
+                    await asyncio.sleep(5)
 
-            text_buffer += text
+        async def stream_reader():
+            """Reads from the LLM stream and puts chunks into the queue."""
+            _sentinel = object()
 
-            # Check for start delimiter
-            if not in_evidence_section and START_DELIMITER in text_buffer:
-                in_evidence_section = True
-                # Split at delimiter and yield any content that came before
-                pre_evidence = text_buffer.split(START_DELIMITER)[0]
-                if pre_evidence:
-                    yield {"type": "content", "content": pre_evidence}
-                # Start the evidence buffer
-                evidence_buffer = [text_buffer.split(START_DELIMITER)[1]]
-                # Clear the text buffer
-                text_buffer = ""
-                continue
+            def get_next_chunk(iterator):
+                try:
+                    return next(iterator)
+                except StopIteration:
+                    return _sentinel
 
-            reconstructed_buffer = "".join(evidence_buffer + [text_buffer]).strip()
-
-            if in_evidence_section and END_DELIMITER in reconstructed_buffer:
-                # Find the position of the delimiter in the reconstructed buffer
-                delimiter_pos = reconstructed_buffer.find(END_DELIMITER)
-                evidence_part = reconstructed_buffer[:delimiter_pos]
-                remaining = reconstructed_buffer[delimiter_pos + len(END_DELIMITER) :]
-
-                # Parse the complete evidence block
-                structured_evidence = CitationHandler.parse_multi_paper_evidence_block(
-                    evidence_part
+            try:
+                blocking_iterator = self.send_message_stream(
+                    message=message_content,
+                    system_prompt=formatted_system_prompt,
+                    history=conversation_history,
+                    provider=llm_provider,
                 )
+                while True:
+                    chunk = await asyncio.to_thread(get_next_chunk, blocking_iterator)
+                    if chunk is _sentinel:
+                        break
+                    await queue.put(chunk)
+            finally:
+                await queue.put(None)
 
-                # Yield both raw and structured evidence
-                yield {
-                    "type": "references",
-                    "content": {
-                        "citations": structured_evidence,
-                    },
-                }
+        pinger_task = asyncio.create_task(pinger())
+        stream_reader_task = asyncio.create_task(stream_reader())
 
-                # Reset buffers and state
-                in_evidence_section = False
-                evidence_buffer = []
-                text_buffer = remaining
+        first_chunk_received = False
 
-                # Yield any remaining content after evidence section
-                if remaining:
-                    yield {"type": "content", "content": remaining}
-                continue
+        try:
+            while True:
+                item = await queue.get()
+                if item is None:  # Stream is done
+                    break
 
-            # Handle normal streaming
-            if in_evidence_section:
-                evidence_buffer.append(text)
-                text_buffer = ""
-            else:
-                # Keep a reasonable buffer size for detecting delimiters
-                if len(text_buffer) > len(START_DELIMITER) * 2:
-                    to_yield = text_buffer[: -len(START_DELIMITER)]
-                    yield {"type": "content", "content": to_yield}
-                    text_buffer = text_buffer[-len(START_DELIMITER) :]
+                if isinstance(item, dict) and item.get("type") == "status":
+                    yield item
+                    continue
+
+                if not first_chunk_received:
+                    pinger_task.cancel()
+                    first_chunk_received = True
+
+                chunk: StreamChunk = item  # type: ignore
+                text = chunk.text
+
+                logger.debug(f"Received chunk: {text}")
+
+                if not text:
+                    continue
+
+                text_buffer += text
+
+                if not in_evidence_section and START_DELIMITER in text_buffer:
+                    in_evidence_section = True
+                    pre_evidence = text_buffer.split(START_DELIMITER)[0]
+                    if pre_evidence:
+                        yield {"type": "content", "content": pre_evidence}
+                    evidence_buffer = [text_buffer.split(START_DELIMITER)[1]]
+                    text_buffer = ""
+                    continue
+
+                reconstructed_buffer = "".join(evidence_buffer + [text_buffer]).strip()
+
+                if in_evidence_section and END_DELIMITER in reconstructed_buffer:
+                    delimiter_pos = reconstructed_buffer.find(END_DELIMITER)
+                    evidence_part = reconstructed_buffer[:delimiter_pos]
+                    remaining = reconstructed_buffer[
+                        delimiter_pos + len(END_DELIMITER) :
+                    ]
+
+                    structured_evidence = (
+                        CitationHandler.parse_multi_paper_evidence_block(evidence_part)
+                    )
+
+                    yield {
+                        "type": "references",
+                        "content": {
+                            "citations": structured_evidence,
+                        },
+                    }
+
+                    in_evidence_section = False
+                    evidence_buffer = []
+                    text_buffer = remaining
+
+                    if remaining:
+                        yield {"type": "content", "content": remaining}
+                    continue
+
+                if in_evidence_section:
+                    evidence_buffer.append(text)
+                    text_buffer = ""
+                else:
+                    if len(text_buffer) > len(START_DELIMITER) * 2:
+                        to_yield = text_buffer[: -len(START_DELIMITER)]
+                        yield {"type": "content", "content": to_yield}
+                        text_buffer = text_buffer[-len(START_DELIMITER) :]
+        finally:
+            if not pinger_task.done():
+                pinger_task.cancel()
+            if not stream_reader_task.done():
+                stream_reader_task.cancel()
 
         # Handle case where stream ended while still in evidence section
         if in_evidence_section and evidence_buffer:

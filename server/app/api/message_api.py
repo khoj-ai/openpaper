@@ -78,6 +78,8 @@ async def _stream_chat_chunks(
             except (TypeError, ValueError) as json_error:
                 logger.warning(f"Failed to serialize references: {json_error}")
                 yield f"{json.dumps({'type': 'error', 'content': 'Failed to serialize references'})}{END_DELIMITER}"
+        elif chunk_type == "status":
+            yield f"{json.dumps({'type': 'status', 'content': chunk_content})}{END_DELIMITER}"
 
 
 @message_router.get("/models")
