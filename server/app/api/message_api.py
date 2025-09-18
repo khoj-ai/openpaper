@@ -193,14 +193,14 @@ async def chat_message_multipaper(
                     yield f"{json_response}{END_DELIMITER}"
                     return
 
-                yield f"{json.dumps({'type': 'status', 'content': 'Cleaning and filtering evidence...'})}{END_DELIMITER}"
+                # yield f"{json.dumps({'type': 'status', 'content': 'Cleaning and filtering evidence...'})}{END_DELIMITER}"
 
-                cleaned_evidence = await operations.clean_evidence(
-                    evidence_collection=evidence_collection,
-                    original_question=request.user_query,
-                    current_user=current_user,
-                    llm_provider=LLMProvider.OPENAI,
-                )
+                # cleaned_evidence = await operations.clean_evidence(
+                #     evidence_collection=evidence_collection,
+                #     original_question=request.user_query,
+                #     current_user=current_user,
+                #     llm_provider=LLMProvider.OPENAI,
+                # )
 
                 yield f"{json.dumps({'type': 'status', 'content': 'Generating response...'})}{END_DELIMITER}"
 
@@ -218,7 +218,7 @@ async def chat_message_multipaper(
                     question=request.user_query,
                     llm_provider=request.llm_provider,
                     user_references=request.user_references,
-                    evidence_gathered=cleaned_evidence,
+                    evidence_gathered=evidence_collection,
                     conversation_id=request.conversation_id,
                     current_user=current_user,
                     all_papers=all_papers,
