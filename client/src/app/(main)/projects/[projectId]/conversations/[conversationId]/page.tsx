@@ -161,7 +161,6 @@ function ProjectConversationPageContent() {
                 setIsSessionLoading(false);
                 localStorage.removeItem(`pending-query-${conversationIdFromUrl}`);
                 handleSubmit(null, pendingQuery);
-                setIsSessionLoading(false);
             } else if (messages.length === 0 && isSessionLoading && !isStreaming) {
                 fetchMessages(conversationIdFromUrl);
             }
