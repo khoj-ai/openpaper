@@ -158,13 +158,13 @@ function ProjectConversationPageContent() {
         if (user) {
             const pendingQuery = localStorage.getItem(`pending-query-${conversationIdFromUrl}`);
             if (pendingQuery) {
+                setIsSessionLoading(false);
                 localStorage.removeItem(`pending-query-${conversationIdFromUrl}`);
                 handleSubmit(null, pendingQuery);
                 setIsSessionLoading(false);
             } else if (messages.length === 0 && isSessionLoading && !isStreaming) {
                 fetchMessages(conversationIdFromUrl);
             }
-
         } else if (!authLoading) {
             // Only clear messages if we're not loading auth and definitely have no user
             setMessages([]);
