@@ -256,11 +256,13 @@ class MultiPaperOperations(BaseLLMClient):
         self,
         evidence_collection: EvidenceCollection,
         original_question: str,
+        current_user: CurrentUser,
         llm_provider: Optional[LLMProvider] = None,
     ) -> EvidenceCollection:
         """
         Clean and filter evidence to remove irrelevant snippets before final answer generation
         """
+        start_time = time.time()
         evidence_dict = evidence_collection.get_evidence_dict()
 
         formatted_prompt = EVIDENCE_CLEANING_PROMPT.format(
@@ -304,6 +306,16 @@ class MultiPaperOperations(BaseLLMClient):
                 logger.info(
                     f"Evidence cleaning complete. Original: {len(evidence_dict)} papers, "
                     f"Cleaned: {len(cleaned_collection.get_evidence_dict())} papers"
+                )
+
+                track_event(
+                    "evidence_cleaned",
+                    {
+                        "duration_ms": (time.time() - start_time) * 1000,
+                        "original_papers": len(evidence_dict),
+                        "cleaned_papers": len(cleaned_collection.get_evidence_dict()),
+                    },
+                    user_id=str(current_user.id),
                 )
 
                 return cleaned_collection

@@ -198,6 +198,7 @@ async def chat_message_multipaper(
                 cleaned_evidence = await operations.clean_evidence(
                     evidence_collection=evidence_collection,
                     original_question=request.user_query,
+                    current_user=current_user,
                     llm_provider=LLMProvider.OPENAI,
                 )
 
