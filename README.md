@@ -11,7 +11,7 @@ The Open Paper is a place to upload your paper, highlight, leave comments, take 
 
 ## AI-powered copilot
 
-![ai copilot](https://assets.khoj.dev/annotated_paper_chat_assistant.png)
+![ai copilot](https://assets.khoj.dev/op_chat_1.png)
 
 AI is very useful at helping us elicit an understanding of new information in large, complex documents and translating between complexity <-> simplicity. This is useful in a research context, where the true meaning behind an insight, methodology, or hypothesis may not be immediately apparent. We want to build better bridges between where we are and where we need to go.
 
@@ -21,7 +21,7 @@ The AI copilot uses a citations annotation protocol that pushes it to ground its
 
 ## Parallel Views
 
-![parallel view](https://assets.khoj.dev/annotated_paper_parallel_view.png)
+![parallel view](https://assets.khoj.dev/op_parallel_1.jpeg)
 
 Many tools currently allow you to upload your raw documents and chat with them, but they typically don't show the document in a parallel view. For me, this is a necessary feature as I still need to actually read the document. I want to use an LLM to give me an overview, provide context, extract references, but I want it to do it grounded in the context of the file I'm currently reading. Moreover, I want to highlight, take notes, annotate, all in one place. The split view allows me to do that more easily.
 
@@ -33,7 +33,7 @@ Since you can upload many of your PDFs all in one place, you can also search for
 
 ## Annotations
 
-![annotations](https://assets.khoj.dev/annotated_paper_highlight_annotations.png)
+![annotations](https://assets.khoj.dev/op_annotations_1.jpeg)
 
 Highlights and annotations should help you quickly recall your insights in a given paper and navigate to the particular area of interest.
 
