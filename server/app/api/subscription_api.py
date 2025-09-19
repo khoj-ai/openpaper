@@ -91,6 +91,7 @@ def create_checkout_session(
             "client_reference_id": str(current_user.id),
             "line_items": [{"quantity": 1, "price": price_id}],
             "mode": "subscription",
+            "allow_promotion_codes": True,
             "return_url": f"{YOUR_DOMAIN}/subscribed?session_id={{CHECKOUT_SESSION_ID}}",
         }
 
