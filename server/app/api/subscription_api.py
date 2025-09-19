@@ -458,11 +458,11 @@ async def handle_stripe_webhook(
                     track_event(
                         event_name="subscription_created",
                         properties={
-                            "user_id": str(user_id),
                             "subscription_id": subscription_id,
                             "customer_id": customer_id,
                             "status": stripe_sub.status,
                         },
+                        user_id=str(user_id),
                     )
                 else:
                     logger.warning(
@@ -587,11 +587,11 @@ async def handle_stripe_webhook(
                         track_event(
                             event_name="payment_failed",
                             properties={
-                                "user_id": str(subscription.user_id),
                                 "subscription_id": subscription_id,
                                 "customer_id": customer_id,
                                 "invoice_id": invoice.get("id"),
                             },
+                            user_id=str(subscription.user_id),
                         )
 
                         # Get user email and name for notification
@@ -637,10 +637,10 @@ async def handle_stripe_webhook(
                         track_event(
                             event_name="payment_succeeded",
                             properties={
-                                "user_id": str(subscription.user_id),
                                 "subscription_id": subscription_id,
                                 "invoice_id": invoice.get("id"),
                             },
+                            user_id=str(subscription.user_id),
                         )
 
                         logger.info(
@@ -665,10 +665,10 @@ async def handle_stripe_webhook(
                         track_event(
                             event_name="payment_action_required",
                             properties={
-                                "user_id": str(subscription.user_id),
                                 "subscription_id": subscription_id,
                                 "invoice_id": invoice.get("id"),
                             },
+                            user_id=str(subscription.user_id),
                         )
 
                         logger.info(
@@ -718,6 +718,7 @@ async def handle_stripe_webhook(
                             "user_id": str(subscription.user_id),
                             "subscription_id": subscription_id,
                         },
+                        user_id=str(subscription.user_id),
                     )
 
                     logger.warning(f"Subscription {subscription_id} is now past due")
@@ -911,7 +912,6 @@ def resubscribe(
                     track_event(
                         event_name="subscription_reactivated_new",
                         properties={
-                            "user_id": str(current_user.id),
                             "old_subscription_id": str(
                                 subscription.stripe_subscription_id
                             ),
@@ -923,6 +923,7 @@ def resubscribe(
                                 else "monthly"
                             ),
                         },
+                        user_id=str(current_user.id),
                     )
 
                     logger.info(
@@ -969,10 +970,10 @@ def resubscribe(
                 track_event(
                     event_name="subscription_cancellation_reversed",
                     properties={
-                        "user_id": str(current_user.id),
                         "subscription_id": str(subscription.stripe_subscription_id),
                         "customer_id": str(subscription.stripe_customer_id),
                     },
+                    user_id=str(current_user.id),
                 )
 
                 logger.info(
@@ -1098,13 +1099,13 @@ def change_subscription_interval(
         track_event(
             event_name="subscription_interval_changed",
             properties={
-                "user_id": str(current_user.id),
                 "subscription_id": str(subscription.stripe_subscription_id),
                 "old_interval": (
                     "yearly" if current_price_id == YEARLY_PRICE_ID else "monthly"
                 ),
                 "new_interval": new_interval.value + "ly",
             },
+            user_id=str(current_user.id),
         )
 
         logger.info(
