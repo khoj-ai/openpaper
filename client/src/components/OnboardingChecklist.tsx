@@ -13,7 +13,6 @@ export interface OnboardingChecklistData {
     has_annotations: boolean;
     has_highlights: boolean;
     has_messages: boolean;
-    has_notes: boolean;
     has_completed_paper: boolean;
     onboarding_completed: boolean;
 }
@@ -80,7 +79,6 @@ export default function OnboardingChecklist() {
         { text: "Upload your first paper", completed: !!onboardingData?.has_papers },
         { text: "Highlight a snippet in any paper", completed: !!onboardingData?.has_highlights },
         { text: "Annotate a highlight with a comment", completed: !!onboardingData?.has_annotations },
-        { text: "Take some notes", completed: !!onboardingData?.has_notes },
         { text: "Chat with your paper", completed: !!onboardingData?.has_messages },
         { text: "Finish reading your first paper", completed: !!onboardingData?.has_completed_paper },
     ], [user, onboardingData]);
@@ -97,7 +95,7 @@ export default function OnboardingChecklist() {
             <PopoverTrigger asChild>
                 <Button
                     variant={"ghost"}
-                    className="relative flex items-center gap-2 animate-subtle-glow hover:animate-none"
+                    className="relative flex items-center gap-2 hover:animate-none w-full"
                 >
                     {numCompleted < itemCount && <span className="" />}
                     <Clipboard className="h-4 w-4" />

@@ -61,7 +61,6 @@ async def get_onboarding_status(
     has_annotations = annotation_crud.has_any(db, user=current_user)
     has_messages = message_crud.has_any(db, user=current_user)
     has_papers = paper_crud.has_any(db, user=current_user)
-    has_notes = paper_note_crud.has_any(db, user=current_user)
     has_completed_paper = bool(
         paper_crud.get_by(db, user=current_user, status=PaperStatus.completed)
     )
@@ -72,7 +71,6 @@ async def get_onboarding_status(
             has_annotations,
             has_messages,
             has_papers,
-            has_notes,
             has_completed_paper,
         ]
     )
@@ -83,7 +81,6 @@ async def get_onboarding_status(
         "has_annotations": has_annotations,
         "has_messages": has_messages,
         "has_papers": has_papers,
-        "has_notes": has_notes,
         "has_completed_paper": has_completed_paper,
     }
 
