@@ -94,6 +94,15 @@ def create_checkout_session(
             "return_url": f"{YOUR_DOMAIN}/subscribed?session_id={{CHECKOUT_SESSION_ID}}",
         }
 
+        # Add telemetry
+        track_event(
+            event_name="checkout_initiated",
+            properties={
+                "interval": interval,
+            },
+            user_id=str(current_user.id),
+        )
+
         # Add customer if available
         if customer_id:
             session_params["customer"] = str(customer_id)
