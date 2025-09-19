@@ -55,8 +55,6 @@ async def get_paper_ids(
     Get all paper IDs
     """
     papers: List[Paper] = paper_crud.get_multi_uploads_completed(db, user=current_user)
-    if not papers:
-        return JSONResponse(status_code=404, content={"message": "No papers found"})
     return JSONResponse(
         status_code=200,
         content={

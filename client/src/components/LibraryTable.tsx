@@ -531,8 +531,22 @@ export function LibraryTable({
 									})
 								) : (
 									<TableRow>
-										<TableCell colSpan={numCols} className="h-24 text-center">
-											{searchTerm || filters.length > 0 ? "No papers match your search criteria." : "No papers in your library yet."}
+										<TableCell colSpan={numCols} className="h-32 text-center">
+											{searchTerm || filters.length > 0 ? (
+												"No papers match your search criteria."
+											) : (
+												<div className="flex flex-col items-center gap-4 py-8">
+													<div className="text-muted-foreground text-center">
+														<p className="text-lg font-medium mb-2">No papers in your library yet</p>
+														<p className="text-sm">Upload your first research paper to get started. All your papers will appear here for easy access and organization.</p>
+													</div>
+													<Link href="/" passHref>
+														<Button variant="default" className="bg-blue-500 hover:bg-blue-600 text-white">
+															Upload Your First Paper
+														</Button>
+													</Link>
+												</div>
+											)}
 										</TableCell>
 									</TableRow>
 								)}
