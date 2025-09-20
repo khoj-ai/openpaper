@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/lib/auth";
 import { useSubscription, getStorageUsagePercentage, isStorageNearLimit, isStorageAtLimit, formatFileSize, getPaperUploadPercentage, isPaperUploadNearLimit, isPaperUploadAtLimit, isProjectAtLimit } from "@/hooks/useSubscription";
-import { FileText, Upload, Search, AlertTriangle, AlertCircle, HardDrive, X, ArrowDown, Grid, List } from "lucide-react";
+import { FileText, Upload, Search, AlertTriangle, Grid, List } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Filter, Sort } from "@/components/PaperFiltering";
@@ -50,7 +50,6 @@ export default function PapersPage() {
     const [isCreateProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
     const [isProjectLimitDialogOpen, setProjectLimitDialogOpen] = useState(false);
     const [papersForNewProject, setPapersForNewProject] = useState<PaperItem[]>([]);
-    const SHOW_STORAGE_USAGE_THRESHOLD = 60; // Show storage usage alert if usage is above 60%
 
     useEffect(() => {
         const savedViewMode = localStorage.getItem("papersViewMode");
