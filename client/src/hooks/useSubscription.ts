@@ -6,6 +6,7 @@ export interface SubscriptionLimits {
     knowledge_base_size: number;
     chat_credits_daily: number;
     audio_overviews_monthly: number;
+    projects: number;
     model: string[];
 }
 

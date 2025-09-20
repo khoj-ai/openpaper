@@ -12,6 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { Progress } from "@/components/ui/progress";
+import LoadingIndicator from "@/components/utils/Loading";
 
 export default function Projects() {
 	const [projects, setProjects] = useState<Project[]>([]);
