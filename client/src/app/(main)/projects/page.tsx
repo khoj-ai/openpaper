@@ -7,11 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Project } from "@/lib/schema";
 import { fetchFromApi } from "@/lib/api";
 import { PlusCircle, FolderOpen, Target, BookOpen, FileText, AlertTriangle } from "lucide-react";
-import { useSubscription, isProjectNearLimit, isProjectAtLimit } from "@/hooks/useSubscription";
+import { useSubscription, isProjectNearLimit, isProjectAtLimit, getProjectUsagePercentage } from "@/hooks/useSubscription";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
-import LoadingIndicator from "@/components/utils/Loading";
+import { Progress } from "@/components/ui/progress";
 
 export default function Projects() {
 	const [projects, setProjects] = useState<Project[]>([]);
@@ -20,6 +20,8 @@ export default function Projects() {
 	const [error, setError] = useState<string | null>(null);
 	const { subscription } = useSubscription();
 	const router = useRouter();
+
+	const [showUsageAlert, setShowUsageAlert] = useState(true);
 
 	const atProjectLimit = subscription ? isProjectAtLimit(subscription) : false;
 	const nearProjectLimit = subscription ? isProjectNearLimit(subscription) : false;
@@ -136,19 +138,36 @@ export default function Projects() {
 				}
 			</div>
 
-			{(nearProjectLimit || atProjectLimit) && subscription && (
+			{(nearProjectLimit || atProjectLimit) && subscription && showUsageAlert && (
 				<Alert variant={'default'} className="mb-4">
-					<AlertTriangle className="h-4 w-4" />
-					<AlertTitle className={atProjectLimit ? "text-destructive" : "text-blue-500"}>{atProjectLimit ? "You've built some great projects!" : "Approaching Project Limit"}</AlertTitle>
-					<AlertDescription className="text-muted-foreground">
-						{atProjectLimit
-							? `You have used all of your available projects. Upgrade your plan to create more.`
-							: `You have used ${subscription.usage.projects} of ${subscription.usage.projects + subscription.usage.projects_remaining
-							} projects. Consider upgrading soon.`}
-						<Link href="/pricing" className="font-semibold underline ml-2 text-primary">
-							View Plans
-						</Link>
-					</AlertDescription>
+					<div className="flex justify-between items-start">
+						<div className="flex items-start">
+							<AlertTriangle className="h-4 w-4 mt-1" />
+							<div className="ml-2">
+								<AlertTitle className={atProjectLimit ? "text-destructive" : "text-blue-500"}>{atProjectLimit ? "You've built some great projects!" : "Approaching Project Limit"}</AlertTitle>
+								<AlertDescription className="text-muted-foreground">
+									{atProjectLimit
+										? `You have used all of your available projects. Upgrade your plan to create more.`
+										: `You have used ${subscription.usage.projects} of ${subscription.limits.projects} projects. Consider upgrading soon.`}
+									<Link href="/pricing" className="font-semibold underline ml-2 text-primary">
+										View Plans
+									</Link>
+								</AlertDescription>
+							</div>
+						</div>
+						<Button variant="outline" size="sm" onClick={() => setShowUsageAlert(false)} className="self-start">
+							Dismiss
+						</Button>
+					</div>
+					<div className="mt-4 space-y-4">
+						<div>
+							<div className="flex justify-between text-sm text-muted-foreground">
+								<span>Projects: {subscription.usage.projects} used</span>
+								<span>{subscription.limits.projects} total</span>
+							</div>
+							<Progress value={getProjectUsagePercentage(subscription)} className="h-2 mt-1" />
+						</div>
+					</div>
 				</Alert>
 			)}
 

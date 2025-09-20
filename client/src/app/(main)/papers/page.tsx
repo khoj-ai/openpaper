@@ -314,6 +314,8 @@ export default function PapersPage() {
     }
 
     const UsageDisplay = () => {
+        const [showAlert, setShowAlert] = useState(true);
+
         if (subscriptionLoading) {
             return <Skeleton className="h-20 w-full mb-6" />;
         }
@@ -330,9 +332,9 @@ export default function PapersPage() {
         const atPaperUploadLimit = isPaperUploadAtLimit(subscription);
         const nearPaperUploadLimit = isPaperUploadNearLimit(subscription);
 
-        const showAlert = atStorageLimit || nearStorageLimit || atPaperUploadLimit || nearPaperUploadLimit;
+        const shouldShowAlert = atStorageLimit || nearStorageLimit || atPaperUploadLimit || nearPaperUploadLimit;
 
-        if (!showAlert) {
+        if (!shouldShowAlert || !showAlert) {
             return null;
         }
 
@@ -344,14 +346,23 @@ export default function PapersPage() {
 
         return (
             <Alert variant={'default'} className="mb-4">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle className={atLimit ? "text-destructive" : "text-blue-500"}>{title}</AlertTitle>
-                <AlertDescription className="text-muted-foreground">
-                    {description}
-                    <Link href="/pricing" className="font-semibold underline ml-2 text-primary">
-                        View Plans
-                    </Link>
-                </AlertDescription>
+                <div className="flex justify-between items-start">
+                    <div className="flex items-start">
+                        <AlertTriangle className="h-4 w-4 mt-1" />
+                        <div className="ml-2">
+                            <AlertTitle className={atLimit ? "text-destructive" : "text-blue-500"}>{title}</AlertTitle>
+                            <AlertDescription className="text-muted-foreground">
+                                {description}
+                                <Link href="/pricing" className="font-semibold underline ml-2 text-primary">
+                                    View Plans
+                                </Link>
+                            </AlertDescription>
+                        </div>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => setShowAlert(false)} className="self-start">
+                        Dismiss
+                    </Button>
+                </div>
                 <div className="mt-4 space-y-4">
                     {(nearStorageLimit || atStorageLimit) && (
                         <div>
