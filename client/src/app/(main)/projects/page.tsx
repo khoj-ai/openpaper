@@ -137,9 +137,9 @@ export default function Projects() {
 			</div>
 
 			{(nearProjectLimit || atProjectLimit) && subscription && (
-				<Alert variant={'default'} className="mb-4 border-blue-500 border-l-4">
-					<AlertTriangle className="h-4 w-4 text-blue-500" />
-					<AlertTitle className={atProjectLimit ? "text-blue-500" : ""}>{atProjectLimit ? "You've built some great projects!" : "Approaching Project Limit"}</AlertTitle>
+				<Alert variant={'default'} className="mb-4">
+					<AlertTriangle className="h-4 w-4" />
+					<AlertTitle className={atProjectLimit ? "text-destructive" : "text-blue-500"}>{atProjectLimit ? "You've built some great projects!" : "Approaching Project Limit"}</AlertTitle>
 					<AlertDescription className="text-muted-foreground">
 						{atProjectLimit
 							? `You have used all of your available projects. Upgrade your plan to create more.`
