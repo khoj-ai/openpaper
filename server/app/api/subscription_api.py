@@ -563,6 +563,28 @@ async def handle_stripe_webhook(
 
                     logger.info(f"Subscription {subscription_id} has been canceled")
 
+                    # Track subscription cancellation event
+                    track_event(
+                        event_name="subscription_canceled",
+                        properties={
+                            "subscription_id": subscription_id,
+                            "customer_id": stripe_sub.get("customer"),
+                            "interval": (
+                                "yearly"
+                                if stripe_received_price_id == YEARLY_PRICE_ID
+                                else "monthly"
+                            ),
+                            "canceled_at": (
+                                datetime.fromtimestamp(
+                                    stripe_sub.get("canceled_at", 0)
+                                ).isoformat()
+                                if stripe_sub.get("canceled_at")
+                                else None
+                            ),
+                        },
+                        user_id=str(subscription.user_id),
+                    )
+
             except Exception as e:
                 logger.error(f"Error canceling subscription: {e}")
 
