@@ -42,9 +42,9 @@ export function CollapsibleSidebarMenu<T extends { id: string; title?: string; }
     return (
         <Collapsible asChild defaultOpen={defaultOpen} className="group/collapsible">
             <SidebarMenuItem>
-                <CollapsibleTrigger asChild>
-                    <Link href={url}>
-                        <SidebarMenuButton>
+                <div className="flex items-center w-full">
+                    <Link href={url} className="flex items-center flex-1" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                        <SidebarMenuButton className="flex-1">
                             <Icon />
                             <span>{title}</span>
                             {tag && (
@@ -52,10 +52,14 @@ export function CollapsibleSidebarMenu<T extends { id: string; title?: string; }
                                     {tag}
                                 </span>
                             )}
-                            <ChevronDown className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
                         </SidebarMenuButton>
                     </Link>
-                </CollapsibleTrigger>
+                    <CollapsibleTrigger asChild>
+                        <button className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded">
+                            <ChevronDown className="h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                        </button>
+                    </CollapsibleTrigger>
+                </div>
                 <CollapsibleContent>
                     <SidebarMenuSub>
                         {items.slice(0, maxItems).map((item) => (
