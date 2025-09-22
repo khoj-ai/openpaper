@@ -291,7 +291,7 @@ export function LibraryTable({
 							>
 								{selectedPapers.size > 0 && (
 									<span className="text-sm font-medium text-muted-foreground">
-										{selectedPapers.size} paper{selectedPapers.size !== 1 ? 's' : ''} selected
+										{selectedPapers.size} paper{selectedPapers.size !== 1 ? 's' : ''}
 									</span>
 								)}
 								<div className="flex items-center gap-2">
@@ -562,7 +562,7 @@ export function LibraryTable({
 									<Link href={`/paper/${selectedPaperForPreview.id}`} passHref>
 										<h3 className="font-bold text-lg mb-2 pr-8 hover:underline cursor-pointer flex items-center gap-2">
 											{selectedPaperForPreview.title}
-											<ExternalLink className="h-4 w-4" />
+											<ExternalLink className="h-4 w-4 flex-shrink-0" />
 										</h3>
 									</Link>
 									{selectedPaperForPreview.preview_url && (
@@ -667,7 +667,7 @@ export function LibraryTable({
 									<Link href={`/paper/${selectedPaperForPreview.id}`} passHref>
 										<h3 className="font-bold text-lg mb-2 pr-8 hover:underline cursor-pointer flex items-center gap-2">
 											{selectedPaperForPreview.title}
-											<ExternalLink className="h-4 w-4" />
+											<ExternalLink className="h-4 w-4 flex-shrink-0" />
 										</h3>
 									</Link>
 									{selectedPaperForPreview.preview_url && (
