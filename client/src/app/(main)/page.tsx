@@ -376,7 +376,7 @@ export default function Home() {
 				<PdfDropzone
 					onFileSelect={handleFileUpload}
 					onUrlClick={handleLinkClick}
-					maxSizeMb={10} // Set desired max size
+					maxSizeMb={15} // Set desired max size
 				/>
 
 				{/* Section break and header for relevant papers */}

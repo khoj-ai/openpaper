@@ -11,7 +11,7 @@ interface PdfDropzoneProps {
     disabled?: boolean;
 }
 
-export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 5, disabled = false }: PdfDropzoneProps) {
+export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 15, disabled = false }: PdfDropzoneProps) {
     const [isDragging, setIsDragging] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
