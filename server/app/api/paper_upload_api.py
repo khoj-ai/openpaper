@@ -19,7 +19,6 @@ from datetime import datetime, timezone
 from typing import Optional, Union
 from uuid import UUID
 
-import requests
 from app.auth.dependencies import get_required_user
 from app.database.crud.paper_crud import paper_crud
 from app.database.crud.paper_upload_crud import (
@@ -30,6 +29,7 @@ from app.database.crud.paper_upload_crud import (
 from app.database.database import get_db
 from app.database.models import PaperUploadJob
 from app.database.telemetry import track_event
+from app.helpers.parser import validate_pdf_content, validate_url_and_fetch_pdf
 from app.helpers.pdf_jobs import pdf_jobs_client
 from app.helpers.s3 import s3_service
 from app.helpers.subscription_limits import (
@@ -142,10 +142,11 @@ async def upload_pdf_from_url(
             },
         )
 
-    # Validate the URL
-    url = request.url
-    if not url or not str(url).lower().endswith(".pdf"):
-        return JSONResponse(status_code=400, content={"message": "URL must be a PDF"})
+    # Validate the URL and fetch PDF content
+    url = str(request.url)
+    is_valid, pdf_bytes, error_message = await validate_url_and_fetch_pdf(url)
+    if not is_valid:
+        return JSONResponse(status_code=400, content={"message": error_message})
 
     # Create the paper upload job
     paper_upload_job_obj = PaperUploadJobCreate(
@@ -166,9 +167,14 @@ async def upload_pdf_from_url(
 
     casted_project_id = UUID(str(project_id)) if project_id else None
 
+    # Get filename from URL
+    filename = url.split("/")[-1]
+
+    # Pass file contents and filename instead of the UploadFile object
     background_tasks.add_task(
-        upload_file_from_url_microservice,
-        url=url,
+        upload_raw_file_microservice,
+        file_contents=pdf_bytes,
+        filename=filename,
         paper_upload_job=paper_upload_job,
         current_user=current_user,
         db=db,
@@ -220,6 +226,11 @@ async def upload_pdf(
             status_code=400, content={"message": "Error reading uploaded file"}
         )
 
+    # Validate PDF content
+    is_valid, error_message = await validate_pdf_content(file_contents, source="upload")
+    if not is_valid:
+        return JSONResponse(status_code=400, content={"message": error_message})
+
     # Create the paper upload job
     paper_upload_job_obj = PaperUploadJobCreate(
         started_at=datetime.now(timezone.utc),
@@ -257,57 +268,6 @@ async def upload_pdf(
             "job_id": str(paper_upload_job.id),
         },
     )
-
-
-async def upload_file_from_url_microservice(
-    url: HttpUrl,
-    paper_upload_job: PaperUploadJob,
-    current_user: CurrentUser,
-    db: Session,
-    project_id: Optional[UUID] = None,
-) -> None:
-    """
-    Helper function to upload a file from a URL using the microservice.
-    """
-
-    paper_upload_job_crud.mark_as_running(
-        db=db,
-        job_id=str(paper_upload_job.id),
-        user=current_user,
-    )
-
-    try:
-        # Download the file to get its contents
-        response = requests.get(str(url), timeout=30)
-        response.raise_for_status()
-        file_contents = response.content
-
-        # Submit to microservice
-        task_id = await pdf_jobs_client.submit_pdf_processing_job_with_upload(
-            pdf_bytes=file_contents,
-            paper_upload_job=paper_upload_job,
-            db=db,
-            user=current_user,
-            project_id=project_id,
-        )
-
-        # Update job with task_id
-        paper_upload_job_crud.update(
-            db=db,
-            db_obj=paper_upload_job,
-            obj_in=PaperUploadJobUpdate(task_id=task_id),
-            user=current_user,
-        )
-
-    except Exception as e:
-        logger.error(
-            f"Error submitting file from URL to microservice: {str(e)}", exc_info=True
-        )
-        paper_upload_job_crud.mark_as_failed(
-            db=db,
-            job_id=str(paper_upload_job.id),
-            user=current_user,
-        )
 
 
 async def check_subscription_limits(
