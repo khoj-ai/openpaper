@@ -17,6 +17,7 @@ import { Input } from "./ui/input";
 import { useSidebar } from "./ui/sidebar";
 import {
 	Sheet,
+	SheetClose,
 	SheetContent,
 } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -280,58 +281,60 @@ export function LibraryTable({
 						</div>
 					)}
 				</div>
-				<div className="fixed md:relative bottom-4 md:bottom-auto right-4 md:right-auto z-50 md:z-auto bg-background md:bg-transparent p-4 md:p-0 rounded-lg md:rounded-none shadow-lg md:shadow-none border md:border-none">
-					<div className="flex flex-col md:flex-row md:items-center gap-4">
-						{selectable && onSelectFiles && (
-							<div
-								className={`flex flex-col md:flex-row items-start md:items-center gap-3 transition-all duration-200 ${selectedPapers.size > 0
-									? "opacity-100 translate-y-0"
-									: "opacity-0 translate-y-2 pointer-events-none"
-									}`}
-							>
-								{selectedPapers.size > 0 && (
-									<span className="text-sm font-medium text-muted-foreground">
-										{selectedPapers.size} paper{selectedPapers.size !== 1 ? 's' : ''}
-									</span>
-								)}
-								<div className="flex items-center gap-2">
-									{actionOptions.map((action) => (
-										<Button
-											key={action}
-											variant="default"
-											size="sm"
-											onClick={() => handleAction(action)}
-											className="font-medium bg-blue-500 text-white hover:bg-blue-600 dark:hover:bg-blue-400 cursor-pointer"
-										>
-											{action}
-										</Button>
-									))}
+				{(!isMobile || selectedPapers.size > 0) && (
+					<div className="fixed md:relative bottom-4 md:bottom-auto right-4 md:right-auto z-50 md:z-auto bg-background md:bg-transparent p-4 md:p-0 rounded-lg md:rounded-none shadow-lg md:shadow-none border md:border-none">
+						<div className="flex flex-col md:flex-row md:items-center gap-4">
+							{selectable && onSelectFiles && (
+								<div
+									className={`flex flex-col md:flex-row items-start md:items-center gap-3 transition-all duration-200 ${selectedPapers.size > 0
+										? "opacity-100 translate-y-0"
+										: "opacity-0 translate-y-2 pointer-events-none"
+										}`}
+								>
+									{selectedPapers.size > 0 && (
+										<span className="text-sm font-medium text-muted-foreground">
+											{selectedPapers.size} paper{selectedPapers.size !== 1 ? 's' : ''}
+										</span>
+									)}
+									<div className="flex items-center gap-2">
+										{actionOptions.map((action) => (
+											<Button
+												key={action}
+												variant="default"
+												size="sm"
+												onClick={() => handleAction(action)}
+												className="font-medium bg-blue-500 text-white hover:bg-blue-600 dark:hover:bg-blue-400 cursor-pointer"
+											>
+												{action}
+											</Button>
+										))}
+									</div>
 								</div>
-							</div>
-						)}
-						<div className={`flex items-center gap-2 transition-all duration-200 ${selectedPapers.size > 0 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-							{selectable && handleDelete && (
-								<DropdownMenu>
-									<DropdownMenuTrigger asChild>
-										<Button variant="outline">
-											Actions <ChevronDown className="h-4 w-4 ml-2" />
-										</Button>
-									</DropdownMenuTrigger>
-									<DropdownMenuContent>
-										<DropdownMenuItem
-											onClick={handleDeletePapers}
-											disabled={selectedPapers.size === 0}
-											className="text-red-500"
-										>
-											<Trash2 className="h-4 w-4 mr-2" />
-											Delete ({selectedPapers.size})
-										</DropdownMenuItem>
-									</DropdownMenuContent>
-								</DropdownMenu>
 							)}
+							<div className={`flex items-center gap-2 transition-all duration-200 ${selectedPapers.size > 0 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+								{selectable && handleDelete && (
+									<DropdownMenu>
+										<DropdownMenuTrigger asChild>
+											<Button variant="outline">
+												Actions <ChevronDown className="h-4 w-4 ml-2" />
+											</Button>
+										</DropdownMenuTrigger>
+										<DropdownMenuContent>
+											<DropdownMenuItem
+												onClick={handleDeletePapers}
+												disabled={selectedPapers.size === 0}
+												className="text-red-500"
+											>
+												<Trash2 className="h-4 w-4 mr-2" />
+												Delete ({selectedPapers.size})
+											</DropdownMenuItem>
+										</DropdownMenuContent>
+									</DropdownMenu>
+								)}
+							</div>
 						</div>
 					</div>
-				</div>
+				)}
 			</div>
 
 			<div className="flex flex-wrap gap-2 mb-4">
@@ -559,21 +562,6 @@ export function LibraryTable({
 						<Sheet open={!!selectedPaperForPreview} onOpenChange={(open) => { if (!open) setSelectedPaperForPreview(null); }}>
 							<SheetContent side="bottom" className="h-full w-full flex flex-col p-0">
 								<div className="p-4 relative flex-grow overflow-y-auto">
-									<Link href={`/paper/${selectedPaperForPreview.id}`} passHref>
-										<h3 className="font-bold text-lg mb-2 pr-8 hover:underline cursor-pointer flex items-center gap-2">
-											{selectedPaperForPreview.title}
-											<ExternalLink className="h-4 w-4 flex-shrink-0" />
-										</h3>
-									</Link>
-									{selectedPaperForPreview.preview_url && (
-										<>
-											{/* eslint-disable-next-line @next/next/no-img-element */}
-											<img src={selectedPaperForPreview.preview_url}
-												alt="Paper preview"
-												className="w-full h-auto my-4 rounded-md"
-											/>
-										</>
-									)}
 									<div className="flex items-center gap-2 flex-wrap">
 										{selectedPaperForPreview.status && (
 											<DropdownMenu>
@@ -648,7 +636,31 @@ export function LibraryTable({
 											</DialogContent>
 										</Dialog>
 									</div>
+									<Link href={`/paper/${selectedPaperForPreview.id}`} passHref>
+										<h3 className="font-bold text-lg mb-2 pr-8 hover:underline cursor-pointer flex items-center gap-2">
+											{selectedPaperForPreview.title}
+											<ExternalLink className="h-4 w-4 flex-shrink-0" />
+										</h3>
+									</Link>
+									{selectedPaperForPreview.preview_url && (
+										<>
+											{/* eslint-disable-next-line @next/next/no-img-element */}
+											<img src={selectedPaperForPreview.preview_url}
+												alt="Paper preview"
+												className="w-full h-auto my-4 rounded-md"
+											/>
+										</>
+									)}
 									<p className="text-sm mt-4 break-words">{selectedPaperForPreview.abstract}</p>
+									<SheetClose asChild>
+										<Button
+											variant="ghost"
+											className="w-full"
+											onClick={() => setSelectedPaperForPreview(null)}
+										>
+											Close
+										</Button>
+									</SheetClose>
 								</div>
 							</SheetContent>
 						</Sheet>
