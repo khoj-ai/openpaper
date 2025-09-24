@@ -352,15 +352,17 @@ export default function PapersPage() {
                             <AlertTitle className={atLimit ? "text-destructive" : "text-blue-500"}>{title}</AlertTitle>
                             <AlertDescription className="text-muted-foreground">
                                 {description}
-                                <Link href="/pricing" className="font-semibold underline ml-2 text-primary">
-                                    View Plans
-                                </Link>
                             </AlertDescription>
                         </div>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => setShowAlert(false)} className="self-start">
-                        Dismiss
-                    </Button>
+                    <div className="flex items-center gap-x-2">
+                        <Button asChild size="sm">
+                            <Link href="/pricing">Upgrade</Link>
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setShowAlert(false)} className="self-start">
+                            Dismiss
+                        </Button>
+                    </div>
                 </div>
                 <div className="mt-4 space-y-4">
                     {(nearStorageLimit || atStorageLimit) && (

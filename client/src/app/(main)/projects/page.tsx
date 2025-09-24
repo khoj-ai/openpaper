@@ -150,15 +150,17 @@ export default function Projects() {
 									{atProjectLimit
 										? `You have used all of your available projects. Upgrade your plan to create more.`
 										: `You have used ${subscription.usage.projects} of ${subscription.limits.projects} projects. Consider upgrading soon.`}
-									<Link href="/pricing" className="font-semibold underline ml-2 text-primary">
-										View Plans
-									</Link>
 								</AlertDescription>
 							</div>
 						</div>
-						<Button variant="outline" size="sm" onClick={() => setShowUsageAlert(false)} className="self-start">
-							Dismiss
-						</Button>
+						<div className="flex items-center gap-x-2">
+							<Button asChild size="sm">
+								<Link href="/pricing">Upgrade</Link>
+							</Button>
+							<Button variant="outline" size="sm" onClick={() => setShowUsageAlert(false)} className="self-start">
+								Dismiss
+							</Button>
+						</div>
 					</div>
 					<div className="mt-4 space-y-4">
 						<div>
