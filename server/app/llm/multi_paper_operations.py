@@ -155,7 +155,7 @@ class MultiPaperOperations(BaseLLMClient):
                 system_prompt=evidence_gathering_prompt,
                 history=conversation_history,
                 contents=message_content,
-                model_type=ModelType.DEFAULT,
+                model_type=ModelType.FAST,
                 function_declarations=function_declarations,
                 provider=llm_provider,
                 enable_thinking=True,
