@@ -29,7 +29,7 @@ read_file_function = {
 
 search_file_function = {
     "name": "search_file",
-    "description": "Use this tool to find specific information within a single paper. You can use a regular expression for powerful searches. It returns the lines that match your query, along with their line numbers. This is useful for pinpointing exact details without reading the whole paper.",
+    "description": "Use this tool to find specific information within a single paper. You will use a regular expression for powerful searches. It returns the lines that match your query, along with their line numbers. This is useful for pinpointing exact details without reading the whole paper.",
     "parameters": {
         "type": "object",
         "properties": {
@@ -48,7 +48,7 @@ search_file_function = {
 
 view_file_function = {
     "name": "view_file",
-    "description": "Use this tool when you want to look at a specific part of a paper. You can specify a range of lines to view. This is helpful when you already have an idea of where the information is, for example, after using 'search_file' and getting a line number. It helps you see the context around a specific line or section.",
+    "description": "Use this tool when you want to look at a specific part of a paper. You must specify a range of lines to view. This is helpful when you already have an idea of where the information is, for example, after using 'search_file' and getting a line number. It helps you see the context around a specific line or section.",
     "parameters": {
         "type": "object",
         "properties": {
@@ -86,13 +86,13 @@ read_abstract_function = {
 
 search_all_files_function = {
     "name": "search_all_files",
-    "description": "Search for a specific query (as regex) across all available papers. This is useful for broad, exploratory searches when you're not sure which paper contains the information you need. It returns a list of matching lines with their corresponding paper IDs and line numbers. If you already know which paper to search in, `search_file` is a more targeted and efficient option.",
+    "description": "Search for a specific query (as a regular expression) across all available papers. This is useful for broad, exploratory searches when you're not sure which paper contains the information you need. It returns a list of matching lines with their corresponding paper IDs and line numbers. If you already know which paper to search in, `search_file` is a more targeted and efficient option.",
     "parameters": {
         "type": "object",
         "properties": {
             "query": {
                 "type": "string",
-                "description": "The regex pattern to search for in the file content of all papers. This should not be a complex query, but rather a simple regex pattern that matches lines in the file content. This can include keywords, phrases, or specific patterns you are looking for. It will help you zero in on the relevant target lines across all papers.",
+                "description": "The regex pattern to search for in the file content of all papers. This should not be a complex query, but rather a simple regex pattern that matches lines in the file content. This can include keywords, very particular phrases, or specific patterns you are looking for. It is generally better to use simpler, refined queries. It will help you zero in on the relevant target lines across all papers.",
             },
         },
         "required": ["query"],

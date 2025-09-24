@@ -124,14 +124,14 @@ Current evidence: {gathered_evidence}
 - Use search tools to identify papers most relevant to each question component
 - Prioritize recent, high-impact studies and systematic reviews
 - Focus on papers with strong methodologies and clear findings
-- Aim for 3-5 high-quality sources rather than exhaustive coverage
+- Aim for 3-5 high-quality sources or exhaustive recall
+- Be complete and thorough in your search, aiming for excellent recall
 
 ### 3. Evidence Extraction Standards
 For each relevant paper, extract:
 - **Core findings**: Specific results, effect sizes, statistical significance
 - **Methodology**: Study design, sample size, key variables, limitations
 - **Context**: Population studied, timeframe, geographic scope
-- **Reliability indicators**: Peer review status, journal quality, replication
 
 ### 4. Synthesis Requirements
 - Identify convergent findings across studies
