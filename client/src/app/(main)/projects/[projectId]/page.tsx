@@ -51,6 +51,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { useSubscription, isPaperUploadAtLimit, isChatCreditAtLimit } from "@/hooks/useSubscription";
 import { toast } from "sonner";
+import ConversationCard from "@/components/ConversationCard";
 
 interface PdfUploadResponse {
 	message: string;
@@ -124,6 +125,18 @@ export default function ProjectPage() {
 			console.error(err);
 		}
 	}, [projectId]);
+
+	const handleDeleteConversation = async (conversationId: string) => {
+		try {
+			await fetchFromApi(`/api/conversation/${conversationId}`, {
+				method: "DELETE",
+			});
+			setConversations(conversations.filter((c) => c.id !== conversationId));
+		} catch (err) {
+			setError("Failed to delete conversation. Please try again.");
+			console.error(err);
+		}
+	};
 
 	useEffect(() => {
 		if (projectId) {
@@ -479,13 +492,7 @@ export default function ProjectPage() {
 					<div>
 						{conversations.length > 0 ? (
 							conversations.map((convo, index) => (
-								<a key={index} href={`/projects/${projectId}/conversations/${convo.id}`} className="block p-4 mb-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow animate-fade-in">
-									<div className="font-semibold text-accent-foreground flex items-center justify-between">
-										{convo.title}
-										<ArrowRight className="w-4 h-4 text-gray-400 transform transition-transform group-hover:translate-x-1" />
-									</div>
-									<p>{formatDate(convo.updated_at)}</p>
-								</a>
+								<ConversationCard key={index} convo={convo} href={`/projects/${projectId}/conversations/${convo.id}`} onDelete={handleDeleteConversation} />
 							))
 						) : (
 							<div className="text-center p-8 border-dashed border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-800/50">

@@ -1,16 +1,13 @@
-"use client"
-
 "use client";
 
 import { useEffect, useState } from "react";
 import { fetchFromApi } from "@/lib/api";
 import { Conversation } from "@/lib/schema";
-import { formatDate } from "@/lib/utils";
 import Link from "next/link";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
+import ConversationCard from "@/components/ConversationCard";
 
 export default function PastConversationsPage() {
 	const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -29,6 +26,17 @@ export default function PastConversationsPage() {
 
 		fetchConversations();
 	}, []);
+
+	const handleDeleteConversation = async (conversationId: string) => {
+		try {
+			await fetchFromApi(`/api/conversation/${conversationId}`, {
+				method: "DELETE",
+			});
+			setConversations(conversations.filter((c) => c.id !== conversationId));
+		} catch (error) {
+			console.error("Error deleting conversation", error);
+		}
+	};
 
 	const filteredConversations = conversations.filter((conversation) =>
 		conversation.title?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -60,16 +68,12 @@ export default function PastConversationsPage() {
 			<div className="flex flex-col gap-3">
 				{filteredConversations.length > 0 ? (
 					filteredConversations.map((conversation) => (
-						<Link href={`/understand?id=${conversation.id}`} key={conversation.id}>
-							<Card className="p-4 transition-all hover:bg-muted/80 cursor-pointer border-border hover:border-primary/50">
-								<div className="flex justify-between items-center">
-									<h2 className="text-lg font-semibold truncate pr-4">{conversation.title}</h2>
-									<p className="text-sm text-muted-foreground flex-shrink-0">
-										{formatDate(conversation.updated_at)}
-									</p>
-								</div>
-							</Card>
-						</Link>
+						<ConversationCard
+							key={conversation.id}
+							convo={conversation}
+							href={`/understand?id=${conversation.id}`}
+							onDelete={handleDeleteConversation}
+						/>
 					))
 				) : (
 					<div className="text-center py-12">
