@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, ArrowRight, Loader2, MessageCircle, Pencil, PlusCircle, Send, Sparkles } from "lucide-react";
+import { AlertCircle, Loader2, MessageCircle, Pencil, PlusCircle, Send, Sparkles } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { fetchFromApi } from "@/lib/api";
@@ -19,7 +19,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import AddFromLibrary from "@/components/AddFromLibrary";
-import { formatDate } from "@/lib/utils";
 import {
 	Dialog,
 	DialogHeader,
