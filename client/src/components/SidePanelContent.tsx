@@ -157,6 +157,9 @@ export function SidePanelContent({
     const [currentLoadingMessageIndex, setCurrentLoadingMessageIndex] = useState(0);
     const [errorState, setErrorState] = useState<{ failedUserMessage: string } | null>(null);
     const [projects, setProjects] = useState<Project[]>([]);
+    const [allProjects, setAllProjects] = useState<Project[]>([]);
+    const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+    const [addingToProjectId, setAddingToProjectId] = useState<string | null>(null);
     const [isCreateProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
     const [isProjectLimitDialogOpen, setProjectLimitDialogOpen] = useState(false);
     const router = useRouter();
@@ -184,14 +187,42 @@ export function SidePanelContent({
 
     useEffect(() => {
         if (rightSideFunction === 'Projects' && id) {
-            getProjectsForPaper(id)
-                .then(setProjects)
-                .catch(err => {
-                    console.error("Error fetching projects for paper", err);
-                    toast.error("Error fetching projects for paper");
-                });
+            setIsLoadingProjects(true);
+            Promise.all([
+                getProjectsForPaper(id),
+                fetchFromApi("/api/projects?detailed=true"),
+            ]).then(([paperProjects, allProjs]) => {
+                setProjects(paperProjects || []);
+                setAllProjects(allProjs || []);
+            }).catch(err => {
+                console.error("Error fetching projects", err);
+                toast.error("Error fetching projects");
+            }).finally(() => {
+                setIsLoadingProjects(false);
+            });
         }
     }, [rightSideFunction, id]);
+
+    const handleAddPaperToProject = async (projectId: string) => {
+        setAddingToProjectId(projectId);
+        try {
+            await fetchFromApi(`/api/projects/papers/${projectId}`, {
+                method: 'POST',
+                body: JSON.stringify({ paper_ids: [id] })
+            });
+            toast.success("Paper added to project successfully!");
+
+            const projectToAdd = allProjects.find(p => p.id === projectId);
+            if (projectToAdd && !projects.some(p => p.id === projectId)) {
+                setProjects(prev => [...prev, projectToAdd]);
+            }
+        } catch (error) {
+            console.error("Failed to add paper to project", error);
+            toast.error("Failed to add paper to project.");
+        } finally {
+            setAddingToProjectId(null);
+        }
+    };
 
     const handleCreateProjectSubmit = async (title: string, description: string) => {
         try {
@@ -854,6 +885,8 @@ export function SidePanelContent({
     }, []);
     const heightClass = isMobile ? "h-[calc(100vh-128px)]" : "h-[calc(100vh-64px)]";
 
+    const projectsToAdd = allProjects.filter(p => !projects.some(pp => pp.id === p.id));
+
     return (
         <>
             {
@@ -1056,6 +1089,41 @@ export function SidePanelContent({
                                             </Button>
                                         </div>
                                     )}
+                                    <div className="pt-4 mt-4 border-t">
+                                        <h3 className="text-lg font-semibold mb-2">Add to Projects</h3>
+                                        {isLoadingProjects ? (
+                                            <div className="flex items-center justify-center py-4">
+                                                <Loader className="animate-spin mr-2 h-4 w-4" />
+                                                <span>Loading projects...</span>
+                                            </div>
+                                        ) : projectsToAdd.length > 0 ? (
+                                            <div className="space-y-2">
+                                                {projectsToAdd.map(project => (
+                                                    <div key={project.id} className="flex items-center justify-between p-2 border rounded-md">
+                                                        <div className='pr-2'>
+                                                            <div className="font-semibold">{project.title}</div>
+                                                            {project.description && <div className="text-sm text-muted-foreground">{project.description}</div>}
+                                                        </div>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => handleAddPaperToProject(project.id)}
+                                                            disabled={addingToProjectId === project.id}
+                                                            className="flex-shrink-0"
+                                                        >
+                                                            {addingToProjectId === project.id ? (
+                                                                <Loader className="animate-spin h-4 w-4" />
+                                                            ) : (
+                                                                "Add"
+                                                            )}
+                                                        </Button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-muted-foreground">This paper has been added to all available projects.</p>
+                                        )}
+                                    </div>
                                 </div>
                             )
                         }
