@@ -31,8 +31,6 @@ jobs:
 
             - name: Setup Docker Buildx
               uses: docker/setup-buildx-action@v3
-              with:
-                driver: docker
 
             - name: Build and push client image
               uses: docker/build-push-action@v5
@@ -60,8 +58,6 @@ jobs:
 
           - name: Setup Docker Buildx
             uses: docker/setup-buildx-action@v3
-            with:
-              driver: docker
 
           - name: Build and push server image
             uses: docker/build-push-action@v5
@@ -87,8 +83,6 @@ jobs:
 
           - name: Setup Docker Buildx
             uses: docker/setup-buildx-action@v3
-            with:
-              driver: docker
 
           - name: Build and push jobs image
             uses: docker/build-push-action@v5
