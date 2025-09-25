@@ -36,6 +36,7 @@ from app.llm.tools.file_tools import (
     view_file_function,
 )
 from app.llm.tools.meta_tools import stop_function
+from app.llm.utils import retry_llm_operation
 from app.schemas.message import EvidenceCleaningResponse, EvidenceCollection
 from app.schemas.user import CurrentUser
 from fastapi import Depends
@@ -51,6 +52,7 @@ from app.database.telemetry import track_event
 class MultiPaperOperations(BaseLLMClient):
     """Operations related to multi-paper analysis and chat functionality"""
 
+    @retry_llm_operation(max_retries=3, delay=1.0)
     async def gather_evidence(
         self,
         conversation_id: str,
@@ -100,7 +102,16 @@ class MultiPaperOperations(BaseLLMClient):
                 user=current_user,
             )
 
-        formatted_paper_options = {str(paper.id): paper.title for paper in all_papers}
+        formatted_paper_options = {
+            str(paper.id): {
+                "title": paper.title,
+                "length": len(str(paper.raw_content)),
+                "keywords": paper.keywords,
+                "authors": paper.authors,
+                "published": paper.publish_date,
+            }
+            for paper in all_papers
+        }
 
         function_declarations = [
             read_file_function,
@@ -178,8 +189,8 @@ class MultiPaperOperations(BaseLLMClient):
                         paper_id_arg = fn_args.get("paper_id")
                         query_arg = fn_args.get("query")
                         paper_name = (
-                            formatted_paper_options.get(
-                                str(paper_id_arg), "knowledge base"
+                            formatted_paper_options.get(str(paper_id_arg), {}).get(
+                                "title", "knowledge base"
                             )
                             if paper_id_arg
                             else "knowledge base"

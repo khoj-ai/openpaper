@@ -126,6 +126,8 @@ Current evidence: {gathered_evidence}
 - Focus on papers with strong methodologies and clear findings
 - Aim for 3-5 high-quality sources or exhaustive recall
 - Be complete and thorough in your search, aiming for excellent recall
+- Think carefully about what queries can be used to source the most relevant information
+- Collect more information to refine your understanding of the question and the evidence needed. You should aim to have a holistic understanding of the documents
 
 ### 3. Evidence Extraction Standards
 For each relevant paper, extract:

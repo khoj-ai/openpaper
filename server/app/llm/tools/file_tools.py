@@ -48,7 +48,7 @@ search_file_function = {
 
 view_file_function = {
     "name": "view_file",
-    "description": "Use this tool when you want to look at a specific part of a paper. You must specify a range of lines to view. This is helpful when you already have an idea of where the information is, for example, after using 'search_file' and getting a line number. It helps you see the context around a specific line or section.",
+    "description": "Use this tool when you want to look at a specific part of a paper. You must specify a range of lines to view. This is helpful when you already have an idea of where the information is, for example, after using 'search_file' and getting a line number. It helps you see the context around a specific line or section. Use this to get a focused view of the content without being overwhelmed by the entire paper, especially to collect more details.",
     "parameters": {
         "type": "object",
         "properties": {
