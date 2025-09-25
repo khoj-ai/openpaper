@@ -1,6 +1,5 @@
 import logging
 import uuid
-from pathlib import Path
 from typing import Optional
 
 from app.auth.dependencies import get_current_user, get_required_user
