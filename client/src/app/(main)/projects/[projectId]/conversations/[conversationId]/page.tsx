@@ -59,7 +59,7 @@ function ProjectConversationPageContent() {
     const [isTyping, setIsTyping] = useState(false);
     const [statusMessage, setStatusMessage] = useState('');
     const [highlightedInfo, setHighlightedInfo] = useState<{ paperId: string; messageIndex: number } | null>(null);
-
+    const [isCentered, setIsCentered] = useState(false);
     const [isSessionLoading, setIsSessionLoading] = useState(true);
     const [projectName, setProjectName] = useState<string>('');
     const [conversationName, setConversationName] = useState<string>('');
@@ -455,7 +455,6 @@ function ProjectConversationPageContent() {
         handleSubmit();
     }, [handleSubmit]);
 
-    const [isCentered, setIsCentered] = useState(false);
 
     return (
         <div className="mx-none w-full p-4 flex flex-col h-[calc(100vh-64px)]">
