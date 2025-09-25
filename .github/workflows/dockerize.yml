@@ -16,31 +16,33 @@ permissions:
 
 jobs:
     build_client:
-        name: Build and Push client image
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+      name: Build and Push client image
+      runs-on: ubuntu-latest
+      steps:
+          - name: Checkout code
+            uses: actions/checkout@v4
 
-            - name: Login to GitHub container registry
-              uses: docker/login-action@v3
-              with:
-                  registry: ghcr.io
-                  username: ${{ github.repository_owner }}
-                  password: ${{ secrets.GITHUB_TOKEN }}
+          - name: Login to GitHub container registry
+            uses: docker/login-action@v3
+            with:
+                registry: ghcr.io
+                username: ${{ github.repository_owner }}
+                password: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: Setup Docker Buildx
-              uses: docker/setup-buildx-action@v3
+          - name: Setup Docker Buildx
+            uses: docker/setup-buildx-action@v3
+            with:
+              driver: docker
 
-            - name: Build and push client image
-              uses: docker/build-push-action@v5
-              with:
-                  context: ./client
-                  file: ./client/Dockerfile
-                  push: true
-                  tags: ghcr.io/${{ github.repository_owner }}/ap-client:${{ github.ref_name == 'master' && 'latest' || github.ref_name }}
-                  cache-from: type=gha
-                  cache-to: type=gha,mode=max
+          - name: Build and push client image
+            uses: docker/build-push-action@v5
+            with:
+                context: ./client
+                file: ./client/Dockerfile
+                push: true
+                tags: ghcr.io/${{ github.repository_owner }}/ap-client:${{ github.ref_name == 'master' && 'latest' || github.ref_name }}
+                cache-from: type=gha
+                cache-to: type=gha,mode=max
 
     build_server:
       name: Build and Push server image
@@ -58,6 +60,8 @@ jobs:
 
           - name: Setup Docker Buildx
             uses: docker/setup-buildx-action@v3
+            with:
+              driver: docker
 
           - name: Build and push server image
             uses: docker/build-push-action@v5
@@ -83,6 +87,8 @@ jobs:
 
           - name: Setup Docker Buildx
             uses: docker/setup-buildx-action@v3
+            with:
+              driver: docker
 
           - name: Build and push jobs image
             uses: docker/build-push-action@v5
