@@ -229,7 +229,7 @@ const UsageLimitCard = ({
                 />
 
                 <UsageItem
-                    label="Monthly Audio Overviews"
+                    label="Weekly Audio Overviews"
                     used={subscription.usage.audio_overviews_used}
                     total={subscription.usage.audio_overviews_used + subscription.usage.audio_overviews_remaining}
                     percentage={getAudioOverviewUsagePercentage(subscription)}
