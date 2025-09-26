@@ -5,7 +5,7 @@ export interface SubscriptionLimits {
     paper_uploads: number;
     knowledge_base_size: number;
     chat_credits_daily: number;
-    audio_overviews_monthly: number;
+    audio_overviews_weekly: number;
     projects: number;
     model: string[];
 }
