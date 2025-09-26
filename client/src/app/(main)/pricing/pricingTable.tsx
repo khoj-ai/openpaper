@@ -208,7 +208,7 @@ export default function PricingTable({
                         </thead>
                         <tbody>
                             {features.map((feature, index) => {
-                                const isComingSoon = feature.name === "Projects";
+                                const isComingSoon = false; //feature.name === "Projects";
                                 const isTeamsOnly = feature.name === "Team annotations" || feature.name === "Team chat";
 
                                 return (
