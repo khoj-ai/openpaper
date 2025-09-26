@@ -54,7 +54,7 @@ export default function Projects() {
 					description: "You have used all of your available projects. Upgrade your plan to create more.",
 					action: {
 						label: "View Plans",
-						onClick: () => router.push("/settings/billing"),
+						onClick: () => router.push("/pricing"),
 					},
 				});
 			} else if (nearProjectLimit) {
@@ -63,7 +63,7 @@ export default function Projects() {
 						} projects. Consider upgrading soon.`,
 					action: {
 						label: "View Plans",
-						onClick: () => router.push("/settings/billing"),
+						onClick: () => router.push("/pricing"),
 					},
 				});
 			}
