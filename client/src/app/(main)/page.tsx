@@ -361,9 +361,9 @@ export default function Home() {
 				<div className="flex flex-col items-center gap-4 mx-auto">
 					{relevantPapers.length > 0 && (
 						<Badge asChild variant="outline" className="cursor-pointer bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white hover:text-primary">
-							<Link href="/understand" className="flex items-center gap-1">
+							<Link href="/projects" className="flex items-center gap-1">
 								<Sparkles className="h-3 w-3" />
-								Find answers across your documents
+								Create a research project
 							</Link>
 						</Badge>
 					)}
