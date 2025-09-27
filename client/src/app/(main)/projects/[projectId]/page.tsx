@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Loader2, MessageCircle, Pencil, PlusCircle, Send, Sparkles } from "lucide-react";
+import { AlertCircle, ArrowRight, Loader2, MessageCircle, Pencil, PlusCircle, Send, Sparkles } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { fetchFromApi } from "@/lib/api";
@@ -490,9 +490,19 @@ export default function ProjectPage() {
 					{/* Conversations List */}
 					<div>
 						{conversations.length > 0 ? (
-							conversations.map((convo, index) => (
-								<ConversationCard key={index} convo={convo} href={`/projects/${projectId}/conversations/${convo.id}`} onDelete={handleDeleteConversation} />
-							))
+							<>
+								{conversations.slice(0, 3).map((convo, index) => (
+									<ConversationCard key={index} convo={convo} href={`/projects/${projectId}/conversations/${convo.id}`} onDelete={handleDeleteConversation} />
+								))}
+								{conversations.length > 3 && (
+									<div className="mt-4 text-left">
+										<Link href={`/project/${projectId}/past`}>
+											View {conversations.length - 3} more
+											<ArrowRight className="inline-block ml-1 h-4 w-4" />
+										</Link>
+									</div>
+								)}
+							</>
 						) : (
 							<div className="text-center p-8 border-dashed border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-800/50">
 								<div className="p-4 bg-blue-100 dark:bg-blue-900/30 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
