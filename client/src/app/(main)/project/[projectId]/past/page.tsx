@@ -7,25 +7,28 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import ConversationHistory from '@/components/ConversationHistory';
+import { useParams } from 'next/navigation';
 
-export default function ProjectPastConversationsPage({ params }: { params: { projectId: string } }) {
+export default function ProjectPastConversationsPage() {
+    const params = useParams();
+    const projectId = params.projectId as string;
     const [conversations, setConversations] = useState<Conversation[]>([]);
 
     useEffect(() => {
         const fetchConversations = async () => {
             try {
-                const response = await fetchFromApi(`/api/projects/conversations/${params.projectId}`);
+                const response = await fetchFromApi(`/api/projects/conversations/${projectId}`);
                 setConversations(response);
             } catch (error) {
-                console.error(`Error fetching conversations for project ${params.projectId}`, error);
+                console.error(`Error fetching conversations for project ${projectId}`, error);
                 setConversations([]);
             }
         };
 
-        if (params.projectId) {
+        if (projectId) {
             fetchConversations();
         }
-    }, [params.projectId]);
+    }, [projectId]);
 
     const handleDeleteConversation = async (conversationId: string) => {
         try {
@@ -47,7 +50,7 @@ export default function ProjectPastConversationsPage({ params }: { params: { pro
                         Browse and manage your previous conversations for this project.
                     </p>
                 </div>
-                <Link href={`/projects/${params.projectId}`}>
+                <Link href={`/projects/${projectId}`}>
                     <Button variant="outline">
                         <Plus className="mr-2 h-4 w-4" /> New Chat
                     </Button>
@@ -56,7 +59,7 @@ export default function ProjectPastConversationsPage({ params }: { params: { pro
             <ConversationHistory
                 conversations={conversations}
                 onDelete={handleDeleteConversation}
-                hrefGenerator={(conversation) => `/projects/${params.projectId}/conversations/${conversation.id}`}
+                hrefGenerator={(conversation) => `/projects/${projectId}/conversations/${conversation.id}`}
             />
         </div>
     );
