@@ -7,7 +7,6 @@ import {
     CreditUsage,
     PaperNoteData,
     Reference,
-    Project,
 } from '@/lib/schema';
 import {
     X,
@@ -23,7 +22,6 @@ import {
     Check,
     Route,
     User,
-    ArrowRight,
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -54,23 +52,13 @@ import CustomCitationLink from '@/components/utils/CustomCitationLink';
 import Link from 'next/link';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import React, { useState, useRef, useEffect, useMemo, useCallback, FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
 import { toast } from "sonner";
-import { fetchFromApi, fetchStreamFromApi, getProjectsForPaper } from '@/lib/api';
+import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { useSubscription, getChatCreditUsagePercentage, isChatCreditAtLimit, isChatCreditNearLimit, isProjectAtLimit } from '@/hooks/useSubscription';
+import { useSubscription, getChatCreditUsagePercentage, isChatCreditAtLimit, isChatCreditNearLimit } from '@/hooks/useSubscription';
 import { Avatar } from './ui/avatar';
 import { PaperProjects } from './PaperProjects';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+
 
 interface SidePanelContentProps {
     rightSideFunction: string;
@@ -157,7 +145,7 @@ export function SidePanelContent({
     const [currentLoadingMessageIndex, setCurrentLoadingMessageIndex] = useState(0);
     const [errorState, setErrorState] = useState<{ failedUserMessage: string } | null>(null);
 
-    const router = useRouter();
+
 
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const chatInputFormRef = useRef<HTMLFormElement | null>(null);

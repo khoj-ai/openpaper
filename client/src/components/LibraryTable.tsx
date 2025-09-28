@@ -17,18 +17,12 @@ import { Input } from "./ui/input";
 import { useSidebar } from "./ui/sidebar";
 import {
 	Sheet,
-	SheetClose,
 	SheetContent,
 } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { ArrowUpDown, CheckCheck, Trash2, X, ExternalLink, Copy, ChevronDown } from "lucide-react";
+import { ArrowUpDown, CheckCheck, Trash2, X, ChevronDown } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { getStatusIcon, PaperStatusEnum } from "@/components/utils/PdfStatus";
-import { handleStatusChange } from "@/components/utils/paperUtils";
-import { citationStyles } from "@/components/utils/paperUtils";
 import Link from "next/link";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { PaperPreview } from "./PaperPreview";
 import { toast } from "sonner";
 import { PaperFiltering, Filter, Sort } from "@/components/PaperFiltering";
@@ -221,22 +215,7 @@ export function LibraryTable({
 		setSelectedPapers(new Set());
 	};
 
-	const copyToClipboard = (text: string, styleName: string) => {
-		navigator.clipboard.writeText(text).then(() => {
-			// Success feedback using toast
-			toast("Copied!", {
-				description: `${styleName} citation copied to clipboard.`,
-				richColors: true,
-			});
-		}).catch(err => {
-			console.error('Failed to copy text: ', err);
-			// Error feedback using toast
-			toast("Copy failed", {
-				description: "Could not copy citation to clipboard.",
-				richColors: true,
-			});
-		});
-	};
+
 
 	if (loading) {
 		return (
