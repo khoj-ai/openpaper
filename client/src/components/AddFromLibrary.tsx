@@ -39,6 +39,7 @@ export default function AddFromLibrary({ projectId, onPapersAdded, projectPaperI
             actionOptions={["Add"]}
             onSelectFiles={handleAddPapers}
             projectPaperIds={projectPaperIds}
+            maxHeight="60vh"
         />
     );
 }
