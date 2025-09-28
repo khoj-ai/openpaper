@@ -508,8 +508,8 @@ export default function PapersPage() {
                 onSubmit={handleCreateProjectSubmit}
             />
             <UsageDisplay />
-            <Tabs value={viewMode} onValueChange={setViewMode} className="w-full flex flex-col">
-                <div className="flex items-center justify-between mb-4">
+            <Tabs value={viewMode} onValueChange={setViewMode} className="w-full flex flex-col flex-1 min-h-0">
+                <div className="flex items-center justify-between mb-4 flex-shrink-0">
                     <h1 className="text-3xl font-bold tracking-tight">Library</h1>
                     <TabsList>
                         <TabsTrigger value="table" onClick={() => localStorage.setItem('papersViewMode', 'table')}>
@@ -522,7 +522,7 @@ export default function PapersPage() {
                         </TabsTrigger>
                     </TabsList>
                 </div>
-                <TabsContent value="card">
+                <TabsContent value="card" className="flex-1 min-h-0">
                     <LibraryGrid
                         papers={papers}
                         filteredPapers={filteredPapers}
@@ -541,7 +541,7 @@ export default function PapersPage() {
                         EmptyState={EmptyState}
                     />
                 </TabsContent>
-                <TabsContent value="table" className="flex-grow">
+                <TabsContent value="table" className="flex-1 min-h-0">
                     <LibraryTable
                         setPapers={setPapers}
                         handleDelete={deletePaper}

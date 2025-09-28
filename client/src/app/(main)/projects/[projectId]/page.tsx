@@ -551,7 +551,7 @@ export default function ProjectPage() {
 								<SheetHeader className="px-6">
 									<SheetTitle>Add Papers to Project</SheetTitle>
 								</SheetHeader>
-								<div className="mt-4 px-6">
+								<div className="mt-0 px-6">
 									<h3 className="text-lg font-semibold mb-2">Upload New Papers</h3>
 									<h2>You can upload any additional papers to your library here. They will automatically be added to the project.</h2>
 									<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} disabled={isPaperUploadAtLimit(subscription)} />

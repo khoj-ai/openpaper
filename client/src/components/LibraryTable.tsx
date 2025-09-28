@@ -46,7 +46,7 @@ export function LibraryTable({
 	projectPaperIds = [],
 	handleDelete,
 	setPapers,
-	maxHeight = 'calc(100vh - 20rem)',
+	maxHeight = 'calc(100vh - 16rem)',
 }: LibraryTableProps) {
 	const selectable = selectableProp ?? (onSelectFiles ? true : false);
 	const { state: sidebarState } = useSidebar();
@@ -240,8 +240,8 @@ export function LibraryTable({
 
 
 	return (
-		<div className="flex flex-col h-fit w-full max-w-full overflow-hidden">
-			<div className="flex flex-col md:flex-row md:items-center justify-between gap-4 flex-shrink-0">
+		<div className="space-y-4 w-full max-w-full overflow-hidden">
+			<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
 				<div className="flex flex-col md:flex-row items-start md:items-center gap-4 w-full">
 					<Input
 						placeholder="Filter papers by title, authors, organizations, or keywords..."
@@ -319,7 +319,7 @@ export function LibraryTable({
 				)}
 			</div>
 
-			<div className="flex flex-wrap gap-2 flex-shrink-0">
+			<div className="flex flex-wrap gap-2 mb-4">
 				{filters.map(filter => (
 					<Badge key={`${filter.type}-${filter.value}`} variant="secondary" className="flex items-center gap-1">
 						{filter.value}
@@ -335,16 +335,15 @@ export function LibraryTable({
 				))}
 			</div>
 
-			<div className="grid grid-cols-1 gap-4 flex-1 min-h-0 mt-4" style={{
+			<div className="grid grid-cols-1 gap-4 min-h-0" style={{
 				gridTemplateColumns: selectedPaperForPreview && !isMobile
 					? sidebarState === 'expanded'
 						? '1fr 320px'
 						: '1fr 384px'
-					: '1fr',
-				maxHeight: maxHeight
+					: '1fr'
 			}}>
-				<div className="border bg-card transition-all duration-300 ease-in-out min-w-0 overflow-hidden h-full">
-					<div className="overflow-y-auto h-full">
+				<div className="border bg-card transition-all duration-300 ease-in-out min-w-0 overflow-hidden">
+					<div className="overflow-y-auto" style={{ height: maxHeight }}>
 						<Table>
 							<TableHeader className="sticky top-0 bg-card z-10">
 								<TableRow className="hover:bg-transparent border-b-2">
