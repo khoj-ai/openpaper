@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, ArrowRight, Loader2, MessageCircle, Pencil, PlusCircle, Send, Sparkles } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, BookOpen, Library, Loader2, MessageCircle, Pencil, PlusCircle, Send, Sparkles, UploadCloud } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { fetchFromApi } from "@/lib/api";
@@ -76,6 +76,7 @@ export default function ProjectPage() {
 	const [currentTitle, setCurrentTitle] = useState("");
 	const [currentDescription, setCurrentDescription] = useState("");
 	const [isAddPapersSheetOpen, setIsAddPapersSheetOpen] = useState(false);
+	const [addPapersView, setAddPapersView] = useState<'initial' | 'upload' | 'library'>('initial');
 	const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
 	const { subscription } = useSubscription();
 
@@ -540,7 +541,12 @@ export default function ProjectPage() {
 				<div className="w-full lg:w-1/3 px-4">
 					<div className="flex justify-between items-center mb-4">
 						<h2 className="text-2xl font-bold">Papers</h2>
-						<Sheet open={isAddPapersSheetOpen} onOpenChange={setIsAddPapersSheetOpen}>
+						<Sheet open={isAddPapersSheetOpen} onOpenChange={(isOpen) => {
+							setIsAddPapersSheetOpen(isOpen);
+							if (!isOpen) {
+								setAddPapersView('initial');
+							}
+						}}>
 							<SheetTrigger asChild>
 								<Button variant="outline">
 									<PlusCircle className="mr-2 h-4 w-4" />
@@ -552,25 +558,83 @@ export default function ProjectPage() {
 									<SheetTitle>Add Papers to Project</SheetTitle>
 								</SheetHeader>
 								<div className="mt-0 px-6">
-									<h3 className="text-lg font-semibold mb-2">Upload New Papers</h3>
-									<h2>You can upload any additional papers to your library here. They will automatically be added to the project.</h2>
-									<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} disabled={isPaperUploadAtLimit(subscription)} />
-									{isPaperUploadAtLimit(subscription) && (
-										<Alert variant="destructive" className="mt-4">
-											<AlertCircle className="h-4 w-4" />
-											<AlertTitle>Upload Limit Reached</AlertTitle>
-											<AlertDescription>
-												You have reached your paper upload limit. Please{" "}
-												<Link href="/pricing" className="font-bold underline">
-													upgrade your plan
-												</Link>{" "}
-												to upload more papers.
-											</AlertDescription>
-										</Alert>
+									{addPapersView === 'initial' && (
+										<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+											<button
+												onClick={() => setAddPapersView('upload')}
+												className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
+											>
+												<div className="relative">
+													<UploadCloud className="w-12 h-12 text-gray-400 group-hover:text-blue-500 mb-4 transition-colors" />
+													<div className="absolute -top-1 -right-1 w-5 h-5 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+														<span className="text-xs font-medium text-blue-600 dark:text-blue-300"><PlusCircle className="h-4 w-4" /></span>
+													</div>
+												</div>
+												<h3 className="text-lg font-semibold group-hover:text-blue-600 transition-colors">Upload New Papers</h3>
+												<p className="text-sm text-gray-500 text-center mt-1">
+													Upload PDFs from your computer or URL
+												</p>
+												<p className="text-xs mt-2 font-medium">
+													Drag & drop or browse →
+												</p>
+											</button>
+											<button
+												onClick={() => setAddPapersView('library')}
+												className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
+											>
+												<div className="relative">
+													<Library className="w-12 h-12 text-gray-400 group-hover:text-blue-500 mb-4 transition-colors" />
+													<div className="absolute -top-1 -right-1 w-5 h-5 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+														<span className="text-xs font-medium text-blue-600 dark:text-blue-300"><BookOpen className="h-4 w-4"/></span>
+													</div>
+												</div>
+												<h3 className="text-lg font-semibold group-hover:text-blue-600 transition-colors">Add from Library</h3>
+												<p className="text-sm text-gray-500 text-center mt-1">
+													Choose from papers already in your library
+												</p>
+												<p className="text-xs mt-2 font-medium">
+													Browse existing papers →
+												</p>
+											</button>
+										</div>
 									)}
-									{uploadError && <p className="text-red-500 mt-4">{uploadError}</p>}
-									<h3 className="text-lg font-semibold mb-2">Add from Library</h3>
-									<AddFromLibrary projectId={projectId} onPapersAdded={getProjectPapers} projectPaperIds={papers.map(p => p.id)} />
+
+									{addPapersView === 'upload' && (
+										<div>
+											<Button variant="ghost" onClick={() => setAddPapersView('initial')} className="mb-4">
+												<ArrowLeft className="mr-2 h-4 w-4" />
+												Back
+											</Button>
+											<h3 className="text-lg font-semibold mb-2">Upload New Papers</h3>
+											<p className="text-sm text-gray-500 mb-4">Upload papers to your library. They will be automatically added to this project.</p>
+											<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} disabled={isPaperUploadAtLimit(subscription)} />
+											{isPaperUploadAtLimit(subscription) && (
+												<Alert variant="destructive" className="mt-4">
+													<AlertCircle className="h-4 w-4" />
+													<AlertTitle>Upload Limit Reached</AlertTitle>
+													<AlertDescription>
+														You have reached your paper upload limit. Please{" "}
+														<Link href="/pricing" className="font-bold underline">
+															upgrade your plan
+														</Link>{" "}
+														to upload more papers.
+													</AlertDescription>
+												</Alert>
+											)}
+											{uploadError && <p className="text-red-500 mt-4">{uploadError}</p>}
+										</div>
+									)}
+
+									{addPapersView === 'library' && (
+										<div>
+											<Button variant="ghost" onClick={() => setAddPapersView('initial')} className="mb-4">
+												<ArrowLeft className="mr-2 h-4 w-4" />
+												Back
+											</Button>
+											<h3 className="text-lg font-semibold mb-2">Add from Library</h3>
+											<AddFromLibrary projectId={projectId} onPapersAdded={getProjectPapers} projectPaperIds={papers.map(p => p.id)} />
+										</div>
+									)}
 								</div>
 							</SheetContent>
 						</Sheet>
