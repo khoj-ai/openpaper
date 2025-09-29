@@ -11,7 +11,7 @@ from app.database.crud.audio_overview_crud import (
 )
 from app.database.crud.paper_crud import paper_crud
 from app.database.database import get_db
-from app.database.models import JobStatus, Paper
+from app.database.models import ConversableType, JobStatus, Paper
 from app.database.telemetry import track_event
 from app.helpers.s3 import s3_service
 from app.schemas.user import CurrentUser
@@ -74,7 +74,9 @@ async def create_audio_overview(
     # Create the audio overview job
     audio_overview_job = audio_overview_job_crud.create(
         db,
-        obj_in=AudioOverviewJobCreate(paper_id=paper_uuid),
+        obj_in=AudioOverviewJobCreate(
+            conversable_id=paper_uuid, conversable_type=ConversableType.PAPER
+        ),
         current_user=current_user,
     )
 
@@ -157,7 +159,8 @@ async def get_audio_overview_job_status(
         content={
             "job_id": str(audio_overview_job.id),
             "status": audio_overview_job.status,
-            "paper_id": str(audio_overview_job.paper_id),
+            "conversable_id": str(audio_overview_job.conversable_id),
+            "conversable_type": audio_overview_job.conversable_type,
         },
     )
 

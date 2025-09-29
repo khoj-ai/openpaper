@@ -11,7 +11,7 @@ from app.database.crud.audio_overview_crud import (
 )
 from app.database.crud.paper_crud import paper_crud
 from app.database.database import get_db
-from app.database.models import JobStatus
+from app.database.models import ConversableType, JobStatus
 from app.database.telemetry import track_event
 from app.llm.operations import operations
 from app.llm.speech import speaker
@@ -124,7 +124,8 @@ def generate_audio_overview(
 
         # Step 3: Create AudioOverview record
         audio_overview_data = AudioOverviewCreate(
-            paper_id=paper_id,
+            conversable_id=paper_id,
+            conversable_type=ConversableType.PAPER,
             s3_object_key=object_key,
             transcript=narrative_summary.summary,
             citations=narrative_summary.citations,

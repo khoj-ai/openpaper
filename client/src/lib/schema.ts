@@ -246,7 +246,8 @@ export interface CreditUsage {
 
 export interface AudioOverview {
     id: string;
-    paper_id: string;
+    conversable_id: string;
+    conversable_type: string;
     audio_url: string;
     transcript: string;
     title: string;

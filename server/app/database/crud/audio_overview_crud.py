@@ -3,7 +3,12 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from app.database.crud.base_crud import CRUDBase
-from app.database.models import AudioOverview, AudioOverviewJob, JobStatus
+from app.database.models import (
+    AudioOverview,
+    AudioOverviewJob,
+    ConversableType,
+    JobStatus,
+)
 from app.schemas.responses import ResponseCitation
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
@@ -11,7 +16,8 @@ from sqlalchemy.orm import Session
 
 
 class AudioOverviewJobBase(BaseModel):
-    paper_id: UUID
+    conversable_id: UUID
+    conversable_type: ConversableType = ConversableType.PAPER
 
 
 class AudioOverviewJobCreate(AudioOverviewJobBase):
@@ -25,7 +31,8 @@ class AudioOverviewJobUpdate(BaseModel):
 
 
 class AudioOverviewBase(BaseModel):
-    paper_id: UUID
+    conversable_id: UUID
+    conversable_type: ConversableType = ConversableType.PAPER
     s3_object_key: str
     transcript: Optional[str] = None
     citations: Optional[List[ResponseCitation]] = None
@@ -60,30 +67,56 @@ class AudioOverviewJobCRUD(
         db.refresh(db_obj)
         return db_obj
 
-    def get_by_paper_and_user(
-        self, db: Session, *, paper_id: UUID, current_user: CurrentUser
+    def get_by_conversable_and_user(
+        self,
+        db: Session,
+        *,
+        conversable_id: UUID,
+        conversable_type: ConversableType,
+        current_user: CurrentUser
     ) -> Optional[AudioOverviewJob]:
-        """Get audio overview job by paper ID and user"""
+        """Get audio overview job by conversable ID, type and user"""
         return (
             db.query(AudioOverviewJob)
             .filter(
-                AudioOverviewJob.paper_id == paper_id,
+                AudioOverviewJob.conversable_id == conversable_id,
+                AudioOverviewJob.conversable_type == conversable_type,
                 AudioOverviewJob.user_id == current_user.id,
             )
             .order_by(AudioOverviewJob.created_at.desc())
             .first()
         )
 
+    # Backward compatibility method for paper-specific queries
+    def get_by_paper_and_user(
+        self, db: Session, *, paper_id: UUID, current_user: CurrentUser
+    ) -> Optional[AudioOverviewJob]:
+        """Get audio overview job by paper ID and user (backward compatibility)"""
+        return self.get_by_conversable_and_user(
+            db=db,
+            conversable_id=paper_id,
+            conversable_type=ConversableType.PAPER,
+            current_user=current_user,
+        )
+
     def get_user_jobs(
-        self, db: Session, *, current_user: CurrentUser, status: Optional[str] = None
+        self,
+        db: Session,
+        *,
+        current_user: CurrentUser,
+        status: Optional[str] = None,
+        conversable_type: Optional[ConversableType] = None
     ) -> List[AudioOverviewJob]:
-        """Get all audio overview jobs for a user, optionally filtered by status"""
+        """Get all audio overview jobs for a user, optionally filtered by status and type"""
         query = db.query(AudioOverviewJob).filter(
             AudioOverviewJob.user_id == current_user.id
         )
 
         if status:
             query = query.filter(AudioOverviewJob.status == status)
+
+        if conversable_type:
+            query = query.filter(AudioOverviewJob.conversable_type == conversable_type)
 
         return query.order_by(AudioOverviewJob.created_at.desc()).all()
 
@@ -120,7 +153,14 @@ class AudioOverviewJobCRUD(
         """Convert AudioOverviewJob object to dictionary"""
         return {
             "id": str(job.id),
-            "paper_id": str(job.paper_id),
+            "conversable_id": str(job.conversable_id),
+            "conversable_type": job.conversable_type,
+            # Keep paper_id for backward compatibility
+            "paper_id": (
+                str(job.conversable_id)
+                if job.conversable_type == ConversableType.PAPER
+                else None
+            ),
             "status": job.status,
             "started_at": job.started_at.isoformat() if job.started_at else None,
             "completed_at": job.completed_at.isoformat() if job.completed_at else None,
@@ -146,44 +186,83 @@ class AudioOverviewCRUD(
         db.refresh(db_obj)
         return db_obj
 
-    def get_by_paper_and_user(
-        self, db: Session, *, paper_id: UUID, current_user: CurrentUser
+    def get_by_conversable_and_user(
+        self,
+        db: Session,
+        *,
+        conversable_id: UUID,
+        conversable_type: ConversableType,
+        current_user: CurrentUser
     ) -> Optional[List[AudioOverview]]:
-        """Get audio overview by paper ID and user"""
+        """Get audio overviews by conversable ID, type and user"""
         return (
             db.query(AudioOverview)
             .filter(
-                AudioOverview.paper_id == paper_id,
+                AudioOverview.conversable_id == conversable_id,
+                AudioOverview.conversable_type == conversable_type,
                 AudioOverview.user_id == current_user.id,
             )
             .order_by(AudioOverview.created_at.desc())
             .all()
         )
 
-    def get_mrc_by_paper_and_user(
-        self, db: Session, *, paper_id: UUID, current_user: CurrentUser
+    def get_mrc_by_conversable_and_user(
+        self,
+        db: Session,
+        *,
+        conversable_id: UUID,
+        conversable_type: ConversableType,
+        current_user: CurrentUser
     ) -> Optional[AudioOverview]:
-        """Get the most recent audio overview by paper ID and user"""
+        """Get the most recent audio overview by conversable ID, type and user"""
         return (
             db.query(AudioOverview)
             .filter(
-                AudioOverview.paper_id == paper_id,
+                AudioOverview.conversable_id == conversable_id,
+                AudioOverview.conversable_type == conversable_type,
                 AudioOverview.user_id == current_user.id,
             )
             .order_by(AudioOverview.created_at.desc())
             .first()
         )
 
-    def get_user_overviews(
-        self, db: Session, *, current_user: CurrentUser
-    ) -> List[AudioOverview]:
-        """Get all audio overviews for a user"""
-        return (
-            db.query(AudioOverview)
-            .filter(AudioOverview.user_id == current_user.id)
-            .order_by(AudioOverview.created_at.desc())
-            .all()
+    # Backward compatibility methods for paper-specific queries
+    def get_by_paper_and_user(
+        self, db: Session, *, paper_id: UUID, current_user: CurrentUser
+    ) -> Optional[List[AudioOverview]]:
+        """Get audio overviews by paper ID and user (backward compatibility)"""
+        return self.get_by_conversable_and_user(
+            db=db,
+            conversable_id=paper_id,
+            conversable_type=ConversableType.PAPER,
+            current_user=current_user,
         )
+
+    def get_mrc_by_paper_and_user(
+        self, db: Session, *, paper_id: UUID, current_user: CurrentUser
+    ) -> Optional[AudioOverview]:
+        """Get the most recent audio overview by paper ID and user (backward compatibility)"""
+        return self.get_mrc_by_conversable_and_user(
+            db=db,
+            conversable_id=paper_id,
+            conversable_type=ConversableType.PAPER,
+            current_user=current_user,
+        )
+
+    def get_user_overviews(
+        self,
+        db: Session,
+        *,
+        current_user: CurrentUser,
+        conversable_type: Optional[ConversableType] = None
+    ) -> List[AudioOverview]:
+        """Get all audio overviews for a user, optionally filtered by type"""
+        query = db.query(AudioOverview).filter(AudioOverview.user_id == current_user.id)
+
+        if conversable_type:
+            query = query.filter(AudioOverview.conversable_type == conversable_type)
+
+        return query.order_by(AudioOverview.created_at.desc()).all()
 
     def update_transcript(
         self,
@@ -215,7 +294,14 @@ class AudioOverviewCRUD(
         """Convert AudioOverview object to dictionary"""
         return {
             "id": str(overview.id),
-            "paper_id": str(overview.paper_id),
+            "conversable_id": str(overview.conversable_id),
+            "conversable_type": overview.conversable_type,
+            # Keep paper_id for backward compatibility
+            "paper_id": (
+                str(overview.conversable_id)
+                if overview.conversable_type == ConversableType.PAPER
+                else None
+            ),
             "s3_object_key": overview.s3_object_key,
             "transcript": overview.transcript,
             "created_at": (
@@ -232,25 +318,32 @@ class AudioOverviewCRUD(
         }
 
     def get_audio_overviews_used_this_week(
-        self, db: Session, *, current_user: CurrentUser
+        self,
+        db: Session,
+        *,
+        current_user: CurrentUser,
+        conversable_type: Optional[ConversableType] = None
     ) -> int:
         """
         Get the number of audio overviews used by the user this week.
+        Optionally filter by conversable type.
         """
         start_of_week = datetime.now(timezone.utc) - timedelta(
             days=datetime.now(timezone.utc).weekday()
         )
         start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
         end_of_week = start_of_week + timedelta(days=7)
-        return (
-            db.query(AudioOverview)
-            .filter(
-                AudioOverview.user_id == current_user.id,
-                AudioOverview.created_at >= start_of_week,
-                AudioOverview.created_at < end_of_week,
-            )
-            .count()
+
+        query = db.query(AudioOverview).filter(
+            AudioOverview.user_id == current_user.id,
+            AudioOverview.created_at >= start_of_week,
+            AudioOverview.created_at < end_of_week,
         )
+
+        if conversable_type:
+            query = query.filter(AudioOverview.conversable_type == conversable_type)
+
+        return query.count()
 
 
 # Create single instances to use throughout the application
