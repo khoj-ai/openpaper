@@ -5,7 +5,7 @@ Your summary should be structured in a way that is easy to understand and provid
 
 If you encounter any difficult or complex concepts, explain them in simple terms to ensure clarity for a broad audience.
 
-Your summary should be no more than 4000 characters long, and it should be written in a narrative style that flows logically from one point to the next without abrupt transitions or special headings or formatting. The summary should be written in a way that is engaging and informative, suitable for readers who may not be experts in the field.
+Your summary should be no more than {length} characters long, and it should be written in a narrative style that flows logically from one point to the next without abrupt transitions or special headings or formatting. The summary should be written in a way that is engaging and informative, suitable for readers who may not be experts in the field.
 
 Write the summary in plain text, with minimal syntax formatting for citations.
 
@@ -38,13 +38,12 @@ Create a narrative summary that:
 3. Highlights agreements and disagreements between papers
 4. Provides a cohesive narrative that addresses the summary request
 5. Includes proper citations and references to the source papers
+6. Is limited to {length} characters
 
 The summary should be engaging, informative, and suitable for audio narration.
 
 Return your response as a JSON object matching this exact schema:
 {schema}
-
-Ensure your response is valid JSON and includes all required fields from the schema.
 """
 
 # See note about Github Flavored Markdown and footnotes: https://github.blog/changelog/2021-09-30-footnotes-now-supported-in-markdown-fields/

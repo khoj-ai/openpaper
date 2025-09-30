@@ -5,7 +5,7 @@ import re
 import time
 import uuid
 from contextlib import suppress
-from typing import AsyncGenerator, Dict, List, Optional, Sequence, Union
+from typing import AsyncGenerator, Dict, List, Literal, Optional, Sequence, Union
 
 from app.database.crud.paper_crud import paper_crud
 from app.database.crud.projects.project_crud import project_crud
@@ -553,6 +553,7 @@ class MultiPaperOperations(BaseLLMClient):
         self,
         current_user: CurrentUser,
         additional_instructions: Optional[str] = None,
+        length: Optional[Literal["short", "medium", "long"]] = "medium",
         project_id: Optional[str] = None,
         llm_provider: Optional[LLMProvider] = None,
         db: Session = Depends(get_db),
@@ -567,6 +568,12 @@ class MultiPaperOperations(BaseLLMClient):
 
         if additional_instructions:
             summary_request += f" Additionally, {additional_instructions}"
+
+        word_count_map = {
+            "short": 5000,
+            "medium": 20000,
+            "long": 40000,
+        }
 
         # Use the existing evidence gathering system
         async for result in self.gather_evidence(
@@ -616,6 +623,7 @@ class MultiPaperOperations(BaseLLMClient):
         formatted_prompt = GENERATE_MULTI_PAPER_NARRATIVE_SUMMARY.format(
             summary_request=summary_request,
             evidence_gathered=cleaned_evidence.get_evidence_dict(),
+            length=word_count_map.get(str(length), word_count_map["short"]),
             paper_metadata=paper_metadata,
             additional_instructions=additional_instructions or "",
             schema=audio_overview_schema,

@@ -1,7 +1,7 @@
 import logging
 import re
 import uuid
-from typing import AsyncGenerator, Optional, Sequence, Union
+from typing import AsyncGenerator, Literal, Optional, Sequence, Union
 
 import httpx
 from app.database.crud.paper_crud import paper_crud
@@ -40,6 +40,7 @@ class PaperOperations(BaseLLMClient):
         self,
         paper_id: str,
         user: CurrentUser,
+        length: Optional[Literal["short", "medium", "long"]] = "medium",
         additional_instructions: Optional[str] = None,
         db: Session = Depends(get_db),
     ) -> AudioOverviewForLLM:
@@ -53,8 +54,15 @@ class PaperOperations(BaseLLMClient):
 
         audio_overview_schema = AudioOverviewForLLM.model_json_schema()
 
+        word_count_map = {
+            "short": 4000,
+            "medium": 15000,
+            "long": 40000,
+        }
+
         formatted_prompt = GENERATE_NARRATIVE_SUMMARY.format(
             additional_instructions=additional_instructions,
+            length=word_count_map.get(str(length), word_count_map["short"]),
             schema=audio_overview_schema,
         )
 

@@ -34,15 +34,19 @@ class ResponseCitation(BaseModel):
     index: int = Field(
         description="The index of the citation in the paper's reference list. This is used to identify the citation in discussions or findings."
     )
+    paper_id: Optional[str] = Field(
+        default=None,
+        description="The unique identifier of the paper from which this citation is drawn. This helps to contextualize the citation within the broader multi-paper analysis. This is required when there are multiple papers being analyzed.",
+    )
 
 
 class AudioOverviewForLLM(BaseModel):
     summary: str = Field(
-        description="The helpful summary of the research. This should include key findings, contributions, and implications of the paper."
+        description="The helpful summary of the research. This should include key findings, contributions, and implications of the paper. Include inline citations, which are to be documented separately in the citations field, which directly back up your claims. The format should include the citation index (e.g., [^1], [^2]) in the summary."
     )
     citations: List[ResponseCitation] = Field(
         default=[],
-        description="List of the raw text citations from the paper that are relevant to the summary. These should be direct quotes or paraphrases from the paper that support the summary provided. These should not be extracted references from the references of the paper. Rather, they are references relevant to your summary. Remember to include the citation index (e.g., [^1], [^2]) in the summary.",
+        description="List of the raw text citations from the paper that are relevant to the summary. These should be direct quotes or paraphrases from the paper(s) that support the summary provided. These should not be extracted references from the references of the paper. Rather, they are references from the raw documents relevant to your summary.",
     )
     title: str = Field(description="The title of the narrative overview.")
 

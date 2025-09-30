@@ -8,6 +8,8 @@ from app.database.models import (
     AudioOverviewJob,
     ConversableType,
     JobStatus,
+    Project,
+    ProjectRole,
 )
 from app.schemas.responses import ResponseCitation
 from app.schemas.user import CurrentUser
@@ -236,6 +238,34 @@ class AudioOverviewCRUD(
             conversable_id=paper_id,
             conversable_type=ConversableType.PAPER,
             current_user=current_user,
+        )
+
+    def get_by_project_and_user(
+        self, db: Session, *, project_id: UUID, current_user: CurrentUser
+    ) -> Optional[List[AudioOverview]]:
+        """Get audio overviews by project ID and user (backward compatibility)"""
+        return self.get_by_conversable_and_user(
+            db=db,
+            conversable_id=project_id,
+            conversable_type=ConversableType.PROJECT,
+            current_user=current_user,
+        )
+
+    def get_by_id_project_and_user(
+        self, db: Session, *, id: UUID, project_id: UUID, current_user: CurrentUser
+    ) -> Optional[AudioOverview]:
+        """Get audio overview by ID, project ID and user - ensures user has project access"""
+        return (
+            db.query(AudioOverview)
+            .join(Project, AudioOverview.conversable_id == Project.id)
+            .join(ProjectRole, Project.id == ProjectRole.project_id)
+            .filter(
+                AudioOverview.id == id,
+                AudioOverview.conversable_id == project_id,
+                AudioOverview.conversable_type == ConversableType.PROJECT,
+                ProjectRole.user_id == current_user.id,
+            )
+            .first()
         )
 
     def get_mrc_by_paper_and_user(

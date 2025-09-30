@@ -30,6 +30,7 @@ async def generate_audio_overview(
     paper_id: Optional[UUID] = None,
     project_id: Optional[UUID] = None,
     additional_instructions: Optional[str] = None,
+    length: Optional[Literal["short", "medium", "long"]] = "medium",
     voice: Literal[
         "alloy",
         "ash",
@@ -240,6 +241,7 @@ async def generate_audio_overview_async(
         "shimmer",
         "verse",
     ] = "nova",
+    length: Optional[Literal["short", "medium", "long"]] = "medium",
     db: Session = Depends(get_db),
 ) -> None:
     """
@@ -253,5 +255,6 @@ async def generate_audio_overview_async(
         audio_overview_job_id=audio_overview_job_id,
         additional_instructions=additional_instructions,
         voice=voice,
+        length=length,
         db=db,
     )

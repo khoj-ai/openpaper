@@ -779,7 +779,7 @@ class AudioOverview(Base):
 
     citations = Column(
         JSONB, nullable=True
-    )  # Store citations in a JSONB format for flexibility. Typically, it would be a list of dicts with keys like `index` and `text`. See `AudioOverviewCitation` schema for more details.
+    )  # Store citations in a JSONB format for flexibility. Typically, it would be a list of dicts with keys like `index` and `text`.
 
     title = Column(String, nullable=True)
 
