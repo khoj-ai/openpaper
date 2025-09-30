@@ -10,6 +10,7 @@ from app.database.crud.audio_overview_crud import (
     audio_overview_job_crud,
 )
 from app.database.crud.paper_crud import paper_crud
+from app.database.crud.projects.project_crud import project_crud
 from app.database.database import get_db
 from app.database.models import ConversableType, JobStatus, Paper
 from app.database.telemetry import track_event
@@ -105,6 +106,76 @@ async def create_audio_overview(
         properties={
             "voice": audio_request.voice or "nova",
             "job_id": str(job_id_as_uuid),
+        },
+        user_id=str(current_user.id),
+    )
+
+    # Return the job ID immediately so the client can track progress
+    return JSONResponse(
+        status_code=202,
+        content={
+            "message": "Audio overview generation started",
+            "job_id": str(job_id_as_uuid),
+            "status": audio_overview_job.status,
+        },
+    )
+
+
+@paper_audio_router.post("/project/{project_id}")
+async def create_project_audio_overview(
+    request: Request,
+    project_id: str,
+    audio_request: AudioOverviewCreateRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """
+    Create audio overview for a project by ID
+    """
+    # Fetch the project from the database
+    project = project_crud.get(db, id=project_id, user=current_user)
+
+    if not project:
+        return JSONResponse(status_code=404, content={"message": "Project not found"})
+
+    project_uuid = uuid.UUID(str(project.id))
+
+    # Create the audio overview job
+    audio_overview_job = audio_overview_job_crud.create(
+        db,
+        obj_in=AudioOverviewJobCreate(
+            conversable_id=project_uuid, conversable_type=ConversableType.PROJECT
+        ),
+        current_user=current_user,
+    )
+
+    if not audio_overview_job:
+        return JSONResponse(
+            status_code=500,
+            content={"message": "Failed to create audio overview job"},
+        )
+
+    job_id_as_uuid = uuid.UUID(str(audio_overview_job.id))
+    logger.info(f"Created audio overview job with ID: {job_id_as_uuid}")
+
+    # Add the audio generation task as a background task
+    background_tasks.add_task(
+        generate_audio_overview_async,
+        project_id=project_uuid,
+        user=current_user,
+        audio_overview_job_id=job_id_as_uuid,
+        additional_instructions=audio_request.additional_instructions,
+        voice=audio_request.voice or "nova",
+        db=db,
+    )
+
+    track_event(
+        "audio_overview_requested",
+        properties={
+            "voice": audio_request.voice or "nova",
+            "job_id": str(job_id_as_uuid),
+            "conversable_type": "project",
         },
         user_id=str(current_user.id),
     )

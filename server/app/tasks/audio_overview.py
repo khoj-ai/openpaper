@@ -10,6 +10,7 @@ from app.database.crud.audio_overview_crud import (
     audio_overview_job_crud,
 )
 from app.database.crud.paper_crud import paper_crud
+from app.database.crud.projects.project_crud import project_crud
 from app.database.database import get_db
 from app.database.models import ConversableType, JobStatus
 from app.database.telemetry import track_event
@@ -23,10 +24,11 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 
-def generate_audio_overview(
-    paper_id: UUID,
+async def generate_audio_overview(
     user: CurrentUser,
     audio_overview_job_id: UUID,
+    paper_id: Optional[UUID] = None,
+    project_id: Optional[UUID] = None,
     additional_instructions: Optional[str] = None,
     voice: Literal[
         "alloy",
@@ -57,6 +59,8 @@ def generate_audio_overview(
     """
 
     start_time = datetime.now(timezone.utc)
+    assert paper_id or project_id, "Either paper_id or project_id must be provided"
+
     try:
 
         # Update job status to running
@@ -69,21 +73,40 @@ def generate_audio_overview(
 
         logger.info(f"Starting audio overview generation for paper {paper_id}")
 
-        # Get paper details for title
-        paper = paper_crud.get(db, id=str(paper_id), user=user)
-        if not paper:
-            raise ValueError(f"Paper with ID {paper_id} not found")
-
-        paper_title = str(paper.title) or "Untitled Paper"
+        conversable_title: str = ""
 
         # Step 1: Generate narrative summary
         logger.info(f"Generating narrative summary for paper {paper_id}")
-        narrative_summary: AudioOverviewForLLM = operations.create_narrative_summary(
-            paper_id=str(paper_id),
-            user=user,
-            additional_instructions=additional_instructions,
-            db=db,
-        )
+        narrative_summary: Optional[AudioOverviewForLLM] = None
+
+        if paper_id:
+            # Get paper details for title
+            paper = paper_crud.get(db, id=str(paper_id), user=user)
+            if not paper:
+                raise ValueError(f"Paper with ID {paper_id} not found")
+            conversable_title = str(paper.title) or "Untitled Paper"
+
+            narrative_summary = operations.create_narrative_summary(
+                paper_id=str(paper_id),
+                user=user,
+                additional_instructions=additional_instructions,
+                db=db,
+            )
+        elif project_id:
+            project = project_crud.get(db, id=str(project_id), user=user)
+
+            if not project:
+                raise ValueError(f"Project with ID {project_id} not found")
+            conversable_title = (
+                f"{project.title} - {project.description}" or "Untitled Project"
+            )
+
+            narrative_summary = await operations.create_multi_paper_narrative_summary(
+                project_id=str(project_id),
+                current_user=user,
+                additional_instructions=additional_instructions,
+                db=db,
+            )
 
         if not narrative_summary or not narrative_summary.summary:
             raise ValueError("Failed to generate narrative summary")
@@ -96,7 +119,8 @@ def generate_audio_overview(
         track_event(
             "narrative_summary_generated",
             properties={
-                "paper_id": paper_id,
+                "paper_id": paper_id or project_id,
+                "project_id": project_id,
                 "summary_length": len(narrative_summary.summary),
                 "job_id": str(audio_overview_job_id),
                 "num_citations": len(narrative_summary.citations),
@@ -112,7 +136,7 @@ def generate_audio_overview(
         # Step 2: Convert summary to speech
         logger.info(f"Converting summary to speech with voice: {voice}")
         object_key, file_url = speaker.generate_speech_from_text(
-            title=paper_title,
+            title=conversable_title,
             text=cleaned_narration,
             voice=voice,
         )
@@ -124,12 +148,14 @@ def generate_audio_overview(
 
         # Step 3: Create AudioOverview record
         audio_overview_data = AudioOverviewCreate(
-            conversable_id=paper_id,
-            conversable_type=ConversableType.PAPER,
+            conversable_id=paper_id or project_id,  # type: ignore
+            conversable_type=(
+                ConversableType.PAPER if paper_id else ConversableType.PROJECT
+            ),
             s3_object_key=object_key,
             transcript=narrative_summary.summary,
             citations=narrative_summary.citations,
-            title=narrative_summary.title or paper_title,
+            title=narrative_summary.title or conversable_title,
         )
 
         audio_overview = audio_overview_crud.create(
@@ -196,9 +222,10 @@ def generate_audio_overview(
 
 
 async def generate_audio_overview_async(
-    paper_id: UUID,
     user: CurrentUser,
     audio_overview_job_id: UUID,
+    paper_id: Optional[UUID] = None,
+    project_id: Optional[UUID] = None,
     additional_instructions: Optional[str] = None,
     voice: Literal[
         "alloy",
@@ -219,8 +246,9 @@ async def generate_audio_overview_async(
     Async wrapper for generate_audio_overview function.
     Useful for background task processing.
     """
-    return generate_audio_overview(
+    return await generate_audio_overview(
         paper_id=paper_id,
+        project_id=project_id,
         user=user,
         audio_overview_job_id=audio_overview_job_id,
         additional_instructions=additional_instructions,

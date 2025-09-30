@@ -19,6 +19,34 @@ Response Schema:
 {schema}
 """
 
+GENERATE_MULTI_PAPER_NARRATIVE_SUMMARY = """
+You are tasked with creating a comprehensive narrative summary based on multiple research papers.
+
+Summary Request: {summary_request}
+
+Evidence Gathered from Papers:
+{evidence_gathered}
+
+Paper Metadata:
+{paper_metadata}
+
+Additional Instructions: {additional_instructions}
+
+Create a narrative summary that:
+1. Synthesizes information across all relevant papers
+2. Identifies key themes, trends, and insights
+3. Highlights agreements and disagreements between papers
+4. Provides a cohesive narrative that addresses the summary request
+5. Includes proper citations and references to the source papers
+
+The summary should be engaging, informative, and suitable for audio narration.
+
+Return your response as a JSON object matching this exact schema:
+{schema}
+
+Ensure your response is valid JSON and includes all required fields from the schema.
+"""
+
 # See note about Github Flavored Markdown and footnotes: https://github.blog/changelog/2021-09-30-footnotes-now-supported-in-markdown-fields/
 
 ANSWER_PAPER_QUESTION_SYSTEM_PROMPT = """

@@ -20,6 +20,7 @@ from app.llm.prompts import (
     EVIDENCE_CLEANING_PROMPT,
     EVIDENCE_GATHERING_MESSAGE,
     EVIDENCE_GATHERING_SYSTEM_PROMPT,
+    GENERATE_MULTI_PAPER_NARRATIVE_SUMMARY,
     PREVIOUS_TOOL_CALLS_MESSAGE,
 )
 from app.llm.provider import LLMProvider, StreamChunk, TextContent
@@ -38,6 +39,7 @@ from app.llm.tools.file_tools import (
 from app.llm.tools.meta_tools import stop_function
 from app.llm.utils import retry_llm_operation
 from app.schemas.message import EvidenceCleaningResponse, EvidenceCollection
+from app.schemas.responses import AudioOverviewForLLM
 from app.schemas.user import CurrentUser
 from fastapi import Depends
 from sqlalchemy.orm import Session
@@ -55,9 +57,9 @@ class MultiPaperOperations(BaseLLMClient):
     @retry_llm_operation(max_retries=3, delay=1.0)
     async def gather_evidence(
         self,
-        conversation_id: str,
         question: str,
         current_user: CurrentUser,
+        conversation_id: Optional[str] = None,
         llm_provider: Optional[LLMProvider] = None,
         user_references: Optional[Sequence[str]] = None,
         project_id: Optional[str] = None,
@@ -75,10 +77,14 @@ class MultiPaperOperations(BaseLLMClient):
             else None
         )
 
-        casted_conversation_id = uuid.UUID(conversation_id)
-
-        conversation_history = message_crud.get_conversation_messages(
-            db, conversation_id=casted_conversation_id, current_user=current_user
+        conversation_history = (
+            message_crud.get_conversation_messages(
+                db,
+                conversation_id=uuid.UUID(conversation_id),
+                current_user=current_user,
+            )
+            if conversation_id
+            else []
         )
 
         # Initialize evidence collection
@@ -541,3 +547,98 @@ class MultiPaperOperations(BaseLLMClient):
         # Yield any remaining text buffer content
         if text_buffer:
             yield {"type": "content", "content": text_buffer}
+
+    @retry_llm_operation(max_retries=3, delay=1.0)
+    async def create_multi_paper_narrative_summary(
+        self,
+        current_user: CurrentUser,
+        additional_instructions: Optional[str] = None,
+        project_id: Optional[str] = None,
+        llm_provider: Optional[LLMProvider] = None,
+        db: Session = Depends(get_db),
+    ) -> AudioOverviewForLLM:
+        """
+        Create a narrative summary across multiple papers using evidence gathering
+        """
+        # First, gather evidence based on the summary request
+        evidence_collection = EvidenceCollection()
+
+        summary_request = f"Provide a comprehensive narrative summary of the key findings, contributions, and insights from the papers in this collection. Synthesize the information to highlight overarching themes and significant advancements."
+
+        if additional_instructions:
+            summary_request += f" Additionally, {additional_instructions}"
+
+        # Use the existing evidence gathering system
+        async for result in self.gather_evidence(
+            question=f"{summary_request}",
+            current_user=current_user,
+            llm_provider=llm_provider,
+            project_id=project_id,
+            db=db,
+        ):
+            if result.get("type") == "evidence_gathered":
+                evidence_dict = result.get("content", {})
+                for paper_id, snippets in evidence_dict.items():
+                    evidence_collection.add_evidence(paper_id, snippets)
+                break
+
+        # Clean the evidence to focus on summary-relevant content
+        cleaned_evidence = await self.clean_evidence(
+            evidence_collection=evidence_collection,
+            original_question=summary_request,
+            current_user=current_user,
+            llm_provider=llm_provider,
+        )
+
+        # Get paper metadata for context
+        if project_id:
+            project = project_crud.get(db, id=project_id, user=current_user)
+            if not project:
+                raise ValueError("Project not found.")
+            all_papers = project_paper_crud.get_all_papers_by_project_id(
+                db, project_id=uuid.UUID(project_id), user=current_user
+            )
+        else:
+            all_papers = paper_crud.get_all_available_papers(db, user=current_user)
+
+        paper_metadata = {
+            str(paper.id): {
+                "title": paper.title,
+                "authors": paper.authors,
+                "published": paper.publish_date,
+            }
+            for paper in all_papers
+        }
+
+        # Generate the narrative summary
+        audio_overview_schema = AudioOverviewForLLM.model_json_schema()
+
+        formatted_prompt = GENERATE_MULTI_PAPER_NARRATIVE_SUMMARY.format(
+            summary_request=summary_request,
+            evidence_gathered=cleaned_evidence.get_evidence_dict(),
+            paper_metadata=paper_metadata,
+            additional_instructions=additional_instructions or "",
+            schema=audio_overview_schema,
+        )
+
+        message_content = [TextContent(text=formatted_prompt)]
+
+        # Generate narrative summary using the LLM
+        response = self.generate_content(
+            contents=message_content,
+            model_type=ModelType.DEFAULT,
+            provider=llm_provider,
+        )
+
+        try:
+            if response and response.text:
+                # Parse the response text as JSON
+                response_json = JSONParser.validate_and_extract_json(response.text)
+                # Validate against the AudioOverview schema
+                audio_overview = AudioOverviewForLLM.model_validate(response_json)
+                return audio_overview
+            else:
+                raise ValueError("Empty response from LLM.")
+        except ValueError as e:
+            logger.error(f"Error parsing LLM response: {e}", exc_info=True)
+            raise ValueError(f"Invalid response from LLM: {str(e)}")
