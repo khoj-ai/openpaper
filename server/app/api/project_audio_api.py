@@ -1,5 +1,6 @@
 import logging
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from app.api.paper_audio_api import AudioOverviewCreateRequest
 from app.auth.dependencies import get_required_user
@@ -153,8 +154,12 @@ async def get_audio_overview_jobs_by_project_id(
         return JSONResponse(status_code=200, content=[])
 
     if not all:
+        # Use UTC for comparison
+        one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
         audio_overview_jobs = [
-            job for job in audio_overview_jobs if job.status != JobStatus.COMPLETED
+            job
+            for job in audio_overview_jobs
+            if (job.status != JobStatus.COMPLETED and job.started_at >= one_hour_ago)
         ]
 
     # Convert the audio overview jobs to a list of dictionaries
