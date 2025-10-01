@@ -5,6 +5,7 @@ export type HighlightType = 'topic' | 'motivation' | 'method' | 'evidence' | 're
 export interface ReferenceCitation {
     index: number;
     text: string;
+    paper_id?: string;
 }
 
 export interface PaperData {
@@ -255,6 +256,15 @@ export interface AudioOverview {
     created_at: string;
     updated_at: string;
     job_id: string;
+}
+
+export interface AudioOverviewJob {
+    id: string;
+    status: JobStatusType;
+    conversable_id: string;
+    conversable_type: string;
+    started_at: string;
+    completed_at: string | null;
 }
 
 export interface Project {

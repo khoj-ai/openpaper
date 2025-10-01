@@ -75,6 +75,8 @@ export function PdfViewer(props: PdfViewerProps) {
 		handleStatusChange = () => { },
 	} = props;
 
+	console.log("pdf url", pdfUrl);
+
 	const [currentPage, setCurrentPage] = useState<number>(1);
 	const [currSearchText, setCurrSearchText] = useState<string>(explicitSearchTerm || "");
 

@@ -243,6 +243,22 @@ export const formatDate = (dateString: string): string => {
     }
 };
 
+// Helper function to format date and time
+export const formatDateTime = (dateString: string): string => {
+    try {
+        return new Date(dateString).toLocaleString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+    catch {
+        return dateString;
+    }
+};
+
 // Helper function to truncate text
 export const truncateText = (text: string, maxLength: number = 200): string => {
     if (text.length <= maxLength) return text;
