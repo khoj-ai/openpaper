@@ -130,6 +130,44 @@ async def get_project_audio_overviews(
     )
 
 
+@project_audio_router.get("/jobs/{project_id}")
+async def get_audio_overview_jobs_by_project_id(
+    request: Request,
+    project_id: str,
+    all: bool = False,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """
+    Get all audio overview jobs for a specific project by ID
+    """
+    # Fetch the audio overview jobs from the database
+    audio_overview_jobs = audio_overview_job_crud.get_by_project_and_user(
+        db,
+        project_id=uuid.UUID(project_id),
+        current_user=current_user,
+    )
+
+    if not audio_overview_jobs:
+        # If no audio overview jobs are found, return an empty list
+        return JSONResponse(status_code=200, content=[])
+
+    if not all:
+        audio_overview_jobs = [
+            job for job in audio_overview_jobs if job.status != JobStatus.COMPLETED
+        ]
+
+    # Convert the audio overview jobs to a list of dictionaries
+    audio_overview_job_list = [
+        audio_overview_job_crud.job_to_dict(job) for job in audio_overview_jobs
+    ]
+
+    return JSONResponse(
+        status_code=200,
+        content=audio_overview_job_list,
+    )
+
+
 @project_audio_router.get("/file/{project_id}/{audio_overview_id}")
 async def get_audio_overview_by_id(
     request: Request,

@@ -57,7 +57,7 @@ class AudioOverviewJobCRUD(
 ):
     """CRUD operations for AudioOverviewJob model"""
 
-    def create(
+    def create(  # type: ignore[override]
         self, db: Session, *, obj_in: AudioOverviewJobCreate, current_user: CurrentUser
     ) -> AudioOverviewJob:
         """Create a new audio overview job"""
@@ -76,8 +76,36 @@ class AudioOverviewJobCRUD(
         conversable_id: UUID,
         conversable_type: ConversableType,
         current_user: CurrentUser
-    ) -> Optional[AudioOverviewJob]:
-        """Get audio overview job by conversable ID, type and user"""
+    ) -> Optional[List[AudioOverviewJob]]:
+        """Get audio overviews by conversable ID, type and user"""
+        if conversable_type == ConversableType.PAPER:
+            # For papers, check direct ownership
+            return (
+                db.query(AudioOverviewJob)
+                .filter(
+                    AudioOverviewJob.conversable_id == conversable_id,
+                    AudioOverviewJob.conversable_type == conversable_type,
+                    AudioOverviewJob.user_id == current_user.id,
+                )
+                .order_by(AudioOverviewJob.created_at.desc())
+                .all()
+            )
+        elif conversable_type == ConversableType.PROJECT:
+            # For projects, check user has project access through ProjectRole
+            return (
+                db.query(AudioOverviewJob)
+                .join(Project, AudioOverviewJob.conversable_id == Project.id)
+                .join(ProjectRole, Project.id == ProjectRole.project_id)
+                .filter(
+                    AudioOverviewJob.conversable_id == conversable_id,
+                    AudioOverviewJob.conversable_type == conversable_type,
+                    ProjectRole.user_id == current_user.id,
+                )
+                .order_by(AudioOverviewJob.created_at.desc())
+                .all()
+            )
+
+        # Fallback to direct ownership for other types
         return (
             db.query(AudioOverviewJob)
             .filter(
@@ -86,7 +114,7 @@ class AudioOverviewJobCRUD(
                 AudioOverviewJob.user_id == current_user.id,
             )
             .order_by(AudioOverviewJob.created_at.desc())
-            .first()
+            .all()
         )
 
     # Backward compatibility method for paper-specific queries
@@ -94,10 +122,22 @@ class AudioOverviewJobCRUD(
         self, db: Session, *, paper_id: UUID, current_user: CurrentUser
     ) -> Optional[AudioOverviewJob]:
         """Get audio overview job by paper ID and user (backward compatibility)"""
-        return self.get_by_conversable_and_user(
+        results = self.get_by_conversable_and_user(
             db=db,
             conversable_id=paper_id,
             conversable_type=ConversableType.PAPER,
+            current_user=current_user,
+        )
+        return results[0] if results else None
+
+    def get_by_project_and_user(
+        self, db: Session, *, project_id: UUID, current_user: CurrentUser
+    ) -> Optional[List[AudioOverviewJob]]:
+        """Get audio overview job by project ID and user (backward compatibility)"""
+        return self.get_by_conversable_and_user(
+            db=db,
+            conversable_id=project_id,
+            conversable_type=ConversableType.PROJECT,
             current_user=current_user,
         )
 
@@ -176,7 +216,7 @@ class AudioOverviewCRUD(
 ):
     """CRUD operations for AudioOverview model"""
 
-    def create(
+    def create(  # type: ignore[override]
         self, db: Session, *, obj_in: AudioOverviewCreate, current_user: CurrentUser
     ) -> AudioOverview:
         """Create a new audio overview"""
@@ -197,6 +237,34 @@ class AudioOverviewCRUD(
         current_user: CurrentUser
     ) -> Optional[List[AudioOverview]]:
         """Get audio overviews by conversable ID, type and user"""
+        if conversable_type == ConversableType.PAPER:
+            # For papers, check direct ownership
+            return (
+                db.query(AudioOverview)
+                .filter(
+                    AudioOverview.conversable_id == conversable_id,
+                    AudioOverview.conversable_type == conversable_type,
+                    AudioOverview.user_id == current_user.id,
+                )
+                .order_by(AudioOverview.created_at.desc())
+                .all()
+            )
+        elif conversable_type == ConversableType.PROJECT:
+            # For projects, check user has project access through ProjectRole
+            return (
+                db.query(AudioOverview)
+                .join(Project, AudioOverview.conversable_id == Project.id)
+                .join(ProjectRole, Project.id == ProjectRole.project_id)
+                .filter(
+                    AudioOverview.conversable_id == conversable_id,
+                    AudioOverview.conversable_type == conversable_type,
+                    ProjectRole.user_id == current_user.id,
+                )
+                .order_by(AudioOverview.created_at.desc())
+                .all()
+            )
+
+        # Fallback to direct ownership for other types
         return (
             db.query(AudioOverview)
             .filter(
