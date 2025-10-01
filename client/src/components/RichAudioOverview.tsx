@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useIsMobile } from "@/lib/useMobile";
 import { Button } from "@/components/ui/button";
 import Markdown from "react-markdown";
@@ -31,6 +31,8 @@ export const RichAudioOverview = ({
     const [isPdfVisible, setIsPdfVisible] = useState(false);
     const [highlightedInfo, setHighlightedInfo] = useState<{ paperId: string; messageIndex: number } | null>(null);
     const [activeCitationKey, setActiveCitationKey] = useState<string | null>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const pdfContainerRef = useRef<HTMLDivElement>(null);
     const isMobile = useIsMobile();
 
     const handleCitationClick = (key: string, messageIndex: number) => {
@@ -47,6 +49,20 @@ export const RichAudioOverview = ({
                 setSearchTerm(citation.text);
                 setIsPdfVisible(true);
                 setHighlightedInfo({ paperId: citation.paper_id, messageIndex });
+
+                // Ensure content is scrollable after PDF viewer opens
+                setTimeout(() => {
+                    if (scrollContainerRef.current) {
+                        scrollContainerRef.current.scrollTop = 0;
+                    }
+                    // Reset PDF viewer scroll to show toolbar - delay to ensure PDF has loaded
+                    setTimeout(() => {
+                        const pdfContainer = document.getElementById('pdf-container');
+                        if (pdfContainer) {
+                            pdfContainer.scrollTop = 0;
+                        }
+                    }, 500);
+                }, 100);
             }
         }
 
@@ -67,9 +83,9 @@ export const RichAudioOverview = ({
     };
 
     return (
-        <div className="flex flex-row w-full h-full">
+        <div className="flex flex-row w-full h-full overflow-hidden">
             <div className={`flex flex-col h-full transition-all duration-500 ease-in-out ${isMobile ? (isPdfVisible ? 'hidden' : 'w-full') : (isPdfVisible ? 'w-1/3' : 'w-full')}`}>
-                <div className="flex-1 w-full overflow-y-auto transition-all duration-300 ease-in-out">
+                <div ref={scrollContainerRef} className="rich-audio-overview-scroll flex-1 w-full overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out">
                     <div className={`space-y-4 w-full transition-all duration-300 ease-in-out ${isPdfVisible ? 'p-2' : 'p-6'}`}>
                     {/* Header */}
                     <div className="flex items-start justify-between mb-6">
@@ -193,7 +209,7 @@ export const RichAudioOverview = ({
 
             {/* PDF Viewer Panel */}
             {isPdfVisible && (
-                <div className={`${isMobile ? 'w-full relative' : 'w-2/3 border-l-2'} flex flex-col animate-in slide-in-from-right-5 duration-500 ease-in-out`}>
+                <div className={`${isMobile ? 'w-full relative' : 'w-2/3 border-l-2'} flex flex-col h-full overflow-hidden animate-in slide-in-from-right-5 duration-500 ease-in-out`}>
                     {isMobile && (
                         <Button
                             onClick={() => setIsPdfVisible(false)}
@@ -204,7 +220,7 @@ export const RichAudioOverview = ({
                             <X className="h-6 w-6" />
                         </Button>
                     )}
-                    <div className="flex-grow transition-all duration-300 ease-in-out">
+                    <div className="flex-1 h-full overflow-hidden transition-all duration-300 ease-in-out">
                         {pdfUrl && (
                             <PdfViewer
                                 pdfUrl={pdfUrl}

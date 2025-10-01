@@ -8,7 +8,7 @@ import "react-pdf/dist/esm/Page/TextLayer.css";
 import "../app/globals.css";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, ArrowLeft, ArrowRight, X, Minus, Plus } from "lucide-react";
+import { Search, ArrowLeft, ArrowRight, X, Minus, Plus, ChevronUp } from "lucide-react";
 import { addAIHighlightToNodes, addHighlightToNodes, findAllHighlightedPassages } from "./utils/PdfHighlightUtils";
 import { usePdfSearch } from "./hooks/PdfSearch";
 import { usePdfNavigation } from "./hooks/PdfNavigation";
@@ -79,7 +79,7 @@ export function PdfViewer(props: PdfViewerProps) {
 
 	const [currentPage, setCurrentPage] = useState<number>(1);
 	const [currSearchText, setCurrSearchText] = useState<string>(explicitSearchTerm || "");
-
+	const [showScrollToTop, setShowScrollToTop] = useState(false);
 	const [textLayerExtractionFailed, setTextLayerExtractionFailed] = useState(false);
 
 	const { numPages, allPagesLoaded, onDocumentLoadSuccess, handlePageLoadSuccess } = usePdfLoader();
@@ -199,6 +199,25 @@ export function PdfViewer(props: PdfViewerProps) {
 		return () => containerRef.current?.removeEventListener('scroll', handleScroll);
 	}, [currentPage]);
 
+	// Monitor scroll position for scroll-to-top button
+	useEffect(() => {
+		const handleScrollTop = () => {
+			if (!containerRef.current) return;
+
+			// Show scroll-to-top button when scrolled down more than 200px
+			setShowScrollToTop(containerRef.current.scrollTop > 200);
+		};
+
+		containerRef.current?.addEventListener('scroll', handleScrollTop);
+		return () => containerRef.current?.removeEventListener('scroll', handleScrollTop);
+	}, []);
+
+	const scrollToTop = () => {
+		if (containerRef.current) {
+			containerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+		}
+	};
+
 	const [textReadyPages, setTextReadyPages] = useState<Set<number>>(new Set());
 	const allTextPagesReady = numPages && numPages > 0 && textReadyPages.size === numPages;
 
@@ -266,7 +285,7 @@ export function PdfViewer(props: PdfViewerProps) {
 
 
 	return (
-		<div ref={containerRef} className="flex flex-col gap-4 w-full h-[calc(100vh-100px)] overflow-y-auto" id="pdf-container">
+		<div ref={containerRef} className="flex flex-col gap-4 w-full h-full overflow-y-auto" id="pdf-container">
 			{/* Toolbar */}
 			<div className="sticky top-0 z-10 flex items-center justify-between bg-white/80 dark:bg-black/80 backdrop-blur-sm p-2 rounded-none w-full border-b border-gray-300">
 				<div className="flex items-center gap-2 flex-grow max-w-md">
@@ -485,6 +504,18 @@ export function PdfViewer(props: PdfViewerProps) {
 					setUserMessageReferences={setUserMessageReferences}
 					setAddedContentForPaperNote={setAddedContentForPaperNote}
 				/>
+			)}
+
+			{/* Scroll to top button */}
+			{showScrollToTop && (
+				<Button
+					onClick={scrollToTop}
+					size="sm"
+					variant="secondary"
+					className="fixed bottom-4 right-4 z-20 rounded-full w-10 h-10 p-0 shadow-lg"
+				>
+					<ChevronUp size={16} />
+				</Button>
 			)}
 		</div>
 	);

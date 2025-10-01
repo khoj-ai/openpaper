@@ -280,11 +280,6 @@ export default function Artifacts({ projectId, papers }: ArtifactsProps) {
                                                             onClose={() => { }}
                                                         />
                                                     </div>
-                                                    <div className="flex-shrink-0 flex justify-end p-6 pt-0">
-                                                        <DialogTrigger asChild>
-                                                            <Button variant="secondary">Close</Button>
-                                                        </DialogTrigger>
-                                                    </div>
                                                 </DialogContent>
                                             </Dialog>
                                         )}
