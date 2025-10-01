@@ -32,7 +32,6 @@ export const RichAudioOverview = ({
     const [highlightedInfo, setHighlightedInfo] = useState<{ paperId: string; messageIndex: number } | null>(null);
     const [activeCitationKey, setActiveCitationKey] = useState<string | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
-    const pdfContainerRef = useRef<HTMLDivElement>(null);
     const isMobile = useIsMobile();
 
     const handleCitationClick = (key: string, messageIndex: number) => {
