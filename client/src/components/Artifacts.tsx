@@ -14,8 +14,16 @@ import {
     DialogContent,
     DialogTitle,
     DialogTrigger,
-    DialogDescription
+    DialogDescription,
+    DialogClose
 } from "@/components/ui/dialog";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { RichAudioOverview } from "./RichAudioOverview";
 
 interface ArtifactsProps {
@@ -23,12 +31,18 @@ interface ArtifactsProps {
     papers: PaperItem[];
 }
 
+const audioLengthOptions = [
+    { label: "Short (5-10 mins)", value: "short" },
+    { label: "Medium (10-20 mins)", value: "medium" },
+    { label: "Long (20+ mins)", value: "long" },
+];
+
 export default function Artifacts({ projectId, papers }: ArtifactsProps) {
     const [audioInstructions, setAudioInstructions] = useState("");
+    const [selectedAudioLength, setSelectedAudioLength] = useState("medium");
     const [isCreatingAudio, setIsCreatingAudio] = useState(false);
     const [audioOverviews, setAudioOverviews] = useState<AudioOverview[]>([]);
     const [audioJobs, setAudioJobs] = useState<AudioOverviewJob[]>([]);
-    const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
     const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
     const [loadingAudioId, setLoadingAudioId] = useState<string | null>(null);
     const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
@@ -106,7 +120,8 @@ export default function Artifacts({ projectId, papers }: ArtifactsProps) {
         setIsCreatingAudio(true);
         try {
             const requestData = {
-                additional_instructions: audioInstructions.trim() || null
+                additional_instructions: audioInstructions.trim() || null,
+                length: selectedAudioLength,
             };
 
             await fetchFromApi(`/api/projects/audio/${projectId}`, {
@@ -118,6 +133,8 @@ export default function Artifacts({ projectId, papers }: ArtifactsProps) {
             });
 
             setAudioInstructions("");
+            setIsCreatingAudio(false);
+
             // Fetch jobs and start polling
             const jobs = await getProjectAudioJobs();
             const hasPendingJobs = jobs.some((job: AudioOverviewJob) => job.status === 'pending' || job.status === 'running');
@@ -269,24 +286,43 @@ export default function Artifacts({ projectId, papers }: ArtifactsProps) {
                                 Generate an audio overview of your project papers. Add custom instructions to guide the content.
                             </DialogDescription>
                         </DialogHeader>
-                        <div className="mt-4">
-                            <Label htmlFor="audio-instructions" className="text-sm font-medium">
-                                Custom Instructions (Optional)
-                            </Label>
-                            <Textarea
-                                id="audio-instructions"
-                                placeholder="Add any specific topics, focus areas, or instructions for the audio overview..."
-                                value={audioInstructions}
-                                onChange={(e) => setAudioInstructions(e.target.value)}
-                                className="mt-2 min-h-[100px] resize-none"
-                            />
+                        <div className="space-y-4 mt-4">
+                            <div>
+                                <Label htmlFor="audio-length" className="text-sm font-medium">
+                                    Audio Length
+                                </Label>
+                                <Select value={selectedAudioLength} onValueChange={setSelectedAudioLength}>
+                                    <SelectTrigger className="mt-2">
+                                        <SelectValue placeholder="Select audio length" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {audioLengthOptions.map((option) => (
+                                            <SelectItem key={option.value} value={option.value}>
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div>
+                                <Label htmlFor="audio-instructions" className="text-sm font-medium">
+                                    Custom Instructions (Optional)
+                                </Label>
+                                <Textarea
+                                    id="audio-instructions"
+                                    placeholder="Add any specific topics, focus areas, or instructions for the audio overview..."
+                                    value={audioInstructions}
+                                    onChange={(e) => setAudioInstructions(e.target.value)}
+                                    className="mt-2 min-h-[100px] resize-none"
+                                />
+                            </div>
                         </div>
                         <div className="flex justify-end gap-2 mt-6">
-                            <DialogTrigger asChild>
+                            <DialogClose asChild>
                                 <Button variant="secondary">
                                     Cancel
                                 </Button>
-                            </DialogTrigger>
+                            </DialogClose>
                             <Button onClick={handleCreateAudioOverview} disabled={isCreatingAudio}>
                                 {isCreatingAudio ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Volume2 className="mr-2 h-4 w-4" />}
                                 Create
