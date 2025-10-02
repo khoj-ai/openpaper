@@ -72,25 +72,25 @@ export default function Artifacts({ projectId, papers }: ArtifactsProps) {
         }
     }, [projectId]);
 
-    // const startPolling = useCallback(() => {
-    //     if (pollingInterval) {
-    //         clearInterval(pollingInterval);
-    //     }
+    const startPolling = useCallback(() => {
+        if (pollingInterval) {
+            clearInterval(pollingInterval);
+        }
 
-    //     const interval = setInterval(async () => {
-    //         const jobs = await getProjectAudioJobs();
-    //         const hasPendingJobs = jobs.some((job: AudioOverviewJob) => job.status === 'pending' || job.status === 'running');
+        const interval = setInterval(async () => {
+            const jobs = await getProjectAudioJobs();
+            const hasPendingJobs = jobs.some((job: AudioOverviewJob) => job.status === 'pending' || job.status === 'running');
 
-    //         if (!hasPendingJobs) {
-    //             // No more pending jobs, stop polling and refresh overviews
-    //             clearInterval(interval);
-    //             setPollingInterval(null);
-    //             getProjectAudioOverviews();
-    //         }
-    //     }, 20000); // Poll every 20 seconds
+            if (!hasPendingJobs) {
+                // No more pending jobs, stop polling and refresh overviews
+                clearInterval(interval);
+                setPollingInterval(null);
+                getProjectAudioOverviews();
+            }
+        }, 20000); // Poll every 20 seconds
 
-    //     setPollingInterval(interval);
-    // }, [pollingInterval, getProjectAudioJobs, getProjectAudioOverviews]);
+        setPollingInterval(interval);
+    }, [pollingInterval, getProjectAudioJobs, getProjectAudioOverviews]);
 
     const stopPolling = useCallback(() => {
         if (pollingInterval) {
@@ -105,7 +105,7 @@ export default function Artifacts({ projectId, papers }: ArtifactsProps) {
             getProjectAudioJobs().then(jobs => {
                 const hasPendingJobs = jobs.some((job: AudioOverviewJob) => job.status === 'pending' || job.status === 'running');
                 if (hasPendingJobs) {
-                    // startPolling();
+                    startPolling();
                 }
             });
         }
@@ -114,7 +114,7 @@ export default function Artifacts({ projectId, papers }: ArtifactsProps) {
         return () => {
             stopPolling();
         };
-    }, [projectId, getProjectAudioOverviews, getProjectAudioJobs, stopPolling]);
+    }, [projectId, getProjectAudioOverviews, getProjectAudioJobs, startPolling, stopPolling]);
 
     const handleCreateAudioOverview = async () => {
         setIsCreatingAudio(true);
@@ -133,13 +133,12 @@ export default function Artifacts({ projectId, papers }: ArtifactsProps) {
             });
 
             setAudioInstructions("");
-            setIsCreatingAudio(false);
 
             // Fetch jobs and start polling
             const jobs = await getProjectAudioJobs();
             const hasPendingJobs = jobs.some((job: AudioOverviewJob) => job.status === 'pending' || job.status === 'running');
             if (hasPendingJobs) {
-                // startPolling();
+                startPolling();
             }
         } catch (err) {
             console.error("Failed to create audio overview:", err);
