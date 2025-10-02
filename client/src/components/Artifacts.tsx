@@ -113,7 +113,8 @@ export default function Artifacts({ projectId, papers }: ArtifactsProps) {
         return () => {
             stopPolling();
         };
-    }, [projectId, getProjectAudioOverviews, getProjectAudioJobs, startPolling, stopPolling]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [projectId]);
 
     const handleCreateAudioOverview = async () => {
         setCreateAudioDialogOpen(false);
