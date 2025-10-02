@@ -120,7 +120,6 @@ export default function Artifacts({ projectId, papers }: ArtifactsProps) {
         return () => {
             stopPolling();
         };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [projectId]);
 
     const handleCreateAudioOverview = async () => {
@@ -335,7 +334,7 @@ export default function Artifacts({ projectId, papers }: ArtifactsProps) {
                         </DialogHeader>
                         {atAudioLimit ? (
                             <div className="mt-4 text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/30 rounded-md">
-                                <p className="text-sm text-yellow-800 dark:text-yellow-200">You've used all your audio overviews for this week.</p>
+                                <p className="text-sm text-yellow-800 dark:text-yellow-200">You&apos;ve used all your audio overviews for this week.</p>
                                 <Link href="/pricing" passHref>
                                     <Button variant="link" className="p-0 h-auto text-sm">Upgrade your plan to create more.</Button>
                                 </Link>
