@@ -18,13 +18,11 @@ import { PdfViewer } from "@/components/PdfViewer";
 interface RichAudioOverviewProps {
     audioOverview: AudioOverview;
     papers?: PaperItem[];
-    onClose?: () => void;
 }
 
 export const RichAudioOverview = ({
     audioOverview,
     papers,
-    onClose,
 }: RichAudioOverviewProps) => {
     const [pdfUrl, setPdfUrl] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState<string | null>(null);
@@ -93,11 +91,6 @@ export const RichAudioOverview = ({
                                 {audioOverview.title}
                             </h2>
                         </div>
-                        {onClose && (
-                            <Button onClick={onClose} variant="ghost" size="icon" className="ml-4">
-                                <X className="h-6 w-6" />
-                            </Button>
-                        )}
                     </div>
 
                     {/* Transcript Content */}

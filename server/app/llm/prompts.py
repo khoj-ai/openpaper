@@ -38,7 +38,7 @@ Create a narrative summary that:
 3. Highlights agreements and disagreements between papers
 4. Provides a cohesive narrative that addresses the summary request
 5. Includes proper citations and references to the source papers
-6. Is limited to {length} characters
+6. Is limited to a maximum of {length} characters
 
 The summary should be engaging, informative, and suitable for audio narration.
 

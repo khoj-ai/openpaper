@@ -104,6 +104,7 @@ async def generate_audio_overview(
 
             narrative_summary = await operations.create_multi_paper_narrative_summary(
                 project_id=str(project_id),
+                length=length,
                 current_user=user,
                 additional_instructions=additional_instructions,
                 db=db,

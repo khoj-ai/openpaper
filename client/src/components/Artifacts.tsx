@@ -41,9 +41,11 @@ export default function Artifacts({ projectId, papers }: ArtifactsProps) {
     const [audioInstructions, setAudioInstructions] = useState("");
     const [selectedAudioLength, setSelectedAudioLength] = useState("medium");
     const [isCreatingAudio, setIsCreatingAudio] = useState(false);
+    const [isCreateAudioDialogOpen, setCreateAudioDialogOpen] = useState(false);
     const [audioOverviews, setAudioOverviews] = useState<AudioOverview[]>([]);
     const [audioJobs, setAudioJobs] = useState<AudioOverviewJob[]>([]);
     const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
+    const [activatedAudioIds, setActivatedAudioIds] = useState<string[]>([]);
     const [loadingAudioId, setLoadingAudioId] = useState<string | null>(null);
     const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
     const [audioProgress, setAudioProgress] = useState<{ [key: string]: { currentTime: number; duration: number } }>({});
@@ -117,6 +119,7 @@ export default function Artifacts({ projectId, papers }: ArtifactsProps) {
     }, [projectId, getProjectAudioOverviews, getProjectAudioJobs, startPolling, stopPolling]);
 
     const handleCreateAudioOverview = async () => {
+        setCreateAudioDialogOpen(false);
         setIsCreatingAudio(true);
         try {
             const requestData = {
@@ -209,6 +212,9 @@ export default function Artifacts({ projectId, papers }: ArtifactsProps) {
                     };
                 }
 
+                if (!activatedAudioIds.includes(audioOverviewId)) {
+                    setActivatedAudioIds(prev => [...prev, audioOverviewId]);
+                }
                 audio.play();
             }
         } catch (err) {
@@ -268,7 +274,7 @@ export default function Artifacts({ projectId, papers }: ArtifactsProps) {
             </div>
 
             <div className="flex flex-wrap gap-3">
-                <Dialog>
+                <Dialog open={isCreateAudioDialogOpen} onOpenChange={setCreateAudioDialogOpen}>
                     <DialogTrigger asChild>
                         <button
                             disabled={papers.length === 0}
@@ -388,7 +394,6 @@ export default function Artifacts({ projectId, papers }: ArtifactsProps) {
                                                         <RichAudioOverview
                                                             audioOverview={overview}
                                                             papers={papers || []}
-                                                            onClose={() => { }}
                                                         />
                                                     </div>
                                                 </DialogContent>
@@ -397,82 +402,86 @@ export default function Artifacts({ projectId, papers }: ArtifactsProps) {
                                     </div>
                                 </div>
 
-                                {/* Progress Bar */}
-                                <div className="mb-3">
-                                    <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
-                                        <span>{progress ? formatTime(progress.currentTime) : '0:00'}</span>
-                                        <span>{progress ? formatTime(progress.duration) : '0:00'}</span>
-                                    </div>
-                                    <div className="relative">
-                                        <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full bg-blue-500 transition-all duration-100"
-                                                style={{ width: `${progressPercentage}%` }}
-                                            />
-                                        </div>
-                                        <input
-                                            type="range"
-                                            min="0"
-                                            max="100"
-                                            value={progressPercentage}
-                                            onChange={(e) => handleSeek(overview.id, Number(e.target.value))}
-                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Controls */}
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center space-x-2">
-                                        <button
-                                            onClick={() => skipBackward(overview.id)}
-                                            className="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
-                                            title="Skip back 10s"
-                                        >
-                                            <RotateCcw className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                            onClick={() => skipForward(overview.id)}
-                                            className="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
-                                            title="Skip forward 10s"
-                                        >
-                                            <RotateCcw className="w-4 h-4 scale-x-[-1]" />
-                                        </button>
-                                    </div>
-
-                                    <div className="flex items-center space-x-3">
-                                        {/* Volume Control */}
-                                        <div className="flex items-center space-x-1">
-                                            <Volume2 className="w-3 h-3 text-gray-500 dark:text-gray-400" />
-                                            <input
-                                                type="range"
-                                                min="0"
-                                                max="1"
-                                                step="0.01"
-                                                value={volume}
-                                                onChange={(e) => handleVolumeChange(overview.id, Number(e.target.value))}
-                                                className="w-16 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-                                            />
+                                {activatedAudioIds.includes(overview.id) && (
+                                    <>
+                                        {/* Progress Bar */}
+                                        <div className="mb-3">
+                                            <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                                <span>{progress ? formatTime(progress.currentTime) : '0:00'}</span>
+                                                <span>{progress ? formatTime(progress.duration) : '0:00'}</span>
+                                            </div>
+                                            <div className="relative">
+                                                <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-blue-500 transition-all duration-100"
+                                                        style={{ width: `${progressPercentage}%` }}
+                                                    />
+                                                </div>
+                                                <input
+                                                    type="range"
+                                                    min="0"
+                                                    max="100"
+                                                    value={progressPercentage}
+                                                    onChange={(e) => handleSeek(overview.id, Number(e.target.value))}
+                                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                />
+                                            </div>
                                         </div>
 
-                                        {/* Speed Control */}
-                                        <div className="flex space-x-1">
-                                            {[0.75, 1, 1.25, 1.5, 2].map((speedOption) => (
+                                        {/* Controls */}
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center space-x-2">
                                                 <button
-                                                    key={speedOption}
-                                                    onClick={() => handleSpeedChange(overview.id, speedOption)}
-                                                    className={`px-2 py-1 text-xs rounded ${
-                                                        speed === speedOption
-                                                            ? 'bg-blue-600 text-white'
-                                                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-                                                    } transition-colors`}
+                                                    onClick={() => skipBackward(overview.id)}
+                                                    className="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                                                    title="Skip back 10s"
                                                 >
-                                                    {speedOption}x
+                                                    <RotateCcw className="w-4 h-4" />
                                                 </button>
-                                            ))}
+                                                <button
+                                                    onClick={() => skipForward(overview.id)}
+                                                    className="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                                                    title="Skip forward 10s"
+                                                >
+                                                    <RotateCcw className="w-4 h-4 scale-x-[-1]" />
+                                                </button>
+                                            </div>
+
+                                            <div className="flex items-center space-x-3">
+                                                {/* Volume Control */}
+                                                <div className="flex items-center space-x-1">
+                                                    <Volume2 className="w-3 h-3 text-gray-500 dark:text-gray-400" />
+                                                    <input
+                                                        type="range"
+                                                        min="0"
+                                                        max="1"
+                                                        step="0.01"
+                                                        value={volume}
+                                                        onChange={(e) => handleVolumeChange(overview.id, Number(e.target.value))}
+                                                        className="w-16 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                                                    />
+                                                </div>
+
+                                                {/* Speed Control */}
+                                                <div className="flex space-x-1">
+                                                    {[0.75, 1, 1.25, 1.5, 2].map((speedOption) => (
+                                                        <button
+                                                            key={speedOption}
+                                                            onClick={() => handleSpeedChange(overview.id, speedOption)}
+                                                            className={`px-2 py-1 text-xs rounded ${
+                                                                speed === speedOption
+                                                                    ? 'bg-blue-600 text-white'
+                                                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                                                            } transition-colors`}
+                                                        >
+                                                            {speedOption}x
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                </div>
+                                    </>
+                                )}
                             </div>
                         );
                     })}
