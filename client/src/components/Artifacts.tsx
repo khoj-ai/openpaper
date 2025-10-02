@@ -47,7 +47,7 @@ export default function Artifacts({ projectId, papers }: ArtifactsProps) {
     const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
     const [activatedAudioIds, setActivatedAudioIds] = useState<string[]>([]);
     const [loadingAudioId, setLoadingAudioId] = useState<string | null>(null);
-    const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
+    const pollingInterval = useRef<NodeJS.Timeout | null>(null);
     const [audioProgress, setAudioProgress] = useState<{ [key: string]: { currentTime: number; duration: number } }>({});
     const [audioVolume, setAudioVolume] = useState<{ [key: string]: number }>({});
     const [audioSpeed, setAudioSpeed] = useState<{ [key: string]: number }>({});
@@ -74,10 +74,15 @@ export default function Artifacts({ projectId, papers }: ArtifactsProps) {
         }
     }, [projectId]);
 
-    const startPolling = useCallback(() => {
-        if (pollingInterval) {
-            clearInterval(pollingInterval);
+    const stopPolling = useCallback(() => {
+        if (pollingInterval.current) {
+            clearInterval(pollingInterval.current);
+            pollingInterval.current = null;
         }
+    }, []);
+
+    const startPolling = useCallback(() => {
+        stopPolling();
 
         const interval = setInterval(async () => {
             const jobs = await getProjectAudioJobs();
@@ -85,21 +90,13 @@ export default function Artifacts({ projectId, papers }: ArtifactsProps) {
 
             if (!hasPendingJobs) {
                 // No more pending jobs, stop polling and refresh overviews
-                clearInterval(interval);
-                setPollingInterval(null);
+                stopPolling();
                 getProjectAudioOverviews();
             }
         }, 20000); // Poll every 20 seconds
 
-        setPollingInterval(interval);
-    }, [pollingInterval, getProjectAudioJobs, getProjectAudioOverviews]);
-
-    const stopPolling = useCallback(() => {
-        if (pollingInterval) {
-            clearInterval(pollingInterval);
-            setPollingInterval(null);
-        }
-    }, [pollingInterval]);
+        pollingInterval.current = interval;
+    }, [getProjectAudioJobs, getProjectAudioOverviews, stopPolling]);
 
     useEffect(() => {
         if (projectId) {
