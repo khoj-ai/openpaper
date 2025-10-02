@@ -571,8 +571,8 @@ class MultiPaperOperations(BaseLLMClient):
 
         word_count_map = {
             "short": 5000,
-            "medium": 20000,
-            "long": 40000,
+            "medium": 40000,
+            "long": 100000,
         }
 
         # Use the existing evidence gathering system
