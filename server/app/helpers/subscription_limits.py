@@ -110,6 +110,19 @@ def get_user_knowledge_base_size_limit(db: Session, user: CurrentUser) -> int:
     return limits[KB_SIZE_KEY]
 
 
+def get_user_audio_overviews_limit(db: Session, user: CurrentUser) -> int:
+    """
+    Get the audio overview limits for a user based on their subscription plan.
+
+    Returns:
+        int: The audio overview limit per week.
+    """
+    plan = get_user_subscription_plan(db, user)
+    limits = get_plan_limits(plan)
+
+    return limits[AUDIO_OVERVIEWS_KEY]
+
+
 def can_user_upload_paper(db: Session, user: CurrentUser) -> tuple[bool, Optional[str]]:
     """
     Check if a user can upload a new paper based on their subscription limits.
@@ -146,6 +159,49 @@ def can_user_upload_paper(db: Session, user: CurrentUser) -> tuple[bool, Optiona
         return (
             False,
             f"You have reached your paper upload limit ({int(paper_limit)} papers) for the {plan_name} plan. Please upgrade your subscription to upload more papers, or delete existing papers to free up space.",
+        )
+
+    return True, None
+
+
+def can_user_create_audio_overview(
+    db: Session, user: CurrentUser
+) -> tuple[bool, Optional[str]]:
+    """
+    Check if a user can create a new audio overview based on their subscription limits.
+
+    Returns:
+        tuple: (can_create: bool, error_message: Optional[str])
+    """
+    plan = get_user_subscription_plan(db, user)
+    limits = get_plan_limits(plan)
+
+    current_audio_overviews_used = get_user_audio_overviews_used_this_month(db, user)
+    audio_overview_limit = limits[AUDIO_OVERVIEWS_KEY]
+
+    # Handle unlimited plans
+    if audio_overview_limit == float("inf"):
+        return True, None
+
+    # If the user has reached their audio overview limit
+    if current_audio_overviews_used >= audio_overview_limit:
+        track_event(
+            "action_blocked_limit_reached",
+            user_id=str(user.id),
+            properties={
+                "current_audio_overviews_used": current_audio_overviews_used,
+                "audio_overview_limit": audio_overview_limit,
+                "type": "audio_overviews",
+                "plan": plan.value,
+            },
+        )
+        plan_name = {
+            SubscriptionPlan.BASIC: "Basic",
+            SubscriptionPlan.RESEARCHER: "Researcher",
+        }.get(plan, "Basic")
+        return (
+            False,
+            f"You have reached your audio overview limit ({int(audio_overview_limit)} audio overviews per week) for the {plan_name} plan. Please upgrade your subscription to create more audio overviews.",
         )
 
     return True, None

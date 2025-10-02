@@ -15,6 +15,7 @@ from app.database.database import get_db
 from app.database.models import ConversableType, JobStatus
 from app.database.telemetry import track_event
 from app.helpers.s3 import s3_service
+from app.helpers.subscription_limits import can_user_create_audio_overview
 from app.schemas.user import CurrentUser
 from app.tasks.audio_overview import generate_audio_overview_async
 from dotenv import load_dotenv
@@ -43,6 +44,19 @@ async def create_project_audio_overview(
     Create audio overview for a project by ID
     """
     # Fetch the project from the database
+    can_create, reason = can_user_create_audio_overview(db, current_user)
+
+    if not can_create:
+        logger.warning(
+            f"User {current_user.id} attempted to create an audio overview but was denied: {reason}"
+        )
+        return JSONResponse(
+            status_code=403,
+            content={
+                "message": "Audio overview creation limit reached. Please upgrade your subscription plan."
+            },
+        )
+
     project = project_crud.get(db, id=project_id, user=current_user)
 
     if not project:
