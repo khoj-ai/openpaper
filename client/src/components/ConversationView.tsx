@@ -378,7 +378,7 @@ export const ConversationView = ({
 							<X className="h-6 w-6" />
 						</Button>
 					)}
-					<div className="flex-grow transition-all duration-300 ease-in-out">
+					<div className="flex-grow transition-all duration-300 ease-in-out overflow-y-auto">
 						{pdfUrl && (
 							<PdfViewer
 								pdfUrl={pdfUrl}
