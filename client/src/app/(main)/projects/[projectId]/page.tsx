@@ -79,6 +79,7 @@ export default function ProjectPage() {
 	const [isAddPapersSheetOpen, setIsAddPapersSheetOpen] = useState(false);
 	const [addPapersView, setAddPapersView] = useState<'initial' | 'upload' | 'library'>('initial');
 	const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+	const [showAllPapers, setShowAllPapers] = useState(false);
 	const { subscription } = useSubscription();
 
 	const chatDisabled = isChatCreditAtLimit(subscription);
@@ -647,11 +648,18 @@ export default function ProjectPage() {
 
 					{papers && papers.length > 0 ? (
 						<div className="grid grid-cols-1 gap-4">
-							{papers.map((paper, index) => (
+							{papers.slice(0, showAllPapers ? papers.length : 7).map((paper, index) => (
 								<div key={paper.id} className="animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
 									<PaperCard paper={paper} minimalist={true} projectId={projectId} onUnlink={getProjectPapers} />
 								</div>
 							))}
+							{papers.length > 7 && !showAllPapers && (
+								<div className="mt-4 text-center">
+									<Button variant="outline" onClick={() => setShowAllPapers(true)}>
+										Show More
+									</Button>
+								</div>
+							)}
 						</div>
 					) : (
 						<div className="text-center p-8 border-dashed border-2 border-gray-300 rounded-xl bg-gray-50">
