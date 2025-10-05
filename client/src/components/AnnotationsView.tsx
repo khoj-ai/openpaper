@@ -130,7 +130,7 @@ function HighlightThread({
 
 	return (
 		<Card
-			className={`transition-colors cursor-pointer rounded-lg p-2 ${activeBgColor}`}
+			className={`transition-colors cursor-pointer rounded-lg px-2 ${activeBgColor}`}
 			onClick={onClick}
 		>
 			<CardContent className="p-0">
@@ -214,7 +214,7 @@ function AnnotationsToolbar({
 	readonly,
 }: AnnotationsToolbarProps) {
 	return (
-		<div className="flex items-center gap-3 p-3 border-b border-border bg-muted/20">
+		<div className="flex items-center gap-3 px-3 border-b border-border bg-muted/20">
 			<Select value={selectedHighlightType} onValueChange={onHighlightTypeFilter}>
 				<SelectTrigger className="w-[140px] h-8">
 					<SelectValue placeholder="All types" />
@@ -340,7 +340,7 @@ export function AnnotationsView(
 
 	if (sortedHighlights.length === 0) {
 		return (
-			<div className="flex flex-col gap-4 p-4 text-center">
+			<div className="flex flex-col gap-4 text-center">
 				<p className="text-secondary-foreground text-sm">
 					{readonly ? "There are no annotations for this paper." : "Highlight text in the document to begin annotating."}
 				</p>

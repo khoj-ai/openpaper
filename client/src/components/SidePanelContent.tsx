@@ -815,7 +815,7 @@ export function SidePanelContent({
                     <div className="flex-grow h-full overflow-hidden">
                         {
                             rightSideFunction === 'Notes' && (
-                                <div className='p-2 w-full h-full flex flex-col'>
+                                <div className='p-4 w-full h-full flex flex-col'>
                                     <div className="flex justify-between items-center mb-2 flex-shrink-0">
                                         <div className="flex items-center gap-2">
                                             <TooltipProvider>
@@ -890,7 +890,7 @@ export function SidePanelContent({
                         }
                         {
                             rightSideFunction === 'Annotations' && user && (
-                                <div className={`flex flex-col ${heightClass} md:px-2 overflow-y-auto`}>
+                                <div className={`flex flex-col ${heightClass} overflow-y-auto`}>
                                     <AnnotationsView
                                         annotations={annotations}
                                         highlights={highlights}

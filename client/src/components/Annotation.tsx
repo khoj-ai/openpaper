@@ -44,7 +44,7 @@ export default function Annotation({
     if (isEditing && !readonly) {
         return (
             <div className="group relative">
-                <div className="flex items-start gap-4 p-4 bg-background dark:bg-card border border-border rounded-xl shadow-sm">
+                <div className="flex items-start gap-4 px-4 py-3 bg-background dark:bg-card border border-border rounded-xl shadow-sm">
                     {/* Avatar */}
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isAI
                         ? 'bg-blue-200 dark:bg-blue-800'
@@ -105,7 +105,7 @@ export default function Annotation({
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
-            <div className="relative flex items-start gap-4 p-4 rounded-xl border bg-background dark:bg-card border-border hover:border-border/80 dark:hover:border-border hover:shadow-sm dark:hover:shadow-lg transition-all duration-300">
+            <div className="relative flex items-start gap-4 px-4 py-3 rounded-xl border bg-background dark:bg-card border-border hover:border-border/80 dark:hover:border-border hover:shadow-sm dark:hover:shadow-lg transition-all duration-300">
 
                 {/* Avatar */}
                 <div className="relative">
