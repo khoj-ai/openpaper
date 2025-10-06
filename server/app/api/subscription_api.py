@@ -21,10 +21,6 @@ from app.helpers.subscription_limits import get_user_usage_info
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
-from subscription_schedules_refactor import (
-    change_subscription_interval_with_schedule,
-    get_existing_schedule_for_subscription,
-)
 
 STRIPE_API_KEY = os.getenv("STRIPE_API_KEY")
 if not STRIPE_API_KEY:
@@ -333,11 +329,6 @@ async def handle_stripe_webhook(
             "invoice.payment_action_required",
             "customer.subscription.past_due",
             "invoice.payment_succeeded",
-            "subscription_schedule.created",
-            "subscription_schedule.updated",
-            "subscription_schedule.canceled",
-            "subscription_schedule.completed",
-            "subscription_schedule.released",
         ]:
             logger.info(f"Skipping unsupported event type: {event_type}")
             return {"success": False}
@@ -770,240 +761,6 @@ async def handle_stripe_webhook(
                     f"Error processing past due subscription: {e}", exc_info=True
                 )
 
-        elif event_type == "subscription_schedule.created":
-            schedule = event["data"]["object"]
-            schedule_id = schedule.get("id")
-            subscription_id = schedule.get("subscription")
-
-            try:
-                # Check if this is one of our interval change schedules
-                metadata = schedule.get("metadata", {})
-                if metadata.get("change_type") == "interval_change":
-                    user_id = metadata.get("user_id")
-                    old_price_id = metadata.get("old_price_id")
-                    new_price_id = metadata.get("new_price_id")
-
-                    logger.info(
-                        f"Interval change schedule {schedule_id} created for user {user_id}"
-                    )
-                    logger.info(f"Will change from {old_price_id} to {new_price_id}")
-
-                    # Track the schedule creation
-                    if user_id:
-                        track_event(
-                            event_name="subscription_schedule_created",
-                            properties={
-                                "schedule_id": schedule_id,
-                                "subscription_id": subscription_id,
-                                "change_type": "interval_change",
-                                "old_price_id": old_price_id,
-                                "new_price_id": new_price_id,
-                            },
-                            user_id=user_id,
-                        )
-
-            except Exception as e:
-                logger.error(
-                    f"Error processing subscription_schedule.created: {e}",
-                    exc_info=True,
-                )
-
-        elif event_type == "subscription_schedule.updated":
-            schedule = event["data"]["object"]
-            schedule_id = schedule.get("id")
-            subscription_id = schedule.get("subscription")
-
-            try:
-                # Log the update - this will fire when phases change, etc.
-                logger.info(
-                    f"Schedule {schedule_id} updated, status: {schedule.get('status')}"
-                )
-
-                # Check if this is one of our interval change schedules
-                metadata = schedule.get("metadata", {})
-                if metadata.get("change_type") == "interval_change":
-                    user_id = metadata.get("user_id")
-                    new_price_id = metadata.get("new_price_id")
-
-                    # Check if we've moved to Phase 2 (the new interval phase)
-                    current_phase = schedule.get("current_phase")
-
-                    # If we're in phase index 1 (Phase 2), the interval change is now active
-                    if (
-                        current_phase
-                        and current_phase.get("index") == 1
-                        and new_price_id
-                        and subscription_id
-                    ):
-                        logger.info(
-                            f"Phase 2 started for schedule {schedule_id} - updating database with new interval"
-                        )
-
-                        # Update database to reflect the new interval is now active
-                        try:
-                            subscription = (
-                                subscription_crud.get_by_stripe_subscription_id(
-                                    db, subscription_id
-                                )
-                            )
-                            if subscription:
-                                subscription_crud.update_subscription_status(
-                                    db,
-                                    subscription_id,
-                                    status=str(
-                                        subscription.status
-                                    ),  # Keep current status
-                                    stripe_price_id=new_price_id,
-                                )
-                                logger.info(
-                                    f"Updated database with new price {new_price_id} for subscription {subscription_id} when Phase 2 began"
-                                )
-
-                                # Track the actual interval change activation
-                                track_event(
-                                    event_name="subscription_interval_change_activated",
-                                    properties={
-                                        "schedule_id": schedule_id,
-                                        "subscription_id": subscription_id,
-                                        "new_price_id": new_price_id,
-                                        "phase": "phase_2_started",
-                                    },
-                                    user_id=user_id,
-                                )
-                        except Exception as db_error:
-                            logger.error(
-                                f"Error updating database when Phase 2 started: {db_error}"
-                            )
-
-                    if user_id:
-                        track_event(
-                            event_name="subscription_schedule_updated",
-                            properties={
-                                "schedule_id": schedule_id,
-                                "status": schedule.get("status"),
-                                "current_phase": (
-                                    current_phase.get("index")
-                                    if current_phase
-                                    else None
-                                ),
-                                "change_type": "interval_change",
-                            },
-                            user_id=user_id,
-                        )
-
-            except Exception as e:
-                logger.error(
-                    f"Error processing subscription_schedule.updated: {e}",
-                    exc_info=True,
-                )
-
-        elif event_type == "subscription_schedule.completed":
-            schedule = event["data"]["object"]
-            schedule_id = schedule.get("id")
-            subscription_id = schedule.get("subscription")
-
-            try:
-                # Check if this was an interval change schedule
-                metadata = schedule.get("metadata", {})
-                if metadata.get("change_type") == "interval_change":
-                    user_id = metadata.get("user_id")
-                    new_price_id = metadata.get("new_price_id")
-
-                    logger.info(
-                        f"Interval change schedule {schedule_id} completed for user {user_id}"
-                    )
-                    logger.info(
-                        f"Subscription {subscription_id} schedule finished - subscription is now released"
-                    )
-
-                    # Track the completion (schedule finished, subscription released)
-                    if user_id:
-                        track_event(
-                            event_name="subscription_interval_change_completed",
-                            properties={
-                                "schedule_id": schedule_id,
-                                "subscription_id": subscription_id,
-                                "new_price_id": new_price_id,
-                                "status": "schedule_completed_and_released",
-                            },
-                            user_id=user_id,
-                        )
-
-                    # Note: Database was already updated when Phase 2 began in subscription_schedule.updated
-                    # No need to update again here - just log that the schedule is complete
-                    logger.info(
-                        f"Schedule {schedule_id} completed successfully. Subscription {subscription_id} is now released and managing itself."
-                    )
-
-            except Exception as e:
-                logger.error(
-                    f"Error processing subscription_schedule.completed: {e}",
-                    exc_info=True,
-                )
-
-        elif event_type == "subscription_schedule.canceled":
-            schedule = event["data"]["object"]
-            schedule_id = schedule.get("id")
-
-            try:
-                metadata = schedule.get("metadata", {})
-                if metadata.get("change_type") == "interval_change":
-                    user_id = metadata.get("user_id")
-                    logger.info(
-                        f"Interval change schedule {schedule_id} was canceled for user {user_id}"
-                    )
-
-                    # Track the cancellation
-                    if user_id:
-                        track_event(
-                            event_name="subscription_schedule_canceled",
-                            properties={
-                                "schedule_id": schedule_id,
-                                "change_type": "interval_change",
-                            },
-                            user_id=user_id,
-                        )
-
-            except Exception as e:
-                logger.error(
-                    f"Error processing subscription_schedule.canceled: {e}",
-                    exc_info=True,
-                )
-
-        elif event_type == "subscription_schedule.released":
-            schedule = event["data"]["object"]
-            schedule_id = schedule.get("id")
-            subscription_id = schedule.get("subscription")
-
-            try:
-                metadata = schedule.get("metadata", {})
-                if metadata.get("change_type") == "interval_change":
-                    user_id = metadata.get("user_id")
-                    logger.info(
-                        f"Interval change schedule {schedule_id} released for user {user_id}"
-                    )
-                    logger.info(
-                        f"Subscription {subscription_id} is now managing itself normally"
-                    )
-
-                    # Track the release
-                    if user_id:
-                        track_event(
-                            event_name="subscription_schedule_released",
-                            properties={
-                                "schedule_id": schedule_id,
-                                "subscription_id": subscription_id,
-                                "change_type": "interval_change",
-                            },
-                            user_id=user_id,
-                        )
-
-            except Exception as e:
-                logger.error(
-                    f"Error processing subscription_schedule.released: {e}",
-                    exc_info=True,
-                )
-
         # Return a 200 response to acknowledge receipt of the event. We should only arrive here if the event was processed successfully.
         return {"success": True}
 
@@ -1100,36 +857,7 @@ def resubscribe(
             }
 
         try:
-            # Check if there's an existing subscription schedule first
-
             subscription_id = str(subscription.stripe_subscription_id)
-            existing_schedule = get_existing_schedule_for_subscription(
-                subscription_id, customer=str(subscription.stripe_customer_id)
-            )
-
-            if existing_schedule:
-                # There's an active schedule - handle it carefully
-                metadata = existing_schedule.get("metadata", {})
-                if metadata.get("change_type") == "interval_change":
-                    # This subscription has a pending interval change
-                    logger.info(
-                        f"Found pending interval change schedule {existing_schedule.id} for subscription {subscription_id}"
-                    )
-
-                    # For resubscription with pending changes, we have two options:
-                    # 1. Cancel the schedule and reactivate with current settings
-                    # 2. Keep the schedule and reactivate (let the interval change proceed)
-                    # For now, we'll inform the user about the pending change
-                    return {
-                        "success": False,
-                        "error": "pending_interval_change",
-                        "message": "Your subscription has a pending interval change. Please contact support or cancel the interval change first.",
-                        "schedule_id": existing_schedule.id,
-                        "pending_change": {
-                            "old_price_id": metadata.get("old_price_id"),
-                            "new_price_id": metadata.get("new_price_id"),
-                        },
-                    }
 
             # Check if the Stripe subscription still exists and is canceled
             stripe_sub = stripe.Subscription.retrieve(subscription_id)
@@ -1346,9 +1074,7 @@ def change_subscription_interval(
         subscription_id = str(subscription.stripe_subscription_id)
 
         # Get the current Stripe subscription
-        stripe_sub = stripe.Subscription.retrieve(
-            subscription_id, expand=["default_payment_method"]
-        )
+        stripe_sub = stripe.Subscription.retrieve(subscription_id)
 
         # Check if subscription is active
         if stripe_sub.status not in ["active", "trialing"]:
@@ -1370,7 +1096,7 @@ def change_subscription_interval(
         )
 
         # Get current price ID to check if change is actually needed
-        current_price_id = stripe_sub.get("plan", {}).get("id")
+        current_price_id = stripe_sub["items"]["data"][0]["price"]["id"]
 
         if current_price_id == new_price_id:
             return {
@@ -1378,30 +1104,36 @@ def change_subscription_interval(
                 "message": f"Subscription is already on {new_interval.value}ly billing",
             }
 
-        # Use the refactored function to create the subscription schedule
+        # Update the subscription directly
         try:
-            result = change_subscription_interval_with_schedule(
-                subscription_id=subscription_id,
-                new_price_id=new_price_id,
-                current_price_id=current_price_id,
-                user_id=str(current_user.id),
-                customer_id=str(subscription.stripe_customer_id),
+            updated_subscription = stripe.Subscription.modify(
+                subscription_id,
+                items=[
+                    {
+                        "id": stripe_sub["items"]["data"][0]["id"],
+                        "price": new_price_id,
+                    }
+                ],
+                proration_behavior="create_prorations",
+                billing_cycle_anchor="now",
             )
-            schedule_id = result["schedule_id"]
-            effective_date = result["effective_date"]
-        except Exception as schedule_error:
-            logger.error(f"Error creating subscription schedule: {schedule_error}")
+
+            effective_date = datetime.fromtimestamp(
+                updated_subscription["items"]["data"][0]["current_period_end"]
+            )
+
+        except Exception as e:
+            logger.error(f"Error updating subscription: {e}")
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to create subscription schedule: {str(schedule_error)}",
+                detail=f"Failed to update subscription: {str(e)}",
             )
 
         # Track the interval change event
         track_event(
-            event_name="subscription_interval_change_scheduled",
+            event_name="subscription_interval_changed",
             properties={
                 "subscription_id": subscription_id,
-                "schedule_id": schedule_id,
                 "old_interval": (
                     "yearly" if current_price_id == YEARLY_PRICE_ID else "monthly"
                 ),
@@ -1412,7 +1144,7 @@ def change_subscription_interval(
         )
 
         logger.info(
-            f"Created subscription schedule {schedule_id} for user {current_user.id} to change from "
+            f"Subscription {subscription_id} for user {current_user.id} changed from "
             f"{'yearly' if current_price_id == YEARLY_PRICE_ID else 'monthly'} to "
             f"{new_interval.value}ly, effective at: {effective_date}"
         )
@@ -1429,7 +1161,6 @@ def change_subscription_interval(
             "message": f"Subscription interval will change to {new_interval.value}ly at the end of the current billing cycle",
             "current_period_end": effective_date,
             "new_interval": new_interval.value + "ly",
-            "schedule_id": schedule_id,
         }
 
     except Exception as stripe_error:
