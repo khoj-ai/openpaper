@@ -449,6 +449,11 @@ export default function PricingPage() {
                                             Switch from {isAnnual ? "annual" : "monthly"} to {isAnnual ? "monthly" : "annual"} billing.
                                             The change will take effect at the end of your current billing cycle.
                                         </DialogDescription>
+                                        {!isAnnual && (
+                                            <DialogDescription className="text-slate-600 dark:text-slate-400">
+                                                You will be charged the prorated amount for the remainder of the new billing cycle, effective immediately.
+                                            </DialogDescription>
+                                        )}
                                     </DialogHeader>
                                     <div className="flex gap-3 mt-4">
                                         <DialogTrigger asChild>
@@ -495,24 +500,11 @@ export default function PricingPage() {
                                 Annual
                             </span>
                             <Badge variant="secondary" className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-0 text-xs px-2 py-0.5">
-                                Save 33%
+                                {isCurrentlySubscribed && isAnnual ? `Saving $${annualSavings}/year!` : `Save $${annualSavings}/year`}
                             </Badge>
                         </div>
                     </div>
 
-                    {/* Current Subscription Info */}
-                    {isCurrentlySubscribed && (
-                        <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 text-center sm:text-left">
-                            <Badge variant="outline" className="border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-xs">
-                                Current: {userSubscription?.subscription.interval === "year" ? "Annual" : "Monthly"}
-                            </Badge>
-                            {isActiveSubscription && (
-                                <span className="text-xs text-slate-500 dark:text-slate-400 max-w-xs sm:max-w-none">
-                                    Click toggle to change
-                                </span>
-                            )}
-                        </div>
-                    )}
                 </div>
             )}
 
