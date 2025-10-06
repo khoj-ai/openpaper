@@ -41,26 +41,6 @@ def get_existing_schedule_for_subscription(
         return None
 
 
-def cancel_existing_schedule(subscription_id: str, customer: str) -> bool:
-    """
-    Cancel any existing active subscription schedule for the given subscription.
-    Returns True if successful or no schedule existed, False on error.
-    """
-    try:
-        existing_schedule = get_existing_schedule_for_subscription(
-            subscription_id, customer=customer
-        )
-        if existing_schedule:
-            stripe.SubscriptionSchedule.cancel(existing_schedule.id)
-            print(
-                f"Canceled existing schedule {existing_schedule.id} for subscription {subscription_id}"
-            )
-        return True
-    except Exception as e:
-        print(f"Error canceling existing schedule: {e}")
-        return False
-
-
 def change_subscription_interval_with_schedule(
     subscription_id: str,
     new_price_id: str,

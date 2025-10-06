@@ -22,7 +22,6 @@ from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 from subscription_schedules_refactor import (
-    cancel_existing_schedule,
     change_subscription_interval_with_schedule,
     get_existing_schedule_for_subscription,
 )
