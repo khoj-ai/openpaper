@@ -9,7 +9,6 @@ import { useState, useEffect, useCallback } from 'react';
 
 import {
     Highlighter,
-    NotebookText,
     MessageCircle,
     Focus,
     Loader2,
@@ -56,11 +55,6 @@ const ChatTool = {
     icon: MessageCircle,
 }
 
-const NotesTool = {
-    name: "Notes",
-    icon: NotebookText,
-}
-
 const AnnotationsTool = {
     name: "Annotations",
     icon: Highlighter,
@@ -87,7 +81,6 @@ const PaperToolset = {
         ChatTool,
         AudioTool,
         AnnotationsTool,
-        NotesTool,
         ShareTool,
         ProjectTool,
         FocusTool,

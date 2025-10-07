@@ -10,10 +10,7 @@ import {
 } from '@/lib/schema';
 import {
     X,
-    Eye,
-    Edit,
     Loader,
-    HelpCircle,
     ArrowUp,
     Feather,
     Share2Icon,
@@ -33,9 +30,6 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { CommandShortcut, localizeCommandToOS } from '@/components/ui/command';
-import { Toggle } from "@/components/ui/toggle";
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { AnnotationsView } from '@/components/AnnotationsView';
@@ -82,7 +76,6 @@ interface SidePanelContentProps {
     userMessageReferences: string[];
     setUserMessageReferences: React.Dispatch<React.SetStateAction<string[]>>;
     paperNoteContent: string | undefined;
-    handleNotesChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
     isMobile: boolean;
 }
 
@@ -117,14 +110,11 @@ export function SidePanelContent({
     userMessageReferences,
     setUserMessageReferences,
     paperNoteContent,
-    handleNotesChange,
     isMobile,
 }: SidePanelContentProps) {
     const { user } = useAuth();
     const [paperNoteData, setPaperNoteData] = useState<PaperNoteData | null>(null);
-    const [lastPaperNoteSaveTime, setLastPaperNoteSaveTime] = useState<number | null>(null);
     const [conversationId, setConversationId] = useState<string | null>(null);
-    const [isMarkdownPreview, setIsMarkdownPreview] = useState(false);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [currentMessage, setCurrentMessage] = useState('');
     const [hasMoreMessages, setHasMoreMessages] = useState(true);
@@ -187,8 +177,6 @@ export function SidePanelContent({
                     headers: { 'Content-Type': 'application/json' }
                 });
             }
-
-            setLastPaperNoteSaveTime(Date.now());
 
             // On successful save, clear the local storage version
             localStorage.removeItem(`paper-note-${id}`);
@@ -813,81 +801,6 @@ export function SidePanelContent({
             {
                 rightSideFunction !== 'Focus' && (
                     <div className="flex-grow h-full overflow-hidden">
-                        {
-                            rightSideFunction === 'Notes' && (
-                                <div className='p-4 w-full h-full flex flex-col'>
-                                    <div className="flex justify-between items-center mb-2 flex-shrink-0">
-                                        <div className="flex items-center gap-2">
-                                            <TooltipProvider>
-                                                <Tooltip>
-                                                    <TooltipTrigger>
-                                                        <HelpCircle className="h-4 w-4 text-gray-500" />
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>
-                                                        <p>Supports Markdown formatting:</p>
-                                                        <ul className="text-xs mt-1">
-                                                            <li>**bold**</li>
-                                                            <li>*italic*</li>
-                                                            <li># Heading</li>
-                                                            <li>- List items</li>
-                                                            <li>{">"} Blockquotes</li>
-                                                        </ul>
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </TooltipProvider>
-                                        </div>
-                                        <TooltipProvider>
-                                            <Tooltip>
-                                                <TooltipTrigger>
-
-                                                    <Toggle
-                                                        aria-label="Toggle markdown preview"
-                                                        onPressedChange={(pressed) => setIsMarkdownPreview(pressed)}
-                                                        pressed={isMarkdownPreview}
-                                                    >
-                                                        <CommandShortcut>
-                                                            {localizeCommandToOS('M')}
-                                                        </CommandShortcut>
-                                                        {isMarkdownPreview ? <Eye size={16} /> : <Edit size={16} />}
-                                                    </Toggle>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    <p>Toggle between edit and preview mode</p>
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        </TooltipProvider>
-                                    </div>
-
-                                    {isMarkdownPreview ? (
-                                        <div className="flex-1 min-h-0 relative">
-                                            <div className="absolute inset-0 overflow-y-auto">
-                                                <div className="prose dark:prose-invert !max-w-full text-sm">
-                                                    <Markdown
-                                                        remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
-                                                        rehypePlugins={[rehypeKatex]}
-                                                    >
-                                                        {paperNoteContent || ''}
-                                                    </Markdown>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <Textarea
-                                            className='w-full flex-1'
-                                            value={paperNoteContent}
-                                            onChange={handleNotesChange}
-                                            placeholder="Start taking notes..."
-                                        />
-                                    )}
-
-                                    {paperNoteContent && lastPaperNoteSaveTime && (
-                                        <div className="text-xs text-green-500 mt-2 flex-shrink-0">
-                                            Last saved: {new Date(lastPaperNoteSaveTime).toLocaleTimeString()}
-                                        </div>
-                                    )}
-                                </div>
-                            )
-                        }
                         {
                             rightSideFunction === 'Annotations' && user && (
                                 <div className={`flex flex-col ${heightClass} overflow-y-auto`}>
