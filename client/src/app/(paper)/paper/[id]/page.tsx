@@ -81,8 +81,7 @@ const PaperToolset = {
         ChatTool,
         AudioTool,
         AnnotationsTool,
-        ShareTool,
-        ProjectTool,
+
         FocusTool,
     ],
 }

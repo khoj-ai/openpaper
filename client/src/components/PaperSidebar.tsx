@@ -10,7 +10,7 @@ import {
     SidebarMenuItem,
     SidebarProvider
 } from "@/components/ui/sidebar";
-import { LucideIcon } from 'lucide-react';
+import { LucideIcon, Share, FolderCode } from 'lucide-react';
 
 interface PaperSidebarProps {
     rightSideFunction: string;

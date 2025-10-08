@@ -8,8 +8,12 @@ import { AuthProvider } from "@/lib/auth";
 
 import { Toaster } from "@/components/ui/sonner";
 import { PostHogProvider, ThemeProvider } from "@/lib/providers";
+import { SharePaperButton } from '@/components/SharePaperButton';
+
 import { SidebarController } from "@/components/utils/SidebarAutoCollapse";
 import Image from "next/image";
+import { ManageProjectsButton } from "@/components/ManageProjectsButton";
+import { MobilePaperMenu } from "@/components/MobilePaperMenu";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -94,6 +98,13 @@ export default function RootLayout({
 											/>
 											<span className="text-sm font-semibold">Open Paper</span>
 										</header>
+										{/* Desktop buttons */}
+										<div className="hidden md:flex items-center gap-2">
+											<ManageProjectsButton />
+											<SharePaperButton />
+										</div>
+										{/* Mobile menu */}
+										<MobilePaperMenu />
 									</header>
 									<SidebarController>
 										{children}

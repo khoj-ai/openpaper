@@ -872,6 +872,7 @@ export function SidePanelContent({
                                 <PaperProjects id={id} />
                             )
                         }
+
                         {/* Paper Images Section - Disabled pending extraction improvements */}
                         {/* {
                 rightSideFunction === 'Figures' && (
@@ -1082,13 +1083,13 @@ export function SidePanelContent({
                                             isStreaming && (
                                                 <div className="flex items-center gap-3 p-0">
                                                     <Loader className="animate-spin w-6 h-6 text-blue-500 flex-shrink-0" />
-                                                    <div className="text-sm text-secondary-foreground p-0">
-                                                        {displayedText}
-                                                        {isTyping && (
-                                                            <span className="animate-pulse">|</span>
-                                                        )}
-                                                    </div>
-                                                </div>
+                    <div className="text-sm text-secondary-foreground p-0">
+                        {displayedText}
+                        {isTyping && (
+                            <span className="animate-pulse">|</span>
+                        )}
+                    </div>
+                </div>
                                             )
                                         }
                                         <div ref={messagesEndRef} />
