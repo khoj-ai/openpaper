@@ -84,6 +84,9 @@ class InstitutionsKeywords(BaseModel):
 # - You may include images of figures if they are helpful to the summary. You may reference them in markdown image format inline using the placeholder IDs. Example: ![Figure 1](IMG_placeholder_1)
 class SummaryAndCitations(BaseModel):
     """Schema for summary and citations extraction."""
+    summary_citations: List[ResponseCitation] = Field(
+        description="List of citations that are relevant to the summary. These should be direct quotes or paraphrases from the paper that support the summary provided. Remember to include the citation index (e.g., [^1], [^2]) in the summary.",
+    )
     summary: str = Field(
         description="""
     Generate a comprehensive yet concise summary of the research paper in markdown format that captures the essential contributions and findings for readers with basic domain knowledge.
@@ -91,7 +94,7 @@ class SummaryAndCitations(BaseModel):
     ## Content Requirements:
     - **Opening overview**: 2-4 sentences establishing the research problem, approach, and primary contribution
     - **Core sections**: Organize using clear headings such as:
-    - **Background/Motivation**: Why this research matters
+    - **Motivation**: Why this research matters
     - **Methodology**: Key experimental design, datasets, models, or theoretical approaches
     - **Key Findings**: Primary results with specific metrics, performance improvements, or discoveries
     - **Implications**: Significance for the field, limitations, and future directions
@@ -116,9 +119,6 @@ class SummaryAndCitations(BaseModel):
 
     Do not include a title or repeat the paper's title in the summary.
     """,
-    )
-    summary_citations: List[ResponseCitation] = Field(
-        description="List of citations that are relevant to the summary. These should be direct quotes or paraphrases from the paper that support the summary provided. Remember to include the citation index (e.g., [^1], [^2]) in the summary.",
     )
 
 
