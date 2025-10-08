@@ -13,9 +13,7 @@ import {
     Focus,
     Loader2,
     Lightbulb,
-    Share,
     AudioLines,
-    FolderCode,
 } from 'lucide-react';
 import { toast } from "sonner";
 
@@ -60,19 +58,9 @@ const AnnotationsTool = {
     icon: Highlighter,
 }
 
-const ShareTool = {
-    name: "Share",
-    icon: Share,
-}
-
 const AudioTool = {
     name: "Audio",
     icon: AudioLines,
-}
-
-const ProjectTool = {
-    name: "Projects",
-    icon: FolderCode,
 }
 
 const PaperToolset = {

@@ -35,7 +35,7 @@ export function SharePaperButton() {
             try {
                 const data = await fetchFromApi(`/api/paper?id=${paperId}`);
                 setPaperData(data);
-            } catch (error) {
+            } catch {
                 toast.error("Failed to fetch paper details.");
             }
         };
@@ -55,7 +55,7 @@ export function SharePaperButton() {
                 setPaperData(data);
             }
             toast.success("Paper shared successfully!");
-        } catch (error) {
+        } catch {
             toast.error("Failed to share paper.");
         } finally {
             setIsSharing(false);
