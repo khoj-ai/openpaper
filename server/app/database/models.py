@@ -16,7 +16,7 @@ from sqlalchemy import (  # type: ignore
     Text,
     and_,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import (  # type: ignore
     DeclarativeBase,
@@ -334,6 +334,7 @@ class Paper(Base):
     publish_date = Column(DateTime, nullable=True)
     starter_questions = Column(ARRAY(String), nullable=True)
     raw_content = Column(Text, nullable=True)
+    ts_vector = Column(TSVECTOR, nullable=True)
     page_offset_map = Column(
         JSONB, nullable=True
     )  # Maps page numbers to text offsets. Useful for re-annotation.

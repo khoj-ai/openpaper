@@ -22,6 +22,7 @@ from app.llm.utils import find_offsets
 from app.schemas.responses import PaperMetadataExtraction, ResponseCitation
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -467,7 +468,10 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
         db_query = db.query(Paper).filter(Paper.user_id == user.id)
 
         if query:
-            db_query = db_query.filter(Paper.raw_content.ilike(f"%{query}%"))
+            # The query is split into words and joined with '&' to create a tsquery.
+            # This means all words in the query must be present in the document.
+            ts_query = func.to_tsquery("english", " & ".join(query.split()))
+            db_query = db_query.filter(Paper.ts_vector.op("@@")(ts_query))
 
         return db_query.order_by(Paper.updated_at.desc()).all()
 
