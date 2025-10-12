@@ -12,7 +12,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { FileText, Loader2, MessageCircleWarning, Sparkles } from "lucide-react";
+import { ArrowRight, FileText, Loader2, MessageCircleWarning, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { PdfDropzone } from "@/components/PdfDropzone";
@@ -396,8 +396,8 @@ export default function Home() {
 								</div>
 								<Button variant="ghost" size="sm" asChild>
 									<Link href="/papers" className="flex items-center gap-2">
-										<FileText className="h-4 w-4" />
-										View all papers
+										View Library
+										<ArrowRight className="h-4 w-4" />
 									</Link>
 								</Button>
 							</div>
