@@ -73,6 +73,7 @@ export default function ProjectPage() {
 	const [pdfUrl, setPdfUrl] = useState("");
 	const [isUploading, setIsUploading] = useState(false);
 	const [newQuery, setNewQuery] = useState("");
+	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [showEditAlert, setShowEditAlert] = useState(false);
 	const [currentTitle, setCurrentTitle] = useState("");
 	const [currentDescription, setCurrentDescription] = useState("");
@@ -228,6 +229,7 @@ export default function ProjectPage() {
 	const handleNewQuery = async () => {
 		if (!newQuery.trim()) return;
 
+		setIsSubmitting(true);
 		try {
 			const newConversation = await fetchFromApi(`/api/projects/conversations/${projectId}`, {
 				method: "POST",
@@ -238,6 +240,7 @@ export default function ProjectPage() {
 		} catch (err) {
 			setError("Failed to create a new conversation. Please try again.");
 			console.error(err);
+			setIsSubmitting(false);
 		}
 	};
 
@@ -465,15 +468,15 @@ export default function ProjectPage() {
 									}}
 									onKeyDown={handleKeyDown}
 									className="min-h-[80px] resize-none pr-12 border-none dark:border-none focus:border-blue-400 focus:ring-transparent bg-secondary dark:bg-accent text-primary"
-									disabled={chatDisabled}
+									disabled={chatDisabled || isSubmitting}
 								/>
 								<Button
 									type="submit"
-									disabled={!newQuery.trim() || chatDisabled}
+									disabled={!newQuery.trim() || chatDisabled || isSubmitting}
 									size="sm"
 									className="absolute bottom-3 right-3 h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
 								>
-									<Send className="w-4 h-4" />
+									{isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
 								</Button>
 							</form>
 						</div>
