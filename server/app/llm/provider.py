@@ -359,7 +359,7 @@ class OpenAIProvider(BaseLLMProvider):
         # self._client = openai.AzureOpenAI(api_key=self.api_key, azure_endpoint=endpoint, api_version=version)
         self._client = openai.OpenAI(api_key=self.api_key)
         self._default_model = "gpt-4.1"
-        self._fast_model = "gpt-4.1-mini-2025-04-14"
+        self._fast_model = "gpt-5-nano-2025-08-07"
 
     @property
     def client(self) -> openai.OpenAI:

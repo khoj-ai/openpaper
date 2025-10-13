@@ -86,13 +86,13 @@ read_abstract_function = {
 
 search_all_files_function = {
     "name": "search_all_files",
-    "description": "Search for a specific query (as a regular expression) across all available papers. This is useful for broad, exploratory searches when you're not sure which paper contains the information you need. It returns a list of matching lines with their corresponding paper IDs and line numbers. If you already know which paper to search in, `search_file` is a more targeted and efficient option.",
+    "description": "Search for a specific query across all available papers using full-text search. This is useful for broad, exploratory searches when you're not sure which paper contains the information you need. It returns a list of matching lines with their corresponding paper IDs and line numbers. If you already know which paper to search in, `search_file` is a more targeted and efficient option.",
     "parameters": {
         "type": "object",
         "properties": {
             "query": {
                 "type": "string",
-                "description": "The regex pattern to search for in the file content of all papers. This should not be a complex query, but rather a simple regex pattern that matches lines in the file content. This can include keywords, very particular phrases, or specific patterns you are looking for. It is generally better to use simpler, refined queries. It will help you zero in on the relevant target lines across all papers.",
+                "description": "The search query to find in the file content of all papers. This can include keywords and phrases. The search is powered by full-text search, so you can use operators like '&' (AND) and '|' (OR). For example, 'apple & pie' will find papers containing both 'apple' and 'pie'. The tool will then highlight the lines containing these keywords.",
             },
         },
         "required": ["query"],
@@ -181,7 +181,7 @@ def search_all_files(
     project_id: Optional[str] = None,
 ) -> Dict[str, list[str]]:
     """
-    Search for a specific query (as regex) in the file content of all papers.
+    Search for a specific query in the file content of all papers using full-text search.
     Returns a list of matching lines with paper IDs and line numbers.
     """
     all_papers: List[Paper] = []
@@ -195,23 +195,22 @@ def search_all_files(
         )
     results = {}
 
+    # Extract search terms from the query, stripping FTS operators
+    search_terms = [term for term in re.split(r"[\s&|!()]", query) if term]
+    if not search_terms:
+        return {}
+
     for paper in all_papers:
         paper_id = str(paper.id)
         if not paper_id or not paper.raw_content:
             continue
 
-        # Since the paper itself was matched, we can now search for the lines
         lines = paper.raw_content.splitlines()
         matching_lines = []
-        try:
-            pattern = re.compile(query, re.IGNORECASE)
-            for line_num, line in enumerate(lines, 1):
-                if pattern.search(line):
-                    matching_lines.append(f"{line_num}: {line}")
-        except re.error as e:
-            # This should ideally be handled before calling the function
-            # but as a safeguard, we'll raise a ValueError.
-            raise ValueError(f"Invalid regex pattern: {e}")
+        for line_num, line in enumerate(lines, 1):
+            # Search for any of the terms in the line, case-insensitively
+            if any(term.lower() in line.lower() for term in search_terms):
+                matching_lines.append(f"{line_num}: {line}")
 
         if matching_lines:
             results[paper_id] = matching_lines
