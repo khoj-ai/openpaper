@@ -44,7 +44,7 @@ def add_to_default_audience(email: str, name: Union[str, None] = None) -> None:
     """
     try:
         split_name = name.split() if name else []
-        fname = split_name[0] if split_name else ""
+        fname = split_name[0] if len(split_name) > 0 else ""
         lname = " ".join(split_name[1:]) if len(split_name) > 1 else ""
         payload = resend.Contacts.CreateParams = {  # type: ignore
             "email": email,
