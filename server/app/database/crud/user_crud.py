@@ -9,7 +9,6 @@ from app.database.crud.base_crud import CRUDBase
 from app.database.models import Session as DBSession
 from app.database.models import User
 from app.schemas.user import UserCreate, UserCreateWithProvider, UserUpdate
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
