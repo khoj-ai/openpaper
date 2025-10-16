@@ -298,6 +298,16 @@ async def email_signin(
         # Check if user exists with email auth provider
         db_user = user_crud.get_by_email_and_provider(db, email=email, provider="email")
 
+        # Check if user exists with a different provider
+        user_with_different_provider = user_crud.get_by_email(db, email=email)
+
+        if user_with_different_provider and not db_user:
+            # User exists but with a different provider
+            return AuthResponse(
+                success=False,
+                message="You've previously used a different sign in method. Please go back and try again.",
+            )
+
         newly_created = False
 
         # If user doesn't exist, create them

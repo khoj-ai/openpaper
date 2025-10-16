@@ -173,7 +173,7 @@ function LoginContent() {
 	} else if (showOtp) {
 		headerContent = {
 			title: "Check your email",
-			description: `Enter the 6-digit code we sent to ${email}`
+			description: `Enter the 6-digit code we sent to ${email}. This will expire in 10 minutes.`,
 		};
 	}
 
