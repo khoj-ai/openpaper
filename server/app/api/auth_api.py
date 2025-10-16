@@ -23,7 +23,7 @@ from app.database.database import get_db
 from app.database.models import PaperStatus
 from app.database.telemetry import track_event
 from app.helpers.email import add_to_default_audience, send_onboarding_email
-from app.schemas.user import CurrentUser, UserCreateWithProvider
+from app.schemas.user import CurrentUser, UserCreateWithProvider, UserUpdate
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
@@ -43,6 +43,7 @@ class AuthResponse(BaseModel):
     success: bool
     message: str
     user: Optional[CurrentUser] = None
+    newly_created: bool = False
 
 
 @auth_router.get("/me", response_model=AuthResponse)
@@ -176,6 +177,19 @@ async def google_callback(
                 detail="Failed to get user info",
             )
 
+        # Check if user exists with a different provider
+        existing_user = user_crud.get_by_email_and_provider(
+            db, email=user_info.email, provider="google"
+        )
+        user_with_different_provider = user_crud.get_by_email(db, email=user_info.email)
+
+        if user_with_different_provider and not existing_user:
+            # User exists but with a different provider
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="User logged in with different method",
+            )
+
         # Create or update user
         user_data = UserCreateWithProvider(
             email=user_info.email,
@@ -255,6 +269,13 @@ class EmailSignInRequest(BaseModel):
     email: str
 
 
+class EmailSetNameRequest(BaseModel):
+    """Request model for setting name."""
+
+    email: str
+    name: str
+
+
 class EmailVerifyRequest(BaseModel):
     """Request model for email verification."""
 
@@ -277,10 +298,13 @@ async def email_signin(
         # Check if user exists with email auth provider
         db_user = user_crud.get_by_email_and_provider(db, email=email, provider="email")
 
+        newly_created = False
+
         # If user doesn't exist, create them
         if not db_user:
             db_user = user_crud.create_email_user(db, email=email)
             logger.info(f"Created new email user: {email}")
+            newly_created = True
 
         # Generate verification code
         code, expires_at = email_auth_client.generate_verification_data()
@@ -296,7 +320,9 @@ async def email_signin(
         if success:
             track_event("email_signin_initiated", user_id=str(db_user.id))
             return AuthResponse(
-                success=True, message="Verification code sent to your email"
+                success=True,
+                message="Verification code sent to your email",
+                newly_created=newly_created,
             )
         else:
             return AuthResponse(
@@ -312,10 +338,44 @@ async def email_signin(
         )
 
 
+@auth_router.post("/email/fullname", response_model=AuthResponse)
+async def email_set_name(
+    request: EmailSetNameRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Set name for email user if they don't have one.
+    """
+    try:
+        email = request.email.lower().strip()
+
+        # Check if user exists with email auth provider
+        db_user = user_crud.get_by_email_and_provider(db, email=email, provider="email")
+
+        if not db_user:
+            return AuthResponse(success=False, message="User not found")
+
+        if db_user.name:
+            return AuthResponse(success=True, message="Name already set", user=db_user)
+
+        # Update user with name
+        user_crud.update(
+            db, db_obj=db_user, obj_in=UserUpdate(name=request.name), user=db_user
+        )
+
+        return AuthResponse(success=True, message="Name set successfully")
+
+    except Exception as e:
+        logger.error(f"Error during setting name: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error during setting name",
+        )
+
+
 @auth_router.post("/email/verify", response_model=AuthResponse)
 async def email_verify(
     request: EmailVerifyRequest,
-    response: Response,
     http_request: Request,
     db: Session = Depends(get_db),
 ):
@@ -332,6 +392,8 @@ async def email_verify(
 
         if not db_user:
             return AuthResponse(success=False, message="User not found")
+
+        new_user = db_user.is_email_verified == False
 
         # Check if verification code matches and is not expired
         verification_token = str(db_user.email_verification_token)
@@ -365,21 +427,35 @@ async def email_verify(
             ip_address=client_host,
         )
 
-        # Set the session cookie
-        set_session_cookie(
-            response,
-            token=getattr(session, "token"),
-            expires_at=getattr(session, "expires_at"),
+        # Create redirect URL
+        redirect_url = f"{client_domain}/auth/callback?success=true"
+
+        if new_user:
+            redirect_url += "&welcome=true"
+            add_to_default_audience(email=email, name=None)
+
+        # Create JSON response with redirect info
+        response_data = {
+            "success": True,
+            "message": "Email verified successfully",
+            "redirectUrl": redirect_url,
+        }
+
+        # Create response and set the session cookie
+        response = Response(
+            content=json.dumps(response_data),
+            status_code=200,
+            media_type="application/json",
         )
 
-        # Convert to CurrentUser schema
-        current_user = CurrentUser.model_validate(db_user)
+        # Set the session cookie on the response
+        set_session_cookie(
+            response, token=session.token, expires_at=session.expires_at  # type: ignore
+        )
 
         track_event("email_signin_completed", user_id=str(db_user.id))
 
-        return AuthResponse(
-            success=True, message="Email verified successfully", user=current_user
-        )
+        return response
 
     except Exception as e:
         logger.error(f"Error during email verification: {e}", exc_info=True)
