@@ -157,7 +157,7 @@ const formSchema = z.object({
 	jobTitles: z.array(z.string()).min(1),
 	jobTitlesOther: z.string().optional(),
 	readingFrequency: z.string(),
-	referralSource: z.string(),
+	referralSource: z.string().min(1),
 	referralSourceOther: z.string().optional(),
 });
 
