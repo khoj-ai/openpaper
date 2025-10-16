@@ -67,6 +67,7 @@ def get_current_user(
         name=str(db_user.name),
         is_admin=bool(db_user.is_admin),
         picture=str(db_user.picture),
+        is_email_verified=bool(db_user.is_email_verified),
         is_active=is_user_active,
     )
 

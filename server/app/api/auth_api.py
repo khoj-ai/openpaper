@@ -3,16 +3,21 @@ import logging
 import os
 import random
 import secrets
+from datetime import datetime, timezone
 from typing import Optional
 
 from app.auth.dependencies import get_current_user, get_required_user
+from app.auth.email import email_auth_client
 from app.auth.google import google_auth_client
-from app.auth.utils import clear_session_cookie, set_session_cookie
+from app.auth.utils import (
+    clear_session_cookie,
+    is_verification_code_valid,
+    set_session_cookie,
+)
 from app.database.crud.annotation_crud import annotation_crud
 from app.database.crud.highlight_crud import highlight_crud
 from app.database.crud.message_crud import message_crud
 from app.database.crud.paper_crud import paper_crud
-from app.database.crud.paper_note_crud import paper_note_crud
 from app.database.crud.user_crud import user as user_crud
 from app.database.database import get_db
 from app.database.models import PaperStatus
@@ -241,3 +246,144 @@ async def google_callback(
             url=redirect_url, status_code=status.HTTP_302_FOUND
         )
         return redirect_response
+
+
+# Email Authentication Models
+class EmailSignInRequest(BaseModel):
+    """Request model for email sign-in."""
+
+    email: str
+
+
+class EmailVerifyRequest(BaseModel):
+    """Request model for email verification."""
+
+    email: str
+    code: str
+
+
+@auth_router.post("/email/signin", response_model=AuthResponse)
+async def email_signin(
+    request: EmailSignInRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Initiate email sign-in by sending a 6-digit verification code.
+    Creates user if they don't exist.
+    """
+    try:
+        email = request.email.lower().strip()
+
+        # Check if user exists with email auth provider
+        db_user = user_crud.get_by_email_and_provider(db, email=email, provider="email")
+
+        # If user doesn't exist, create them
+        if not db_user:
+            db_user = user_crud.create_email_user(db, email=email)
+            logger.info(f"Created new email user: {email}")
+
+        # Generate verification code
+        code, expires_at = email_auth_client.generate_verification_data()
+
+        # Update user with verification code
+        user_crud.update_verification_code(
+            db, user=db_user, code=code, expires_at=expires_at
+        )
+
+        # Send verification email
+        success = email_auth_client.send_verification_code(email, code)
+
+        if success:
+            track_event("email_signin_initiated", user_id=str(db_user.id))
+            return AuthResponse(
+                success=True, message="Verification code sent to your email"
+            )
+        else:
+            return AuthResponse(
+                success=False,
+                message="Failed to send verification code. Please try again.",
+            )
+
+    except Exception as e:
+        logger.error(f"Error during email sign-in: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error during sign-in",
+        )
+
+
+@auth_router.post("/email/verify", response_model=AuthResponse)
+async def email_verify(
+    request: EmailVerifyRequest,
+    response: Response,
+    http_request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Verify email with 6-digit code and create session.
+    """
+    try:
+
+        email = request.email.lower().strip()
+        code = request.code.strip()
+
+        # Find user with email auth provider
+        db_user = user_crud.get_by_email_and_provider(db, email=email, provider="email")
+
+        if not db_user:
+            return AuthResponse(success=False, message="User not found")
+
+        # Check if verification code matches and is not expired
+        verification_token = str(db_user.email_verification_token)
+        verification_expires = datetime.fromisoformat(
+            str(db_user.email_verification_expires_at)
+        )
+
+        if (
+            not verification_token
+            or not verification_expires
+            or not is_verification_code_valid(
+                verification_expires, code, verification_token
+            )
+        ):
+
+            return AuthResponse(
+                success=False, message="Invalid or expired verification code"
+            )
+
+        # Mark email as verified and clear verification code
+        user_crud.verify_email(db, user=db_user)
+
+        # Create a new session
+        user_agent = http_request.headers.get("user-agent")
+        client_host = http_request.client.host if http_request.client else None
+
+        session = user_crud.create_session(
+            db=db,
+            user_id=getattr(db_user, "id"),
+            user_agent=user_agent,
+            ip_address=client_host,
+        )
+
+        # Set the session cookie
+        set_session_cookie(
+            response,
+            token=getattr(session, "token"),
+            expires_at=getattr(session, "expires_at"),
+        )
+
+        # Convert to CurrentUser schema
+        current_user = CurrentUser.model_validate(db_user)
+
+        track_event("email_signin_completed", user_id=str(db_user.id))
+
+        return AuthResponse(
+            success=True, message="Email verified successfully", user=current_user
+        )
+
+    except Exception as e:
+        logger.error(f"Error during email verification: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error during verification",
+        )

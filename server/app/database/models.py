@@ -11,6 +11,7 @@ from sqlalchemy import (  # type: ignore
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -71,6 +72,7 @@ class Base(DeclarativeBase):
 
 class AuthProvider(str, Enum):
     GOOGLE = "google"
+    EMAIL = "email"  # For email-based authentication with passcode
     # Add more providers as needed
     # GITHUB = "github"
     # MICROSOFT = "microsoft"
@@ -111,6 +113,15 @@ class User(Base):
     # OAuth related fields
     auth_provider = Column(String, nullable=False)
     provider_user_id = Column(String, nullable=False, index=True)
+
+    # Email authentication fields
+    is_email_verified = Column(
+        Boolean, default=False, nullable=False
+    )  # Track if email is verified
+    email_verification_token = Column(String, nullable=True)  # Store 6-digit code
+    email_verification_expires_at = Column(
+        DateTime(timezone=True), nullable=True
+    )  # Expiry time
 
     # Optional profile information
     locale = Column(String, nullable=True)
@@ -317,6 +328,11 @@ class Conversation(Base):
 
 class Paper(Base):
     __tablename__ = "papers"
+
+    # Define the GIN index for full-text search
+    __table_args__ = (
+        Index("ix_papers_ts_vector", "ts_vector", postgresql_using="gin"),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     # we can change the default to TODO once we have some kind of bulk paper upload? for now, every upload automatically converts to reading

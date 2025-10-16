@@ -12,6 +12,7 @@ class UserBase(BaseModel):
     picture: Optional[str] = None
     is_active: bool = True
     is_admin: bool = False
+    is_email_verified: bool = False
     locale: Optional[str] = None
 
 
@@ -40,6 +41,7 @@ class UserUpdate(BaseModel):
 class User(UserBase):
     id: UUID
     auth_provider: str
+    is_email_verified: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -98,6 +100,7 @@ class CurrentUser(BaseModel):
     name: Optional[str] = None
     is_admin: bool = False
     picture: Optional[str] = None
+    is_email_verified: bool = False
 
     # is_active describes if the user account is on the RESEARCHER or BASIC plan
     is_active: bool = False

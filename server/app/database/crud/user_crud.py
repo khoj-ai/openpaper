@@ -65,6 +65,9 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             db, provider=obj_in.auth_provider, provider_user_id=obj_in.provider_user_id
         )
 
+        # Since OAuth providers verify email, we can mark email as verified
+        obj_in.is_email_verified = True
+
         # If exists, update info
         if db_user:
             update_data = obj_in.model_dump(
@@ -155,6 +158,55 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         result = db.query(DBSession).filter(DBSession.user_id == user_id).delete()
         db.commit()
         return result
+
+    def create_email_user(
+        self, db: Session, *, email: str, name: Optional[str] = None
+    ) -> User:
+        """Create a new user for email authentication."""
+        db_obj = User(
+            email=email,
+            name=name,
+            auth_provider="email",
+            provider_user_id=email,  # Use email as provider_user_id for email auth
+            is_active=True,
+            is_admin=False,
+            is_email_verified=False,  # Not verified initially
+        )
+        db.add(db_obj)
+        db.commit()
+        db.refresh(db_obj)
+        return db_obj
+
+    def update_verification_code(
+        self, db: Session, *, user: User, code: str, expires_at: datetime.datetime
+    ) -> User:
+        """Update user's verification code and expiry."""
+        user.email_verification_token = code  # type: ignore
+        user.email_verification_expires_at = expires_at  # type: ignore
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        return user
+
+    def verify_email(self, db: Session, *, user: User) -> User:
+        """Mark user's email as verified and clear verification code."""
+        user.is_email_verified = True  # type: ignore
+        user.email_verification_token = None  # type: ignore
+        user.email_verification_expires_at = None  # type: ignore
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        return user
+
+    def get_by_email_and_provider(
+        self, db: Session, *, email: str, provider: str = "email"
+    ) -> Optional[User]:
+        """Get a user by email and specific auth provider."""
+        return (
+            db.query(User)
+            .filter(User.email == email, User.auth_provider == provider)
+            .first()
+        )
 
 
 user = CRUDUser(User)

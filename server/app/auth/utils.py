@@ -1,5 +1,7 @@
 import os
-from datetime import datetime, timezone
+import random
+import string
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 from app.auth.dependencies import SESSION_COOKIE_NAME
@@ -59,3 +61,46 @@ def clear_session_cookie(response: Response) -> None:
         domain=SESSION_COOKIE_DOMAIN,
         path="/",
     )
+
+
+def generate_verification_code() -> str:
+    """
+    Generate a 6-digit verification code.
+
+    Returns:
+        str: A 6-digit numeric verification code
+    """
+    return "".join(random.choices(string.digits, k=6))
+
+
+def is_verification_code_valid(
+    expires_at: datetime, provided: str, actual: str
+) -> bool:
+    """
+    Check if a verification code is still valid (not expired).
+
+    Args:
+        expires_at: The expiration datetime of the verification code
+        provided: The verification code provided by the user
+        actual: The actual verification code to compare against
+
+    Returns:
+        bool: True if the code is still valid, False otherwise
+    """
+    if not expires_at:
+        return False
+
+    if provided != actual:
+        return False
+
+    return datetime.now(timezone.utc) < expires_at
+
+
+def get_verification_code_expiry() -> datetime:
+    """
+    Get the expiry time for a new verification code (10 minutes from now).
+
+    Returns:
+        datetime: The expiry time for the verification code
+    """
+    return datetime.now(timezone.utc) + timedelta(minutes=10)
