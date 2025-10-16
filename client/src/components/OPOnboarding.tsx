@@ -279,11 +279,11 @@ export function OPOnboarding() {
 											variant="outline"
 											role="combobox"
 											className={cn(
-												"w-full justify-between",
+												"w-full justify-between min-h-10 h-auto py-2",
 												!field.value?.length && "text-muted-foreground"
 											)}
 										>
-											<div className="flex gap-1 flex-wrap">
+											<div className="flex gap-1 flex-wrap flex-1 text-left">
 												{field.value && field.value.length > 0 ? (
 													field.value.map((val) => {
 														const option = researchFields.find(f => f.value === val);
@@ -312,7 +312,7 @@ export function OPOnboarding() {
 													"Select your fields"
 												)}
 											</div>
-											<ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+											<ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50 self-start mt-1" />
 										</Button>
 									</FormControl>
 								</PopoverTrigger>
@@ -389,11 +389,11 @@ export function OPOnboarding() {
 											variant="outline"
 											role="combobox"
 											className={cn(
-												"w-full justify-between",
+												"w-full justify-between min-h-10 h-auto py-2",
 												!field.value?.length && "text-muted-foreground"
 											)}
 										>
-											<div className="flex gap-1 flex-wrap">
+											<div className="flex gap-1 flex-wrap flex-1 text-left">
 												{field.value && field.value.length > 0 ? (
 													field.value.map((val) => {
 														const option = jobTitles.find(f => f.value === val);
@@ -422,7 +422,7 @@ export function OPOnboarding() {
 													"Select your job title(s)"
 												)}
 											</div>
-											<ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+											<ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50 self-start mt-1" />
 										</Button>
 									</FormControl>
 								</PopoverTrigger>
