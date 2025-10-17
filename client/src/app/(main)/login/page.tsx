@@ -96,8 +96,12 @@ function LoginContent() {
 			} else {
 				setEmailError(data.message || 'Failed to send verification code.');
 			}
-		} catch (error: any) {
-			setEmailError(error.message || 'An unexpected error occurred.');
+		} catch (error) {
+			if (error instanceof Error) {
+				setEmailError(error.message);
+			} else {
+				setEmailError('An unexpected error occurred.');
+			}
 		} finally {
 			setIsEmailLoading(false);
 		}
@@ -123,8 +127,12 @@ function LoginContent() {
 			} else {
 				setEmailError(data.message || 'Failed to set name.');
 			}
-		} catch (error: any) {
-			setEmailError(error.message || 'An unexpected error occurred.');
+		} catch (error) {
+			if (error instanceof Error) {
+				setEmailError(error.message);
+			} else {
+				setEmailError('An unexpected error occurred.');
+			}
 		} finally {
 			setIsEmailLoading(false);
 		}
