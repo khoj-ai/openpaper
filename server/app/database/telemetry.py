@@ -8,12 +8,14 @@ DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "t")
 posthog = Posthog(
     POSTHOG_API_KEY,
     host="https://us.i.posthog.com",
+    enable_exception_autocapture=True,
 )
 
 posthog_sync = Posthog(
     POSTHOG_API_KEY,
     host="https://us.i.posthog.com",
     sync_mode=True,
+    enable_exception_autocapture=True,
 )
 
 if DEBUG:
