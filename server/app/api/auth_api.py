@@ -305,7 +305,7 @@ async def email_signin(
             # User exists but with a different provider
             return AuthResponse(
                 success=False,
-                message="You've previously used a different sign in method. Please go back and try again.",
+                message="You previously used a different sign in method. Please try again.",
             )
 
         newly_created = False
