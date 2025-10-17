@@ -177,7 +177,7 @@ export function PaperProjects({ id, view = 'full' }: PaperProjectsProps) {
                     )}
                 </>
             )}
-            {view === 'full' && (
+            {view === 'full' && projectsToAdd.length > 0 && (
                 <div className="pt-4 mt-4 border-t">
                     <h3 className="text-lg font-semibold mb-2">Add to Projects</h3>
                     {isLoadingProjects ? (
