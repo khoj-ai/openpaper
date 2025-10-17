@@ -12,6 +12,7 @@ import Image from "next/image";
 import { Input } from "@/components/ui/input";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { fetchFromApi } from "@/lib/api";
+import { Badge } from "@/components/ui/badge";
 
 function LoginContent() {
 	const { user, loading, error: authError, login } = useAuth();
@@ -28,6 +29,14 @@ function LoginContent() {
 	const [showNameInput, setShowNameInput] = useState(false);
 	const [firstName, setFirstName] = useState('');
 	const [lastName, setLastName] = useState('');
+	const [lastUsedProvider, setLastUsedProvider] = useState<string | null>(null);
+
+	useEffect(() => {
+		const storedProvider = localStorage.getItem('signin-provider');
+		if (storedProvider) {
+			setLastUsedProvider(storedProvider);
+		}
+	}, []);
 
 
 	// Handle error query param
@@ -58,6 +67,7 @@ function LoginContent() {
 
 	const handleLogin = async () => {
 		setError(null);
+		localStorage.setItem('signin-provider', 'google');
 		await login();
 	};
 
@@ -69,6 +79,7 @@ function LoginContent() {
 
 	const handleEmailSignIn = async (e: React.FormEvent) => {
 		e.preventDefault();
+		localStorage.setItem('signin-provider', 'email');
 		setIsEmailLoading(true);
 		setEmailError(null);
 		try {
@@ -162,7 +173,7 @@ function LoginContent() {
 
 	let headerContent = {
 		title: "Sign in to Open Paper",
-		description: "Connect with your Google account to access your papers and annotations."
+		description: "Connect with an account to access your papers, projects, and annotations."
 	};
 
 	if (showNameInput) {
@@ -215,6 +226,7 @@ function LoginContent() {
 										className="mr-2"
 									/>
 									Continue with Google
+									{lastUsedProvider === 'google' && <Badge variant="secondary" className="ml-auto">Last Used</Badge>}
 								</Button>
 
 								<div className="relative my-4">
@@ -289,6 +301,7 @@ function LoginContent() {
 										disabled={isEmailLoading || !email}
 									>
 										{isEmailLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Continue with Email"}
+										{!isEmailLoading && lastUsedProvider === 'email' && <Badge variant="secondary" className="ml-auto">Last Used</Badge>}
 									</Button>
 								</div>
 							</form>
