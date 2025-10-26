@@ -18,7 +18,7 @@ import { useAuth } from "@/lib/auth";
 import { PdfDropzone } from "@/components/PdfDropzone";
 import Link from "next/link";
 import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience";
-import { PaperItem, JobStatusType, JobStatusResponse, PdfUploadResponse } from "@/lib/schema";
+import { PaperItem, JobStatusType, JobStatusResponse } from "@/lib/schema";
 import PaperCard from "@/components/PaperCard";
 import { toast } from "sonner";
 import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isPaperUploadNearLimit, isStorageNearLimit } from "@/hooks/useSubscription";
