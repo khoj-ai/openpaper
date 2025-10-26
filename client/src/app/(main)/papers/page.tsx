@@ -29,6 +29,7 @@ import { LibraryTable } from "@/components/LibraryTable";
 import { CreateProjectDialog } from "@/components/CreateProjectDialog";
 import { useRouter } from "next/navigation";
 import { LibraryGrid } from "@/components/LibraryGrid";
+import { UploadModal } from "@/components/UploadModal";
 
 // TODO: We could add a search look-up for the paper journal name to avoid placeholders
 
@@ -50,6 +51,22 @@ export default function PapersPage() {
     const [isCreateProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
     const [isProjectLimitDialogOpen, setProjectLimitDialogOpen] = useState(false);
     const [papersForNewProject, setPapersForNewProject] = useState<PaperItem[]>([]);
+    const [isUploadModalOpen, setUploadModalOpen] = useState(false);
+
+    const fetchPapers = async () => {
+        try {
+            const response = await fetchFromApi("/api/paper/all")
+            const sortedPapers = response.papers.sort((a: PaperItem, b: PaperItem) => {
+                return new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime();
+            });
+            setPapers(sortedPapers)
+            setFilteredPapers(sortedPapers)
+        } catch (error) {
+            console.error("Error fetching papers:", error)
+        } finally {
+            setLoading(false);
+        }
+    }
 
     useEffect(() => {
         const savedViewMode = localStorage.getItem("papersViewMode");
@@ -59,23 +76,8 @@ export default function PapersPage() {
     }, []);
 
     useEffect(() => {
-        const fetchPapers = async () => {
-            try {
-                const response = await fetchFromApi("/api/paper/all")
-                const sortedPapers = response.papers.sort((a: PaperItem, b: PaperItem) => {
-                    return new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime();
-                });
-                setPapers(sortedPapers)
-                setFilteredPapers(sortedPapers)
-            } catch (error) {
-                console.error("Error fetching papers:", error)
-            } finally {
-                setLoading(false);
-            }
-        }
-
         fetchPapers();
-    }, [])
+    }, []);
 
     useEffect(() => {
         // Cleanup timeout on unmount
@@ -507,10 +509,17 @@ export default function PapersPage() {
                 onOpenChange={setCreateProjectDialogOpen}
                 onSubmit={handleCreateProjectSubmit}
             />
+            <UploadModal open={isUploadModalOpen} onOpenChange={setUploadModalOpen} onUploadComplete={() => { fetchPapers(); }} />
             <UsageDisplay />
             <Tabs value={viewMode} onValueChange={setViewMode} className="w-full flex flex-col flex-1 min-h-0">
                 <div className="flex items-center justify-between mb-4 flex-shrink-0">
-                    <h1 className="text-3xl font-bold tracking-tight">Library</h1>
+                    <div className="flex items-center gap-x-4">
+                        <h1 className="text-3xl font-bold tracking-tight">Library</h1>
+                        <Button onClick={() => setUploadModalOpen(true)}>
+                            <Upload className="h-4 w-4 mr-2" />
+                            Upload
+                        </Button>
+                    </div>
                     <TabsList>
                         <TabsTrigger value="table" onClick={() => localStorage.setItem('papersViewMode', 'table')}>
                             <List className="h-4 w-4 mr-2" />

@@ -4,6 +4,8 @@ import React, { useState, useRef, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { UploadCloud } from 'lucide-react';
 
+const MAX_PAPERS_TO_UPLOAD = 10;
+
 interface PdfDropzoneProps {
     onFileSelect: (files: File[]) => void;
     onUrlClick: () => void;
@@ -27,6 +29,17 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 15, disabled
             return false;
         }
         return true;
+    };
+
+    const processFiles = (files: File[]) => {
+        if (files.length > MAX_PAPERS_TO_UPLOAD) {
+            setError(`You can upload a maximum of ${MAX_PAPERS_TO_UPLOAD} papers at a time.`);
+            return;
+        }
+        const validFiles = files.filter(handleFileValidation);
+        if (validFiles.length > 0) {
+            onFileSelect(validFiles);
+        }
     };
 
     const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
@@ -62,11 +75,7 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 15, disabled
         setError(null);
 
         const files = Array.from(e.dataTransfer.files);
-        const validFiles = files.filter(handleFileValidation);
-
-        if (validFiles.length > 0) {
-            onFileSelect(validFiles);
-        }
+        processFiles(files);
 
         if (e.dataTransfer) {
             e.dataTransfer.items.clear();
@@ -76,11 +85,7 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 15, disabled
     const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (disabled) return;
         const files = Array.from(e.target.files || []);
-        const validFiles = files.filter(handleFileValidation);
-
-        if (validFiles.length > 0) {
-            onFileSelect(validFiles);
-        }
+        processFiles(files);
 
         if (e.target) {
             e.target.value = '';
@@ -121,7 +126,7 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 15, disabled
                     Click to upload, or drag and drop
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">
-                    Attach a PDF file up to {maxSizeMb}MB
+                    Select up to 10 papers, up to {maxSizeMb}MB each
                 </p>
                 {error && <p className="text-sm text-destructive mt-2">{error}</p>}
             </div>

@@ -276,3 +276,14 @@ export interface Project {
     created_at: string;
     updated_at: string;
 }
+
+export interface PdfUploadResponse {
+    message: string;
+    job_id: string;
+    file_name?: string;
+}
+
+export interface MinimalJob {
+    jobId: string;
+    fileName: string;
+}

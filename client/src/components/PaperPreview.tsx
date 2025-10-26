@@ -38,7 +38,7 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
     return (
         <div className="border bg-card rounded-lg transition-all duration-300 ease-in-out min-w-0 overflow-hidden">
             <div className="h-full">
-                <div className="p-4 relative max-h-[70vh] overflow-y-auto">
+                <div className="p-4 relative overflow-y-auto">
                     <Button
                         variant="ghost"
                         size="icon"
@@ -136,7 +136,7 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
                             </DialogContent>
                         </Dialog>
                     </div>
-                    <p className="text-sm my-4 break-words">{paper.abstract}</p>
+                    <p className="text-sm my-4 break-words max-h-[20vh] overflow-y-auto">{paper.abstract}</p>
                     <PaperProjects id={paper.id} view='compact' />
                 </div>
             </div>

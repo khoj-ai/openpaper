@@ -18,16 +18,11 @@ import { useAuth } from "@/lib/auth";
 import { PdfDropzone } from "@/components/PdfDropzone";
 import Link from "next/link";
 import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience";
-import { PaperItem } from "@/lib/schema";
+import { PaperItem, JobStatusType, JobStatusResponse, PdfUploadResponse } from "@/lib/schema";
 import PaperCard from "@/components/PaperCard";
-import { JobStatusType, JobStatusResponse } from "@/lib/schema";
 import { toast } from "sonner";
 import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isPaperUploadNearLimit, isStorageNearLimit } from "@/hooks/useSubscription";
-
-interface PdfUploadResponse {
-	message: string;
-	job_id: string;
-}
+import { uploadSingleFile, uploadFromUrlWithFallback } from "@/lib/uploadUtils";
 
 const DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE = "We encountered an error processing your request. Please check the file or URL and try again.";
 
@@ -247,20 +242,11 @@ export default function Home() {
 			setFileLength('lots of');
 		});
 
-		const formData = new FormData();
-		formData.append('file', file);
-
 		try {
-			const response: PdfUploadResponse = await fetchFromApi('/api/paper/upload/', {
-				method: 'POST',
-				body: formData,
-				headers: {
-					Accept: 'application/json',
-				},
-			});
+			const job = await uploadSingleFile(file);
 
 			// Start polling job status
-			pollJobStatus(response.job_id);
+			pollJobStatus(job.jobId);
 		} catch (error) {
 			console.error('Error uploading file:', error);
 			setShowErrorAlert(true);
@@ -278,57 +264,22 @@ export default function Home() {
 		setIsUploading(true);
 		setFileSize(null);
 		setCeleryMessage(null); // Reset celery message
+
 		try {
-			const response = await fetch(url, {
-				method: 'GET',
-			});
+			const job = await uploadFromUrlWithFallback(url);
 
-			// Check if the response is OK
-			if (!response.ok) throw new Error('Failed to fetch PDF');
-
-			const contentDisposition = response.headers.get('content-disposition');
-			const randomFilename = Math.random().toString(36).substring(2, 15) + '.pdf';
-			let filename = randomFilename;
-
-			if (contentDisposition && contentDisposition.includes('attachment')) {
-				const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
-				const matches = filenameRegex.exec(contentDisposition);
-				if (matches != null && matches[1]) {
-					filename = matches[1].replace(/['"]/g, '');
-				}
-			} else {
-				const urlParts = url.split('/');
-				const urlFilename = urlParts[urlParts.length - 1];
-				if (urlFilename && urlFilename.toLowerCase().endsWith('.pdf')) {
-					filename = urlFilename;
-				}
-			}
-
-			const blob = await response.blob();
-			const file = new File([blob], filename, { type: 'application/pdf' });
-
-			await handleFileUpload([file]); // Pass as array
+			// Start polling job status
+			pollJobStatus(job.jobId);
 		} catch (error) {
-			console.log('Client-side fetch failed, trying server-side fetch...', error);
-
-			try {
-				// Fallback to server-side fetch
-				const response: PdfUploadResponse = await fetchFromApi('/api/paper/upload/from-url', {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-					},
-					body: JSON.stringify({ url }),
-				});
-
-				// Start polling job status
-				pollJobStatus(response.job_id);
-
-			} catch (serverError) {
-				console.error('Both client and server-side fetches failed:', serverError);
-				setShowErrorAlert(true);
-				setIsUploading(false);
+			console.error('Error uploading from URL:', error);
+			setShowErrorAlert(true);
+			setErrorAlertMessage(error instanceof Error ? error.message : DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE);
+			if (error instanceof Error && error.message.includes('upgrade') && error.message.includes('upload limit')) {
+				setShowPricingOnError(true);
+			} else {
+				setShowPricingOnError(false);
 			}
+			setIsUploading(false);
 		}
 	};
 

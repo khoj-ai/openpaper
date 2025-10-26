@@ -7,7 +7,8 @@ import { fetchFromApi } from "@/lib/api";
 import { Project, PaperItem, Conversation } from "@/lib/schema";
 import { PdfDropzone } from "@/components/PdfDropzone";
 import PaperCard from "@/components/PaperCard";
-import PdfUploadTracker, { MinimalJob } from "@/components/PdfUploadTracker";
+import PdfUploadTracker from "@/components/PdfUploadTracker";
+import { MinimalJob } from "@/lib/schema";
 import {
 	Sheet,
 	SheetContent,
