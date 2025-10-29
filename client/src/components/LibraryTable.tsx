@@ -204,7 +204,8 @@ export function LibraryTable({
 				successfullyDeletedIds.push(paperId);
 			} catch (error) {
 				console.error(`Failed to delete paper ${paperId}:`, error);
-				toast.error("Failed to delete a paper.");
+				// The previous method (handleDelete) should take care of the toast message.
+				// toast.error("Failed to delete a paper.");
 			}
 		}
 

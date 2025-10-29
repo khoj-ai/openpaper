@@ -149,7 +149,7 @@ export default function PapersPage() {
         try {
             await fetchFromApi(`/api/paper?id=${paperId}`, {
                 method: "DELETE",
-            })
+            });
             setPapers(papers.filter((paper) => paper.id !== paperId));
             setFilteredPapers(filteredPapers.filter((paper) => paper.id !== paperId));
             setSearchResults((prevResults) => {
@@ -166,9 +166,12 @@ export default function PapersPage() {
             })
             toast.success("Paper deleted successfully");
         } catch (error) {
-            console.error("Error deleting paper:", error)
-            toast.error("Failed to remove this paper. Make sure it's not part of a project.");
-            // TODO Could also try to handle this by re-fetching papers
+            if (error instanceof Error && error.message) {
+                toast.error(error.message);
+                throw error;
+            }
+            toast.error("Failed to remove this paper.");
+            throw error;
         }
     }
 
