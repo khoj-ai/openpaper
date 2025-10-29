@@ -3,7 +3,7 @@ import { Project } from "@/lib/schema";
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, ArrowRight, FileText, MessageCircle } from "lucide-react";
+import { MoreHorizontal, ArrowRight, FileText, MessageCircle, X } from "lucide-react";
 import { useState } from "react";
 import {
 	AlertDialog,
@@ -22,12 +22,14 @@ import { formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 
 
-export function ProjectCard({ project, onProjectUpdate }: {
+export function ProjectCard({ project, onProjectUpdate, onUnlink }: {
 	project: Project;
 	onProjectUpdate?: () => void;
+	onUnlink?: () => void;
 }) {
 	const [showDeleteAlert, setShowDeleteAlert] = useState(false);
 	const [showEditAlert, setShowEditAlert] = useState(false);
+	const [showUnlinkAlert, setShowUnlinkAlert] = useState(false);
 	const [currentTitle, setCurrentTitle] = useState(project.title);
 	const [currentDescription, setCurrentDescription] = useState(project.description || '');
 	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -127,33 +129,49 @@ export function ProjectCard({ project, onProjectUpdate }: {
 				</Card>
 			</Link>
 			{/* Hover-only dropdown menu */}
-			<div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-all duration-200 ease-in-out transform translate-y-1 group-hover:translate-y-0 z-20">
-				<DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
-					<DropdownMenuTrigger asChild>
-						<Button
-							variant="ghost"
-							size="icon"
-							className="h-8 w-8 bg-background/80 backdrop-blur-sm border-none hover:border-none shadow-none"
-						>
-							<MoreHorizontal className="h-4 w-4" />
-						</Button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end" className="w-32">
-						<DropdownMenuItem
-							onClick={handleEditClick}
-							className="cursor-pointer"
-						>
-							Edit
-						</DropdownMenuItem>
-						<DropdownMenuItem
-							onClick={handleDeleteClick}
-							className="cursor-pointer text-destructive focus:text-destructive"
-						>
-							Delete
-						</DropdownMenuItem>
-					</DropdownMenuContent>
-				</DropdownMenu>
-			</div>
+			{onUnlink ? (
+				<div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-all duration-200 ease-in-out transform translate-y-1 group-hover:translate-y-0 z-20">
+					<Button
+						variant="ghost"
+						size="icon"
+						onClick={(e) => {
+							e.preventDefault();
+							setShowUnlinkAlert(true);
+						}}
+						className="h-8 w-8 bg-background/80 backdrop-blur-sm border-none hover:border-none shadow-none"
+					>
+						<X className="h-4 w-4" />
+					</Button>
+				</div>
+			) : (
+				<div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-all duration-200 ease-in-out transform translate-y-1 group-hover:translate-y-0 z-20">
+					<DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
+						<DropdownMenuTrigger asChild>
+							<Button
+								variant="ghost"
+								size="icon"
+								className="h-8 w-8 bg-background/80 backdrop-blur-sm border-none hover:border-none shadow-none"
+							>
+								<MoreHorizontal className="h-4 w-4" />
+							</Button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="end" className="w-32">
+							<DropdownMenuItem
+								onClick={handleEditClick}
+								className="cursor-pointer"
+							>
+								Edit
+							</DropdownMenuItem>
+							<DropdownMenuItem
+								onClick={handleDeleteClick}
+								className="cursor-pointer text-destructive focus:text-destructive"
+							>
+								Delete
+							</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
+				</div>
+			)}
 
 			<AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
 				<AlertDialogContent>
@@ -211,6 +229,21 @@ export function ProjectCard({ project, onProjectUpdate }: {
 					<AlertDialogFooter>
 						<AlertDialogCancel>Cancel</AlertDialogCancel>
 						<AlertDialogAction onClick={handleUpdateProject}>Save</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			<AlertDialog open={showUnlinkAlert} onOpenChange={setShowUnlinkAlert}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Are you sure you want to unlink this paper?</AlertDialogTitle>
+						<AlertDialogDescription>
+							This action will remove this paper from the project. You can add it back later.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction onClick={onUnlink}>Unlink</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
 			</AlertDialog>

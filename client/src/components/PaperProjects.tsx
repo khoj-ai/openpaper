@@ -60,6 +60,19 @@ export function PaperProjects({ id, view = 'full' }: PaperProjectsProps) {
         }
     }, [id]);
 
+    const handleUnlink = async (projectId: string) => {
+        try {
+            await fetchFromApi(`/api/projects/papers/${projectId}/${id}`, {
+                method: 'DELETE',
+            });
+            toast.success("Paper unlinked from project successfully!");
+            setProjects(prevProjects => prevProjects.filter(p => p.id !== projectId));
+        } catch (error) {
+            console.error("Failed to unlink paper from project", error);
+            toast.error("Failed to unlink paper from project.");
+        }
+    };
+
     const handleAddPaperToProject = async (projectId: string) => {
         setAddingToProjectId(projectId);
         try {
@@ -150,7 +163,11 @@ export function PaperProjects({ id, view = 'full' }: PaperProjectsProps) {
                     {view === 'full' && <p className="text-sm text-muted-foreground">This paper is a member of the following projects.</p>}
                     <div className="space-y-2">
                         {projects.map(project => (
-                            <ProjectCard key={project.id} project={project} />
+                            <ProjectCard
+                                key={project.id}
+                                project={project}
+                                onUnlink={() => handleUnlink(project.id)}
+                            />
                         ))}
                     </div>
                 </>
