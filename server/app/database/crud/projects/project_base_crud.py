@@ -7,7 +7,7 @@ from app.database.crud.base_crud import (
     ModelType,
     UpdateSchemaType,
 )
-from app.database.models import Project, ProjectRole, ProjectRoles
+from app.database.models import Project, ProjectPaper, ProjectRole, ProjectRoles
 from app.schemas.user import CurrentUser
 from sqlalchemy.orm import Query, Session
 
@@ -102,6 +102,17 @@ class ProjectBaseCRUD(CRUDBase[ModelType, CreateSchemaType, UpdateSchemaType]):
             )
 
             if obj:
+                if self.model == Project:
+                    project_id = obj.id
+
+                    db.query(ProjectPaper).filter(
+                        ProjectPaper.project_id == project_id
+                    ).delete(synchronize_session=False)
+
+                    db.query(ProjectRole).filter(
+                        ProjectRole.project_id == project_id
+                    ).delete(synchronize_session=False)
+
                 db.delete(obj)
                 db.commit()
                 return obj
