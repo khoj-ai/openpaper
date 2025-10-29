@@ -68,9 +68,14 @@ export function UploadModal({ open, onOpenChange, onUploadComplete }: UploadModa
     const [jobs, setJobs] = useState<MinimalJob[]>([]);
     const [isUrlDialogOpen, setIsUrlDialogOpen] = useState(false);
     const [importError, setImportError] = useState<string | null>(null);
+    const UPLOAD_LIMIT = 10;
 
     const handleFileSelect = async (files: File[]) => {
         setImportError(null);
+        if (jobs.length + files.length > UPLOAD_LIMIT) {
+            setImportError(`This would exceed the upload limit of ${UPLOAD_LIMIT} files.`);
+            return;
+        }
         const newJobs = await uploadFiles(files);
         setJobs(prevJobs => [...prevJobs, ...newJobs]);
     }
@@ -80,12 +85,20 @@ export function UploadModal({ open, onOpenChange, onUploadComplete }: UploadModa
     }
 
     const onUrlClick = () => {
+        if (jobs.length >= UPLOAD_LIMIT) {
+            setImportError(`You have reached the upload limit of ${UPLOAD_LIMIT} files.`);
+            return;
+        }
         setIsUrlDialogOpen(true);
     }
 
     const handleUrlImport = async (url: string) => {
         try {
             setImportError(null);
+            if (jobs.length >= UPLOAD_LIMIT) {
+                setImportError(`You have reached the upload limit of ${UPLOAD_LIMIT} files.`);
+                return;
+            }
             const newJob = await uploadFromUrl(url);
             setJobs(prevJobs => [...prevJobs, newJob]);
         } catch (error) {
