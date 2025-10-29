@@ -12,6 +12,7 @@ from app.database.crud.paper_note_crud import (
     PaperNoteUpdate,
     paper_note_crud,
 )
+from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
 from app.database.models import Paper, PaperStatus
 from app.database.telemetry import track_event
@@ -558,18 +559,33 @@ async def delete_pdf(
     if not paper:
         return JSONResponse(status_code=404, content={"message": "Document not found"})
 
+    s3_object_key = paper.s3_object_key
+
     # Delete the document from the database
     try:
-        # Delete the file from S3 if s3_object_key exists
-        if paper.s3_object_key:
-            s3_service.delete_file(str(paper.s3_object_key))
-            logger.info(f"Deleted S3 object: {paper.s3_object_key}")
+        projects = project_paper_crud.get_projects_by_paper_id(
+            db, paper_id=uuid.UUID(id), user=current_user
+        )
+
+        if len(projects) > 0:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "message": "Cannot delete document associated with projects. Please remove the document from all projects before deleting."
+                },
+            )
 
         removed_paper = paper_crud.remove(db, id=id, user=current_user)
         if not removed_paper:
             return JSONResponse(
                 status_code=500, content={"message": "Failed to delete document"}
             )
+
+        # Delete the file from S3 if s3_object_key exists
+        if s3_object_key:
+            s3_service.delete_file(str(s3_object_key))
+            logger.info(f"Deleted S3 object: {s3_object_key}")
+
         return JSONResponse(status_code=200, content={"message": "Document deleted"})
     except Exception as e:
         logger.error(f"Error deleting document: {str(e)}")
