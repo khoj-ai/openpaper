@@ -306,6 +306,9 @@ class MultiPaperOperations(BaseLLMClient):
         """
         Compact the evidence collection by summarizing evidence for each paper.
         """
+
+        # TODO what should we do if the evidence being passed in is already too big for inference? break up into chunks?
+
         start_time = time.time()
         evidence_dict = evidence_collection.get_evidence_dict()
 
