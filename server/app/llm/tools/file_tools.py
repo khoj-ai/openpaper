@@ -29,7 +29,7 @@ read_file_function = {
 
 search_file_function = {
     "name": "search_file",
-    "description": "Use this tool to find specific information within a single paper. You will use a regular expression for powerful searches. It returns the lines that match your query, along with their line numbers. This is useful for pinpointing exact details without reading the whole paper.",
+    "description": "Use this tool to find specific information within a single paper. You will use a regular expression for powerful searches. It returns the lines that match your query, along with their line numbers. This is useful for pinpointing exact details without reading the whole paper. Think carefully about how to dynamically search for the correct terms based on the user's question.",
     "parameters": {
         "type": "object",
         "properties": {
@@ -86,7 +86,7 @@ read_abstract_function = {
 
 search_all_files_function = {
     "name": "search_all_files",
-    "description": "Search for a specific query across all available papers using full-text search. This is useful for broad, exploratory searches when you're not sure which paper contains the information you need. It returns a list of matching lines with their corresponding paper IDs and line numbers. If you already know which paper to search in, `search_file` is a more targeted and efficient option.",
+    "description": "Search for a specific query across all available papers using full-text search. This is useful for broad, exploratory searches when you're not sure which paper contains the information you need. It returns a list of matching lines with their corresponding paper IDs and line numbers. Think carefully about how to dynamically search for the correct terms based on the user's question. If you already know which paper to search in, `search_file` is a more targeted and efficient option.",
     "parameters": {
         "type": "object",
         "properties": {
