@@ -567,8 +567,10 @@ export function SidePanelContent({
 
                             // Update the message with the references
                             setStreamingReferences(chunkContent);
-                        }
-                        else {
+                        } else if (chunkType === 'error') {
+                            console.error('Server error in stream:', chunkContent);
+                            throw new Error(`Server error: ${chunkContent}`);
+                        } else {
                             console.warn(`Unknown chunk type: ${chunkType}`);
                         }
                     } catch (error) {

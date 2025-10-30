@@ -292,6 +292,9 @@ function UnderstandPageContent() {
                                 setStreamingReferences(chunkContent);
                             } else if (chunkType === 'status') {
                                 setStatusMessage(chunkContent);
+                            } else if (chunkType === 'error') {
+                                console.error('Server error in stream:', chunkContent);
+                                throw new Error(`Server error: ${chunkContent}`);
                             } else {
                                 console.warn(`Unknown chunk type: ${chunkType}`);
                             }
@@ -299,6 +302,9 @@ function UnderstandPageContent() {
                             console.warn('Received unexpected chunk:', parsedChunk);
                         }
                     } catch (error) {
+                        if (error instanceof Error) {
+                            setError('Sorry, an error occurred while processing the response.');
+                        }
                         console.error('Error processing event:', error, 'Raw event:', event);
                         continue;
                     }
