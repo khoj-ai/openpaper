@@ -198,15 +198,6 @@ async def chat_message_multipaper(
                     yield f"{json_response}{END_DELIMITER}"
                     return
 
-                # yield f"{json.dumps({'type': 'status', 'content': 'Cleaning and filtering evidence...'})}{END_DELIMITER}"
-
-                # cleaned_evidence = await operations.clean_evidence(
-                #     evidence_collection=evidence_collection,
-                #     original_question=request.user_query,
-                #     current_user=current_user,
-                #     llm_provider=LLMProvider.OPENAI,
-                # )
-
                 yield f"{json.dumps({'type': 'status', 'content': 'Generating response...'})}{END_DELIMITER}"
 
                 if request.project_id:
