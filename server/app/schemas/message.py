@@ -15,9 +15,16 @@ class ResponseStyle(str, Enum):
 class Evidence(BaseModel):
     """Model for managing evidence gathered from papers"""
 
-    paper_id: str
-    content: List[str]
-    metadata: Dict[str, List[str]] = {}  # Store line numbers and other metadata
+    paper_id: str = Field(
+        ...,
+        description="Unique identifier for the paper. Not to be used for user-facing responses. Only for internal tracking.",
+    )
+    content: List[str] = Field(
+        default_factory=list, description="List of evidence content strings"
+    )
+    metadata: Dict[str, List[str]] = Field(
+        default_factory=dict, description="Metadata associated with the evidence"
+    )
 
     def add_content(
         self, content: Union[str, List[str]], with_line_numbers: bool = False
@@ -52,8 +59,13 @@ class Evidence(BaseModel):
 class EvidenceCollection(BaseModel):
     """Collection of evidence from multiple papers"""
 
-    evidence: Dict[str, Evidence] = {}
-    previous_tool_calls: List[ToolCall] = []
+    evidence: Dict[str, Evidence] = Field(
+        default_factory=dict, description="Mapping of paper IDs to their evidence"
+    )
+    previous_tool_calls: List[ToolCall] = Field(
+        default_factory=list,
+        description="List of previous tool calls made during evidence gathering",
+    )
 
     def load_from_dict(self, evidence_dict: Dict[str, List[str]]) -> None:
         """Load evidence from a dictionary format"""
@@ -129,4 +141,17 @@ class EvidenceCleaningResponse(BaseModel):
     papers: Dict[str, EvidenceCleaningInstructions] = Field(
         default_factory=dict,
         description="Mapping of paper IDs to their respective cleaning instructions",
+    )
+
+
+class EvidenceSummaryResponse(BaseModel):
+    """Response structure for evidence summarization
+
+    Maps paper IDs to their respective summaries.
+    Each paper_id should correspond to the summary for that paper's evidence.
+    """
+
+    summaries: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Mapping of paper IDs to their respective summaries",
     )
