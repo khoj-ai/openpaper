@@ -303,7 +303,7 @@ function UnderstandPageContent() {
                         }
                     } catch (error) {
                         if (error instanceof Error) {
-                            setError('Sorry, an error occurred while processing the response.');
+                            throw error;
                         }
                         console.error('Error processing event:', error, 'Raw event:', event);
                         continue;
