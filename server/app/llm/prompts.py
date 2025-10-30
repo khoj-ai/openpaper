@@ -223,6 +223,19 @@ Respond with a JSON object structured as:
 {schema}
 """
 
+EVIDENCE_SUMMARIZATION_PROMPT = """You are a research assistant that summarizes collected evidence snippets from research papers into a coherent summary for each paper, focusing on information relevant to the user's question.
+
+User's Question: {question}
+
+Evidence per paper:
+{evidence}
+
+Based on the user's question and the provided evidence, generate a concise summary for each paper. The summary should synthesize the information from the snippets, not just list them.
+
+Your output must be a JSON object following this schema:
+{schema}
+"""
+
 ANSWER_EVIDENCE_BASED_QUESTION_SYSTEM_PROMPT = """
 You are an excellent researcher who provides precise, evidence-based answers from academic papers. Your responses must always include specific text evidence from the paper. You give holistic answers, not just snippets. Help the user understand the content across a library of papers. Your answers should be clear, concise, and informative.
 

@@ -20,6 +20,7 @@ from app.llm.prompts import (
     EVIDENCE_CLEANING_PROMPT,
     EVIDENCE_GATHERING_MESSAGE,
     EVIDENCE_GATHERING_SYSTEM_PROMPT,
+    EVIDENCE_SUMMARIZATION_PROMPT,
     GENERATE_MULTI_PAPER_NARRATIVE_SUMMARY,
     PREVIOUS_TOOL_CALLS_MESSAGE,
 )
@@ -38,7 +39,11 @@ from app.llm.tools.file_tools import (
 )
 from app.llm.tools.meta_tools import stop_function
 from app.llm.utils import retry_llm_operation
-from app.schemas.message import EvidenceCleaningResponse, EvidenceCollection
+from app.schemas.message import (
+    EvidenceCleaningResponse,
+    EvidenceCollection,
+    EvidenceSummaryResponse,
+)
 from app.schemas.responses import AudioOverviewForLLM
 from app.schemas.user import CurrentUser
 from fastapi import Depends
@@ -49,6 +54,8 @@ logger = logging.getLogger(__name__)
 from app.database.crud.message_crud import message_crud
 from app.database.database import get_db
 from app.database.telemetry import track_event
+
+CONTENT_LIMIT_EVIDENCE_GATHERING = 200000  # Character limit for evidence gathering
 
 
 class MultiPaperOperations(BaseLLMClient):
@@ -139,6 +146,24 @@ class MultiPaperOperations(BaseLLMClient):
 
         while n_iterations < max_iterations:
             n_iterations += 1
+
+            # If the collected evidence is very large (over 100,000 characters), we may want to stop gathering more evidence
+            total_evidence_length = sum(
+                sum(len(ev) for ev in ec.content)
+                for ec in evidence_collection.evidence.values()
+            )
+
+            if total_evidence_length > CONTENT_LIMIT_EVIDENCE_GATHERING:
+                yield {
+                    "type": "status",
+                    "content": "Evidence limit reached, compacting evidence...",
+                }
+                logger.info(
+                    "Total evidence length exceeded 200,000 characters, compacting evidence."
+                )
+                evidence_collection = await self.compact_evidence_collection(
+                    evidence_collection, question, current_user, llm_provider
+                )
 
             prev_tool_calls_message = (
                 PREVIOUS_TOOL_CALLS_MESSAGE.format(
@@ -270,6 +295,84 @@ class MultiPaperOperations(BaseLLMClient):
             "type": "evidence_gathered",
             "content": evidence_collection.get_evidence_dict(),
         }
+
+    async def compact_evidence_collection(
+        self,
+        evidence_collection: EvidenceCollection,
+        original_question: str,
+        current_user: CurrentUser,
+        llm_provider: Optional[LLMProvider] = None,
+    ) -> EvidenceCollection:
+        """
+        Compact the evidence collection by summarizing evidence for each paper.
+        """
+        start_time = time.time()
+        evidence_dict = evidence_collection.get_evidence_dict()
+
+        formatted_prompt = EVIDENCE_SUMMARIZATION_PROMPT.format(
+            question=original_question,
+            evidence=json.dumps(evidence_dict, indent=2),
+            schema=EvidenceSummaryResponse.model_json_schema(),
+        )
+
+        message_content = [TextContent(text=formatted_prompt)]
+
+        # Get LLM assessment of evidence relevance
+        llm_response = self.generate_content(
+            system_prompt="You are a research assistant that summarizes evidence.",
+            contents=message_content,
+            model_type=ModelType.DEFAULT,
+            provider=llm_provider,
+        )
+
+        try:
+            if llm_response and llm_response.text:
+                summarization_instructions = JSONParser.validate_and_extract_json(
+                    llm_response.text
+                )
+                summarization_instructions = EvidenceSummaryResponse.model_validate(
+                    summarization_instructions
+                )
+                compacted_collection = EvidenceCollection()
+
+                # Apply summarization
+                for (
+                    paper_id,
+                    summary_data,
+                ) in summarization_instructions.summaries.items():
+                    if paper_id in evidence_dict:
+                        # The new "evidence" is the summary.
+                        compacted_collection.add_evidence(
+                            paper_id, [summary_data], preserve_line_numbers=False
+                        )
+
+                logger.info(
+                    f"Evidence compaction complete. Original: {len(evidence_dict)} papers, "
+                    f"Compacted: {len(compacted_collection.get_evidence_dict())} papers"
+                )
+
+                track_event(
+                    "evidence_compacted",
+                    {
+                        "duration_ms": (time.time() - start_time) * 1000,
+                        "original_papers": len(evidence_dict),
+                        "compacted_papers": len(
+                            compacted_collection.get_evidence_dict()
+                        ),
+                    },
+                    user_id=str(current_user.id),
+                )
+
+                return compacted_collection
+            else:
+                logger.warning("Empty response from LLM during evidence compaction.")
+                return evidence_collection
+
+        except Exception as e:
+            logger.warning(
+                f"Evidence compaction failed: {e}. Returning original evidence."
+            )
+            return evidence_collection
 
     async def clean_evidence(
         self,
