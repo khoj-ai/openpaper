@@ -185,7 +185,10 @@ async def chat_message_multipaper(
                         else:
                             logger.debug(f"received chunks: {chunk}")
 
-                if evidence_collection is None:
+                if (
+                    evidence_collection is None
+                    or len(evidence_collection.evidence) == 0
+                ):
                     json_response = json.dumps(
                         {
                             "type": "content",
