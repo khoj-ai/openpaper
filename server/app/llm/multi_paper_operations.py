@@ -156,7 +156,7 @@ class MultiPaperOperations(BaseLLMClient):
             if total_evidence_length > CONTENT_LIMIT_EVIDENCE_GATHERING:
                 yield {
                     "type": "status",
-                    "content": "Evidence limit reached, compacting evidence...",
+                    "content": "Gathered a lot of data. Compacting evidence...",
                 }
                 logger.info(
                     "Total evidence length exceeded 200,000 characters, compacting evidence."
