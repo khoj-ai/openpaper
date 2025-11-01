@@ -97,7 +97,7 @@ export function ProjectCard({ project, onProjectUpdate, onUnlink }: {
 	return (
 		<div className="relative group">
 			<Link href={`/projects/${project.id}`} className="block" onClick={handleCardClick}>
-				<Card className="h-64 hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-border/50 hover:border-border bg-card/50 backdrop-blur-sm">
+				<Card className="h-64 transition-all duration-300 border-border/50 hover:border-border bg-card/50 backdrop-blur-sm hover:shadow-xl hover:ring-1 hover:ring-border">
 					<CardHeader className="pb-3">
 						<CardTitle className="text-lg font-semibold text-foreground line-clamp-2 flex items-center">
 							{currentTitle}
