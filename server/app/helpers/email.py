@@ -14,7 +14,7 @@ RESEND_MAIN_AUDIENCE_ID = os.getenv("RESEND_MAIN_AUDIENCE_ID")
 
 resend.api_key = RESEND_API_KEY
 
-YOUR_DOMAIN = os.getenv("FRONTEND_URL", "http://localhost:3000")
+YOUR_DOMAIN = os.getenv("CLIENT_DOMAIN", "http://localhost:3000")
 
 REPLY_TO_DEFAULT_EMAIL = "saba@openpaper.ai"
 

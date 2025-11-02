@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 MONTHLY_PRICE_ID = os.getenv("STRIPE_MONTHLY_PRICE_ID")
 YEARLY_PRICE_ID = os.getenv("STRIPE_YEARLY_PRICE_ID")
-YOUR_DOMAIN = os.getenv("FRONTEND_URL", "http://localhost:3000")
+YOUR_DOMAIN = os.getenv("CLIENT_DOMAIN", "http://localhost:3000")
 
 stripe.api_key = STRIPE_API_KEY
 
