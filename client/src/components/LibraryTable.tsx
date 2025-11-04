@@ -64,6 +64,7 @@ export function LibraryTable({
 	const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' } | null>({ key: 'created_at', direction: 'descending' });
 	const [selectedPaperForPreview, setSelectedPaperForPreview] = useState<PaperItem | null>(null);
 	const [taggingPopoverOpen, setTaggingPopoverOpen] = useState(false);
+	const [expandedTags, setExpandedTags] = useState<Set<string>>(new Set());
 
 	const sort: Sort = { type: "publish_date", order: "desc" };
 
@@ -227,6 +228,18 @@ export function LibraryTable({
 		}
 
 		setSelectedPapers(new Set());
+	};
+
+	const toggleExpandedTags = (paperId: string) => {
+		setExpandedTags(prev => {
+			const newSet = new Set(prev);
+			if (newSet.has(paperId)) {
+				newSet.delete(paperId);
+			} else {
+				newSet.add(paperId);
+			}
+			return newSet;
+		});
 	};
 
 	const handleTagClick = (tagName: string) => {
@@ -467,11 +480,9 @@ export function LibraryTable({
 									<TableHead className="min-w-[10rem]">
 										<Button
 											variant="ghost"
-											onClick={() => requestSort('tags')}
 											className="h-auto p-0 font-semibold hover:bg-transparent hover:text-primary"
 										>
 											Tags
-											<ArrowUpDown className="ml-2 h-4 w-4" />
 										</Button>
 									</TableHead>
 									<TableHead className="min-w-[8rem]">
@@ -580,14 +591,11 @@ export function LibraryTable({
 												<TableCell className="py-4 pr-4">
 													<div className="text-xs leading-relaxed">
 														{paper.tags?.length ? (
-															<div className="flex flex-wrap gap-1">
-																{paper.tags.map((tag) => (
+															<div className="flex flex-wrap gap-1 items-center">
+																{(expandedTags.has(paper.id) ? paper.tags : paper.tags.slice(0, 3)).map((tag) => (
 																	<span
 																		key={tag.id}
-																		onClick={(e: React.MouseEvent<HTMLSpanElement>) => {
-																			e.stopPropagation();
-																			handleTagClick(tag.name);
-																		}}
+																		onClick={(e) => { e.stopPropagation(); handleTagClick(tag.name); }}
 																		className="group relative inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-sm dark:bg-blue-900 dark:text-blue-200 cursor-pointer"
 																	>
 																		{tag.name}
@@ -602,6 +610,14 @@ export function LibraryTable({
 																		</button>
 																	</span>
 																))}
+																{paper.tags.length > 3 && !expandedTags.has(paper.id) && (
+																	<button
+																		onClick={(e) => { e.stopPropagation(); toggleExpandedTags(paper.id); }}
+																		className="text-muted-foreground text-xs hover:underline"
+																	>
+																		+ {paper.tags.length - 3} more
+																	</button>
+																)}
 															</div>
 														) : (
 															<span className="text-muted-foreground">No tags</span>
