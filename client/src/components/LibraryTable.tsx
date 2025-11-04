@@ -28,6 +28,7 @@ import { PaperFiltering, Filter, Sort } from "@/components/PaperFiltering";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { TagSelector } from "./TagSelector";
+import { toast } from "sonner";
 
 
 interface LibraryTableProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -226,6 +227,36 @@ export function LibraryTable({
 		}
 
 		setSelectedPapers(new Set());
+	};
+
+	const handleTagClick = (tagName: string) => {
+		const newFilter: Filter = { type: 'tag', value: tagName };
+		if (!filters.some(f => f.type === 'tag' && f.value === tagName)) {
+			setFilters([...filters, newFilter]);
+		}
+	};
+
+	const handleRemoveTag = async (paperId: string, tagId: string) => {
+		try {
+			await fetchFromApi(`/api/paper/papers/${paperId}/tags/${tagId}`, {
+				method: "DELETE",
+			});
+			toast.success("Tag removed successfully.");
+			setInternalPapers(prevPapers =>
+				prevPapers.map(p => {
+					if (p.id === paperId) {
+						return {
+							...p,
+							tags: p.tags?.filter(t => t.id !== tagId)
+						};
+					}
+					return p;
+				})
+			);
+		} catch (error) {
+			console.error("Failed to remove tag", error);
+			toast.error("Failed to remove tag.");
+		}
 	};
 
 
@@ -550,19 +581,27 @@ export function LibraryTable({
 													<div className="text-xs leading-relaxed">
 														{paper.tags?.length ? (
 															<div className="flex flex-wrap gap-1">
-																{paper.tags.slice(0, 3).map((tag, i) => (
+																{paper.tags.map((tag) => (
 																	<span
-																		key={i}
-																		className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded-sm dark:bg-blue-900 dark:text-blue-200"
+																		key={tag.id}
+																		onClick={(e: React.MouseEvent<HTMLSpanElement>) => {
+																			e.stopPropagation();
+																			handleTagClick(tag.name);
+																		}}
+																		className="group relative inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-sm dark:bg-blue-900 dark:text-blue-200 cursor-pointer"
 																	>
 																		{tag.name}
+																		<button
+																			onClick={(e) => {
+																				e.stopPropagation();
+																				handleRemoveTag(paper.id, tag.id);
+																			}}
+																			className="ml-1.5 -mr-1 p-0.5 bg-blue-200/50 dark:bg-blue-800/50 text-blue-700 dark:text-blue-100 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+																		>
+																			<X className="h-2.5 w-2.5" />
+																		</button>
 																	</span>
 																))}
-																{paper.tags.length > 3 && (
-																	<span className="text-muted-foreground text-xs">
-																		+{paper.tags.length - 3} more
-																	</span>
-																)}
 															</div>
 														) : (
 															<span className="text-muted-foreground">No tags</span>
