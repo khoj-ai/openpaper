@@ -115,6 +115,7 @@ async def get_active_paper_ids(
                     "institutions": paper.institutions,
                     "keywords": paper.keywords,
                     "status": paper.status,
+                    "tags": [tag.name for tag in paper.tags],
                 }
                 for paper in papers
             ]

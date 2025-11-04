@@ -23,7 +23,7 @@ from app.schemas.responses import PaperMetadataExtraction, ResponseCitation
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 logger = logging.getLogger(__name__)
 
@@ -277,6 +277,7 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
         """
         return (
             db.query(Paper)
+            .options(selectinload(Paper.tags))
             .outerjoin(PaperUploadJob, Paper.upload_job_id == PaperUploadJob.id)
             .filter(
                 Paper.user_id == user.id,
