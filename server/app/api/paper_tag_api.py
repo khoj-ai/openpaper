@@ -9,6 +9,7 @@ from app.database.crud.paper_tag_crud import (
     paper_tag_crud,
 )
 from app.database.database import get_db
+from app.schemas.paper_tag import BulkTagRequest
 from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -45,6 +46,30 @@ def get_all_tags(
     """
     tags = paper_tag_crud.get_multi(db, user=current_user)
     return [{"id": str(t.id), "name": t.name, "color": t.color} for t in tags]
+
+
+@paper_tag_router.post("/bulk", status_code=200)
+def bulk_add_tags(
+    request: BulkTagRequest,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """
+    Apply multiple tags to multiple papers.
+    """
+    try:
+        paper_tag_crud.bulk_add_tags_to_papers(
+            db,
+            paper_ids=request.paper_ids,
+            tag_ids=request.tag_ids,
+            user=current_user,
+        )
+        return {"message": "Tags applied successfully."}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to apply tags in bulk: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to apply tags.")
 
 
 @paper_tag_router.post("/papers/{paper_id}/tags/{tag_id}", status_code=201)

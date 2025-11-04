@@ -127,5 +127,53 @@ class PaperTagCRUD(CRUDBase[PaperTag, PaperTagCreate, PaperTagUpdate]):
             return []
         return tag.papers
 
+    def bulk_add_tags_to_papers(
+        self,
+        db: Session,
+        *,
+        paper_ids: List[uuid.UUID],
+        tag_ids: List[uuid.UUID],
+        user: CurrentUser,
+    ):
+        # First, verify all papers and tags belong to the user
+        papers = (
+            db.query(Paper.id)
+            .filter(Paper.user_id == user.id, Paper.id.in_(paper_ids))
+            .all()
+        )
+        # Convert list of tuples to list of UUIDs
+        found_paper_ids = {p[0] for p in papers}
+        if len(found_paper_ids) != len(set(paper_ids)):
+            raise ValueError(
+                "One or more papers not found or do not belong to the user."
+            )
+
+        tags = (
+            db.query(PaperTag.id)
+            .filter(PaperTag.user_id == user.id, PaperTag.id.in_(tag_ids))
+            .all()
+        )
+        found_tag_ids = {t[0] for t in tags}
+        if len(found_tag_ids) != len(set(tag_ids)):
+            raise ValueError("One or more tags not found or do not belong to the user.")
+
+        associations_to_create = []
+        for paper_id in paper_ids:
+            for tag_id in tag_ids:
+                # Check if the association already exists
+                existing_association = (
+                    db.query(PaperTagAssociation)
+                    .filter_by(paper_id=paper_id, tag_id=tag_id)
+                    .first()
+                )
+                if not existing_association:
+                    associations_to_create.append(
+                        {"paper_id": paper_id, "tag_id": tag_id}
+                    )
+
+        if associations_to_create:
+            db.bulk_insert_mappings(PaperTagAssociation, associations_to_create)
+            db.commit()
+
 
 paper_tag_crud = PaperTagCRUD(PaperTag)
