@@ -2,18 +2,12 @@ import logging
 import uuid
 
 from app.auth.dependencies import get_required_user
-from app.database.crud.paper_crud import paper_crud
-from app.database.crud.paper_tag_crud import (
-    PaperTagCreate,
-    PaperTagUpdate,
-    paper_tag_crud,
-)
+from app.database.crud.paper_tag_crud import PaperTagCreate, paper_tag_crud
 from app.database.database import get_db
 from app.schemas.paper_tag import BulkTagRequest
 from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 load_dotenv()
