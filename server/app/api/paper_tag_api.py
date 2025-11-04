@@ -1,0 +1,127 @@
+import logging
+import uuid
+
+from app.auth.dependencies import get_required_user
+from app.database.crud.paper_crud import paper_crud
+from app.database.crud.paper_tag_crud import (
+    PaperTagCreate,
+    PaperTagUpdate,
+    paper_tag_crud,
+)
+from app.database.database import get_db
+from app.schemas.user import CurrentUser
+from dotenv import load_dotenv
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
+
+load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+paper_tag_router = APIRouter()
+
+
+@paper_tag_router.post("/", status_code=201)
+def create_tag(
+    tag_in: PaperTagCreate,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """
+    Create a new tag for the current user.
+    """
+    tag = paper_tag_crud.create(db, obj_in=tag_in, user=current_user)
+    return {"id": str(tag.id), "name": tag.name, "color": tag.color}
+
+
+@paper_tag_router.get("/")
+def get_all_tags(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """
+    Get all tags for the current user.
+    """
+    tags = paper_tag_crud.get_multi(db, user=current_user)
+    return [{"id": str(t.id), "name": t.name, "color": t.color} for t in tags]
+
+
+@paper_tag_router.post("/papers/{paper_id}/tags/{tag_id}", status_code=201)
+def add_tag_to_paper(
+    paper_id: str,
+    tag_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """
+    Add a tag to a specific paper.
+    """
+    association = paper_tag_crud.add_tag_to_paper(
+        db,
+        paper_id=uuid.UUID(paper_id),
+        tag_id=uuid.UUID(tag_id),
+        user=current_user,
+    )
+    if not association:
+        raise HTTPException(
+            status_code=404, detail="Paper or Tag not found, or permission denied."
+        )
+    return {"message": "Tag added to paper successfully."}
+
+
+@paper_tag_router.delete("/papers/{paper_id}/tags/{tag_id}", status_code=204)
+def remove_tag_from_paper(
+    paper_id: str,
+    tag_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """
+    Remove a tag from a specific paper.
+    """
+    paper_tag_crud.remove_tag_from_paper(
+        db,
+        paper_id=uuid.UUID(paper_id),
+        tag_id=uuid.UUID(tag_id),
+        user=current_user,
+    )
+    return
+
+
+@paper_tag_router.get("/papers/{paper_id}/tags")
+def get_tags_for_paper(
+    paper_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """
+    Get all tags for a specific paper.
+    """
+    tags = paper_tag_crud.get_tags_for_paper(
+        db, paper_id=uuid.UUID(paper_id), user=current_user
+    )
+    return [{"id": str(t.id), "name": t.name, "color": t.color} for t in tags]
+
+
+@paper_tag_router.get("/tags/{tag_id}/papers")
+def get_papers_for_tag(
+    tag_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """
+    Get all papers associated with a specific tag.
+    """
+    papers = paper_tag_crud.get_papers_for_tag(
+        db, tag_id=uuid.UUID(tag_id), user=current_user
+    )
+    return [
+        {
+            "id": str(p.id),
+            "title": p.title,
+            "authors": p.authors,
+            "publish_date": p.publish_date,
+        }
+        for p in papers
+    ]
