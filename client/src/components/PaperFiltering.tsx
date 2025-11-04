@@ -26,7 +26,7 @@ import { PaperItem } from "@/lib/schema";
 import { PaperStatusEnum } from "@/components/utils/PdfStatus";
 
 export type Filter = {
-    type: "author" | "keyword" | "status"
+    type: "author" | "keyword" | "status" | "tag"
     value: string
 }
 
@@ -47,6 +47,7 @@ interface PaperFilteringProps {
 export function PaperFiltering({ papers, onFilterChange, onSortChange, filters, sort, showSort = true }: PaperFilteringProps) {
     const authors = Array.from(new Set(papers.flatMap(p => p.authors || [])))
     const keywords = Array.from(new Set(papers.flatMap(p => p.keywords || [])))
+    const tags = Array.from(new Set(papers.flatMap(p => p.tags?.map(t => t.name) || [])))
 
     const handleSelectFilter = (filter: Filter) => {
         const newFilters = filters.some(f => f.type === filter.type && f.value === filter.value)
@@ -146,6 +147,33 @@ export function PaperFiltering({ papers, onFilterChange, onSortChange, filters, 
                                                 >
                                                     {isFilterActive({ type: "keyword", value: keyword }) && <Check className="mr-2 h-4 w-4" />}
                                                     {keyword}
+                                                </CommandItem>
+                                            ))}
+                                        </CommandGroup>
+                                    </CommandList>
+                                </Command>
+                            </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                        <DropdownMenuSub>
+                            <DropdownMenuSubTrigger>Tags</DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent className="p-0">
+                                <Command>
+                                    <CommandInput
+                                        placeholder="Filter tag..."
+                                        autoFocus={true}
+                                        className="h-9"
+                                    />
+                                    <CommandList>
+                                        <CommandEmpty>No tags found.</CommandEmpty>
+                                        <CommandGroup>
+                                            {tags.map(tag => (
+                                                <CommandItem
+                                                    key={tag}
+                                                    value={tag}
+                                                    onSelect={() => handleSelectFilter({ type: "tag", value: tag })}
+                                                >
+                                                    {isFilterActive({ type: "tag", value: tag }) && <Check className="mr-2 h-4 w-4" />}
+                                                    {tag}
                                                 </CommandItem>
                                             ))}
                                         </CommandGroup>
