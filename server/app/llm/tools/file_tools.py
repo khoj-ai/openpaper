@@ -92,7 +92,7 @@ search_all_files_function = {
         "properties": {
             "query": {
                 "type": "string",
-                "description": "The search query to find in the file content of all papers. This can include keywords and phrases. The search is powered by full-text search, so you can use operators like '&' (AND) and '|' (OR). For example, 'apple & pie' will find papers containing both 'apple' and 'pie'. The tool will then highlight the lines containing these keywords.",
+                "description": "The search query to find in the file content of all papers. This can include keywords and phrases. The search is powered by full-text search, so you can use operators like '&' (AND) and '|' (OR). For example, 'apple & pie' will find papers containing both 'apple' and 'pie'. Avoid using hyphens in search terms as they can cause errors; use spaces instead (e.g., 'red team' instead of 'red-team'). The tool will then highlight the lines containing these keywords.",
             },
         },
         "required": ["query"],
@@ -184,6 +184,10 @@ def search_all_files(
     Search for a specific query in the file content of all papers using full-text search.
     Returns a list of matching lines with paper IDs and line numbers.
     """
+    # Sanitize the query for to_tsquery by replacing hyphens with spaces,
+    # as hyphens can cause syntax errors in this context.
+    sanitized_query = query.replace("-", " ")
+
     all_papers: List[Paper] = []
     if project_id:
         all_papers = project_paper_crud.get_all_papers_by_project_id(
@@ -191,12 +195,12 @@ def search_all_files(
         )
     else:
         all_papers = paper_crud.get_all_available_papers(
-            db, user=current_user, query=query
+            db, user=current_user, query=sanitized_query
         )
     results = {}
 
     # Extract search terms from the query, stripping FTS operators
-    search_terms = [term for term in re.split(r"[\s&|!()]", query) if term]
+    search_terms = [term for term in re.split(r"[\s&|!()]", sanitized_query) if term]
     if not search_terms:
         return {}
 
