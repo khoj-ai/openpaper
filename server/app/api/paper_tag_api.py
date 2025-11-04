@@ -72,29 +72,6 @@ def bulk_add_tags(
         raise HTTPException(status_code=500, detail="Failed to apply tags.")
 
 
-@paper_tag_router.post("/papers/{paper_id}/tags/{tag_id}", status_code=201)
-def add_tag_to_paper(
-    paper_id: str,
-    tag_id: str,
-    db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_required_user),
-):
-    """
-    Add a tag to a specific paper.
-    """
-    association = paper_tag_crud.add_tag_to_paper(
-        db,
-        paper_id=uuid.UUID(paper_id),
-        tag_id=uuid.UUID(tag_id),
-        user=current_user,
-    )
-    if not association:
-        raise HTTPException(
-            status_code=404, detail="Paper or Tag not found, or permission denied."
-        )
-    return {"message": "Tag added to paper successfully."}
-
-
 @paper_tag_router.delete("/papers/{paper_id}/tags/{tag_id}", status_code=204)
 def remove_tag_from_paper(
     paper_id: str,
