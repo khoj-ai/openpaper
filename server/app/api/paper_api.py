@@ -56,34 +56,32 @@ async def get_paper_ids(
     Get all paper IDs
     """
     papers: List[Paper] = paper_crud.get_multi_uploads_completed(db, user=current_user)
+    data = [
+        {
+            "id": str(paper.id),
+            "title": paper.title,
+            "created_at": str(paper.created_at),
+            "abstract": paper.abstract,
+            "authors": paper.authors,
+            "institutions": paper.institutions,
+            "keywords": paper.keywords,
+            "status": paper.status,
+            "preview_url": paper.preview_url,
+            "size_in_kb": paper.size_in_kb,
+            "publish_date": (str(paper.publish_date) if paper.publish_date else None),
+            "file_url": s3_service.get_cached_presigned_url_by_owner(
+                db,
+                str(paper.id),
+                str(paper.s3_object_key),
+                str(current_user.id),
+            ),
+            "tags": [{"id": str(tag.id), "name": tag.name, "color": tag.color} for tag in paper.tags],  # type: ignore
+        }
+        for paper in papers
+    ]
     return JSONResponse(
         status_code=200,
-        content={
-            "papers": [
-                {
-                    "id": str(paper.id),
-                    "title": paper.title,
-                    "created_at": str(paper.created_at),
-                    "abstract": paper.abstract,
-                    "authors": paper.authors,
-                    "institutions": paper.institutions,
-                    "keywords": paper.keywords,
-                    "status": paper.status,
-                    "preview_url": paper.preview_url,
-                    "size_in_kb": paper.size_in_kb,
-                    "publish_date": (
-                        str(paper.publish_date) if paper.publish_date else None
-                    ),
-                    "file_url": s3_service.get_cached_presigned_url_by_owner(
-                        db,
-                        str(paper.id),
-                        str(paper.s3_object_key),
-                        str(current_user.id),
-                    ),
-                }
-                for paper in papers
-            ]
-        },
+        content={"papers": data},
     )
 
 
@@ -102,23 +100,27 @@ async def get_active_paper_ids(
         return JSONResponse(
             status_code=404, content={"message": "No active papers found"}
         )
+
+    data = [
+        {
+            "id": str(paper.id),
+            "title": paper.title,
+            "created_at": str(paper.created_at),
+            "abstract": paper.abstract,
+            "authors": paper.authors,
+            "institutions": paper.institutions,
+            "keywords": paper.keywords,
+            "status": paper.status,
+            "preview_url": paper.preview_url,
+            "size_in_kb": paper.size_in_kb,
+            "publish_date": (str(paper.publish_date) if paper.publish_date else None),
+        }
+        for paper in papers
+    ]
+
     return JSONResponse(
         status_code=200,
-        content={
-            "papers": [
-                {
-                    "id": str(paper.id),
-                    "title": paper.title,
-                    "created_at": str(paper.created_at),
-                    "abstract": paper.abstract,
-                    "authors": paper.authors,
-                    "institutions": paper.institutions,
-                    "keywords": paper.keywords,
-                    "status": paper.status,
-                }
-                for paper in papers
-            ]
-        },
+        content={"papers": data},
     )
 
 
@@ -403,6 +405,10 @@ async def get_pdf(
     paper_data["summary"] = paper_crud.get_summary_replace_image_placeholders(
         db, paper_id=id, current_user=current_user
     )
+
+    paper_data["tags"] = [  # type: ignore
+        {"id": str(t.id), "name": t.name, "color": t.color} for t in paper.tags  # type: ignore
+    ]
 
     # Return the file URL
     return JSONResponse(status_code=200, content=paper_data)

@@ -20,15 +20,17 @@ import {
 	SheetContent,
 } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { ArrowUpDown, CheckCheck, Trash2, X, ChevronDown } from "lucide-react";
+import { ArrowUpDown, CheckCheck, Trash2, X, ChevronDown, Tag } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { PaperPreview } from "./PaperPreview";
 import { PaperFiltering, Filter, Sort } from "@/components/PaperFiltering";
 import { Badge } from "@/components/ui/badge";
+import { TagSelector } from "./TagSelector";
+import { toast } from "sonner";
 
 
-interface LibraryTableProps {
+interface LibraryTableProps extends React.HTMLAttributes<HTMLDivElement> {
 	selectable?: boolean;
 	onSelectFiles?: (papers: PaperItem[], action: string) => void;
 	actionOptions?: string[];
@@ -46,6 +48,7 @@ export function LibraryTable({
 	handleDelete,
 	setPapers,
 	maxHeight = 'calc(100vh - 16rem)',
+	...props
 }: LibraryTableProps) {
 	const selectable = selectableProp ?? (onSelectFiles ? true : false);
 	const { state: sidebarState } = useSidebar();
@@ -59,26 +62,28 @@ export function LibraryTable({
 	type SortKey = keyof PaperItem;
 	const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' } | null>({ key: 'created_at', direction: 'descending' });
 	const [selectedPaperForPreview, setSelectedPaperForPreview] = useState<PaperItem | null>(null);
+	const [taggingPopoverOpen, setTaggingPopoverOpen] = useState(false);
+	const [expandedTags, setExpandedTags] = useState<Set<string>>(new Set());
 
 	const sort: Sort = { type: "publish_date", order: "desc" };
 
-	useEffect(() => {
-		const getPapers = async () => {
-			try {
-				const data = await fetchFromApi("/api/paper/all");
-				setInternalPapers(data.papers);
-				if (setPapers) {
-					setPapers(data.papers);
-				}
-			} catch (error) {
-				setError("Failed to fetch papers.");
-				console.error(error);
-			} finally {
-				setLoading(false);
+	const fetchPapers = async () => {
+		try {
+			const data = await fetchFromApi("/api/paper/all");
+			setInternalPapers(data.papers);
+			if (setPapers) {
+				setPapers(data.papers);
 			}
-		};
+		} catch (error) {
+			setError("Failed to fetch papers.");
+			console.error(error);
+		} finally {
+			setLoading(false);
+		}
+	};
 
-		getPapers();
+	useEffect(() => {
+		fetchPapers();
 	}, []);
 
 	const setPaper = (paperId: string, updatedPaper: PaperItem) => {
@@ -114,6 +119,9 @@ export function LibraryTable({
 					if (filter.type === 'keyword') {
 						return paper.keywords?.includes(filter.value);
 					}
+					if (filter.type === 'tag') {
+						return paper.tags?.some(t => t.name === filter.value);
+					}
 					if (filter.type === 'status') {
 						return paper.status === filter.value;
 					}
@@ -134,6 +142,10 @@ export function LibraryTable({
 				let comparison = 0;
 				if (key === 'created_at' || key === 'publish_date') {
 					comparison = new Date(aVal as string).getTime() - new Date(bVal as string).getTime();
+				} else if (key === 'tags') {
+					const aTags = (aVal as { name: string }[]).map(t => t.name).join(', ');
+					const bTags = (bVal as { name: string }[]).map(t => t.name).join(', ');
+					comparison = aTags.localeCompare(bTags);
 				} else if (Array.isArray(aVal) && Array.isArray(bVal)) {
 					comparison = aVal.join(', ').localeCompare(bVal.join(', '));
 				} else if (typeof aVal === 'string' && typeof bVal === 'string') {
@@ -217,6 +229,47 @@ export function LibraryTable({
 		setSelectedPapers(new Set());
 	};
 
+	const toggleExpandedTags = (paperId: string) => {
+		setExpandedTags(prev => {
+			const newSet = new Set(prev);
+			if (newSet.has(paperId)) {
+				newSet.delete(paperId);
+			} else {
+				newSet.add(paperId);
+			}
+			return newSet;
+		});
+	};
+
+	const handleTagClick = (tagName: string) => {
+		const newFilter: Filter = { type: 'tag', value: tagName };
+		if (!filters.some(f => f.type === 'tag' && f.value === tagName)) {
+			setFilters([...filters, newFilter]);
+		}
+	};
+
+	const handleRemoveTag = async (paperId: string, tagId: string) => {
+		try {
+			await fetchFromApi(`/api/paper/tag/papers/${paperId}/tags/${tagId}`, {
+				method: "DELETE",
+			});
+			setInternalPapers(prevPapers =>
+				prevPapers.map(p => {
+					if (p.id === paperId) {
+						return {
+							...p,
+							tags: p.tags?.filter(t => t.id !== tagId)
+						};
+					}
+					return p;
+				})
+			);
+		} catch (error) {
+			console.error("Failed to remove tag", error);
+			toast.error("Failed to remove tag.");
+		}
+	};
+
 
 
 	if (loading) {
@@ -235,12 +288,12 @@ export function LibraryTable({
 		);
 	}
 
-	const numCols = 6 + (selectable ? 1 : 0);
+	const numCols = 7 + (selectable ? 1 : 0);
 	const allAvailableSelected = availablePapers.length > 0 && selectedPapers.size === availablePapers.length;
 
 
 	return (
-		<div className="space-y-4 w-full max-w-full overflow-hidden">
+		<div className="space-y-4 w-full max-w-full overflow-hidden" {...props}>
 			<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
 				<div className="flex flex-col md:flex-row items-start md:items-center gap-4 w-full">
 					<Input
@@ -274,9 +327,19 @@ export function LibraryTable({
 										}`}
 								>
 									{selectedPapers.size > 0 && (
-										<span className="text-sm font-medium text-muted-foreground">
-											{selectedPapers.size} paper{selectedPapers.size !== 1 ? 's' : ''}
-										</span>
+										<div className="flex items-center gap-2">
+											<span className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+												{selectedPapers.size} paper{selectedPapers.size !== 1 ? 's' : ''}
+											</span>
+											<Button
+												variant="ghost"
+												size="icon"
+												className="h-6 w-6"
+												onClick={() => setSelectedPapers(new Set())}
+											>
+												<X className="h-4 w-4" />
+											</Button>
+										</div>
 									)}
 									<div className="flex items-center gap-2">
 										{actionOptions.map((action) => (
@@ -294,24 +357,46 @@ export function LibraryTable({
 								</div>
 							)}
 							<div className={`flex items-center gap-2 transition-all duration-200 ${selectedPapers.size > 0 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-								{selectable && handleDelete && (
-									<DropdownMenu>
-										<DropdownMenuTrigger asChild>
-											<Button variant="outline">
-												Actions <ChevronDown className="h-4 w-4 ml-2" />
-											</Button>
-										</DropdownMenuTrigger>
-										<DropdownMenuContent>
-											<DropdownMenuItem
-												onClick={handleDeletePapers}
-												disabled={selectedPapers.size === 0}
-												className="text-red-500"
-											>
-												<Trash2 className="h-4 w-4 mr-2" />
-												Delete ({selectedPapers.size})
-											</DropdownMenuItem>
-										</DropdownMenuContent>
-									</DropdownMenu>
+								{selectable && (
+									<>
+										<DropdownMenu open={taggingPopoverOpen} onOpenChange={setTaggingPopoverOpen}>
+											<DropdownMenuTrigger asChild>
+												<Button variant="outline">
+													<Tag className="h-4 w-4 mr-2" />
+													Tag
+												</Button>
+											</DropdownMenuTrigger>
+											<DropdownMenuContent className="w-80">
+												<TagSelector
+													paperIds={Array.from(selectedPapers)}
+													onTagsApplied={() => {
+														setTaggingPopoverOpen(false);
+														fetchPapers();
+													}}
+												/>
+											</DropdownMenuContent>
+										</DropdownMenu>
+
+										<DropdownMenu>
+											<DropdownMenuTrigger asChild>
+												<Button variant="outline">
+													Actions <ChevronDown className="h-4 w-4 ml-2" />
+												</Button>
+											</DropdownMenuTrigger>
+											<DropdownMenuContent>
+												{handleDelete && (
+													<DropdownMenuItem
+														onClick={handleDeletePapers}
+														disabled={selectedPapers.size === 0}
+														className="text-red-500"
+													>
+														<Trash2 className="h-4 w-4 mr-2" />
+														Delete ({selectedPapers.size})
+													</DropdownMenuItem>
+												)}
+											</DropdownMenuContent>
+										</DropdownMenu>
+									</>
 								)}
 							</div>
 						</div>
@@ -322,7 +407,7 @@ export function LibraryTable({
 			<div className="flex flex-wrap gap-2 mb-4">
 				{filters.map(filter => (
 					<Badge key={`${filter.type}-${filter.value}`} variant="secondary" className="flex items-center gap-1">
-						{filter.value}
+						{filter.type}: {filter.value}
 						<Button
 							variant="ghost"
 							size="sm"
@@ -388,6 +473,14 @@ export function LibraryTable({
 											className="h-auto p-0 font-semibold hover:bg-transparent"
 										>
 											Keywords
+										</Button>
+									</TableHead>
+									<TableHead className="min-w-[10rem]">
+										<Button
+											variant="ghost"
+											className="h-auto p-0 font-semibold hover:bg-transparent hover:text-primary"
+										>
+											Tags
 										</Button>
 									</TableHead>
 									<TableHead className="min-w-[8rem]">
@@ -490,6 +583,42 @@ export function LibraryTable({
 															</div>
 														) : (
 															<span className="text-muted-foreground">No keywords</span>
+														)}
+													</div>
+												</TableCell>
+												<TableCell className="py-4 pr-4">
+													<div className="text-xs leading-relaxed">
+														{paper.tags?.length ? (
+															<div className="flex flex-wrap gap-1 items-center">
+																{(expandedTags.has(paper.id) ? paper.tags : paper.tags.slice(0, 3)).map((tag) => (
+																	<span
+																		key={tag.id}
+																		onClick={(e) => { e.stopPropagation(); handleTagClick(tag.name); }}
+																		className="group relative inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-sm dark:bg-blue-900 dark:text-blue-200 cursor-pointer"
+																	>
+																		{tag.name}
+																		<button
+																			onClick={(e) => {
+																				e.stopPropagation();
+																				handleRemoveTag(paper.id, tag.id);
+																			}}
+																			className="ml-1.5 -mr-1 p-0.5 bg-blue-200/50 dark:bg-blue-800/50 text-blue-700 dark:text-blue-100 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+																		>
+																			<X className="h-2.5 w-2.5" />
+																		</button>
+																	</span>
+																))}
+																{paper.tags.length > 3 && !expandedTags.has(paper.id) && (
+																	<button
+																		onClick={(e) => { e.stopPropagation(); toggleExpandedTags(paper.id); }}
+																		className="text-muted-foreground text-xs hover:underline"
+																	>
+																		+ {paper.tags.length - 3} more
+																	</button>
+																)}
+															</div>
+														) : (
+															<span className="text-muted-foreground">No tags</span>
 														)}
 													</div>
 												</TableCell>

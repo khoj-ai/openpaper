@@ -171,6 +171,9 @@ class User(Base):
     )
 
     project_roles = relationship("ProjectRole", back_populates="user")
+    paper_tags = relationship(
+        "PaperTag", back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class Session(Base):
@@ -326,6 +329,39 @@ class Conversation(Base):
     )
 
 
+class PaperTag(Base):
+    __tablename__ = "paper_tags"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String, nullable=False)
+    color = Column(String, nullable=True)  # Optional color for the tag
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+
+    user = relationship("User", back_populates="paper_tags")
+    papers = relationship(
+        "Paper",
+        secondary="paper_tag_association",
+        back_populates="tags",
+    )
+
+
+class PaperTagAssociation(Base):
+    __tablename__ = "paper_tag_association"
+
+    paper_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("papers.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    tag_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("paper_tags.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+
 class Paper(Base):
     __tablename__ = "papers"
 
@@ -418,6 +454,12 @@ class Paper(Base):
     )
 
     project_papers = relationship("ProjectPaper", back_populates="paper")
+
+    tags = relationship(
+        "PaperTag",
+        secondary="paper_tag_association",
+        back_populates="papers",
+    )
 
 
 class Project(Base):

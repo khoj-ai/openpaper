@@ -175,7 +175,7 @@ export default function PapersPage() {
         }
     }
 
-    const handleMakeProject = (papers: PaperItem[], action: string) => {
+    const handleTableAction = (papers: PaperItem[], action: string) => {
         if (action !== "Make Project") return;
 
         if (isProjectAtLimit(subscription)) {
@@ -515,24 +515,24 @@ export default function PapersPage() {
             <UploadModal open={isUploadModalOpen} onOpenChange={setUploadModalOpen} onUploadComplete={() => { fetchPapers(); }} />
             <UsageDisplay />
             <Tabs value={viewMode} onValueChange={setViewMode} className="w-full flex flex-col flex-1 min-h-0">
-                <div className="flex items-center justify-between mb-4 flex-shrink-0">
-                    <div className="flex items-center gap-x-4">
-                        <h1 className="text-3xl font-bold tracking-tight">Library</h1>
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 flex-shrink-0">
+                    <h1 className="text-3xl font-bold tracking-tight">Library</h1>
+                    <div className="flex items-center gap-x-4 mt-2 md:mt-0">
                         <Button onClick={() => setUploadModalOpen(true)}>
                             <Upload className="h-4 w-4 mr-2" />
                             Upload
                         </Button>
+                        <TabsList>
+                            <TabsTrigger value="table" onClick={() => localStorage.setItem('papersViewMode', 'table')}>
+                                <List className="h-4 w-4 mr-2" />
+                                Table
+                            </TabsTrigger>
+                            <TabsTrigger value="card" onClick={() => localStorage.setItem('papersViewMode', 'card')}>
+                                <Grid className="h-4 w-4 mr-2" />
+                                Card
+                            </TabsTrigger>
+                        </TabsList>
                     </div>
-                    <TabsList>
-                        <TabsTrigger value="table" onClick={() => localStorage.setItem('papersViewMode', 'table')}>
-                            <List className="h-4 w-4 mr-2" />
-                            Table
-                        </TabsTrigger>
-                        <TabsTrigger value="card" onClick={() => localStorage.setItem('papersViewMode', 'card')}>
-                            <Grid className="h-4 w-4 mr-2" />
-                            Card
-                        </TabsTrigger>
-                    </TabsList>
                 </div>
                 <TabsContent value="card" className="flex-1 min-h-0">
                     <LibraryGrid
@@ -559,7 +559,7 @@ export default function PapersPage() {
                         handleDelete={deletePaper}
                         selectable={true}
                         actionOptions={["Make Project"]}
-                        onSelectFiles={handleMakeProject}
+                        onSelectFiles={handleTableAction}
                     />
                 </TabsContent>
             </Tabs>

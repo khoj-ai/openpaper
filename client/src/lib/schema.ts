@@ -219,6 +219,12 @@ export interface JobStatusResponse {
 	celery_progress_message: string | null;
 }
 
+export interface PaperTag {
+    id: string;
+    name: string;
+    color: string;
+}
+
 export interface PaperItem {
     id: string
     title: string
@@ -233,6 +239,7 @@ export interface PaperItem {
     preview_url?: string
     file_url?: string
     size_in_kb?: number
+    tags?: PaperTag[]
 }
 
 export interface CreditUsage {

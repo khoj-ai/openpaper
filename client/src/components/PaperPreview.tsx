@@ -11,6 +11,8 @@ import { citationStyles, handleStatusChange } from "@/components/utils/paperUtil
 import { getStatusIcon, PaperStatusEnum } from "@/components/utils/PdfStatus";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { PaperProjects } from "./PaperProjects";
+import { TagSelector } from "./TagSelector";
+import { fetchFromApi } from "@/lib/api";
 
 interface PaperPreviewProps {
     paper: PaperItem;
@@ -19,6 +21,28 @@ interface PaperPreviewProps {
 }
 
 export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
+    const handleRemoveTag = async (tagId: string) => {
+        try {
+            await fetchFromApi(`/api/paper/tag/papers/${paper.id}/tags/${tagId}`, {
+                method: "DELETE",
+            });
+            const updatedPaper = {
+                ...paper,
+                tags: paper.tags?.filter(t => t.id !== tagId)
+            };
+            setPaper(paper.id, updatedPaper);
+        } catch (error) {
+            console.error("Failed to remove tag", error);
+            toast.error("Failed to remove tag.");
+        }
+    };
+
+    const onTagsApplied = () => {
+        // Let's try to update the paper by refetching it.
+        fetchFromApi(`/api/paper?id=${paper.id}`).then(updatedPaper => {
+            setPaper(paper.id, updatedPaper);
+        });
+    };
 
     const copyToClipboard = (text: string, styleName: string) => {
         navigator.clipboard.writeText(text).then(() => {
@@ -137,6 +161,33 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
                         </Dialog>
                     </div>
                     <p className="text-sm my-4 break-words max-h-[20vh] overflow-y-auto">{paper.abstract}</p>
+                    <div className="space-y-2 mb-4">
+                        <h4 className="font-semibold text-sm">Tags</h4>
+                        <div className="flex flex-wrap gap-2 items-center">
+                            {paper.tags?.map(tag => (
+                                <span key={tag.id} className="group relative inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-sm dark:bg-blue-900 dark:text-blue-200 text-xs">
+                                    {tag.name}
+                                    <button
+                                        onClick={() => handleRemoveTag(tag.id)}
+                                        className="ml-1.5 -mr-1 p-0.5 bg-blue-200/50 dark:bg-blue-800/50 text-blue-700 dark:text-blue-100 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                        <X className="h-2.5 w-2.5" />
+                                    </button>
+                                </span>
+                            ))}
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm" className="h-7 text-xs">Add Tag</Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent className="w-80" align="start">
+                                    <TagSelector
+                                        paperIds={[paper.id]}
+                                        onTagsApplied={onTagsApplied}
+                                    />
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+                    </div>
                     <PaperProjects id={paper.id} view='compact' />
                 </div>
             </div>
