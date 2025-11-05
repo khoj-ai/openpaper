@@ -251,10 +251,9 @@ export function LibraryTable({
 
 	const handleRemoveTag = async (paperId: string, tagId: string) => {
 		try {
-			await fetchFromApi(`/api/paper/papers/${paperId}/tags/${tagId}`, {
+			await fetchFromApi(`/api/paper/tag/papers/${paperId}/tags/${tagId}`, {
 				method: "DELETE",
 			});
-			toast.success("Tag removed successfully.");
 			setInternalPapers(prevPapers =>
 				prevPapers.map(p => {
 					if (p.id === paperId) {

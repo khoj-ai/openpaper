@@ -75,7 +75,6 @@ export function TagSelector({ paperIds, onTagsApplied }: TagSelectorProps) {
                     tag_ids: Array.from(selectedTags),
                 }),
             });
-            toast.success("Tags applied successfully.");
             onTagsApplied();
         } catch (error) {
             console.error("Failed to apply tags", error);
