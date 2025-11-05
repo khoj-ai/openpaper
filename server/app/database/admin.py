@@ -14,6 +14,7 @@ from app.database.models import (
     Project,
     ProjectPaper,
     ProjectRole,
+    Subscription,
     User,
 )
 from fastapi import FastAPI, Request
@@ -42,6 +43,22 @@ class OnboardingAdmin(ModelView, model=Onboarding):
         Onboarding.user_id,
         Onboarding.research_fields,
         Onboarding.job_titles,
+    ]
+
+
+class SubscriptionAdmin(ModelView, model=Subscription):
+    column_list = [
+        Subscription.id,
+        Subscription.user_id,
+        Subscription.plan,
+        Subscription.status,
+        Subscription.created_at,
+        Subscription.cancel_at_period_end,
+    ]
+    column_searchable_list = [
+        Subscription.user_id,
+        Subscription.plan,
+        Subscription.status,
     ]
 
 
@@ -234,3 +251,4 @@ def setup_admin(app: FastAPI):
     admin.add_view(ProjectRoleAdmin)
     admin.add_view(ProjectPaperAdmin)
     admin.add_view(OnboardingAdmin)
+    admin.add_view(SubscriptionAdmin)
