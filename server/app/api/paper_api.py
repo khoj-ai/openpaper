@@ -406,6 +406,10 @@ async def get_pdf(
         db, paper_id=id, current_user=current_user
     )
 
+    paper_data["tags"] = [  # type: ignore
+        {"id": str(t.id), "name": t.name, "color": t.color} for t in paper.tags  # type: ignore
+    ]
+
     # Return the file URL
     return JSONResponse(status_code=200, content=paper_data)
 
