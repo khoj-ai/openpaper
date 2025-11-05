@@ -21,12 +21,11 @@ import {
 } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ArrowUpDown, CheckCheck, Trash2, X, ChevronDown, Tag } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { PaperPreview } from "./PaperPreview";
 import { PaperFiltering, Filter, Sort } from "@/components/PaperFiltering";
 import { Badge } from "@/components/ui/badge";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { TagSelector } from "./TagSelector";
 import { toast } from "sonner";
 
@@ -144,8 +143,8 @@ export function LibraryTable({
 				if (key === 'created_at' || key === 'publish_date') {
 					comparison = new Date(aVal as string).getTime() - new Date(bVal as string).getTime();
 				} else if (key === 'tags') {
-					const aTags = (aVal as any[]).map(t => t.name).join(', ');
-					const bTags = (bVal as any[]).map(t => t.name).join(', ');
+					const aTags = (aVal as { name: string }[]).map(t => t.name).join(', ');
+					const bTags = (bVal as { name: string }[]).map(t => t.name).join(', ');
 					comparison = aTags.localeCompare(bTags);
 				} else if (Array.isArray(aVal) && Array.isArray(bVal)) {
 					comparison = aVal.join(', ').localeCompare(bVal.join(', '));
