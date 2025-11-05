@@ -4,6 +4,7 @@ import uuid
 from app.auth.dependencies import get_required_user
 from app.database.crud.paper_tag_crud import PaperTagCreate, paper_tag_crud
 from app.database.database import get_db
+from app.database.telemetry import track_event
 from app.schemas.paper_tag import BulkTagRequest
 from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
@@ -27,6 +28,17 @@ def create_tag(
     Create a new tag for the current user.
     """
     tag = paper_tag_crud.create(db, obj_in=tag_in, user=current_user)
+
+    track_event(
+        "tag_created",
+        properties={
+            "tag_id": str(tag.id),
+            "tag_name": tag.name,
+            "tag_color": tag.color,
+        },
+        user_id=str(current_user.id),
+    )
+
     return {"id": str(tag.id), "name": tag.name, "color": tag.color}
 
 
@@ -58,6 +70,16 @@ def bulk_add_tags(
             tag_ids=request.tag_ids,
             user=current_user,
         )
+
+        track_event(
+            "tags_bulk_added_to_papers",
+            properties={
+                "n_papers": len(request.paper_ids),
+                "tag_ids": [str(t_id) for t_id in request.tag_ids],
+            },
+            user_id=str(current_user.id),
+        )
+
         return {"message": "Tags applied successfully."}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -82,6 +104,13 @@ def remove_tag_from_paper(
         tag_id=uuid.UUID(tag_id),
         user=current_user,
     )
+
+    track_event(
+        "tag_removed_from_paper",
+        properties={"paper_id": paper_id, "tag_id": tag_id},
+        user_id=str(current_user.id),
+    )
+
     return
 
 
