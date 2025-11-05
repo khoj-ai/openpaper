@@ -118,8 +118,10 @@ export default function Projects() {
 					</Link>
 				</Button>
 				<Button variant="outline" size="lg" className="px-6">
-					<BookOpen className="mr-2 w-4 h-4" />
-					Learn More
+					<Link href="/blog/projects">
+						<BookOpen className="mr-2 w-4 h-4" />
+						Learn More
+					</Link>
 				</Button>
 			</div>
 		</div>
