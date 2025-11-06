@@ -9,7 +9,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { useEffect, useState, useMemo } from "react";
-import { fetchFromApi } from "@/lib/api";
+import { fetchFromApi, getAllPapers } from "@/lib/api";
 import { PaperItem } from "@/lib/schema";
 import { Checkbox } from "./ui/checkbox";
 import { Button } from "./ui/button";
@@ -28,6 +28,7 @@ import { PaperFiltering, Filter, Sort } from "@/components/PaperFiltering";
 import { Badge } from "@/components/ui/badge";
 import { TagSelector } from "./TagSelector";
 import { toast } from "sonner";
+import { usePapers } from "@/hooks/usePapers";
 
 
 interface LibraryTableProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -46,16 +47,13 @@ export function LibraryTable({
 	actionOptions = [],
 	projectPaperIds = [],
 	handleDelete,
-	setPapers,
 	maxHeight = 'calc(100vh - 16rem)',
 	...props
 }: LibraryTableProps) {
 	const selectable = selectableProp ?? (onSelectFiles ? true : false);
+	const { papers, error: papersFetchError, isLoading, mutate } = usePapers();
 	const { state: sidebarState } = useSidebar();
 	const isMobile = useIsMobile();
-	const [internalPapers, setInternalPapers] = useState<PaperItem[]>([]);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
 	const [selectedPapers, setSelectedPapers] = useState<Set<string>>(new Set());
 	const [searchTerm, setSearchTerm] = useState('');
 	const [filters, setFilters] = useState<Filter[]>([]);
@@ -67,36 +65,22 @@ export function LibraryTable({
 
 	const sort: Sort = { type: "publish_date", order: "desc" };
 
-	const fetchPapers = async () => {
-		try {
-			const data = await fetchFromApi("/api/paper/all");
-			setInternalPapers(data.papers);
-			if (setPapers) {
-				setPapers(data.papers);
-			}
-		} catch (error) {
-			setError("Failed to fetch papers.");
-			console.error(error);
-		} finally {
-			setLoading(false);
-		}
-	};
-
-	useEffect(() => {
-		fetchPapers();
-	}, []);
-
 	const setPaper = (paperId: string, updatedPaper: PaperItem) => {
-		setInternalPapers(prevPapers =>
-			prevPapers.map(p => (p.id === paperId ? updatedPaper : p))
+		mutate(
+			(currentPapers: PaperItem[] | undefined) => {
+				if (!currentPapers) return [];
+				return currentPapers.map(p => (p.id === paperId ? updatedPaper : p));
+			},
+			{ revalidate: false }
 		);
+
 		if (selectedPaperForPreview && selectedPaperForPreview.id === paperId) {
 			setSelectedPaperForPreview(updatedPaper);
 		}
 	};
 
 	const processedPapers = useMemo(() => {
-		let filteredPapers = [...internalPapers];
+		let filteredPapers = [...(papers || [])];
 
 		if (searchTerm) {
 			filteredPapers = filteredPapers.filter(paper => {
@@ -160,7 +144,7 @@ export function LibraryTable({
 		}
 
 		return filteredPapers;
-	}, [internalPapers, searchTerm, filters, sortConfig]);
+	}, [papers, searchTerm, filters, sortConfig]);
 
 	const availablePapers = useMemo(() => {
 		return processedPapers.filter(p => !projectPaperIds.includes(p.id));
@@ -198,7 +182,7 @@ export function LibraryTable({
 
 	const handleAction = (action: string) => {
 		if (onSelectFiles) {
-			const selectedItems = internalPapers.filter((p) => selectedPapers.has(p.id));
+			const selectedItems = (papers || []).filter((p) => selectedPapers.has(p.id));
 			onSelectFiles(selectedItems, action);
 			setSelectedPapers(new Set());
 		}
@@ -208,22 +192,15 @@ export function LibraryTable({
 		if (!handleDelete) return;
 
 		const paperIdsToDelete = Array.from(selectedPapers);
-		const successfullyDeletedIds: string[] = [];
-		for (const paperId of paperIdsToDelete) {
-			try {
-				await handleDelete(paperId);
-				successfullyDeletedIds.push(paperId);
-			} catch (error) {
-				console.error(`Failed to delete paper ${paperId}:`, error);
-				// The previous method (handleDelete) should take care of the toast message.
-				// toast.error("Failed to delete a paper.");
-			}
-		}
+		const deletePromises = paperIdsToDelete.map(id => handleDelete(id));
 
-		if (successfullyDeletedIds.length > 0) {
-			setInternalPapers(prevPapers =>
-				prevPapers.filter(p => !successfullyDeletedIds.includes(p.id))
-			);
+		try {
+			await Promise.all(deletePromises);
+			toast.success(`Successfully deleted ${paperIdsToDelete.length} paper(s).`);
+			mutate(); // Revalidate the papers list
+		} catch (error) {
+			console.error("Failed to delete some papers:", error);
+			toast.error("An error occurred while deleting papers.");
 		}
 
 		setSelectedPapers(new Set());
@@ -253,17 +230,9 @@ export function LibraryTable({
 			await fetchFromApi(`/api/paper/tag/papers/${paperId}/tags/${tagId}`, {
 				method: "DELETE",
 			});
-			setInternalPapers(prevPapers =>
-				prevPapers.map(p => {
-					if (p.id === paperId) {
-						return {
-							...p,
-							tags: p.tags?.filter(t => t.id !== tagId)
-						};
-					}
-					return p;
-				})
-			);
+			// Don't need to send a toast for success - can be noisy.
+			// toast.success("Tag removed.");
+			mutate(); // Revalidate the papers list
 		} catch (error) {
 			console.error("Failed to remove tag", error);
 			toast.error("Failed to remove tag.");
@@ -272,7 +241,7 @@ export function LibraryTable({
 
 
 
-	if (loading) {
+	if (isLoading) {
 		return (
 			<div className="flex items-center justify-center py-12">
 				<div className="text-muted-foreground">Loading papers...</div>
@@ -280,10 +249,10 @@ export function LibraryTable({
 		);
 	}
 
-	if (error) {
+	if (papersFetchError) {
 		return (
 			<div className="flex items-center justify-center py-12">
-				<div className="text-destructive">{error}</div>
+				<div className="text-destructive">{papersFetchError}</div>
 			</div>
 		);
 	}
@@ -303,16 +272,16 @@ export function LibraryTable({
 						className="w-full md:max-w-xl"
 					/>
 					<PaperFiltering
-						papers={internalPapers}
+						papers={papers || []}
 						onFilterChange={setFilters}
 						onSortChange={() => { }}
 						filters={filters}
 						sort={sort}
 						showSort={false}
 					/>
-					{processedPapers.length !== internalPapers.length && (
+					{processedPapers.length !== (papers || []).length && (
 						<div className="text-sm text-muted-foreground">
-							Showing {processedPapers.length} of {internalPapers.length} papers
+							Showing {processedPapers.length} of {(papers || []).length} papers
 						</div>
 					)}
 				</div>
@@ -371,7 +340,7 @@ export function LibraryTable({
 													paperIds={Array.from(selectedPapers)}
 													onTagsApplied={() => {
 														setTaggingPopoverOpen(false);
-														fetchPapers();
+														mutate();
 													}}
 												/>
 											</DropdownMenuContent>

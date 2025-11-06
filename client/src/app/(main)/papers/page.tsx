@@ -30,15 +30,15 @@ import { CreateProjectDialog } from "@/components/CreateProjectDialog";
 import { useRouter } from "next/navigation";
 import { LibraryGrid } from "@/components/LibraryGrid";
 import { UploadModal } from "@/components/UploadModal";
+import { usePapers } from "@/hooks/usePapers";
 
 // TODO: We could add a search look-up for the paper journal name to avoid placeholders
 
 export default function PapersPage() {
-    const [papers, setPapers] = useState<PaperItem[]>([]);
+    const { papers, error, isLoading, setPapers, mutate } = usePapers();
     const [searchTerm, setSearchTerm] = useState<string>("");
     const [filteredPapers, setFilteredPapers] = useState<PaperItem[]>([]);
     const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
-    const [loading, setLoading] = useState<boolean>(true);
     const [searching, setSearching] = useState<boolean>(false);
     const searchInputRef = useRef<HTMLInputElement | null>(null);
     const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
@@ -53,21 +53,6 @@ export default function PapersPage() {
     const [papersForNewProject, setPapersForNewProject] = useState<PaperItem[]>([]);
     const [isUploadModalOpen, setUploadModalOpen] = useState(false);
 
-    const fetchPapers = async () => {
-        try {
-            const response = await fetchFromApi("/api/paper/all")
-            const sortedPapers = response.papers.sort((a: PaperItem, b: PaperItem) => {
-                return new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime();
-            });
-            setPapers(sortedPapers)
-            setFilteredPapers(sortedPapers)
-        } catch (error) {
-            console.error("Error fetching papers:", error)
-        } finally {
-            setLoading(false);
-        }
-    }
-
     useEffect(() => {
         const savedViewMode = localStorage.getItem("papersViewMode");
         if (savedViewMode) {
@@ -76,8 +61,13 @@ export default function PapersPage() {
     }, []);
 
     useEffect(() => {
-        fetchPapers();
-    }, []);
+        if (papers) {
+            const sortedPapers = [...papers].sort((a, b) => {
+                return new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime();
+            });
+            setFilteredPapers(sortedPapers);
+        }
+    }, [papers]);
 
     useEffect(() => {
         // Cleanup timeout on unmount
@@ -108,8 +98,13 @@ export default function PapersPage() {
     useEffect(() => {
         let papersToFilter = papers;
 
+        if (!papersToFilter) {
+            setFilteredPapers([]);
+            return;
+        }
+
         // Apply filters
-        if (filters.length > 0) {
+        if (filters.length > 0 && papersToFilter) {
             papersToFilter = papersToFilter.filter(paper => {
                 return filters.every(filter => {
                     if (filter.type === "author") {
@@ -150,7 +145,6 @@ export default function PapersPage() {
             await fetchFromApi(`/api/paper?id=${paperId}`, {
                 method: "DELETE",
             });
-            setPapers(papers.filter((paper) => paper.id !== paperId));
             setFilteredPapers(filteredPapers.filter((paper) => paper.id !== paperId));
             setSearchResults((prevResults) => {
                 if (!prevResults) return null;
@@ -220,11 +214,11 @@ export default function PapersPage() {
     };
 
     const performSearch = useCallback(async (term: string) => {
-        if (!term.trim()) {
-            setFilteredPapers(papers)
-            setSearchResults(null)
-            setFilters([])
-            return
+        if (!term.trim() && papers) {
+            setFilteredPapers(papers);
+            setSearchResults(null);
+            setFilters([]);
+            return;
         }
 
         setSearching(true)
@@ -276,16 +270,18 @@ export default function PapersPage() {
             console.log("Error performing search:", error);
             setSearchResults(null)
             // Fall back to client-side search if API fails
-            setFilteredPapers(
-                papers.filter((paper) =>
-                    paper.title?.toLowerCase().includes(term.toLowerCase()) ||
-                    paper.keywords?.some((keyword) => keyword.toLowerCase().includes(term.toLowerCase())) ||
-                    paper.abstract?.toLowerCase().includes(term.toLowerCase()) ||
-                    paper.authors?.some((author) => author.toLowerCase().includes(term.toLowerCase())) ||
-                    paper.institutions?.some((institution) => institution.toLowerCase().includes(term.toLowerCase())) ||
-                    paper.summary?.toLowerCase().includes(term.toLowerCase())
+            if (papers) {
+                setFilteredPapers(
+                    papers.filter((paper) =>
+                        paper.title?.toLowerCase().includes(term.toLowerCase()) ||
+                        paper.keywords?.some((keyword) => keyword.toLowerCase().includes(term.toLowerCase())) ||
+                        paper.abstract?.toLowerCase().includes(term.toLowerCase()) ||
+                        paper.authors?.some((author) => author.toLowerCase().includes(term.toLowerCase())) ||
+                        paper.institutions?.some((institution) => institution.toLowerCase().includes(term.toLowerCase())) ||
+                        paper.summary?.toLowerCase().includes(term.toLowerCase())
+                    )
                 )
-            )
+            }
         } finally {
             setSearching(false)
         }
@@ -309,9 +305,6 @@ export default function PapersPage() {
     }
 
     const handlePaperSet = (paperId: string, paper: PaperItem) => {
-        setPapers((prevPapers) =>
-            prevPapers.map((p) => (p.id === paperId ? { ...p, ...paper } : p))
-        )
         setFilteredPapers((prevFiltered) =>
             prevFiltered.map((p) => (p.id === paperId ? { ...p, ...paper } : p))
         )
@@ -428,7 +421,7 @@ export default function PapersPage() {
 
     const EmptyState = () => {
         // No papers uploaded at all
-        if (papers.length === 0) {
+        if (papers && papers.length === 0) {
             return (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                     <FileText className="h-16 w-16 text-muted-foreground mb-6" />
@@ -447,7 +440,7 @@ export default function PapersPage() {
         }
 
         // Has papers but search/filter returned no results
-        if (papers.length > 0 && filteredPapers.length === 0) {
+        if (papers && papers.length > 0 && filteredPapers.length === 0) {
             return (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                     <Search className="h-12 w-12 text-muted-foreground mb-4" />
@@ -476,7 +469,7 @@ export default function PapersPage() {
         return null;
     }
 
-    if (loading) {
+    if (isLoading || authLoading) {
         return (
             <div className="w-full max-w-6xl mx-auto p-4">
                 <Skeleton className="h-10 w-full mb-4" />
@@ -512,7 +505,7 @@ export default function PapersPage() {
                 onOpenChange={setCreateProjectDialogOpen}
                 onSubmit={handleCreateProjectSubmit}
             />
-            <UploadModal open={isUploadModalOpen} onOpenChange={setUploadModalOpen} onUploadComplete={() => { fetchPapers(); }} />
+            <UploadModal open={isUploadModalOpen} onOpenChange={setUploadModalOpen} onUploadComplete={() => { mutate(); }} />
             <UsageDisplay />
             <Tabs value={viewMode} onValueChange={setViewMode} className="w-full flex flex-col flex-1 min-h-0">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 flex-shrink-0">
@@ -536,7 +529,7 @@ export default function PapersPage() {
                 </div>
                 <TabsContent value="card" className="flex-1 min-h-0">
                     <LibraryGrid
-                        papers={papers}
+                        papers={papers || []}
                         filteredPapers={filteredPapers}
                         searchResults={searchResults}
                         searchTerm={searchTerm}
@@ -555,7 +548,6 @@ export default function PapersPage() {
                 </TabsContent>
                 <TabsContent value="table" className="flex-1 min-h-0">
                     <LibraryTable
-                        setPapers={setPapers}
                         handleDelete={deletePaper}
                         selectable={true}
                         actionOptions={["Make Project"]}
