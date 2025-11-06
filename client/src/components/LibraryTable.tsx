@@ -8,8 +8,8 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { useEffect, useState, useMemo } from "react";
-import { fetchFromApi, getAllPapers } from "@/lib/api";
+import { useState, useMemo } from "react";
+import { fetchFromApi } from "@/lib/api";
 import { PaperItem } from "@/lib/schema";
 import { Checkbox } from "./ui/checkbox";
 import { Button } from "./ui/button";
