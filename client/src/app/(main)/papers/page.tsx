@@ -35,7 +35,7 @@ import { usePapers } from "@/hooks/usePapers";
 // TODO: We could add a search look-up for the paper journal name to avoid placeholders
 
 export default function PapersPage() {
-    const { papers, error, isLoading, setPapers, mutate } = usePapers();
+    const { papers, isLoading, mutate } = usePapers();
     const [searchTerm, setSearchTerm] = useState<string>("");
     const [filteredPapers, setFilteredPapers] = useState<PaperItem[]>([]);
     const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
