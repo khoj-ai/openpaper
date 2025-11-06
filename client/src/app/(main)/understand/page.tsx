@@ -3,8 +3,9 @@
 
 import { useSubscription, isChatCreditAtLimit } from '@/hooks/useSubscription';
 import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
-import { useState, useEffect, FormEvent, useRef, useCallback, Suspense } from 'react';
+import { useState, useEffect, FormEvent, useRef, useCallback, Suspense, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { usePapers } from '@/hooks/usePapers';
 
 import { toast } from "sonner";
 
@@ -13,7 +14,6 @@ import {
     Reference,
 } from '@/lib/schema';
 import { useAuth } from '@/lib/auth';
-import { PaperItem } from "@/lib/schema";
 
 interface ChatRequestBody {
     user_query: string;
@@ -37,7 +37,21 @@ function UnderstandPageContent() {
     const searchParams = useSearchParams();
     const { user, loading: authLoading } = useAuth();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const [papers, setPapers] = useState<PaperItem[]>([]);
+    const { papers: fetchedPapers, error: papersError } = usePapers();
+
+    const papers = useMemo(() => {
+        if (!fetchedPapers) return [];
+        return [...fetchedPapers].sort((a, b) => {
+            return new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime();
+        });
+    }, [fetchedPapers]);
+
+    useEffect(() => {
+        if (papersError) {
+            console.error("Error fetching papers:", papersError);
+            toast.error("Failed to fetch papers.");
+        }
+    }, [papersError]);
 
 
     const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -127,22 +141,6 @@ function UnderstandPageContent() {
             setIsSessionLoading(false);
         }
     }, [searchParams, user, fetchMessages, isStreaming]);
-
-    useEffect(() => {
-        const fetchPapers = async () => {
-            try {
-                const response = await fetchFromApi("/api/paper/all")
-                const sortedPapers = response.papers.sort((a: PaperItem, b: PaperItem) => {
-                    return new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime();
-                });
-                setPapers(sortedPapers)
-            } catch (error) {
-                console.error("Error fetching papers:", error)
-            }
-        }
-
-        fetchPapers();
-    }, [])
 
     useEffect(() => {
         if (isStreaming) {

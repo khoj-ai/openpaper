@@ -69,10 +69,6 @@ export async function fetchStreamFromApi(
     return response.body;
 }
 
-export async function getAllPapers() {
-    return fetchFromApi('/api/paper/all');
-}
-
 export async function getProjectsForPaper(paperId: string) {
     return fetchFromApi(`/api/projects/papers/from/${paperId}`);
 }
