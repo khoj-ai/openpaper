@@ -197,7 +197,7 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                     )}
 
                     {paper.abstract && (
-                        <div className="bg-slate-50 dark:bg-slate-900 p-3 border-l-2 border-slate-300 dark:border-slate-700">
+                        <div className="bg-slate-50 dark:bg-gray-900 p-3 border-l-2 border-slate-300 dark:border-slate-700">
                             <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
                                 {paper.abstract.length > 150
                                     ? paper.abstract.slice(0, 150) + "..."
@@ -352,7 +352,7 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                         {paper.abstract && (
                             <div>
                                 <h3 className="font-semibold text-lg mb-3 text-slate-900 dark:text-slate-100">Abstract</h3>
-                                <div className="bg-slate-50 dark:bg-slate-900 p-4 border-l-2 border-slate-300 dark:border-slate-700">
+                                <div className="bg-slate-50 dark:bg-gray-900 p-4 border-l-2 border-slate-300 dark:border-slate-700">
                                     <p className="text-slate-700 dark:text-slate-300 leading-relaxed">
                                         {paper.abstract}
                                     </p>
@@ -369,7 +369,7 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                                 </h3>
                                 <div className="grid gap-2">
                                     {paper.authorships?.map((authorship, index) => (
-                                        <div key={index} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                                        <div key={index} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-gray-900 rounded border border-slate-200 dark:border-slate-800">
                                             <div>
                                                 {authorship.author?.orcid ? (
                                                     <a
@@ -411,7 +411,7 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                                 </h3>
                                 <div className="grid gap-2">
                                     {institutions.map(institution => (
-                                        <div key={institution.id} className="p-3 bg-slate-50 dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                                        <div key={institution.id} className="p-3 bg-slate-50 dark:bg-gray-900 rounded border border-slate-200 dark:border-slate-800">
                                             <a
                                                 href={institution.ror}
                                                 target="_blank"
@@ -459,7 +459,7 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                                             <h4 className="font-medium text-sm text-slate-600 dark:text-slate-400 mb-2 mt-3">Topics:</h4>
                                             <div className="space-y-2">
                                                 {paper.topics.map((topic, i) => (
-                                                    <div key={i} className="p-3 bg-slate-50 rounded border border-slate-200 dark:bg-slate-900 dark:border-slate-800">
+                                                    <div key={i} className="p-3 bg-slate-50 rounded border border-slate-200 dark:bg-gray-900 dark:border-slate-800">
                                                         <div className="font-medium text-slate-900 dark:text-slate-100">
                                                             {topic.display_name}
                                                             {topic.score && (
@@ -485,7 +485,7 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                             <h3 className="font-semibold text-lg mb-3 text-slate-900 dark:text-slate-100">Publication Details</h3>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {paper.cited_by_count !== undefined && (
-                                    <div className="bg-slate-50 p-4 rounded border border-slate-200 dark:bg-slate-900 dark:border-slate-800">
+                                    <div className="bg-slate-50 p-4 rounded border border-slate-200 dark:bg-gray-900 dark:border-slate-800">
                                         <div className="font-medium text-slate-600 dark:text-slate-400">Citations</div>
                                         <div className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
                                             {paper.cited_by_count}
@@ -493,7 +493,7 @@ export default function PaperResultCard({ paper }: PaperResultCardProps) {
                                     </div>
                                 )}
                                 {paper.open_access && (
-                                    <div className="bg-slate-50 p-4 rounded border border-slate-200 dark:bg-slate-900 dark:border-slate-800">
+                                    <div className="bg-slate-50 p-4 rounded border border-slate-200 dark:bg-gray-900 dark:border-slate-800">
                                         <div className="font-medium text-slate-600 dark:text-slate-400">Open Access Status</div>
                                         <Badge className={`mt-2 ${paper.open_access.is_oa ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-700'}`}>
                                             {paper.open_access.oa_status}
