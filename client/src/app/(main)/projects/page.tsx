@@ -132,7 +132,7 @@ export default function Projects() {
 			<div className="flex justify-between items-center mb-4">
 				<h1 className="text-2xl font-bold">Projects</h1>
 				{projects.length > 0 &&
-					<Button asChild className="bg-blue-500 hover:bg-blue-600 dark:hover:bg-blue-400" disabled={atProjectLimit}>
+					<Button asChild className="bg-blue-500 dark:text-card-foreground hover:bg-blue-600 dark:hover:bg-blue-400" disabled={atProjectLimit}>
 						<Link href="/projects/create">
 							<PlusCircle className="mr-2" />
 							New Project
