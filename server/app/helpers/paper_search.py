@@ -1,12 +1,15 @@
 import logging
+import os
 from enum import Enum
-from typing import List, Optional, Union
+from typing import List, Optional
 from urllib.parse import quote
 
 import requests
 from pydantic import BaseModel, ConfigDict, model_validator
 
 logger = logging.getLogger(__name__)
+
+SEMANTIC_SCHOLAR_API_KEY = os.getenv("SEMANTIC_SCHOLAR_API_KEY")
 
 
 class OAStatus(str, Enum):
@@ -283,3 +286,53 @@ def construct_citation_graph(open_alex_id: str) -> OpenAlexCitationGraph:
     return OpenAlexCitationGraph(
         cites=cites_data, cited_by=cited_by_data, center=center
     )
+
+
+def get_doi(title: str, author: Optional[str] = None) -> Optional[str]:
+    """
+    Retrieve the DOI for a paper given its title and optional author using a series of external APIs.
+
+    1. CrossRef API
+    2. OpenAlex API (if CrossRef fails)
+    3. Semantic Scholar API (if OpenAlex fails)
+
+    Args:
+        title (str): The title of the paper.
+        author (Optional[str]): The author of the paper.
+
+    Returns:
+        Optional[str]: The DOI of the paper if found, otherwise None.
+    """
+    base_url = "https://api.crossref.org/works"
+    params = {"query.title": title, "rows": 1}
+    if author:
+        params["query.author"] = author
+
+    try:
+        response = requests.get(base_url, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        items = data.get("message", {}).get("items", [])
+        if items:
+            return items[0].get("DOI")
+    except requests.RequestException:
+        try:
+            open_alex_results = search_open_alex(title)
+            if open_alex_results.results:
+                doi = open_alex_results.results[0].doi
+                if doi:
+                    return doi
+        except Exception:
+            try:
+                ss_url = "https://api.semanticscholar.org/graph/v1/paper/search"
+                ss_params = {"query": title, "limit": 1, "fields": "doi"}
+                ss_response = requests.get(ss_url, params=ss_params, timeout=10)
+                ss_response.raise_for_status()
+                ss_data = ss_response.json()
+                if ss_data.get("data"):
+                    doi = ss_data["data"][0].get("doi")
+                    if doi:
+                        return doi
+            except requests.RequestException:
+                return None
+    return None
