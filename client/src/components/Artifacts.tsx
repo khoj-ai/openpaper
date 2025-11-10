@@ -122,6 +122,15 @@ export default function Artifacts({ projectId, papers }: ArtifactsProps) {
         };
     }, [projectId]);
 
+    const pollAudioData = useCallback(async () => {
+        // Fetch jobs first to determine if there are pending/running jobs,
+        // then refresh audio overviews so UI updates.
+        const jobs = await getProjectAudioJobs();
+        await getProjectAudioOverviews();
+        const hasPendingJobs = jobs.some((job: AudioOverviewJob) => job.status === 'pending' || job.status === 'running');
+        return hasPendingJobs;
+    }, [getProjectAudioJobs, getProjectAudioOverviews]);
+
     const handleCreateAudioOverview = async () => {
         if (atAudioLimit) {
             toast.error("You have reached your audio overview limit. Please upgrade to create more.");
@@ -131,6 +140,7 @@ export default function Artifacts({ projectId, papers }: ArtifactsProps) {
         setCreateAudioDialogOpen(false);
         setIsCreatingAudio(true);
         try {
+            toast.info("Your audio overview is being generated. This may take a few minutes.");
             const requestData = {
                 additional_instructions: audioInstructions.trim() || null,
                 length: selectedAudioLength,
@@ -178,9 +188,8 @@ export default function Artifacts({ projectId, papers }: ArtifactsProps) {
                 }
             }
 
-            // Fetch jobs and start polling
-            const jobs = await getProjectAudioJobs();
-            const hasPendingJobs = jobs.some((job: AudioOverviewJob) => job.status === 'pending' || job.status === 'running');
+            // Immediately poll for jobs and overviews, then start interval polling
+            const hasPendingJobs = await pollAudioData();
             if (hasPendingJobs) {
                 startPolling();
             }
