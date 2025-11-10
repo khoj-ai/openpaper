@@ -193,6 +193,11 @@ class MultiPaperOperations(BaseLLMClient):
                 TextContent(text=formatted_prompt),
             ]
 
+            yield {
+                "type": "status",
+                "content": f"Reviewing collected evidence (iteration {n_iterations}/{max_iterations})...",
+            }
+
             llm_response = self.generate_content(
                 system_prompt=evidence_gathering_prompt,
                 history=conversation_history,
