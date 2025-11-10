@@ -291,7 +291,7 @@ Inline Math notation should be wrapped in double dollar signs, like this: $$\\fr
 
 11. You are not allowed any html formatting. Only use Markdown, LaTeX, and code blocks.
 
-12. In the response you present to the user, do not include the paper ID when referencing particular papers.
+12. In the response main response you construct, do not include the paper ID when referencing particular papers. The paper ID should only be used for internal citation tracking in the evidence section.
 
 Example format:
 
