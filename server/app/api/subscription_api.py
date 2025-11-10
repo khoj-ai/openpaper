@@ -500,8 +500,18 @@ async def handle_stripe_webhook(
                         return {"success": False}
 
                     # Check if subscription is being scheduled for cancellation
+                    # Stripe supports two cancellation methods:
+                    # 1. cancel_at_period_end: true - cancels at end of current period
+                    # 2. cancel_at: timestamp - cancels at a specific future date
                     cancel_at_period_end = stripe_sub.get("cancel_at_period_end", False)
+                    cancel_at = stripe_sub.get("cancel_at")
                     previous_cancel_at_period_end = subscription.cancel_at_period_end
+
+                    # Treat either cancellation method as a pending cancellation
+                    is_scheduled_for_cancellation = cancel_at_period_end or (
+                        cancel_at is not None
+                    )
+                    was_scheduled_for_cancellation = previous_cancel_at_period_end
 
                     # Update with new data
                     subscription_crud.update_subscription_status(
@@ -519,11 +529,14 @@ async def handle_stripe_webhook(
                             if stripe_sub.get("current_period_end")
                             else None
                         ),
-                        cancel_at_period_end=cancel_at_period_end,
+                        cancel_at_period_end=is_scheduled_for_cancellation,
                     )
 
-                    # Track subscription cancellation event when cancel_at_period_end changes to True
-                    if cancel_at_period_end and not previous_cancel_at_period_end:
+                    # Track subscription cancellation event when cancellation is newly scheduled
+                    if (
+                        is_scheduled_for_cancellation
+                        and not was_scheduled_for_cancellation
+                    ):
                         track_event(
                             event_name="subscription_canceled",
                             properties={
