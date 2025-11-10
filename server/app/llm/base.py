@@ -1,8 +1,10 @@
 import logging
+import time
 from enum import Enum
 from typing import Any, Dict, Iterator, List, Optional
 
 from app.database.models import Message
+from app.database.telemetry import track_event
 from app.llm.provider import (
     BaseLLMProvider,
     FileContent,
@@ -93,16 +95,62 @@ class BaseLLMClient:
         **kwargs,
     ) -> LLMResponse:
         """Generate content using the specified provider"""
+        start_time = time.time()
         model = self._get_model_for_type(model_type, provider)
-        return self._get_provider(provider).generate_content(
-            model,
-            contents,
-            system_prompt=system_prompt,
-            function_declarations=function_declarations,
-            history=history,
-            enable_thinking=enable_thinking,
-            **kwargs,
-        )
+        target_provider = provider or self.default_provider
+
+        try:
+            response = self._get_provider(provider).generate_content(
+                model,
+                contents,
+                system_prompt=system_prompt,
+                function_declarations=function_declarations,
+                history=history,
+                enable_thinking=enable_thinking,
+                **kwargs,
+            )
+
+            end_time = time.time()
+            duration_ms = (end_time - start_time) * 1000
+
+            # Track the event with model and timing information
+            track_event(
+                "llm_generate_content",
+                {
+                    "model": model,
+                    "provider": target_provider.value,
+                    "model_type": model_type.value,
+                    "duration_ms": duration_ms,
+                    "has_function_declarations": function_declarations is not None,
+                    "enable_thinking": enable_thinking,
+                },
+            )
+
+            logger.info(
+                f"Generated content using {target_provider.value}/{model} in {duration_ms:.2f}ms"
+            )
+
+            return response
+        except Exception as e:
+            end_time = time.time()
+            duration_ms = (end_time - start_time) * 1000
+
+            # Track failures too
+            track_event(
+                "llm_generate_content_error",
+                {
+                    "model": model,
+                    "provider": target_provider.value,
+                    "model_type": model_type.value,
+                    "duration_ms": duration_ms,
+                    "error": str(e),
+                },
+            )
+
+            logger.error(
+                f"Error generating content with {target_provider.value}/{model}: {e}"
+            )
+            raise
 
     def send_message_stream(
         self,
