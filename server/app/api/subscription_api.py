@@ -499,6 +499,10 @@ async def handle_stripe_webhook(
                         )
                         return {"success": False}
 
+                    # Check if subscription is being scheduled for cancellation
+                    cancel_at_period_end = stripe_sub.get("cancel_at_period_end", False)
+                    previous_cancel_at_period_end = subscription.cancel_at_period_end
+
                     # Update with new data
                     subscription_crud.update_subscription_status(
                         db,
@@ -515,10 +519,35 @@ async def handle_stripe_webhook(
                             if stripe_sub.get("current_period_end")
                             else None
                         ),
-                        cancel_at_period_end=stripe_sub.get(
-                            "cancel_at_period_end", False
-                        ),
+                        cancel_at_period_end=cancel_at_period_end,
                     )
+
+                    # Track subscription cancellation event when cancel_at_period_end changes to True
+                    if cancel_at_period_end and not previous_cancel_at_period_end:
+                        track_event(
+                            event_name="subscription_canceled",
+                            properties={
+                                "subscription_id": subscription_id,
+                                "customer_id": stripe_sub.get("customer"),
+                                "interval": (
+                                    "yearly"
+                                    if stripe_received_price_id == YEARLY_PRICE_ID
+                                    else "monthly"
+                                ),
+                                "canceled_at": (
+                                    datetime.fromtimestamp(
+                                        stripe_sub.get("canceled_at", 0)
+                                    ).isoformat()
+                                    if stripe_sub.get("canceled_at")
+                                    else None
+                                ),
+                                "cancel_at_period_end": True,
+                            },
+                            user_id=str(subscription.user_id),
+                        )
+                        logger.info(
+                            f"Subscription {subscription_id} scheduled for cancellation at period end"
+                        )
 
                     logger.info(
                         f"Subscription {subscription_id} updated to status: {stripe_sub.status}"
