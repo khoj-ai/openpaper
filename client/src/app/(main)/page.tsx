@@ -328,6 +328,7 @@ export default function Home() {
 					onFileSelect={handleFileUpload}
 					onUrlClick={handleLinkClick}
 					maxSizeMb={15} // Set desired max size
+					maxPapers={1}
 				/>
 
 				{/* Section break and header for relevant papers */}

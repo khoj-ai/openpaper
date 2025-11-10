@@ -11,9 +11,10 @@ interface PdfDropzoneProps {
     onUrlClick: () => void;
     maxSizeMb?: number;
     disabled?: boolean;
+    maxPapers?: number;
 }
 
-export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 15, disabled = false }: PdfDropzoneProps) {
+export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 15, disabled = false, maxPapers = MAX_PAPERS_TO_UPLOAD }: PdfDropzoneProps) {
     const [isDragging, setIsDragging] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -32,8 +33,8 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 15, disabled
     };
 
     const processFiles = (files: File[]) => {
-        if (files.length > MAX_PAPERS_TO_UPLOAD) {
-            setError(`You can upload a maximum of ${MAX_PAPERS_TO_UPLOAD} papers at a time.`);
+        if (files.length > maxPapers) {
+            setError(`You can upload a maximum of ${maxPapers} papers at a time.`);
             return;
         }
         const validFiles = files.filter(handleFileValidation);
@@ -80,7 +81,7 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 15, disabled
         if (e.dataTransfer) {
             e.dataTransfer.items.clear();
         }
-    }, [onFileSelect, maxSize, maxSizeMb, disabled]);
+    }, [onFileSelect, maxSize, maxSizeMb, disabled, maxPapers]);
 
     const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (disabled) return;
@@ -118,7 +119,7 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 15, disabled
                     accept=".pdf"
                     className="hidden"
                     onChange={handleFileInputChange}
-                    multiple
+                    multiple={maxPapers > 1}
                     disabled={disabled}
                 />
                 <UploadCloud className={`h-12 w-12 mb-4 ${isDragging && !disabled ? 'text-primary' : 'text-muted-foreground'}`} />
@@ -126,7 +127,9 @@ export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 15, disabled
                     Click to upload, or drag and drop
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">
-                    Select up to 10 papers, up to {maxSizeMb}MB each
+                    {maxPapers === 1
+                        ? `Upload a paper up to ${maxSizeMb}MB`
+                        : `Select up to ${maxPapers} papers, up to ${maxSizeMb}MB each`}
                 </p>
                 {error && <p className="text-sm text-destructive mt-2">{error}</p>}
             </div>
