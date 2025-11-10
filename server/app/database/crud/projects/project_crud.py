@@ -2,6 +2,7 @@ import logging
 from typing import List, Optional
 
 from app.database.crud.projects.project_base_crud import ProjectBaseCRUD
+from app.database.crud.user_crud import user as user_crud
 from app.database.models import (
     ConversableType,
     Conversation,
@@ -127,6 +128,21 @@ class ProjectCRUD(ProjectBaseCRUD[Project, ProjectCreate, ProjectUpdate]):
                 exc_info=True,
             )
             return []
+
+    def has_role(
+        self, db: Session, *, project_id: str, user_id: str, role: ProjectRoles
+    ) -> bool:
+        """Check if a user has a specific role in a project."""
+        project_role = (
+            db.query(ProjectRole)
+            .filter(
+                ProjectRole.project_id == project_id,
+                ProjectRole.user_id == user_id,
+                ProjectRole.role == role,
+            )
+            .first()
+        )
+        return project_role is not None
 
 
 project_crud = ProjectCRUD(Project)

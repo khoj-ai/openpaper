@@ -249,6 +249,87 @@ def send_profile_email(
         logger.error(f"Failed to send profile email: {e}", exc_info=True)
 
 
+def send_general_invite_email(
+    to_email: str,
+    from_name: str,
+    invite_link: str,
+) -> bool:
+    """
+    Send a general invitation email using Resend.
+
+    Args:
+        to_email: Recipient email address
+        from_name: Name of the person sending the invite
+        invite_link: Link to accept the invitation
+
+    Returns:
+        bool: True if email was sent successfully, False otherwise
+    """
+    try:
+        subject = f"{from_name} invited you to join Open Paper"
+        html_content = (
+            load_email_template("general_invite.html")
+            .replace("{{from_name}}", from_name)
+            .replace("{{invite_link}}", invite_link)
+        )
+
+        payload = resend.Emails.SendParams = {  # type: ignore
+            "from": f"Open Paper <noreply@updates.openpaper.ai>",
+            "to": to_email,
+            "subject": subject,
+            "html": html_content,
+        }
+
+        resend.Emails.send(payload)  # type: ignore
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to send invite email to {to_email}: {e}", exc_info=True)
+        return False
+
+
+def send_project_invite_email(
+    to_email: str,
+    from_name: str,
+    project_title: str,
+    invite_link: str,
+) -> bool:
+    """
+    Send a project invitation email using Resend.
+
+    Args:
+        to_email: Recipient email address
+        from_name: Name of the person sending the invite
+        project_title: Title of the project
+        invite_link: Link to accept the invitation
+
+    Returns:
+        bool: True if email was sent successfully, False otherwise
+    """
+    try:
+        subject = f"{from_name} invited you to collaborate on '{project_title}'"
+        html_content = (
+            load_email_template("project_invite.html")
+            .replace("{{from_name}}", from_name)
+            .replace("{{project_title}}", project_title)
+            .replace("{{invite_link}}", invite_link)
+        )
+
+        payload = resend.Emails.SendParams = {  # type: ignore
+            "from": f"Open Paper <noreply@updates.openpaper.ai>",
+            "to": to_email,
+            "subject": subject,
+            "html": html_content,
+        }
+
+        resend.Emails.send(payload)  # type: ignore
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to send invite email to {to_email}: {e}", exc_info=True)
+        return False
+
+
 def send_email(
     to_email: str,
     subject: str,

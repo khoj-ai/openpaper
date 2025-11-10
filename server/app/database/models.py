@@ -98,6 +98,8 @@ class SubscriptionStatus(str, Enum):
 
 class ProjectRoles(str, Enum):
     ADMIN = "admin"
+    EDITOR = "editor"
+    VIEWER = "viewer"
 
 
 class User(Base):
@@ -492,6 +494,20 @@ class Project(Base):
         ),
         overlaps="audio_overview_jobs",
     )
+
+
+class ProjectRoleInvitation(Base):
+    __tablename__ = "project_role_invitations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id = Column(
+        UUID(as_uuid=True), ForeignKey("project.id", ondelete="CASCADE"), nullable=False
+    )
+    email = Column(String, nullable=False)
+    role = Column(String, nullable=False)
+    invited_at = Column(DateTime(timezone=True), server_default=func.now())
+    accepted_at = Column(DateTime(timezone=True), nullable=True)
+    token = Column(String, unique=True, nullable=False, index=True)
 
 
 class ProjectRole(Base):
