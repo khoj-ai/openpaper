@@ -1,8 +1,8 @@
 """add project invitations
 
-Revision ID: f613e69bab69
+Revision ID: 8afed8ffae09
 Revises: 3f9510f9b35c
-Create Date: 2025-11-11 00:30:27.685462+00:00
+Create Date: 2025-11-11 01:27:17.410141+00:00
 
 """
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "f613e69bab69"
+revision: str = "8afed8ffae09"
 down_revision: Union[str, None] = "3f9510f9b35c"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -26,6 +26,7 @@ def upgrade() -> None:
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column("project_id", sa.UUID(), nullable=False),
         sa.Column("email", sa.String(), nullable=False),
+        sa.Column("invited_by", sa.UUID(), nullable=False),
         sa.Column("role", sa.String(), nullable=False),
         sa.Column(
             "invited_at",
@@ -45,6 +46,10 @@ def upgrade() -> None:
             sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=True,
+        ),
+        sa.ForeignKeyConstraint(
+            ["invited_by"],
+            ["users.id"],
         ),
         sa.ForeignKeyConstraint(["project_id"], ["project.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
