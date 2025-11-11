@@ -11,7 +11,7 @@ from app.database.models import (
     ProjectRoles,
 )
 from app.helpers.email import (
-    YOUR_DOMAIN,
+    CLIENT_DOMAIN,
     send_general_invite_email,
     send_project_invite_email,
 )
@@ -30,6 +30,7 @@ class ProjectRoleInvitationBase(BaseModel):
 
 class ProjectRoleInvitationCreate(ProjectRoleInvitationBase):
     project_id: str
+    invited_by: str
 
 
 class ProjectRoleInvitationUpdate(BaseModel):
@@ -69,6 +70,7 @@ class ProjectRoleInvitationCRUD(
                 project_id=obj_in.project_id,
                 email=obj_in.email,
                 role=obj_in.role,
+                invited_by=obj_in.invited_by,
             )
             db.add(db_obj)
             db.commit()
@@ -134,7 +136,10 @@ class ProjectRoleInvitationCRUD(
 
             # Create the invitation
             invitation_create = ProjectRoleInvitationCreate(
-                project_id=project_id, email=email, role=role
+                project_id=project_id,
+                email=email,
+                role=role,
+                invited_by=str(inviting_user.id),
             )
             invitation = self.create(db, obj_in=invitation_create, user=inviting_user)
 
@@ -144,7 +149,7 @@ class ProjectRoleInvitationCRUD(
                     logger.error(f"Project with id {project_id} not found.")
                     return invitation
 
-                invite_link = f"{YOUR_DOMAIN}/project/{project_id}/accept-invite"
+                invite_link = f"{CLIENT_DOMAIN}/project/{project_id}/accept-invite"
 
                 if invited_user:
                     send_project_invite_email(
@@ -239,6 +244,19 @@ class ProjectRoleInvitationCRUD(
                 exc_info=True,
             )
             return False
+
+    def get_pending_invitations_for_email(
+        self, db: Session, *, email: str
+    ) -> list[ProjectRoleInvitation]:
+        """Get all pending invitations for a given email."""
+        return (
+            db.query(ProjectRoleInvitation)
+            .filter(
+                ProjectRoleInvitation.email == email,
+                ProjectRoleInvitation.accepted_at == None,
+            )
+            .all()
+        )
 
 
 project_role_invitation_crud = ProjectRoleInvitationCRUD(ProjectRoleInvitation)
