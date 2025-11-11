@@ -19,6 +19,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+@router.get("/{project_id}")
+async def get_project_invitations(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """Get all invitations for a project"""
+    invitations = project_role_invitation_crud.get_by_project(
+        db, project_id=project_id, user=current_user
+    )
+    return JSONResponse(status_code=200, content={"invitations": invitations})
+
+
 @router.post("/{project_id}/invite")
 async def invite_user_to_project(
     project_id: str,

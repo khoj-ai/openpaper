@@ -204,3 +204,76 @@ async def delete_project(
             status_code=400,
             content={"message": f"Failed to delete project: {str(e)}"},
         )
+
+
+@projects_router.get("/{project_id}/collaborators")
+async def get_project_collaborators(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+) -> JSONResponse:
+    """Get all collaborators for a specific project"""
+    try:
+        roles = project_crud.get_all_roles(db, project_id=project_id, user=current_user)
+
+        collaborators = [
+            {
+                "user_id": role.user_id,
+                "picture": role.user.picture,
+                "name": role.user.name,
+                "role": role.role,
+            }
+            for role in roles
+        ]
+
+        return JSONResponse(
+            status_code=200,
+            content=collaborators,
+        )
+    except Exception as e:
+        logger.error(f"Error fetching collaborators for project {project_id}: {e}")
+        return JSONResponse(
+            status_code=400,
+            content={"message": f"Failed to fetch collaborators: {str(e)}"},
+        )
+
+
+@projects_router.delete("/{project_id}/collaborators/{user_id}")
+async def remove_project_collaborator(
+    project_id: str,
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+) -> JSONResponse:
+    """Remove a collaborator from a specific project"""
+    try:
+        project_role = project_crud.remove_collaborator(
+            db, project_id=project_id, user_id=user_id, user=current_user
+        )
+
+        if not project_role:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "message": f"Collaborator with ID {user_id} not found in project {project_id} or insufficient permissions."
+                },
+            )
+
+        track_event(
+            "project_collaborator_removed",
+            user_id=str(current_user.id),
+            properties={"removed_user_id": user_id, "project_id": project_id},
+        )
+
+        return JSONResponse(
+            status_code=200,
+            content={"message": "Collaborator removed successfully"},
+        )
+    except Exception as e:
+        logger.error(
+            f"Error removing collaborator {user_id} from project {project_id}: {e}"
+        )
+        return JSONResponse(
+            status_code=400,
+            content={"message": f"Failed to remove collaborator: {str(e)}"},
+        )
