@@ -209,14 +209,14 @@ export interface PaperImage {
 }
 
 export interface JobStatusResponse {
-	job_id: string;
-	status: JobStatusType;
-	started_at: string;
-	completed_at: string | null;
-	paper_id: string | null;
-	has_file_url: boolean;
-	has_metadata: boolean;
-	celery_progress_message: string | null;
+    job_id: string;
+    status: JobStatusType;
+    started_at: string;
+    completed_at: string | null;
+    paper_id: string | null;
+    has_file_url: boolean;
+    has_metadata: boolean;
+    celery_progress_message: string | null;
 }
 
 export interface PaperTag {
@@ -293,4 +293,21 @@ export interface PdfUploadResponse {
 export interface MinimalJob {
     jobId: string;
     fileName: string;
+}
+
+export type ProjectRole = 'admin' | 'editor' | 'viewer';
+
+export interface Collaborator {
+    id: string;
+    name: string;
+    picture: string;
+    email: string;
+    role: ProjectRole;
+}
+
+export interface PendingInvite {
+    id?: string;
+    email: string;
+    role: ProjectRole;
+    invited_at: string;
 }
