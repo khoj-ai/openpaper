@@ -3,7 +3,7 @@ import logging
 import os
 import random
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 
 from app.auth.dependencies import get_current_user, get_required_user
