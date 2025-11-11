@@ -176,6 +176,9 @@ class User(Base):
     paper_tags = relationship(
         "PaperTag", back_populates="user", cascade="all, delete-orphan"
     )
+    invitations = relationship(
+        "ProjectRoleInvitation", back_populates="inviter", cascade="all, delete-orphan"
+    )
 
 
 class Session(Base):
@@ -504,9 +507,15 @@ class ProjectRoleInvitation(Base):
         UUID(as_uuid=True), ForeignKey("project.id", ondelete="CASCADE"), nullable=False
     )
     email = Column(String, nullable=False)
+    invited_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     role = Column(String, nullable=False)
     invited_at = Column(DateTime(timezone=True), server_default=func.now())
     accepted_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    inviter = relationship(
+        "User", foreign_keys=[invited_by], back_populates="invitations"
+    )
 
 
 class ProjectRole(Base):
