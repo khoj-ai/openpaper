@@ -218,10 +218,11 @@ async def get_project_collaborators(
 
         collaborators = [
             {
-                "user_id": role.user_id,
+                "id": role.id,
                 "picture": role.user.picture,
                 "name": role.user.name,
                 "role": role.role,
+                "email": role.user.email,
             }
             for role in roles
         ]
@@ -238,31 +239,31 @@ async def get_project_collaborators(
         )
 
 
-@projects_router.delete("/{project_id}/collaborators/{user_id}")
+@projects_router.delete("/{project_id}/collaborators/{role_id}")
 async def remove_project_collaborator(
     project_id: str,
-    user_id: str,
+    role_id: str,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_required_user),
 ) -> JSONResponse:
     """Remove a collaborator from a specific project"""
     try:
         project_role = project_crud.remove_collaborator(
-            db, project_id=project_id, user_id=user_id, user=current_user
+            db, project_id=project_id, role_id=role_id, user=current_user
         )
 
         if not project_role:
             return JSONResponse(
                 status_code=404,
                 content={
-                    "message": f"Collaborator with ID {user_id} not found in project {project_id} or insufficient permissions."
+                    "message": f"Collaborator with ID {role_id} not found in project {project_id} or insufficient permissions."
                 },
             )
 
         track_event(
             "project_collaborator_removed",
             user_id=str(current_user.id),
-            properties={"removed_user_id": user_id, "project_id": project_id},
+            properties={"removed_role_id": role_id, "project_id": project_id},
         )
 
         return JSONResponse(
@@ -271,7 +272,7 @@ async def remove_project_collaborator(
         )
     except Exception as e:
         logger.error(
-            f"Error removing collaborator {user_id} from project {project_id}: {e}"
+            f"Error removing collaborator {role_id} from project {project_id}: {e}"
         )
         return JSONResponse(
             status_code=400,
