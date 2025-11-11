@@ -507,7 +507,6 @@ class ProjectRoleInvitation(Base):
     role = Column(String, nullable=False)
     invited_at = Column(DateTime(timezone=True), server_default=func.now())
     accepted_at = Column(DateTime(timezone=True), nullable=True)
-    token = Column(String, unique=True, nullable=False, index=True)
 
 
 class ProjectRole(Base):
