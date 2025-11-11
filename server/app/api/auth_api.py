@@ -443,6 +443,9 @@ async def email_verify(
         if new_user:
             redirect_url += "&welcome=true"
             add_to_default_audience(email=email, name=None)
+            send_onboarding_email(
+                email=str(db_user.email), name=str(db_user.name) or None
+            )
 
         # Create JSON response with redirect info
         response_data = {
