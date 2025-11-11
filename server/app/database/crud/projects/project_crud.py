@@ -144,5 +144,50 @@ class ProjectCRUD(ProjectBaseCRUD[Project, ProjectCreate, ProjectUpdate]):
         )
         return project_role is not None
 
+    def get_all_roles(
+        self, db: Session, *, project_id: str, user: CurrentUser
+    ) -> List[ProjectRole]:
+        """Get all roles for a specific project."""
+        project = self.get(db, id=project_id, user=user)
+        if not project:
+            return []
+
+        return db.query(ProjectRole).filter(ProjectRole.project_id == project_id).all()
+
+    def remove_collaborator(
+        self, db: Session, *, project_id: str, user_id: str, user: CurrentUser
+    ) -> Optional[ProjectRole]:
+        """Remove a collaborator from a specific project."""
+        admin_project_role = self.has_role(
+            db, project_id=project_id, user_id=str(user.id), role=ProjectRoles.ADMIN
+        )
+
+        if not admin_project_role:
+            return None
+
+        project_role = (
+            db.query(ProjectRole)
+            .filter(
+                ProjectRole.project_id == project_id,
+                ProjectRole.user_id == user_id,
+            )
+            .first()
+        )
+
+        if not project_role:
+            return None
+
+        try:
+            db.delete(project_role)
+            db.commit()
+            return project_role
+        except Exception as e:
+            db.rollback()
+            logger.error(
+                f"Error removing collaborator {user_id} from project {project_id}: {str(e)}",
+                exc_info=True,
+            )
+            return None
+
 
 project_crud = ProjectCRUD(Project)
