@@ -96,6 +96,20 @@ class ProjectRoleInvitationCRUD(
             .first()
         )
 
+    def get_by_project(
+        self, db: Session, *, project_id: str, user: CurrentUser
+    ) -> list[ProjectRoleInvitation]:
+        project = project_crud.get(db, id=project_id, user=user)
+
+        if not project:
+            return []
+
+        return (
+            db.query(self.model)
+            .filter(ProjectRoleInvitation.project_id == project_id)
+            .all()
+        )
+
     def invite_user(
         self,
         db: Session,
