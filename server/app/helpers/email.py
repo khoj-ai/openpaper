@@ -14,7 +14,7 @@ RESEND_MAIN_AUDIENCE_ID = os.getenv("RESEND_MAIN_AUDIENCE_ID")
 
 resend.api_key = RESEND_API_KEY
 
-YOUR_DOMAIN = os.getenv("CLIENT_DOMAIN", "http://localhost:3000")
+CLIENT_DOMAIN = os.getenv("CLIENT_DOMAIN", "http://localhost:3000")
 
 REPLY_TO_DEFAULT_EMAIL = "saba@openpaper.ai"
 
@@ -167,7 +167,7 @@ def notify_billing_issue(email: str, issue: str, name: Union[str, None] = None) 
         issue (str): The type of billing issue (e.g., "payment").
     """
     try:
-        manage_url = f"{YOUR_DOMAIN}/pricing"
+        manage_url = f"{CLIENT_DOMAIN}/pricing"
         payload = resend.Emails.SendParams = {  # type: ignore
             "from": "Open Paper <support@updates.openpaper.ai>",
             "reply_to": REPLY_TO_DEFAULT_EMAIL,
