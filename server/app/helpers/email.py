@@ -252,7 +252,6 @@ def send_profile_email(
 def send_general_invite_email(
     to_email: str,
     from_name: str,
-    invite_link: str,
 ) -> bool:
     """
     Send a general invitation email using Resend.
@@ -260,17 +259,17 @@ def send_general_invite_email(
     Args:
         to_email: Recipient email address
         from_name: Name of the person sending the invite
-        invite_link: Link to accept the invitation
 
     Returns:
         bool: True if email was sent successfully, False otherwise
     """
     try:
+        signup_link = "https://openpaper.ai/login"
         subject = f"{from_name} invited you to join Open Paper"
         html_content = (
             load_email_template("general_invite.html")
             .replace("{{from_name}}", from_name)
-            .replace("{{invite_link}}", invite_link)
+            .replace("{{signup_link}}", signup_link)
         )
 
         payload = resend.Emails.SendParams = {  # type: ignore
