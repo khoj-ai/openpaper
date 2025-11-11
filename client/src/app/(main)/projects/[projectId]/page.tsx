@@ -53,6 +53,7 @@ import { useSubscription, isPaperUploadAtLimit, isChatCreditAtLimit } from "@/ho
 import { toast } from "sonner";
 import ConversationCard from "@/components/ConversationCard";
 import Artifacts from "@/components/Artifacts";
+import { ProjectCollaborators } from "@/components/ProjectCollaborators";
 
 interface PdfUploadResponse {
 	message: string;
@@ -549,6 +550,7 @@ export default function ProjectPage() {
 
 				{/* Right side - Papers */}
 				<div className="w-full lg:w-1/3 px-4">
+
 					<div className="flex justify-between items-center mb-4">
 						<h2 className="text-2xl font-bold">Papers</h2>
 						<Sheet open={isAddPapersSheetOpen} onOpenChange={(isOpen) => {
@@ -595,7 +597,7 @@ export default function ProjectPage() {
 												<div className="relative">
 													<Library className="w-12 h-12 text-gray-400 group-hover:text-blue-500 mb-4 transition-colors" />
 													<div className="absolute -top-1 -right-1 w-5 h-5 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-														<span className="text-xs font-medium text-blue-600 dark:text-blue-300"><BookOpen className="h-4 w-4"/></span>
+														<span className="text-xs font-medium text-blue-600 dark:text-blue-300"><BookOpen className="h-4 w-4" /></span>
 													</div>
 												</div>
 												<h3 className="text-lg font-semibold group-hover:text-blue-600 transition-colors">Add from Library</h3>
@@ -700,6 +702,9 @@ export default function ProjectPage() {
 							</Dialog>
 						</div>
 					)}
+					<div className="mt-6">
+						<ProjectCollaborators projectId={projectId} currentUserIsAdmin={true} />
+					</div>
 				</div>
 			</div>
 
