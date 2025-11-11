@@ -155,7 +155,7 @@ class ProjectCRUD(ProjectBaseCRUD[Project, ProjectCreate, ProjectUpdate]):
         return db.query(ProjectRole).filter(ProjectRole.project_id == project_id).all()
 
     def remove_collaborator(
-        self, db: Session, *, project_id: str, user_id: str, user: CurrentUser
+        self, db: Session, *, project_id: str, role_id: str, user: CurrentUser
     ) -> Optional[ProjectRole]:
         """Remove a collaborator from a specific project."""
         admin_project_role = self.has_role(
@@ -169,7 +169,7 @@ class ProjectCRUD(ProjectBaseCRUD[Project, ProjectCreate, ProjectUpdate]):
             db.query(ProjectRole)
             .filter(
                 ProjectRole.project_id == project_id,
-                ProjectRole.user_id == user_id,
+                ProjectRole.id == role_id,
             )
             .first()
         )
@@ -184,7 +184,7 @@ class ProjectCRUD(ProjectBaseCRUD[Project, ProjectCreate, ProjectUpdate]):
         except Exception as e:
             db.rollback()
             logger.error(
-                f"Error removing collaborator {user_id} from project {project_id}: {str(e)}",
+                f"Error removing collaborator {role_id} from project {project_id}: {str(e)}",
                 exc_info=True,
             )
             return None
