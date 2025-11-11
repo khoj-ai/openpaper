@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import List, Optional
 
 from app.database.crud.base_crud import CRUDBase
 from app.database.crud.projects.project_crud import project_crud
@@ -176,7 +176,6 @@ class ProjectRoleInvitationCRUD(
                     send_general_invite_email(
                         to_email=email,
                         from_name=str(inviting_user.name),
-                        invite_link=invite_link,
                     )
 
             return invitation
@@ -188,6 +187,28 @@ class ProjectRoleInvitationCRUD(
                 exc_info=True,
             )
             return None
+
+    def invite_users(
+        self,
+        db: Session,
+        *,
+        project_id: str,
+        invites: List[ProjectRoleInvitationBase],
+        inviting_user: CurrentUser,
+    ) -> list[ProjectRoleInvitation]:
+        """Invite multiple users to a project with a specific role by creating invitations."""
+        invitations = []
+        for invite in invites:
+            invitation = self.invite_user(
+                db,
+                project_id=project_id,
+                email=invite.email,
+                role=invite.role,
+                inviting_user=inviting_user,
+            )
+            if invitation:
+                invitations.append(invitation)
+        return invitations
 
     def accept_invitation(
         self, db: Session, *, invitation_id: str, user: CurrentUser
@@ -271,6 +292,49 @@ class ProjectRoleInvitationCRUD(
             )
             .all()
         )
+
+    def retract_invitation(
+        self, db: Session, *, invitation_id: str, user: CurrentUser
+    ) -> bool:
+        """Retract a project invitation."""
+        try:
+            invitation: ProjectRoleInvitation | None = (
+                db.query(ProjectRoleInvitation)
+                .filter(ProjectRoleInvitation.id == invitation_id)
+                .first()
+            )
+
+            if not invitation:
+                logger.warning(
+                    f"Invitation {invitation_id} not found for retraction by user {user.id}"
+                )
+                return False
+
+            # Check if the user has admin role in the project
+            if not project_crud.has_role(
+                db,
+                project_id=str(invitation.project_id),
+                user_id=str(user.id),
+                role=ProjectRoles.ADMIN,
+            ):
+                logger.warning(
+                    f"User {user.id} does not have admin role in project {invitation.project_id} for retraction"
+                )
+                return False
+
+            # Delete the invitation
+            db.delete(invitation)
+            db.commit()
+
+            return True
+
+        except Exception as e:
+            db.rollback()
+            logger.error(
+                f"Error retracting invitation {invitation_id} by user {user.id}: {str(e)}",
+                exc_info=True,
+            )
+            return False
 
 
 project_role_invitation_crud = ProjectRoleInvitationCRUD(ProjectRoleInvitation)
