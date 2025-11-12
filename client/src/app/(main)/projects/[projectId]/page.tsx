@@ -656,7 +656,7 @@ export default function ProjectPage() {
 						<div className="grid grid-cols-1 gap-4">
 							{papers.slice(0, showAllPapers ? papers.length : 7).map((paper, index) => (
 								<div key={paper.id} className="animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
-									<PaperCard paper={paper} minimalist={true} projectId={projectId} onUnlink={getProjectPapers} />
+									<PaperCard paper={paper} minimalist={true} projectId={projectId} onUnlink={getProjectPapers} is_owner={paper.is_owner} />
 								</div>
 							))}
 							{papers.length > 7 && !showAllPapers && (
