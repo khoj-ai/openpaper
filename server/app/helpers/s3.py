@@ -4,12 +4,12 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from typing import Optional
-from urllib.parse import urlparse
 
 import boto3
 import requests
+from app.database.crud.paper_crud import PaperUpdate, paper_crud
 from app.database.crud.projects.project_paper_crud import project_paper_crud
-from app.database.models import Paper
+from app.database.models import Paper, User
 from app.schemas.user import CurrentUser
 from botocore.exceptions import ClientError
 from sqlalchemy.orm import Session
@@ -242,8 +242,6 @@ class S3Service:
         Returns:
             str: Presigned URL or None if error
         """
-        from app.database.crud.paper_crud import PaperUpdate, paper_crud
-
         try:
             # Get the paper using CRUD
             paper = paper_crud.get(db, id=paper_id, user=current_user)
@@ -312,7 +310,6 @@ class S3Service:
         Returns:
             bool: True if invalidated successfully
         """
-        from app.database.crud.paper_crud import PaperUpdate, paper_crud
 
         try:
             paper = paper_crud.get(db, id=paper_id, user=current_user)
@@ -346,8 +343,6 @@ class S3Service:
         """
         Get a cached presigned URL for a paper owned by a specific user (used for shared papers)
         """
-        from app.database.crud.paper_crud import PaperUpdate, paper_crud
-        from app.database.models import User
 
         try:
             # Get the owner user object
@@ -401,6 +396,64 @@ class S3Service:
 
         # Generate and return the presigned URL
         return self.generate_presigned_url(object_key, expiration)
+
+    def duplicate_file(
+        self, source_object_key: str, new_filename: str
+    ) -> tuple[str, str]:
+        """
+        Duplicate a file in S3
+
+        Args:
+            source_object_key: The S3 object key of the source file
+            new_filename: The filename for the duplicated file
+
+        Returns:
+            tuple: New S3 object key and public URL
+        """
+        try:
+            # Generate a unique key for the new S3 object
+            new_object_key = f"{UPLOAD_DIR}/{uuid.uuid4()}-{new_filename}"
+
+            # Copy the object within S3
+            copy_source = {"Bucket": self.bucket_name, "Key": source_object_key}
+            self.s3_client.copy_object(
+                CopySource=copy_source,
+                Bucket=self.bucket_name,
+                Key=new_object_key,
+            )
+
+            # Generate the URL for the duplicated file
+            file_url = f"https://{self.cloudflare_bucket_name}/{new_object_key}"
+
+            return new_object_key, file_url
+
+        except ClientError as e:
+            logger.error(f"Error duplicating file in S3: {e}")
+            raise
+
+    def duplicate_file_from_url(self, s3_url: str, new_filename: str):
+        """
+        Duplicate a file in S3 given its URL
+
+        Args:
+            s3_url: The S3 URL of the source file
+            new_filename: The filename for the duplicated file
+
+        Returns:
+            tuple: New S3 object key and public URL
+        """
+        try:
+            # Extract the object key from the URL
+            parsed_url = s3_url.split(f"https://{self.cloudflare_bucket_name}/")
+            if len(parsed_url) != 2:
+                raise ValueError("Invalid S3 URL format")
+            source_object_key = parsed_url[1]
+
+            return self.duplicate_file(source_object_key, new_filename)
+
+        except Exception as e:
+            logger.error(f"Error duplicating file from URL in S3: {e}")
+            raise
 
 
 # Create a single instance to use throughout the application
