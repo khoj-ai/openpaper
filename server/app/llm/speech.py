@@ -1,12 +1,9 @@
-import asyncio
-import base64
 import os
 import tempfile
 from typing import Literal, Tuple
 
 import openai
 from app.helpers.s3 import s3_service
-from openai.types.chat import ChatCompletionAudioParam
 
 
 class OpenAISpeaker:
