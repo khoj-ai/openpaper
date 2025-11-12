@@ -218,7 +218,7 @@ async def get_project_collaborators(
 
         collaborators = [
             {
-                "id": role.id,
+                "id": str(role.id),
                 "picture": role.user.picture,
                 "name": role.user.name,
                 "role": role.role,
@@ -232,7 +232,9 @@ async def get_project_collaborators(
             content=collaborators,
         )
     except Exception as e:
-        logger.error(f"Error fetching collaborators for project {project_id}: {e}")
+        logger.error(
+            f"Error fetching collaborators for project {project_id}: {e}", exc_info=True
+        )
         return JSONResponse(
             status_code=400,
             content={"message": f"Failed to fetch collaborators: {str(e)}"},
