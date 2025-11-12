@@ -417,8 +417,12 @@ class Paper(Base):
     doi = Column(String, nullable=True)  # Digital Object Identifier
     size_in_kb = Column(Integer, nullable=True)  # Size of the paper file in KB
 
-    # OpenAlex metadata
-    open_alex_id = Column(String, nullable=True)  # OpenAlex ID for the paper
+    # Some papers can be forked/duplicated from other papers (across users). To handle this, we store the parent paper ID of the original paper.
+    parent_paper_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("papers.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     user = relationship("User", back_populates="papers")
     conversations = relationship(
