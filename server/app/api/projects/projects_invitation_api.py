@@ -30,6 +30,32 @@ class BulkInviteRequest(BaseModel):
     invites: list[InviteUser]
 
 
+@router.get("/user")
+async def get_user_invitations(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """Get all invitations for the current user"""
+    invitations = project_role_invitation_crud.get_pending_invitations_for_email(
+        db, email=current_user.email
+    )
+
+    payload = [
+        {
+            "id": str(inv.id),
+            "project_id": str(inv.project_id),
+            "project_name": inv.project.title if inv.project else None,
+            "email": inv.email,
+            "role": str(inv.role),
+            "invited_at": str(inv.invited_at),
+            "invited_by": inv.inviter.email if inv.inviter else None,
+            "accepted_at": str(inv.accepted_at) if inv.accepted_at else None,
+        }
+        for inv in invitations
+    ]
+    return JSONResponse(status_code=200, content={"invitations": payload})
+
+
 @router.get("/{project_id}")
 async def get_project_invitations(
     project_id: str,
@@ -47,30 +73,8 @@ async def get_project_invitations(
             "email": inv.email,
             "role": str(inv.role),
             "invited_at": str(inv.invited_at),
-        }
-        for inv in invitations
-    ]
-    return JSONResponse(status_code=200, content={"invitations": payload})
-
-
-@router.get("/user")
-async def get_user_invitations(
-    db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_required_user),
-):
-    """Get all invitations for the current user"""
-    invitations = project_role_invitation_crud.get_pending_invitations_for_email(
-        db, email=current_user.email
-    )
-
-    payload = [
-        {
-            "id": str(inv.id),
-            "project_id": str(inv.project_id),
-            "email": inv.email,
-            "role": str(inv.role),
-            "invited_at": str(inv.invited_at),
-            "accepted_at": str(inv.accepted_at) if inv.accepted_at else None,
+            "invited_by": inv.inviter.email if inv.inviter else None,
+            "project_name": inv.project.title if inv.project else None,
         }
         for inv in invitations
     ]

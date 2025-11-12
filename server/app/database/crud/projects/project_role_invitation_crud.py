@@ -17,7 +17,7 @@ from app.helpers.email import (
 )
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel, EmailStr
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +106,10 @@ class ProjectRoleInvitationCRUD(
 
         return (
             db.query(self.model)
+            .options(
+                joinedload(ProjectRoleInvitation.inviter),
+                joinedload(ProjectRoleInvitation.project),
+            )
             .filter(ProjectRoleInvitation.project_id == project_id)
             .all()
         )
@@ -286,6 +290,10 @@ class ProjectRoleInvitationCRUD(
         """Get all pending invitations for a given email."""
         return (
             db.query(ProjectRoleInvitation)
+            .options(
+                joinedload(ProjectRoleInvitation.inviter),
+                joinedload(ProjectRoleInvitation.project),
+            )
             .filter(
                 ProjectRoleInvitation.email == email,
                 ProjectRoleInvitation.accepted_at == None,
