@@ -240,6 +240,7 @@ export interface PaperItem {
     file_url?: string
     size_in_kb?: number
     tags?: PaperTag[]
+    is_owner?: boolean
 }
 
 export interface CreditUsage {
