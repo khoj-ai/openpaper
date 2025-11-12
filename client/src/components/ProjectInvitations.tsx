@@ -84,26 +84,30 @@ export function ProjectInvitations({ onInvitationAccepted, defaultOpen = false }
 	const handleReject = async (invitationId: string) => {
 		setProcessingIds(prev => new Set(prev).add(invitationId));
 
-		// Simulate API delay
-		await new Promise(resolve => setTimeout(resolve, 800));
+		try {
+			await fetchFromApi(`/api/projects/invitations/modify/${invitationId}/reject`, {
+				method: 'POST',
+			});
 
-		toast.success("Invitation rejected");
+			toast.success("Invitation rejected");
 
-		// Remove the rejected invitation from the list
-		setInvitations(prev => prev.filter(inv => inv.id !== invitationId));
-
-		setProcessingIds(prev => {
-			const next = new Set(prev);
-			next.delete(invitationId);
-			return next;
-		});
+			// Remove the rejected invitation from the list
+			setInvitations(prev => prev.filter(inv => inv.id !== invitationId));
+		} catch (error) {
+			console.error('Failed to reject invitation:', error);
+			toast.error(error instanceof Error ? error.message : 'Failed to reject invitation');
+		} finally {
+			setProcessingIds(prev => {
+				const next = new Set(prev);
+				next.delete(invitationId);
+				return next;
+			});
+		}
 	};
 
 	if (pendingCount === 0) {
 		return null;
 	}
-
-	console.log("pending invitations:", invitations.filter(inv => !inv.accepted_at));
 
 	return (
 		<>
