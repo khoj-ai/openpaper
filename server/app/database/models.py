@@ -497,6 +497,9 @@ class Project(Base):
         ),
         overlaps="audio_overview_jobs",
     )
+    invitations = relationship(
+        "ProjectRoleInvitation", back_populates="project", cascade="all, delete-orphan"
+    )
 
 
 class ProjectRoleInvitation(Base):
@@ -515,6 +518,9 @@ class ProjectRoleInvitation(Base):
     # Relationships
     inviter = relationship(
         "User", foreign_keys=[invited_by], back_populates="invitations"
+    )
+    project = relationship(
+        "Project", back_populates="invitations", foreign_keys=[project_id]
     )
 
 
