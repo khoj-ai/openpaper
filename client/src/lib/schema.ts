@@ -311,3 +311,14 @@ export interface PendingInvite {
     role: ProjectRole;
     invited_at: string;
 }
+
+export interface ProjectInvitation {
+	id: string;
+	project_id: string;
+	project_name: string;
+	invited_by: string;
+	email: string;
+	role: string;
+	accepted_at?: string;
+	invited_at: string;
+}
