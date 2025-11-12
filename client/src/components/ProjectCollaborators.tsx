@@ -39,27 +39,40 @@ import { Collaborator, PendingInvite } from '@/lib/schema';
 import { fetchFromApi } from '@/lib/api';
 import { Badge } from './ui/badge';
 
-// Mock data for collaborators
-const mockCollaborators: Collaborator[] = [
-	{ id: '1', name: 'Alice', picture: 'https://github.com/alice.png', email: 'alice@example.com', role: 'admin' },
-	{ id: '2', name: 'Bob', picture: 'https://github.com/bob.png', email: 'bob@example.com', role: 'editor' },
-	{ id: '3', name: 'Charlie', picture: 'https://github.com/charlie.png', email: 'charlie@example.com', role: 'viewer' },
-	{ id: '4', name: 'David', picture: 'https://github.com/david.png', email: 'david@example.com', role: 'viewer' },
-	{ id: '5', name: 'Eve', picture: 'https://github.com/eve.png', email: 'eve@example.com', role: 'editor' },
-];
-
 interface ProjectCollaboratorsProps {
 	projectId: string;
 	currentUserIsAdmin: boolean;
 }
 
 export function ProjectCollaborators({ projectId, currentUserIsAdmin }: ProjectCollaboratorsProps) {
-	const [collaborators, setCollaborators] = useState<Collaborator[]>(mockCollaborators);
+	const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
 	const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 	const [draftInvites, setDraftInvites] = useState<PendingInvite[]>([{ email: '', role: 'viewer', invited_at: '' }]);
 	const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
 	const [isExpanded, setIsExpanded] = useState(false);
 	const [isSending, setIsSending] = useState(false);
+	const [isLoading, setIsLoading] = useState(true);
+
+	// Load collaborators on mount
+	useEffect(() => {
+		const loadCollaborators = async () => {
+			try {
+				setIsLoading(true);
+				const response: Collaborator[] = await fetchFromApi(`/api/projects/${projectId}/collaborators`);
+
+				if (response) {
+					setCollaborators(response);
+				}
+			} catch (error) {
+				console.error('Error loading collaborators:', error);
+				toast.error('Failed to load collaborators.');
+			} finally {
+				setIsLoading(false);
+			}
+		};
+
+		loadCollaborators();
+	}, [projectId]);
 
 	// Load pending invites on mount
 	useEffect(() => {
@@ -224,7 +237,8 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin }: ProjectC
 												<SelectContent>
 													<SelectItem value="viewer">Viewer</SelectItem>
 													<SelectItem value="editor">Editor</SelectItem>
-													<SelectItem value="admin">Admin</SelectItem>
+													{/* Don't allow Admin selection for now for simplicity */}
+													{/* <SelectItem value="admin">Admin</SelectItem> */}
 												</SelectContent>
 											</Select>
 										</div>
@@ -256,8 +270,21 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin }: ProjectC
 				)}
 			</CardHeader>
 			<CardContent>
-				<div className="space-y-4">
-					{displayedCollaborators.map((collaborator: Collaborator) => (
+				{isLoading ? (
+					<div className="space-y-4">
+						{[1, 2, 3].map((i) => (
+							<div key={i} className="flex items-center space-x-4 animate-pulse">
+								<div className="h-10 w-10 rounded-full bg-muted" />
+								<div className="flex-1 space-y-2">
+									<div className="h-4 bg-muted rounded w-1/3" />
+									<div className="h-3 bg-muted rounded w-1/2" />
+								</div>
+							</div>
+						))}
+					</div>
+				) : (
+					<div className="space-y-4">
+						{displayedCollaborators.map((collaborator: Collaborator) => (
 						<div key={collaborator.id} className="flex items-center justify-between">
 							<div className="flex items-center space-x-4">
 								<Avatar>
@@ -284,7 +311,7 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin }: ProjectC
 											<AlertDialogHeader>
 												<AlertDialogTitle>Remove Collaborator</AlertDialogTitle>
 												<AlertDialogDescription>
-													Are you sure you want to remove {collaborator.name} from the project? You will have to invite them again to add them back.
+													Are you sure you want to remove <b>{collaborator.name}</b> from the project? You will have to invite them again to add them back.
 												</AlertDialogDescription>
 											</AlertDialogHeader>
 											<AlertDialogFooter>
@@ -351,8 +378,9 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin }: ProjectC
 							</div>
 						</>
 					)}
-				</div>
-				{collaborators.length > 3 && (
+					</div>
+				)}
+				{!isLoading && collaborators.length > 3 && (
 					<div className="mt-4">
 						<Button variant="link" onClick={() => setIsExpanded(!isExpanded)} className="p-0 h-auto">
 							{isExpanded ? 'Show less' : `See all (${collaborators.length})`}
