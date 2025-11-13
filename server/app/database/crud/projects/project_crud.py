@@ -144,6 +144,19 @@ class ProjectCRUD(ProjectBaseCRUD[Project, ProjectCreate, ProjectUpdate]):
         )
         return project_role is not None
 
+    def get_role_in_project(
+        self, db: Session, *, project_id: str, user: CurrentUser
+    ) -> ProjectRoles | None:
+        project_role = (
+            db.query(ProjectRole)
+            .filter(
+                ProjectRole.project_id == project_id,
+                ProjectRole.user_id == str(user.id),
+            )
+            .first()
+        )
+        return project_role.role if project_role else None
+
     def get_all_roles(
         self, db: Session, *, project_id: str, user: CurrentUser
     ) -> List[ProjectRole]:
