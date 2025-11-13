@@ -23,6 +23,7 @@ import { PdfViewer } from "@/components/PdfViewer";
 
 interface ConversationViewProps {
 	messages: ChatMessage[];
+	isOwner: boolean;
 	papers: PaperItem[];
 	isStreaming: boolean;
 	streamingChunks: string[];
@@ -47,6 +48,7 @@ interface ConversationViewProps {
 
 export const ConversationView = ({
 	messages,
+	isOwner,
 	papers,
 	isStreaming,
 	streamingChunks,
@@ -154,94 +156,94 @@ export const ConversationView = ({
 	);
 
 	const memoizedMessages = messages.map((msg, index) => (
+		<div
+			key={`${msg.id || `msg-${index}`}-${msg.role}`} // Use a stable and unique key
+			className="flex flex-row gap-2 items-end transition-all duration-300 ease-in-out"
+		>
 			<div
-				key={`${msg.id || `msg-${index}`}-${msg.role}`} // Use a stable and unique key
-				className="flex flex-row gap-2 items-end transition-all duration-300 ease-in-out"
+				data-message-index={index}
+				className={`relative group prose dark:prose-invert !max-w-full transition-all duration-300 ease-in-out ${msg.role === "user"
+					? "text-lg w-fit animate-fade-in line-clamp-3 mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-600 px-2 py-2 rounded-xl border border-blue-100 dark:border-gray-600"
+					: "w-full text-primary"
+					}`}
 			>
-				<div
-					data-message-index={index}
-					className={`relative group prose dark:prose-invert !max-w-full transition-all duration-300 ease-in-out ${msg.role === "user"
-						? "text-lg w-fit animate-fade-in line-clamp-3 mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-600 px-2 py-2 rounded-xl border border-blue-100 dark:border-gray-600"
-						: "w-full text-primary"
-						}`}
-				>
-					<Markdown
-						remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
-						rehypePlugins={[rehypeKatex]}
-						components={{
-							p: (props) => (
-								<CustomCitationLink
-									{...props}
-									handleCitationClick={handleCitationClick}
-									messageIndex={index}
-									citations={msg.references?.citations || []}
-									papers={papers}
-								/>
-							),
-							li: (props) => (
-								<CustomCitationLink
-									{...props}
-									handleCitationClick={handleCitationClick}
-									messageIndex={index}
-									citations={msg.references?.citations || []}
-									papers={papers}
-								/>
-							),
-							div: (props) => (
-								<CustomCitationLink
-									{...props}
-									handleCitationClick={handleCitationClick}
-									messageIndex={index}
-									citations={msg.references?.citations || []}
-									papers={papers}
-								/>
-							),
-							td: (props) => (
-								<CustomCitationLink
-									{...props}
-									handleCitationClick={handleCitationClick}
-									messageIndex={index}
-									citations={msg.references?.citations || []}
-									papers={papers}
-								/>
-							),
-							table: (props) => (
-								<div className="overflow-x-auto">
-									<table {...props} className="min-w-full border-collapse" />
-								</div>
-							),
-						}}
-					>
-						{msg.content}
-					</Markdown>
-					{msg.role === "assistant" && (
-						<ChatMessageActions message={msg.content} references={msg.references} />
-					)}
-					{msg.references && msg.references["citations"]?.length > 0 && (
-						<div>
-							<div
-								className="mt-0 pt-0 border-t border-gray-300 dark:border-gray-700"
-								id="references-section"
-							>
-								<h4 className="text-sm font-semibold mb-2">References</h4>
-							</div>
-							<ReferencePaperCards
-								citations={msg.references.citations}
-								papers={papers}
-								messageId={msg.id}
+				<Markdown
+					remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
+					rehypePlugins={[rehypeKatex]}
+					components={{
+						p: (props) => (
+							<CustomCitationLink
+								{...props}
+								handleCitationClick={handleCitationClick}
 								messageIndex={index}
-								highlightedPaper={
-									highlightedInfo && highlightedInfo.messageIndex === index
-										? highlightedInfo.paperId
-										: null
-								}
-								onHighlightClear={() => setHighlightedInfo(null)}
+								citations={msg.references?.citations || []}
+								papers={papers}
 							/>
+						),
+						li: (props) => (
+							<CustomCitationLink
+								{...props}
+								handleCitationClick={handleCitationClick}
+								messageIndex={index}
+								citations={msg.references?.citations || []}
+								papers={papers}
+							/>
+						),
+						div: (props) => (
+							<CustomCitationLink
+								{...props}
+								handleCitationClick={handleCitationClick}
+								messageIndex={index}
+								citations={msg.references?.citations || []}
+								papers={papers}
+							/>
+						),
+						td: (props) => (
+							<CustomCitationLink
+								{...props}
+								handleCitationClick={handleCitationClick}
+								messageIndex={index}
+								citations={msg.references?.citations || []}
+								papers={papers}
+							/>
+						),
+						table: (props) => (
+							<div className="overflow-x-auto">
+								<table {...props} className="min-w-full border-collapse" />
+							</div>
+						),
+					}}
+				>
+					{msg.content}
+				</Markdown>
+				{msg.role === "assistant" && (
+					<ChatMessageActions message={msg.content} references={msg.references} />
+				)}
+				{msg.references && msg.references["citations"]?.length > 0 && (
+					<div>
+						<div
+							className="mt-0 pt-0 border-t border-gray-300 dark:border-gray-700"
+							id="references-section"
+						>
+							<h4 className="text-sm font-semibold mb-2">References</h4>
 						</div>
-					)}
-				</div>
+						<ReferencePaperCards
+							citations={msg.references.citations}
+							papers={papers}
+							messageId={msg.id}
+							messageIndex={index}
+							highlightedPaper={
+								highlightedInfo && highlightedInfo.messageIndex === index
+									? highlightedInfo.paperId
+									: null
+							}
+							onHighlightClear={() => setHighlightedInfo(null)}
+						/>
+					</div>
+				)}
 			</div>
-		));
+		</div>
+	));
 
 	return (
 		<div className="flex flex-row w-full h-full">
@@ -397,7 +399,7 @@ export const ConversationView = ({
 										: "Ask a follow-up"
 								}
 								className="pr-16 resize-none w-full bg-secondary"
-								disabled={isStreaming || papers.length === 0 || chatCreditLimitReached}
+								disabled={isStreaming || papers.length === 0 || chatCreditLimitReached || !isOwner}
 								onKeyDown={(e) => {
 									if (e.key === "Enter" && !e.shiftKey) {
 										e.preventDefault();
@@ -409,7 +411,7 @@ export const ConversationView = ({
 								type="submit"
 								variant="ghost"
 								className="absolute top-1/2 right-2 -translate-y-1/2"
-								disabled={isStreaming || papers.length === 0 || chatCreditLimitReached}
+								disabled={isStreaming || papers.length === 0 || chatCreditLimitReached || !isOwner}
 							>
 								<ArrowUp className="h-5 w-5" />
 							</Button>

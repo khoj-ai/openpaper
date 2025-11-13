@@ -71,6 +71,9 @@ export interface Conversation {
     id: string;
     title: string;
     updated_at: string;
+    is_owner?: boolean;
+    owner_picture?: string;
+    owner_name?: string;
 }
 
 
@@ -283,6 +286,7 @@ export interface Project {
     num_conversations?: number;
     created_at: string;
     updated_at: string;
+    current_user_role?: ProjectRole;
 }
 
 export interface PdfUploadResponse {
