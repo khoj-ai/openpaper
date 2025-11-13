@@ -84,6 +84,8 @@ async def get_project_conversations(
                 "id": str(conv.id),
                 "title": conv.title,
                 "is_owner": conv.user_id == current_user.id,
+                "owner_picture": conv.user.picture,
+                "owner_name": conv.user.name,
                 "updated_at": conv.updated_at.isoformat(),
             }
             for conv in conversations

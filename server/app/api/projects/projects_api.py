@@ -127,9 +127,16 @@ async def get_project(
                 status_code=404,
                 content={"message": f"Project with ID {project_id} not found."},
             )
+        project_payload = project.to_dict()
+
+        current_user_role = project_crud.get_role_in_project(
+            db, project_id=project_id, user=current_user
+        )
+        project_payload["current_user_role"] = current_user_role
+
         return JSONResponse(
             status_code=200,
-            content=project.to_dict(),
+            content=project_payload,
         )
     except Exception as e:
         logger.error(f"Error fetching project: {e}")
