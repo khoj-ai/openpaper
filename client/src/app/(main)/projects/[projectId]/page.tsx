@@ -82,7 +82,8 @@ export default function ProjectPage() {
 	const [isAddPapersSheetOpen, setIsAddPapersSheetOpen] = useState(false);
 	const [addPapersView, setAddPapersView] = useState<'initial' | 'upload' | 'library'>('initial');
 	const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
-	const [showAllPapers, setShowAllPapers] = useState(false);
+	const [showAllOwnedPapers, setShowAllOwnedPapers] = useState(false);
+	const [showAllOtherPapers, setShowAllOtherPapers] = useState(false);
 	const { subscription } = useSubscription();
 
 	const chatDisabled = isChatCreditAtLimit(subscription);
@@ -653,20 +654,55 @@ export default function ProjectPage() {
 					</div>
 
 					{papers && papers.length > 0 ? (
-						<div className="grid grid-cols-1 gap-4">
-							{papers.slice(0, showAllPapers ? papers.length : 7).map((paper, index) => (
-								<div key={paper.id} className="animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
-									<PaperCard paper={paper} minimalist={true} projectId={projectId} onUnlink={getProjectPapers} is_owner={paper.is_owner} />
+						(() => {
+							const ownedPapers = papers.filter(p => p.is_owner);
+							const otherPapers = papers.filter(p => !p.is_owner);
+							const papersToShow = 3;
+
+							return (
+								<div className="flex flex-col gap-6">
+									{ownedPapers.length > 0 && (
+										<div>
+											<h3 className="text-lg font-semibold mb-3 text-gray-700 dark:text-gray-300">Your Papers</h3>
+											<div className="grid grid-cols-1 gap-4">
+												{ownedPapers.slice(0, showAllOwnedPapers ? ownedPapers.length : papersToShow).map((paper, index) => (
+													<div key={paper.id} className="animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
+														<PaperCard paper={paper} minimalist={true} projectId={projectId} onUnlink={getProjectPapers} is_owner={paper.is_owner} />
+													</div>
+												))}
+											</div>
+											{ownedPapers.length > papersToShow && !showAllOwnedPapers && (
+												<div className="mt-4 text-left">
+													<Button variant="outline" onClick={() => setShowAllOwnedPapers(true)}>
+														Show All {ownedPapers.length}
+													</Button>
+												</div>
+											)}
+										</div>
+									)}
+
+									{otherPapers.length > 0 && (
+										<div>
+											<h3 className="text-lg font-semibold mb-3 text-gray-700 dark:text-gray-300">From Collaborators</h3>
+											<div className="grid grid-cols-1 gap-4">
+												{otherPapers.slice(0, showAllOtherPapers ? otherPapers.length : papersToShow).map((paper, index) => (
+													<div key={paper.id} className="animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
+														<PaperCard paper={paper} minimalist={true} projectId={projectId} onUnlink={getProjectPapers} is_owner={paper.is_owner} />
+													</div>
+												))}
+											</div>
+											{otherPapers.length > papersToShow && !showAllOtherPapers && (
+												<div className="mt-4 text-left">
+													<Button variant="outline" onClick={() => setShowAllOtherPapers(true)}>
+														Show All {otherPapers.length}
+													</Button>
+												</div>
+											)}
+										</div>
+									)}
 								</div>
-							))}
-							{papers.length > 7 && !showAllPapers && (
-								<div className="mt-4 text-center">
-									<Button variant="outline" onClick={() => setShowAllPapers(true)}>
-										Show More
-									</Button>
-								</div>
-							)}
-						</div>
+							)
+						})()
 					) : (
 						<div className="text-center p-8 border-dashed border-2 border-gray-300 rounded-xl bg-gray-50">
 							<div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">

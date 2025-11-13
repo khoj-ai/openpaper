@@ -81,7 +81,7 @@ export default function PaperCard({ paper, handleDelete, setPaper, minimalist = 
 	};
 
 	return (
-		<Card key={paper.id} className={`overflow-hidden transition-shadow ${minimalist ? 'p-0 border-none shadow-none w-full rounded-none !bg-transparent' : 'pt-2 pb-0 hover:shadow-md'}`}>
+		<Card key={paper.id} className={`relative overflow-hidden transition-shadow ${minimalist ? 'p-0 border-none shadow-none w-full rounded-none !bg-transparent' : 'pt-2 pb-0 hover:shadow-md'}`}>
 			<div className={`flex items-start ${minimalist ? 'w-full' : ''}`}>
 				<div className="flex-grow">
 					<div className="flex h-fit flex-col md:flex-row">
