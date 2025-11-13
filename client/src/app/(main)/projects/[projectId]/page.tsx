@@ -744,7 +744,7 @@ export default function ProjectPage() {
 						</div>
 					)}
 					<div className="mt-6">
-						<ProjectCollaborators projectId={projectId} currentUserIsAdmin={true} />
+						<ProjectCollaborators projectId={projectId} currentUserIsAdmin={project.current_user_role === "admin"} />
 					</div>
 				</div>
 			</div>

@@ -38,6 +38,7 @@ import { X } from 'lucide-react';
 import { Collaborator, PendingInvite } from '@/lib/schema';
 import { fetchFromApi } from '@/lib/api';
 import { Badge } from './ui/badge';
+import { getAlphaHashToBackgroundColor, getInitials } from '@/lib/utils';
 
 interface ProjectCollaboratorsProps {
 	projectId: string;
@@ -289,7 +290,9 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin }: ProjectC
 							<div className="flex items-center space-x-4">
 								<Avatar>
 									<AvatarImage src={collaborator.picture} alt={collaborator.name} />
-									<AvatarFallback>{collaborator.name.charAt(0).toUpperCase()}</AvatarFallback>
+									<AvatarFallback className={getAlphaHashToBackgroundColor(collaborator.name)}>
+										{getInitials(collaborator.name)}
+									</AvatarFallback>
 								</Avatar>
 								<div>
 									<p className="font-medium">{collaborator.name}</p>
