@@ -28,6 +28,7 @@ import {
 	DialogTrigger,
 	DialogDescription
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -663,7 +664,9 @@ export default function ProjectPage() {
 								<div className="flex flex-col gap-6">
 									{ownedPapers.length > 0 && (
 										<div>
-											<h3 className="text-lg font-semibold mb-3 text-gray-700 dark:text-gray-300">Your Papers</h3>
+											<div className="mb-3">
+												<Badge variant="secondary">Your Papers</Badge>
+											</div>
 											<div className="grid grid-cols-1 gap-4">
 												{ownedPapers.slice(0, showAllOwnedPapers ? ownedPapers.length : papersToShow).map((paper, index) => (
 													<div key={paper.id} className="animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
@@ -673,7 +676,7 @@ export default function ProjectPage() {
 											</div>
 											{ownedPapers.length > papersToShow && !showAllOwnedPapers && (
 												<div className="mt-4 text-left">
-													<Button variant="outline" onClick={() => setShowAllOwnedPapers(true)}>
+													<Button variant="ghost" className="p-0 h-auto" onClick={() => setShowAllOwnedPapers(true)}>
 														Show All {ownedPapers.length}
 													</Button>
 												</div>
@@ -683,7 +686,9 @@ export default function ProjectPage() {
 
 									{otherPapers.length > 0 && (
 										<div>
-											<h3 className="text-lg font-semibold mb-3 text-gray-700 dark:text-gray-300">From Collaborators</h3>
+											<div className="mb-3">
+												<Badge variant="secondary">From Collaborators</Badge>
+											</div>
 											<div className="grid grid-cols-1 gap-4">
 												{otherPapers.slice(0, showAllOtherPapers ? otherPapers.length : papersToShow).map((paper, index) => (
 													<div key={paper.id} className="animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
@@ -693,7 +698,7 @@ export default function ProjectPage() {
 											</div>
 											{otherPapers.length > papersToShow && !showAllOtherPapers && (
 												<div className="mt-4 text-left">
-													<Button variant="outline" onClick={() => setShowAllOtherPapers(true)}>
+													<Button variant="ghost" className="p-0 h-auto" onClick={() => setShowAllOtherPapers(true)}>
 														Show All {otherPapers.length}
 													</Button>
 												</div>
