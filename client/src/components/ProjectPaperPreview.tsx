@@ -84,7 +84,6 @@ export function ProjectPaperPreview({ paper }: ProjectPaperPreviewProps) {
                             Duplicate
                         </Button>
                     </div>
-                    <p className="text-sm my-4 break-words max-h-[20vh] overflow-y-auto">{paper.abstract}</p>
                 </div>
                 <div className="flex-grow overflow-auto">
                     {paper.file_url && (
