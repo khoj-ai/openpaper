@@ -14,7 +14,7 @@ RESEND_MAIN_AUDIENCE_ID = os.getenv("RESEND_MAIN_AUDIENCE_ID")
 
 resend.api_key = RESEND_API_KEY
 
-YOUR_DOMAIN = os.getenv("CLIENT_DOMAIN", "http://localhost:3000")
+CLIENT_DOMAIN = os.getenv("CLIENT_DOMAIN", "http://localhost:3000")
 
 REPLY_TO_DEFAULT_EMAIL = "saba@openpaper.ai"
 
@@ -167,7 +167,7 @@ def notify_billing_issue(email: str, issue: str, name: Union[str, None] = None) 
         issue (str): The type of billing issue (e.g., "payment").
     """
     try:
-        manage_url = f"{YOUR_DOMAIN}/pricing"
+        manage_url = f"{CLIENT_DOMAIN}/pricing"
         payload = resend.Emails.SendParams = {  # type: ignore
             "from": "Open Paper <support@updates.openpaper.ai>",
             "reply_to": REPLY_TO_DEFAULT_EMAIL,
@@ -252,7 +252,6 @@ def send_profile_email(
 def send_general_invite_email(
     to_email: str,
     from_name: str,
-    invite_link: str,
 ) -> bool:
     """
     Send a general invitation email using Resend.
@@ -260,17 +259,17 @@ def send_general_invite_email(
     Args:
         to_email: Recipient email address
         from_name: Name of the person sending the invite
-        invite_link: Link to accept the invitation
 
     Returns:
         bool: True if email was sent successfully, False otherwise
     """
     try:
+        signup_link = "https://openpaper.ai/login"
         subject = f"{from_name} invited you to join Open Paper"
         html_content = (
             load_email_template("general_invite.html")
             .replace("{{from_name}}", from_name)
-            .replace("{{invite_link}}", invite_link)
+            .replace("{{signup_link}}", signup_link)
         )
 
         payload = resend.Emails.SendParams = {  # type: ignore
@@ -292,7 +291,6 @@ def send_project_invite_email(
     to_email: str,
     from_name: str,
     project_title: str,
-    invite_link: str,
 ) -> bool:
     """
     Send a project invitation email using Resend.
@@ -301,12 +299,12 @@ def send_project_invite_email(
         to_email: Recipient email address
         from_name: Name of the person sending the invite
         project_title: Title of the project
-        invite_link: Link to accept the invitation
 
     Returns:
         bool: True if email was sent successfully, False otherwise
     """
     try:
+        invite_link = f"{CLIENT_DOMAIN}/projects?openInvites=true"
         subject = f"{from_name} invited you to collaborate on '{project_title}'"
         html_content = (
             load_email_template("project_invite.html")

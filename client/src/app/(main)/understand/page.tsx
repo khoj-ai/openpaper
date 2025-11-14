@@ -360,6 +360,7 @@ function UnderstandPageContent() {
         <div className="h-[calc(100vh-64px)] mx-2">
             <ConversationView
                 messages={messages}
+                isOwner={true}
                 papers={papers}
                 isStreaming={isStreaming}
                 streamingChunks={streamingChunks}

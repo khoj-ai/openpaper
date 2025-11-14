@@ -28,6 +28,7 @@ import {
 	DialogTrigger,
 	DialogDescription
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -53,6 +54,7 @@ import { useSubscription, isPaperUploadAtLimit, isChatCreditAtLimit } from "@/ho
 import { toast } from "sonner";
 import ConversationCard from "@/components/ConversationCard";
 import Artifacts from "@/components/Artifacts";
+import { ProjectCollaborators } from "@/components/ProjectCollaborators";
 
 interface PdfUploadResponse {
 	message: string;
@@ -65,6 +67,7 @@ export default function ProjectPage() {
 	const projectId = params.projectId as string;
 	const [project, setProject] = useState<Project | null>(null);
 	const [papers, setPapers] = useState<PaperItem[]>([]);
+	const [hasCollaborators, setHasCollaborators] = useState<boolean>(false);
 	const [conversations, setConversations] = useState<Conversation[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -81,7 +84,8 @@ export default function ProjectPage() {
 	const [isAddPapersSheetOpen, setIsAddPapersSheetOpen] = useState(false);
 	const [addPapersView, setAddPapersView] = useState<'initial' | 'upload' | 'library'>('initial');
 	const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
-	const [showAllPapers, setShowAllPapers] = useState(false);
+	const [showAllOwnedPapers, setShowAllOwnedPapers] = useState(false);
+	const [showAllOtherPapers, setShowAllOtherPapers] = useState(false);
 	const { subscription } = useSubscription();
 
 	const chatDisabled = isChatCreditAtLimit(subscription);
@@ -129,8 +133,6 @@ export default function ProjectPage() {
 			console.error(err);
 		}
 	}, [projectId]);
-
-
 
 	const handleDeleteConversation = async (conversationId: string) => {
 		try {
@@ -458,37 +460,41 @@ export default function ProjectPage() {
 				{/* Left side - Conversations */}
 				<div className="w-full lg:w-2/3 px-4">
 					{/* Conversation Input */}
-					{papers.length > 0 ? (
-						<div className="mb-6">
-							<form onSubmit={handleNewQuerySubmit} className="relative">
-								<Textarea
-									placeholder={chatDisabled ? "Nice! You have used your chat credits for the week. Upgrade your plan to use more." : "Ask a question about your papers, analyze findings, or explore new ideas..."}
-									value={newQuery}
-									onChange={(e) => {
-										setNewQuery(e.target.value)
-									}}
-									onKeyDown={handleKeyDown}
-									className="min-h-[80px] resize-none pr-12 border-none dark:border-none focus:border-blue-400 focus:ring-transparent bg-secondary dark:bg-accent text-primary"
-									disabled={chatDisabled || isSubmitting}
-								/>
-								<Button
-									type="submit"
-									disabled={!newQuery.trim() || chatDisabled || isSubmitting}
-									size="sm"
-									className="absolute bottom-3 right-3 h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-								>
-									{isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-								</Button>
-							</form>
-						</div>
-					) : (
-						<div className="mb-6 text-center p-8 border-dashed border-2 border-gray-300 rounded-xl bg-gray-50">
-							<div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-								<MessageCircle className="w-8 h-8 text-gray-400" />
-							</div>
-							<h3 className="text-lg font-semibold text-gray-600 mb-2">Ready to Start Conversations</h3>
-							<p className="text-gray-500">Add papers to your project to begin discussing and analyzing them.</p>
-						</div>
+					{project?.current_user_role !== 'viewer' && (
+						<>
+							{papers.length > 0 ? (
+								<div className="mb-6">
+									<form onSubmit={handleNewQuerySubmit} className="relative">
+										<Textarea
+											placeholder={chatDisabled ? "Nice! You have used your chat credits for the week. Upgrade your plan to use more." : "Ask a question about your papers, analyze findings, or explore new ideas..."}
+											value={newQuery}
+											onChange={(e) => {
+												setNewQuery(e.target.value)
+											}}
+											onKeyDown={handleKeyDown}
+											className="min-h-[80px] resize-none pr-12 border-none dark:border-none focus:border-blue-400 focus:ring-transparent bg-secondary dark:bg-accent text-primary"
+											disabled={chatDisabled || isSubmitting}
+										/>
+										<Button
+											type="submit"
+											disabled={!newQuery.trim() || chatDisabled || isSubmitting}
+											size="sm"
+											className="absolute bottom-3 right-3 h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+										>
+											{isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+										</Button>
+									</form>
+								</div>
+							) : (
+								<div className="mb-6 text-center p-8 border-dashed border-2 border-gray-300 rounded-xl bg-gray-50">
+									<div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+										<MessageCircle className="w-8 h-8 text-gray-400" />
+									</div>
+									<h3 className="text-lg font-semibold text-gray-600 mb-2">Ready to Start Conversations</h3>
+									<p className="text-gray-500">Add papers to your project to begin discussing and analyzing them.</p>
+								</div>
+							)}
+						</>
 					)}
 
 					<div className="flex justify-between items-center mb-4">
@@ -500,7 +506,12 @@ export default function ProjectPage() {
 						{conversations.length > 0 ? (
 							<>
 								{conversations.slice(0, 3).map((convo, index) => (
-									<ConversationCard key={index} convo={convo} href={`/projects/${projectId}/conversations/${convo.id}`} onDelete={handleDeleteConversation} />
+									<ConversationCard
+										key={index}
+										convo={convo}
+										showAvatar={hasCollaborators}
+										href={`/projects/${projectId}/conversations/${convo.id}`}
+										onDelete={handleDeleteConversation} />
 								))}
 								{conversations.length > 3 && (
 									<div className="mt-4 text-left">
@@ -544,127 +555,172 @@ export default function ProjectPage() {
 					</div>
 
 					{/* Artifacts Section */}
-					<Artifacts projectId={projectId} papers={papers} />
+					<Artifacts projectId={projectId} papers={papers} currentUserRole={project.current_user_role} />
 				</div>
 
 				{/* Right side - Papers */}
 				<div className="w-full lg:w-1/3 px-4">
 					<div className="flex justify-between items-center mb-4">
 						<h2 className="text-2xl font-bold">Papers</h2>
-						<Sheet open={isAddPapersSheetOpen} onOpenChange={(isOpen) => {
-							setIsAddPapersSheetOpen(isOpen);
-							if (!isOpen) {
-								setAddPapersView('initial');
-							}
-						}}>
-							<SheetTrigger asChild>
-								<Button variant="outline">
-									<PlusCircle className="mr-2 h-4 w-4" />
-									Add
-								</Button>
-							</SheetTrigger>
-							<SheetContent className="sm:max-w-[90vw]! w-[90vw] overflow-y-auto">
-								<SheetHeader className="px-6">
-									<SheetTitle>Add Papers to Project</SheetTitle>
-								</SheetHeader>
-								<div className="mt-0 px-6">
-									{addPapersView === 'initial' && (
-										<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-											<button
-												onClick={() => setAddPapersView('upload')}
-												className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
-											>
-												<div className="relative">
-													<UploadCloud className="w-12 h-12 text-gray-400 group-hover:text-blue-500 mb-4 transition-colors" />
-													<div className="absolute -top-1 -right-1 w-5 h-5 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-														<span className="text-xs font-medium text-blue-600 dark:text-blue-300"><PlusCircle className="h-4 w-4" /></span>
+						{project?.current_user_role !== 'viewer' && (
+							<Sheet open={isAddPapersSheetOpen} onOpenChange={(isOpen) => {
+								setIsAddPapersSheetOpen(isOpen);
+								if (!isOpen) {
+									setAddPapersView('initial');
+								}
+							}}>
+								<SheetTrigger asChild>
+									<Button variant="outline">
+										<PlusCircle className="mr-2 h-4 w-4" />
+										Add
+									</Button>
+								</SheetTrigger>
+								<SheetContent className="sm:max-w-[90vw]! w-[90vw] overflow-y-auto">
+									<SheetHeader className="px-6">
+										<SheetTitle>Add Papers to Project</SheetTitle>
+									</SheetHeader>
+									<div className="mt-0 px-6">
+										{addPapersView === 'initial' && (
+											<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+												<button
+													onClick={() => setAddPapersView('upload')}
+													className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
+												>
+													<div className="relative">
+														<UploadCloud className="w-12 h-12 text-gray-400 group-hover:text-blue-500 mb-4 transition-colors" />
+														<div className="absolute -top-1 -right-1 w-5 h-5 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+															<span className="text-xs font-medium text-blue-600 dark:text-blue-300"><PlusCircle className="h-4 w-4" /></span>
+														</div>
 													</div>
-												</div>
-												<h3 className="text-lg font-semibold group-hover:text-blue-600 transition-colors">Upload New Papers</h3>
-												<p className="text-sm text-gray-500 text-center mt-1">
-													Upload PDFs from your computer or URL
-												</p>
-												<p className="text-xs mt-2 font-medium">
-													Drag & drop or browse →
-												</p>
-											</button>
-											<button
-												onClick={() => setAddPapersView('library')}
-												className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
-											>
-												<div className="relative">
-													<Library className="w-12 h-12 text-gray-400 group-hover:text-blue-500 mb-4 transition-colors" />
-													<div className="absolute -top-1 -right-1 w-5 h-5 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-														<span className="text-xs font-medium text-blue-600 dark:text-blue-300"><BookOpen className="h-4 w-4"/></span>
+													<h3 className="text-lg font-semibold group-hover:text-blue-600 transition-colors">Upload New Papers</h3>
+													<p className="text-sm text-gray-500 text-center mt-1">
+														Upload PDFs from your computer or URL
+													</p>
+													<p className="text-xs mt-2 font-medium">
+														Drag & drop or browse →
+													</p>
+												</button>
+												<button
+													onClick={() => setAddPapersView('library')}
+													className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
+												>
+													<div className="relative">
+														<Library className="w-12 h-12 text-gray-400 group-hover:text-blue-500 mb-4 transition-colors" />
+														<div className="absolute -top-1 -right-1 w-5 h-5 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+															<span className="text-xs font-medium text-blue-600 dark:text-blue-300"><BookOpen className="h-4 w-4" /></span>
+														</div>
 													</div>
-												</div>
-												<h3 className="text-lg font-semibold group-hover:text-blue-600 transition-colors">Add from Library</h3>
-												<p className="text-sm text-gray-500 text-center mt-1">
-													Choose from papers already in your library
-												</p>
-												<p className="text-xs mt-2 font-medium">
-													Browse existing papers →
-												</p>
-											</button>
-										</div>
-									)}
+													<h3 className="text-lg font-semibold group-hover:text-blue-600 transition-colors">Add from Library</h3>
+													<p className="text-sm text-gray-500 text-center mt-1">
+														Choose from papers already in your library
+													</p>
+													<p className="text-xs mt-2 font-medium">
+														Browse existing papers →
+													</p>
+												</button>
+											</div>
+										)}
 
-									{addPapersView === 'upload' && (
-										<div>
-											<Button variant="ghost" onClick={() => setAddPapersView('initial')} className="mb-4">
-												<ArrowLeft className="mr-2 h-4 w-4" />
-												Back
-											</Button>
-											<h3 className="text-lg font-semibold mb-2">Upload New Papers</h3>
-											<p className="text-sm text-gray-500 mb-4">Upload papers to your library. They will be automatically added to this project.</p>
-											<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} disabled={isPaperUploadAtLimit(subscription)} />
-											{isPaperUploadAtLimit(subscription) && (
-												<Alert variant="destructive" className="mt-4">
-													<AlertCircle className="h-4 w-4" />
-													<AlertTitle>Upload Limit Reached</AlertTitle>
-													<AlertDescription>
-														You have reached your paper upload limit. Please{" "}
-														<Link href="/pricing" className="font-bold underline">
-															upgrade your plan
-														</Link>{" "}
-														to upload more papers.
-													</AlertDescription>
-												</Alert>
-											)}
-											{uploadError && <p className="text-red-500 mt-4">{uploadError}</p>}
-										</div>
-									)}
+										{addPapersView === 'upload' && (
+											<div>
+												<Button variant="ghost" onClick={() => setAddPapersView('initial')} className="mb-4">
+													<ArrowLeft className="mr-2 h-4 w-4" />
+													Back
+												</Button>
+												<h3 className="text-lg font-semibold mb-2">Upload New Papers</h3>
+												<p className="text-sm text-gray-500 mb-4">Upload papers to your library. They will be automatically added to this project.</p>
+												<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} disabled={isPaperUploadAtLimit(subscription)} />
+												{isPaperUploadAtLimit(subscription) && (
+													<Alert variant="destructive" className="mt-4">
+														<AlertCircle className="h-4 w-4" />
+														<AlertTitle>Upload Limit Reached</AlertTitle>
+														<AlertDescription>
+															You have reached your paper upload limit. Please{" "}
+															<Link href="/pricing" className="font-bold underline">
+																upgrade your plan
+															</Link>{" "}
+															to upload more papers.
+														</AlertDescription>
+													</Alert>
+												)}
+												{uploadError && <p className="text-red-500 mt-4">{uploadError}</p>}
+											</div>
+										)}
 
-									{addPapersView === 'library' && (
-										<div>
-											<Button variant="ghost" onClick={() => setAddPapersView('initial')} className="mb-4">
-												<ArrowLeft className="mr-2 h-4 w-4" />
-												Back
-											</Button>
-											<h3 className="text-lg font-semibold mb-2">Add from Library</h3>
-											<AddFromLibrary projectId={projectId} onPapersAdded={getProjectPapers} projectPaperIds={papers.map(p => p.id)} />
-										</div>
-									)}
-								</div>
-							</SheetContent>
-						</Sheet>
+										{addPapersView === 'library' && (
+											<div>
+												<Button variant="ghost" onClick={() => setAddPapersView('initial')} className="mb-4">
+													<ArrowLeft className="mr-2 h-4 w-4" />
+													Back
+												</Button>
+												<h3 className="text-lg font-semibold mb-2">Add from Library</h3>
+												<AddFromLibrary projectId={projectId} onPapersAdded={getProjectPapers} projectPaperIds={papers.map(p => p.id)} />
+											</div>
+										)}
+									</div>
+								</SheetContent>
+							</Sheet>
+						)}
 					</div>
 
 					{papers && papers.length > 0 ? (
-						<div className="grid grid-cols-1 gap-4">
-							{papers.slice(0, showAllPapers ? papers.length : 7).map((paper, index) => (
-								<div key={paper.id} className="animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
-									<PaperCard paper={paper} minimalist={true} projectId={projectId} onUnlink={getProjectPapers} />
+						(() => {
+							const ownedPapers = papers.filter(p => p.is_owner);
+							const otherPapers = papers.filter(p => !p.is_owner);
+							const papersToShow = 3;
+
+							return (
+								<div className="flex flex-col gap-6">
+									{ownedPapers.length > 0 && (
+										<div>
+											{
+												otherPapers.length > 0 && (
+													<div className="mb-3">
+														<Badge variant="secondary">Your Papers</Badge>
+													</div>
+												)
+											}
+											<div className="grid grid-cols-1 gap-4">
+												{ownedPapers.slice(0, showAllOwnedPapers ? ownedPapers.length : papersToShow).map((paper, index) => (
+													<div key={paper.id} className="animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
+														<PaperCard paper={paper} minimalist={true} projectId={projectId} onUnlink={getProjectPapers} is_owner={paper.is_owner} />
+													</div>
+												))}
+											</div>
+											{ownedPapers.length > papersToShow && !showAllOwnedPapers && (
+												<div className="mt-4 text-left">
+													<Button variant="ghost" className="p-0 h-auto" onClick={() => setShowAllOwnedPapers(true)}>
+														Show All {ownedPapers.length}
+													</Button>
+												</div>
+											)}
+										</div>
+									)}
+
+									{otherPapers.length > 0 && (
+										<div>
+											<div className="mb-3">
+												<Badge variant="secondary">From Collaborators</Badge>
+											</div>
+											<div className="grid grid-cols-1 gap-4">
+												{otherPapers.slice(0, showAllOtherPapers ? otherPapers.length : papersToShow).map((paper, index) => (
+													<div key={paper.id} className="animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
+														<PaperCard paper={paper} minimalist={true} projectId={projectId} onUnlink={getProjectPapers} is_owner={paper.is_owner} />
+													</div>
+												))}
+											</div>
+											{otherPapers.length > papersToShow && !showAllOtherPapers && (
+												<div className="mt-4 text-left">
+													<Button variant="ghost" className="p-0 h-auto" onClick={() => setShowAllOtherPapers(true)}>
+														Show All {otherPapers.length}
+													</Button>
+												</div>
+											)}
+										</div>
+									)}
 								</div>
-							))}
-							{papers.length > 7 && !showAllPapers && (
-								<div className="mt-4 text-center">
-									<Button variant="outline" onClick={() => setShowAllPapers(true)}>
-										Show More
-									</Button>
-								</div>
-							)}
-						</div>
+							)
+						})()
 					) : (
 						<div className="text-center p-8 border-dashed border-2 border-gray-300 rounded-xl bg-gray-50">
 							<div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
@@ -700,6 +756,12 @@ export default function ProjectPage() {
 							</Dialog>
 						</div>
 					)}
+					<div className="mt-6">
+						<ProjectCollaborators
+							projectId={projectId}
+							setHasCollaborators={setHasCollaborators}
+							currentUserIsAdmin={project.current_user_role === "admin"} />
+					</div>
 				</div>
 			</div>
 

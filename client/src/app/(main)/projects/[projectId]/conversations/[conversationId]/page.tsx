@@ -47,6 +47,7 @@ function ProjectConversationPageContent() {
 
     const { user, loading: authLoading } = useAuth();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [isOwner, setIsOwner] = useState<boolean>(true);
     const [papers, setPapers] = useState<PaperItem[]>([]);
 
     const [currentMessage, setCurrentMessage] = useState('');
@@ -136,6 +137,7 @@ function ProjectConversationPageContent() {
             const response = await fetchFromApi(`/api/projects/conversations/${projectId}/${id}`);
             if (response && response.messages) {
                 setMessages(response.messages);
+                setIsOwner(response.is_owner);
                 setConversationId(id);
                 setIsCentered(false);
             }
@@ -476,6 +478,7 @@ function ProjectConversationPageContent() {
             <div className="flex-1 min-h-0 pt-4">
                 <ConversationView
                     messages={messages}
+                    isOwner={isOwner}
                     papers={papers}
                     isStreaming={isStreaming}
                     streamingChunks={streamingChunks}

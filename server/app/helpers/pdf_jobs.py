@@ -252,6 +252,11 @@ class PDFJobsClient:
             f"Uploading PDF and submitting job - Size: {len(pdf_bytes)} bytes, Filename: {filename}, Job ID: {job_id}"
         )
 
+        # Track created resources for potential rollback
+        s3_object_key: Optional[str] = None
+        created_paper = None
+        created_project_paper = None
+
         try:
             # Upload PDF to S3
             file_obj = BytesIO(pdf_bytes)
@@ -295,14 +300,14 @@ class PDFJobsClient:
                 casted_uuid = UUID(str(created_paper.id))
 
                 # Create project paper association if project_id is provided
-                project_paper = project_paper_crud.create(
+                created_project_paper = project_paper_crud.create(
                     db=db,
                     obj_in=ProjectPaperCreate(paper_id=casted_uuid),
                     user=user,
                     project_id=project_id,
                 )
 
-                if not project_paper:
+                if not created_project_paper:
                     raise Exception(
                         "Failed to associate paper with project. Check permissions or if the paper already exists in the project."
                     )
@@ -314,7 +319,46 @@ class PDFJobsClient:
 
         except Exception as e:
             error_msg = str(e)
-            print(f"DEBUG: PDF upload and job submission failed: {error_msg}")
+            logger.error(
+                f"PDF upload and job submission failed: {error_msg}", exc_info=True
+            )
+
+            # Rollback: Clean up created resources
+            logger.info("Rolling back created resources due to task submission failure")
+
+            # Remove project paper association if it was created
+            if created_project_paper and project_id and created_paper:
+                try:
+                    project_paper_crud.remove_by_paper_and_project(
+                        db=db,
+                        paper_id=UUID(str(created_paper.id)),
+                        project_id=project_id,
+                        user=user,
+                    )
+                    logger.info(
+                        f"Rolled back project paper association for paper {created_paper.id}"
+                    )
+                except Exception as rollback_error:
+                    logger.error(
+                        f"Failed to rollback project paper association: {rollback_error}"
+                    )
+
+            # Remove paper record if it was created
+            if created_paper and created_paper.id:
+                try:
+                    paper_crud.remove(db=db, id=created_paper.id, user=user)
+                    logger.info(f"Rolled back paper record with ID {created_paper.id}")
+                except Exception as rollback_error:
+                    logger.error(f"Failed to rollback paper record: {rollback_error}")
+
+            # Delete S3 file if it was uploaded
+            if s3_object_key:
+                try:
+                    s3_service.delete_file(s3_object_key)
+                    logger.info(f"Rolled back S3 file with key {s3_object_key}")
+                except Exception as rollback_error:
+                    logger.error(f"Failed to rollback S3 file: {rollback_error}")
+
             raise Exception(
                 f"Failed to upload PDF and submit processing job: {error_msg}"
             ) from e
