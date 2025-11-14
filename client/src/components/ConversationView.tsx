@@ -339,7 +339,7 @@ export const ConversationView = ({
 												<div className="mt-1">
 													<button onClick={() => setIsHistoryOpen(!isHistoryOpen)} className="flex items-center text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
 														{isHistoryOpen ? <ChevronUp className="w-4 h-4 mr-1" /> : <ChevronDown className="w-4 h-4 mr-1" />}
-														<span>Status History</span>
+														<span>Progress</span>
 													</button>
 													{isHistoryOpen && (
 														<ul className="mt-2 border-l border-gray-300 dark:border-gray-600">
