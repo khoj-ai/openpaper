@@ -26,7 +26,7 @@ interface PaperCardProps {
 	is_owner?: boolean;
 }
 
-const PaperCardWrapper = ({ is_owner, paper, children }: { is_owner: boolean, paper: PaperItem, children: React.ReactNode }) => {
+const PaperCardWrapper = ({ is_owner, paper, children, projectId }: { is_owner: boolean, paper: PaperItem, children: React.ReactNode, projectId?: string }) => {
 	const [isOpen, setIsOpen] = React.useState(false);
 
 	if (is_owner) {
@@ -38,7 +38,7 @@ const PaperCardWrapper = ({ is_owner, paper, children }: { is_owner: boolean, pa
 				<div className="block group cursor-pointer">{children}</div>
 			</DialogTrigger>
 			<DialogContent className="max-w-[90vw] sm:max-w-[90vw] h-[90vh] overflow-y-auto p-0">
-				<ProjectPaperPreview paper={paper} />
+				<ProjectPaperPreview paper={paper} projectId={projectId!} />
 			</DialogContent>
 		</Dialog>
 	);
@@ -209,7 +209,7 @@ export default function PaperCard({ paper, handleDelete, setPaper, minimalist = 
 									</div>
 								</div>
 
-								<PaperCardWrapper is_owner={is_owner} paper={paper}>
+								<PaperCardWrapper is_owner={is_owner} paper={paper} projectId={projectId}>
 									<h3 className={`font-semibold text-gray-900 dark:text-gray-100 line-clamp-2 text-sm leading-tight group-hover:underline ${minimalist ? 'p-0 mt-0 text-base rounded-none' : 'text-lg mb-3'}`}>
 										{paper.title}
 									</h3>
