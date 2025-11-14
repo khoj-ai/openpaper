@@ -3,7 +3,7 @@
 import { Loader2, Pause, Play, Volume2, RotateCcw } from "lucide-react";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { fetchFromApi } from "@/lib/api";
-import { AudioOverview, PaperItem, AudioOverviewJob } from "@/lib/schema";
+import { AudioOverview, PaperItem, AudioOverviewJob, ProjectRole } from "@/lib/schema";
 import AudioOverviewGenerationJobCard from "@/components/AudioOverviewGenerationJobCard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,6 +33,7 @@ import { RichAudioOverview } from "./RichAudioOverview";
 interface ArtifactsProps {
     projectId: string;
     papers: PaperItem[];
+    currentUserRole?: ProjectRole;
 }
 
 const audioLengthOptions = [
@@ -41,7 +42,7 @@ const audioLengthOptions = [
     { label: "Long (20+ mins)", value: "long" },
 ];
 
-export default function Artifacts({ projectId, papers }: ArtifactsProps) {
+export default function Artifacts({ projectId, papers, currentUserRole }: ArtifactsProps) {
     const router = useRouter();
     const { subscription, refetch: refetchSubscription } = useSubscription();
     const atAudioLimit = subscription ? isAudioOverviewAtLimit(subscription) : false;
@@ -324,78 +325,80 @@ export default function Artifacts({ projectId, papers }: ArtifactsProps) {
             </div>
 
             <div className="flex flex-wrap gap-3">
-                <Dialog open={isCreateAudioDialogOpen} onOpenChange={setCreateAudioDialogOpen}>
-                    <DialogTrigger asChild>
-                        <button
-                            disabled={papers.length === 0}
-                            className="flex flex-col items-center justify-center p-3 border-2 border-dashed rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed aspect-square w-1/4"
-                        >
-                            <Volume2 className="w-6 h-6 text-gray-400 group-hover:text-blue-500 mb-1 transition-colors" />
-                            <span className="text-xs font-medium text-center leading-tight">Audio Overview</span>
-                        </button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Create an Audio Overview</DialogTitle>
-                            <DialogDescription>
-                                Generate an audio overview of your project papers. Add custom instructions to guide the content.
-                            </DialogDescription>
-                        </DialogHeader>
-                        {atAudioLimit ? (
-                            <div className="mt-4 text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/30 rounded-md">
-                                <p className="text-sm text-yellow-800 dark:text-yellow-200">You&apos;ve used all your audio overviews for this week.</p>
-                                <Link href="/pricing" passHref>
-                                    <Button variant="link" className="p-0 h-auto text-sm">Upgrade your plan to create more.</Button>
-                                </Link>
-                            </div>
-                        ) : (
-                            <div className="space-y-4 mt-4">
-                                <div>
-                                    <Label htmlFor="audio-length" className="text-sm font-medium">
-                                        Audio Length
-                                    </Label>
-                                    <Select value={selectedAudioLength} onValueChange={setSelectedAudioLength}>
-                                        <SelectTrigger className="mt-2">
-                                            <SelectValue placeholder="Select audio length" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {audioLengthOptions.map((option) => (
-                                                <SelectItem key={option.value} value={option.value}>
-                                                    {option.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                {currentUserRole !== ProjectRole.Viewer &&
+                    <Dialog open={isCreateAudioDialogOpen} onOpenChange={setCreateAudioDialogOpen}>
+                        <DialogTrigger asChild>
+                            <button
+                                disabled={papers.length === 0}
+                                className="flex flex-col items-center justify-center p-3 border-2 border-dashed rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed aspect-square w-1/4"
+                            >
+                                <Volume2 className="w-6 h-6 text-gray-400 group-hover:text-blue-500 mb-1 transition-colors" />
+                                <span className="text-xs font-medium text-center leading-tight">Audio Overview</span>
+                            </button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Create an Audio Overview</DialogTitle>
+                                <DialogDescription>
+                                    Generate an audio overview of your project papers. Add custom instructions to guide the content.
+                                </DialogDescription>
+                            </DialogHeader>
+                            {atAudioLimit ? (
+                                <div className="mt-4 text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/30 rounded-md">
+                                    <p className="text-sm text-yellow-800 dark:text-yellow-200">You&apos;ve used all your audio overviews for this week.</p>
+                                    <Link href="/pricing" passHref>
+                                        <Button variant="link" className="p-0 h-auto text-sm">Upgrade your plan to create more.</Button>
+                                    </Link>
                                 </div>
-                                <div>
-                                    <Label htmlFor="audio-instructions" className="text-sm font-medium">
-                                        Custom Instructions (Optional)
-                                    </Label>
-                                    <Textarea
-                                        id="audio-instructions"
-                                        placeholder="Add any specific topics, focus areas, or instructions for the audio overview..."
-                                        value={audioInstructions}
-                                        onChange={(e) => setAudioInstructions(e.target.value)}
-                                        className="mt-2 min-h-[100px] resize-none"
-                                    />
+                            ) : (
+                                <div className="space-y-4 mt-4">
+                                    <div>
+                                        <Label htmlFor="audio-length" className="text-sm font-medium">
+                                            Audio Length
+                                        </Label>
+                                        <Select value={selectedAudioLength} onValueChange={setSelectedAudioLength}>
+                                            <SelectTrigger className="mt-2">
+                                                <SelectValue placeholder="Select audio length" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {audioLengthOptions.map((option) => (
+                                                    <SelectItem key={option.value} value={option.value}>
+                                                        {option.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="audio-instructions" className="text-sm font-medium">
+                                            Custom Instructions (Optional)
+                                        </Label>
+                                        <Textarea
+                                            id="audio-instructions"
+                                            placeholder="Add any specific topics, focus areas, or instructions for the audio overview..."
+                                            value={audioInstructions}
+                                            onChange={(e) => setAudioInstructions(e.target.value)}
+                                            className="mt-2 min-h-[100px] resize-none"
+                                        />
+                                    </div>
                                 </div>
-                            </div>
-                        )}
-                        {!atAudioLimit && (
-                            <div className="flex justify-end gap-2 mt-6">
-                                <DialogClose asChild>
-                                    <Button variant="secondary">
-                                        Cancel
+                            )}
+                            {!atAudioLimit && (
+                                <div className="flex justify-end gap-2 mt-6">
+                                    <DialogClose asChild>
+                                        <Button variant="secondary">
+                                            Cancel
+                                        </Button>
+                                    </DialogClose>
+                                    <Button onClick={handleCreateAudioOverview} disabled={isCreatingAudio || atAudioLimit}>
+                                        {isCreatingAudio ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Volume2 className="mr-2 h-4 w-4" />}
+                                        Create
                                     </Button>
-                                </DialogClose>
-                                <Button onClick={handleCreateAudioOverview} disabled={isCreatingAudio || atAudioLimit}>
-                                    {isCreatingAudio ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Volume2 className="mr-2 h-4 w-4" />}
-                                    Create
-                                </Button>
-                            </div>
-                        )}
-                    </DialogContent>
-                </Dialog>
+                                </div>
+                            )}
+                        </DialogContent>
+                    </Dialog>
+                }
             </div>
 
             {/* Audio Overview Generation Jobs */}
