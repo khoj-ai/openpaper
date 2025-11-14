@@ -174,7 +174,6 @@ class ProjectRoleInvitationCRUD(
                         to_email=email,
                         project_title=project.title,
                         from_name=str(inviting_user.name),
-                        invite_link=invite_link,
                     )
                 else:
                     send_general_invite_email(
