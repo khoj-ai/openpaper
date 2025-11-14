@@ -208,6 +208,12 @@ class MultiPaperOperations(BaseLLMClient):
                 enable_thinking=True,
             )
 
+            if len(llm_response.tool_calls) == 0:
+                logger.info(
+                    "No tool calls returned from LLM, ending evidence gathering."
+                )
+                break
+
             for fn_selected in llm_response.tool_calls:
                 start_time = time.time()
                 fn_name = fn_selected.name
