@@ -6,12 +6,39 @@ import { toast } from "sonner";
 import { citationStyles } from "@/components/utils/paperUtils";
 import { Copy, FilePlus2 } from "lucide-react";
 import { PdfViewer } from "./PdfViewer";
+import { useRouter } from "next/navigation";
+import { fetchFromApi } from "@/lib/api";
+import { useEffect, useState } from "react";
 
 interface ProjectPaperPreviewProps {
     paper: PaperItem;
+    projectId: string;
 }
 
-export function ProjectPaperPreview({ paper }: ProjectPaperPreviewProps) {
+export function ProjectPaperPreview({ paper, projectId }: ProjectPaperPreviewProps) {
+    const router = useRouter();
+    const [forkedPaper, setForkedPaper] = useState<PaperItem | null>(null);
+    const [isCheckingFork, setIsCheckingFork] = useState(true);
+
+    useEffect(() => {
+        const checkForkStatus = async () => {
+            if (!paper.id) return;
+            setIsCheckingFork(true);
+            try {
+                const response = await fetchFromApi(`/api/projects/papers/forked/${paper.id}`);
+                if (response.paper) {
+                    setForkedPaper(response.paper);
+                }
+            } catch (error) {
+                console.log("Could not check fork status, or paper is not forked.", error);
+            } finally {
+                setIsCheckingFork(false);
+            }
+        };
+
+        checkForkStatus();
+    }, [paper.id]);
+
     const copyToClipboard = (text: string, styleName: string) => {
         navigator.clipboard.writeText(text).then(() => {
             toast("Copied!", {
@@ -25,6 +52,46 @@ export function ProjectPaperPreview({ paper }: ProjectPaperPreviewProps) {
                 richColors: true,
             });
         });
+    };
+
+    const handleDuplicate = async () => {
+        if (!projectId) {
+            toast.error("Cannot duplicate", {
+                description: "This paper is not part of a project.",
+                richColors: true,
+            });
+            return;
+        }
+
+        const toastId = toast.loading("Duplicating paper...");
+
+        try {
+            const response = await fetchFromApi('/api/projects/papers/fork', {
+                method: 'POST',
+                body: JSON.stringify({
+                    source_project_id: projectId,
+                    paper_id: paper.id,
+                }),
+            });
+
+            if (response.new_paper_id) {
+                toast.success("Paper duplicated!", {
+                    id: toastId,
+                    description: "Redirecting to the new paper...",
+                    richColors: true,
+                });
+                router.push(`/paper/${response.new_paper_id}`);
+            } else {
+                throw new Error("Invalid response from server.");
+            }
+        } catch (error) {
+            console.error("Failed to duplicate paper:", error);
+            toast.error("Duplication failed", {
+                id: toastId,
+                description: "Could not duplicate the paper. Please try again.",
+                richColors: true,
+            });
+        }
     };
 
     return (
@@ -79,10 +146,22 @@ export function ProjectPaperPreview({ paper }: ProjectPaperPreviewProps) {
                                 </DialogFooter>
                             </DialogContent>
                         </Dialog>
-                        <Button variant="outline" size="sm" className="h-8 px-3 text-xs">
-                            <FilePlus2 className="h-4 w-4 mr-2" />
-                            Duplicate
-                        </Button>
+                        {isCheckingFork ? (
+                            <Button variant="outline" size="sm" className="h-8 px-3 text-xs" disabled>
+                                <FilePlus2 className="h-4 w-4 mr-2" />
+                                Checking...
+                            </Button>
+                        ) : forkedPaper ? (
+                            <Button variant="outline" size="sm" className="h-8 px-3 text-xs" onClick={() => router.push(`/paper/${forkedPaper.id}`)}>
+                                <FilePlus2 className="h-4 w-4 mr-2" />
+                                View Fork
+                            </Button>
+                        ) : (
+                            <Button variant="outline" size="sm" className="h-8 px-3 text-xs" onClick={handleDuplicate}>
+                                <FilePlus2 className="h-4 w-4 mr-2" />
+                                Duplicate
+                            </Button>
+                        )}
                     </div>
                 </div>
                 <div className="flex-grow overflow-auto">
