@@ -178,6 +178,12 @@ async def fork_paper_from_project(
             project_id=None,  # Not associating with any project initially
         )
 
+        if not new_project_paper:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to associate forked paper with user's library.",
+            )
+
         track_event(
             "paper_forked_from_project",
             user_id=str(current_user.id),
@@ -200,6 +206,55 @@ async def fork_paper_from_project(
         return JSONResponse(
             status_code=400,
             content={"message": f"Failed to fork paper from project: {str(e)}"},
+        )
+
+
+@project_papers_router.get("/forked/{parent_paper_id}")
+async def get_forked_paper(
+    parent_paper_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+) -> JSONResponse:
+    """Get the paper forked from a specific parent paper"""
+    try:
+        paper = project_paper_crud.get_forked_papers_by_parent_id(
+            db, parent_paper_id=uuid.UUID(parent_paper_id), user=current_user
+        )
+
+        if not paper:
+            return JSONResponse(
+                status_code=200,
+                content={"paper": None},
+            )
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "paper": {
+                    "id": str(paper.id),
+                    "title": paper.title,
+                    "created_at": str(paper.created_at),
+                    "abstract": paper.abstract,
+                    "authors": paper.authors,
+                    "institutions": paper.institutions,
+                    "keywords": paper.keywords,
+                    "status": paper.status,
+                    "file_url": s3_service.get_cached_presigned_url(
+                        db,
+                        str(paper.id),
+                        str(paper.s3_object_key),
+                        current_user=current_user,
+                    ),
+                    "is_owner": paper.user_id == current_user.id,
+                }
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Error fetching forked papers: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=400,
+            content={"message": f"Failed to fetch forked papers: {str(e)}"},
         )
 
 

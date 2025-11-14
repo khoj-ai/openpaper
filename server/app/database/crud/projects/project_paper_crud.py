@@ -213,5 +213,17 @@ class ProjectPaperCRUD(
 
         return projects
 
+    def get_forked_papers_by_parent_id(
+        self, db: Session, *, parent_paper_id: uuid.UUID, user: CurrentUser
+    ) -> Paper | None:
+        # First, find the paper that has the given parent_paper_id. This can only be one at max.
+        forked_paper: Paper | None = (
+            db.query(Paper)
+            .filter(Paper.parent_paper_id == parent_paper_id, Paper.user_id == user.id)
+            .one_or_none()
+        )
+
+        return forked_paper
+
 
 project_paper_crud = ProjectPaperCRUD(ProjectPaper)
