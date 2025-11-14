@@ -473,7 +473,6 @@ async def email_verify(
                         to_email=email,
                         project_title=str(project.title),
                         from_name=str(invitation.inviter.name),
-                        invite_link=invite_link,
                     )
 
         # Create JSON response with redirect info
