@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useRef, useState } from "react";
+import { FormEvent, useCallback, useRef, useState, useEffect } from "react";
 import { useIsMobile } from "@/lib/useMobile";
 import { AnimatedMarkdown } from "@/components/AnimatedMarkdown";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import remarkGfm from "remark-gfm";
 import rehypeKatex from "rehype-katex";
 import remarkMath from "remark-math";
 import "katex/dist/katex.min.css";
-import { Loader, ArrowUp, Recycle, X } from "lucide-react";
+import { Loader, ArrowUp, Recycle, X, ChevronDown, ChevronUp } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import CustomCitationLink from "@/components/utils/CustomCitationLink";
 import { ChatMessageActions } from "@/components/ChatMessageActions";
@@ -77,6 +77,42 @@ export const ConversationView = ({
 	const [searchTerm, setSearchTerm] = useState<string | null>(null);
 	const [isPdfVisible, setIsPdfVisible] = useState(false);
 	const isMobile = useIsMobile();
+
+	const [statusMessageHistory, setStatusMessageHistory] = useState<{ message: string; startTime: number }[]>([]);
+	const [elapsedTime, setElapsedTime] = useState(0);
+	const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
+	useEffect(() => {
+		if (statusMessage && (statusMessageHistory.length === 0 || statusMessageHistory[statusMessageHistory.length - 1].message !== statusMessage)) {
+			setStatusMessageHistory(prev => [...prev, { message: statusMessage, startTime: Date.now() }]);
+		}
+	}, [statusMessage, statusMessageHistory]);
+
+	useEffect(() => {
+		if (!isStreaming) {
+			setStatusMessageHistory([]);
+			setIsHistoryOpen(false);
+		}
+	}, [isStreaming]);
+
+	useEffect(() => {
+		let interval: NodeJS.Timeout | undefined;
+		if (isStreaming && statusMessageHistory.length > 0) {
+			const updateElapsedTime = () => {
+				const lastStatus = statusMessageHistory[statusMessageHistory.length - 1];
+				if (lastStatus) {
+					setElapsedTime(Math.floor((Date.now() - lastStatus.startTime) / 1000));
+				}
+			};
+			updateElapsedTime();
+			interval = setInterval(updateElapsedTime, 1000);
+		} else {
+			setElapsedTime(0);
+		}
+		return () => {
+			if (interval) clearInterval(interval);
+		};
+	}, [isStreaming, statusMessageHistory]);
 
 	const handleCitationClick = (key: string, messageIndex: number) => {
 		originalHandleCitationClick(key, messageIndex);
@@ -290,11 +326,31 @@ export const ConversationView = ({
 						{isStreaming && (
 							<div className="flex items-center gap-3 p-2">
 								<Loader className="animate-spin w-6 h-6 text-blue-500 flex-shrink-0" />
-								<div className="text-sm text-secondary-foreground">
+								<div className="text-sm text-secondary-foreground w-full">
 									{displayedText}
 									{isTyping && <span className="animate-pulse">|</span>}
-									{statusMessage && (
-										<div className="text-xs text-gray-500">{statusMessage}</div>
+									{statusMessageHistory.length > 0 && (
+										<div className="text-xs text-gray-500 mt-1">
+											<div className="flex justify-between items-center">
+												<span>{statusMessageHistory[statusMessageHistory.length - 1].message}</span>
+												<span className="ml-2 text-gray-400 tabular-nums">({elapsedTime}s)</span>
+											</div>
+											{statusMessageHistory.length > 1 && (
+												<div className="mt-1">
+													<button onClick={() => setIsHistoryOpen(!isHistoryOpen)} className="flex items-center text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+														{isHistoryOpen ? <ChevronUp className="w-4 h-4 mr-1" /> : <ChevronDown className="w-4 h-4 mr-1" />}
+														<span>Status History</span>
+													</button>
+													{isHistoryOpen && (
+														<ul className="mt-1 pl-4 border-l border-gray-300 dark:border-gray-600">
+															{statusMessageHistory.slice(0, -1).reverse().map((status, index) => (
+																<li key={index} className="text-gray-400">{status.message}</li>
+															))}
+														</ul>
+													)}
+												</div>
+											)}
+										</div>
 									)}
 								</div>
 							</div>
