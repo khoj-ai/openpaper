@@ -517,7 +517,9 @@ class MultiPaperOperations(BaseLLMClient):
             """Yields a status message every 5 seconds to keep the connection alive."""
             with suppress(asyncio.CancelledError):
                 while True:
-                    await queue.put({"type": "status", "content": "Thinking..."})
+                    await queue.put(
+                        {"type": "status", "content": "Finalizing thoughts..."}
+                    )
                     await asyncio.sleep(5)
 
         async def stream_reader():

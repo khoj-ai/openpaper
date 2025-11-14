@@ -342,9 +342,12 @@ export const ConversationView = ({
 														<span>Status History</span>
 													</button>
 													{isHistoryOpen && (
-														<ul className="mt-1 pl-4 border-l border-gray-300 dark:border-gray-600">
+														<ul className="mt-2 border-l border-gray-300 dark:border-gray-600">
 															{statusMessageHistory.slice(0, -1).reverse().map((status, index) => (
-																<li key={index} className="text-gray-400">{status.message}</li>
+																<li key={index} className="relative ml-4 mb-1 text-gray-400">
+																	<div className="absolute w-2 h-2 bg-gray-400 rounded-full top-1.5 -left-5 dark:bg-gray-500"></div>
+																	{status.message}
+																</li>
 															))}
 														</ul>
 													)}
