@@ -286,101 +286,101 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin }: ProjectC
 				) : (
 					<div className="space-y-4">
 						{displayedCollaborators.map((collaborator: Collaborator) => (
-						<div key={collaborator.id} className="flex items-center justify-between">
-							<div className="flex items-center space-x-4">
-								<Avatar>
-									<AvatarImage src={collaborator.picture} alt={collaborator.name} />
-									<AvatarFallback className={getAlphaHashToBackgroundColor(collaborator.name)}>
-										{getInitials(collaborator.name)}
-									</AvatarFallback>
-								</Avatar>
-								<div>
-									<p className="font-medium">{collaborator.name}</p>
-									<p className="text-sm text-muted-foreground">{collaborator.email}</p>
+							<div key={collaborator.id} className="flex items-center justify-between">
+								<div className="flex items-center space-x-4">
+									<Avatar>
+										<AvatarImage src={collaborator.picture} alt={collaborator.name} />
+										<AvatarFallback className={getAlphaHashToBackgroundColor(collaborator.name)}>
+											{getInitials(collaborator.name)}
+										</AvatarFallback>
+									</Avatar>
+									<div>
+										<p className="font-medium">{collaborator.name}</p>
+										<p className="text-sm text-muted-foreground">{collaborator.email}</p>
+									</div>
+								</div>
+								<div className="flex items-center space-x-2">
+									<Badge variant={'outline'}>
+										{collaborator.role}
+									</Badge>
+									{currentUserIsAdmin && collaborator.role !== ProjectRole.Admin && (
+										<AlertDialog>
+											<AlertDialogTrigger asChild>
+												<Button variant="ghost" size="sm" className='h-auto p-0 w-auto'>
+													<X className="h-4 w-4" />
+												</Button>
+											</AlertDialogTrigger>
+											<AlertDialogContent>
+												<AlertDialogHeader>
+													<AlertDialogTitle>Remove Collaborator</AlertDialogTitle>
+													<AlertDialogDescription>
+														Are you sure you want to remove <b>{collaborator.name}</b> from the project? You will have to invite them again to add them back.
+													</AlertDialogDescription>
+												</AlertDialogHeader>
+												<AlertDialogFooter>
+													<AlertDialogCancel>Cancel</AlertDialogCancel>
+													<AlertDialogAction onClick={() => handleRemove(collaborator.id)}>
+														Remove
+													</AlertDialogAction>
+												</AlertDialogFooter>
+											</AlertDialogContent>
+										</AlertDialog>
+									)}
 								</div>
 							</div>
-							<div className="flex items-center space-x-2">
-								<Badge variant={'outline'}>
-									{collaborator.role}
-								</Badge>
-								{currentUserIsAdmin && collaborator.role !== ProjectRole.Admin && (
-									<AlertDialog>
-										<AlertDialogTrigger asChild>
-											<Button variant="outline" size="sm">
-												<X className="h-4 w-4" />
-											</Button>
-										</AlertDialogTrigger>
-										<AlertDialogContent>
-											<AlertDialogHeader>
-												<AlertDialogTitle>Remove Collaborator</AlertDialogTitle>
-												<AlertDialogDescription>
-													Are you sure you want to remove <b>{collaborator.name}</b> from the project? You will have to invite them again to add them back.
-												</AlertDialogDescription>
-											</AlertDialogHeader>
-											<AlertDialogFooter>
-												<AlertDialogCancel>Cancel</AlertDialogCancel>
-												<AlertDialogAction onClick={() => handleRemove(collaborator.id)}>
-													Remove
-												</AlertDialogAction>
-											</AlertDialogFooter>
-										</AlertDialogContent>
-									</AlertDialog>
-								)}
-							</div>
-						</div>
-					))}
+						))}
 
-					{/* Pending Invites Section */}
-					{pendingInvites.length > 0 && (
-						<>
-							<div className="border-t pt-4 mt-4">
-								<p className="text-sm font-medium text-muted-foreground mb-3">Pending Invites</p>
-								<div className="space-y-3">
-									{pendingInvites.map((invite: PendingInvite, index: number) => (
-										<div key={`pending-${index}`} className="flex items-center justify-between opacity-60">
-											<div className="flex items-center space-x-4">
-												<Avatar className="opacity-50">
-													<AvatarFallback className="bg-muted">
-														{invite.email.charAt(0).toUpperCase()}
-													</AvatarFallback>
-												</Avatar>
-												<div>
-													<p className="font-medium text-muted-foreground">{invite.email}</p>
-													<p className="text-xs text-muted-foreground">Invite sent • Not yet accepted</p>
+						{/* Pending Invites Section */}
+						{pendingInvites.length > 0 && (
+							<>
+								<div className="border-t pt-4 mt-4">
+									<p className="text-sm font-medium text-muted-foreground mb-3">Pending Invites</p>
+									<div className="space-y-3">
+										{pendingInvites.map((invite: PendingInvite, index: number) => (
+											<div key={`pending-${index}`} className="flex items-center justify-between opacity-60">
+												<div className="flex items-center space-x-4">
+													<Avatar className="opacity-50">
+														<AvatarFallback className="bg-muted">
+															{invite.email.charAt(0).toUpperCase()}
+														</AvatarFallback>
+													</Avatar>
+													<div>
+														<p className="font-medium text-muted-foreground">{invite.email}</p>
+														<p className="text-xs text-muted-foreground">Invite sent • Not yet accepted</p>
+													</div>
+												</div>
+												<div className="flex items-center space-x-2">
+													<span className="text-sm text-muted-foreground">{invite.role}</span>
+													{currentUserIsAdmin && (
+														<AlertDialog>
+															<AlertDialogTrigger asChild>
+																<Button variant="ghost" size="sm" className='h-auto p-0 w-auto'>
+																	<X className="h-4 w-4" />
+																</Button>
+															</AlertDialogTrigger>
+															<AlertDialogContent>
+																<AlertDialogHeader>
+																	<AlertDialogTitle>Cancel Invitation</AlertDialogTitle>
+																	<AlertDialogDescription>
+																		Are you sure you want to cancel the invitation to {invite.email}?
+																	</AlertDialogDescription>
+																</AlertDialogHeader>
+																<AlertDialogFooter>
+																	<AlertDialogCancel>Cancel</AlertDialogCancel>
+																	<AlertDialogAction onClick={() => invite.id && removePendingInvite(invite.id)}>
+																		Cancel Invitation
+																	</AlertDialogAction>
+																</AlertDialogFooter>
+															</AlertDialogContent>
+														</AlertDialog>
+													)}
 												</div>
 											</div>
-											<div className="flex items-center space-x-2">
-												<span className="text-sm text-muted-foreground">{invite.role}</span>
-												{currentUserIsAdmin && (
-													<AlertDialog>
-														<AlertDialogTrigger asChild>
-															<Button variant="outline" size="sm">
-																<X className="h-4 w-4" />
-															</Button>
-														</AlertDialogTrigger>
-														<AlertDialogContent>
-															<AlertDialogHeader>
-																<AlertDialogTitle>Cancel Invitation</AlertDialogTitle>
-																<AlertDialogDescription>
-																	Are you sure you want to cancel the invitation to {invite.email}?
-																</AlertDialogDescription>
-															</AlertDialogHeader>
-															<AlertDialogFooter>
-																<AlertDialogCancel>Cancel</AlertDialogCancel>
-																<AlertDialogAction onClick={() => invite.id && removePendingInvite(invite.id)}>
-																	Cancel Invitation
-																</AlertDialogAction>
-															</AlertDialogFooter>
-														</AlertDialogContent>
-													</AlertDialog>
-												)}
-											</div>
-										</div>
-									))}
+										))}
+									</div>
 								</div>
-							</div>
-						</>
-					)}
+							</>
+						)}
 					</div>
 				)}
 				{!isLoading && collaborators.length > 3 && (
