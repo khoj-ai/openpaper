@@ -67,6 +67,7 @@ export default function ProjectPage() {
 	const projectId = params.projectId as string;
 	const [project, setProject] = useState<Project | null>(null);
 	const [papers, setPapers] = useState<PaperItem[]>([]);
+	const [hasCollaborators, setHasCollaborators] = useState<boolean>(false);
 	const [conversations, setConversations] = useState<Conversation[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -132,8 +133,6 @@ export default function ProjectPage() {
 			console.error(err);
 		}
 	}, [projectId]);
-
-
 
 	const handleDeleteConversation = async (conversationId: string) => {
 		try {
@@ -507,7 +506,12 @@ export default function ProjectPage() {
 						{conversations.length > 0 ? (
 							<>
 								{conversations.slice(0, 3).map((convo, index) => (
-									<ConversationCard key={index} convo={convo} href={`/projects/${projectId}/conversations/${convo.id}`} onDelete={handleDeleteConversation} />
+									<ConversationCard
+										key={index}
+										convo={convo}
+										showAvatar={hasCollaborators}
+										href={`/projects/${projectId}/conversations/${convo.id}`}
+										onDelete={handleDeleteConversation} />
 								))}
 								{conversations.length > 3 && (
 									<div className="mt-4 text-left">
@@ -753,7 +757,10 @@ export default function ProjectPage() {
 						</div>
 					)}
 					<div className="mt-6">
-						<ProjectCollaborators projectId={projectId} currentUserIsAdmin={project.current_user_role === "admin"} />
+						<ProjectCollaborators
+							projectId={projectId}
+							setHasCollaborators={setHasCollaborators}
+							currentUserIsAdmin={project.current_user_role === "admin"} />
 					</div>
 				</div>
 			</div>

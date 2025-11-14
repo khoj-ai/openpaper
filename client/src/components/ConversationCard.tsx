@@ -20,11 +20,12 @@ import { getAlphaHashToBackgroundColor } from "@/lib/utils";
 
 interface ConversationCardProps {
 	convo: Conversation;
+	showAvatar?: boolean;
 	href: string;
 	onDelete: (conversationId: string) => void;
 }
 
-export default function ConversationCard({ convo, href, onDelete }: ConversationCardProps) {
+export default function ConversationCard({ convo, href, onDelete, showAvatar = true }: ConversationCardProps) {
 	const [isAlertOpen, setIsAlertOpen] = useState(false);
 
 	const handleDelete = (e: React.MouseEvent) => {
@@ -52,7 +53,7 @@ export default function ConversationCard({ convo, href, onDelete }: Conversation
 						</p>
 					</div>
 					<div className="flex flex-col items-end">
-						{convo.owner_name && (
+						{showAvatar && convo.owner_name && (
 							<Avatar className="size-6 mb-2">
 								<AvatarImage src={convo.owner_picture} />
 								<AvatarFallback

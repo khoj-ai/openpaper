@@ -43,9 +43,10 @@ import { getAlphaHashToBackgroundColor, getInitials } from '@/lib/utils';
 interface ProjectCollaboratorsProps {
 	projectId: string;
 	currentUserIsAdmin: boolean;
+	setHasCollaborators?: (hasCollaborators: boolean) => void;
 }
 
-export function ProjectCollaborators({ projectId, currentUserIsAdmin }: ProjectCollaboratorsProps) {
+export function ProjectCollaborators({ projectId, currentUserIsAdmin, setHasCollaborators }: ProjectCollaboratorsProps) {
 	const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
 	const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 	const [draftInvites, setDraftInvites] = useState<PendingInvite[]>([{ email: '', role: ProjectRole.Viewer, invited_at: '' }]);
@@ -63,6 +64,9 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin }: ProjectC
 
 				if (response) {
 					setCollaborators(response);
+					if (setHasCollaborators) {
+						setHasCollaborators(response.length > 1);
+					}
 				}
 			} catch (error) {
 				console.error('Error loading collaborators:', error);
