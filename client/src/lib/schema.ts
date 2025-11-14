@@ -300,7 +300,11 @@ export interface MinimalJob {
     fileName: string;
 }
 
-export type ProjectRole = 'admin' | 'editor' | 'viewer';
+export enum ProjectRole {
+    Admin = 'admin',
+    Editor = 'editor',
+    Viewer = 'viewer',
+}
 
 export interface Collaborator {
     id: string;

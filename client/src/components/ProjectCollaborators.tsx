@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { X } from 'lucide-react';
-import { Collaborator, PendingInvite } from '@/lib/schema';
+import { Collaborator, PendingInvite, ProjectRole } from '@/lib/schema';
 import { fetchFromApi } from '@/lib/api';
 import { Badge } from './ui/badge';
 import { getAlphaHashToBackgroundColor, getInitials } from '@/lib/utils';
@@ -48,7 +48,7 @@ interface ProjectCollaboratorsProps {
 export function ProjectCollaborators({ projectId, currentUserIsAdmin }: ProjectCollaboratorsProps) {
 	const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
 	const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
-	const [draftInvites, setDraftInvites] = useState<PendingInvite[]>([{ email: '', role: 'viewer', invited_at: '' }]);
+	const [draftInvites, setDraftInvites] = useState<PendingInvite[]>([{ email: '', role: ProjectRole.Viewer, invited_at: '' }]);
 	const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
 	const [isExpanded, setIsExpanded] = useState(false);
 	const [isSending, setIsSending] = useState(false);
@@ -132,7 +132,7 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin }: ProjectC
 			setPendingInvites([...pendingInvites, ...newPendingInvites]);
 
 			// Reset draft invites
-			setDraftInvites([{ email: '', role: 'viewer', invited_at: '' }]);
+			setDraftInvites([{ email: '', role: ProjectRole.Viewer, invited_at: '' }]);
 			setIsInviteModalOpen(false);
 
 			toast.success(response.message || `${response.invited_count} invitation(s) sent.`);
@@ -165,7 +165,7 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin }: ProjectC
 	};
 
 	const addDraftInvite = () => {
-		setDraftInvites([...draftInvites, { email: '', role: 'viewer', invited_at: '' }]);
+		setDraftInvites([...draftInvites, { email: '', role: ProjectRole.Viewer, invited_at: '' }]);
 	};
 
 	const removeDraftInvite = (index: number) => {
@@ -303,7 +303,7 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin }: ProjectC
 								<Badge variant={'outline'}>
 									{collaborator.role}
 								</Badge>
-								{currentUserIsAdmin && collaborator.role !== 'admin' && (
+								{currentUserIsAdmin && collaborator.role !== ProjectRole.Admin && (
 									<AlertDialog>
 										<AlertDialogTrigger asChild>
 											<Button variant="outline" size="sm">
