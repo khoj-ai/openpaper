@@ -19,6 +19,12 @@ const nextConfig = {
                 hostname: 'openpaper.ai',
                 port: '',
                 pathname: '/**',
+            },
+            {
+                protocol: 'https' as const,
+                hostname: 'lh3.googleusercontent.com',
+                port: '',
+                pathname: '/**',
             }
         ],
     },
