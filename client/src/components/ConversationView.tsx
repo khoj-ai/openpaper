@@ -99,9 +99,9 @@ export const ConversationView = ({
 		let interval: NodeJS.Timeout | undefined;
 		if (isStreaming && statusMessageHistory.length > 0) {
 			const updateElapsedTime = () => {
-				const lastStatus = statusMessageHistory[statusMessageHistory.length - 1];
-				if (lastStatus) {
-					setElapsedTime(Math.floor((Date.now() - lastStatus.startTime) / 1000));
+				const firstStatus = statusMessageHistory[0];
+				if (firstStatus) {
+					setElapsedTime(Math.floor((Date.now() - firstStatus.startTime) / 1000));
 				}
 			};
 			updateElapsedTime();
