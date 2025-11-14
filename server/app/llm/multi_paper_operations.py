@@ -144,7 +144,10 @@ class MultiPaperOperations(BaseLLMClient):
             "stop": lambda: None,
         }
 
-        while n_iterations < max_iterations:
+        prev_queries = set()
+        should_stop = False  # Flag to track when STOP is called
+
+        while n_iterations < max_iterations and not should_stop:
             n_iterations += 1
 
             # If the collected evidence is very large (over 100,000 characters), we may want to stop gathering more evidence
@@ -219,12 +222,22 @@ class MultiPaperOperations(BaseLLMClient):
                 fn_name = fn_selected.name
                 fn_args = fn_selected.args
 
-                evidence_collection.add_tool_call(fn_selected)
-
+                # Check for STOP signal first, before duplicate detection
                 if fn_name == "stop":
                     logger.info("Received STOP signal from LLM.")
                     yield {"type": "stop", "content": "STOP signal received."}
+                    should_stop = True
                     break
+
+                if f"{fn_name}:{fn_args}" in prev_queries:
+                    logger.info(
+                        f"Function call {fn_name} with args {fn_args} has already been made, skipping to avoid repetition."
+                    )
+                    continue
+
+                prev_queries.add(f"{fn_name}:{fn_args}")
+
+                evidence_collection.add_tool_call(fn_selected)
 
                 if fn_name in function_maps:
                     try:

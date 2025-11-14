@@ -12,6 +12,8 @@ from sqlalchemy.orm import Session
 # Function declarations for LLM tools related to file operations
 # --------------------------------------------------------------
 
+# NOTE: REMEMBER TO UPDATE THE EVIDENCE GATHERING SYSTEM PROMPT WHEN ADDING OR CHANGING FUNCTIONALITY FOR ANY OF THESE TOOLS
+
 read_file_function = {
     "name": "read_file",
     "description": "Use this tool when you need to read the entire content of a single paper. It's best for when you need a complete overview of the paper's text. If you're looking for specific information, consider using 'search_file' first.",
