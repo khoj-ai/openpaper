@@ -219,15 +219,18 @@ class MultiPaperOperations(BaseLLMClient):
 
             for fn_selected in llm_response.tool_calls:
                 start_time = time.time()
-                fn_name = fn_selected.name
+                # Normalize function name to handle variants like "STOP" vs "stop"
+                fn_name_raw = fn_selected.name
+                fn_name = fn_name_raw.lower() if fn_name_raw else fn_name_raw
                 fn_args = fn_selected.args
 
-                # Check for STOP signal first, before duplicate detection
+                # Check for STOP signal (case-insensitive) - set flag but continue processing other tool calls
                 if fn_name == "stop":
-                    logger.info("Received STOP signal from LLM.")
-                    yield {"type": "stop", "content": "STOP signal received."}
+                    logger.info(
+                        "Received STOP signal from LLM. Will stop after processing remaining tool calls in this batch."
+                    )
                     should_stop = True
-                    break
+                    continue  # Skip to next tool call, don't break immediately
 
                 if f"{fn_name}:{fn_args}" in prev_queries:
                     logger.info(
@@ -303,8 +306,12 @@ class MultiPaperOperations(BaseLLMClient):
                         logger.error(f"Error executing function {fn_name}: {e}")
                         yield {"type": "error", "content": str(e)}
                 else:
-                    logger.warning(f"Unknown function called: {fn_name}")
-                    yield {"type": "error", "content": f"Unknown function: {fn_name}"}
+                    # Log original function name for easier debugging when the LLM returns unexpected tool names
+                    logger.warning(f"Unknown function called: {fn_name_raw}")
+                    yield {
+                        "type": "error",
+                        "content": f"Unknown function: {fn_name_raw}",
+                    }
                 end_time = time.time()
                 track_event(
                     "function_call",
