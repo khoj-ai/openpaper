@@ -664,9 +664,13 @@ export default function ProjectPage() {
 								<div className="flex flex-col gap-6">
 									{ownedPapers.length > 0 && (
 										<div>
-											<div className="mb-3">
-												<Badge variant="secondary">Your Papers</Badge>
-											</div>
+											{
+												otherPapers.length > 0 && (
+													<div className="mb-3">
+														<Badge variant="secondary">Your Papers</Badge>
+													</div>
+												)
+											}
 											<div className="grid grid-cols-1 gap-4">
 												{ownedPapers.slice(0, showAllOwnedPapers ? ownedPapers.length : papersToShow).map((paper, index) => (
 													<div key={paper.id} className="animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
