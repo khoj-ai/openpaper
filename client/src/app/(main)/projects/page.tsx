@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ProjectCard } from "@/components/ProjectCard";
 import { Button } from "@/components/ui/button";
 import { Project } from "@/lib/schema";
@@ -15,18 +15,20 @@ import { Progress } from "@/components/ui/progress";
 import LoadingIndicator from "@/components/utils/Loading";
 import { ProjectInvitations } from "@/components/ProjectInvitations";
 
-export default function Projects() {
+function ProjectsPage() {
 	const [projects, setProjects] = useState<Project[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const { user, loading: userLoading } = useAuth();
 	const [error, setError] = useState<string | null>(null);
 	const { subscription } = useSubscription();
 	const router = useRouter();
+	const searchParams = useSearchParams();
 
 	const [showUsageAlert, setShowUsageAlert] = useState(true);
 
 	const atProjectLimit = subscription ? isProjectAtLimit(subscription) : false;
 	const nearProjectLimit = subscription ? isProjectNearLimit(subscription) : false;
+	const openInvites = searchParams.get("openInvites") !== null;
 
 	const getProjects = async () => {
 		try {
@@ -157,7 +159,7 @@ export default function Projects() {
 			<div className="flex justify-between items-center mb-4">
 				<h1 className="text-2xl font-bold">Projects</h1>
 				<div className="flex gap-2">
-					<ProjectInvitations onInvitationAccepted={getProjects} />
+					<ProjectInvitations onInvitationAccepted={getProjects} defaultOpen={openInvites} />
 					{projects.length > 0 && (
 						<Button asChild className="bg-blue-500 dark:text-card-foreground hover:bg-blue-600 dark:hover:bg-blue-400" disabled={atProjectLimit}>
 							<Link href="/projects/create">
@@ -227,4 +229,15 @@ export default function Projects() {
 			)}
 		</div>
 	);
+}
+
+export default function Projects() {
+	return (
+		<Suspense fallback={<div className="flex items-center justify-center py-12">
+			<LoadingIndicator />
+			<span className="ml-3 text-gray-600">Loading...</span>
+		</div>}>
+			<ProjectsPage />
+		</Suspense>
+	)
 }
