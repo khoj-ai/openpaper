@@ -123,8 +123,7 @@ export function ProjectInvitations({ onInvitationAccepted, defaultOpen = false }
 			<Button
 				variant="outline"
 				className="relative"
-				onClick={() => !atProjectLimit && setOpen(true)}
-				disabled={atProjectLimit}
+				onClick={() => setOpen(true)}
 				title={atProjectLimit ? "You have reached your project limit. Upgrade your plan to accept more project invitations." : undefined}
 			>
 				<Mail className="mr-2 h-4 w-4" />
@@ -143,7 +142,7 @@ export function ProjectInvitations({ onInvitationAccepted, defaultOpen = false }
 						<DialogTitle>Project Invitations</DialogTitle>
 						<DialogDescription>
 							{atProjectLimit
-								? "You've reached your project limit. Upgrade your plan to accept more project invitations."
+								? <>You've reached your project limit. <Link href="/pricing" className="text-blue-600 hover:text-blue-700 underline">Upgrade your plan</Link> to accept more project invitations.</>
 								: pendingCount > 0
 									? `You have ${pendingCount} pending invitation${pendingCount === 1 ? '' : 's'}`
 									: "You have no pending invitations"}
