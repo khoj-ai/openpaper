@@ -33,6 +33,12 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { X } from 'lucide-react';
 import { Collaborator, PendingInvite, ProjectRole } from '@/lib/schema';
@@ -162,6 +168,28 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin, setHasColl
 		}
 	};
 
+	const handleRoleChange = async (collaboratorId: string, newRole: ProjectRole) => {
+		try {
+			await fetchFromApi(`/api/projects/${projectId}/collaborators/change`, {
+				method: 'POST',
+				body: JSON.stringify({
+					role_id: collaboratorId,
+					new_role: newRole,
+				}),
+			});
+
+			// Update local state
+			setCollaborators(collaborators.map((c: Collaborator) =>
+				c.id === collaboratorId ? { ...c, role: newRole } : c
+			));
+
+			toast.success(`Role updated to ${newRole}.`);
+		} catch (error) {
+			console.error('Error changing role:', error);
+			toast.error(error instanceof Error ? error.message : 'Failed to change role. Please try again.');
+		}
+	};
+
 	const handleDraftInviteChange = (index: number, field: keyof PendingInvite, value: string) => {
 		const updatedInvites = [...draftInvites];
 		updatedInvites[index] = { ...updatedInvites[index], [field]: value };
@@ -200,6 +228,45 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin, setHasColl
 	}
 
 	const displayedCollaborators = isExpanded ? collaborators : collaborators.slice(0, 3);
+
+	// Role Badge Component - clickable dropdown for admins, static for others
+	const RoleBadgeDropdown = ({ collaborator }: { collaborator: Collaborator }) => {
+		const canChangeRole = currentUserIsAdmin && collaborator.role !== ProjectRole.Admin;
+
+		if (!canChangeRole) {
+			return (
+				<Badge variant={'outline'}>
+					{collaborator.role}
+				</Badge>
+			);
+		}
+
+		// Determine the alternate role (the one not currently assigned)
+		const alternateRole = collaborator.role === ProjectRole.Viewer ? ProjectRole.Editor : ProjectRole.Viewer;
+
+		return (
+			<DropdownMenu>
+				<DropdownMenuTrigger asChild>
+					<Badge variant={'outline'} className="cursor-pointer hover:bg-accent">
+						{collaborator.role}
+					</Badge>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end">
+					<DropdownMenuItem
+						disabled
+						className="text-xs text-muted-foreground"
+					>
+						Change role to:
+					</DropdownMenuItem>
+					<DropdownMenuItem
+						onClick={() => handleRoleChange(collaborator.id, alternateRole)}
+					>
+						{alternateRole}
+					</DropdownMenuItem>
+				</DropdownMenuContent>
+			</DropdownMenu>
+		);
+	};
 
 	return (
 		<Card>
@@ -304,9 +371,7 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin, setHasColl
 									</div>
 								</div>
 								<div className="flex items-center space-x-2">
-									<Badge variant={'outline'}>
-										{collaborator.role}
-									</Badge>
+									<RoleBadgeDropdown collaborator={collaborator} />
 									{currentUserIsAdmin && collaborator.role !== ProjectRole.Admin && (
 										<AlertDialog>
 											<AlertDialogTrigger asChild>

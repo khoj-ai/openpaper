@@ -202,5 +202,48 @@ class ProjectCRUD(ProjectBaseCRUD[Project, ProjectCreate, ProjectUpdate]):
             )
             return None
 
+    def change_collaborator_role(
+        self,
+        db: Session,
+        *,
+        project_id: str,
+        role_id: str,
+        new_role: ProjectRoles,
+        user: CurrentUser,
+    ) -> Optional[ProjectRole]:
+        """Change a collaborator's role in a specific project."""
+        admin_project_role = self.has_role(
+            db, project_id=project_id, user_id=str(user.id), role=ProjectRoles.ADMIN
+        )
+
+        if not admin_project_role:
+            return None
+
+        project_role: ProjectRole | None = (
+            db.query(ProjectRole)
+            .filter(
+                ProjectRole.project_id == project_id,
+                ProjectRole.id == role_id,
+            )
+            .first()
+        )
+
+        if not project_role:
+            return None
+
+        try:
+            project_role.role = str(new_role.value)  # type: ignore
+            db.add(project_role)
+            db.commit()
+            db.refresh(project_role)
+            return project_role
+        except Exception as e:
+            db.rollback()
+            logger.error(
+                f"Error changing role for collaborator {role_id} in project {project_id}: {str(e)}",
+                exc_info=True,
+            )
+            return None
+
 
 project_crud = ProjectCRUD(Project)

@@ -7,9 +7,6 @@ from app.database.crud.projects.project_crud import (
     ProjectUpdate,
     project_crud,
 )
-from app.database.crud.projects.project_role_invitation_crud import (
-    project_role_invitation_crud,
-)
 from app.database.database import get_db
 from app.database.models import ProjectRoles
 from app.database.telemetry import track_event
@@ -210,6 +207,68 @@ async def delete_project(
         return JSONResponse(
             status_code=400,
             content={"message": f"Failed to delete project: {str(e)}"},
+        )
+
+
+###################################
+# Collaborators-related endpoints #
+###################################
+
+
+class ChangeRoleRequest(BaseModel):
+    role_id: str
+    new_role: ProjectRoles
+
+
+@projects_router.post("/{project_id}/collaborators/change")
+async def change_project_collaborator_role(
+    request: ChangeRoleRequest,
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+) -> JSONResponse:
+    """Change a collaborator's role in a specific project"""
+    role_id = request.role_id
+    new_role = request.new_role
+
+    try:
+        project_role = project_crud.change_collaborator_role(
+            db,
+            project_id=project_id,
+            role_id=role_id,
+            new_role=new_role,
+            user=current_user,
+        )
+
+        if not project_role:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "message": f"Collaborator with ID {role_id} not found in project {project_id} or insufficient permissions."
+                },
+            )
+
+        track_event(
+            "project_collaborator_role_changed",
+            user_id=str(current_user.id),
+            properties={
+                "changed_role_id": role_id,
+                "new_role": new_role,
+                "project_id": project_id,
+            },
+        )
+
+        return JSONResponse(
+            status_code=200,
+            content={"message": "Collaborator role updated successfully"},
+        )
+    except Exception as e:
+        logger.error(
+            f"Error changing role for collaborator {role_id} in project {project_id}: {e}"
+        )
+        return JSONResponse(
+            status_code=400,
+            content={"message": f"Failed to change collaborator role: {str(e)}"},
         )
 
 
