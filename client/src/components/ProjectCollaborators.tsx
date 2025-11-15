@@ -406,43 +406,71 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin, setHasColl
 									<p className="text-sm font-medium text-muted-foreground mb-3">Pending Invites</p>
 									<div className="space-y-3">
 										{pendingInvites.map((invite: PendingInvite, index: number) => (
-											<div key={`pending-${index}`} className="flex items-center justify-between opacity-60">
-												<div className="flex items-center space-x-4">
-													<Avatar className="opacity-50">
+											<div key={`pending-${index}`} className="opacity-60">
+												<div className="flex items-start gap-4">
+													<Avatar className="opacity-50 mt-1">
 														<AvatarFallback className="bg-muted">
 															{invite.email.charAt(0).toUpperCase()}
 														</AvatarFallback>
 													</Avatar>
-													<div>
-														<p className="font-medium text-muted-foreground">{invite.email}</p>
+													<div className="flex-1 min-w-0">
+														<p className="font-medium text-muted-foreground break-words">{invite.email}</p>
 														<p className="text-xs text-muted-foreground">Invite sent • Not yet accepted</p>
+														{/* Role and actions on mobile */}
+														<div className="flex items-center gap-2 mt-2 md:hidden">
+															<span className="text-sm text-muted-foreground">{invite.role}</span>
+															{currentUserIsAdmin && (
+																<AlertDialog>
+																	<AlertDialogTrigger asChild>
+																		<Button variant="ghost" size="sm" className='h-auto p-0 w-auto'>
+																			<X className="h-4 w-4" />
+																		</Button>
+																	</AlertDialogTrigger>
+																	<AlertDialogContent>
+																		<AlertDialogHeader>
+																			<AlertDialogTitle>Cancel Invitation</AlertDialogTitle>
+																			<AlertDialogDescription>
+																				Are you sure you want to cancel the invitation to {invite.email}?
+																			</AlertDialogDescription>
+																		</AlertDialogHeader>
+																		<AlertDialogFooter>
+																			<AlertDialogCancel>Cancel</AlertDialogCancel>
+																			<AlertDialogAction onClick={() => invite.id && removePendingInvite(invite.id)}>
+																				Cancel Invitation
+																			</AlertDialogAction>
+																		</AlertDialogFooter>
+																	</AlertDialogContent>
+																</AlertDialog>
+															)}
+														</div>
 													</div>
-												</div>
-												<div className="flex items-center space-x-2">
-													<span className="text-sm text-muted-foreground">{invite.role}</span>
-													{currentUserIsAdmin && (
-														<AlertDialog>
-															<AlertDialogTrigger asChild>
-																<Button variant="ghost" size="sm" className='h-auto p-0 w-auto'>
-																	<X className="h-4 w-4" />
-																</Button>
-															</AlertDialogTrigger>
-															<AlertDialogContent>
-																<AlertDialogHeader>
-																	<AlertDialogTitle>Cancel Invitation</AlertDialogTitle>
-																	<AlertDialogDescription>
-																		Are you sure you want to cancel the invitation to {invite.email}?
-																	</AlertDialogDescription>
-																</AlertDialogHeader>
-																<AlertDialogFooter>
-																	<AlertDialogCancel>Cancel</AlertDialogCancel>
-																	<AlertDialogAction onClick={() => invite.id && removePendingInvite(invite.id)}>
-																		Cancel Invitation
-																	</AlertDialogAction>
-																</AlertDialogFooter>
-															</AlertDialogContent>
-														</AlertDialog>
-													)}
+													{/* Role and actions on desktop */}
+													<div className="hidden md:flex items-center gap-2">
+														<span className="text-sm text-muted-foreground">{invite.role}</span>
+														{currentUserIsAdmin && (
+															<AlertDialog>
+																<AlertDialogTrigger asChild>
+																	<Button variant="ghost" size="sm" className='h-auto p-0 w-auto'>
+																		<X className="h-4 w-4" />
+																	</Button>
+																</AlertDialogTrigger>
+																<AlertDialogContent>
+																	<AlertDialogHeader>
+																		<AlertDialogTitle>Cancel Invitation</AlertDialogTitle>
+																		<AlertDialogDescription>
+																			Are you sure you want to cancel the invitation to {invite.email}?
+																		</AlertDialogDescription>
+																	</AlertDialogHeader>
+																	<AlertDialogFooter>
+																		<AlertDialogCancel>Cancel</AlertDialogCancel>
+																		<AlertDialogAction onClick={() => invite.id && removePendingInvite(invite.id)}>
+																			Cancel Invitation
+																		</AlertDialogAction>
+																	</AlertDialogFooter>
+																</AlertDialogContent>
+															</AlertDialog>
+														)}
+													</div>
 												</div>
 											</div>
 										))}
