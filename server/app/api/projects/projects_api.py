@@ -126,10 +126,10 @@ async def get_project(
             )
         project_payload = project.to_dict()
 
-        current_user_role = project_crud.get_role_in_project(
+        role = project_crud.get_role_in_project(
             db, project_id=project_id, user=current_user
         )
-        project_payload["current_user_role"] = current_user_role
+        project_payload["role"] = role
 
         return JSONResponse(
             status_code=200,
@@ -213,6 +213,8 @@ async def delete_project(
 ###################################
 # Collaborators-related endpoints #
 ###################################
+
+# TODO: Eventually, we can refactor so that the project_role operations have a separate crud and router
 
 
 class ChangeRoleRequest(BaseModel):
@@ -304,6 +306,46 @@ async def get_project_collaborators(
         return JSONResponse(
             status_code=400,
             content={"message": f"Failed to fetch collaborators: {str(e)}"},
+        )
+
+
+@projects_router.delete("/{project_id}/collaborators/self")
+async def remove_self_from_project(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+) -> JSONResponse:
+    """Remove self as a collaborator from a specific project"""
+    try:
+        success = project_crud.remove_self_from_project(
+            db, project_id=project_id, user=current_user
+        )
+
+        if not success:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "message": f"You are not a collaborator in project {project_id} or insufficient permissions."
+                },
+            )
+
+        track_event(
+            "project_self_removed",
+            user_id=str(current_user.id),
+            properties={"project_id": project_id},
+        )
+
+        return JSONResponse(
+            status_code=200,
+            content={"message": "You have been removed from the project successfully"},
+        )
+    except Exception as e:
+        logger.error(f"Error removing self from project {project_id}: {e}")
+        return JSONResponse(
+            status_code=400,
+            content={
+                "message": f"Failed to remove yourself from the project: {str(e)}"
+            },
         )
 
 

@@ -286,7 +286,8 @@ export interface Project {
     num_conversations?: number;
     created_at: string;
     updated_at: string;
-    current_user_role?: ProjectRole;
+    role?: ProjectRole;
+    num_roles?: number;
 }
 
 export interface PdfUploadResponse {
