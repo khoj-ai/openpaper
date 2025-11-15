@@ -38,8 +38,10 @@ class AnnotatedProject(ProjectBase):
     id: Optional[str] = None
     num_papers: int = 0
     num_conversations: int = 0
+    num_roles: int = 0
     updated_at: Optional[str] = None
     created_at: Optional[str] = None
+    role: Optional[ProjectRoles] = None
 
 
 class ProjectCRUD(ProjectBaseCRUD[Project, ProjectCreate, ProjectUpdate]):
@@ -93,6 +95,8 @@ class ProjectCRUD(ProjectBaseCRUD[Project, ProjectCreate, ProjectUpdate]):
                     func.coalesce(func.count(Conversation.id.distinct()), 0).label(
                         "num_conversations"
                     ),
+                    ProjectRole.role.label("role"),
+                    func.coalesce(func.count(ProjectRole.id), 0).label("num_roles"),
                 )
                 .join(ProjectRole, Project.id == ProjectRole.project_id)
                 .outerjoin(ProjectPaper, Project.id == ProjectPaper.project_id)
@@ -102,21 +106,23 @@ class ProjectCRUD(ProjectBaseCRUD[Project, ProjectCreate, ProjectUpdate]):
                     & (Conversation.conversable_type == ConversableType.PROJECT.value),
                 )
                 .filter(ProjectRole.user_id == user.id)
-                .group_by(Project.id)
+                .group_by(Project.id, ProjectRole.role)
                 .all()
             )
 
             # Convert the results to AnnotatedProject objects
             annotated_projects = []
-            for project, num_papers, num_conversations in query:
+            for project, num_papers, num_conversations, role, num_roles in query:
                 annotated_project = AnnotatedProject(
                     id=str(project.id),
                     title=project.title,
                     description=project.description,
                     num_papers=num_papers,
                     num_conversations=num_conversations,
+                    num_roles=num_roles,
                     updated_at=str(project.updated_at) if project.updated_at else None,
                     created_at=str(project.created_at) if project.created_at else None,
+                    role=ProjectRoles(role) if role is not None else None,
                 )
                 annotated_projects.append(annotated_project)
 
@@ -201,6 +207,34 @@ class ProjectCRUD(ProjectBaseCRUD[Project, ProjectCreate, ProjectUpdate]):
                 exc_info=True,
             )
             return None
+
+    def remove_self_from_project(
+        self, db: Session, *, project_id: str, user: CurrentUser
+    ) -> bool:
+        """Allow a user to remove themselves from a specific project."""
+        project_role = (
+            db.query(ProjectRole)
+            .filter(
+                ProjectRole.project_id == project_id,
+                ProjectRole.user_id == str(user.id),
+            )
+            .first()
+        )
+
+        if not project_role or project_role.role == ProjectRoles.ADMIN:
+            return False
+
+        try:
+            db.delete(project_role)
+            db.commit()
+            return True
+        except Exception as e:
+            db.rollback()
+            logger.error(
+                f"Error removing user {user.id} from project {project_id}: {str(e)}",
+                exc_info=True,
+            )
+            return False
 
     def change_collaborator_role(
         self,

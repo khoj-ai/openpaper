@@ -460,7 +460,7 @@ export default function ProjectPage() {
 				{/* Left side - Conversations */}
 				<div className="w-full lg:w-2/3 px-4">
 					{/* Conversation Input */}
-					{project?.current_user_role !== 'viewer' && (
+					{project?.role !== 'viewer' && (
 						<>
 							{papers.length > 0 ? (
 								<div className="mb-6">
@@ -555,14 +555,14 @@ export default function ProjectPage() {
 					</div>
 
 					{/* Artifacts Section */}
-					<Artifacts projectId={projectId} papers={papers} currentUserRole={project.current_user_role} />
+					<Artifacts projectId={projectId} papers={papers} currentUserRole={project.role} />
 				</div>
 
 				{/* Right side - Papers */}
 				<div className="w-full lg:w-1/3 px-4">
 					<div className="flex justify-between items-center mb-4">
 						<h2 className="text-2xl font-bold">Papers</h2>
-						{project?.current_user_role !== 'viewer' && (
+						{project?.role !== 'viewer' && (
 							<Sheet open={isAddPapersSheetOpen} onOpenChange={(isOpen) => {
 								setIsAddPapersSheetOpen(isOpen);
 								if (!isOpen) {
@@ -760,7 +760,7 @@ export default function ProjectPage() {
 						<ProjectCollaborators
 							projectId={projectId}
 							setHasCollaborators={setHasCollaborators}
-							currentUserIsAdmin={project.current_user_role === "admin"} />
+							currentUserIsAdmin={project.role === "admin"} />
 					</div>
 				</div>
 			</div>
