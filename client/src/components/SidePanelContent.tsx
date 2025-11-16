@@ -50,8 +50,9 @@ import { toast } from "sonner";
 import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useSubscription, getChatCreditUsagePercentage, isChatCreditAtLimit, isChatCreditNearLimit } from '@/hooks/useSubscription';
-import { Avatar } from './ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { PaperProjects } from './PaperProjects';
+import { getAlphaHashToBackgroundColor, getInitials } from '@/lib/utils';
 
 
 interface SidePanelContentProps {
@@ -700,8 +701,10 @@ export function SidePanelContent({
                 {
                     msg.role === 'user' && user && (
                         <Avatar className="h-6 w-6">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            {user.picture ? (<img src={user.picture} alt={user.name} />) : (<User size={16} />)}
+                            <AvatarImage src={user.picture} alt={user.name} />
+                            <AvatarFallback className={getAlphaHashToBackgroundColor(user.name)}>
+                                {getInitials(user.name)}
+                            </AvatarFallback>
                         </Avatar>
                     )
                 }
