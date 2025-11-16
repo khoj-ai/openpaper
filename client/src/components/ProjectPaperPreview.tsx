@@ -66,21 +66,24 @@ export function ProjectPaperPreview({ paper, projectId }: ProjectPaperPreviewPro
         const toastId = toast.loading("Duplicating paper...");
 
         try {
+            const requestBody = {
+                source_project_id: projectId,
+                paper_id: paper.id,
+            };
+
             const response = await fetchFromApi('/api/projects/papers/fork', {
                 method: 'POST',
-                body: JSON.stringify({
-                    source_project_id: projectId,
-                    paper_id: paper.id,
-                }),
+                body: JSON.stringify(requestBody),
             });
 
             if (response.new_paper_id) {
                 toast.success("Paper duplicated!", {
                     id: toastId,
-                    description: "Redirecting to the new paper...",
+                    description: "Paper has been duplicated successfully.",
                     richColors: true,
                 });
-                router.push(`/paper/${response.new_paper_id}`);
+                // Update the forked paper state to show the "View Fork" button
+                setForkedPaper({ ...paper, id: response.new_paper_id });
             } else {
                 throw new Error("Invalid response from server.");
             }
@@ -154,12 +157,12 @@ export function ProjectPaperPreview({ paper, projectId }: ProjectPaperPreviewPro
                         ) : forkedPaper ? (
                             <Button variant="outline" size="sm" className="h-8 px-3 text-xs" onClick={() => router.push(`/paper/${forkedPaper.id}`)}>
                                 <FilePlus2 className="h-4 w-4 mr-2" />
-                                View Fork
+                                Open
                             </Button>
                         ) : (
                             <Button variant="outline" size="sm" className="h-8 px-3 text-xs" onClick={handleDuplicate}>
                                 <FilePlus2 className="h-4 w-4 mr-2" />
-                                Duplicate
+                                Add to My Library
                             </Button>
                         )}
                     </div>
