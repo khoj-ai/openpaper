@@ -39,6 +39,7 @@ logger = logging.getLogger(__name__)
 class LLMProvider(Enum):
     GEMINI = "gemini"
     OPENAI = "openai"
+    GROQ = "groq"
 
 
 class LLMResponse:
@@ -343,23 +344,25 @@ class GeminiProvider(BaseLLMProvider):
 class OpenAIProvider(BaseLLMProvider):
     """OpenAI LLM provider implementation"""
 
-    def __init__(self):
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        default_model: Optional[str] = None,
+        fast_model: Optional[str] = None,
+    ):
 
-        self.api_key = os.getenv("OPENAI_API_KEY")
-        # the azure openai endpoint isn't accepting the `file` type in the content list, so disable it for now
-        # self.api_key = os.getenv("AZURE_OPENAI_API_KEY")
-        endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-        version = os.getenv("AZURE_OPENAI_VERSION", "2025-04-01-preview")
+        # Allow explicit api_key/base_url overrides while keeping env-based defaults.
+        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
 
         if not self.api_key:
             raise ValueError("OPENAI_API_KEY environment variable is required")
-        if not endpoint:
-            raise ValueError("AZURE_OPENAI_ENDPOINT environment variable is required")
 
-        # self._client = openai.AzureOpenAI(api_key=self.api_key, azure_endpoint=endpoint, api_version=version)
-        self._client = openai.OpenAI(api_key=self.api_key)
-        self._default_model = "gpt-4.1"
-        self._fast_model = "gpt-4.1-2025-04-14"
+        # For standard OpenAI, base_url should be None. For OpenAI-compatible
+        # providers, pass a custom base_url when constructing this provider.
+        self._client = openai.OpenAI(api_key=self.api_key, base_url=base_url)
+        self._default_model = default_model or "gpt-4.1"
+        self._fast_model = fast_model or "gpt-4.1-2025-04-14"
 
     @property
     def client(self) -> openai.OpenAI:

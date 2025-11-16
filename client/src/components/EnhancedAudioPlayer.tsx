@@ -319,7 +319,6 @@ export function EnhancedAudioPlayer({ audioOverview, paper_title, setExplicitSea
                 </div>
 
                 <div className="flex items-center space-x-1 flex-wrap justify-center">
-                    <span className="text-sm text-accent-foreground mr-2">Speed:</span>
                     {[0.75, 1, 1.25, 1.5, 2].map((speed) => (
                         <button
                             key={speed}

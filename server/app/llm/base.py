@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 from enum import Enum
 from typing import Any, Dict, Iterator, List, Optional
@@ -58,6 +59,18 @@ class BaseLLMClient:
                 self._providers[provider] = GeminiProvider()
             elif provider == LLMProvider.OPENAI:
                 self._providers[provider] = OpenAIProvider()
+            elif provider == LLMProvider.GROQ:
+                # Custom OpenAI-compatible provider using a separate base URL and API key.
+                # These can be configured via environment variables or another config layer.
+                custom_api_key = os.getenv("GROQ_API_KEY")
+                custom_base_url = os.getenv("GROQ_BASE_URL")
+
+                self._providers[provider] = OpenAIProvider(
+                    api_key=custom_api_key,
+                    base_url=custom_base_url,
+                    default_model="openai/gpt-oss-120b",
+                    fast_model="moonshotai/kimi-k2-instruct-0905",
+                )
             else:
                 raise ValueError(f"Unsupported LLM provider: {provider}")
 
