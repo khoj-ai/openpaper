@@ -2,7 +2,7 @@ import logging
 import re
 import uuid
 from datetime import datetime
-from typing import List, Optional, Tuple, cast
+from typing import List, Optional, Tuple
 
 from app.database.crud.annotation_crud import AnnotationCreate, annotation_crud
 from app.database.crud.base_crud import CRUDBase
@@ -496,52 +496,6 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
                         topics.add(str(keyword).strip())
 
         return list(topics)
-
-    def fork_paper(
-        self,
-        db: Session,
-        *,
-        parent_paper_id: str,
-        new_file_object_key: str,
-        new_file_url: str,
-        new_preview_url: Optional[str],
-        current_user: CurrentUser,
-    ) -> Optional[Paper]:
-        """Fork a paper to create a duplicate for the current user."""
-        original_paper = self.get(db, id=parent_paper_id, user=current_user)
-        if not original_paper:
-            logger.error(
-                f"Original paper with ID {parent_paper_id} not found for forking."
-            )
-            return None
-
-        # Create a new PaperCreate object with the same data as the original
-        new_paper_data = PaperCreate(
-            file_url=new_file_url,
-            s3_object_key=new_file_object_key,
-            authors=original_paper.authors,  # type: ignore
-            title=str(original_paper.title),
-            abstract=str(original_paper.abstract),
-            institutions=original_paper.institutions,  # type: ignore
-            keywords=original_paper.keywords,  # type: ignore
-            summary=str(original_paper.summary),
-            summary_citations=original_paper.summary_citations,  # type: ignore
-            starter_questions=original_paper.starter_questions,  # type: ignore
-            publish_date=str(original_paper.publish_date),
-            raw_content=str(original_paper.raw_content),
-            upload_job_id=None,  # New upload job ID
-            preview_url=new_preview_url,
-            size_in_kb=(
-                int(cast(int, original_paper.size_in_kb))
-                if original_paper.size_in_kb is not None
-                else None
-            ),
-            parent_paper_id=uuid.UUID(str(original_paper.id)),  # Set parent paper ID
-        )
-
-        # Create the new paper in the database
-        new_paper = self.create(db, obj_in=new_paper_data, user=current_user)
-        return new_paper
 
 
 # Create a single instance to use throughout the application

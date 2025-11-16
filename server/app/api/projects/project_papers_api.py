@@ -24,6 +24,138 @@ logger = logging.getLogger(__name__)
 project_papers_router = APIRouter()
 
 
+class ForkPaperFromProjectRequest(BaseModel):
+    source_project_id: str
+    paper_id: str
+
+
+@project_papers_router.post("/fork")
+async def fork_paper_from_project(
+    request: ForkPaperFromProjectRequest,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+) -> JSONResponse:
+    """
+    As we can have multiple users working on the same project, sometimes there may be papers in a project a different user wants to fork into their own library. This endpoint allows a user to fork a paper from a specified project into their own library.
+    """
+    try:
+        project_paper: Paper | None = project_paper_crud.get_paper_by_project(
+            db,
+            paper_id=uuid.UUID(request.paper_id),
+            project_id=uuid.UUID(request.source_project_id),
+            user=current_user,
+        )
+
+        if not project_paper:
+            raise HTTPException(
+                status_code=404,
+                detail="Paper not found in the specified project or user does not have access.",
+            )
+
+        duplicate_paper_key, duplicate_file_url = s3_service.duplicate_file(
+            source_object_key=str(project_paper.s3_object_key),
+            new_filename=f"forked_{uuid.uuid4()}.pdf",
+        )
+
+        duplicate_preview_key, duplicate_preview_url = (
+            s3_service.duplicate_file_from_url(
+                s3_url=str(project_paper.preview_url),
+                new_filename=f"forked_preview_{uuid.uuid4()}.png",
+            )
+        )
+
+        new_paper = project_paper_crud.fork_paper(
+            db,
+            parent_paper_id=str(project_paper.id),
+            new_file_object_key=duplicate_paper_key,
+            new_file_url=duplicate_file_url,
+            new_preview_url=duplicate_preview_url,
+            project_id=request.source_project_id,
+            current_user=current_user,
+        )
+
+        if not new_paper:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to fork paper.",
+            )
+
+        # We do not add it to the paper to the project as this would be redundant - the user is forking it to their own library
+
+        track_event(
+            "paper_forked_from_project",
+            user_id=str(current_user.id),
+            properties={
+                "source_project_id": request.source_project_id,
+                "paper_id": request.paper_id,
+            },
+        )
+
+        return JSONResponse(
+            status_code=201,
+            content={
+                "message": "Paper forked successfully",
+                "new_paper_id": str(new_paper.id),
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Error forking paper from project: {e}")
+        return JSONResponse(
+            status_code=400,
+            content={"message": f"Failed to fork paper from project: {str(e)}"},
+        )
+
+
+@project_papers_router.get("/forked/{parent_paper_id}")
+async def get_forked_paper(
+    parent_paper_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+) -> JSONResponse:
+    """Get the paper forked from a specific parent paper"""
+    try:
+        paper = project_paper_crud.get_forked_papers_by_parent_id(
+            db, parent_paper_id=uuid.UUID(parent_paper_id), user=current_user
+        )
+
+        if not paper:
+            return JSONResponse(
+                status_code=200,
+                content={"paper": None},
+            )
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "paper": {
+                    "id": str(paper.id),
+                    "title": paper.title,
+                    "created_at": str(paper.created_at),
+                    "abstract": paper.abstract,
+                    "authors": paper.authors,
+                    "institutions": paper.institutions,
+                    "keywords": paper.keywords,
+                    "status": paper.status,
+                    "file_url": s3_service.get_cached_presigned_url(
+                        db,
+                        str(paper.id),
+                        str(paper.s3_object_key),
+                        current_user=current_user,
+                    ),
+                    "is_owner": paper.user_id == current_user.id,
+                }
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Error fetching forked papers: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=400,
+            content={"message": f"Failed to fetch forked papers: {str(e)}"},
+        )
+
+
 class AddPaperToProjectRequest(BaseModel):
     paper_ids: List[str]
 
@@ -112,149 +244,6 @@ async def get_project_papers(
         return JSONResponse(
             status_code=400,
             content={"message": f"Failed to fetch project papers: {str(e)}"},
-        )
-
-
-class ForkPaperFromProjectRequest(BaseModel):
-    source_project_id: str
-    paper_id: str
-
-
-@project_papers_router.post("/fork")
-async def fork_paper_from_project(
-    request: ForkPaperFromProjectRequest,
-    db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_required_user),
-) -> JSONResponse:
-    """
-    As we can have multiple users working on the same project, sometimes there may be papers in a project a different user wants to fork into their own library. This endpoint allows a user to fork a paper from a specified project into their own library.
-    """
-    try:
-        project_paper: Paper | None = project_paper_crud.get_paper_by_project(
-            db,
-            paper_id=uuid.UUID(request.paper_id),
-            project_id=uuid.UUID(request.source_project_id),
-            user=current_user,
-        )
-
-        if not project_paper:
-            raise HTTPException(
-                status_code=404,
-                detail="Paper not found in the specified project or user does not have access.",
-            )
-
-        duplicate_paper_key, duplicate_file_url = s3_service.duplicate_file(
-            source_object_key=str(project_paper.s3_object_key),
-            new_filename=f"forked_{uuid.uuid4()}.pdf",
-        )
-
-        duplicate_preview_key, duplicate_preview_url = (
-            s3_service.duplicate_file_from_url(
-                s3_url=str(project_paper.preview_url),
-                new_filename=f"forked_preview_{uuid.uuid4()}.png",
-            )
-        )
-
-        new_paper = paper_crud.fork_paper(
-            db,
-            parent_paper_id=str(project_paper.id),
-            new_file_object_key=duplicate_paper_key,
-            new_file_url=duplicate_file_url,
-            new_preview_url=duplicate_preview_url,
-            current_user=current_user,
-        )
-
-        if not new_paper:
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to fork paper.",
-            )
-
-        # Create a new paper entry for the user
-        new_project_paper = project_paper_crud.create(
-            db,
-            obj_in=ProjectPaperCreate(paper_id=uuid.UUID(str(new_paper.id))),
-            user=current_user,
-            project_id=None,  # Not associating with any project initially
-        )
-
-        if not new_project_paper:
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to associate forked paper with user's library.",
-            )
-
-        track_event(
-            "paper_forked_from_project",
-            user_id=str(current_user.id),
-            properties={
-                "source_project_id": request.source_project_id,
-                "paper_id": request.paper_id,
-            },
-        )
-
-        return JSONResponse(
-            status_code=201,
-            content={
-                "message": "Paper forked successfully",
-                "new_paper_id": str(new_project_paper.id),
-            },
-        )
-
-    except Exception as e:
-        logger.error(f"Error forking paper from project: {e}")
-        return JSONResponse(
-            status_code=400,
-            content={"message": f"Failed to fork paper from project: {str(e)}"},
-        )
-
-
-@project_papers_router.get("/forked/{parent_paper_id}")
-async def get_forked_paper(
-    parent_paper_id: str,
-    db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_required_user),
-) -> JSONResponse:
-    """Get the paper forked from a specific parent paper"""
-    try:
-        paper = project_paper_crud.get_forked_papers_by_parent_id(
-            db, parent_paper_id=uuid.UUID(parent_paper_id), user=current_user
-        )
-
-        if not paper:
-            return JSONResponse(
-                status_code=200,
-                content={"paper": None},
-            )
-
-        return JSONResponse(
-            status_code=200,
-            content={
-                "paper": {
-                    "id": str(paper.id),
-                    "title": paper.title,
-                    "created_at": str(paper.created_at),
-                    "abstract": paper.abstract,
-                    "authors": paper.authors,
-                    "institutions": paper.institutions,
-                    "keywords": paper.keywords,
-                    "status": paper.status,
-                    "file_url": s3_service.get_cached_presigned_url(
-                        db,
-                        str(paper.id),
-                        str(paper.s3_object_key),
-                        current_user=current_user,
-                    ),
-                    "is_owner": paper.user_id == current_user.id,
-                }
-            },
-        )
-
-    except Exception as e:
-        logger.error(f"Error fetching forked papers: {e}", exc_info=True)
-        return JSONResponse(
-            status_code=400,
-            content={"message": f"Failed to fetch forked papers: {str(e)}"},
         )
 
 
