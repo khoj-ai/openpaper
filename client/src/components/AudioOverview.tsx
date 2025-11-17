@@ -222,6 +222,8 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
             if (response) {
                 setAudioOverview(response);
                 setJobStatus(null); // Clear job status since we have the overview now
+                setIsLoading(false); // Stop loading state
+                setError(null); // Clear any errors since we successfully fetched the overview
 
                 // Use functional update to get the latest value
                 setAllAudioOverviews((prevOverviews) => {
@@ -258,11 +260,17 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
             }
         } catch (err) {
             console.error('Error polling job status:', err);
+            // Only show error if we don't already have an audio overview
+            // This prevents showing errors after the overview has been successfully fetched
             if (showErrorOnFail) {
-                setError('Failed to get job status');
+                setError((prevError) => {
+                    // Don't set error if we already have an audio overview
+                    // This handles the race condition where polling continues after completion
+                    return audioOverview ? null : 'Failed to get job status';
+                });
             }
         }
-    }, [paper_id, fetchAudioOverview]);
+    }, [paper_id, fetchAudioOverview, audioOverview]);
 
 
 
