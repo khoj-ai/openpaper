@@ -55,6 +55,7 @@ from app.database.crud.message_crud import message_crud
 from app.database.database import get_db
 from app.database.telemetry import track_event
 
+# TODO Really need to find a better, more robust way to implement the truncation logic based on the tokenization window limits. I know current model has a limit of 250k tokens - we should have a more dynamic way to accommodate additional text for prompts, chat history, and of course evidence. We'll have to estimate the token counts based on character counts for now - then we can even add some basic heuristics for pruning down chat history or evidence if we exceed limits.
 CONTENT_LIMIT_EVIDENCE_GATHERING = 150000  # Character limit for evidence gathering
 
 
