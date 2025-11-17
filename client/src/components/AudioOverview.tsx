@@ -263,11 +263,11 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
             // Only show error if we don't already have an audio overview
             // This prevents showing errors after the overview has been successfully fetched
             if (showErrorOnFail) {
-                setError((prevError) => {
-                    // Don't set error if we already have an audio overview
-                    // This handles the race condition where polling continues after completion
-                    return audioOverview ? null : 'Failed to get job status';
-                });
+                // Don't set error if we already have an audio overview
+                // This handles the race condition where polling continues after completion
+                if (!audioOverview) {
+                    setError('Failed to get job status');
+                }
             }
         }
     }, [paper_id, fetchAudioOverview, audioOverview]);
