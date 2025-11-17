@@ -55,7 +55,7 @@ from app.database.crud.message_crud import message_crud
 from app.database.database import get_db
 from app.database.telemetry import track_event
 
-CONTENT_LIMIT_EVIDENCE_GATHERING = 200000  # Character limit for evidence gathering
+CONTENT_LIMIT_EVIDENCE_GATHERING = 150000  # Character limit for evidence gathering
 
 
 class MultiPaperOperations(BaseLLMClient):
@@ -162,7 +162,7 @@ class MultiPaperOperations(BaseLLMClient):
                     "content": "Gathered a lot of data. Compacting evidence...",
                 }
                 logger.info(
-                    "Total evidence length exceeded 200,000 characters, compacting evidence."
+                    f"Total evidence length exceeded {CONTENT_LIMIT_EVIDENCE_GATHERING} characters, compacting evidence."
                 )
                 evidence_collection = await self.compact_evidence_collection(
                     evidence_collection, question, current_user, llm_provider
