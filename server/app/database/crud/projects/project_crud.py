@@ -85,6 +85,16 @@ class ProjectCRUD(ProjectBaseCRUD[Project, ProjectCreate, ProjectUpdate]):
         Get all projects for a user with metadata (num_papers, num_conversations) in a single query.
         """
         try:
+            # Subquery to count roles per project
+            roles_subquery = (
+                db.query(
+                    ProjectRole.project_id,
+                    func.count(ProjectRole.id).label("num_roles"),
+                )
+                .group_by(ProjectRole.project_id)
+                .subquery()
+            )
+
             # Build a query that joins all necessary tables and aggregates the counts
             query = (
                 db.query(
@@ -96,9 +106,10 @@ class ProjectCRUD(ProjectBaseCRUD[Project, ProjectCreate, ProjectUpdate]):
                         "num_conversations"
                     ),
                     ProjectRole.role.label("role"),
-                    func.coalesce(func.count(ProjectRole.id), 0).label("num_roles"),
+                    func.coalesce(roles_subquery.c.num_roles, 0).label("num_roles"),
                 )
                 .join(ProjectRole, Project.id == ProjectRole.project_id)
+                .outerjoin(roles_subquery, Project.id == roles_subquery.c.project_id)
                 .outerjoin(ProjectPaper, Project.id == ProjectPaper.project_id)
                 .outerjoin(
                     Conversation,
@@ -106,7 +117,7 @@ class ProjectCRUD(ProjectBaseCRUD[Project, ProjectCreate, ProjectUpdate]):
                     & (Conversation.conversable_type == ConversableType.PROJECT.value),
                 )
                 .filter(ProjectRole.user_id == user.id)
-                .group_by(Project.id, ProjectRole.role)
+                .group_by(Project.id, ProjectRole.role, roles_subquery.c.num_roles)
                 .all()
             )
 

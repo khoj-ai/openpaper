@@ -145,7 +145,7 @@ export function ProjectCard({ project, onProjectUpdate, onUnlink }: {
 										<MessageCircle className="h-3 w-3" />
 										<span>{project.num_conversations ?? 0}</span>
 									</div>
-									{project.num_roles !== undefined && (
+									{project.num_roles !== undefined && project.num_roles > 1 && (
 										<div className="flex items-center gap-1">
 											<Users className="h-3 w-3" />
 											<span>{project.num_roles ?? 0}</span>
