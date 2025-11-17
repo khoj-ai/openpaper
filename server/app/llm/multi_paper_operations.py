@@ -319,6 +319,7 @@ class MultiPaperOperations(BaseLLMClient):
                     {
                         "function_name": fn_name,
                         "duration_ms": (end_time - start_time) * 1000,
+                        "project_type": project_id is not None,
                     },
                     user_id=str(current_user.id),
                 )
