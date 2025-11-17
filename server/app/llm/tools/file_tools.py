@@ -1,5 +1,7 @@
 import re
 import uuid
+from logging import getLogger
+from time import time
 from typing import Dict, List, Optional
 
 from app.database.crud.paper_crud import paper_crud
@@ -7,6 +9,8 @@ from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.models import Paper
 from app.schemas.user import CurrentUser
 from sqlalchemy.orm import Session
+
+logger = getLogger(__name__)
 
 # --------------------------------------------------------------
 # Function declarations for LLM tools related to file operations
@@ -186,25 +190,45 @@ def search_all_files(
     Search for a specific query in the file content of all papers using full-text search.
     Returns a list of matching lines with paper IDs and line numbers.
     """
+    start_time = time()
+
     # Sanitize the query for to_tsquery by replacing hyphens with spaces,
     # as hyphens can cause syntax errors in this context.
     sanitized_query = query.replace("-", " ")
-
     all_papers: List[Paper] = []
+
     if project_id:
-        all_papers = project_paper_crud.get_all_papers_by_project_id(
+        project_papers = project_paper_crud.get_all_papers_by_project_id(
             db, project_id=uuid.UUID(project_id), user=current_user
+        )
+        if len(project_papers) == 0:
+            return {}
+
+        paper_ids: List[str] = [str(p.id) for p in project_papers]
+        all_papers = paper_crud.get_all_available_papers(
+            db, user=current_user, query=sanitized_query, paper_ids=paper_ids
         )
     else:
         all_papers = paper_crud.get_all_available_papers(
             db, user=current_user, query=sanitized_query
         )
-    results = {}
 
-    # Extract search terms from the query, stripping FTS operators
-    search_terms = [term for term in re.split(r"[\s&|!()]", sanitized_query) if term]
+    end_time = time()
+    elapsed_time = end_time - start_time
+    logger.info(f"Full-text search completed in {elapsed_time:.2f} seconds")
+
+    start_time = time()
+
+    results: Dict[str, list[str]] = {}
+
+    # Extract search terms from the query, stripping FTS operators, and normalize
+    raw_terms = [term for term in re.split(r"[\s&|!()]", sanitized_query) if term]
+    search_terms = list({t.lower() for t in raw_terms})  # deduplicated, lowercased
     if not search_terms:
         return {}
+
+    # Safety limit to avoid scanning extremely large files exhaustively
+    MAX_MATCHES_PER_PAPER = 100
 
     for paper in all_papers:
         paper_id = str(paper.id)
@@ -212,14 +236,24 @@ def search_all_files(
             continue
 
         lines = paper.raw_content.splitlines()
-        matching_lines = []
+        matching_lines: list[str] = []
+
         for line_num, line in enumerate(lines, 1):
+            lower_line = line.lower()
             # Search for any of the terms in the line, case-insensitively
-            if any(term.lower() in line.lower() for term in search_terms):
+            if any(term in lower_line for term in search_terms):
                 matching_lines.append(f"{line_num}: {line}")
+
+                # Stop early if we've collected enough matches for this paper
+                if len(matching_lines) >= MAX_MATCHES_PER_PAPER:
+                    break
 
         if matching_lines:
             results[paper_id] = matching_lines
+
+    end_time = time()
+    elapsed_time = end_time - start_time
+    logger.info(f"Line-by-line search completed in {elapsed_time:.2f} seconds")
 
     return results
 

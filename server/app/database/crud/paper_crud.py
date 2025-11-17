@@ -459,14 +459,25 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
         )
 
     def get_all_available_papers(
-        self, db: Session, *, user: CurrentUser, query: Optional[str] = None
+        self,
+        db: Session,
+        *,
+        user: CurrentUser,
+        query: Optional[str] = None,
+        paper_ids: Optional[List[str]] = None,
     ) -> List[Paper]:
         """
         Get all papers available to the user, regardless of status.
         This includes papers with 'todo', 'reading', and 'completed' statuses.
         If a query is provided, it will filter papers by raw_content.
+        If paper_ids is provided, it will filter papers by the given list of IDs.
         """
         db_query = db.query(Paper).filter(Paper.user_id == user.id)
+
+        if paper_ids:
+            db_query = db_query.filter(Paper.id.in_(paper_ids))
+
+        db_query = db_query.filter(Paper.ts_vector.isnot(None))
 
         if query:
             # The query is split into words and joined with '&' to create a tsquery.
