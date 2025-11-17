@@ -22,7 +22,7 @@ from app.llm.utils import find_offsets
 from app.schemas.responses import PaperMetadataExtraction, ResponseCitation
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session, selectinload
 
 logger = logging.getLogger(__name__)
@@ -486,6 +486,79 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
             db_query = db_query.filter(Paper.ts_vector.op("@@")(ts_query))
 
         return db_query.order_by(Paper.updated_at.desc()).all()
+
+    def search_papers_and_get_matching_lines(
+        self,
+        db: Session,
+        *,
+        user: CurrentUser,
+        query: str,
+        paper_ids: Optional[List[uuid.UUID]] = None,
+    ) -> List[Tuple[str, int, str]]:
+        """
+        Search for papers using full-text search and return the matching lines.
+        """
+        sanitized_query = query.replace("-", " ")
+        # Split on | to preserve phrases like "machine learning"
+        raw_terms = [
+            term.strip() for term in sanitized_query.split("|") if term.strip()
+        ]
+        if not raw_terms:
+            return []
+
+        search_terms = list({t.lower() for t in raw_terms})
+        # For regex, escape special chars and join individual words
+        regex_terms = []
+        for term in search_terms:
+            # Escape special regex characters
+            escaped_term = re.escape(term)
+            regex_terms.append(escaped_term)
+        regex_query = "|".join(regex_terms)
+
+        # Use phraseto_tsquery for each term to preserve multi-word phrases
+        # Build the OR combination of phrase queries
+        phrase_parts = []
+        for i, term in enumerate(search_terms):
+            phrase_parts.append(f"phraseto_tsquery('english', :term_{i})")
+        fts_query_clause = " || ".join(phrase_parts)
+
+        # Base query
+        sql_base = f"""
+            WITH matching_papers AS (
+                SELECT id
+                FROM papers
+                WHERE ts_vector @@ ({fts_query_clause})
+                  AND user_id = :user_id
+        """
+
+        sql_end = """
+            )
+            SELECT p.id, lines.line_number, lines.line_content
+            FROM papers p,
+                 unnest(string_to_array(p.raw_content, '\n')) WITH ORDINALITY AS lines(line_content, line_number)
+            WHERE p.id IN (SELECT id FROM matching_papers)
+              AND lines.line_content ~* :regex_query
+            ORDER BY p.id, lines.line_number;
+        """
+
+        params = {
+            "user_id": user.id,
+            "regex_query": regex_query,
+        }
+
+        # Add each term as a separate parameter
+        for i, term in enumerate(search_terms):
+            params[f"term_{i}"] = term
+
+        if paper_ids:
+            sql_base += " AND id = ANY(:paper_ids)"
+            params["paper_ids"] = paper_ids
+
+        final_sql = sql_base + sql_end
+
+        result = db.execute(text(final_sql), params).fetchall()
+
+        return [(str(row[0]), row[1], row[2]) for row in result]
 
     def get_topics(
         self,

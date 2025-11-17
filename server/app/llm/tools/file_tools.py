@@ -98,7 +98,7 @@ search_all_files_function = {
         "properties": {
             "query": {
                 "type": "string",
-                "description": "The search query to find in the file content of all papers. This can include keywords and phrases. The search is powered by full-text search, so you can use operators like '&' (AND) and '|' (OR). For example, 'apple & pie' will find papers containing both 'apple' and 'pie'. Avoid using hyphens in search terms as they can cause errors; use spaces instead (e.g., 'red team' instead of 'red-team'). The tool will then highlight the lines containing these keywords.",
+                "description": "The search query to find in the file content of all papers. Use the '|' (pipe) character to separate alternative search terms (OR logic). Each term separated by '|' can be a single word OR a multi-word phrase that will be searched exactly as written. Examples: 'machine learning|neural network|deep learning' searches for any of these three phrases. 'quantum computing|qubit' searches for either the phrase 'quantum computing' or the word 'qubit'. Multi-word phrases preserve spaces and are matched as complete phrases. Hyphens are automatically converted to spaces, so use spaces in multi-word terms (e.g., 'red team' not 'red-team').",
             },
         },
         "required": ["query"],
@@ -192,68 +192,31 @@ def search_all_files(
     """
     start_time = time()
 
-    # Sanitize the query for to_tsquery by replacing hyphens with spaces,
-    # as hyphens can cause syntax errors in this context.
-    sanitized_query = query.replace("-", " ")
-    all_papers: List[Paper] = []
-
+    paper_ids: Optional[List[uuid.UUID]] = None
     if project_id:
-        project_papers = project_paper_crud.get_all_papers_by_project_id(
+        paper_ids = project_paper_crud.get_project_paper_ids_by_project_id(
             db, project_id=uuid.UUID(project_id), user=current_user
         )
-        if len(project_papers) == 0:
+        if not paper_ids:
             return {}
 
-        paper_ids: List[str] = [str(p.id) for p in project_papers]
-        all_papers = paper_crud.get_all_available_papers(
-            db, user=current_user, query=sanitized_query, paper_ids=paper_ids
-        )
-    else:
-        all_papers = paper_crud.get_all_available_papers(
-            db, user=current_user, query=sanitized_query
-        )
+    matching_lines_tuples = paper_crud.search_papers_and_get_matching_lines(
+        db, user=current_user, query=query, paper_ids=paper_ids
+    )
 
     end_time = time()
     elapsed_time = end_time - start_time
-    logger.info(f"Full-text search completed in {elapsed_time:.2f} seconds")
-
-    start_time = time()
+    logger.info(
+        f"Database search for matching lines completed in {elapsed_time:.2f} seconds"
+    )
 
     results: Dict[str, list[str]] = {}
 
-    # Extract search terms from the query, stripping FTS operators, and normalize
-    raw_terms = [term for term in re.split(r"[\s&|!()]", sanitized_query) if term]
-    search_terms = list({t.lower() for t in raw_terms})  # deduplicated, lowercased
-    if not search_terms:
-        return {}
+    for paper_id, line_num, line in matching_lines_tuples:
+        if paper_id not in results:
+            results[paper_id] = []
 
-    # Safety limit to avoid scanning extremely large files exhaustively
-    MAX_MATCHES_PER_PAPER = 100
-
-    for paper in all_papers:
-        paper_id = str(paper.id)
-        if not paper_id or not paper.raw_content:
-            continue
-
-        lines = paper.raw_content.splitlines()
-        matching_lines: list[str] = []
-
-        for line_num, line in enumerate(lines, 1):
-            lower_line = line.lower()
-            # Search for any of the terms in the line, case-insensitively
-            if any(term in lower_line for term in search_terms):
-                matching_lines.append(f"{line_num}: {line}")
-
-                # Stop early if we've collected enough matches for this paper
-                if len(matching_lines) >= MAX_MATCHES_PER_PAPER:
-                    break
-
-        if matching_lines:
-            results[paper_id] = matching_lines
-
-    end_time = time()
-    elapsed_time = end_time - start_time
-    logger.info(f"Line-by-line search completed in {elapsed_time:.2f} seconds")
+        results[paper_id].append(f"{line_num}: {line}")
 
     return results
 
