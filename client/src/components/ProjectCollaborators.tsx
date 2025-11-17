@@ -92,7 +92,7 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin, setHasColl
 				const response = await fetchFromApi(`/api/projects/invitations/${projectId}/`);
 
 				if (response.invitations) {
-					const invites: PendingInvite[] = response.invitations.map((inv: any) => ({
+					const invites: PendingInvite[] = response.invitations.map((inv: PendingInvite) => ({
 						id: inv.id,
 						email: inv.email,
 						role: inv.role,
@@ -131,7 +131,7 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin, setHasColl
 			});
 
 			// Construct pending invites from response
-			const newPendingInvites: PendingInvite[] = response.invitations.map((inv: any) => ({
+			const newPendingInvites: PendingInvite[] = response.invitations.map((inv: PendingInvite) => ({
 				id: inv.id,
 				email: inv.email,
 				role: inv.role,
@@ -202,7 +202,7 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin, setHasColl
 
 	const removeDraftInvite = (index: number) => {
 		if (draftInvites.length > 1) {
-			const updatedInvites = draftInvites.filter((_: any, i: number) => i !== index);
+			const updatedInvites = draftInvites.filter((_: unknown, i: number) => i !== index);
 			setDraftInvites(updatedInvites);
 		}
 	};

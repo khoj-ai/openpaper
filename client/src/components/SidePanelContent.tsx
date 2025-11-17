@@ -18,7 +18,6 @@ import {
     Sparkle,
     Check,
     Route,
-    User,
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import {

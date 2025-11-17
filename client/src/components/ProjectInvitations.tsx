@@ -54,7 +54,7 @@ export function ProjectInvitations({ onInvitationAccepted, defaultOpen = false }
 
 	const handleAccept = async (invitationId: string) => {
 		if (atProjectLimit) {
-			toast.error("You've reached your project limit. Upgrade your plan to accept more project invitations.");
+			toast.error("You&apos;ve reached your project limit. Upgrade your plan to accept more project invitations.");
 			return;
 		}
 
@@ -142,7 +142,7 @@ export function ProjectInvitations({ onInvitationAccepted, defaultOpen = false }
 						<DialogTitle>Project Invitations</DialogTitle>
 						<DialogDescription>
 							{atProjectLimit
-								? <>You've reached your project limit. <Link href="/pricing" className="text-blue-600 hover:text-blue-700 underline">Upgrade your plan</Link> to accept more project invitations.</>
+								? <>You&apos;ve reached your project limit. <Link href="/pricing" className="text-blue-600 hover:text-blue-700 underline">Upgrade your plan</Link> to accept more project invitations.</>
 								: pendingCount > 0
 									? `You have ${pendingCount} pending invitation${pendingCount === 1 ? '' : 's'}`
 									: "You have no pending invitations"}
