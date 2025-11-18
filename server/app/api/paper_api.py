@@ -56,6 +56,13 @@ async def get_paper_ids(
     Get all paper IDs
     """
     papers: List[Paper] = paper_crud.get_multi_uploads_completed(db, user=current_user)
+
+    # Bulk retrieve presigned URLs for all papers (optimized with parallelization)
+    file_urls = s3_service.get_cached_presigned_urls_bulk(
+        db=db,
+        papers=papers,
+    )
+
     data = [
         {
             "id": str(paper.id),
@@ -69,12 +76,7 @@ async def get_paper_ids(
             "preview_url": paper.preview_url,
             "size_in_kb": paper.size_in_kb,
             "publish_date": (str(paper.publish_date) if paper.publish_date else None),
-            "file_url": s3_service.get_cached_presigned_url_by_owner(
-                db,
-                str(paper.id),
-                str(paper.s3_object_key),
-                str(current_user.id),
-            ),
+            "file_url": file_urls.get(str(paper.id)),
             "tags": [{"id": str(tag.id), "name": tag.name, "color": tag.color} for tag in paper.tags],  # type: ignore
         }
         for paper in papers

@@ -1,5 +1,7 @@
 import re
 import uuid
+from logging import getLogger
+from time import time
 from typing import Dict, List, Optional
 
 from app.database.crud.paper_crud import paper_crud
@@ -7,6 +9,8 @@ from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.models import Paper
 from app.schemas.user import CurrentUser
 from sqlalchemy.orm import Session
+
+logger = getLogger(__name__)
 
 # --------------------------------------------------------------
 # Function declarations for LLM tools related to file operations
@@ -94,7 +98,7 @@ search_all_files_function = {
         "properties": {
             "query": {
                 "type": "string",
-                "description": "The search query to find in the file content of all papers. This can include keywords and phrases. The search is powered by full-text search, so you can use operators like '&' (AND) and '|' (OR). For example, 'apple & pie' will find papers containing both 'apple' and 'pie'. Avoid using hyphens in search terms as they can cause errors; use spaces instead (e.g., 'red team' instead of 'red-team'). The tool will then highlight the lines containing these keywords.",
+                "description": "The search query to find in the file content of all papers. Use the '|' (pipe) character to separate alternative search terms (OR logic). Each term separated by '|' can be a single word OR a multi-word phrase that will be searched exactly as written. Examples: 'machine learning|neural network|deep learning' searches for any of these three phrases. 'quantum computing|qubit' searches for either the phrase 'quantum computing' or the word 'qubit'. Multi-word phrases preserve spaces and are matched as complete phrases. Hyphens are automatically converted to spaces, so use spaces in multi-word terms (e.g., 'red team' not 'red-team').",
             },
         },
         "required": ["query"],
@@ -186,40 +190,33 @@ def search_all_files(
     Search for a specific query in the file content of all papers using full-text search.
     Returns a list of matching lines with paper IDs and line numbers.
     """
-    # Sanitize the query for to_tsquery by replacing hyphens with spaces,
-    # as hyphens can cause syntax errors in this context.
-    sanitized_query = query.replace("-", " ")
+    start_time = time()
 
-    all_papers: List[Paper] = []
+    paper_ids: Optional[List[uuid.UUID]] = None
     if project_id:
-        all_papers = project_paper_crud.get_all_papers_by_project_id(
+        paper_ids = project_paper_crud.get_project_paper_ids_by_project_id(
             db, project_id=uuid.UUID(project_id), user=current_user
         )
-    else:
-        all_papers = paper_crud.get_all_available_papers(
-            db, user=current_user, query=sanitized_query
-        )
-    results = {}
+        if not paper_ids:
+            return {}
 
-    # Extract search terms from the query, stripping FTS operators
-    search_terms = [term for term in re.split(r"[\s&|!()]", sanitized_query) if term]
-    if not search_terms:
-        return {}
+    matching_lines_tuples = paper_crud.search_papers_and_get_matching_lines(
+        db, user=current_user, query=query, paper_ids=paper_ids
+    )
 
-    for paper in all_papers:
-        paper_id = str(paper.id)
-        if not paper_id or not paper.raw_content:
-            continue
+    end_time = time()
+    elapsed_time = end_time - start_time
+    logger.info(
+        f"Database search for matching lines completed in {elapsed_time:.2f} seconds"
+    )
 
-        lines = paper.raw_content.splitlines()
-        matching_lines = []
-        for line_num, line in enumerate(lines, 1):
-            # Search for any of the terms in the line, case-insensitively
-            if any(term.lower() in line.lower() for term in search_terms):
-                matching_lines.append(f"{line_num}: {line}")
+    results: Dict[str, list[str]] = {}
 
-        if matching_lines:
-            results[paper_id] = matching_lines
+    for paper_id, line_num, line in matching_lines_tuples:
+        if paper_id not in results:
+            results[paper_id] = []
+
+        results[paper_id].append(f"{line_num}: {line}")
 
     return results
 

@@ -29,9 +29,10 @@ export default function CreateProjectPage() {
 			router.push(`/projects/${project.id}`);
 		} catch (err) {
 			setError("Failed to create project. Please try again.");
-			console.error(err);
-		} finally {
+
+			// Keep loading state active during navigation
 			setIsLoading(false);
+			console.error(err);
 		}
 	};
 

@@ -55,7 +55,8 @@ from app.database.crud.message_crud import message_crud
 from app.database.database import get_db
 from app.database.telemetry import track_event
 
-CONTENT_LIMIT_EVIDENCE_GATHERING = 200000  # Character limit for evidence gathering
+# TODO Really need to find a better, more robust way to implement the truncation logic based on the tokenization window limits. I know current model has a limit of 250k tokens - we should have a more dynamic way to accommodate additional text for prompts, chat history, and of course evidence. We'll have to estimate the token counts based on character counts for now - then we can even add some basic heuristics for pruning down chat history or evidence if we exceed limits.
+CONTENT_LIMIT_EVIDENCE_GATHERING = 150000  # Character limit for evidence gathering
 
 
 class MultiPaperOperations(BaseLLMClient):
@@ -162,7 +163,7 @@ class MultiPaperOperations(BaseLLMClient):
                     "content": "Gathered a lot of data. Compacting evidence...",
                 }
                 logger.info(
-                    "Total evidence length exceeded 200,000 characters, compacting evidence."
+                    f"Total evidence length exceeded {CONTENT_LIMIT_EVIDENCE_GATHERING} characters, compacting evidence."
                 )
                 evidence_collection = await self.compact_evidence_collection(
                     evidence_collection, question, current_user, llm_provider
@@ -318,6 +319,7 @@ class MultiPaperOperations(BaseLLMClient):
                     {
                         "function_name": fn_name,
                         "duration_ms": (end_time - start_time) * 1000,
+                        "project_type": project_id is not None,
                     },
                     user_id=str(current_user.id),
                 )

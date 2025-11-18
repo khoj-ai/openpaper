@@ -2,7 +2,6 @@ import io
 import logging
 from typing import Tuple
 
-import PyPDF2
 import requests
 from PyPDF2 import PdfReader
 
@@ -96,6 +95,7 @@ async def validate_pdf_content(
                 logger.warning(
                     f"PDF from {source} has minimal text content - might be image-only"
                 )
+                return False, "PDF appears to have minimal text content"
 
         except Exception as e:
             return False, f"PDF structure is corrupted or unreadable: {str(e)}"

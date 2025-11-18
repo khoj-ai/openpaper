@@ -7,9 +7,10 @@ import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from app.database.crud.paper_crud import PaperCreate, PaperUpdate, paper_crud
+from app.database.crud.paper_crud import PaperUpdate, paper_crud
 from app.database.crud.paper_image_crud import PaperImageCreate, paper_image_crud
 from app.database.crud.paper_upload_crud import paper_upload_job_crud
+from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
 from app.database.models import JobStatus
 from app.database.telemetry import track_event
@@ -23,6 +24,49 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 webhook_router = APIRouter()
+
+
+def handle_failed_upload(
+    db: Session, job_id: str, job_user: CurrentUser, reason: str = "Unknown error"
+) -> None:
+    """
+    Handle cleanup for a failed paper upload job.
+
+    Removes the paper record and any associated ProjectPaper relationships
+    that were created during the upload process.
+
+    Args:
+        db: Database session
+        job_id: The upload job ID
+        job_user: The user who owns the job
+        reason: Description of why the upload failed
+    """
+    logger.error(f"PDF processing failed for job {job_id}: {reason}")
+
+    # Clean up the paper record that was created during upload
+    existing_paper = paper_crud.get_by_upload_job_id(
+        db=db, upload_job_id=job_id, user=job_user
+    )
+    if existing_paper:
+        # First remove any ProjectPaper associations (RESTRICT constraint)
+        projects = project_paper_crud.get_projects_by_paper_id(
+            db=db, paper_id=uuid.UUID(str(existing_paper.id)), user=job_user
+        )
+        for project in projects:
+            project_paper_crud.remove_by_paper_and_project(
+                db=db,
+                paper_id=uuid.UUID(str(existing_paper.id)),
+                project_id=uuid.UUID(str(project.id)),
+                user=job_user,
+            )
+            logger.info(
+                f"Removed ProjectPaper association for paper {existing_paper.id} and project {project.id}"
+            )
+
+        logger.info(f"Removing failed paper {existing_paper.id} for job {job_id}")
+        paper_crud.remove(db=db, id=str(existing_paper.id), user=job_user)
+
+    paper_upload_job_crud.mark_as_failed(db=db, job_id=job_id, user=job_user)
 
 
 class PDFImage(BaseModel):
@@ -60,6 +104,8 @@ class PDFProcessingResult(BaseModel):
 
 
 class WebhookData(BaseModel):
+    """Schema for webhook data from PDF processing service"""
+
     task_id: str
     status: str
     result: PDFProcessingResult
@@ -106,22 +152,44 @@ async def handle_paper_processing_webhook(
 
             if not file_url:
                 logger.error(f"No file_url in webhook result for job {job_id}")
-                paper_upload_job_crud.mark_as_failed(
-                    db=db, job_id=job_id, user=job_user
+                handle_failed_upload(
+                    db=db, job_id=job_id, job_user=job_user, reason="Missing file_url"
                 )
                 return {"status": "webhook processed - failed due to missing file_url"}
 
             if not metadata:
                 logger.error(f"No metadata in webhook result for job {job_id}")
-                paper_upload_job_crud.mark_as_failed(
-                    db=db, job_id=job_id, user=job_user
+                handle_failed_upload(
+                    db=db, job_id=job_id, job_user=job_user, reason="Missing metadata"
                 )
                 return {"status": "webhook processed - failed due to missing metadata"}
 
             if not result.raw_content:
                 logger.error(f"No raw_content in webhook result for job {job_id}")
-                paper_upload_job_crud.mark_as_failed(
-                    db=db, job_id=job_id, user=job_user
+                handle_failed_upload(
+                    db=db,
+                    job_id=job_id,
+                    job_user=job_user,
+                    reason="Missing raw_content",
+                )
+                return {
+                    "status": "webhook processed - failed due to missing raw_content"
+                }
+
+            if not metadata:
+                logger.error(f"No metadata in webhook result for job {job_id}")
+                handle_failed_upload(
+                    db=db, job_id=job_id, job_user=job_user, reason="Missing metadata"
+                )
+                return {"status": "webhook processed - failed due to missing metadata"}
+
+            if not result.raw_content:
+                logger.error(f"No raw_content in webhook result for job {job_id}")
+                handle_failed_upload(
+                    db=db,
+                    job_id=job_id,
+                    job_user=job_user,
+                    reason="Missing raw_content",
                 )
                 return {
                     "status": "webhook processed - failed due to missing raw_content"
@@ -250,14 +318,25 @@ async def handle_paper_processing_webhook(
         else:
             # Processing failed
             error_message = result.error if result.error else "Unknown error"
-            logger.error(f"PDF processing failed for job {job_id}: {error_message}")
-            paper_upload_job_crud.mark_as_failed(db=db, job_id=job_id, user=job_user)
+            handle_failed_upload(
+                db=db, job_id=job_id, job_user=job_user, reason=error_message
+            )
 
     except Exception as e:
         logger.error(
             f"Error processing webhook for job {job_id}: {str(e)}", exc_info=True
         )
-        paper_upload_job_crud.mark_as_failed(db=db, job_id=job_id, user=job_user)
+
+        # Clean up the paper record on exception as well
+        try:
+            handle_failed_upload(db=db, job_id=job_id, job_user=job_user, reason=str(e))
+        except Exception as cleanup_error:
+            logger.error(
+                f"Failed to cleanup paper for job {job_id}: {str(cleanup_error)}"
+            )
+            # Still mark job as failed even if cleanup fails
+            paper_upload_job_crud.mark_as_failed(db=db, job_id=job_id, user=job_user)
+
         raise HTTPException(status_code=500, detail="Error processing webhook")
 
     return {"status": "webhook processed"}
