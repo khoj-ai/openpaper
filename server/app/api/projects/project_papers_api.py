@@ -100,10 +100,10 @@ async def fork_paper_from_project(
         )
 
     except Exception as e:
-        logger.error(f"Error forking paper from project: {e}")
+        logger.error(f"Error forking paper from project: {e}", exc_info=True)
         return JSONResponse(
             status_code=400,
-            content={"message": f"Failed to fork paper from project: {str(e)}"},
+            content={"message": "Failed to fork paper from project"},
         )
 
 
@@ -152,7 +152,7 @@ async def get_forked_paper(
         logger.error(f"Error fetching forked papers: {e}", exc_info=True)
         return JSONResponse(
             status_code=400,
-            content={"message": f"Failed to fetch forked papers: {str(e)}"},
+            content={"message": "Failed to fetch forked papers"},
         )
 
 
@@ -193,10 +193,10 @@ async def add_paper_to_project(
         )
 
     except Exception as e:
-        logger.error(f"Error adding paper to project: {e}")
+        logger.error(f"Error adding paper to project: {e}", exc_info=True)
         return JSONResponse(
             status_code=400,
-            content={"message": f"Failed to add paper to project: {str(e)}"},
+            content={"message": "Failed to add paper to project"},
         )
 
 
@@ -243,7 +243,7 @@ async def get_project_papers(
         logger.error(f"Error fetching project papers: {e}", exc_info=True)
         return JSONResponse(
             status_code=400,
-            content={"message": f"Failed to fetch project papers: {str(e)}"},
+            content={"message": f"Failed to fetch project papers"},
         )
 
 
@@ -268,7 +268,7 @@ async def get_projects_from_paper_id(
         logger.error(f"Error fetching projects for paper: {e}", exc_info=True)
         return JSONResponse(
             status_code=400,
-            content={"message": f"Failed to fetch projects for paper: {str(e)}"},
+            content={"message": "Failed to fetch projects for paper"},
         )
 
 
@@ -304,8 +304,8 @@ async def remove_paper_from_project(
             content={"message": "Paper removed from project successfully"},
         )
     except Exception as e:
-        logger.error(f"Error removing paper from project: {e}")
+        logger.error(f"Error removing paper from project: {e}", exc_info=True)
         return JSONResponse(
             status_code=400,
-            content={"message": f"Failed to remove paper from project: {str(e)}"},
+            content={"message": "Failed to remove paper from project"},
         )
