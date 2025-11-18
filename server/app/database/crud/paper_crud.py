@@ -268,7 +268,7 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
         *,
         user: CurrentUser,
         skip: int = 0,
-        limit: int = 100,
+        limit: int = 500,
         status: Optional[PaperStatus] = None,
     ) -> List[Paper]:
         """

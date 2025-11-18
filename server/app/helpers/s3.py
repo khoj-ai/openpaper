@@ -1,9 +1,10 @@
 import logging
 import os
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
-from typing import Optional
+from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
 import boto3
@@ -376,6 +377,126 @@ class S3Service:
         except Exception as e:
             logger.error(f"Error getting cached presigned URL by owner: {e}")
             return None
+
+    def get_cached_presigned_urls_bulk(
+        self,
+        db: Session,
+        papers: List[Paper],
+        expiration: int = 28800,
+    ) -> Dict[str, Optional[str]]:
+        """
+        Bulk retrieve presigned URLs for multiple papers, parallelizing S3 calls for expired URLs.
+
+        This method optimizes for the common case where most URLs are cached:
+        1. First pass: identify which papers have valid cached URLs (fast, sequential DB reads)
+        2. Second pass: generate new URLs for expired/missing ones (parallelized S3 API calls)
+        3. Third pass: update the database with new URLs (sequential DB writes)
+
+        Args:
+            db: Database session
+            papers: List of Paper objects to get URLs for
+            owner_id: The owner user ID (for permissions)
+            expiration: URL expiration time in seconds (default: 8 hours)
+
+        Returns:
+            Dict mapping paper_id (str) to presigned URL (or None if error)
+        """
+        from app.database.crud.paper_crud import PaperUpdate, paper_crud
+
+        result: Dict[str, Optional[str]] = {}
+        papers_needing_urls: List[Paper] = []
+        now = datetime.now(timezone.utc)
+
+        # First pass: check cache status for all papers (fast, sequential)
+        for paper in papers:
+            paper_id = str(paper.id)
+
+            # Check if we have a valid cached URL
+            if (
+                paper.cached_presigned_url
+                and paper.presigned_url_expires_at
+                and paper.presigned_url_expires_at > now
+            ):
+                result[paper_id] = str(paper.cached_presigned_url)
+                logger.debug(f"Using cached presigned URL for paper {paper_id}")
+            else:
+                papers_needing_urls.append(paper)
+
+        if not papers_needing_urls:
+            return result
+
+        logger.info(
+            f"Generating {len(papers_needing_urls)} new presigned URLs in parallel"
+        )
+
+        # Second pass: generate new URLs in parallel (no DB access, just S3 API calls)
+        def generate_url_for_paper(
+            paper: Paper,
+        ) -> tuple[str, Optional[str], Optional[int]]:
+            """Generate URL and file size for a single paper"""
+            try:
+                url = self.generate_presigned_url(str(paper.s3_object_key), expiration)
+
+                # Get file size if not already cached
+                size_in_kb = None
+                if paper.size_in_kb is None and url:
+                    size_in_kb = self.get_file_size_in_kb(str(paper.s3_object_key))
+
+                return (str(paper.id), url, size_in_kb)
+            except Exception as e:
+                logger.error(f"Error generating URL for paper {paper.id}: {e}")
+                return (str(paper.id), None, None)
+
+        # Use ThreadPoolExecutor for parallel S3 API calls
+        new_urls: Dict[str, Optional[str]] = {}
+        papers_to_update: Dict[str, tuple[Paper, str, Optional[int]]] = {}
+
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_paper = {
+                executor.submit(generate_url_for_paper, paper): paper
+                for paper in papers_needing_urls
+            }
+
+            for future in as_completed(future_to_paper):
+                paper_id, url, size_in_kb = future.result()
+                new_urls[paper_id] = url
+
+                if url:
+                    paper = future_to_paper[future]
+                    papers_to_update[paper_id] = (paper, url, size_in_kb)
+
+        # Third pass: update database with new URLs (sequential DB writes)
+        expires_at = now + timedelta(seconds=expiration - 300)
+
+        for paper_id, (paper, url, size_in_kb) in papers_to_update.items():
+            try:
+                update_data = PaperUpdate(
+                    cached_presigned_url=url,
+                    presigned_url_expires_at=expires_at,
+                )
+
+                # Only update size if we got a new value
+                if size_in_kb is not None:
+                    update_data.size_in_kb = size_in_kb
+
+                paper_crud.update(
+                    db=db,
+                    db_obj=paper,
+                    obj_in=update_data,
+                    user=None,  # Bulk operation, skip user check
+                )
+                result[paper_id] = url
+                logger.debug(f"Cached new presigned URL for paper {paper_id}")
+            except Exception as e:
+                logger.error(f"Error updating cached URL for paper {paper_id}: {e}")
+                result[paper_id] = url  # Still return the URL even if caching failed
+
+        # Add any papers that failed to generate URLs
+        for paper_id, url in new_urls.items():
+            if paper_id not in result:
+                result[paper_id] = url
+
+        return result
 
     def get_cached_presigned_url_by_project(
         self,
