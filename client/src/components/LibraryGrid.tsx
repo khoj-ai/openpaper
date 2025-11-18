@@ -1,6 +1,6 @@
 "use client";
 
-import type { PaperItem, SearchResults } from "@/lib/schema";
+import type { PaperItem, PaperResult, SearchResults } from "@/lib/schema";
 import type { Filter, Sort } from "@/components/PaperFiltering";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -139,14 +139,14 @@ export function LibraryGrid({
                                 >
                                     {isSearchMode ? (
                                         <PaperSearchResultCard
-                                            paper={item as any}
+                                            paper={item as PaperResult}
                                             searchTerm={searchTerm}
                                             handleDelete={deletePaper}
                                             setPaper={handlePaperSet}
                                         />
                                     ) : (
                                         <PaperCard
-                                            paper={item as any}
+                                            paper={item as PaperItem}
                                             handleDelete={deletePaper}
                                             setPaper={handlePaperSet}
                                         />
