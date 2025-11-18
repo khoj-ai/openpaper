@@ -174,7 +174,7 @@ async def invite_user_to_project(
         logger.error(f"Error inviting users to project: {e}", exc_info=True)
         return JSONResponse(
             status_code=400,
-            content={"message": f"Failed to invite users: {str(e)}"},
+            content={"message": "Failed to invite users"},
         )
 
 
@@ -185,6 +185,15 @@ async def accept_invitation(
     current_user: CurrentUser = Depends(get_required_user),
 ) -> JSONResponse:
     """Accept a project invitation"""
+    # Validate that invitation_id is a valid UUID
+    try:
+        uuid.UUID(invitation_id)
+    except ValueError:
+        return JSONResponse(
+            status_code=400,
+            content={"message": "Invalid invitation ID."},
+        )
+
     try:
         # Check subscription limits before allowing the user to join another project
         can_create_project, error_message = can_user_create_project(db, current_user)
@@ -219,10 +228,10 @@ async def accept_invitation(
             },
         )
     except Exception as e:
-        logger.error(f"Error accepting invitation: {e}")
+        logger.error(f"Error accepting invitation: {e}", exc_info=True)
         return JSONResponse(
             status_code=400,
-            content={"message": f"Failed to accept invitation: {str(e)}"},
+            content={"message": "Failed to accept invitation"},
         )
 
 
@@ -255,10 +264,10 @@ async def reject_invitation(
             content={"message": "Invitation rejected successfully."},
         )
     except Exception as e:
-        logger.error(f"Error rejecting invitation: {e}")
+        logger.error(f"Error rejecting invitation: {e}", exc_info=True)
         return JSONResponse(
             status_code=400,
-            content={"message": f"Failed to reject invitation: {str(e)}"},
+            content={"message": f"Failed to reject invitation"},
         )
 
 
@@ -293,8 +302,8 @@ async def retract_invitation(
             content={"message": "Invitation retracted successfully."},
         )
     except Exception as e:
-        logger.error(f"Error retracting invitation: {e}")
+        logger.error(f"Error retracting invitation: {e}", exc_info=True)
         return JSONResponse(
             status_code=400,
-            content={"message": f"Failed to retract invitation: {str(e)}"},
+            content={"message": "Failed to retract invitation"},
         )
