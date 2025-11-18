@@ -310,7 +310,7 @@ export default function ProjectPage() {
 
 				<div className="group relative">
 					<div className="flex items-center">
-						<h1 className="text-3xl font-bold text-gray-800 rounded-lg px-0">{project.title}</h1>
+						<h1 className="text-3xl font-bold text-primary-foreground rounded-lg px-0">{project.title}</h1>
 						<Button
 							variant="ghost"
 							size="icon"
@@ -320,7 +320,7 @@ export default function ProjectPage() {
 							<Pencil className="h-4 w-4" />
 						</Button>
 					</div>
-					<p className="text-lg text-gray-600 mb-8">{project.description}</p>
+					<p className="text-lg text-secondary-foreground mb-8">{project.description}</p>
 				</div>
 
 				<div className="mt-4">
@@ -442,7 +442,7 @@ export default function ProjectPage() {
 
 			<div className="group relative">
 				<div className="flex items-center">
-					<h1 className="text-3xl font-bold text-gray-800 dark:text-gray-200 p-2 rounded-lg px-0">{project.title}</h1>
+					<h1 className="text-3xl font-bold text-primary p-2 rounded-lg px-0">{project.title}</h1>
 					<Button
 						variant="ghost"
 						size="icon"
@@ -452,7 +452,7 @@ export default function ProjectPage() {
 						<Pencil className="h-4 w-4" />
 					</Button>
 				</div>
-				<p className="text-lg text-gray-600 mb-6">{project.description}</p>
+				<p className="text-lg text-secondary-foreground mb-6">{project.description}</p>
 			</div>
 
 
