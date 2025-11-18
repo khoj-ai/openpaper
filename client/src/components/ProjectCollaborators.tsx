@@ -271,7 +271,12 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin, setHasColl
 	return (
 		<Card>
 			<CardHeader className="flex flex-row items-center justify-between">
-				<CardTitle>Collaborators</CardTitle>
+				<CardTitle className="flex items-center gap-2">
+					Collaborators
+					<span className="text-xs text-yellow-500 bg-yellow-100 dark:bg-yellow-800 dark:text-yellow-200 px-1 rounded">
+						new
+					</span>
+				</CardTitle>
 				{currentUserIsAdmin && (
 					<Dialog open={isInviteModalOpen} onOpenChange={setIsInviteModalOpen}>
 						<DialogTrigger asChild>
