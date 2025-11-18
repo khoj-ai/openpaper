@@ -9,7 +9,8 @@ import PaperSearchResultCard from "@/components/PaperSearchResultCard";
 import { PaperFiltering } from "@/components/PaperFiltering";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
-import { JSX } from "react";
+import { JSX, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 
 interface LibraryGridProps {
     papers: PaperItem[];
@@ -46,6 +47,20 @@ export function LibraryGrid({
     SearchStatsDisplay,
     EmptyState,
 }: LibraryGridProps) {
+    const gridContainerRef = useRef<HTMLDivElement>(null);
+
+    // Determine which data to use
+    const isSearchMode = searchResults && searchTerm.trim();
+    const displayItems = isSearchMode ? searchResults.papers : filteredPapers;
+
+    // Virtualization for grid items
+    const rowVirtualizer = useVirtualizer({
+        count: displayItems.length,
+        getScrollElement: () => gridContainerRef.current,
+        estimateSize: () => 200, // Estimated card height in pixels
+        overscan: 5,
+    });
+
     return (
         <>
             {papers.length > 0 && (
@@ -95,30 +110,51 @@ export function LibraryGrid({
 
             <SearchStatsDisplay />
 
-            {filteredPapers.length > 0 ? (
-                <div className="grid grid-cols-1 gap-4">
-                    {searchResults && searchTerm.trim() ? (
-                        // Use PaperSearchResultCard for search results
-                        searchResults.papers.map((paper) => (
-                            <PaperSearchResultCard
-                                key={paper.id}
-                                paper={paper}
-                                searchTerm={searchTerm}
-                                handleDelete={deletePaper}
-                                setPaper={handlePaperSet}
-                            />
-                        ))
-                    ) : (
-                        // Use regular PaperCard for normal view
-                        filteredPapers.map((paper) => (
-                            <PaperCard
-                                key={paper.id}
-                                paper={paper}
-                                handleDelete={deletePaper}
-                                setPaper={handlePaperSet}
-                            />
-                        ))
-                    )}
+            {displayItems.length > 0 ? (
+                <div
+                    ref={gridContainerRef}
+                    className="overflow-y-auto"
+                    style={{ height: 'calc(100vh - 16rem)' }}
+                >
+                    <div
+                        style={{
+                            height: `${rowVirtualizer.getTotalSize()}px`,
+                            width: '100%',
+                            position: 'relative',
+                        }}
+                    >
+                        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                            const item = displayItems[virtualRow.index];
+                            return (
+                                <div
+                                    key={virtualRow.key}
+                                    style={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        left: 0,
+                                        width: '100%',
+                                        height: `${virtualRow.size}px`,
+                                        transform: `translateY(${virtualRow.start}px)`,
+                                    }}
+                                >
+                                    {isSearchMode ? (
+                                        <PaperSearchResultCard
+                                            paper={item as any}
+                                            searchTerm={searchTerm}
+                                            handleDelete={deletePaper}
+                                            setPaper={handlePaperSet}
+                                        />
+                                    ) : (
+                                        <PaperCard
+                                            paper={item as any}
+                                            handleDelete={deletePaper}
+                                            setPaper={handlePaperSet}
+                                        />
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             ) : (
                 <EmptyState />
