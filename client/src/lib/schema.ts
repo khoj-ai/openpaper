@@ -71,6 +71,9 @@ export interface Conversation {
     id: string;
     title: string;
     updated_at: string;
+    is_owner?: boolean;
+    owner_picture?: string;
+    owner_name?: string;
 }
 
 
@@ -209,14 +212,14 @@ export interface PaperImage {
 }
 
 export interface JobStatusResponse {
-	job_id: string;
-	status: JobStatusType;
-	started_at: string;
-	completed_at: string | null;
-	paper_id: string | null;
-	has_file_url: boolean;
-	has_metadata: boolean;
-	celery_progress_message: string | null;
+    job_id: string;
+    status: JobStatusType;
+    started_at: string;
+    completed_at: string | null;
+    paper_id: string | null;
+    has_file_url: boolean;
+    has_metadata: boolean;
+    celery_progress_message: string | null;
 }
 
 export interface PaperTag {
@@ -240,6 +243,7 @@ export interface PaperItem {
     file_url?: string
     size_in_kb?: number
     tags?: PaperTag[]
+    is_owner?: boolean
 }
 
 export interface CreditUsage {
@@ -282,6 +286,8 @@ export interface Project {
     num_conversations?: number;
     created_at: string;
     updated_at: string;
+    role?: ProjectRole;
+    num_roles?: number;
 }
 
 export interface PdfUploadResponse {
@@ -293,4 +299,36 @@ export interface PdfUploadResponse {
 export interface MinimalJob {
     jobId: string;
     fileName: string;
+}
+
+export enum ProjectRole {
+    Admin = 'admin',
+    Editor = 'editor',
+    Viewer = 'viewer',
+}
+
+export interface Collaborator {
+    id: string;
+    name: string;
+    picture: string;
+    email: string;
+    role: ProjectRole;
+}
+
+export interface PendingInvite {
+    id?: string;
+    email: string;
+    role: ProjectRole;
+    invited_at: string;
+}
+
+export interface ProjectInvitation {
+	id: string;
+	project_id: string;
+	project_name: string;
+	invited_by: string;
+	email: string;
+	role: string;
+	accepted_at?: string;
+	invited_at: string;
 }

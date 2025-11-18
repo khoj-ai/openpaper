@@ -60,7 +60,7 @@ async def create_project_conversation(
         )
 
     except Exception as e:
-        logger.error(f"Error creating project conversation: {e}")
+        logger.error(f"Error creating project conversation: {e}", exc_info=True)
         return JSONResponse(
             status_code=400,
             content={"message": f"Failed to create project conversation: {str(e)}"},
@@ -83,6 +83,9 @@ async def get_project_conversations(
             {
                 "id": str(conv.id),
                 "title": conv.title,
+                "is_owner": conv.user_id == current_user.id,
+                "owner_picture": conv.user.picture,
+                "owner_name": conv.user.name,
                 "updated_at": conv.updated_at.isoformat(),
             }
             for conv in conversations
@@ -128,9 +131,10 @@ async def get_project_conversation(
         # Fetch messages for the conversation
         casted_conversation_id = uuid.UUID(conversation_id)
 
-        messages = message_crud.get_conversation_messages(
+        messages = message_crud.get_project_conversation_messages(
             db,
             conversation_id=casted_conversation_id,
+            project_id=uuid.UUID(project_id),
             current_user=current_user,
             page=page,
             page_size=page_size,
@@ -142,6 +146,7 @@ async def get_project_conversation(
             content={
                 "id": str(conversation.id),
                 "title": conversation.title,
+                "is_owner": conversation.user_id == current_user.id,
                 "messages": formatted_messages,
             },
         )

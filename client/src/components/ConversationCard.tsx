@@ -1,7 +1,7 @@
 "use client";
 
 import { Conversation } from "@/lib/schema";
-import { formatDate } from "@/lib/utils";
+import { formatDate, getInitials } from "@/lib/utils";
 import { ArrowRight, Trash2 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -14,15 +14,18 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
+import { getAlphaHashToBackgroundColor } from "@/lib/utils";
 
 interface ConversationCardProps {
 	convo: Conversation;
+	showAvatar?: boolean;
 	href: string;
 	onDelete: (conversationId: string) => void;
 }
 
-export default function ConversationCard({ convo, href, onDelete }: ConversationCardProps) {
+export default function ConversationCard({ convo, href, onDelete, showAvatar = true }: ConversationCardProps) {
 	const [isAlertOpen, setIsAlertOpen] = useState(false);
 
 	const handleDelete = (e: React.MouseEvent) => {
@@ -42,21 +45,40 @@ export default function ConversationCard({ convo, href, onDelete }: Conversation
 				href={href}
 				className="block p-4 mb-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-all hover:bg-gray-50 dark:hover:bg-gray-800 animate-fade-in group"
 			>
-				<div className="font-semibold text-accent-foreground flex items-center justify-between">
-					<span>{convo.title}</span>
-					<div className="flex items-center">
-						<Button
-							variant="ghost"
-							size="icon"
-							onClick={handleDelete}
-							className="mr-2 opacity-0 group-hover:opacity-100 transition-opacity"
-						>
-							<Trash2 className="w-4 h-4 text-gray-400" />
-						</Button>
-						<ArrowRight className="w-4 h-4 text-gray-400 transform transition-transform group-hover:translate-x-1 opacity-0 group-hover:opacity-100 transition-opacity" />
+				<div className="flex items-start justify-between">
+					<div className="flex flex-col">
+						<span className="font-semibold text-accent-foreground">{convo.title}</span>
+						<p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+							{formatDate(convo.updated_at)}
+						</p>
+					</div>
+					<div className="flex flex-col items-end">
+						{showAvatar && convo.owner_name && (
+							<Avatar className="size-6 mb-2">
+								<AvatarImage src={convo.owner_picture} />
+								<AvatarFallback
+									className={`${getAlphaHashToBackgroundColor(
+										convo.owner_name,
+									)} text-xs`}>
+									{getInitials(convo.owner_name)}
+								</AvatarFallback>
+							</Avatar>
+						)}
+						<div className="flex items-center">
+							{convo.is_owner && (
+								<Button
+									variant="ghost"
+									size="icon"
+									onClick={handleDelete}
+									className="mr-2 opacity-0 group-hover:opacity-100 transition-opacity"
+								>
+									<Trash2 className="w-4 h-4 text-gray-400" />
+								</Button>
+							)}
+							<ArrowRight className="w-4 h-4 text-gray-400 transform transition-all group-hover:translate-x-1 opacity-0 group-hover:opacity-100" />
+						</div>
 					</div>
 				</div>
-				<p>{formatDate(convo.updated_at)}</p>
 			</a>
 			<AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
 				<AlertDialogContent>

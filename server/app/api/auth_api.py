@@ -3,7 +3,7 @@ import logging
 import os
 import random
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 
 from app.auth.dependencies import get_current_user, get_required_user
@@ -18,11 +18,19 @@ from app.database.crud.annotation_crud import annotation_crud
 from app.database.crud.highlight_crud import highlight_crud
 from app.database.crud.message_crud import message_crud
 from app.database.crud.paper_crud import paper_crud
+from app.database.crud.projects.project_role_invitation_crud import (
+    project_role_invitation_crud,
+)
 from app.database.crud.user_crud import user as user_crud
 from app.database.database import get_db
-from app.database.models import PaperStatus
+from app.database.models import PaperStatus, Project, User
 from app.database.telemetry import track_event
-from app.helpers.email import add_to_default_audience, send_onboarding_email
+from app.helpers.email import (
+    CLIENT_DOMAIN,
+    add_to_default_audience,
+    send_onboarding_email,
+    send_project_invite_email,
+)
 from app.schemas.user import CurrentUser, UserCreateWithProvider, UserUpdate
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import RedirectResponse
@@ -443,6 +451,29 @@ async def email_verify(
         if new_user:
             redirect_url += "&welcome=true"
             add_to_default_audience(email=email, name=None)
+            send_onboarding_email(
+                email=str(db_user.email), name=str(db_user.name) or None
+            )
+
+            # Check if newly created user has any pending project invitations. If so, send out the invitations.
+            pending_invitations = (
+                project_role_invitation_crud.get_pending_invitations_for_email(
+                    db, email=email
+                )
+            )
+            for invitation in pending_invitations:
+                project: Project | None = (
+                    db.query(Project)
+                    .filter(Project.id == invitation.project_id)
+                    .first()
+                )
+                if project and invitation.inviter:
+                    invite_link = f"{CLIENT_DOMAIN}/project/{project.id}/accept-invite"
+                    send_project_invite_email(
+                        to_email=email,
+                        project_title=str(project.title),
+                        from_name=str(invitation.inviter.name),
+                    )
 
         # Create JSON response with redirect info
         response_data = {

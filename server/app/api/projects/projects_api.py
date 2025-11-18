@@ -7,9 +7,6 @@ from app.database.crud.projects.project_crud import (
     ProjectUpdate,
     project_crud,
 )
-from app.database.crud.projects.project_role_invitation_crud import (
-    project_role_invitation_crud,
-)
 from app.database.database import get_db
 from app.database.models import ProjectRoles
 from app.database.telemetry import track_event
@@ -127,9 +124,16 @@ async def get_project(
                 status_code=404,
                 content={"message": f"Project with ID {project_id} not found."},
             )
+        project_payload = project.to_dict()
+
+        role = project_crud.get_role_in_project(
+            db, project_id=project_id, user=current_user
+        )
+        project_payload["role"] = role
+
         return JSONResponse(
             status_code=200,
-            content=project.to_dict(),
+            content=project_payload,
         )
     except Exception as e:
         logger.error(f"Error fetching project: {e}")
@@ -203,4 +207,184 @@ async def delete_project(
         return JSONResponse(
             status_code=400,
             content={"message": f"Failed to delete project: {str(e)}"},
+        )
+
+
+###################################
+# Collaborators-related endpoints #
+###################################
+
+# TODO: Eventually, we can refactor so that the project_role operations have a separate crud and router
+
+
+class ChangeRoleRequest(BaseModel):
+    role_id: str
+    new_role: ProjectRoles
+
+
+@projects_router.post("/{project_id}/collaborators/change")
+async def change_project_collaborator_role(
+    request: ChangeRoleRequest,
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+) -> JSONResponse:
+    """Change a collaborator's role in a specific project"""
+    role_id = request.role_id
+    new_role = request.new_role
+
+    try:
+        project_role = project_crud.change_collaborator_role(
+            db,
+            project_id=project_id,
+            role_id=role_id,
+            new_role=new_role,
+            user=current_user,
+        )
+
+        if not project_role:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "message": f"Collaborator with ID {role_id} not found in project {project_id} or insufficient permissions."
+                },
+            )
+
+        track_event(
+            "project_collaborator_role_changed",
+            user_id=str(current_user.id),
+            properties={
+                "changed_role_id": role_id,
+                "new_role": new_role,
+                "project_id": project_id,
+            },
+        )
+
+        return JSONResponse(
+            status_code=200,
+            content={"message": "Collaborator role updated successfully"},
+        )
+    except Exception as e:
+        logger.error(
+            f"Error changing role for collaborator {role_id} in project {project_id}: {e}"
+        )
+        return JSONResponse(
+            status_code=400,
+            content={"message": f"Failed to change collaborator role: {str(e)}"},
+        )
+
+
+@projects_router.get("/{project_id}/collaborators")
+async def get_project_collaborators(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+) -> JSONResponse:
+    """Get all collaborators for a specific project"""
+    try:
+        roles = project_crud.get_all_roles(db, project_id=project_id, user=current_user)
+
+        collaborators = [
+            {
+                "id": str(role.id),
+                "picture": role.user.picture,
+                "name": role.user.name,
+                "role": role.role,
+                "email": role.user.email,
+            }
+            for role in roles
+        ]
+
+        return JSONResponse(
+            status_code=200,
+            content=collaborators,
+        )
+    except Exception as e:
+        logger.error(
+            f"Error fetching collaborators for project {project_id}: {e}", exc_info=True
+        )
+        return JSONResponse(
+            status_code=400,
+            content={"message": f"Failed to fetch collaborators: {str(e)}"},
+        )
+
+
+@projects_router.delete("/{project_id}/collaborators/self")
+async def remove_self_from_project(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+) -> JSONResponse:
+    """Remove self as a collaborator from a specific project"""
+    try:
+        success = project_crud.remove_self_from_project(
+            db, project_id=project_id, user=current_user
+        )
+
+        if not success:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "message": f"You are not a collaborator in project {project_id} or insufficient permissions."
+                },
+            )
+
+        track_event(
+            "project_self_removed",
+            user_id=str(current_user.id),
+            properties={"project_id": project_id},
+        )
+
+        return JSONResponse(
+            status_code=200,
+            content={"message": "You have been removed from the project successfully"},
+        )
+    except Exception as e:
+        logger.error(f"Error removing self from project {project_id}: {e}")
+        return JSONResponse(
+            status_code=400,
+            content={
+                "message": f"Failed to remove yourself from the project: {str(e)}"
+            },
+        )
+
+
+@projects_router.delete("/{project_id}/collaborators/{role_id}")
+async def remove_project_collaborator(
+    project_id: str,
+    role_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+) -> JSONResponse:
+    """Remove a collaborator from a specific project"""
+    try:
+        project_role = project_crud.remove_collaborator(
+            db, project_id=project_id, role_id=role_id, user=current_user
+        )
+
+        if not project_role:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "message": f"Collaborator with ID {role_id} not found in project {project_id} or insufficient permissions."
+                },
+            )
+
+        track_event(
+            "project_collaborator_removed",
+            user_id=str(current_user.id),
+            properties={"removed_role_id": role_id, "project_id": project_id},
+        )
+
+        return JSONResponse(
+            status_code=200,
+            content={"message": "Collaborator removed successfully"},
+        )
+    except Exception as e:
+        logger.error(
+            f"Error removing collaborator {role_id} from project {project_id}: {e}"
+        )
+        return JSONResponse(
+            status_code=400,
+            content={"message": f"Failed to remove collaborator: {str(e)}"},
         )

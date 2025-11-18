@@ -56,6 +56,7 @@ class PaperCreate(PaperBase):
     s3_object_key: Optional[str] = None
     upload_job_id: Optional[str] = None
     preview_url: Optional[str] = None
+    parent_paper_id: Optional[uuid.UUID] = None
 
 
 class PaperUpdate(PaperBase):

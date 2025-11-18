@@ -51,7 +51,7 @@ class ProjectConversationCRUD(
                 .filter(
                     ProjectRole.project_id == project_id,
                     ProjectRole.user_id == user.id,
-                    ProjectRole.role.in_([ProjectRoles.ADMIN]),
+                    ProjectRole.role.in_([ProjectRoles.ADMIN, ProjectRoles.EDITOR]),
                 )
                 .first()
             )

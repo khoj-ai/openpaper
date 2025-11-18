@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ProjectCard } from "@/components/ProjectCard";
 import { Button } from "@/components/ui/button";
 import { Project } from "@/lib/schema";
@@ -13,19 +13,22 @@ import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { Progress } from "@/components/ui/progress";
 import LoadingIndicator from "@/components/utils/Loading";
+import { ProjectInvitations } from "@/components/ProjectInvitations";
 
-export default function Projects() {
+function ProjectsPage() {
 	const [projects, setProjects] = useState<Project[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const { user, loading: userLoading } = useAuth();
 	const [error, setError] = useState<string | null>(null);
 	const { subscription } = useSubscription();
 	const router = useRouter();
+	const searchParams = useSearchParams();
 
 	const [showUsageAlert, setShowUsageAlert] = useState(true);
 
 	const atProjectLimit = subscription ? isProjectAtLimit(subscription) : false;
 	const nearProjectLimit = subscription ? isProjectNearLimit(subscription) : false;
+	const openInvites = searchParams.get("openInvites") !== null;
 
 	const getProjects = async () => {
 		try {
@@ -72,52 +75,76 @@ export default function Projects() {
 
 	// Enhanced empty state component
 	const EmptyState = () => (
-		<div className="flex flex-col items-center justify-center py-12 px-4 text-center max-w-2xl mx-auto">
-			<div className="relative mb-6">
-				<div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-cyan-100 rounded-full flex items-center justify-center mb-4">
-					<FolderOpen className="w-12 h-12 text-blue-600" />
+		<div className="flex flex-col items-center justify-center py-16 px-4 text-center max-w-3xl mx-auto">
+			{/* Floating Icon Group */}
+			<div className="relative mb-8">
+				<div className="relative w-32 h-32 mx-auto">
+					{/* Background gradient circle */}
+					<div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-primary/5 to-transparent rounded-full blur-2xl" />
+
+					{/* Main icon container */}
+					<div className="relative w-full h-full bg-gradient-to-br from-blue-500/5 to-primary/10 dark:from-blue-500/10 dark:to-primary/20 rounded-2xl flex items-center justify-center border border-blue-500/10 shadow-sm">
+						<FolderOpen className="w-14 h-14 text-primary" strokeWidth={1.5} />
+					</div>
+
+					{/* Floating accent icons */}
+					<div className="absolute -top-2 -right-2 w-12 h-12 bg-background dark:bg-card rounded-xl flex items-center justify-center border border-blue-500/20 shadow-md">
+						<Target className="w-6 h-6 text-blue-500" strokeWidth={2} />
+					</div>
+					<div className="absolute -bottom-1 -left-2 w-10 h-10 bg-background dark:bg-card rounded-lg flex items-center justify-center border border-border shadow-md">
+						<FileText className="w-5 h-5 text-muted-foreground" strokeWidth={2} />
+					</div>
 				</div>
 			</div>
 
-			<h2 className="text-2xl font-semibold text-gray-900 mb-3">
+			<h2 className="text-3xl font-bold text-foreground mb-3">
 				Ready to organize your research?
 			</h2>
 
-			<p className="text-gray-600 mb-8 leading-relaxed">
+			<p className="text-muted-foreground text-lg mb-10 leading-relaxed max-w-xl">
 				Projects help you organize your library, get targeted AI assistance, and keep your research focused.
-				Create your first project to make more use of your workspace.
 			</p>
 
-			<div className="grid md:grid-cols-3 gap-4 mb-8 w-full max-w-lg">
-				<div className="flex flex-col items-center p-4 bg-gray-50 rounded-lg">
-					<Target className="w-6 h-6 text-blue-600 mb-2" />
-					<h3 className="font-medium text-sm text-gray-900 mb-1">Stay Focused</h3>
-					<p className="text-xs text-gray-600 text-center">Organize resources by topic or goal</p>
+			{/* Feature cards */}
+			<div className="grid sm:grid-cols-3 gap-4 mb-10 w-full max-w-2xl">
+				<div className="group flex flex-col items-center p-6 bg-card border border-border rounded-xl hover:shadow-md hover:border-primary/20 transition-all duration-200">
+					<div className="w-12 h-12 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+						<Target className="w-6 h-6 text-primary" strokeWidth={2} />
+					</div>
+					<h3 className="font-semibold text-sm text-foreground mb-2">Stay Focused</h3>
+					<p className="text-xs text-muted-foreground leading-relaxed">Organize resources by topic or goal</p>
 				</div>
-				<div className="flex flex-col items-center p-4 bg-gray-50 rounded-lg">
-					<Target className="w-6 h-6 text-purple-600 mb-2" />
-					<h3 className="font-medium text-sm text-gray-900 mb-1">Smart AI Help</h3>
-					<p className="text-xs text-gray-600 text-center">Get context-aware assistance</p>
+
+				<div className="group flex flex-col items-center p-6 bg-card border border-border rounded-xl hover:shadow-md hover:border-primary/20 transition-all duration-200">
+					<div className="w-12 h-12 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+						<BookOpen className="w-6 h-6 text-primary" strokeWidth={2} />
+					</div>
+					<h3 className="font-semibold text-sm text-foreground mb-2">Smart AI Help</h3>
+					<p className="text-xs text-muted-foreground leading-relaxed">Get context-aware assistance</p>
 				</div>
-				<div className="flex flex-col items-center p-4 bg-gray-50 rounded-lg">
-					<FileText className="w-6 h-6 text-green-600 mb-2" />
-					<h3 className="font-medium text-sm text-gray-900 mb-1">Collate Research</h3>
-					<p className="text-xs text-gray-600 text-center">Streamline literature reviews</p>
+
+				<div className="group flex flex-col items-center p-6 bg-card border border-border rounded-xl hover:shadow-md hover:border-primary/20 transition-all duration-200">
+					<div className="w-12 h-12 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+						<FileText className="w-6 h-6 text-primary" strokeWidth={2} />
+					</div>
+					<h3 className="font-semibold text-sm text-foreground mb-2">Collate Research</h3>
+					<p className="text-xs text-muted-foreground leading-relaxed">Streamline literature reviews</p>
 				</div>
 			</div>
 
+			{/* CTA buttons */}
 			<div className="flex flex-col sm:flex-row gap-3">
 				<Button
 					asChild
-					className="bg-gradient-to-br from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 px-6"
 					size="lg"
+					className="px-8 shadow-sm"
 				>
 					<Link href="/projects/create">
 						<PlusCircle className="mr-2 w-5 h-5" />
 						Create Your First Project
 					</Link>
 				</Button>
-				<Button variant="outline" size="lg" className="px-6">
+				<Button variant="outline" size="lg" className="px-8" asChild>
 					<Link href="/blog/projects">
 						<BookOpen className="mr-2 w-4 h-4" />
 						Learn More
@@ -129,18 +156,6 @@ export default function Projects() {
 
 	return (
 		<div className="container mx-auto p-4">
-			<div className="flex justify-between items-center mb-4">
-				<h1 className="text-2xl font-bold">Projects</h1>
-				{projects.length > 0 &&
-					<Button asChild className="bg-blue-500 dark:text-card-foreground hover:bg-blue-600 dark:hover:bg-blue-400" disabled={atProjectLimit}>
-						<Link href="/projects/create">
-							<PlusCircle className="mr-2" />
-							New Project
-						</Link>
-					</Button>
-				}
-			</div>
-
 			{(nearProjectLimit || atProjectLimit) && subscription && showUsageAlert && (
 				<Alert variant={'default'} className="mb-4">
 					<div className="flex justify-between items-start">
@@ -176,6 +191,20 @@ export default function Projects() {
 				</Alert>
 			)}
 
+			<div className="flex justify-between items-center mb-4">
+				<h1 className="text-2xl font-bold">Projects</h1>
+				<div className="flex gap-2">
+					<ProjectInvitations onInvitationAccepted={getProjects} defaultOpen={openInvites} />
+					{projects.length > 0 && (
+						<Button asChild className="bg-blue-500 dark:text-card-foreground hover:bg-blue-600 dark:hover:bg-blue-400" disabled={atProjectLimit}>
+							<Link href="/projects/create">
+								<PlusCircle className="mr-2" />
+								New Project
+							</Link>
+						</Button>
+					)}
+				</div>
+			</div>
 			{isLoading ? (
 				<div className="flex items-center justify-center py-12">
 					<LoadingIndicator />
@@ -199,4 +228,15 @@ export default function Projects() {
 			)}
 		</div>
 	);
+}
+
+export default function Projects() {
+	return (
+		<Suspense fallback={<div className="flex items-center justify-center py-12">
+			<LoadingIndicator />
+			<span className="ml-3 text-gray-600">Loading...</span>
+		</div>}>
+			<ProjectsPage />
+		</Suspense>
+	)
 }

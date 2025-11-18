@@ -176,6 +176,9 @@ class User(Base):
     paper_tags = relationship(
         "PaperTag", back_populates="user", cascade="all, delete-orphan"
     )
+    invitations = relationship(
+        "ProjectRoleInvitation", back_populates="inviter", cascade="all, delete-orphan"
+    )
 
 
 class Session(Base):
@@ -414,8 +417,12 @@ class Paper(Base):
     doi = Column(String, nullable=True)  # Digital Object Identifier
     size_in_kb = Column(Integer, nullable=True)  # Size of the paper file in KB
 
-    # OpenAlex metadata
-    open_alex_id = Column(String, nullable=True)  # OpenAlex ID for the paper
+    # Some papers can be forked/duplicated from other papers (across users). To handle this, we store the parent paper ID of the original paper.
+    parent_paper_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("papers.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     user = relationship("User", back_populates="papers")
     conversations = relationship(
@@ -494,6 +501,9 @@ class Project(Base):
         ),
         overlaps="audio_overview_jobs",
     )
+    invitations = relationship(
+        "ProjectRoleInvitation", back_populates="project", cascade="all, delete-orphan"
+    )
 
 
 class ProjectRoleInvitation(Base):
@@ -504,10 +514,18 @@ class ProjectRoleInvitation(Base):
         UUID(as_uuid=True), ForeignKey("project.id", ondelete="CASCADE"), nullable=False
     )
     email = Column(String, nullable=False)
+    invited_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     role = Column(String, nullable=False)
     invited_at = Column(DateTime(timezone=True), server_default=func.now())
     accepted_at = Column(DateTime(timezone=True), nullable=True)
-    token = Column(String, unique=True, nullable=False, index=True)
+
+    # Relationships
+    inviter = relationship(
+        "User", foreign_keys=[invited_by], back_populates="invitations"
+    )
+    project = relationship(
+        "Project", back_populates="invitations", foreign_keys=[project_id]
+    )
 
 
 class ProjectRole(Base):
