@@ -330,6 +330,9 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin, setHasColl
 									</div>
 								))}
 							</div>
+							<p className="text-sm text-muted-foreground pt-2">
+								<strong>Viewers</strong> can see all papers, chats, and artifacts, but cannot create new ones. <strong>Editors</strong> can do all that, plus add papers and create new chats and artifacts.
+							</p>
 							<Button variant="outline" onClick={addDraftInvite} className="mt-2">
 								Add another
 							</Button>
