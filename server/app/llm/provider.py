@@ -138,7 +138,7 @@ class GeminiProvider(BaseLLMProvider):
 
         self._client = genai.Client(api_key=self.api_key)
         self._default_model = "gemini-2.5-pro"
-        self._fast_model = "gemini-2.5-flash-lite-preview-06-17"
+        self._fast_model = "gemini-2.5-flash"
 
     @property
     def client(self) -> genai.Client:
