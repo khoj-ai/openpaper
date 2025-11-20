@@ -7,7 +7,7 @@ import Link from "next/link";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { citationStyles, handleStatusChange, formatDate, truncateText } from "@/components/utils/paperUtils";
+import { citationStyles, handleStatusChange, truncateText } from "@/components/utils/paperUtils";
 import { getStatusIcon, PaperStatusEnum } from "@/components/utils/PdfStatus";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { PaperProjects } from "./PaperProjects";
