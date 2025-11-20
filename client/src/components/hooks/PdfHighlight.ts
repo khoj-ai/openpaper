@@ -61,7 +61,7 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
         else {
             fetchHighlights();
         }
-    }, []);
+    }, [paperId, readOnlyHighlights.length]);
 
     const scrollToHighlightAndPositionTooltip = (
         selector: string,
