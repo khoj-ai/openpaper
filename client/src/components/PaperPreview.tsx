@@ -2,17 +2,19 @@
 
 import { PaperItem } from "@/lib/schema";
 import { Button } from "./ui/button";
-import { X, ExternalLink, Copy } from "lucide-react";
+import { X, ExternalLink, Copy, Highlighter } from "lucide-react";
 import Link from "next/link";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { citationStyles, handleStatusChange } from "@/components/utils/paperUtils";
+import { citationStyles, handleStatusChange, formatDate, truncateText } from "@/components/utils/paperUtils";
 import { getStatusIcon, PaperStatusEnum } from "@/components/utils/PdfStatus";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { PaperProjects } from "./PaperProjects";
 import { TagSelector } from "./TagSelector";
 import { fetchFromApi } from "@/lib/api";
+import { useHighlights } from "./hooks/PdfHighlight";
+import { useState } from "react";
 
 interface PaperPreviewProps {
     paper: PaperItem;
@@ -21,6 +23,11 @@ interface PaperPreviewProps {
 }
 
 export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
+    const { highlights } = useHighlights(paper.id);
+    const [showAllHighlights, setShowAllHighlights] = useState(false);
+
+    const highlightCount = highlights?.filter(highlight => highlight.role === 'user').length || 0;
+
     const handleRemoveTag = async (tagId: string) => {
         try {
             await fetchFromApi(`/api/paper/tag/papers/${paper.id}/tags/${tagId}`, {
@@ -161,6 +168,44 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
                         </Dialog>
                     </div>
                     <p className="text-sm my-4 break-words max-h-[20vh] overflow-y-auto">{paper.abstract}</p>
+
+                    {/* Highlights Section */}
+                    {highlightCount > 0 && (
+                        <div className="space-y-2 mb-4">
+                            <h4 className="font-semibold text-sm flex items-center gap-2">
+                                <Highlighter className="h-4 w-4 text-yellow-600" />
+                                Highlights ({highlightCount})
+                            </h4>
+                            <div className="space-y-3">
+                                {highlights.filter(highlight => highlight.role === 'user').slice(0, showAllHighlights ? undefined : 3).map((highlight) => (
+                                    <div key={highlight.id} className="p-2 border-l-2 border-yellow-400 bg-yellow-50/50 dark:bg-yellow-950/20 rounded-r">
+                                        <p className="text-sm">
+                                            {truncateText(highlight.raw_text, 200)}
+                                        </p>
+                                        {highlight.page_number != null && (
+                                            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                                                <span>Page {highlight.page_number + 1}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                                {highlightCount > 3 && (
+                                    <Button
+                                        variant="link"
+                                        size="sm"
+                                        className="h-auto p-0 text-xs"
+                                        onClick={() => setShowAllHighlights(!showAllHighlights)}
+                                    >
+                                        {showAllHighlights
+                                            ? 'Show less'
+                                            : `+${highlightCount - 3} more highlight${highlightCount - 3 !== 1 ? 's' : ''}`
+                                        }
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="space-y-2 mb-4">
                         <h4 className="font-semibold text-sm">Tags</h4>
                         <div className="flex flex-wrap gap-2 items-center">

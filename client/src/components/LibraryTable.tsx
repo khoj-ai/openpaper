@@ -667,8 +667,10 @@ export function LibraryTable({
 				{selectedPaperForPreview && (
 					isMobile ? (
 						<Sheet open={!!selectedPaperForPreview} onOpenChange={(open) => { if (!open) setSelectedPaperForPreview(null); }}>
-							<SheetContent side="bottom" className="h-full w-full flex flex-col p-0">
-								<PaperPreview paper={selectedPaperForPreview} onClose={() => setSelectedPaperForPreview(null)} setPaper={setPaper} />
+							<SheetContent side="bottom" className="h-[90vh] w-full flex flex-col p-0 overflow-hidden [&>button]:hidden">
+								<div className="overflow-y-auto flex-1">
+									<PaperPreview paper={selectedPaperForPreview} onClose={() => setSelectedPaperForPreview(null)} setPaper={setPaper} />
+								</div>
 							</SheetContent>
 						</Sheet>
 					) : (
