@@ -15,6 +15,7 @@ import { useState } from "react"
 import { uploadFiles, uploadFromUrl } from "@/lib/uploadUtils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import LoadingIndicator from "@/components/utils/Loading"
 
 interface UploadModalProps {
     open: boolean;
@@ -68,6 +69,7 @@ export function UploadModal({ open, onOpenChange, onUploadComplete }: UploadModa
     const [jobs, setJobs] = useState<MinimalJob[]>([]);
     const [isUrlDialogOpen, setIsUrlDialogOpen] = useState(false);
     const [importError, setImportError] = useState<string | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const UPLOAD_LIMIT = 10;
 
     const handleFileSelect = async (files: File[]) => {
@@ -76,8 +78,13 @@ export function UploadModal({ open, onOpenChange, onUploadComplete }: UploadModa
             setImportError(`This would exceed the upload limit of ${UPLOAD_LIMIT} files.`);
             return;
         }
-        const newJobs = await uploadFiles(files);
-        setJobs(prevJobs => [...prevJobs, ...newJobs]);
+        setIsSubmitting(true);
+        try {
+            const newJobs = await uploadFiles(files);
+            setJobs(prevJobs => [...prevJobs, ...newJobs]);
+        } finally {
+            setIsSubmitting(false);
+        }
     }
 
     const onComplete = (paperId: string) => {
@@ -99,6 +106,7 @@ export function UploadModal({ open, onOpenChange, onUploadComplete }: UploadModa
                 setImportError(`You have reached the upload limit of ${UPLOAD_LIMIT} files.`);
                 return;
             }
+            setIsSubmitting(true);
             const newJob = await uploadFromUrl(url);
             setJobs(prevJobs => [...prevJobs, newJob]);
         } catch (error) {
@@ -106,6 +114,8 @@ export function UploadModal({ open, onOpenChange, onUploadComplete }: UploadModa
             setImportError(
                 "Failed to import from URL. Please check the URL and try again."
             );
+        } finally {
+            setIsSubmitting(false);
         }
     }
 
@@ -120,10 +130,17 @@ export function UploadModal({ open, onOpenChange, onUploadComplete }: UploadModa
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
-                        <PdfDropzone
-                            onFileSelect={handleFileSelect}
-                            onUrlClick={onUrlClick}
-                        />
+                        {isSubmitting ? (
+                            <div className="flex flex-col items-center justify-center h-64 space-y-4">
+                                <LoadingIndicator />
+                                <p className="text-sm text-gray-600 dark:text-gray-400">Processing your papers...</p>
+                            </div>
+                        ) : (
+                            <PdfDropzone
+                                onFileSelect={handleFileSelect}
+                                onUrlClick={onUrlClick}
+                            />
+                        )}
                         {importError && (
                             <p className="text-red-500 text-sm mt-2">{importError}</p>
                         )}
