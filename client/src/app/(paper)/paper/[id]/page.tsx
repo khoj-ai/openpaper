@@ -537,7 +537,7 @@ export default function PaperView() {
                         </Button>
                         <Button variant="ghost" onClick={() => setMobileView('panel')} className={`flex flex-col items-center gap-1 ${mobileView === 'panel' ? 'text-blue-500' : ''}`}>
                             <Box size={24} />
-                            <span className="text-xs">Panel</span>
+                            <span className="text-xs">Tools</span>
                         </Button>
                     </div>
                 </div>
