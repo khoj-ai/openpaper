@@ -1,16 +1,15 @@
 import { PaperItem } from "@/lib/schema";
 import { Card } from "@/components/ui/card"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Book, Copy, MoreVertical, Trash2, Unlink } from "lucide-react";
+import { Book, MoreVertical, Trash2, Unlink } from "lucide-react";
 import { toast } from "sonner";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getStatusIcon, PaperStatusEnum } from "@/components/utils/PdfStatus";
 import Link from "next/link";
 import { formatFileSize } from "@/hooks/useSubscription";
-import { citationStyles, handleStatusChange } from "./utils/paperUtils";
+import { handleStatusChange } from "./utils/paperUtils";
 import { fetchFromApi } from "@/lib/api";
 import { ProjectPaperPreview } from "./ProjectPaperPreview";
 import { CitePaperButton } from "./CitePaperButton";
@@ -46,24 +45,6 @@ const PaperCardWrapper = ({ is_owner, paper, children, projectId }: { is_owner: 
 }
 
 export default function PaperCard({ paper, handleDelete, setPaper, minimalist = false, projectId, onUnlink, is_owner = true }: PaperCardProps) {
-
-	// Function to copy text to clipboard
-	const copyToClipboard = (text: string, styleName: string) => {
-		navigator.clipboard.writeText(text).then(() => {
-			// Success feedback using toast
-			toast("Copied!", {
-				description: `${styleName} citation copied to clipboard.`,
-				richColors: true,
-			});
-		}).catch(err => {
-			console.error('Failed to copy text: ', err);
-			// Error feedback using toast
-			toast("Copy failed", {
-				description: "Could not copy citation to clipboard.",
-				richColors: true,
-			});
-		});
-	};
 
 	const handleUnlink = async () => {
 		if (!projectId) return;
