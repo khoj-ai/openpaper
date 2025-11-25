@@ -23,8 +23,6 @@ export interface PaperData {
     is_public: boolean;
     share_id: string;
     status: PaperStatus;
-    open_alex_id?: string;
-    doi?: string;
 }
 
 export interface PaperNoteData {
