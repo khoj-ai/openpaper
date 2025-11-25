@@ -2,12 +2,10 @@
 
 import { PaperItem } from "@/lib/schema";
 import { Button } from "./ui/button";
-import { X, ExternalLink, Copy, Highlighter } from "lucide-react";
+import { X, ExternalLink, Highlighter } from "lucide-react";
 import Link from "next/link";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { citationStyles, handleStatusChange, truncateText } from "@/components/utils/paperUtils";
+import { handleStatusChange, truncateText } from "@/components/utils/paperUtils";
 import { getStatusIcon, PaperStatusEnum } from "@/components/utils/PdfStatus";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { PaperProjects } from "./PaperProjects";
@@ -15,6 +13,7 @@ import { TagSelector } from "./TagSelector";
 import { fetchFromApi } from "@/lib/api";
 import { useHighlights } from "./hooks/PdfHighlight";
 import { useState } from "react";
+import { CitePaperButton } from "./CitePaperButton";
 
 interface PaperPreviewProps {
     paper: PaperItem;
@@ -48,21 +47,6 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
         // Let's try to update the paper by refetching it.
         fetchFromApi(`/api/paper?id=${paper.id}`).then(updatedPaper => {
             setPaper(paper.id, updatedPaper);
-        });
-    };
-
-    const copyToClipboard = (text: string, styleName: string) => {
-        navigator.clipboard.writeText(text).then(() => {
-            toast("Copied!", {
-                description: `${styleName} citation copied to clipboard.`,
-                richColors: true,
-            });
-        }).catch(err => {
-            console.error('Failed to copy text: ', err);
-            toast("Copy failed", {
-                description: "Could not copy citation to clipboard.",
-                richColors: true,
-            });
         });
     };
 
@@ -120,52 +104,7 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         )}
-                        <Dialog>
-                            <DialogTrigger asChild>
-                                <Button variant="outline" size="sm" className="h-8 px-3 text-xs">
-                                    Cite
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-[625px]">
-                                <DialogHeader>
-                                    <DialogTitle>Cite Paper</DialogTitle>
-                                    <DialogDescription>
-                                        Copy the citation format you need for <b>{paper.title}</b>.
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <ScrollArea className="h-[300px] w-full rounded-md border p-4">
-                                    <div className="grid gap-4 py-4">
-                                        {citationStyles.map((style) => {
-                                            const citationText = style.generator(paper);
-                                            return (
-                                                <div key={style.name} className="flex items-start justify-between gap-2">
-                                                    <div className="flex-grow min-w-0">
-                                                        <h4 className="font-semibold mb-1">{style.name}</h4>
-                                                        <p className="text-sm bg-muted p-2 rounded break-words">{citationText}</p>
-                                                    </div>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="mt-5 h-8 w-8 flex-shrink-0"
-                                                        onClick={() => copyToClipboard(citationText, style.name)}
-                                                        aria-label={`Copy ${style.name} citation`}
-                                                    >
-                                                        <Copy className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </ScrollArea>
-                                <DialogFooter>
-                                    <DialogClose asChild>
-                                        <Button type="button" variant="secondary">
-                                            Close
-                                        </Button>
-                                    </DialogClose>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
+                        <CitePaperButton paper={paper} />
                     </div>
                     <p className="text-sm my-4 break-words max-h-[20vh] overflow-y-auto">{paper.abstract}</p>
 

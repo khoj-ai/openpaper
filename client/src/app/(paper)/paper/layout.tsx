@@ -9,6 +9,7 @@ import { AuthProvider } from "@/lib/auth";
 import { Toaster } from "@/components/ui/sonner";
 import { PostHogProvider, ThemeProvider } from "@/lib/providers";
 import { SharePaperButton } from '@/components/SharePaperButton';
+import { CitePaperButton } from '@/components/CitePaperButton';
 
 import { SidebarController } from "@/components/utils/SidebarAutoCollapse";
 import Image from "next/image";
@@ -98,13 +99,14 @@ export default function RootLayout({
 											/>
 											<span className="text-sm font-semibold">Open Paper</span>
 										</header>
-										{/* Desktop buttons */}
-										<div className="hidden md:flex items-center gap-2">
-											<ManageProjectsButton />
-											<SharePaperButton />
-										</div>
-										{/* Mobile menu */}
-										<MobilePaperMenu />
+									{/* Desktop buttons */}
+									<div className="hidden md:flex items-center gap-2">
+										<ManageProjectsButton />
+										<CitePaperButton />
+										<SharePaperButton />
+									</div>
+									{/* Mobile menu */}
+									<MobilePaperMenu />
 									</header>
 									<SidebarController>
 										{children}

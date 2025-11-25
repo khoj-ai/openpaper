@@ -13,6 +13,7 @@ import { formatFileSize } from "@/hooks/useSubscription";
 import { citationStyles, handleStatusChange } from "./utils/paperUtils";
 import { fetchFromApi } from "@/lib/api";
 import { ProjectPaperPreview } from "./ProjectPaperPreview";
+import { CitePaperButton } from "./CitePaperButton";
 import React from "react";
 
 
@@ -120,52 +121,7 @@ export default function PaperCard({ paper, handleDelete, setPaper, minimalist = 
 									{/* Action buttons in top right */}
 									<div className="flex gap-1">
 										{!minimalist && (
-											<Dialog>
-												<DialogTrigger asChild>
-													<Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
-														Cite
-													</Button>
-												</DialogTrigger>
-												<DialogContent className="sm:max-w-[625px]">
-													<DialogHeader>
-														<DialogTitle>Cite Paper</DialogTitle>
-														<DialogDescription>
-															Copy the citation format you need for <b>{paper.title}</b>.
-														</DialogDescription>
-													</DialogHeader>
-													<ScrollArea className="h-[300px] w-full rounded-md border p-4">
-														<div className="grid gap-4 py-4">
-															{citationStyles.map((style) => {
-																const citationText = style.generator(paper);
-																return (
-																	<div key={style.name} className="flex items-start justify-between gap-2">
-																		<div className="flex-grow">
-																			<h4 className="font-semibold mb-1">{style.name}</h4>
-																			<p className="text-sm bg-muted p-2 rounded break-words">{citationText}</p>
-																		</div>
-																		<Button
-																			variant="ghost"
-																			size="icon"
-																			className="mt-5 h-8 w-8 flex-shrink-0"
-																			onClick={() => copyToClipboard(citationText, style.name)}
-																			aria-label={`Copy ${style.name} citation`}
-																		>
-																			<Copy className="h-4 w-4" />
-																		</Button>
-																	</div>
-																);
-															})}
-														</div>
-													</ScrollArea>
-													<DialogFooter>
-														<DialogClose asChild>
-															<Button type="button" variant="secondary">
-																Close
-															</Button>
-														</DialogClose>
-													</DialogFooter>
-												</DialogContent>
-											</Dialog>
+											<CitePaperButton paper={paper} />
 										)}
 										{
 											handleDelete && is_owner && (
