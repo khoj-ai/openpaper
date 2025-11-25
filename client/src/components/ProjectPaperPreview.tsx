@@ -86,7 +86,7 @@ export function ProjectPaperPreview({ paper, projectId }: ProjectPaperPreviewPro
                 <div className="p-4 border-b">
                     <h3 className="font-bold text-lg mb-2 pr-8">{paper.title}</h3>
                     <div className="flex items-center gap-2 flex-wrap">
-                        <CitePaperButton paper={paper} />
+                        <CitePaperButton paper={paper} minimalist={true} />
                         {isCheckingFork ? (
                             <Button variant="outline" size="sm" className="h-8 px-3 text-xs" disabled>
                                 <FilePlus2 className="h-4 w-4 mr-2" />

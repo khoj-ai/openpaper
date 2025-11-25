@@ -104,7 +104,7 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         )}
-                        <CitePaperButton paper={paper} />
+                        <CitePaperButton paper={paper} minimalist={true} />
                     </div>
                     <p className="text-sm my-4 break-words max-h-[20vh] overflow-y-auto">{paper.abstract}</p>
 
