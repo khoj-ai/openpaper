@@ -43,6 +43,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             auth_provider=obj_in.auth_provider,
             provider_user_id=obj_in.provider_user_id,
             locale=obj_in.locale,
+            is_email_verified=obj_in.is_email_verified,
             is_active=True,
             is_admin=False,
         )
