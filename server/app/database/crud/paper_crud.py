@@ -125,7 +125,7 @@ class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
 
         # If we have enough reading papers, return them
         if len(reading_papers) >= limit:
-            return reading_papers[:limit]
+            return reading_papers
 
         # Calculate how many more papers we need
         remaining_limit = limit - len(reading_papers)
