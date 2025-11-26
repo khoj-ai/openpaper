@@ -211,10 +211,7 @@ export default function Home() {
 		const fetchPapers = async () => {
 			try {
 				const response = await fetchFromApi("/api/paper/relevant");
-				const sortedPapers = response.papers.sort((a: PaperItem, b: PaperItem) => {
-					return new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime();
-				});
-				setRelevantPapers(sortedPapers);
+				setRelevantPapers(response.papers);
 			} catch (error) {
 				console.error("Error fetching papers:", error);
 				setRelevantPapers([]);
