@@ -233,14 +233,15 @@ export default function SharedPaperView() {
                         }}>
                         {msg.content}
                     </Markdown>
-                    {msg.role === 'assistant' && (
-                        <ChatMessageActions message={msg.content} references={msg.references} />
-                    )}
-                    {
-                        msg.references && msg.references.citations && msg.references.citations.length > 0 && (
-                            <div className="mt-0 pt-0 border-t border-gray-300 dark:border-gray-700" id="references-section">
+                    {msg.references && msg.references.citations && msg.references.citations.length > 0 ? (
+                        <div className="mt-0 pt-0 border-t border-gray-300 dark:border-gray-700" id="references-section">
+                            <div className="flex items-center justify-between">
                                 <h4 className="text-sm font-semibold mb-2">References</h4>
-                                <ul className="list-none p-0">
+                                {msg.role === 'assistant' && (
+                                    <ChatMessageActions message={msg.content} references={msg.references} />
+                                )}
+                            </div>
+                            <ul className="list-none p-0">
                                     {msg.references.citations.map((value, refIndex) => (
                                         <div
                                             key={refIndex}
@@ -267,6 +268,10 @@ export default function SharedPaperView() {
                                     ))}
                                 </ul>
                             </div>
+                        ) : (
+                            msg.role === 'assistant' && (
+                                <ChatMessageActions message={msg.content} references={msg.references} />
+                            )
                         )}
                 </div>
             </div>

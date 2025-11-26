@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Pause, Play, RotateCcw, Volume2 } from 'lucide-react';
-import { AudioOverview } from '@/lib/schema';
+import { AudioOverview, Reference } from '@/lib/schema';
 import CustomCitationLink from '@/components/utils/CustomCitationLink';
+import { ChatMessageActions } from '@/components/ChatMessageActions';
 import Markdown from 'react-markdown';
 
 interface EnhancedAudioPlayerProps {
@@ -376,9 +377,17 @@ export function EnhancedAudioPlayer({ audioOverview, paper_title, setExplicitSea
             )}
 
             {/* Citations */}
-            {audioOverview.citations && audioOverview.citations.length > 0 && (
+            {audioOverview.citations && audioOverview.citations.length > 0 ? (
                 <div className="mt-4 pt-4 border-t border-gray-300 dark:border-gray-700" id="references-section">
-                    <h4 className="text-sm font-semibold mb-2">References</h4>
+                    <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-semibold mb-2">References</h4>
+                        <ChatMessageActions
+                            message={audioOverview.transcript}
+                            references={{
+                                citations: audioOverview.citations.map(c => ({ key: String(c.index), reference: c.text }))
+                            }}
+                        />
+                    </div>
                     <ul className="list-none p-0">
                         {audioOverview.citations.map((citation) => (
                             <div
@@ -399,6 +408,13 @@ export function EnhancedAudioPlayer({ audioOverview, paper_title, setExplicitSea
                         ))}
                     </ul>
                 </div>
+            ) : (
+                <ChatMessageActions
+                    message={audioOverview.transcript}
+                    references={{
+                        citations: audioOverview.citations?.map(c => ({ key: String(c.index), reference: c.text })) || []
+                    }}
+                />
             )}
         </div>
     );

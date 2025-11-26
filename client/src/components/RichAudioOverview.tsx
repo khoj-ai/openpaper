@@ -84,120 +84,122 @@ export const RichAudioOverview = ({
             <div className={`flex flex-col h-full transition-all duration-500 ease-in-out ${isMobile ? (isPdfVisible ? 'hidden' : 'w-full') : (isPdfVisible ? 'w-1/3' : 'w-full')}`}>
                 <div ref={scrollContainerRef} className="rich-audio-overview-scroll flex-1 w-full overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out">
                     <div className={`space-y-4 w-full transition-all duration-300 ease-in-out ${isPdfVisible ? 'p-2' : 'p-6'}`}>
-                    {/* Header */}
-                    <div className="flex items-start justify-between mb-6">
-                        <div className="flex-1">
-                            <h2 className="text-2xl font-bold text-primary mb-2">
-                                {audioOverview.title}
-                            </h2>
+                        {/* Header */}
+                        <div className="flex items-start justify-between mb-6">
+                            <div className="flex-1">
+                                <h2 className="text-2xl font-bold text-primary mb-2">
+                                    {audioOverview.title}
+                                </h2>
+                            </div>
                         </div>
-                    </div>
 
-                    {/* Transcript Content */}
-                    <div className="relative group prose dark:prose-invert !max-w-full transition-all duration-300 ease-in-out">
-                        <Markdown
-                            remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
-                            rehypePlugins={[rehypeKatex]}
-                            components={{
-                                p: (props) => (
-                                    <CustomCitationLink
-                                        {...props}
-                                        handleCitationClick={handleCitationClick}
-                                        messageIndex={0}
-                                        citations={convertedCitations}
-                                        papers={papers || []}
-                                    />
-                                ),
-                                li: (props) => (
-                                    <CustomCitationLink
-                                        {...props}
-                                        handleCitationClick={handleCitationClick}
-                                        messageIndex={0}
-                                        citations={convertedCitations}
-                                        papers={papers || []}
-                                    />
-                                ),
-                                div: (props) => (
-                                    <CustomCitationLink
-                                        {...props}
-                                        handleCitationClick={handleCitationClick}
-                                        messageIndex={0}
-                                        citations={convertedCitations}
-                                        papers={papers || []}
-                                    />
-                                ),
-                                td: (props) => (
-                                    <CustomCitationLink
-                                        {...props}
-                                        handleCitationClick={handleCitationClick}
-                                        messageIndex={0}
-                                        citations={convertedCitations}
-                                        papers={papers || []}
-                                    />
-                                ),
-                                table: (props) => (
-                                    <div className="overflow-x-auto">
-                                        <table {...props} className="min-w-full border-collapse" />
+                        {/* Transcript Content */}
+                        <div className="relative group prose dark:prose-invert !max-w-full transition-all duration-300 ease-in-out">
+                            <Markdown
+                                remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
+                                rehypePlugins={[rehypeKatex]}
+                                components={{
+                                    p: (props) => (
+                                        <CustomCitationLink
+                                            {...props}
+                                            handleCitationClick={handleCitationClick}
+                                            messageIndex={0}
+                                            citations={convertedCitations}
+                                            papers={papers || []}
+                                        />
+                                    ),
+                                    li: (props) => (
+                                        <CustomCitationLink
+                                            {...props}
+                                            handleCitationClick={handleCitationClick}
+                                            messageIndex={0}
+                                            citations={convertedCitations}
+                                            papers={papers || []}
+                                        />
+                                    ),
+                                    div: (props) => (
+                                        <CustomCitationLink
+                                            {...props}
+                                            handleCitationClick={handleCitationClick}
+                                            messageIndex={0}
+                                            citations={convertedCitations}
+                                            papers={papers || []}
+                                        />
+                                    ),
+                                    td: (props) => (
+                                        <CustomCitationLink
+                                            {...props}
+                                            handleCitationClick={handleCitationClick}
+                                            messageIndex={0}
+                                            citations={convertedCitations}
+                                            papers={papers || []}
+                                        />
+                                    ),
+                                    table: (props) => (
+                                        <div className="overflow-x-auto">
+                                            <table {...props} className="min-w-full border-collapse" />
+                                        </div>
+                                    ),
+                                }}
+                            >
+                                {audioOverview.transcript}
+                            </Markdown>
+
+                            {/* References Section */}
+                            {audioOverview.citations && audioOverview.citations.length > 0 ? (
+                                <div>
+                                    <div
+                                        className="mt-6 pt-4 border-t border-gray-300 dark:border-gray-700 flex items-center justify-between"
+                                        id="references-section"
+                                    >
+                                        <h4 className="text-sm font-semibold mb-2">References</h4>
+                                        <ChatMessageActions
+                                            message={audioOverview.transcript}
+                                            references={references}
+                                        />
                                     </div>
-                                ),
-                            }}
-                        >
-                            {audioOverview.transcript}
-                        </Markdown>
-
-                        {/* Message Actions */}
-                        <ChatMessageActions
-                            message={audioOverview.transcript}
-                            references={references}
-                        />
-
-                        {/* References Section */}
-                        {audioOverview.citations && audioOverview.citations.length > 0 && (
-                            <div>
-                                <div
-                                    className="mt-6 pt-4 border-t border-gray-300 dark:border-gray-700"
-                                    id="references-section"
-                                >
-                                    <h4 className="text-sm font-semibold mb-2">References</h4>
-                                </div>
-                                {papers && papers.length > 0 ? (
-                                    <ReferencePaperCards
-                                        citations={convertedCitations}
-                                        papers={papers}
-                                        messageId={audioOverview.id}
-                                        messageIndex={0}
-                                        highlightedPaper={
-                                            highlightedInfo && highlightedInfo.messageIndex === 0
-                                                ? highlightedInfo.paperId
-                                                : null
-                                        }
-                                        onHighlightClear={() => setHighlightedInfo(null)}
-                                    />
-                                ) : (
-                                    <div className="space-y-2">
-                                        {audioOverview.citations.map((citation) => (
-                                            <div
-                                                key={citation.index}
-                                                className={`p-3 rounded-lg border text-sm transition-colors ${
-                                                    activeCitationKey === String(citation.index)
+                                    {papers && papers.length > 0 ? (
+                                        <ReferencePaperCards
+                                            citations={convertedCitations}
+                                            papers={papers}
+                                            messageId={audioOverview.id}
+                                            messageIndex={0}
+                                            highlightedPaper={
+                                                highlightedInfo && highlightedInfo.messageIndex === 0
+                                                    ? highlightedInfo.paperId
+                                                    : null
+                                            }
+                                            onHighlightClear={() => setHighlightedInfo(null)}
+                                        />
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {audioOverview.citations.map((citation) => (
+                                                <div
+                                                    key={citation.index}
+                                                    className={`p-3 rounded-lg border text-sm transition-colors ${activeCitationKey === String(citation.index)
                                                         ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
                                                         : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-                                                }`}
-                                            >
-                                                <span className="font-medium text-blue-600 dark:text-blue-400">
-                                                    [{citation.index}]
-                                                </span>{' '}
-                                                {citation.text}
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                                                        }`}
+                                                >
+                                                    <span className="font-medium text-blue-600 dark:text-blue-400">
+                                                        [{citation.index}]
+                                                    </span>{' '}
+                                                    {citation.text}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <ChatMessageActions
+                                    message={audioOverview.transcript}
+                                    references={references}
+                                />
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
 
             {/* PDF Viewer Panel */}
             {isPdfVisible && (
