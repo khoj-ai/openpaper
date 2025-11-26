@@ -751,13 +751,15 @@ export function SidePanelContent({
                         }}>
                         {msg.content}
                     </Markdown>
-                    {msg.role === 'assistant' && (
-                        <ChatMessageActions message={msg.content} references={msg.references} />
-                    )}
                     {
                         msg.references && msg.references.citations && msg.references.citations.length > 0 && (
-                            <div className="mt-0 pt-0 border-t border-gray-300 dark:border-gray-700" id="references-section">
-                                <h4 className="text-sm font-semibold mb-2">References</h4>
+                            <div>
+                                <div className="mt-0 pt-0 border-t border-gray-300 dark:border-gray-700 flex justify-between items-center" id="references-section">
+                                    <h4 className="text-sm font-semibold">References</h4>
+                                    {msg.role === 'assistant' && (
+                                        <ChatMessageActions message={msg.content} references={msg.references} />
+                                    )}
+                                </div>
                                 <ul className="list-none p-0">
                                     {msg.references.citations.map((value, refIndex) => (
                                         <div
@@ -1079,7 +1081,18 @@ export function SidePanelContent({
                                                             ),
                                                         }}
                                                     />
-                                                    <ChatMessageActions message={streamingChunks.join('')} references={streamingReferences} />
+                                                    {streamingReferences && streamingReferences.citations && streamingReferences.citations.length > 0 && (
+                                                        <div
+                                                            className="mt-0 pt-0 border-t border-gray-300 dark:border-gray-700 flex justify-between items-center"
+                                                            id="references-section"
+                                                        >
+                                                            <h4 className="text-sm font-semibold">References</h4>
+                                                            <ChatMessageActions
+                                                                message={streamingChunks.join('')}
+                                                                references={streamingReferences}
+                                                            />
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )
                                         }

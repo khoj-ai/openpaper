@@ -216,16 +216,16 @@ export const ConversationView = ({
 				>
 					{msg.content}
 				</Markdown>
-				{msg.role === "assistant" && (
-					<ChatMessageActions message={msg.content} references={msg.references} />
-				)}
-				{msg.references && msg.references["citations"]?.length > 0 && (
+				{msg.references && msg.references["citations"]?.length > 0 ? (
 					<div>
 						<div
-							className="mt-0 pt-0 border-t border-gray-300 dark:border-gray-700"
+							className="mt-0 pt-0 border-t border-gray-300 dark:border-gray-700 flex items-center justify-between"
 							id="references-section"
 						>
 							<h4 className="text-sm font-semibold mb-2">References</h4>
+							{msg.role === "assistant" && (
+								<ChatMessageActions message={msg.content} references={msg.references} />
+							)}
 						</div>
 						<ReferencePaperCards
 							citations={msg.references.citations}
@@ -240,6 +240,10 @@ export const ConversationView = ({
 							onHighlightClear={() => setHighlightedInfo(null)}
 						/>
 					</div>
+				) : (
+					msg.role === "assistant" && (
+						<ChatMessageActions message={msg.content} references={msg.references} />
+					)
 				)}
 			</div>
 		</div>

@@ -50,13 +50,13 @@ export function ChatMessageActions({ message, references }: ChatMessageActionsPr
 	};
 
 	return (
-		<div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-			<div className="flex items-center space-x-1 bg-background/50 backdrop-blur-sm p-1 rounded-lg">
+		<div className="">
+			<div className="flex items-center space-x-1 p-1 rounded-lg">
 				<Button
 					variant="ghost"
 					size="icon"
 					className="h-6 w-6"
-					onClick={copyAsMarkdown}
+					onClick={copyAsPlainText}
 					title="Copy"
 				>
 					{hasCopied ? (
@@ -72,8 +72,8 @@ export function ChatMessageActions({ message, references }: ChatMessageActionsPr
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent>
-						<DropdownMenuItem onClick={copyAsPlainText}>
-							As Plaintext
+						<DropdownMenuItem onClick={copyAsMarkdown}>
+							As Markdown
 						</DropdownMenuItem>
 						<DropdownMenuItem onClick={copyWithReferences} disabled={!references || !references.citations || references.citations.length === 0}>
 							With References
