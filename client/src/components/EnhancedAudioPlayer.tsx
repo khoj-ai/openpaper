@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Pause, Play, RotateCcw, Volume2 } from 'lucide-react';
-import { AudioOverview, Reference } from '@/lib/schema';
+import { AudioOverview } from '@/lib/schema';
 import CustomCitationLink from '@/components/utils/CustomCitationLink';
 import { ChatMessageActions } from '@/components/ChatMessageActions';
 import Markdown from 'react-markdown';
