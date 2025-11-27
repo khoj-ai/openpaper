@@ -132,6 +132,8 @@ function UnderstandPageContent() {
     // (e.g., showing the loading skeleton unnecessarily).
     useEffect(() => {
         const id = searchParams.get('id');
+        const queryParam = searchParams.get('q');
+
         if (id && user && !isStreaming) {
             fetchMessages(id);
         } else if (!id && !isStreaming) {
@@ -139,6 +141,15 @@ function UnderstandPageContent() {
             setConversationId(null);
             setIsCentered(true);
             setIsSessionLoading(false);
+
+            // Pre-fill the input with the query parameter if provided
+            if (queryParam && !currentMessage) {
+                setCurrentMessage(queryParam);
+                // Focus the input after a short delay
+                setTimeout(() => {
+                    inputMessageRef.current?.focus();
+                }, 100);
+            }
         }
     }, [searchParams, user, fetchMessages, isStreaming]);
 
