@@ -260,7 +260,10 @@ export default function Home() {
 						</div>
 
 						{/* Search Bar */}
-						<HomeSearch />
+						{
+							hasContent &&
+							<HomeSearch />
+						}
 					</div>
 				</header>
 
