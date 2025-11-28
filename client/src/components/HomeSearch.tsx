@@ -1,25 +1,23 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Search, FileText, FolderKanban, Command, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { fetchFromApi } from "@/lib/api";
-import { PaperItem, Project, SearchResults } from "@/lib/schema";
-
-interface SearchResult {
-    papers: PaperItem[];
-    projects: Project[];
-}
+import { PaperItem, SearchResults } from "@/lib/schema";
+import { useProjects } from "@/hooks/useProjects";
 
 export function HomeSearch() {
     const [query, setQuery] = useState("");
     const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [hasSearched, setHasSearched] = useState(false);
-    const [results, setResults] = useState<SearchResult>({ papers: [], projects: [] });
+    const [papers, setPapers] = useState<PaperItem[]>([]);
+    const { projects: allProjects } = useProjects();
     const inputRef = useRef<HTMLInputElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
     const router = useRouter();
 
     // Keyboard shortcut (Cmd+K)
@@ -54,9 +52,16 @@ export function HomeSearch() {
 
     // Debounced search
     useEffect(() => {
+        // Cancel any pending request when query changes
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+
         if (!query.trim()) {
-            setResults({ papers: [], projects: [] });
+            setPapers([]);
             setHasSearched(false);
+            setIsLoading(false);
             return;
         }
 
@@ -65,11 +70,22 @@ export function HomeSearch() {
         setIsLoading(true);
 
         const timeout = setTimeout(async () => {
+            // Create a new AbortController for this request
+            const controller = new AbortController();
+            abortControllerRef.current = controller;
+
             try {
                 // Search papers
-                const searchResponse: SearchResults = await fetchFromApi(`/api/search/local?q=${encodeURIComponent(query)}&limit=5`);
+                const searchResponse: SearchResults = await fetchFromApi(
+                    `/api/search/local?q=${encodeURIComponent(query)}&limit=5`,
+                    { signal: controller.signal }
+                );
+
+                // Check if this request was aborted
+                if (controller.signal.aborted) return;
+
                 // PaperResult can be mapped to PaperItem (they share id, title, authors, etc.)
-                const papers: PaperItem[] = (searchResponse?.papers || []).map((p) => ({
+                const mappedPapers: PaperItem[] = (searchResponse?.papers || []).map((p) => ({
                     id: p.id,
                     title: p.title || "Untitled",
                     authors: p.authors || [],
@@ -80,26 +96,28 @@ export function HomeSearch() {
                     preview_url: p.preview_url || undefined,
                 }));
 
-                // Search projects (filter client-side for now)
-                const projectsResponse = await fetchFromApi("/api/projects");
-                const projects = (projectsResponse || [])
-                    .filter((p: Project) =>
-                        p.title.toLowerCase().includes(query.toLowerCase()) ||
-                        p.description?.toLowerCase().includes(query.toLowerCase())
-                    )
-                    .slice(0, 3);
-
-                setResults({ papers, projects });
+                setPapers(mappedPapers);
                 setHasSearched(true);
+                setIsLoading(false);
             } catch (error) {
+                // Ignore abort errors
+                if (error instanceof Error && error.name === 'AbortError') {
+                    return;
+                }
                 console.error("Search error:", error);
                 setHasSearched(true);
-            } finally {
                 setIsLoading(false);
             }
         }, 300);
 
-        return () => clearTimeout(timeout);
+        return () => {
+            clearTimeout(timeout);
+            // Also abort any in-flight request on cleanup
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+                abortControllerRef.current = null;
+            }
+        };
     }, [query]);
 
     const handleSelect = useCallback((type: "paper" | "project", id: string) => {
@@ -112,7 +130,19 @@ export function HomeSearch() {
         }
     }, [router]);
 
-    const hasResults = results.papers.length > 0 || results.projects.length > 0;
+    // Filter projects client-side based on query
+    const filteredProjects = useMemo(() => {
+        if (!query.trim()) return [];
+        const lowerQuery = query.toLowerCase();
+        return allProjects
+            .filter((p) =>
+                p.title.toLowerCase().includes(lowerQuery) ||
+                p.description?.toLowerCase().includes(lowerQuery)
+            )
+            .slice(0, 3);
+    }, [allProjects, query]);
+
+    const hasResults = papers.length > 0 || filteredProjects.length > 0;
 
     return (
         <div ref={containerRef} className="relative w-full max-w-2xl mx-auto px-4">
@@ -144,12 +174,12 @@ export function HomeSearch() {
                         </div>
                     ) : hasResults ? (
                         <div className="max-h-[400px] overflow-y-auto">
-                            {results.projects.length > 0 && (
+                            {filteredProjects.length > 0 && (
                                 <div className="p-2">
                                     <p className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                                         Projects
                                     </p>
-                                    {results.projects.map((project) => (
+                                    {filteredProjects.map((project) => (
                                         <button
                                             key={project.id}
                                             onClick={() => handleSelect("project", project.id)}
@@ -168,12 +198,12 @@ export function HomeSearch() {
                                     ))}
                                 </div>
                             )}
-                            {results.papers.length > 0 && (
+                            {papers.length > 0 && (
                                 <div className="p-2 border-t">
                                     <p className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                                         Papers
                                     </p>
-                                    {results.papers.map((paper) => (
+                                    {papers.map((paper) => (
                                         <button
                                             key={paper.id}
                                             onClick={() => handleSelect("paper", paper.id)}
