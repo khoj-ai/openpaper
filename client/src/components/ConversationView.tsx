@@ -399,6 +399,7 @@ export const ConversationView = ({
 								value={currentMessage}
 								onChange={handleTextareaChange}
 								ref={inputMessageRef}
+								autoFocus
 								placeholder={
 									isCentered
 										? "Discover something in your papers..."
