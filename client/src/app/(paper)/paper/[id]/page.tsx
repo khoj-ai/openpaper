@@ -24,7 +24,6 @@ import {
     PaperData,
     PaperHighlight,
     JobStatusResponse,
-    PaperNoteData,
 } from '@/lib/schema';
 
 import { PaperStatus, PaperStatusEnum } from '@/components/utils/PdfStatus';
@@ -344,21 +343,9 @@ export default function PaperView() {
             }
         }
 
-        async function fetchPaperNote() {
-            try {
-                const response: PaperNoteData = await fetchFromApi(`/api/paper/note?paper_id=${id}`);
-                setPaperNoteContent(response.content);
-            } catch (error) {
-                console.error('Error fetching paper note:', error);
-            }
-        }
-
-        fetchPaperNote();
-
         if (jobId) return;
 
         fetchPaper();
-        fetchPaperNote();
         refreshAnnotations();
         fetchHighlights();
     }, [id, jobId]);
