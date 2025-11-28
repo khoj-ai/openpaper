@@ -7,7 +7,6 @@ import { fetchFromApi } from "@/lib/api";
 import { PaperItem } from "@/lib/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate } from "@/lib/utils";
-import { getStatusIcon } from "@/components/utils/PdfStatus";
 
 interface RecentPapersGridProps {
     papers?: PaperItem[];
@@ -20,38 +19,45 @@ function PaperCardCompact({ paper }: { paper: PaperItem }) {
     return (
         <Link
             href={`/paper/${paper.id}`}
-            className="group flex flex-col p-4 rounded-xl border border-border/50 bg-card hover:border-border hover:shadow-sm transition-all h-full"
+            className="group flex flex-col rounded-xl border border-border/50 bg-card hover:border-border hover:shadow-sm transition-all h-full overflow-hidden"
         >
-            <div className="flex items-start justify-between gap-2 mb-2">
-                <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex-shrink-0">
-                    <FileText className="h-4 w-4" />
+            {paper.preview_url ? (
+                <div className="relative w-full aspect-[4/3] bg-muted">
+                    <img
+                        src={paper.preview_url}
+                        alt={paper.title || "Paper preview"}
+                        className="w-full h-full object-cover"
+                    />
                 </div>
-                {paper.status && (
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                        {getStatusIcon(paper.status)}
-                    </span>
-                )}
-            </div>
-
-            <h3 className="font-medium text-sm line-clamp-2 group-hover:text-primary transition-colors flex-1">
-                {paper.title || "Untitled Paper"}
-            </h3>
-
-            <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground">
-                {paper.authors && paper.authors.length > 0 && (
-                    <span className="truncate">
-                        {paper.authors[0]}
-                        {paper.authors.length > 1 && ` +${paper.authors.length - 1}`}
-                    </span>
-                )}
-            </div>
-
-            {createdAt && (
-                <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
-                    <Clock className="h-3 w-3" />
-                    {createdAt}
+            ) : (
+                <div className="flex items-start justify-between gap-2 p-4 pb-2">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex-shrink-0">
+                        <FileText className="h-4 w-4" />
+                    </div>
                 </div>
             )}
+
+            <div className={`flex flex-col flex-1 ${paper.preview_url ? "p-4" : "px-4 pb-4"}`}>
+                <h3 className="font-medium text-sm line-clamp-2 group-hover:text-primary transition-colors flex-1">
+                    {paper.title || "Untitled Paper"}
+                </h3>
+
+                <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground">
+                    {paper.authors && paper.authors.length > 0 && (
+                        <span className="truncate">
+                            {paper.authors[0]}
+                            {paper.authors.length > 1 && ` +${paper.authors.length - 1}`}
+                        </span>
+                    )}
+                </div>
+
+                {createdAt && (
+                    <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        {createdAt}
+                    </div>
+                )}
+            </div>
         </Link>
     );
 }
