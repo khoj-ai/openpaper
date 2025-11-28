@@ -19,7 +19,7 @@ import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience"
 import { PaperItem, JobStatusType, JobStatusResponse, Project } from "@/lib/schema";
 import { toast } from "sonner";
 import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isPaperUploadNearLimit, isStorageNearLimit } from "@/hooks/useSubscription";
-import { uploadFromUrlWithFallback } from "@/lib/uploadUtils";
+import { uploadFromUrlWithFallback, uploadFiles } from "@/lib/uploadUtils";
 
 // New components for redesigned home
 import { HomeSearch } from "@/components/HomeSearch";
@@ -32,7 +32,6 @@ const DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE = "We encountered an error processing y
 
 export default function Home() {
 	const [isUploading, setIsUploading] = useState(false);
-	const [isUrlDialogOpen, setIsUrlDialogOpen] = useState(false);
 
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	const [jobUploadStatus, setJobUploadStatus] = useState<JobStatusType | null>(null);
@@ -234,6 +233,35 @@ export default function Home() {
 		}
 	};
 
+	// Handle file upload with custom loading experience
+	const handleUploadStart = async (files: File[], _onComplete: (paperId: string) => void) => {
+		if (files.length === 0) return;
+
+		const file = files[0];
+		setIsUploading(true);
+		setFileSize(file.size);
+		setFileLength(null);
+		setCeleryMessage(null);
+		setMessageIndex(0);
+
+		try {
+			const jobs = await uploadFiles(files);
+			if (jobs.length > 0) {
+				pollJobStatus(jobs[0].jobId);
+			}
+		} catch (error) {
+			console.error('Error uploading file:', error);
+			setShowErrorAlert(true);
+			setErrorAlertMessage(error instanceof Error ? error.message : DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE);
+			if (error instanceof Error && error.message.includes('upgrade') && error.message.includes('upload limit')) {
+				setShowPricingOnError(true);
+			} else {
+				setShowPricingOnError(false);
+			}
+			setIsUploading(false);
+		}
+	};
+
 	if (authLoading) {
 		return null;
 	}
@@ -269,7 +297,7 @@ export default function Home() {
 
 				{/* Main Content */}
 				{!isLoadingData && !hasContent ? (
-					<HomeEmptyState onUploadComplete={refreshData} />
+					<HomeEmptyState onUploadComplete={refreshData} onUploadStart={handleUploadStart} />
 				) : (
 					<div className="space-y-12">
 						{/* Quick Actions */}
@@ -277,6 +305,7 @@ export default function Home() {
 							<QuickActions
 								onUploadComplete={refreshData}
 								onProjectCreated={refreshData}
+								onUploadStart={handleUploadStart}
 							/>
 						</section>
 
@@ -342,60 +371,6 @@ export default function Home() {
 					</DialogContent>
 				</Dialog>
 			)}
-
-			{/* URL Import Dialog */}
-			<Dialog open={isUrlDialogOpen} onOpenChange={setIsUrlDialogOpen}>
-				<DialogContent>
-					<DialogHeader>
-						<DialogTitle>Import PDF from URL</DialogTitle>
-						<DialogDescription>
-							Enter the public URL of the PDF you want to upload.
-						</DialogDescription>
-					</DialogHeader>
-					<Input
-						type="url"
-						placeholder="https://arxiv.org/pdf/1706.03762v7"
-						value={pdfUrl}
-						onChange={(e) => setPdfUrl(e.target.value)}
-						className="mt-4"
-					/>
-					<div className="flex justify-end gap-2 mt-4">
-						<Button variant="secondary" onClick={() => setIsUrlDialogOpen(false)}>
-							Cancel
-						</Button>
-						<Button
-							onClick={async () => {
-								if (pdfUrl) {
-									setIsUploading(true);
-									setFileSize(null);
-									setCeleryMessage(null);
-									setIsUrlDialogOpen(false);
-
-									try {
-										const job = await uploadFromUrlWithFallback(pdfUrl);
-										pollJobStatus(job.jobId);
-									} catch (error) {
-										console.error('Error uploading from URL:', error);
-										setShowErrorAlert(true);
-										setErrorAlertMessage(error instanceof Error ? error.message : DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE);
-										if (error instanceof Error && error.message.includes('upgrade') && error.message.includes('upload limit')) {
-											setShowPricingOnError(true);
-										} else {
-											setShowPricingOnError(false);
-										}
-										setIsUploading(false);
-									}
-								}
-								setPdfUrl("");
-							}}
-							disabled={!pdfUrl || isUploading}
-						>
-							{isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-							Submit
-						</Button>
-					</div>
-				</DialogContent>
-			</Dialog>
 
 			{/* Upload Progress Dialog */}
 			<Dialog open={isUploading} onOpenChange={(open) => !open && setIsUploading(false)}>

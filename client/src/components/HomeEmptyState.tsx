@@ -9,15 +9,38 @@ import Link from "next/link";
 
 interface HomeEmptyStateProps {
     onUploadComplete?: () => void;
+    onUploadStart?: (files: File[], onComplete: (paperId: string) => void) => void;
 }
 
-export function HomeEmptyState({ onUploadComplete }: HomeEmptyStateProps) {
+export function HomeEmptyState({ onUploadComplete, onUploadStart }: HomeEmptyStateProps) {
     const router = useRouter();
     const [isUploadModalOpen, setUploadModalOpen] = useState(false);
+
+    // Use custom upload handling if provided (for home page experience)
+    const useCustomUpload = !!onUploadStart;
 
     const handleUploadComplete = (paperId: string) => {
         router.push(`/paper/${paperId}`);
         onUploadComplete?.();
+    };
+
+    const handleUploadClick = () => {
+        if (useCustomUpload) {
+            // Trigger file input for custom upload handling
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.pdf';
+            input.multiple = false;
+            input.onchange = (e) => {
+                const files = Array.from((e.target as HTMLInputElement).files || []);
+                if (files.length > 0 && onUploadStart) {
+                    onUploadStart(files, handleUploadComplete);
+                }
+            };
+            input.click();
+        } else {
+            setUploadModalOpen(true);
+        }
     };
 
     return (
@@ -55,7 +78,7 @@ export function HomeEmptyState({ onUploadComplete }: HomeEmptyStateProps) {
                 <Button
                     size="lg"
                     className="flex-1 bg-primary hover:bg-primary/90"
-                    onClick={() => setUploadModalOpen(true)}
+                    onClick={handleUploadClick}
                 >
                     <Upload className="h-4 w-4 mr-2" />
                     Upload your first paper
@@ -108,11 +131,13 @@ export function HomeEmptyState({ onUploadComplete }: HomeEmptyStateProps) {
                 </p>
             </div>
 
-            <UploadModal
-                open={isUploadModalOpen}
-                onOpenChange={setUploadModalOpen}
-                onUploadComplete={handleUploadComplete}
-            />
+            {!useCustomUpload && (
+                <UploadModal
+                    open={isUploadModalOpen}
+                    onOpenChange={setUploadModalOpen}
+                    onUploadComplete={handleUploadComplete}
+                />
+            )}
         </div>
     );
 }

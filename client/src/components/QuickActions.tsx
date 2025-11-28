@@ -54,12 +54,17 @@ function QuickActionCard({ icon, title, description, onClick, variant = "default
 interface QuickActionsProps {
     onUploadComplete?: () => void;
     onProjectCreated?: () => void;
+    onUploadStart?: (files: File[], onComplete: (paperId: string) => void) => void;
+    onUrlImport?: (url: string, onComplete: (paperId: string) => void) => void;
 }
 
-export function QuickActions({ onUploadComplete, onProjectCreated }: QuickActionsProps) {
+export function QuickActions({ onUploadComplete, onProjectCreated, onUploadStart, onUrlImport }: QuickActionsProps) {
     const router = useRouter();
     const [isUploadModalOpen, setUploadModalOpen] = useState(false);
     const [isCreateProjectOpen, setCreateProjectOpen] = useState(false);
+
+    // Use custom upload handling if provided (for home page experience)
+    const useCustomUpload = !!(onUploadStart || onUrlImport);
 
     const handleUploadComplete = (paperId: string) => {
         router.push(`/paper/${paperId}`);
@@ -97,7 +102,24 @@ export function QuickActions({ onUploadComplete, onProjectCreated }: QuickAction
                     icon={<Upload className="h-5 w-5" />}
                     title="Upload Paper"
                     description="Add a PDF to your library"
-                    onClick={() => setUploadModalOpen(true)}
+                    onClick={() => {
+                        if (useCustomUpload) {
+                            // Trigger file input for custom upload handling
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = '.pdf';
+                            input.multiple = false;
+                            input.onchange = (e) => {
+                                const files = Array.from((e.target as HTMLInputElement).files || []);
+                                if (files.length > 0 && onUploadStart) {
+                                    onUploadStart(files, handleUploadComplete);
+                                }
+                            };
+                            input.click();
+                        } else {
+                            setUploadModalOpen(true);
+                        }
+                    }}
                     variant="primary"
                 />
                 <QuickActionCard
@@ -115,11 +137,13 @@ export function QuickActions({ onUploadComplete, onProjectCreated }: QuickAction
                 />
             </div>
 
-            <UploadModal
-                open={isUploadModalOpen}
-                onOpenChange={setUploadModalOpen}
-                onUploadComplete={handleUploadComplete}
-            />
+            {!useCustomUpload && (
+                <UploadModal
+                    open={isUploadModalOpen}
+                    onOpenChange={setUploadModalOpen}
+                    onUploadComplete={handleUploadComplete}
+                />
+            )}
 
             <CreateProjectDialog
                 open={isCreateProjectOpen}
