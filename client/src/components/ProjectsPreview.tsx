@@ -82,7 +82,7 @@ export function ProjectsPreview({ limit = 4 }: ProjectsPreviewProps) {
     useEffect(() => {
         const fetchProjects = async () => {
             try {
-                const response = await fetchFromApi("/api/projects?detailed=true");
+                const response = await fetchFromApi("/api/projects?detailed=true&limit=3");
                 // Sort by updated_at and take top N
                 const sorted = (response || [])
                     .sort((a: Project, b: Project) =>
