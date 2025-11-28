@@ -8,19 +8,66 @@ import { fetchFromApi } from "@/lib/api";
 import { PaperItem, SearchResults } from "@/lib/schema";
 import { useProjects } from "@/hooks/useProjects";
 
+// Represents a selectable item in the search results
+type SelectableItem =
+    | { type: "project"; id: string }
+    | { type: "paper"; id: string }
+    | { type: "ask" };
+
 export function HomeSearch() {
     const [query, setQuery] = useState("");
     const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [hasSearched, setHasSearched] = useState(false);
     const [papers, setPapers] = useState<PaperItem[]>([]);
+    const [selectedIndex, setSelectedIndex] = useState(0);
     const { projects: allProjects } = useProjects();
     const inputRef = useRef<HTMLInputElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const resultsRef = useRef<HTMLDivElement>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
     const router = useRouter();
 
-    // Keyboard shortcut (Cmd+K)
+    // Filter projects client-side based on query
+    const filteredProjects = useMemo(() => {
+        if (!query.trim()) return [];
+        const lowerQuery = query.toLowerCase();
+        return allProjects
+            .filter((p) =>
+                p.title.toLowerCase().includes(lowerQuery) ||
+                p.description?.toLowerCase().includes(lowerQuery)
+            )
+            .slice(0, 3);
+    }, [allProjects, query]);
+
+    // Build a flat list of selectable items for keyboard navigation
+    const selectableItems = useMemo((): SelectableItem[] => {
+        const items: SelectableItem[] = [];
+        filteredProjects.forEach((p) => items.push({ type: "project", id: p.id }));
+        papers.forEach((p) => items.push({ type: "paper", id: p.id }));
+        // Always include "Ask knowledge base" option when there's a query
+        if (query.trim()) {
+            items.push({ type: "ask" });
+        }
+        return items;
+    }, [filteredProjects, papers, query]);
+
+    const hasResults = papers.length > 0 || filteredProjects.length > 0;
+
+    // Reset selected index when results change
+    useEffect(() => {
+        setSelectedIndex(0);
+    }, [selectableItems.length]);
+
+    // Scroll selected item into view
+    useEffect(() => {
+        if (resultsRef.current && selectedIndex >= 0) {
+            const selectedElement = resultsRef.current.querySelector(`[data-index="${selectedIndex}"]`);
+            selectedElement?.scrollIntoView({ block: "nearest" });
+        }
+    }, [selectedIndex]);
+
+    // Keyboard shortcut (Cmd+K) and arrow navigation
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -130,19 +177,41 @@ export function HomeSearch() {
         }
     }, [router]);
 
-    // Filter projects client-side based on query
-    const filteredProjects = useMemo(() => {
-        if (!query.trim()) return [];
-        const lowerQuery = query.toLowerCase();
-        return allProjects
-            .filter((p) =>
-                p.title.toLowerCase().includes(lowerQuery) ||
-                p.description?.toLowerCase().includes(lowerQuery)
-            )
-            .slice(0, 3);
-    }, [allProjects, query]);
+    const handleAskKnowledgeBase = useCallback(() => {
+        setIsOpen(false);
+        router.push(`/understand?q=${encodeURIComponent(query)}`);
+        setQuery("");
+    }, [router, query]);
 
-    const hasResults = papers.length > 0 || filteredProjects.length > 0;
+    const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (!isOpen || selectableItems.length === 0) return;
+
+        switch (e.key) {
+            case "ArrowDown":
+                e.preventDefault();
+                setSelectedIndex((prev) =>
+                    prev < selectableItems.length - 1 ? prev + 1 : 0
+                );
+                break;
+            case "ArrowUp":
+                e.preventDefault();
+                setSelectedIndex((prev) =>
+                    prev > 0 ? prev - 1 : selectableItems.length - 1
+                );
+                break;
+            case "Enter":
+                e.preventDefault();
+                const selected = selectableItems[selectedIndex];
+                if (selected) {
+                    if (selected.type === "ask") {
+                        handleAskKnowledgeBase();
+                    } else {
+                        handleSelect(selected.type, selected.id);
+                    }
+                }
+                break;
+        }
+    }, [isOpen, selectableItems, selectedIndex, handleSelect, handleAskKnowledgeBase]);
 
     return (
         <div ref={containerRef} className="relative w-full max-w-2xl mx-auto px-4">
@@ -155,6 +224,7 @@ export function HomeSearch() {
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onFocus={() => setIsOpen(true)}
+                    onKeyDown={handleKeyDown}
                     className="w-full h-12 pl-12 pr-16 text-base rounded-xl border border-input bg-background focus:border-primary/50 focus-visible:ring-0 transition-all"
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs text-muted-foreground pointer-events-none">
@@ -173,17 +243,19 @@ export function HomeSearch() {
                             <span className="text-sm">Searching...</span>
                         </div>
                     ) : hasResults ? (
-                        <div className="max-h-[400px] overflow-y-auto">
+                        <div ref={resultsRef} className="max-h-[400px] overflow-y-auto">
                             {filteredProjects.length > 0 && (
                                 <div className="p-2">
                                     <p className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                                         Projects
                                     </p>
-                                    {filteredProjects.map((project) => (
+                                    {filteredProjects.map((project, idx) => (
                                         <button
                                             key={project.id}
+                                            data-index={idx}
                                             onClick={() => handleSelect("project", project.id)}
-                                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-left transition-colors"
+                                            onMouseEnter={() => setSelectedIndex(idx)}
+                                            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${selectedIndex === idx ? "bg-accent" : "hover:bg-accent"}`}
                                         >
                                             <FolderKanban className="h-4 w-4 text-primary flex-shrink-0" />
                                             <div className="min-w-0">
@@ -203,44 +275,52 @@ export function HomeSearch() {
                                     <p className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                                         Papers
                                     </p>
-                                    {papers.map((paper) => (
-                                        <button
-                                            key={paper.id}
-                                            onClick={() => handleSelect("paper", paper.id)}
-                                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-left transition-colors"
-                                        >
-                                            <FileText className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                                            <div className="min-w-0">
-                                                <p className="font-medium truncate">{paper.title || "Untitled Paper"}</p>
-                                                {paper.authors && paper.authors.length > 0 && (
-                                                    <p className="text-sm text-muted-foreground truncate">
-                                                        {paper.authors.slice(0, 2).join(", ")}
-                                                        {paper.authors.length > 2 && " et al."}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </button>
-                                    ))}
+                                    {papers.map((paper, idx) => {
+                                        const itemIndex = filteredProjects.length + idx;
+                                        return (
+                                            <button
+                                                key={paper.id}
+                                                data-index={itemIndex}
+                                                onClick={() => handleSelect("paper", paper.id)}
+                                                onMouseEnter={() => setSelectedIndex(itemIndex)}
+                                                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${selectedIndex === itemIndex ? "bg-accent" : "hover:bg-accent"}`}
+                                            >
+                                                <FileText className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                                                <div className="min-w-0">
+                                                    <p className="font-medium truncate">{paper.title || "Untitled Paper"}</p>
+                                                    {paper.authors && paper.authors.length > 0 && (
+                                                        <p className="text-sm text-muted-foreground truncate">
+                                                            {paper.authors.slice(0, 2).join(", ")}
+                                                            {paper.authors.length > 2 && " et al."}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             )}
                             {/* Ask knowledge base option */}
                             <div className="p-2 border-t">
-                                <button
-                                    onClick={() => {
-                                        setIsOpen(false);
-                                        router.push(`/understand?q=${encodeURIComponent(query)}`);
-                                        setQuery("");
-                                    }}
-                                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-left transition-colors"
-                                >
-                                    <Search className="h-4 w-4 text-primary flex-shrink-0" />
-                                    <div className="min-w-0 flex-1">
-                                        <p className="font-medium">Ask your knowledge base</p>
-                                        <p className="text-sm text-muted-foreground truncate">
-                                            "{query}"
-                                        </p>
-                                    </div>
-                                </button>
+                                {(() => {
+                                    const askIndex = filteredProjects.length + papers.length;
+                                    return (
+                                        <button
+                                            data-index={askIndex}
+                                            onClick={handleAskKnowledgeBase}
+                                            onMouseEnter={() => setSelectedIndex(askIndex)}
+                                            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${selectedIndex === askIndex ? "bg-accent" : "hover:bg-accent"}`}
+                                        >
+                                            <Search className="h-4 w-4 text-primary flex-shrink-0" />
+                                            <div className="min-w-0 flex-1">
+                                                <p className="font-medium">Ask your knowledge base</p>
+                                                <p className="text-sm text-muted-foreground truncate">
+                                                    "{query}"
+                                                </p>
+                                            </div>
+                                        </button>
+                                    );
+                                })()}
                             </div>
                         </div>
                     ) : hasSearched ? (
