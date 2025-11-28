@@ -37,7 +37,7 @@ function UnderstandPageContent() {
     const searchParams = useSearchParams();
     const { user, loading: authLoading } = useAuth();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const { papers: fetchedPapers, error: papersError } = usePapers();
+    const { papers: fetchedPapers, isLoading: isPapersLoading, error: papersError } = usePapers();
 
     const papers = useMemo(() => {
         if (!fetchedPapers) return [];
@@ -376,6 +376,7 @@ function UnderstandPageContent() {
                 isStreaming={isStreaming}
                 streamingChunks={streamingChunks}
                 streamingReferences={streamingReferences}
+                isPapersLoading={isPapersLoading}
                 statusMessage={statusMessage}
                 error={error}
                 isSessionLoading={isSessionLoading}

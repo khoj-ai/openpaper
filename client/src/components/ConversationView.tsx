@@ -25,6 +25,7 @@ interface ConversationViewProps {
 	messages: ChatMessage[];
 	isOwner: boolean;
 	papers: PaperItem[];
+	isPapersLoading?: boolean;
 	isStreaming: boolean;
 	streamingChunks: string[];
 	streamingReferences?: Reference;
@@ -50,6 +51,7 @@ export const ConversationView = ({
 	messages,
 	isOwner,
 	papers,
+	isPapersLoading = false,
 	isStreaming,
 	streamingChunks,
 	streamingReferences,
@@ -261,7 +263,7 @@ export const ConversationView = ({
 							<ChatHistorySkeleton />
 						) : (
 							<>
-								{papers.length === 0 && messages.length === 0 && !authLoading && (
+								{!isPapersLoading && papers.length === 0 && messages.length === 0 && !authLoading && (
 									<div className="text-center p-8">
 										<h2 className="text-xl font-semibold mb-2">No Papers Found</h2>
 										<p className="text-gray-600 dark:text-gray-400 mb-4">
@@ -403,7 +405,7 @@ export const ConversationView = ({
 										: "Ask a follow-up"
 								}
 								className="pr-16 resize-none w-full bg-secondary"
-								disabled={isStreaming || papers.length === 0 || chatCreditLimitReached || !isOwner}
+								disabled={isStreaming || (!isPapersLoading && papers.length === 0) || chatCreditLimitReached || !isOwner}
 								onKeyDown={(e) => {
 									if (e.key === "Enter" && !e.shiftKey) {
 										e.preventDefault();
@@ -415,7 +417,7 @@ export const ConversationView = ({
 								type="submit"
 								variant="ghost"
 								className="absolute top-1/2 right-2 -translate-y-1/2"
-								disabled={isStreaming || papers.length === 0 || chatCreditLimitReached || !isOwner}
+								disabled={isStreaming || (!isPapersLoading && papers.length === 0) || chatCreditLimitReached || !isOwner}
 							>
 								<ArrowUp className="h-5 w-5" />
 							</Button>
