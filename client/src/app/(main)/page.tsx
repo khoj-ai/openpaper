@@ -11,7 +11,6 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Loader2, MessageCircleWarning, File } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
@@ -19,7 +18,7 @@ import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience"
 import { PaperItem, JobStatusType, JobStatusResponse, Project } from "@/lib/schema";
 import { toast } from "sonner";
 import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isPaperUploadNearLimit, isStorageNearLimit } from "@/hooks/useSubscription";
-import { uploadFromUrlWithFallback, uploadFiles } from "@/lib/uploadUtils";
+import { uploadFiles } from "@/lib/uploadUtils";
 
 // New components for redesigned home
 import { HomeSearch } from "@/components/HomeSearch";
@@ -36,7 +35,6 @@ export default function Home() {
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	const [jobUploadStatus, setJobUploadStatus] = useState<JobStatusType | null>(null);
 
-	const [pdfUrl, setPdfUrl] = useState("");
 	const [relevantPapers, setRelevantPapers] = useState<PaperItem[]>([]);
 	const [projects, setProjects] = useState<Project[]>([]);
 	const [isLoadingData, setIsLoadingData] = useState(true);
@@ -234,7 +232,7 @@ export default function Home() {
 	};
 
 	// Handle file upload with custom loading experience
-	const handleUploadStart = async (files: File[], _onComplete: (paperId: string) => void) => {
+	const handleUploadStart = async (files: File[]) => {
 		if (files.length === 0) return;
 
 		const file = files[0];
@@ -248,6 +246,12 @@ export default function Home() {
 			const jobs = await uploadFiles(files);
 			if (jobs.length > 0) {
 				pollJobStatus(jobs[0].jobId);
+			} else {
+				// All uploads failed - uploadFiles catches errors internally
+				setShowErrorAlert(true);
+				setErrorAlertMessage("Failed to upload the PDF. The file may be corrupted, encrypted, or in an unsupported format.");
+				setShowPricingOnError(false);
+				setIsUploading(false);
 			}
 		} catch (error) {
 			console.error('Error uploading file:', error);

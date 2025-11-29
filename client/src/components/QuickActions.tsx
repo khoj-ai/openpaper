@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, FolderPlus, Globe2, Sparkles } from "lucide-react";
+import { Upload, FolderPlus, Globe2 } from "lucide-react";
 import { UploadModal } from "@/components/UploadModal";
 import { CreateProjectDialog } from "@/components/CreateProjectDialog";
 import { fetchFromApi } from "@/lib/api";

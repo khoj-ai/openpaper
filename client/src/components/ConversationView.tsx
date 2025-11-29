@@ -469,7 +469,6 @@ export const ConversationView = ({
 								handleTextSelection={() => { }}
 								renderAnnotations={() => { }}
 								annotations={[]}
-								setAddedContentForPaperNote={() => { }}
 							/>
 						)}
 					</div>

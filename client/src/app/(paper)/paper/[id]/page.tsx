@@ -114,8 +114,6 @@ export default function PaperView() {
     const [activeCitationMessageIndex, setActiveCitationMessageIndex] = useState<number | null>(null);
     const [explicitSearchTerm, setExplicitSearchTerm] = useState<string | undefined>(undefined);
     const [isSharing, setIsSharing] = useState(false);
-    const [addedContentForPaperNote, setAddedContentForPaperNote] = useState<string | null>(null);
-    const [paperNoteContent, setPaperNoteContent] = useState<string | undefined>(undefined);
     const [userMessageReferences, setUserMessageReferences] = useState<string[]>([]);
 
     const [jobId, setJobId] = useState<string | null>(null);
@@ -258,28 +256,6 @@ export default function PaperView() {
         setActiveHighlight(highlight);
     }, []);
 
-    useEffect(() => {
-        if (addedContentForPaperNote) {
-            const newNoteContent = paperNoteContent ? `${paperNoteContent}` + `\n\n` + `> ${addedContentForPaperNote}` : `> ${addedContentForPaperNote}`;
-
-            setPaperNoteContent(newNoteContent);
-
-            // Set local storage
-            try {
-                localStorage.setItem(`paper-note-${id}`, newNoteContent);
-            } catch (error) {
-                console.error('Error saving to local storage:', error);
-            }
-
-            setAddedContentForPaperNote(null);
-            setRightSideFunction('Notes');
-        }
-    }, [addedContentForPaperNote]);
-
-    // Optimize notes textarea change handler
-    const handleNotesChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        setPaperNoteContent(e.target.value);
-    }, []);
 
     useEffect(() => {
         if (!authLoading && !user) {
@@ -445,9 +421,6 @@ export default function PaperView() {
         handleCitationClick,
         userMessageReferences,
         setUserMessageReferences,
-        setAddedContentForPaperNote,
-        paperNoteContent,
-        handleNotesChange,
     };
 
     if (isMobile) {
@@ -477,7 +450,6 @@ export default function PaperView() {
                                     handleTextSelection={handleTextSelection}
                                     renderAnnotations={renderAnnotations}
                                     annotations={annotations}
-                                    setAddedContentForPaperNote={setAddedContentForPaperNote}
                                     setHighlights={setHighlights}
                                     handleStatusChange={handleStatusChange}
                                     paperStatus={paperData.status}
@@ -565,7 +537,6 @@ export default function PaperView() {
                                 renderAnnotations={renderAnnotations}
                                 annotations={annotations}
                                 setHighlights={setHighlights}
-                                setAddedContentForPaperNote={setAddedContentForPaperNote}
                                 handleStatusChange={handleStatusChange}
                                 paperStatus={paperData.status}
                             />

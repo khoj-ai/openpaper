@@ -315,7 +315,7 @@ export function HomeSearch() {
                                             <div className="min-w-0 flex-1">
                                                 <p className="font-medium">Ask your knowledge base</p>
                                                 <p className="text-sm text-muted-foreground truncate">
-                                                    "{query}"
+                                                    &quot;{query}&quot;
                                                 </p>
                                             </div>
                                         </button>
@@ -326,7 +326,7 @@ export function HomeSearch() {
                     ) : hasSearched ? (
                         <div className="py-6 px-4">
                             <p className="text-center text-muted-foreground mb-4">
-                                No results found for "{query}"
+                                No results found for &quot;{query}&quot;
                             </p>
                             <button
                                 onClick={() => {
@@ -340,7 +340,7 @@ export function HomeSearch() {
                                 <div className="min-w-0 flex-1">
                                     <p className="font-medium text-foreground">Ask your knowledge base</p>
                                     <p className="text-sm text-muted-foreground truncate">
-                                        "{query}"
+                                        &quot;{query}&quot;
                                     </p>
                                 </div>
                             </button>

@@ -128,7 +128,6 @@ export function ProjectPaperPreview({ paper, projectId }: ProjectPaperPreviewPro
                             handleTextSelection={() => { }}
                             renderAnnotations={() => { }}
                             annotations={[]}
-                            setAddedContentForPaperNote={() => { }}
                         />
                     )}
                 </div>
