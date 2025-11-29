@@ -194,7 +194,10 @@ export default function Home() {
 
 	// Fetch papers and projects
 	useEffect(() => {
-		if (!user) return;
+		if (!user) {
+			setIsLoadingData(false);
+			return;
+		}
 
 		const fetchData = async () => {
 			setIsLoadingData(true);
