@@ -672,7 +672,7 @@ async def handle_stripe_webhook(
                             f"Payment failed for subscription {subscription_id}, user {subscription.user_id}"
                         )
 
-                        email_message = "Payment failed for your subscription. Please update your payment method."
+                        email_message = "Payment failed for your subscription. Please update your payment method"
 
                         notify_billing_issue(
                             str(user.email), email_message, str(user.name)

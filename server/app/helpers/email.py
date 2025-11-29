@@ -173,7 +173,7 @@ def notify_billing_issue(email: str, issue: str, name: Union[str, None] = None) 
             "reply_to": REPLY_TO_DEFAULT_EMAIL,
             "to": [email],
             "subject": "Fulfillment Issue Detected",
-            "text": f"Hello {name},\n\nWe have detected an issue with your account. {issue}.\n\nVisit {manage_url} for assistance.\n\nOpen Paper Team",
+            "text": f"Hello {name},\n\nWe have detected an issue with your account. {issue}.\n\nVisit {manage_url} for assistance.\n\n- Open Paper",
         }
 
         resend.Emails.send(payload)  # type: ignore
