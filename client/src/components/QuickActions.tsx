@@ -80,10 +80,17 @@ export function QuickActions({ onUploadComplete, onProjectCreated, onUploadStart
             });
 
             if (response?.id) {
-                toast.success("Project created successfully!");
-                setCreateProjectOpen(false);
-                router.push(`/project/${response.id}`);
-                onProjectCreated?.();
+                try {
+                    await router.push(`/project/${response.id}`);
+                    toast.success("Project created successfully!");
+                    setCreateProjectOpen(false);
+                    onProjectCreated?.();
+                } catch (navError) {
+                    console.error("Navigation error:", navError);
+                    toast.error("Project created, but failed to navigate. Please try again.");
+                }
+            } else {
+                toast.error("Failed to create project. Please try again.");
             }
         } catch (error) {
             console.error("Error creating project:", error);
