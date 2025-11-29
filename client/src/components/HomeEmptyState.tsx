@@ -70,8 +70,8 @@ export function HomeEmptyState({ onUploadComplete, onUploadStart }: HomeEmptySta
                 Welcome to Open Paper
             </h2>
             <p className="text-muted-foreground mb-8 max-w-md">
-                Your AI-powered research companion. Upload papers to get AI-generated summaries,
-                chat with your documents, and organize your research into projects.
+                Your research assistant for managing papers, understanding complex topics,
+                and conducting literature reviews—all in one place.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm">
