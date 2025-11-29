@@ -5,7 +5,6 @@ import {
     ResponseStyle,
     PaperHighlightAnnotation,
     CreditUsage,
-    PaperNoteData,
     Reference,
 } from '@/lib/schema';
 import {
@@ -75,7 +74,6 @@ interface SidePanelContentProps {
     handleCitationClick: (key: string, messageIndex: number) => void;
     userMessageReferences: string[];
     setUserMessageReferences: React.Dispatch<React.SetStateAction<string[]>>;
-    paperNoteContent: string | undefined;
     isMobile: boolean;
 }
 
@@ -109,11 +107,9 @@ export function SidePanelContent({
     handleCitationClick,
     userMessageReferences,
     setUserMessageReferences,
-    paperNoteContent,
     isMobile,
 }: SidePanelContentProps) {
     const { user } = useAuth();
-    const [paperNoteData, setPaperNoteData] = useState<PaperNoteData | null>(null);
     const [conversationId, setConversationId] = useState<string | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [currentMessage, setCurrentMessage] = useState('');
@@ -142,8 +138,6 @@ export function SidePanelContent({
     const inputMessageRef = useRef<HTMLTextAreaElement | null>(null);
     const messagesContainerRef = useRef<HTMLDivElement | null>(null);
 
-    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
     const END_DELIMITER = "END_OF_STREAM";
 
 
@@ -157,60 +151,6 @@ export function SidePanelContent({
         "Crafting insights...",
         "Synthesizing findings...",
     ]
-
-
-
-    const updateNote = useCallback(async (note: string) => {
-        if (!id) return;
-        try {
-            if (!paperNoteData) {
-                const response = await fetchFromApi(`/api/paper/note?paper_id=${id}`, {
-                    method: 'POST',
-                    body: JSON.stringify({ content: note }),
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                setPaperNoteData(response);
-            } else {
-                await fetchFromApi(`/api/paper/note?paper_id=${id}`, {
-                    method: 'PUT',
-                    body: JSON.stringify({ content: note }),
-                    headers: { 'Content-Type': 'application/json' }
-                });
-            }
-
-            // On successful save, clear the local storage version
-            localStorage.removeItem(`paper-note-${id}`);
-        } catch (error) {
-            console.error('Error updating note:', error);
-            // Keep the local storage version for retry later
-        }
-    }, [id, paperNoteData]);
-
-    // Debounced save to prevent excessive local storage writes and re-renders
-    const debouncedSaveNote = useCallback((content: string) => {
-        // Save to local storage
-        try {
-            localStorage.setItem(`paper-note-${id}`, content);
-        } catch (error) {
-            console.error('Error saving to local storage:', error);
-        }
-
-        // Clear existing timeout
-        if (saveTimeoutRef.current) {
-            clearTimeout(saveTimeoutRef.current);
-        }
-
-        // Set new timeout for server save
-        saveTimeoutRef.current = setTimeout(() => {
-            updateNote(content);
-        }, 2000);
-    }, [id, updateNote]);
-
-    useEffect(() => {
-        if (paperNoteContent) {
-            debouncedSaveNote(paperNoteContent);
-        }
-    }, [paperNoteContent, debouncedSaveNote]);
 
     const fetchMoreMessages = async () => {
         if (!hasMoreMessages || isLoadingMoreMessages || !conversationId) return;

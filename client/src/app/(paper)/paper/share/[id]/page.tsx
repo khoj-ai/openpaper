@@ -365,7 +365,6 @@ export default function SharedPaperView() {
                                     handleTextSelection={() => { }}
                                     renderAnnotations={() => { }}
                                     annotations={[]}
-                                    setAddedContentForPaperNote={() => { }}
                                 />
                             ) : (
                                 <div className="flex justify-center items-center h-full">PDF could not be loaded.</div>
@@ -488,7 +487,6 @@ export default function SharedPaperView() {
                             handleTextSelection={() => { }} // Disable text selection interaction
                             renderAnnotations={() => { }}
                             annotations={[]} // Pass empty or actual annotations if viewer uses them
-                            setAddedContentForPaperNote={() => { }}
                         // Add a specific readOnly prop if your PdfViewer supports it
                         // readOnly={true}
                         />

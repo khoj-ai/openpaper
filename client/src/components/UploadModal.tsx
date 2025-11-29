@@ -12,7 +12,7 @@ import { PdfDropzone } from "@/components/PdfDropzone"
 import PdfUploadTracker from "@/components/PdfUploadTracker"
 import { MinimalJob } from "@/lib/schema"
 import { useState } from "react"
-import { uploadFiles, uploadFromUrl } from "@/lib/uploadUtils"
+import { uploadFiles, uploadFromUrlWithFallback } from "@/lib/uploadUtils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import LoadingIndicator from "@/components/utils/Loading"
@@ -107,7 +107,7 @@ export function UploadModal({ open, onOpenChange, onUploadComplete }: UploadModa
                 return;
             }
             setIsSubmitting(true);
-            const newJob = await uploadFromUrl(url);
+            const newJob = await uploadFromUrlWithFallback(url);
             setJobs(prevJobs => [...prevJobs, newJob]);
         } catch (error) {
             console.error("Failed to import from URL", error);

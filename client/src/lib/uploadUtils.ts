@@ -73,25 +73,6 @@ export const uploadFromUrlWithFallback = async (url: string): Promise<MinimalJob
     }
 }
 
-export const uploadSingleFile = async (file: File, projectId?: string): Promise<MinimalJob> => {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    if (projectId) {
-        formData.append('project_id', projectId);
-    }
-
-    const response: PdfUploadResponse = await fetchFromApi('/api/paper/upload/', {
-        method: 'POST',
-        body: formData,
-        headers: {
-            Accept: 'application/json',
-        },
-    });
-
-    return { jobId: response.job_id, fileName: file.name };
-}
-
 export const uploadFromUrlForProject = async (url: string, projectId: string): Promise<MinimalJob> => {
     const res: PdfUploadResponse = await fetchFromApi("/api/paper/upload/from-url", {
         method: "POST",

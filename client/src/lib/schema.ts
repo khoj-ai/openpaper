@@ -25,10 +25,6 @@ export interface PaperData {
     status: PaperStatus;
 }
 
-export interface PaperNoteData {
-    content: string;
-}
-
 export interface ChatMessage {
     id?: string;
     role: 'user' | 'assistant';

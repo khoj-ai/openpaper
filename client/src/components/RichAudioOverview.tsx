@@ -237,7 +237,6 @@ export const RichAudioOverview = ({
                                 handleTextSelection={() => { }}
                                 renderAnnotations={() => { }}
                                 annotations={[]}
-                                setAddedContentForPaperNote={() => { }}
                             />
                         )}
                     </div>
