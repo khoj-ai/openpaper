@@ -9,9 +9,16 @@ import remarkGfm from "remark-gfm";
 import rehypeKatex from "rehype-katex";
 import remarkMath from "remark-math";
 import "katex/dist/katex.min.css";
-import { Loader, ArrowUp, Recycle, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader, ArrowUp, Recycle, X, ChevronDown, ChevronUp, BookOpen } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import CustomCitationLink from "@/components/utils/CustomCitationLink";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { ChatMessageActions } from "@/components/ChatMessageActions";
 import { ChatMessage, Reference, PaperItem } from "@/lib/schema";
 import ReferencePaperCards from "@/components/ReferencePaperCards";
@@ -263,17 +270,31 @@ export const ConversationView = ({
 							<ChatHistorySkeleton />
 						) : (
 							<>
-								{!isPapersLoading && papers.length === 0 && messages.length === 0 && !authLoading && (
-									<div className="text-center p-8">
-										<h2 className="text-xl font-semibold mb-2">No Papers Found</h2>
-										<p className="text-gray-600 dark:text-gray-400 mb-4">
-											You need to have at least one paper indexed to ask questions.
-										</p>
-										<Button onClick={() => (window.location.href = "/")}>
-											Index a Paper
-										</Button>
-									</div>
-								)}
+								<Dialog open={!isPapersLoading && papers.length === 0 && messages.length === 0 && !authLoading}>
+									<DialogContent hideCloseButton onInteractOutside={(e) => e.preventDefault()}>
+										<DialogHeader>
+											<div className="flex items-center justify-center mb-4">
+												<div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10">
+													<BookOpen className="h-6 w-6 text-primary" />
+												</div>
+											</div>
+											<DialogTitle className="text-center">Build Your Knowledge Base</DialogTitle>
+											<DialogDescription className="text-center space-y-3">
+												<p>
+													Upload your first paper to get started. As your library grows, you&apos;ll be able to ask questions across your entire collection.
+												</p>
+												<p className="text-sm text-muted-foreground">
+													Think of it as building a personal research assistant that learns from every paper you add.
+												</p>
+											</DialogDescription>
+										</DialogHeader>
+										<div className="flex justify-center mt-4">
+											<Button onClick={() => (window.location.href = "/")}>
+												Go to Home
+											</Button>
+										</div>
+									</DialogContent>
+								</Dialog>
 
 								{messages.length > 0 && memoizedMessages}
 							</>
