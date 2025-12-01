@@ -108,7 +108,7 @@ export function QuickActions({ onUploadComplete, onProjectCreated, onUploadStart
                 <QuickActionCard
                     icon={<Upload className="h-5 w-5" />}
                     title="Upload Paper"
-                    description="Add a PDF to your library"
+                    description="Understand research faster"
                     onClick={() => {
                         if (useCustomUpload) {
                             // Trigger file input for custom upload handling
