@@ -352,9 +352,6 @@ export default function Home() {
 								GitHub
 							</a>
 						</div>
-						<p>
-							Made with ❤️
-						</p>
 					</div>
 				</div>
 			</footer>
