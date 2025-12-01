@@ -37,7 +37,7 @@ function UnderstandPageContent() {
     const searchParams = useSearchParams();
     const { user, loading: authLoading } = useAuth();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const { papers: fetchedPapers, error: papersError } = usePapers();
+    const { papers: fetchedPapers, isLoading: isPapersLoading, error: papersError } = usePapers();
 
     const papers = useMemo(() => {
         if (!fetchedPapers) return [];
@@ -132,6 +132,8 @@ function UnderstandPageContent() {
     // (e.g., showing the loading skeleton unnecessarily).
     useEffect(() => {
         const id = searchParams.get('id');
+        const queryParam = searchParams.get('q');
+
         if (id && user && !isStreaming) {
             fetchMessages(id);
         } else if (!id && !isStreaming) {
@@ -139,6 +141,15 @@ function UnderstandPageContent() {
             setConversationId(null);
             setIsCentered(true);
             setIsSessionLoading(false);
+
+            // Pre-fill the input with the query parameter if provided
+            if (queryParam && !currentMessage) {
+                setCurrentMessage(queryParam);
+                // Focus the input after a short delay
+                setTimeout(() => {
+                    inputMessageRef.current?.focus();
+                }, 100);
+            }
         }
     }, [searchParams, user, fetchMessages, isStreaming]);
 
@@ -365,6 +376,7 @@ function UnderstandPageContent() {
                 isStreaming={isStreaming}
                 streamingChunks={streamingChunks}
                 streamingReferences={streamingReferences}
+                isPapersLoading={isPapersLoading}
                 statusMessage={statusMessage}
                 error={error}
                 isSessionLoading={isSessionLoading}

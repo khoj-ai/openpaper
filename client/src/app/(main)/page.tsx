@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { fetchFromApi } from "@/lib/api";
@@ -11,30 +10,34 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { ArrowRight, FileText, Loader2, MessageCircleWarning, Sparkles } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Loader2, MessageCircleWarning, File } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { PdfDropzone } from "@/components/PdfDropzone";
 import Link from "next/link";
 import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience";
-import { PaperItem, JobStatusType, JobStatusResponse } from "@/lib/schema";
-import PaperCard from "@/components/PaperCard";
+import { PaperItem, JobStatusType, JobStatusResponse, Project } from "@/lib/schema";
 import { toast } from "sonner";
 import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isPaperUploadNearLimit, isStorageNearLimit } from "@/hooks/useSubscription";
-import { uploadSingleFile, uploadFromUrlWithFallback } from "@/lib/uploadUtils";
+import { uploadFiles } from "@/lib/uploadUtils";
+
+// New components for redesigned home
+import { HomeSearch } from "@/components/HomeSearch";
+import { QuickActions } from "@/components/QuickActions";
+import { ProjectsPreview } from "@/components/ProjectsPreview";
+import { RecentPapersGrid } from "@/components/RecentPapersGrid";
+import { HomeEmptyState } from "@/components/HomeEmptyState";
 
 const DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE = "We encountered an error processing your request. Please check the file or URL and try again.";
 
 export default function Home() {
 	const [isUploading, setIsUploading] = useState(false);
-	const [isUrlDialogOpen, setIsUrlDialogOpen] = useState(false);
 
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	const [jobUploadStatus, setJobUploadStatus] = useState<JobStatusType | null>(null);
 
-	const [pdfUrl, setPdfUrl] = useState("");
 	const [relevantPapers, setRelevantPapers] = useState<PaperItem[]>([]);
+	const [projects, setProjects] = useState<Project[]>([]);
+	const [isLoadingData, setIsLoadingData] = useState(true);
 	const [showErrorAlert, setShowErrorAlert] = useState(false);
 	const [errorAlertMessage, setErrorAlertMessage] = useState(DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE);
 	const [showPricingOnError, setShowPricingOnError] = useState(false);
@@ -46,7 +49,6 @@ export default function Home() {
 	// Toast notifications for subscription limits
 	useEffect(() => {
 		if (!subscriptionLoading && subscription && user) {
-			// Check for at-limit conditions (error styling)
 			if (isStorageAtLimit(subscription)) {
 				toast.error("Storage limit reached", {
 					description: "You've reached your storage limit. Please upgrade your plan or delete some papers to continue.",
@@ -63,9 +65,7 @@ export default function Home() {
 						onClick: () => window.location.href = "/pricing"
 					},
 				});
-			}
-			// Check for near-limit conditions (warning styling)
-			else if (isStorageNearLimit(subscription)) {
+			} else if (isStorageNearLimit(subscription)) {
 				toast.warning("Storage nearly full", {
 					description: "You're approaching your storage limit. Consider upgrading your plan or managing your papers.",
 					action: {
@@ -85,7 +85,7 @@ export default function Home() {
 		}
 	}, [subscription, subscriptionLoading, user]);
 
-	// New state for loading experience
+	// Loading experience state
 	const [elapsedTime, setElapsedTime] = useState(0);
 	const [messageIndex, setMessageIndex] = useState(0);
 	const [fileSize, setFileSize] = useState<number | null>(null);
@@ -93,14 +93,11 @@ export default function Home() {
 	const [displayedMessage, setDisplayedMessage] = useState("");
 	const [celeryMessage, setCeleryMessage] = useState<string | null>(null);
 
-	// Ref to access latest celeryMessage value in intervals
 	const celeryMessageRef = useRef<string | null>(null);
 
-	// Keep ref in sync with state
 	useEffect(() => {
 		celeryMessageRef.current = celeryMessage;
 	}, [celeryMessage]);
-
 
 	const loadingMessages = useMemo(() => [
 		`Processing ${fileLength ? fileLength : 'lots of'} characters`,
@@ -116,7 +113,6 @@ export default function Home() {
 		let messageTimer: NodeJS.Timeout | undefined;
 
 		if (isUploading) {
-
 			setElapsedTime(0);
 			setMessageIndex(0);
 
@@ -125,9 +121,7 @@ export default function Home() {
 			}, 1000);
 
 			messageTimer = setInterval(() => {
-				// Check if celery message is set using ref
 				if (celeryMessageRef.current) {
-					// Clear the message timer if celery message is available
 					if (messageTimer) {
 						clearInterval(messageTimer);
 						messageTimer = undefined;
@@ -155,7 +149,6 @@ export default function Home() {
 		setDisplayedMessage("");
 		let i = 0;
 		const typingTimer = setInterval(() => {
-			// Use celery message if available, otherwise use the cycling message
 			const currentMessage = celeryMessage || loadingMessages[messageIndex];
 			if (i < currentMessage.length) {
 				setDisplayedMessage(currentMessage.slice(0, i + 1));
@@ -168,33 +161,28 @@ export default function Home() {
 		return () => clearInterval(typingTimer);
 	}, [messageIndex, loadingMessages, celeryMessage]);
 
-
 	// Poll job status
 	const pollJobStatus = async (jobId: string) => {
 		try {
 			const response: JobStatusResponse = await fetchFromApi(`/api/paper/upload/status/${jobId}`);
 			setJobUploadStatus(response.status);
 
-			// Update celery message if available
 			if (response.celery_progress_message) {
 				setCeleryMessage(response.celery_progress_message);
 			}
 
 			if (response.paper_id) {
-				// Success - redirect to paper
 				const redirectUrl = new URL(`/paper/${response.paper_id}`, window.location.origin);
 				redirectUrl.searchParams.append('job_id', jobId);
 				setTimeout(() => {
 					window.location.href = redirectUrl.toString();
 				}, 500);
 			} else if (response.status === 'failed') {
-				// Failed - show error
 				console.error('Upload job failed');
 				setShowErrorAlert(true);
 				setIsUploading(false);
 				setJobUploadStatus(null);
 			} else {
-				// Still processing - poll again
 				setTimeout(() => pollJobStatus(jobId), 2000);
 			}
 		} catch (error) {
@@ -204,46 +192,70 @@ export default function Home() {
 		}
 	};
 
+	// Fetch papers and projects
 	useEffect(() => {
-		if (!user) return;
-
-		// Define an async function inside useEffect
-		const fetchPapers = async () => {
-			try {
-				const response = await fetchFromApi("/api/paper/relevant");
-				setRelevantPapers(response.papers);
-			} catch (error) {
-				console.error("Error fetching papers:", error);
-				setRelevantPapers([]);
-			}
+		if (!user) {
+			setIsLoadingData(false);
+			return;
 		}
 
-		// Call the async function
-		fetchPapers();
+		const fetchData = async () => {
+			setIsLoadingData(true);
+			try {
+				const [papersResponse, projectsResponse] = await Promise.all([
+					fetchFromApi("/api/paper/relevant"),
+					fetchFromApi("/api/projects?detailed=true")
+				]);
+				setRelevantPapers(papersResponse?.papers || []);
+				setProjects(projectsResponse || []);
+			} catch (error) {
+				console.error("Error fetching data:", error);
+				setRelevantPapers([]);
+				setProjects([]);
+			} finally {
+				setIsLoadingData(false);
+			}
+		};
+
+		fetchData();
 	}, [user]);
 
+	const refreshData = async () => {
+		if (!user) return;
+		try {
+			const [papersResponse, projectsResponse] = await Promise.all([
+				fetchFromApi("/api/paper/relevant"),
+				fetchFromApi("/api/projects?detailed=true")
+			]);
+			setRelevantPapers(papersResponse?.papers || []);
+			setProjects(projectsResponse || []);
+		} catch (error) {
+			console.error("Error refreshing data:", error);
+		}
+	};
 
-	const handleFileUpload = async (files: File[]) => {
-		// Handle only the first file if multiple files are selected
+	// Handle file upload with custom loading experience
+	const handleUploadStart = async (files: File[]) => {
+		if (files.length === 0) return;
+
 		const file = files[0];
-		if (!file) return;
-
 		setIsUploading(true);
 		setFileSize(file.size);
-		setCeleryMessage(null); // Reset celery message
-
-		file.text().then(text => {
-			setFileLength(text.length.toString());
-		}).catch(err => {
-			console.error('Error reading file text:', err);
-			setFileLength('lots of');
-		});
+		setFileLength(null);
+		setCeleryMessage(null);
+		setMessageIndex(0);
 
 		try {
-			const job = await uploadSingleFile(file);
-
-			// Start polling job status
-			pollJobStatus(job.jobId);
+			const jobs = await uploadFiles(files);
+			if (jobs.length > 0) {
+				pollJobStatus(jobs[0].jobId);
+			} else {
+				// All uploads failed - uploadFiles catches errors internally
+				setShowErrorAlert(true);
+				setErrorAlertMessage("Failed to upload the PDF. The file may be corrupted, encrypted, or in an unsupported format.");
+				setShowPricingOnError(false);
+				setIsUploading(false);
+			}
 		} catch (error) {
 			console.error('Error uploading file:', error);
 			setShowErrorAlert(true);
@@ -257,43 +269,7 @@ export default function Home() {
 		}
 	};
 
-	const handlePdfUrl = async (url: string) => {
-		setIsUploading(true);
-		setFileSize(null);
-		setCeleryMessage(null); // Reset celery message
-
-		try {
-			const job = await uploadFromUrlWithFallback(url);
-
-			// Start polling job status
-			pollJobStatus(job.jobId);
-		} catch (error) {
-			console.error('Error uploading from URL:', error);
-			setShowErrorAlert(true);
-			setErrorAlertMessage(error instanceof Error ? error.message : DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE);
-			if (error instanceof Error && error.message.includes('upgrade') && error.message.includes('upload limit')) {
-				setShowPricingOnError(true);
-			} else {
-				setShowPricingOnError(false);
-			}
-			setIsUploading(false);
-		}
-	};
-
-	const handleLinkClick = () => {
-		setIsUrlDialogOpen(true);
-	};
-
-	const handleDialogConfirm = async () => {
-		if (pdfUrl) {
-			await handlePdfUrl(pdfUrl);
-		}
-		setIsUrlDialogOpen(false);
-		setPdfUrl("");
-	};
-
 	if (authLoading) {
-		// Maybe show a loading spinner or skeleton
 		return null;
 	}
 
@@ -302,150 +278,105 @@ export default function Home() {
 		return null;
 	}
 
+	const hasContent = relevantPapers.length > 0 || projects.length > 0;
+
 	return (
-		<div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center h-[calc(100vh-64px)] p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-			<main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start w-full max-w-6xl">
+		<div className="min-h-[calc(100vh-64px)] bg-gradient-to-b from-background to-muted/20 flex flex-col">
+			<div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex-1 w-full">
+				{/* Header with branding and search */}
+				<header className="mb-10">
+					<div className="flex flex-col items-center gap-6">
+						{/* Logo and Branding */}
+						<div className="flex items-center gap-3">
+							<div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100">
+								<File className="h-4 w-4 text-blue-500" />
+							</div>
+							<h1 className="text-2xl font-bold tracking-tight">Open Paper</h1>
+						</div>
 
-				<div className="flex flex-col items-center gap-4 mx-auto">
-					{relevantPapers.length > 0 && (
-						<Badge asChild variant="outline" className="cursor-pointer bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white hover:text-primary">
-							<Link href="/projects" className="flex items-center gap-1">
-								<Sparkles className="h-3 w-3" />
-								Create a research project
+						{/* Search Bar */}
+						{
+							hasContent &&
+							<HomeSearch />
+						}
+					</div>
+				</header>
+
+				{/* Main Content */}
+				{!isLoadingData && !hasContent ? (
+					<HomeEmptyState onUploadComplete={refreshData} onUploadStart={handleUploadStart} />
+				) : (
+					<div className="space-y-12">
+						{/* Quick Actions */}
+						<section>
+							<QuickActions
+								onUploadComplete={refreshData}
+								onProjectCreated={refreshData}
+								onUploadStart={handleUploadStart}
+							/>
+						</section>
+
+						{/* Two Column Layout for Projects and Papers */}
+						<div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+							{/* Projects Section */}
+							<section>
+								<ProjectsPreview limit={4} />
+							</section>
+
+							{/* Recent Papers Section */}
+							<section>
+								<RecentPapersGrid papers={relevantPapers} limit={4} />
+							</section>
+						</div>
+					</div>
+				)}
+			</div>
+
+			{/* Footer */}
+			<footer className="mt-auto border-t border-border/40">
+				<div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+					<div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
+						<div className="flex items-center gap-4">
+							<Link href="/blog/manifesto" className="hover:text-foreground transition-colors">
+								Manifesto
 							</Link>
-						</Badge>
-					)}
-					<header className="text-2xl font-bold">
-						Open Paper
-					</header>
-				</div>
-
-				{/* Replace buttons with PdfDropzone */}
-				<PdfDropzone
-					onFileSelect={handleFileUpload}
-					onUrlClick={handleLinkClick}
-					maxSizeMb={15} // Set desired max size
-					maxPapers={1}
-				/>
-
-				{/* Section break and header for relevant papers */}
-				{
-					relevantPapers.length > 0 && (
-						<>
-							{/* Visual separator */}
-							<div className="w-full border-t border-border/40 my-8"></div>
-
-							{/* Jump back in section */}
-							<div className="w-full flex items-center justify-between">
-								<div className="flex flex-col gap-2">
-									<h2 className="text-xl font-semibold">Jump back in</h2>
-									<p className="text-sm text-muted-foreground">
-										Continue reading your recent papers
-									</p>
-								</div>
-								<Button variant="ghost" size="sm" asChild>
-									<Link href="/papers" className="flex items-center gap-2">
-										View Library
-										<ArrowRight className="h-4 w-4" />
-									</Link>
-								</Button>
-							</div>
-
-							{/* Papers grid */}
-							<div className="w-full space-y-4 pb-4">
-								{relevantPapers.map((paper) => (
-									<PaperCard
-										key={paper.id}
-										paper={paper}
-										setPaper={(paperId: string, updatedPaper: PaperItem) => {
-											// Handle paper update logic here if needed
-											setRelevantPapers((prev) =>
-												prev.map((p) => (p.id === paperId ? { ...p, ...updatedPaper } : p))
-											);
-										}}
-									/>
-								))}
-							</div>
-						</>
-					)
-				}
-
-			</main >
-			{
-				relevantPapers.length === 0 && (
-					<footer className="row-start-3 grid gap-[24px] items-center justify-center justify-items-center">
-						<p>
-							Made with ❤️ in{" "}
+							<Link href="/about" className="hover:text-foreground transition-colors">
+								About
+							</Link>
 							<a
 								href="https://github.com/khoj-ai/openpaper"
 								target="_blank"
 								rel="noopener noreferrer"
-								className="underline hover:text-foreground transition-colors"
+								className="hover:text-foreground transition-colors"
 							>
-								San Francisco
+								GitHub
 							</a>
-						</p>
-						<Button size="lg" className="w-fit" variant="outline" asChild>
-							<Link href="/blog/manifesto">
-								<FileText className="h-4 w-4 mr-2" />
-								Manifesto
-							</Link>
-						</Button>
-					</footer>
-				)
-			}
-
-			{
-				showErrorAlert && (
-					<Dialog open={showErrorAlert} onOpenChange={setShowErrorAlert}>
-						<DialogContent>
-							<DialogTitle>Upload Failed</DialogTitle>
-							<DialogDescription className="space-y-4 inline-flex items-center">
-								<MessageCircleWarning className="h-6 w-6 text-slate-500 mr-2 flex-shrink-0" />
-								{errorAlertMessage ?? DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE}
-							</DialogDescription>
-							<div className="flex justify-end mt-4">
-								{
-									showPricingOnError && (
-										<Button variant="default" asChild className="mr-2 bg-blue-500 hover:bg-blue-200 dark:bg-blue-600 dark:hover:bg-blue-700 text-white">
-											<Link href="/pricing">Upgrade</Link>
-										</Button>
-									)
-								}
-							</div>
-						</DialogContent>
-					</Dialog>
-				)
-			}
-
-			{/* Dialog for PDF URL */}
-			<Dialog open={isUrlDialogOpen} onOpenChange={setIsUrlDialogOpen}>
-				<DialogContent>
-					<DialogHeader>
-						<DialogTitle>Import PDF from URL</DialogTitle> {/* Updated Title */}
-						<DialogDescription>
-							Enter the public URL of the PDF you want to upload.
-						</DialogDescription>
-					</DialogHeader>
-					<Input
-						type="url"
-						placeholder="https://arxiv.org/pdf/1706.03762v7"
-						value={pdfUrl}
-						onChange={(e) => setPdfUrl(e.target.value)}
-						className="mt-4"
-					/>
-					<div className="flex justify-end gap-2 mt-4">
-						<Button variant="secondary" onClick={() => setIsUrlDialogOpen(false)}>
-							Cancel
-						</Button>
-						<Button onClick={handleDialogConfirm} disabled={!pdfUrl || isUploading}>
-							{isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-							Submit
-						</Button>
+						</div>
 					</div>
-				</DialogContent>
-			</Dialog>
+				</div>
+			</footer>
 
+			{/* Error Dialog */}
+			{showErrorAlert && (
+				<Dialog open={showErrorAlert} onOpenChange={setShowErrorAlert}>
+					<DialogContent>
+						<DialogTitle>Upload Failed</DialogTitle>
+						<DialogDescription className="space-y-4 inline-flex items-center">
+							<MessageCircleWarning className="h-6 w-6 text-slate-500 mr-2 flex-shrink-0" />
+							{errorAlertMessage ?? DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE}
+						</DialogDescription>
+						<div className="flex justify-end mt-4">
+							{showPricingOnError && (
+								<Button variant="default" asChild className="mr-2 bg-blue-500 hover:bg-blue-200 dark:bg-blue-600 dark:hover:bg-blue-700 text-white">
+									<Link href="/pricing">Upgrade</Link>
+								</Button>
+							)}
+						</div>
+					</DialogContent>
+				</Dialog>
+			)}
+
+			{/* Upload Progress Dialog */}
 			<Dialog open={isUploading} onOpenChange={(open) => !open && setIsUploading(false)}>
 				<DialogContent
 					className="sm:max-w-md"
@@ -473,6 +404,6 @@ export default function Home() {
 					</div>
 				</DialogContent>
 			</Dialog>
-		</div >
+		</div>
 	);
 }

@@ -83,6 +83,7 @@ async def create_project(
 async def get_projects(
     db: Session = Depends(get_db),
     detailed: bool = False,
+    limit: int | None = None,
     current_user: CurrentUser = Depends(get_required_user),
 ) -> JSONResponse:
     """Get all projects for the current user"""
@@ -91,7 +92,7 @@ async def get_projects(
 
         if detailed:
             annotated_projects = project_crud.get_all_projects_by_user_with_metadata(
-                db, user=current_user
+                db, user=current_user, limit=limit
             )
             response_data = [project.model_dump() for project in annotated_projects]
         else:

@@ -21,7 +21,6 @@ interface InlineAnnotationMenuProps {
     addHighlight: (selectedText: string, startOffset?: number, endOffset?: number, pageNumber?: number, doAnnotate?: boolean) => void;
     removeHighlight: (highlight: PaperHighlight) => void;
     setUserMessageReferences: React.Dispatch<React.SetStateAction<string[]>>;
-    setAddedContentForPaperNote: (content: string) => void;
 }
 
 export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
@@ -36,7 +35,6 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
         addHighlight,
         removeHighlight,
         setUserMessageReferences,
-        setAddedContentForPaperNote
     } = props;
 
     const [offsets, setOffsets] = useState<{ start: number; end: number, pageNumber: number } | null>(null);
@@ -62,11 +60,6 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                     const newReferences = [...prev, selectedText];
                     return Array.from(new Set(newReferences)); // Remove duplicates
                 });
-            } else if (e.key === "i" && (e.ctrlKey || e.metaKey)) {
-                setAddedContentForPaperNote(selectedText);
-                setSelectedText("");
-                setTooltipPosition(null);
-                setIsAnnotating(false);
             } else if (e.key === "h" && (e.ctrlKey || e.metaKey)) {
                 // Page offsets are zero-indexed, so inc. by 1 for consistency
                 addHighlight(selectedText, offsets?.start, offsets?.end, (offsets?.pageNumber || 0) + 1);

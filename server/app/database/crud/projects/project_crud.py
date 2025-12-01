@@ -79,7 +79,7 @@ class ProjectCRUD(ProjectBaseCRUD[Project, ProjectCreate, ProjectUpdate]):
             return None
 
     def get_all_projects_by_user_with_metadata(
-        self, db: Session, user: CurrentUser
+        self, db: Session, user: CurrentUser, limit: Optional[int] = None
     ) -> List[AnnotatedProject]:
         """
         Get all projects for a user with metadata (num_papers, num_conversations) in a single query.
@@ -118,6 +118,8 @@ class ProjectCRUD(ProjectBaseCRUD[Project, ProjectCreate, ProjectUpdate]):
                 )
                 .filter(ProjectRole.user_id == user.id)
                 .group_by(Project.id, ProjectRole.role, roles_subquery.c.num_roles)
+                .order_by(Project.updated_at.desc())
+                .limit(limit)
                 .all()
             )
 
