@@ -29,6 +29,7 @@ function PaperCardCompact({ paper }: { paper: PaperItem }) {
                         alt={paper.title || "Paper preview"}
                         className="w-full h-full object-cover"
                         fill
+                        unoptimized
                     />
                 </div>
             ) : (
