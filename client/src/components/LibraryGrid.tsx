@@ -9,7 +9,7 @@ import PaperSearchResultCard from "@/components/PaperSearchResultCard";
 import { PaperFiltering } from "@/components/PaperFiltering";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
-import { JSX, useRef } from "react";
+import { JSX, useRef, useEffect } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
 interface LibraryGridProps {
@@ -53,13 +53,22 @@ export function LibraryGrid({
     const isSearchMode = searchResults && searchTerm.trim();
     const displayItems = isSearchMode ? searchResults.papers : filteredPapers;
 
-    // Virtualization for grid items
+    // Virtualization for grid items with dynamic measurement
     const rowVirtualizer = useVirtualizer({
         count: displayItems.length,
         getScrollElement: () => gridContainerRef.current,
-        estimateSize: () => 200, // Estimated card height in pixels
+        estimateSize: () => 200, // Initial estimate, will be corrected by measureElement
         overscan: 5,
+        // Provide a stable key for each item to help the virtualizer track items
+        // when the list changes (e.g., papers loading asynchronously)
+        getItemKey: (index) => displayItems[index]?.id ?? index,
     });
+
+    // Force the virtualizer to recalculate measurements when displayItems change
+    // This fixes collisions that occur when papers load asynchronously
+    useEffect(() => {
+        rowVirtualizer.measure();
+    }, [displayItems, rowVirtualizer]);
 
     return (
         <>
@@ -128,12 +137,13 @@ export function LibraryGrid({
                             return (
                                 <div
                                     key={virtualRow.key}
+                                    data-index={virtualRow.index}
+                                    ref={rowVirtualizer.measureElement}
                                     style={{
                                         position: 'absolute',
                                         top: 0,
                                         left: 0,
                                         width: '100%',
-                                        height: `${virtualRow.size}px`,
                                         transform: `translateY(${virtualRow.start}px)`,
                                     }}
                                 >
