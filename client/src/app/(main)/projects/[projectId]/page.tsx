@@ -310,7 +310,7 @@ export default function ProjectPage() {
 
 				<div className="group relative">
 					<div className="flex items-center">
-						<h1 className="text-3xl font-bold text-primary-foreground rounded-lg px-0">{project.title}</h1>
+						<h1 className="text-3xl font-bold text-primary rounded-lg px-0">{project.title}</h1>
 						<Button
 							variant="ghost"
 							size="icon"
