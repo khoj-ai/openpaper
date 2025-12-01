@@ -81,7 +81,7 @@ export function QuickActions({ onUploadComplete, onProjectCreated, onUploadStart
 
             if (response?.id) {
                 try {
-                    await router.push(`/project/${response.id}`);
+                    await router.push(`/projects/${response.id}`);
                     toast.success("Project created successfully!");
                     setCreateProjectOpen(false);
                     onProjectCreated?.();
