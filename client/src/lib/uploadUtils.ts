@@ -20,7 +20,7 @@ export const uploadFiles = async (files: File[]): Promise<MinimalJob[]> => {
 }
 
 export const uploadFromUrl = async (url: string): Promise<MinimalJob> => {
-    const res: PdfUploadResponse = await fetchFromApi("/api/paper/upload_from_url", {
+    const res: PdfUploadResponse = await fetchFromApi("/api/paper/upload/from-url", {
         method: "POST",
         body: JSON.stringify({ url }),
         headers: {
