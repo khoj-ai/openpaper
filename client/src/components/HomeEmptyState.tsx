@@ -9,15 +9,13 @@ import Link from "next/link";
 
 interface HomeEmptyStateProps {
     onUploadComplete?: () => void;
-    onUploadStart?: (files: File[], onComplete: (paperId: string) => void) => void;
+    onUploadStart?: (files: File[]) => void;
+    onUrlImportStart?: (url: string) => void;
 }
 
-export function HomeEmptyState({ onUploadComplete, onUploadStart }: HomeEmptyStateProps) {
+export function HomeEmptyState({ onUploadComplete, onUploadStart, onUrlImportStart }: HomeEmptyStateProps) {
     const router = useRouter();
     const [isUploadModalOpen, setUploadModalOpen] = useState(false);
-
-    // Use custom upload handling if provided (for home page experience)
-    const useCustomUpload = !!onUploadStart;
 
     const handleUploadComplete = (paperId: string) => {
         router.push(`/paper/${paperId}`);
@@ -25,22 +23,7 @@ export function HomeEmptyState({ onUploadComplete, onUploadStart }: HomeEmptySta
     };
 
     const handleUploadClick = () => {
-        if (useCustomUpload) {
-            // Trigger file input for custom upload handling
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = '.pdf';
-            input.multiple = false;
-            input.onchange = (e) => {
-                const files = Array.from((e.target as HTMLInputElement).files || []);
-                if (files.length > 0 && onUploadStart) {
-                    onUploadStart(files, handleUploadComplete);
-                }
-            };
-            input.click();
-        } else {
-            setUploadModalOpen(true);
-        }
+        setUploadModalOpen(true);
     };
 
     return (
@@ -131,13 +114,14 @@ export function HomeEmptyState({ onUploadComplete, onUploadStart }: HomeEmptySta
                 </p>
             </div>
 
-            {!useCustomUpload && (
-                <UploadModal
-                    open={isUploadModalOpen}
-                    onOpenChange={setUploadModalOpen}
-                    onUploadComplete={handleUploadComplete}
-                />
-            )}
+            <UploadModal
+                open={isUploadModalOpen}
+                uploadLimit={1}
+                onOpenChange={setUploadModalOpen}
+                onUploadComplete={handleUploadComplete}
+                onUploadStart={onUploadStart}
+                onUrlImportStart={onUrlImportStart}
+            />
         </div>
     );
 }

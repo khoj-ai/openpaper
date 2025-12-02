@@ -20,7 +20,12 @@ import LoadingIndicator from "@/components/utils/Loading"
 interface UploadModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    uploadLimit?: number;
     onUploadComplete?: (paperId: string) => void;
+    /** Called when files are selected, allowing parent to handle upload with custom loading experience */
+    onUploadStart?: (files: File[]) => void;
+    /** Called when URL import is initiated, allowing parent to handle with custom loading experience */
+    onUrlImportStart?: (url: string) => void;
 }
 
 function UrlImportDialog({
@@ -65,12 +70,14 @@ function UrlImportDialog({
     )
 }
 
-export function UploadModal({ open, onOpenChange, onUploadComplete }: UploadModalProps) {
+const DEFAULT_UPLOAD_LIMIT = 10;
+
+export function UploadModal({ open, onOpenChange, uploadLimit = DEFAULT_UPLOAD_LIMIT, onUploadComplete, onUploadStart, onUrlImportStart }: UploadModalProps) {
     const [jobs, setJobs] = useState<MinimalJob[]>([]);
     const [isUrlDialogOpen, setIsUrlDialogOpen] = useState(false);
     const [importError, setImportError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const UPLOAD_LIMIT = 10;
+    const UPLOAD_LIMIT = uploadLimit;
 
     const handleFileSelect = async (files: File[]) => {
         setImportError(null);
@@ -78,6 +85,14 @@ export function UploadModal({ open, onOpenChange, onUploadComplete }: UploadModa
             setImportError(`This would exceed the upload limit of ${UPLOAD_LIMIT} files.`);
             return;
         }
+
+        // If parent wants to handle upload, close modal and delegate
+        if (onUploadStart) {
+            onOpenChange(false);
+            onUploadStart(files);
+            return;
+        }
+
         setIsSubmitting(true);
         try {
             const newJobs = await uploadFiles(files);
@@ -100,6 +115,13 @@ export function UploadModal({ open, onOpenChange, onUploadComplete }: UploadModa
     }
 
     const handleUrlImport = async (url: string) => {
+        // If parent wants to handle upload, close modal and delegate
+        if (onUrlImportStart) {
+            onOpenChange(false);
+            onUrlImportStart(url);
+            return;
+        }
+
         try {
             setImportError(null);
             if (jobs.length >= UPLOAD_LIMIT) {
@@ -137,6 +159,8 @@ export function UploadModal({ open, onOpenChange, onUploadComplete }: UploadModa
                             </div>
                         ) : (
                             <PdfDropzone
+                                maxPapers={UPLOAD_LIMIT - jobs.length}
+                                disabled={jobs.length >= UPLOAD_LIMIT}
                                 onFileSelect={handleFileSelect}
                                 onUrlClick={onUrlClick}
                             />

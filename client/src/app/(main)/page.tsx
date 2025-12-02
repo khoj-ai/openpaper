@@ -18,7 +18,7 @@ import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience"
 import { PaperItem, JobStatusType, JobStatusResponse, Project } from "@/lib/schema";
 import { toast } from "sonner";
 import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isPaperUploadNearLimit, isStorageNearLimit } from "@/hooks/useSubscription";
-import { uploadFiles } from "@/lib/uploadUtils";
+import { uploadFiles, uploadFromUrlWithFallback } from "@/lib/uploadUtils";
 
 // New components for redesigned home
 import { HomeSearch } from "@/components/HomeSearch";
@@ -269,6 +269,26 @@ export default function Home() {
 		}
 	};
 
+	// Handle URL import with custom loading experience
+	const handleUrlImportStart = async (url: string) => {
+		setIsUploading(true);
+		setFileSize(null);
+		setFileLength(null);
+		setCeleryMessage(null);
+		setMessageIndex(0);
+
+		try {
+			const job = await uploadFromUrlWithFallback(url);
+			pollJobStatus(job.jobId);
+		} catch (error) {
+			console.error('Error importing from URL:', error);
+			setShowErrorAlert(true);
+			setErrorAlertMessage(error instanceof Error ? error.message : "Failed to import from URL. Please check the URL and try again.");
+			setShowPricingOnError(false);
+			setIsUploading(false);
+		}
+	};
+
 	if (authLoading) {
 		return null;
 	}
@@ -304,7 +324,11 @@ export default function Home() {
 
 				{/* Main Content */}
 				{!isLoadingData && !hasContent ? (
-					<HomeEmptyState onUploadComplete={refreshData} onUploadStart={handleUploadStart} />
+					<HomeEmptyState
+						onUploadComplete={refreshData}
+						onUploadStart={handleUploadStart}
+						onUrlImportStart={handleUrlImportStart}
+					/>
 				) : (
 					<div className="space-y-12">
 						{/* Quick Actions */}
@@ -313,6 +337,7 @@ export default function Home() {
 								onUploadComplete={refreshData}
 								onProjectCreated={refreshData}
 								onUploadStart={handleUploadStart}
+								onUrlImportStart={handleUrlImportStart}
 							/>
 						</section>
 
