@@ -39,6 +39,7 @@ interface LibraryTableProps extends React.HTMLAttributes<HTMLDivElement> {
 	projectPaperIds?: string[];
 	handleDelete?: (paperId: string) => Promise<void>;
 	setPapers?: (papers: PaperItem[]) => void;
+	onUploadClick?: () => void;
 	maxHeight?: string;
 }
 
@@ -48,6 +49,7 @@ export function LibraryTable({
 	actionOptions = [],
 	projectPaperIds = [],
 	handleDelete,
+	onUploadClick,
 	maxHeight = 'calc(100vh - 16rem)',
 	...props
 }: LibraryTableProps) {
@@ -650,11 +652,9 @@ export function LibraryTable({
 														<p className="text-lg font-medium mb-2">No papers in your library yet</p>
 														<p className="text-sm">Upload your first research paper to get started. All your papers will appear here for easy access and organization.</p>
 													</div>
-													<Link href="/" passHref>
-														<Button variant="default" className="bg-blue-500 hover:bg-blue-600 text-white">
-															Upload Your First Paper
-														</Button>
-													</Link>
+													<Button variant="default" className="bg-blue-500 hover:bg-blue-600 text-white" onClick={onUploadClick}>
+														Upload Your First Paper
+													</Button>
 												</div>
 											)}
 										</TableCell>

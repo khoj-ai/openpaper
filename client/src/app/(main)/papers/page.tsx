@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/lib/auth";
 import { useSubscription, getStorageUsagePercentage, isStorageNearLimit, isStorageAtLimit, formatFileSize, getPaperUploadPercentage, isPaperUploadNearLimit, isPaperUploadAtLimit, isProjectAtLimit } from "@/hooks/useSubscription";
-import { FileText, Upload, Search, AlertTriangle, Grid, List } from "lucide-react";
+import { FileText, Upload, Search, AlertTriangle, Grid, List, BookOpen, Highlighter, Quote, FolderKanban } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Filter, Sort } from "@/components/PaperFiltering";
@@ -423,18 +423,59 @@ export default function PapersPage() {
         // No papers uploaded at all
         if (papers && papers.length === 0) {
             return (
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                    <FileText className="h-16 w-16 text-muted-foreground mb-6" />
-                    <h3 className="text-xl font-medium text-foreground mb-3">Your paper library is empty</h3>
-                    <p className="text-muted-foreground max-w-md mb-6">
-                        Upload your first research paper to get started. All your papers will appear here for easy access and organization.
+                <div className="flex flex-col items-center justify-center py-16 px-4 text-center max-w-2xl mx-auto">
+                    {/* Icon with decorative background */}
+                    <div className="relative mb-8">
+                        <div className="relative w-28 h-28 mx-auto">
+                            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-primary/5 to-transparent rounded-full blur-2xl" />
+                            <div className="relative w-full h-full bg-gradient-to-br from-blue-500/5 to-primary/10 dark:from-blue-500/10 dark:to-primary/20 rounded-2xl flex items-center justify-center border border-blue-500/10 shadow-sm">
+                                <BookOpen className="w-12 h-12 text-primary" strokeWidth={1.5} />
+                            </div>
+                            <div className="absolute -top-1 -right-1 w-10 h-10 bg-background dark:bg-card rounded-xl flex items-center justify-center border border-blue-500/20 shadow-md">
+                                <FileText className="w-5 h-5 text-blue-500" strokeWidth={2} />
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 className="text-2xl font-bold text-foreground mb-3">Build Your Research Library</h3>
+                    <p className="text-muted-foreground max-w-md mb-8">
+                        Your library grows as you upload papers, giving you one central place to store all your research,
+                        annotations, and highlights. Build your knowledge base and generate citations effortlessly.
                     </p>
-                    <Link href="/">
-                        <Button className="inline-flex items-center gap-2">
-                            <Upload className="h-4 w-4" />
-                            Upload papers
-                        </Button>
-                    </Link>
+
+                    <Button
+                        size="lg"
+                        className="bg-primary hover:bg-primary/90"
+                        onClick={() => setUploadModalOpen(true)}
+                    >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload your first paper
+                    </Button>
+
+                    {/* Feature highlights */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-12 w-full max-w-lg">
+                        <div className="text-center">
+                            <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-blue-500/10 text-blue-500 mb-2">
+                                <Highlighter className="h-5 w-5" />
+                            </div>
+                            <p className="text-sm font-medium">Annotations</p>
+                            <p className="text-xs text-muted-foreground">Highlight & take notes</p>
+                        </div>
+                        <div className="text-center">
+                            <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-primary mb-2">
+                                <FolderKanban className="h-5 w-5" />
+                            </div>
+                            <p className="text-sm font-medium">Projects</p>
+                            <p className="text-xs text-muted-foreground">Organize by topic</p>
+                        </div>
+                        <div className="text-center">
+                            <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-green-500/10 text-green-500 mb-2">
+                                <Quote className="h-5 w-5" />
+                            </div>
+                            <p className="text-sm font-medium">Citations</p>
+                            <p className="text-xs text-muted-foreground">Export in any format</p>
+                        </div>
+                    </div>
                 </div>
             );
         }
@@ -547,12 +588,17 @@ export default function PapersPage() {
                     />
                 </TabsContent>
                 <TabsContent value="table" className="flex-1 min-h-0">
-                    <LibraryTable
-                        handleDelete={deletePaper}
-                        selectable={true}
-                        actionOptions={["Make Project"]}
-                        onSelectFiles={handleTableAction}
-                    />
+                    {papers && papers.length === 0 ? (
+                        <EmptyState />
+                    ) : (
+                        <LibraryTable
+                            handleDelete={deletePaper}
+                            selectable={true}
+                            actionOptions={["Make Project"]}
+                            onSelectFiles={handleTableAction}
+                            onUploadClick={() => setUploadModalOpen(true)}
+                        />
+                    )}
                 </TabsContent>
             </Tabs>
         </div>
