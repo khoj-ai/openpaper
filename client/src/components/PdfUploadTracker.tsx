@@ -60,20 +60,20 @@ const PdfUploadTracker: React.FC<PdfUploadTrackerProps> = ({ initialJobs, onComp
 	}, [jobs, onComplete]);
 
 	return (
-		<div className="w-full">
+		<div className="w-full overflow-hidden">
 			{jobs.map(job => (
-				<div key={job.jobId} className="w-full p-4 my-2 border rounded-lg flex items-center justify-between min-w-0">
-					<div className="flex-1 min-w-0 mr-4">
+				<div key={job.jobId} className="w-full p-4 my-2 border rounded-lg flex items-center justify-between overflow-hidden">
+					<div className="flex-1 min-w-0 mr-4 overflow-hidden">
 						{job.status === 'completed' && job.paperId ? (
 							<Link
 								href={`/paper/${job.paperId}`}
-								className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 hover:underline cursor-pointer block truncate"
+								className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 hover:underline cursor-pointer block truncate break-all"
 								title={job.fileName}
 							>
 								{job.fileName}
 							</Link>
 						) : (
-							<span className="text-sm font-medium block truncate" title={job.fileName}>
+							<span className="text-sm font-medium block truncate break-all" title={job.fileName}>
 								{job.fileName}
 							</span>
 						)}
