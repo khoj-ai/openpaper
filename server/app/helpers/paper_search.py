@@ -303,36 +303,79 @@ def get_doi(title: str, author: Optional[str] = None) -> Optional[str]:
     Returns:
         Optional[str]: The DOI of the paper if found, otherwise None.
     """
-    base_url = "https://api.crossref.org/works"
-    params = {"query.title": title, "rows": 1}
-    if author:
-        params["query.author"] = author
 
-    try:
+    def get_openalex_doi(title: str) -> Optional[str]:
+        try:
+            open_alex_results = search_open_alex(title)
+            if open_alex_results.results:
+                # Check if title matches of the top result
+                first_result = open_alex_results.results[0]
+                if first_result.title and title.lower() in first_result.title.lower():
+                    return first_result.doi
+        except Exception:
+            return None
+        return None
+
+    def get_crossref_doi(title: str, author: Optional[str] = None) -> Optional[str]:
+        base_url = "https://api.crossref.org/works"
+        params = {"query.title": title, "rows": 1}
+        if author:
+            params["query.author"] = author
+
         response = requests.get(base_url, params=params, timeout=10)
         response.raise_for_status()
         data = response.json()
         items = data.get("message", {}).get("items", [])
         if items:
-            return items[0].get("DOI")
+            top_match = items[0]
+            if "title" in top_match and title.lower() in [
+                t.lower() for t in top_match["title"]
+            ]:
+                return items[0].get("DOI")
+        return None
+
+    def search_semantic_scholar_doi(title: str) -> Optional[str]:
+        # Not working currently - hitting 403 errors with every request. TODO fix once we have a resolution.
+
+        return None  # Temporary disablement
+
+        base_url = "https://api.semanticscholar.org/graph/v1/paper/search"
+        headers = {}
+        if SEMANTIC_SCHOLAR_API_KEY:
+            headers["x-api-key"] = SEMANTIC_SCHOLAR_API_KEY
+
+        params = {"query": title, "limit": 1, "fields": "doi"}
+        response = requests.get(base_url, headers=headers, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        if data.get("data"):
+            top_match = data["data"][0]
+            if "title" in top_match and title.lower() in top_match["title"].lower():
+                return top_match.get("doi")
+        return None
+
+    try:
+        crossref_doi = get_crossref_doi(title, author)
     except requests.RequestException:
-        try:
-            open_alex_results = search_open_alex(title)
-            if open_alex_results.results:
-                doi = open_alex_results.results[0].doi
-                if doi:
-                    return doi
-        except Exception:
-            try:
-                ss_url = "https://api.semanticscholar.org/graph/v1/paper/search"
-                ss_params = {"query": title, "limit": 1, "fields": "doi"}
-                ss_response = requests.get(ss_url, params=ss_params, timeout=10)
-                ss_response.raise_for_status()
-                ss_data = ss_response.json()
-                if ss_data.get("data"):
-                    doi = ss_data["data"][0].get("doi")
-                    if doi:
-                        return doi
-            except requests.RequestException:
-                return None
-    return None
+        logger.exception(
+            f"Error querying CrossRef API for DOI - {title}", exc_info=True
+        )
+        crossref_doi = None
+
+    try:
+        openalex_doi = get_openalex_doi(title)
+    except requests.RequestException:
+        logger.exception(
+            f"Error querying OpenAlex API for DOI - {title}", exc_info=True
+        )
+        openalex_doi = None
+
+    try:
+        semantic_scholar_doi = search_semantic_scholar_doi(title)
+    except requests.RequestException:
+        logger.exception(
+            f"Error querying Semantic Scholar API for DOI - {title}", exc_info=True
+        )
+        semantic_scholar_doi = None
+
+    return crossref_doi or openalex_doi or semantic_scholar_doi
