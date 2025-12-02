@@ -23,7 +23,6 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ArrowUpDown, CheckCheck, Trash2, X, ChevronDown, Tag } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import Link from "next/link";
 import { PaperPreview } from "./PaperPreview";
 import { PaperFiltering, Filter, Sort } from "@/components/PaperFiltering";
 import { Badge } from "@/components/ui/badge";
