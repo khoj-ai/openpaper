@@ -130,49 +130,51 @@ function HighlightThread({
 
 	return (
 		<Card
-			className={`transition-colors cursor-pointer rounded-lg px-2 ${activeBgColor}`}
+			className={`transition-colors cursor-pointer rounded-md border-0 shadow-none py-2 ${activeBgColor}`}
 			onClick={onClick}
 		>
-			<CardContent className="p-0">
+			<CardContent className="p-2">
 				{/* The Blockquote */}
-				<blockquote className={`border-l-4 ${highlightBorderColor} pl-4 py-2 mb-4 bg-background`}>
-					<div className="flex items-start flex-col gap-2">
+				<blockquote className={`border-l-2 ${highlightBorderColor} pl-3 py-1 mb-2`}>
+					<div className="flex items-start flex-col gap-1">
 						{highlight.type && (
 							(() => {
 								const styling = getHighlightTypeStyling(highlight.type);
 								return (
 									<Badge
 										variant={styling.variant}
-										className={`text-xs shrink-0 ${styling.className}`}
+										className={`text-[10px] px-1.5 py-0 shrink-0 ${styling.className}`}
 									>
 										{highlight.type.replace('_', ' ').toLowerCase()}
 									</Badge>
 								);
 							})()
 						)}
-						<p className="text-foreground flex-1">
+						<p className="text-foreground text-sm flex-1">
 							{highlight.raw_text}
 						</p>
 					</div>
 				</blockquote>
 
 				{/* The Annotation Thread */}
-				<div className="space-y-2">
-					{annotations.map((annotation) => (
-						<Annotation
-							key={annotation.id}
-							annotation={{ ...annotation }}
-							removeAnnotation={removeAnnotation}
-							updateAnnotation={updateAnnotation}
-							user={user}
-							readonly={readonly}
-						/>
-					))}
-				</div>
+				{annotations.length > 0 && (
+					<div className="space-y-1 ml-3">
+						{annotations.map((annotation) => (
+							<Annotation
+								key={annotation.id}
+								annotation={{ ...annotation }}
+								removeAnnotation={removeAnnotation}
+								updateAnnotation={updateAnnotation}
+								user={user}
+								readonly={readonly}
+							/>
+						))}
+					</div>
+				)}
 
 				{/* Add Annotation Form */}
 				{isActive && !readonly && addAnnotation && highlight.id && (
-					<div className="pt-2 pl-2">
+					<div className="pt-1 ml-3">
 						<AnnotationButton
 							highlightId={highlight.id}
 							addAnnotation={addAnnotation}
@@ -360,7 +362,7 @@ export function AnnotationsView(
 			/>
 
 			<div className="flex-1 overflow-auto" ref={scrollContainerRef}>
-				<div className="md:space-y-6 md:p-4">
+				<div className="space-y-2 p-2">
 					{filteredHighlights.length === 0 ? (
 						<div className="text-center text-muted-foreground text-sm py-8">
 							No highlights match the current filters.
