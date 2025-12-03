@@ -128,7 +128,7 @@ class OpenAlexResponse(BaseModel):
                 try:
                     valid_results.append(OpenAlexWork(**item))
                 except Exception as e:
-                    logger.warning(f"Skipping invalid OpenAlex work entry: {e}")
+                    logger.debug(f"Skipping invalid OpenAlex work entry: {e}")
 
             data["results"] = valid_results
         return data
@@ -288,7 +288,7 @@ def construct_citation_graph(open_alex_id: str) -> OpenAlexCitationGraph:
     )
 
 
-def get_doi(title: str, author: Optional[str] = None) -> Optional[str]:
+def get_doi(title: str, authors: Optional[List[str]] = None) -> Optional[str]:
     """
     Retrieve the DOI for a paper given its title and optional author using a series of external APIs.
 
@@ -298,8 +298,7 @@ def get_doi(title: str, author: Optional[str] = None) -> Optional[str]:
 
     Args:
         title (str): The title of the paper.
-        author (Optional[str]): The author of the paper.
-
+        authors (Optional[List[str]]): The authors of the paper.
     Returns:
         Optional[str]: The DOI of the paper if found, otherwise None.
     """
@@ -307,20 +306,39 @@ def get_doi(title: str, author: Optional[str] = None) -> Optional[str]:
     def get_openalex_doi(title: str) -> Optional[str]:
         try:
             open_alex_results = search_open_alex(title)
+            target_authors = set(a.lower() for a in authors) if authors else set()
             if open_alex_results.results:
-                # Check if title matches of the top result
-                first_result = open_alex_results.results[0]
-                if first_result.title and title.lower() in first_result.title.lower():
-                    return first_result.doi
+                for result in open_alex_results.results:
+                    # Check if title matches
+                    if not (result.title and title.lower() in result.title.lower()):
+                        continue
+
+                    # If no author provided, return first title match
+                    if not authors:
+                        return result.doi
+
+                    # Check if author matches any authorship
+                    if result.authorships:
+                        work_authors = set(
+                            a.author.display_name.lower()
+                            for a in result.authorships
+                            if a.author and a.author.display_name
+                        )
+                        for authorship in result.authorships:
+                            if authorship.author and authorship.author.display_name:
+                                if work_authors & target_authors:
+                                    return result.doi
         except Exception:
             return None
         return None
 
-    def get_crossref_doi(title: str, author: Optional[str] = None) -> Optional[str]:
+    def get_crossref_doi(
+        title: str, authors: Optional[List[str]] = None
+    ) -> Optional[str]:
         base_url = "https://api.crossref.org/works"
-        params = {"query.title": title, "rows": 1}
-        if author:
-            params["query.author"] = author
+        params = {"query.title": quote(title), "rows": 1}
+        if authors:
+            params["query.author"] = ", ".join(authors)
 
         response = requests.get(base_url, params=params, timeout=10)
         response.raise_for_status()
@@ -331,7 +349,7 @@ def get_doi(title: str, author: Optional[str] = None) -> Optional[str]:
             if "title" in top_match and title.lower() in [
                 t.lower() for t in top_match["title"]
             ]:
-                return items[0].get("DOI")
+                return top_match.get("DOI")
         return None
 
     def search_semantic_scholar_doi(title: str) -> Optional[str]:
@@ -354,8 +372,11 @@ def get_doi(title: str, author: Optional[str] = None) -> Optional[str]:
                 return top_match.get("doi")
         return None
 
+    if not title:
+        return None
+
     try:
-        crossref_doi = get_crossref_doi(title, author)
+        crossref_doi = get_crossref_doi(title, authors)
     except requests.RequestException:
         logger.exception(
             f"Error querying CrossRef API for DOI - {title}", exc_info=True
@@ -377,5 +398,14 @@ def get_doi(title: str, author: Optional[str] = None) -> Optional[str]:
             f"Error querying Semantic Scholar API for DOI - {title}", exc_info=True
         )
         semantic_scholar_doi = None
+
+    if crossref_doi:
+        logger.info(f"Found DOI from CrossRef: {crossref_doi} for title: {title}")
+    elif openalex_doi:
+        logger.info(f"Found DOI from OpenAlex: {openalex_doi} for title: {title}")
+    elif semantic_scholar_doi:
+        logger.info(
+            f"Found DOI from Semantic Scholar: {semantic_scholar_doi} for title: {title}"
+        )
 
     return crossref_doi or openalex_doi or semantic_scholar_doi
