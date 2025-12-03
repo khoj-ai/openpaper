@@ -911,16 +911,6 @@ export function SidePanelContent({
                                         <PaperMetadata
                                             paperData={paperData}
                                             hasMessages={messages.length > 0}
-                                            onClickStarterQuestion={(question) => {
-                                                setCurrentMessage(question);
-                                                inputMessageRef.current?.focus();
-                                                chatInputFormRef.current?.scrollIntoView({
-                                                    behavior: 'smooth',
-                                                    block: 'nearest',
-                                                    inline: 'nearest',
-                                                });
-                                                setPendingStarterQuestion(question);
-                                            }}
                                         />
                                     )}
 

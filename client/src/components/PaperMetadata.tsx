@@ -19,14 +19,11 @@ import {
 } from "@/components/ui/accordion"
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { PaperData } from "@/lib/schema";
 import { isDateValid } from "@/lib/utils";
 
 interface IPaperMetadata {
     paperData: PaperData;
-    // Make onClickStarterQuestion optional as it's not used in readonly mode
-    onClickStarterQuestion?: (question: string) => void;
     hasMessages: boolean;
     readonly?: boolean; // Add readonly prop
 }
@@ -36,7 +33,7 @@ const googleScholarUrl = (searchTerm: string) => {
 }
 
 // Set default for readonly to false
-function PaperMetadata({ paperData, onClickStarterQuestion, hasMessages, readonly = false }: IPaperMetadata) {
+function PaperMetadata({ paperData, hasMessages, readonly = false }: IPaperMetadata) {
     const [isOpen, setIsOpen] = useState(false);
 
     const showAccordion = paperData.authors?.length > 0 || paperData.institutions?.length > 0;
@@ -129,28 +126,7 @@ function PaperMetadata({ paperData, onClickStarterQuestion, hasMessages, readonl
                             <TabsList>
                                 <TabsTrigger value="abstract">Abstract</TabsTrigger>
                                 <TabsTrigger value="metadata">Metadata</TabsTrigger>
-                                <TabsTrigger value="questions">Suggested Questions</TabsTrigger>
                             </TabsList>
-                            <TabsContent value="questions">
-                                {paperData.starter_questions && paperData.starter_questions.length > 0 ? (
-                                    <div className="grid gap-2 grid-cols-1">
-                                        {paperData.starter_questions.slice(0, 5).map((question, i) => (
-                                            <Button
-                                                key={i}
-                                                variant="outline"
-                                                className="text-xs font-medium p-2 max-w-full whitespace-normal h-auto text-left justify-start break-words bg-secondary text-secondary-foreground hover:bg-secondary/50"
-                                                onClick={() => {
-                                                    // Check if onClickStarterQuestion exists before calling
-                                                    onClickStarterQuestion?.(question);
-                                                    setIsOpen(false);
-                                                }}
-                                            >
-                                                {question}
-                                            </Button>
-                                        ))}
-                                    </div>
-                                ) : <p className="text-sm text-muted-foreground">No suggested questions available.</p>}
-                            </TabsContent>
                             <TabsContent value="metadata">
                                 {renderMetadataContent()}
                             </TabsContent>
