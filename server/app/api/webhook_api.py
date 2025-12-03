@@ -14,6 +14,7 @@ from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
 from app.database.models import JobStatus
 from app.database.telemetry import track_event
+from app.helpers.paper_search import get_doi
 from app.helpers.s3 import s3_service
 from app.schemas.responses import PaperMetadataExtraction
 from app.schemas.user import CurrentUser
@@ -281,6 +282,17 @@ async def handle_paper_processing_webhook(
                     )
                     # Don't fail the whole process for image errors
 
+            # Post-processing: attempt to get DOI
+            doi = get_doi(metadata.title, metadata.authors)
+
+            if doi and paper:
+                paper_crud.update(
+                    db=db,
+                    obj_in=PaperUpdate(doi=doi),
+                    db_obj=paper,
+                    user=job_user,
+                )
+
             # Track metadata extraction event
             track_event(
                 "extracted_metadata",
@@ -290,6 +302,7 @@ async def handle_paper_processing_webhook(
                     "has_abstract": bool(metadata.abstract),
                     "has_summary": bool(metadata.summary),
                     "has_ai_highlights": bool(metadata.highlights),
+                    "has_doi": bool(doi),
                     "num_starter_questions": (
                         len(metadata.starter_questions)
                         if metadata.starter_questions
