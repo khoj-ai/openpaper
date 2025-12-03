@@ -11,6 +11,10 @@ logger = logging.getLogger(__name__)
 
 SEMANTIC_SCHOLAR_API_KEY = os.getenv("SEMANTIC_SCHOLAR_API_KEY")
 
+DISABLE_SEMANTIC_SCHOLAR = (
+    True  # Temporary flag to disable Semantic Scholar API calls due to 403 errors
+)
+
 
 class OAStatus(str, Enum):
     """
@@ -355,7 +359,8 @@ def get_doi(title: str, authors: Optional[List[str]] = None) -> Optional[str]:
     def search_semantic_scholar_doi(title: str) -> Optional[str]:
         # Not working currently - hitting 403 errors with every request. TODO fix once we have a resolution.
 
-        return None  # Temporary disablement
+        if DISABLE_SEMANTIC_SCHOLAR:
+            return None
 
         base_url = "https://api.semanticscholar.org/graph/v1/paper/search"
         headers = {}
