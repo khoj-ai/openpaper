@@ -177,7 +177,7 @@ async def handle_paper_processing_webhook(
                     "status": "webhook processed - failed due to missing raw_content"
                 }
 
-            if not metadata:
+            if not metadata or not metadata.title:
                 logger.error(f"No metadata in webhook result for job {job_id}")
                 handle_failed_upload(
                     db=db, job_id=job_id, job_user=job_user, reason="Missing metadata"
