@@ -127,7 +127,7 @@ class Highlights(BaseModel):
     highlights: List[AIHighlight] = Field(
         default=[],
         description="""
-Extract 5-10 standout highlights that capture the most compelling and unique aspects of this research paper. Focus on what makes this paper distinctive rather than summarizing standard content.
+Extract 3-5 standout highlights that capture the most compelling and unique aspects of this research paper. Focus on what makes this paper distinctive rather than summarizing standard content.
 
 ## Selection Criteria:
 **Prioritize highlights that are:**
@@ -157,7 +157,7 @@ Extract 5-10 standout highlights that capture the most compelling and unique asp
 - Abstract-level summaries that don't reveal paper specifics
 - Redundant highlights that convey similar information
 
-Think: "If I could only share 5-10 insights from this paper with a colleague, what would make them most excited to read the full work?"
+Think: "If I could only share 3-5 insights from this paper with a colleague, what would make them most excited to read the full work?"
 """,
     )
 
