@@ -42,6 +42,10 @@ const logos = [
     { src: "/logos/jhu_logo.svg", alt: "Johns Hopkins University", width: 60, height: 40 },
     { src: "/logos/waterloo_logo.svg", alt: "University of Waterloo", width: 40, height: 36 },
     { src: "/logos/nih_logo.svg", alt: "National Institutes of Health", width: 40, height: 36 },
+    { src: "/logos/columbia_logo.svg", alt: "Columbia University", width: 90, height: 60 },
+    { src: "/logos/cmu_logo.svg", alt: "Carnegie Mellon University", width: 90, height: 60 },
+    { src: "/logos/mayo_clinic_logo.svg", alt: "Mayo Clinic", width: 30, height: 20 },
+    { src: "/logos/nhs_logo.svg", alt: "National Health Service", width: 60, height: 40 },
 ];
 
 export default function OpenPaperLanding() {
@@ -239,7 +243,7 @@ export default function OpenPaperLanding() {
                                 Trusted by <span className="text-primary">Researchers</span>
                             </h2>
                             <p className="mt-4 text-muted-foreground md:text-lg max-w-3xl mx-auto">
-                                Used by PhD students, academics, and industry researchers.
+                                Used by PhD students, academics, and industry researchers from these leading institutions.
                             </p>
                         </div>
 
@@ -247,7 +251,7 @@ export default function OpenPaperLanding() {
                         <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden rounded-lg bg-none">
                             <Marquee pauseOnHover className="[--duration:20s]">
                                 {logos.map((logo, index) => (
-                                    <div key={index} className={`flex items-center justify-center h-12 w-28 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:brightness-150"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300 mx-4`}>
+                                    <div key={index} className={`flex items-center justify-center h-12 w-28 rounded-md ${mobileAndDark ? "dark:brightness-100 dark:bg-white/80" : "grayscale dark:grayscale dark:invert dark:brightness-100"} ${!mobileAndDark ? "hover:grayscale-0 hover:brightness-100 hover:bg-white/80 dark:hover:invert-0" : ""} dark:hover:grayscale-0 dark:hover:brightness-100 dark:hover:bg-white/90 transition-all duration-300 mx-4`}>
                                         <Image
                                             src={logo.src}
                                             alt={logo.alt}
@@ -258,8 +262,8 @@ export default function OpenPaperLanding() {
                                     </div>
                                 ))}
                             </Marquee>
-                            <div className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-white dark:from-background"></div>
-                            <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-white dark:from-background"></div>
+                            <div className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-background"></div>
+                            <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-background"></div>
                         </div>
 
                         <div className="mt-12 text-center">
