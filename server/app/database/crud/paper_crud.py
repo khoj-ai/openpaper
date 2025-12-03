@@ -76,7 +76,7 @@ class PaperDocumentMetadata(BaseModel):
 
 
 # Paper CRUD that inherits from the base CRUD
-class PaperCRUD(CRUDBase[Paper, PaperCreate, PaperUpdate]):
+class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
     """CRUD operations specifically for Document model"""
 
     def read_raw_document_content(
