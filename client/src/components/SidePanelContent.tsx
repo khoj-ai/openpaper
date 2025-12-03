@@ -140,6 +140,21 @@ export function SidePanelContent({
 
     const END_DELIMITER = "END_OF_STREAM";
 
+    const defaultStarterQuestions = [
+        "What is the main research question or hypothesis of this paper?",
+        "What methodology did the authors use?",
+        "What are the key findings and conclusions?",
+        "What are the limitations of this study?",
+        "How does this paper relate to other work in the field?",
+    ];
+
+    const starterQuestions = useMemo(() => {
+        if (paperData?.starter_questions && paperData.starter_questions.length > 0) {
+            return paperData.starter_questions;
+        }
+        return defaultStarterQuestions;
+    }, [paperData?.starter_questions]);
+
 
     const chatLoadingMessages = [
         "Thinking about your question...",
@@ -933,27 +948,25 @@ export function SidePanelContent({
                                             <div className="text-center text-gray-500 my-4">
                                                 What do you want to understand about this paper?
                                                 <div className='grid grid-cols-1 gap-2 mt-2'>
-                                                    {paperData.starter_questions && paperData.starter_questions.length > 0 ? (
-                                                        paperData.starter_questions.slice(0, 5).map((question, i) => (
-                                                            <Button
-                                                                key={i}
-                                                                variant="outline"
-                                                                className="text-sm font-medium p-2 max-w-full whitespace-normal h-auto text-left justify-start break-words bg-background text-secondary-foreground hover:bg-secondary/50 border-1 hover:translate-y-0.5 transition-transform duration-200"
-                                                                onClick={() => {
-                                                                    setCurrentMessage(question);
-                                                                    inputMessageRef.current?.focus();
-                                                                    chatInputFormRef.current?.scrollIntoView({
-                                                                        behavior: 'smooth',
-                                                                        block: 'nearest',
-                                                                        inline: 'nearest',
-                                                                    });
-                                                                    setPendingStarterQuestion(question);
-                                                                }}
-                                                            >
-                                                                {question}
-                                                            </Button>
-                                                        ))
-                                                    ) : null}
+                                                    {starterQuestions.slice(0, 5).map((question, i) => (
+                                                        <Button
+                                                            key={i}
+                                                            variant="outline"
+                                                            className="text-sm font-medium p-2 max-w-full whitespace-normal h-auto text-left justify-start break-words bg-background text-secondary-foreground hover:bg-secondary/50 border-1 hover:translate-y-0.5 transition-transform duration-200"
+                                                            onClick={() => {
+                                                                setCurrentMessage(question);
+                                                                inputMessageRef.current?.focus();
+                                                                chatInputFormRef.current?.scrollIntoView({
+                                                                    behavior: 'smooth',
+                                                                    block: 'nearest',
+                                                                    inline: 'nearest',
+                                                                });
+                                                                setPendingStarterQuestion(question);
+                                                            }}
+                                                        >
+                                                            {question}
+                                                        </Button>
+                                                    ))}
                                                 </div>
                                             </div>
                                         ) : (
@@ -1040,13 +1053,13 @@ export function SidePanelContent({
                                             isStreaming && (
                                                 <div className="flex items-center gap-3 p-0">
                                                     <Loader className="animate-spin w-6 h-6 text-blue-500 flex-shrink-0" />
-                    <div className="text-sm text-secondary-foreground p-0">
-                        {displayedText}
-                        {isTyping && (
-                            <span className="animate-pulse">|</span>
-                        )}
-                    </div>
-                </div>
+                                                    <div className="text-sm text-secondary-foreground p-0">
+                                                        {displayedText}
+                                                        {isTyping && (
+                                                            <span className="animate-pulse">|</span>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             )
                                         }
                                         <div ref={messagesEndRef} />

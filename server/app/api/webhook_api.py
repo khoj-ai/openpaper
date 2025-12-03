@@ -222,7 +222,6 @@ async def handle_paper_processing_webhook(
                     keywords=metadata.keywords,
                     institutions=metadata.institutions,
                     publish_date=publish_date,
-                    starter_questions=metadata.starter_questions,
                     raw_content=result.raw_content,
                     page_offset_map=result.page_offset_map,
                     size_in_kb=size_in_kb,
@@ -303,11 +302,6 @@ async def handle_paper_processing_webhook(
                     "has_summary": bool(metadata.summary),
                     "has_ai_highlights": bool(metadata.highlights),
                     "has_doi": bool(doi),
-                    "num_starter_questions": (
-                        len(metadata.starter_questions)
-                        if metadata.starter_questions
-                        else 0
-                    ),
                 },
                 user_id=str(user.id),
             )

@@ -122,18 +122,6 @@ class SummaryAndCitations(BaseModel):
     )
 
 
-class StarterQuestions(BaseModel):
-    """Schema for starter questions extraction."""
-    starter_questions: List[str] = Field(
-        default=[],
-        description="""
-        List of starter questions for discussion.
-        These should be open-ended questions that can guide further exploration of the paper's content and implications.
-        They should help elicit a better understanding of the paper's findings, methodology, and potential applications.
-        """,
-    )
-
-
 class Highlights(BaseModel):
     """Schema for highlights extraction."""
     highlights: List[AIHighlight] = Field(
@@ -214,14 +202,6 @@ The summary should be accessible to readers with basic domain knowledge while ma
     )
     publish_date: Optional[str] = Field(
         default=None, description="Publishing date of the paper in YYYY-MM-DD format"
-    )
-    starter_questions: List[str] = Field(
-        default=[],
-        description="""
-        List of starter questions for discussion.
-        These should be open-ended questions that can guide further exploration of the paper's content and implications.
-        They should help elicit a better understanding of the paper's findings, methodology, and potential applications.
-        """,
     )
     highlights: List[AIHighlight] = Field(
         default=[],

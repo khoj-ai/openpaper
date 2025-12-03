@@ -18,7 +18,6 @@ from src.schemas import (
     TitleAuthorsAbstract,
     InstitutionsKeywords,
     SummaryAndCitations,
-    StarterQuestions,
     Highlights,
 )
 from src.utils import retry_llm_operation, time_it
@@ -318,14 +317,6 @@ class PaperOperations(AsyncLLMClient):
                 )
             else:
                 status_callback("Processing without keyword data")
-        elif model == StarterQuestions:
-            starter_questions = getattr(instance, "starter_questions", [])
-            if starter_questions:
-                status_callback(
-                    f"Constructed {len(starter_questions)} initial questions"
-                )
-            else:
-                status_callback("No starter questions generated")
         elif model == Highlights:
             highlights = getattr(instance, "highlights", [])
             if highlights:
@@ -390,21 +381,6 @@ class PaperOperations(AsyncLLMClient):
             status_callback=status_callback,
         )
         return result
-
-    @retry_llm_operation(max_retries=3, delay=1.0)
-    async def extract_starter_questions(
-        self,
-        paper_content: str,
-        status_callback: Callable[[str], None],
-        cache_key: Optional[str] = None,
-    ) -> StarterQuestions:
-        return await self._extract_single_metadata_field(
-            model=StarterQuestions,
-            cache_key=cache_key,
-            schema=StarterQuestions,
-            paper_content=paper_content,
-            status_callback=status_callback,
-        )
 
     @retry_llm_operation(max_retries=3, delay=1.0)
     async def extract_highlights(
@@ -473,13 +449,6 @@ class PaperOperations(AsyncLLMClient):
                             cache_key=cache_key,
                             status_callback=status_callback
                         )),
-                        asyncio.create_task(time_it("Extracting starter questions", job_id=job_id)                        (
-                            self.extract_starter_questions
-                        )(
-                            paper_content=paper_content,
-                            cache_key=cache_key,
-                            status_callback=status_callback
-                        )),
                         asyncio.create_task(time_it("Extracting highlights", job_id=job_id)                        (
                             self.extract_highlights
                         )(
@@ -498,7 +467,6 @@ class PaperOperations(AsyncLLMClient):
                     title_authors_abstract,
                     institutions_keywords,
                     summary_and_citations,
-                    starter_questions,
                     highlights,
                 ) = results
 
@@ -513,7 +481,6 @@ class PaperOperations(AsyncLLMClient):
                     summary_citations=getattr(
                         summary_and_citations, "summary_citations", []
                     ),
-                    starter_questions=getattr(starter_questions, "starter_questions", []),
                     highlights=getattr(highlights, "highlights", []),
                     publish_date=getattr(title_authors_abstract, "publish_date", None),
                 )

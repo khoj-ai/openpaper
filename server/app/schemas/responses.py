@@ -103,14 +103,6 @@ The summary should be accessible to readers with basic domain knowledge while ma
     publish_date: Optional[str] = Field(
         default=None, description="Publishing date of the paper in YYYY-MM-DD format"
     )
-    starter_questions: List[str] = Field(
-        default=[],
-        description="""
-        List of starter questions for discussion.
-        These should be open-ended questions that can guide further exploration of the paper's content and implications.
-        They should help elicit a better understanding of the paper's findings, methodology, and potential applications.
-        """,
-    )
     highlights: List[AIHighlight] = Field(
         default=[],
         description="List of key highlights from the paper. These should be significant quotes that are must-reads of the paper's findings and contributions. Each highlight should include the text of the highlight and an annotation explaining its significance or relevance to the paper's content. Particularly drill into interesting, novel findings, methodologies, or implications that are worth noting. Pay special attention to tables, figures, and diagrams that may contain important information.",
