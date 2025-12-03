@@ -106,12 +106,11 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
                         )}
                         <CitePaperButton paper={paper} minimalist={true} />
                     </div>
-                    <p className="text-sm my-4 break-words max-h-[20vh] overflow-y-auto">{paper.abstract}</p>
 
                     {/* Highlights Section */}
                     {highlightCount > 0 && (
                         <div className="space-y-2 mb-4">
-                            <h4 className="font-semibold text-sm flex items-center gap-2">
+                            <h4 className="font-semibold text-sm flex items-center gap-2 mt-2">
                                 <Highlighter className="h-4 w-4 text-yellow-600" />
                                 Highlights ({highlightCount})
                             </h4>
@@ -145,7 +144,7 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
                         </div>
                     )}
 
-                    <div className="space-y-2 mb-4">
+                    <div className="space-y-2 my-4">
                         <h4 className="font-semibold text-sm">Tags</h4>
                         <div className="flex flex-wrap gap-2 items-center">
                             {paper.tags?.map(tag => (
