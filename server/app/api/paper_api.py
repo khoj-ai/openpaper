@@ -399,7 +399,7 @@ async def get_pdf(
     if not signed_url:
         return JSONResponse(status_code=404, content={"message": "File not found"})
 
-    if not paper.doi:
+    if not paper.doi and paper.title:
         doi = get_doi(str(paper.title), list(paper.authors) if paper.authors else None)  # type: ignore
         if doi:
             paper_crud.update(
@@ -609,3 +609,38 @@ async def delete_pdf(
             status_code=500,
             content={"message": f"Error deleting document: {str(e)}"},
         )
+
+
+@paper_router.post("/enrich")
+async def enrich_paper_metadata(
+    id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """
+    Enrich the metadata for a paper by its ID.
+
+    1. Find a sufficiently matching DOI using title and authors.
+    2. If found, update the paper's DOI in the database.
+    3. Return the updated paper object.
+    """
+    try:
+        paper = paper_crud.get(db, id=id, user=current_user)
+
+        if not paper:
+            raise HTTPException(status_code=404, detail="Paper not found")
+
+        if paper.doi:
+            return paper  # DOI already exists
+
+        doi = get_doi(str(paper.title), list(paper.authors) if paper.authors else None)  # type: ignore
+        if doi:
+            paper_crud.update(
+                db=db, db_obj=paper, obj_in=PaperUpdate(doi=doi), user=current_user
+            )
+            db.refresh(paper, ["doi"])
+
+        return paper
+    except Exception as e:
+        logger.error(f"Error retrieving paper DOI: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
