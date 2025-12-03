@@ -205,8 +205,14 @@ export default function PaperView() {
                 setJobId(null);
             } else if (response.status === 'failed') {
                 setJobId(null);
-                // Handle failed job
-                console.error('Upload job failed');
+                toast.error("Failed to process your paper", {
+                    description: "There was an error indexing your paper. Please try uploading again.",
+                    duration: 10000,
+                    action: {
+                        label: "Go Home",
+                        onClick: () => router.push('/'),
+                    },
+                });
             } else {
                 setTimeout(() => pollJobStatus(jobId), 2000);
             }
