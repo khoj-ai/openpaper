@@ -16,6 +16,7 @@ from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
 from app.database.models import Paper, PaperStatus
 from app.database.telemetry import track_event
+from app.helpers.paper_search import get_doi
 from app.helpers.s3 import s3_service
 from app.schemas.responses import ResponseCitation
 from app.schemas.user import CurrentUser
@@ -397,6 +398,13 @@ async def get_pdf(
     )
     if not signed_url:
         return JSONResponse(status_code=404, content={"message": "File not found"})
+
+    if not paper.doi:
+        doi = get_doi(str(paper.title), list(paper.authors) if paper.authors else None)  # type: ignore
+        if doi:
+            paper_crud.update(
+                db=db, db_obj=paper, obj_in=PaperUpdate(doi=doi), user=current_user
+            )
 
     paper_data["file_url"] = signed_url
     paper_data["summary_citations"] = [  # type: ignore
