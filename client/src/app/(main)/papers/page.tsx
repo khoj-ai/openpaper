@@ -512,11 +512,60 @@ export default function PapersPage() {
 
     if (isLoading || authLoading) {
         return (
-            <div className="w-full max-w-6xl mx-auto p-4">
-                <Skeleton className="h-10 w-full mb-4" />
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {Array.from({ length: 6 }).map((_, index) => (
-                        <Skeleton key={index} className="h-24 w-full" />
+            <div className="w-full mx-auto p-4">
+                {/* Header skeleton */}
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
+                    <Skeleton className="h-9 w-32 mb-2 md:mb-0" />
+                    <div className="flex items-center gap-x-4">
+                        <Skeleton className="h-10 w-24" />
+                        <Skeleton className="h-10 w-32" />
+                    </div>
+                </div>
+                {/* Search/filter bar skeleton */}
+                <div className="flex flex-col md:flex-row md:items-center gap-4 mb-4">
+                    <Skeleton className="h-10 w-full md:max-w-xl" />
+                    <Skeleton className="h-10 w-24" />
+                </div>
+                {/* Table skeleton */}
+                <div className="border bg-card rounded-md overflow-hidden">
+                    {/* Table header */}
+                    <div className="border-b-2 bg-card p-4">
+                        <div className="flex items-center gap-4">
+                            <Skeleton className="h-4 w-4" />
+                            <Skeleton className="h-4 w-48" />
+                            <Skeleton className="h-4 w-32 hidden md:block" />
+                            <Skeleton className="h-4 w-32 hidden lg:block" />
+                            <Skeleton className="h-4 w-24 hidden lg:block" />
+                            <Skeleton className="h-4 w-20 hidden xl:block" />
+                            <Skeleton className="h-4 w-20 hidden xl:block" />
+                            <Skeleton className="h-4 w-20 hidden xl:block" />
+                        </div>
+                    </div>
+                    {/* Table rows */}
+                    {Array.from({ length: 8 }).map((_, index) => (
+                        <div
+                            key={index}
+                            className={`p-4 border-b ${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'}`}
+                        >
+                            <div className="flex items-center gap-4">
+                                <Skeleton className="h-4 w-4 flex-shrink-0" />
+                                <div className="flex-1 min-w-0 space-y-2">
+                                    <Skeleton className="h-4 w-full max-w-md" />
+                                    <Skeleton className="h-3 w-3/4 max-w-sm md:hidden" />
+                                </div>
+                                <Skeleton className="h-4 w-32 hidden md:block flex-shrink-0" />
+                                <Skeleton className="h-4 w-32 hidden lg:block flex-shrink-0" />
+                                <div className="hidden lg:flex gap-1 flex-shrink-0">
+                                    <Skeleton className="h-6 w-16 rounded-sm" />
+                                    <Skeleton className="h-6 w-14 rounded-sm" />
+                                </div>
+                                <div className="hidden xl:flex gap-1 flex-shrink-0">
+                                    <Skeleton className="h-6 w-14 rounded-sm" />
+                                </div>
+                                <Skeleton className="h-4 w-20 hidden xl:block flex-shrink-0" />
+                                <Skeleton className="h-4 w-20 hidden xl:block flex-shrink-0" />
+                            </div>
+                        </div>
                     ))}
                 </div>
             </div>
