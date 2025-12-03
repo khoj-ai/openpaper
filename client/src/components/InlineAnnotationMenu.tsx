@@ -3,7 +3,7 @@ import {
 } from '@/lib/schema';
 
 import { getSelectionOffsets } from "./utils/PdfTextUtils";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Button } from "./ui/button";
 import { CommandShortcut, localizeCommandToOS } from "./ui/command";
 import { Bookmark, Copy, Highlighter, MessageCircle, Minus, X } from "lucide-react";
@@ -23,6 +23,11 @@ interface InlineAnnotationMenuProps {
     setUserMessageReferences: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
+// Estimated height of the menu (5-6 buttons at ~36px each + padding)
+const MENU_HEIGHT = 280;
+const MENU_WIDTH = 220;
+const MENU_OFFSET = 20;
+
 export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
     const {
         selectedText,
@@ -38,7 +43,41 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
     } = props;
 
     const [offsets, setOffsets] = useState<{ start: number; end: number, pageNumber: number } | null>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+    const [menuPosition, setMenuPosition] = useState<{ left: number; top: number } | null>(null);
 
+    // Calculate optimal position when tooltip position changes
+    useEffect(() => {
+        if (!tooltipPosition) {
+            setMenuPosition(null);
+            return;
+        }
+
+        // Calculate horizontal position (keep existing logic)
+        const left = Math.min(tooltipPosition.x, window.innerWidth - MENU_WIDTH);
+
+        // Calculate vertical position - check if menu fits below cursor
+        const spaceBelow = window.innerHeight - tooltipPosition.y - MENU_OFFSET;
+        const spaceAbove = tooltipPosition.y - MENU_OFFSET;
+
+        let top: number;
+        if (spaceBelow >= MENU_HEIGHT) {
+            // Enough space below - render below cursor
+            top = tooltipPosition.y + MENU_OFFSET;
+        } else if (spaceAbove >= MENU_HEIGHT) {
+            // Not enough space below, but enough above - render above cursor
+            top = tooltipPosition.y - MENU_HEIGHT - MENU_OFFSET;
+        } else {
+            // Not enough space either way - render where there's more space
+            if (spaceBelow >= spaceAbove) {
+                top = tooltipPosition.y + MENU_OFFSET;
+            } else {
+                top = Math.max(10, tooltipPosition.y - MENU_HEIGHT - MENU_OFFSET);
+            }
+        }
+
+        setMenuPosition({ left, top });
+    }, [tooltipPosition]);
 
     useEffect(() => {
         if (selectedText) {
@@ -85,14 +124,15 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
         return () => window.removeEventListener("keydown", handleMouseDown);
     }, [selectedText]);
 
-    if (!tooltipPosition) return null;
+    if (!tooltipPosition || !menuPosition) return null;
 
     return (
         <div
+            ref={menuRef}
             className="fixed z-30 bg-background shadow-lg rounded-lg p-3 border border-border w-[200px]"
             style={{
-                left: `${Math.min(tooltipPosition.x, window.innerWidth - 220)}px`,
-                top: `${tooltipPosition.y + 20}px`,
+                left: `${menuPosition.left}px`,
+                top: `${menuPosition.top}px`,
             }}
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
