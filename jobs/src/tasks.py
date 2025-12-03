@@ -226,6 +226,10 @@ async def process_pdf_file(
 
         logger.info(f"PDF processing completed successfully for {safe_filename} in {duration:.2f} seconds")
 
+        if not metadata.title:
+            # This most likely means the LLM extraction failed
+            raise Exception("Failed to extract metadata from PDF")
+
         return PDFProcessingResult(
             success=True,
             metadata=metadata,
