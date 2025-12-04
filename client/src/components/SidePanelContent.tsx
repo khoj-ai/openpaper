@@ -582,6 +582,8 @@ export function SidePanelContent({
     const memoizedOverviewContent = useMemo(() => {
         if (!paperData?.summary) return null;
 
+        if (paperData.summary === 'None') return null;
+
         return (
             <Markdown
                 remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
