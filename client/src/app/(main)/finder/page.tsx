@@ -21,7 +21,7 @@ import Link from "next/link";
 import { getOpenAlexTypeAheadAuthors, getOpenAlexTypeAheadInstitutions, OpenAlexTypeAheadAuthor, OpenAlexTypeAheadInstitution } from "./utils";
 import { OpenAlexResponse } from "@/lib/schema";
 import PaperResultCard from "./PaperResultCard";
-import HelperCard from "./HelperCard";
+import { FinderIntro } from "./FinderIntro";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Filter, ChevronDown } from "lucide-react";
@@ -410,14 +410,14 @@ export default function FinderPage() {
 
             {/* Rest of your component remains the same */}
             {!results && !loading && (
-                <HelperCard
+                <FinderIntro
                     onExampleClick={(query) => {
                         setQuery(query);
                         inputRef.current?.focus();
                     }}
                     onExampleFilterClick={(filter) => {
                         filterButtonRef.current?.click();
-                        filterInputRef.current?.focus();
+                        setTimeout(() => filterInputRef.current?.focus(), 100);
                         setFilterQuery(filter);
                     }}
                     />
