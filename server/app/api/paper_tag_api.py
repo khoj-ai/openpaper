@@ -5,7 +5,7 @@ from app.auth.dependencies import get_required_user
 from app.database.crud.paper_tag_crud import PaperTagCreate, paper_tag_crud
 from app.database.database import get_db
 from app.database.telemetry import track_event
-from app.schemas.paper_tag import BulkTagRequest
+from app.schemas.paper import BulkTagRequest
 from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException
