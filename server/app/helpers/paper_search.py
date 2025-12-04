@@ -1,10 +1,12 @@
 import logging
 import os
+import re
 from enum import Enum
 from typing import List, Optional
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 import requests
+from app.schemas.paper import EnrichedData
 from pydantic import BaseModel, ConfigDict, model_validator
 
 logger = logging.getLogger(__name__)
@@ -46,16 +48,26 @@ class Keyword(BaseOpenAlexModel):
 
 
 class PrimaryLocationSource(BaseOpenAlexModel):
-    id: str
-    display_name: str
-    type: Optional[str]
-    host_organization: Optional[dict]
+    id: Optional[str] = None
+    display_name: Optional[str] = None
+    type: Optional[str] = None
+    issn_l: Optional[str] = None
+    issn: Optional[List[str]] = None
+    host_organization: Optional[str] = None
 
 
 class PrimaryLocation(BaseOpenAlexModel):
-    is_oa: bool
-    landing_page_url: Optional[str]
-    pdf_url: Optional[str]
+    is_oa: Optional[bool] = None
+    landing_page_url: Optional[str] = None
+    pdf_url: Optional[str] = None
+    source: Optional[PrimaryLocationSource] = None
+
+
+class Biblio(BaseOpenAlexModel):
+    volume: Optional[str] = None
+    issue: Optional[str] = None
+    first_page: Optional[str] = None
+    last_page: Optional[str] = None
 
 
 class SubTopic(BaseOpenAlexModel):
@@ -103,6 +115,7 @@ class OpenAlexWork(BaseOpenAlexModel):
     open_access: Optional[OpenAccess]
     keywords: Optional[List[Keyword]]
     primary_location: Optional[PrimaryLocation]
+    biblio: Optional[Biblio] = None
     topics: Optional[List[Topic]]
     authorships: Optional[List[Authorship]]
     cited_by_count: Optional[int]
@@ -157,6 +170,7 @@ class OpenAlexFilter(BaseModel):
     authors: Optional[List[str]] = None
     institutions: Optional[List[str]] = None
     only_oa: bool = False
+    doi: Optional[str] = None
 
 
 def construct_open_alex_filter_url(filter: OpenAlexFilter) -> str:
@@ -176,6 +190,8 @@ def construct_open_alex_filter_url(filter: OpenAlexFilter) -> str:
         filters.append(f"institutions.id:{'|'.join(filter.institutions)}")
     if filter.only_oa:
         filters.append("open_access.is_oa:true")
+    if filter.doi:
+        filters.append(f"doi:{filter.doi}")
 
     return ",".join(filters) if filters else ""
 
@@ -183,7 +199,7 @@ def construct_open_alex_filter_url(filter: OpenAlexFilter) -> str:
 # Utility functions for searching the OpenAlex API
 # For documentation, see https://docs.openalex.org/api-entities/works/search-works
 def search_open_alex(
-    search_term: str, filter: Optional[OpenAlexFilter] = None, page: int = 1
+    search_term: Optional[str], filter: Optional[OpenAlexFilter] = None, page: int = 1
 ) -> OpenAlexResponse:
     """
     Search the OpenAlex API for papers based on a search term and optional filter.
@@ -198,7 +214,7 @@ def search_open_alex(
     # Construct the search URL
     base_url = "https://api.openalex.org/works"
 
-    params = {"search": quote(search_term), "page": page}
+    params = {"search": quote(search_term) if search_term else "", "page": page}
     if filter:
         params["filter"] = quote(construct_open_alex_filter_url(filter))
 
@@ -218,6 +234,51 @@ def search_open_alex(
     logger.debug(f"Response JSON: {response.json()}")
 
     return OpenAlexResponse(**response.json())
+
+
+def get_host_organization_name(host_organization_url: str) -> Optional[str]:
+    """
+    Retrieve the host organization name from OpenAlex given a host_organization URL.
+
+    The host_organization can be either a Publisher (P...) or an Institution (I...).
+    This function handles both cases.
+
+    Args:
+        host_organization_url (str): The full OpenAlex URL of the host organization
+                                      (e.g., "https://openalex.org/P4310320052" or
+                                       "https://openalex.org/I205783295")
+    Returns:
+        Optional[str]: The name of the host organization if found, otherwise None.
+    """
+    # Extract the ID from the URL (e.g., "P4310320052" from "https://openalex.org/P4310320052")
+    org_id = (
+        host_organization_url.split("/")[-1]
+        if "/" in host_organization_url
+        else host_organization_url
+    )
+
+    # Determine the entity type based on the ID prefix
+    if org_id.startswith("P"):
+        entity_type = "publishers"
+    elif org_id.startswith("I"):
+        entity_type = "institutions"
+    else:
+        logger.warning(f"Unknown host_organization ID type: {org_id}")
+        return None
+
+    url = f"https://api.openalex.org/{entity_type}/{org_id}"
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("display_name")
+        elif response.status_code == 404:
+            return None
+        else:
+            response.raise_for_status()
+    except requests.RequestException:
+        logger.exception(f"Error fetching host organization: {url}")
+        return None
 
 
 def build_abstract_from_inverted_index(inverted_index: dict) -> str:
@@ -292,6 +353,24 @@ def construct_citation_graph(open_alex_id: str) -> OpenAlexCitationGraph:
     )
 
 
+def extract_doi_from_url(url: str) -> str | None:
+    """Extract DOI from various URL formats."""
+    # Decode URL-encoded characters
+    url = unquote(url)
+
+    # DOI pattern: 10.XXXX/anything (until whitespace or certain chars)
+    doi_pattern = r'10\.\d{4,}/[^\s"<>]+'
+
+    match = re.search(doi_pattern, url)
+    if match:
+        doi = match.group(0)
+        # Clean trailing punctuation that might be captured
+        doi = doi.rstrip(".,;:)")
+        return doi
+
+    return None
+
+
 def get_doi(title: str, authors: Optional[List[str]] = None) -> Optional[str]:
     """
     Retrieve the DOI for a paper given its title and optional author using a series of external APIs.
@@ -319,7 +398,7 @@ def get_doi(title: str, authors: Optional[List[str]] = None) -> Optional[str]:
 
                     # If no author provided, return first title match
                     if not authors:
-                        return result.doi
+                        return extract_doi_from_url(result.doi) if result.doi else None
 
                     # Check if author matches any authorship
                     if result.authorships:
@@ -331,7 +410,11 @@ def get_doi(title: str, authors: Optional[List[str]] = None) -> Optional[str]:
                         for authorship in result.authorships:
                             if authorship.author and authorship.author.display_name:
                                 if work_authors & target_authors:
-                                    return result.doi
+                                    return (
+                                        extract_doi_from_url(result.doi)
+                                        if result.doi
+                                        else None
+                                    )
         except Exception:
             return None
         return None
@@ -414,3 +497,82 @@ def get_doi(title: str, authors: Optional[List[str]] = None) -> Optional[str]:
         )
 
     return crossref_doi or openalex_doi or semantic_scholar_doi
+
+
+def get_enriched_data(doi: str) -> Optional[EnrichedData]:
+    """
+    Retrieve enriched data for a paper given its DOI using the OpenAlex API or CrossRef API.
+
+    Args:
+        doi (str): The DOI of the paper.
+    Returns:
+        Optional[EnrichedData]: The enriched data of the paper if found, otherwise None.
+    """
+
+    def get_openalex_enriched_data(doi: str) -> Optional[EnrichedData]:
+        try:
+            oa_filter = OpenAlexFilter(doi=doi)
+            open_alex_results = search_open_alex(None, filter=oa_filter)
+            if open_alex_results.results:
+                result = open_alex_results.results[0]
+
+                # Extract journal from primary_location.source
+                journal = None
+                if result.primary_location and result.primary_location.source:
+                    journal = result.primary_location.source.display_name
+
+                host_organization_id = (
+                    result.primary_location.source.host_organization
+                    if result.primary_location and result.primary_location.source
+                    else None
+                )
+
+                publisher_name = None
+                if host_organization_id:
+                    publisher_name = get_host_organization_name(host_organization_id)
+
+                return EnrichedData(
+                    publisher=publisher_name,
+                    journal=journal,
+                )
+
+        except Exception:
+            return None
+        return None
+
+    def get_crossref_enriched_data(doi: str) -> Optional[EnrichedData]:
+        base_url = f"https://api.crossref.org/works/{quote(doi)}"
+        response = requests.get(base_url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        message = data.get("message", {})
+        publisher = message.get("publisher", "Unknown")
+        journal = message.get("container-title", ["Unknown"])[0]
+
+        return EnrichedData(
+            publisher=publisher,
+            journal=journal,
+        )
+
+    if not doi:
+        return None
+
+    doi = extract_doi_from_url(doi) or doi
+
+    try:
+        openalex_data = get_openalex_enriched_data(doi)
+        if openalex_data:
+            logger.info(f"Found enriched data from OpenAlex for DOI: {doi}")
+            return openalex_data
+
+        crossref_data = get_crossref_enriched_data(doi)
+        if crossref_data:
+            logger.info(f"Found enriched data from CrossRef for DOI: {doi}")
+            return crossref_data
+
+    except requests.RequestException:
+        logger.exception(
+            f"Error querying OpenAlex API for enriched data - {doi}", exc_info=True
+        )
+
+    return None
