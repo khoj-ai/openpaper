@@ -170,7 +170,6 @@ class OpenAlexFilter(BaseModel):
     authors: Optional[List[str]] = None
     institutions: Optional[List[str]] = None
     only_oa: bool = False
-    doi: Optional[str] = None
 
 
 def construct_open_alex_filter_url(filter: OpenAlexFilter) -> str:
@@ -190,8 +189,6 @@ def construct_open_alex_filter_url(filter: OpenAlexFilter) -> str:
         filters.append(f"institutions.id:{'|'.join(filter.institutions)}")
     if filter.only_oa:
         filters.append("open_access.is_oa:true")
-    if filter.doi:
-        filters.append(f"doi:{filter.doi}")
 
     return ",".join(filters) if filters else ""
 
@@ -312,6 +309,35 @@ def get_paper_by_open_alex_id(open_alex_id: str) -> Optional[OpenAlexWork]:
         Optional[OpenAlexWork]: The OpenAlexWork object if found, otherwise None.
     """
     url = f"https://api.openalex.org/works/{quote(open_alex_id)}"
+    response = requests.get(url, timeout=10)
+    if response.status_code == 200:
+        return OpenAlexWork(**response.json())
+    elif response.status_code == 404:
+        return None
+    else:
+        response.raise_for_status()
+
+
+def get_work_by_doi(doi: str) -> Optional[OpenAlexWork]:
+    """
+    Retrieve a work from OpenAlex by its DOI.
+
+    OpenAlex accepts DOIs as external IDs in the works endpoint.
+    The DOI can be in either format:
+    - Full URL: https://doi.org/10.7717/peerj.4375
+    - Just the DOI: 10.7717/peerj.4375
+
+    Args:
+        doi (str): The DOI of the work (with or without https://doi.org/ prefix).
+
+    Returns:
+        Optional[OpenAlexWork]: The OpenAlexWork object if found, otherwise None.
+    """
+    # Ensure DOI is in URL format for OpenAlex
+    if not doi.startswith("https://doi.org/"):
+        doi = f"https://doi.org/{doi}"
+
+    url = f"https://api.openalex.org/works/{doi}"
     response = requests.get(url, timeout=10)
     if response.status_code == 200:
         return OpenAlexWork(**response.json())
@@ -511,11 +537,8 @@ def get_enriched_data(doi: str) -> Optional[EnrichedData]:
 
     def get_openalex_enriched_data(doi: str) -> Optional[EnrichedData]:
         try:
-            oa_filter = OpenAlexFilter(doi=doi)
-            open_alex_results = search_open_alex(None, filter=oa_filter)
-            if open_alex_results.results:
-                result = open_alex_results.results[0]
-
+            result = get_work_by_doi(doi)
+            if result:
                 # Extract journal from primary_location.source
                 journal = None
                 if result.primary_location and result.primary_location.source:
@@ -537,17 +560,24 @@ def get_enriched_data(doi: str) -> Optional[EnrichedData]:
                 )
 
         except Exception:
+            logger.error(
+                f"Error when querying Open Alex API for DOI {doi}", exc_info=True
+            )
             return None
         return None
 
     def get_crossref_enriched_data(doi: str) -> Optional[EnrichedData]:
         base_url = f"https://api.crossref.org/works/{quote(doi)}"
         response = requests.get(base_url, timeout=10)
+        if response.status_code == 404:
+            # DOI not found in CrossRef (common for arXiv, DataCite DOIs)
+            return None
         response.raise_for_status()
         data = response.json()
         message = data.get("message", {})
-        publisher = message.get("publisher", "Unknown")
-        journal = message.get("container-title", ["Unknown"])[0]
+        publisher = message.get("publisher")
+        container_titles = message.get("container-title", [])
+        journal = container_titles[0] if container_titles else None
 
         return EnrichedData(
             publisher=publisher,
@@ -564,7 +594,12 @@ def get_enriched_data(doi: str) -> Optional[EnrichedData]:
         if openalex_data:
             logger.info(f"Found enriched data from OpenAlex for DOI: {doi}")
             return openalex_data
+    except requests.RequestException:
+        logger.exception(
+            f"Error querying OpenAlex API for enriched data - {doi}", exc_info=True
+        )
 
+    try:
         crossref_data = get_crossref_enriched_data(doi)
         if crossref_data:
             logger.info(f"Found enriched data from CrossRef for DOI: {doi}")
@@ -572,7 +607,7 @@ def get_enriched_data(doi: str) -> Optional[EnrichedData]:
 
     except requests.RequestException:
         logger.exception(
-            f"Error querying OpenAlex API for enriched data - {doi}", exc_info=True
+            f"Error querying CrossRef API for enriched data - {doi}", exc_info=True
         )
 
     return None
