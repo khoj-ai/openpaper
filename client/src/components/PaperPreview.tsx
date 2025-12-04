@@ -2,7 +2,7 @@
 
 import { PaperItem } from "@/lib/schema";
 import { Button } from "./ui/button";
-import { X, ExternalLink, Highlighter } from "lucide-react";
+import { X, ExternalLink, Highlighter, Plus } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { handleStatusChange, truncateText } from "@/components/utils/paperUtils";
@@ -145,7 +145,20 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
                     )}
 
                     <div className="space-y-2 my-4">
-                        <h4 className="font-semibold text-sm">Tags</h4>
+                        <div className="flex items-center justify-between mb-1">
+                            <h4 className="font-semibold text-sm">Tags</h4>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm" className="h-7 text-xs"><Plus className="h-2.5 w-2.5" /></Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent className="w-80" align="start">
+                                    <TagSelector
+                                        paperIds={[paper.id]}
+                                        onTagsApplied={onTagsApplied}
+                                    />
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
                         <div className="flex flex-wrap gap-2 items-center">
                             {paper.tags?.map(tag => (
                                 <span key={tag.id} className="group relative inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-sm dark:bg-blue-900 dark:text-blue-200 text-xs">
@@ -158,17 +171,7 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
                                     </button>
                                 </span>
                             ))}
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="sm" className="h-7 text-xs">Add Tag</Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent className="w-80" align="start">
-                                    <TagSelector
-                                        paperIds={[paper.id]}
-                                        onTagsApplied={onTagsApplied}
-                                    />
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+
                         </div>
                     </div>
                     <PaperProjects id={paper.id} view='compact' />
