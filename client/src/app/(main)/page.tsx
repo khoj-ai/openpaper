@@ -89,7 +89,6 @@ export default function Home() {
 	const [elapsedTime, setElapsedTime] = useState(0);
 	const [messageIndex, setMessageIndex] = useState(0);
 	const [fileSize, setFileSize] = useState<number | null>(null);
-	const [fileLength, setFileLength] = useState<string | null>(null);
 	const [displayedMessage, setDisplayedMessage] = useState("");
 	const [celeryMessage, setCeleryMessage] = useState<string | null>(null);
 
@@ -100,12 +99,12 @@ export default function Home() {
 	}, [celeryMessage]);
 
 	const loadingMessages = useMemo(() => [
-		`Processing ${fileLength ? fileLength : 'lots of'} characters`,
+		`Processing bits and bytes...`,
 		`Processing ${fileSize ? (fileSize / 1024 / 1024).toFixed(2) + 'mb' : '...'} `,
 		"Uploading to the cloud",
 		"Extracting metadata",
 		"Crafting grounded citations",
-	], [fileLength, fileSize]);
+	], [fileSize]);
 
 	// Effect for timer and message cycling
 	useEffect(() => {
@@ -241,7 +240,6 @@ export default function Home() {
 		const file = files[0];
 		setIsUploading(true);
 		setFileSize(file.size);
-		setFileLength(null);
 		setCeleryMessage(null);
 		setMessageIndex(0);
 
@@ -273,7 +271,6 @@ export default function Home() {
 	const handleUrlImportStart = async (url: string) => {
 		setIsUploading(true);
 		setFileSize(null);
-		setFileLength(null);
 		setCeleryMessage(null);
 		setMessageIndex(0);
 
