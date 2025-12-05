@@ -16,7 +16,7 @@ from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
 from app.database.models import Paper, PaperStatus
 from app.database.telemetry import track_event
-from app.helpers.paper_search import get_doi
+from app.helpers.paper_search import get_doi, get_enriched_data
 from app.helpers.s3 import s3_service
 from app.schemas.responses import ResponseCitation
 from app.schemas.user import CurrentUser
@@ -404,6 +404,22 @@ async def get_pdf(
         if doi:
             paper_crud.update(
                 db=db, db_obj=paper, obj_in=PaperUpdate(doi=doi), user=current_user
+            )
+
+    if paper.doi and (not paper.journal and not paper.publisher):
+        enriched_data = get_enriched_data(str(paper.doi))
+        if enriched_data:
+            paper_data["journal"] = enriched_data.journal
+            paper_data["publisher"] = enriched_data.publisher
+
+            paper_crud.update(
+                db=db,
+                db_obj=paper,
+                obj_in=PaperUpdate(
+                    journal=enriched_data.journal,
+                    publisher=enriched_data.publisher,
+                ),
+                user=current_user,
             )
 
     paper_data["file_url"] = signed_url

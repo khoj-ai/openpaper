@@ -68,6 +68,8 @@ class PaperUpdate(PaperBase):
     open_alex_id: Optional[str] = None
     doi: Optional[str] = None
     size_in_kb: Optional[int] = None
+    journal: Optional[str] = None
+    publisher: Optional[str] = None
 
 
 class PaperDocumentMetadata(BaseModel):
