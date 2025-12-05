@@ -23,6 +23,8 @@ export interface PaperData {
     is_public: boolean;
     share_id: string;
     status: PaperStatus;
+    journal?: string;
+    publisher?: string;
 }
 
 export interface ChatMessage {
@@ -238,6 +240,8 @@ export interface PaperItem {
     size_in_kb?: number
     tags?: PaperTag[]
     is_owner?: boolean
+    journal?: string
+    publisher?: string
 }
 
 export interface CreditUsage {

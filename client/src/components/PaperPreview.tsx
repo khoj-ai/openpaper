@@ -1,6 +1,6 @@
 "use client";
 
-import { PaperItem } from "@/lib/schema";
+import { PaperData, PaperItem } from "@/lib/schema";
 import { Button } from "./ui/button";
 import { X, ExternalLink, Highlighter, Plus } from "lucide-react";
 import Link from "next/link";
@@ -12,7 +12,7 @@ import { PaperProjects } from "./PaperProjects";
 import { TagSelector } from "./TagSelector";
 import { fetchFromApi } from "@/lib/api";
 import { useHighlights } from "./hooks/PdfHighlight";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CitePaperButton } from "./CitePaperButton";
 
 interface PaperPreviewProps {
@@ -24,6 +24,14 @@ interface PaperPreviewProps {
 export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
     const { highlights } = useHighlights(paper.id);
     const [showAllHighlights, setShowAllHighlights] = useState(false);
+    const [loadedPaper, setLoadedPaper] = useState<PaperData | null>(null);
+
+    useEffect(() => {
+        // Fetch the full paper data to get tags and other details
+        fetchFromApi(`/api/paper?id=${paper.id}`)
+            .then(data => setLoadedPaper(data))
+            .catch(error => console.error("Failed to load paper data", error));
+    }, [paper.id]);
 
     const highlightCount = highlights?.filter(highlight => highlight.role === 'user').length || 0;
 
@@ -106,6 +114,40 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
                         )}
                         <CitePaperButton paper={paper} minimalist={true} />
                     </div>
+
+                    {/* Paper Info Section - Tabular Layout */}
+                    {(loadedPaper?.authors?.length || loadedPaper?.journal || loadedPaper?.publisher || loadedPaper?.publish_date) && (
+                        <div className="mt-4 mb-2 text-sm border rounded-md overflow-hidden">
+                            <table className="w-full">
+                                <tbody className="divide-y divide-border">
+                                    {loadedPaper?.authors && loadedPaper.authors.length > 0 && (
+                                        <tr>
+                                            <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">Author</td>
+                                            <td className="px-3 py-2">{loadedPaper.authors.join(', ')}</td>
+                                        </tr>
+                                    )}
+                                    {loadedPaper?.journal && (
+                                        <tr>
+                                            <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">Publication</td>
+                                            <td className="px-3 py-2">{loadedPaper.journal}</td>
+                                        </tr>
+                                    )}
+                                    {loadedPaper?.publisher && (
+                                        <tr>
+                                            <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">Publisher</td>
+                                            <td className="px-3 py-2">{loadedPaper.publisher}</td>
+                                        </tr>
+                                    )}
+                                    {loadedPaper?.publish_date && (
+                                        <tr>
+                                            <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">Date</td>
+                                            <td className="px-3 py-2">{new Date(loadedPaper.publish_date).toLocaleDateString()}</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
 
                     {/* Highlights Section */}
                     {highlightCount > 0 && (
