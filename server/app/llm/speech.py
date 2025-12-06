@@ -22,7 +22,10 @@ class OpenAISpeaker:
             raise ValueError("AZURE_OPENAI_ENDPOINT environment variable is required")
 
         self.client = openai.AzureOpenAI(
-            api_key=self.api_key, azure_endpoint=endpoint, api_version=version
+            api_key=self.api_key,
+            azure_endpoint=endpoint,
+            api_version=version,
+            timeout=300.0,
         )
         self.model = "gpt-4o-mini-tts"
 

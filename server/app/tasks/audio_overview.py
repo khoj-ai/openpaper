@@ -15,6 +15,7 @@ from app.database.database import get_db
 from app.database.models import ConversableType, JobStatus
 from app.database.telemetry import track_event
 from app.llm.operations import operations
+from app.llm.provider import LLMProvider
 from app.llm.speech import speaker
 from app.schemas.responses import AudioOverviewForLLM
 from app.schemas.user import CurrentUser
@@ -72,12 +73,16 @@ async def generate_audio_overview(
             current_user=user,
         )
 
-        logger.info(f"Starting audio overview generation for paper {paper_id}")
+        logger.info(
+            f"Starting audio overview generation for paper/project {paper_id or project_id}"
+        )
 
         conversable_title: str = ""
 
         # Step 1: Generate narrative summary
-        logger.info(f"Generating narrative summary for paper {paper_id}")
+        logger.info(
+            f"Generating narrative summary for paper/project {paper_id or project_id}"
+        )
         narrative_summary: Optional[AudioOverviewForLLM] = None
 
         if paper_id:
@@ -106,6 +111,7 @@ async def generate_audio_overview(
                 project_id=str(project_id),
                 length=length,
                 current_user=user,
+                llm_provider=LLMProvider.GROQ,
                 additional_instructions=additional_instructions,
                 db=db,
             )
