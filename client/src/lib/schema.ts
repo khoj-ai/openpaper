@@ -24,6 +24,7 @@ export interface PaperData {
     share_id: string;
     status: PaperStatus;
     journal?: string;
+    doi?: string;
     publisher?: string;
 }
 
@@ -241,6 +242,7 @@ export interface PaperItem {
     tags?: PaperTag[]
     is_owner?: boolean
     journal?: string
+    doi?: string
     publisher?: string
 }
 

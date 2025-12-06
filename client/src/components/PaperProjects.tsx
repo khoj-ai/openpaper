@@ -152,14 +152,13 @@ export function PaperProjects({ id, view = 'full' }: PaperProjectsProps) {
                     />
                 </>
             )}
-            <h3 className="text-lg font-semibold">Projects</h3>
             {isLoadingProjects ? (
                 <div className="flex items-center justify-center py-4">
                     <Loader className="animate-spin mr-2 h-4 w-4" />
-                    <span>Loading projects...</span>
                 </div>
             ) : projects.length > 0 ? (
                 <>
+                    <h3 className="text-lg font-semibold">Projects</h3>
                     {view === 'full' && <p className="text-sm text-muted-foreground">This paper is a member of the following projects.</p>}
                     <div className="space-y-2">
                         {projects.map(project => (
@@ -200,7 +199,6 @@ export function PaperProjects({ id, view = 'full' }: PaperProjectsProps) {
                     {isLoadingProjects ? (
                         <div className="flex items-center justify-center py-4">
                             <Loader className="animate-spin mr-2 h-4 w-4" />
-                            <span>Loading projects...</span>
                         </div>
                     ) : projectsToAdd.length > 0 ? (
                         <div className="space-y-2">

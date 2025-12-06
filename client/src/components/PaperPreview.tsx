@@ -28,6 +28,7 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
 
     useEffect(() => {
         // Fetch the full paper data to get tags and other details
+        setLoadedPaper(null);
         fetchFromApi(`/api/paper?id=${paper.id}`)
             .then(data => setLoadedPaper(data))
             .catch(error => console.error("Failed to load paper data", error));
@@ -116,16 +117,39 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
                     </div>
 
                     {/* Paper Info Section - Tabular Layout */}
-                    {(loadedPaper?.authors?.length || loadedPaper?.journal || loadedPaper?.publisher || loadedPaper?.publish_date) && (
+                    {(paper?.authors?.length || loadedPaper?.journal || loadedPaper?.publisher || loadedPaper?.publish_date) && (
                         <div className="mt-4 mb-2 text-sm border rounded-md overflow-hidden">
                             <table className="w-full">
                                 <tbody className="divide-y divide-border">
-                                    {loadedPaper?.authors && loadedPaper.authors.length > 0 && (
+                                    {paper?.authors && paper.authors.length > 0 && (
                                         <tr>
                                             <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">Author</td>
-                                            <td className="px-3 py-2">{loadedPaper.authors.join(', ')}</td>
+                                            <td className="px-3 py-2">{paper.authors.join(', ')}</td>
                                         </tr>
                                     )}
+                                    {paper?.publish_date && (
+                                        <tr>
+                                            <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">Published</td>
+                                            <td className="px-3 py-2">{new Date(paper.publish_date).toLocaleDateString()}</td>
+                                        </tr>
+                                    )}
+                                    {
+                                        paper?.doi && (
+                                            <tr>
+                                                <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">DOI</td>
+                                                <td className="px-3 py-2">
+                                                    <a
+                                                        href={`https://doi.org/${paper.doi}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-600 hover:underline"
+                                                    >
+                                                        {paper.doi}
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        )
+                                    }
                                     {loadedPaper?.journal && (
                                         <tr>
                                             <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">Publication</td>
@@ -136,12 +160,6 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
                                         <tr>
                                             <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">Publisher</td>
                                             <td className="px-3 py-2">{loadedPaper.publisher}</td>
-                                        </tr>
-                                    )}
-                                    {loadedPaper?.publish_date && (
-                                        <tr>
-                                            <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">Date</td>
-                                            <td className="px-3 py-2">{new Date(loadedPaper.publish_date).toLocaleDateString()}</td>
                                         </tr>
                                     )}
                                 </tbody>
