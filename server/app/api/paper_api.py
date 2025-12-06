@@ -1,5 +1,6 @@
 import logging
 import uuid
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from app.auth.dependencies import get_current_user, get_required_user
@@ -32,6 +33,8 @@ logger = logging.getLogger(__name__)
 
 # Create API router with prefix
 paper_router = APIRouter()
+
+CHECK_METADATA_INTERVAL_DAYS = 30
 
 
 class SharePaperSchemaResponse(BaseModel):
@@ -399,14 +402,27 @@ async def get_pdf(
     if not signed_url:
         return JSONResponse(status_code=404, content={"message": "File not found"})
 
-    if not paper.doi and paper.title:
+    should_check_doi = (not paper.doi) and (paper.title is not None)
+    is_cache_stale = (not paper.attempted_metadata_at) or (
+        paper.attempted_metadata_at
+        and (datetime.now(timezone.utc) - paper.attempted_metadata_at).days
+        >= CHECK_METADATA_INTERVAL_DAYS
+    )
+
+    if should_check_doi and is_cache_stale:
         doi = get_doi(str(paper.title), list(paper.authors) if paper.authors else None)  # type: ignore
         if doi:
             paper_crud.update(
                 db=db, db_obj=paper, obj_in=PaperUpdate(doi=doi), user=current_user
             )
+        paper_crud.update(
+            db=db,
+            db_obj=paper,
+            obj_in=PaperUpdate(attempted_metadata_at=datetime.now(timezone.utc)),
+            user=current_user,
+        )
 
-    if paper.doi and (not paper.journal and not paper.publisher):
+    if paper.doi and (not paper.journal and not paper.publisher) and is_cache_stale:
         enriched_data = get_enriched_data(str(paper.doi))
         if enriched_data:
             paper_data["journal"] = enriched_data.journal
@@ -421,6 +437,12 @@ async def get_pdf(
                 ),
                 user=current_user,
             )
+        paper_crud.update(
+            db=db,
+            db_obj=paper,
+            obj_in=PaperUpdate(attempted_metadata_at=datetime.now(timezone.utc)),
+            user=current_user,
+        )
 
     paper_data["file_url"] = signed_url
     paper_data["summary_citations"] = [  # type: ignore
@@ -625,38 +647,3 @@ async def delete_pdf(
             status_code=500,
             content={"message": f"Error deleting document: {str(e)}"},
         )
-
-
-@paper_router.post("/enrich")
-async def enrich_paper_metadata(
-    id: str,
-    db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_required_user),
-):
-    """
-    Enrich the metadata for a paper by its ID.
-
-    1. Find a sufficiently matching DOI using title and authors.
-    2. If found, update the paper's DOI in the database.
-    3. Return the updated paper object.
-    """
-    try:
-        paper = paper_crud.get(db, id=id, user=current_user)
-
-        if not paper:
-            raise HTTPException(status_code=404, detail="Paper not found")
-
-        if paper.doi:
-            return paper  # DOI already exists
-
-        doi = get_doi(str(paper.title), list(paper.authors) if paper.authors else None)  # type: ignore
-        if doi:
-            paper_crud.update(
-                db=db, db_obj=paper, obj_in=PaperUpdate(doi=doi), user=current_user
-            )
-            db.refresh(paper, ["doi"])
-
-        return paper
-    except Exception as e:
-        logger.error(f"Error retrieving paper DOI: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))

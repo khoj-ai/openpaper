@@ -70,6 +70,7 @@ class PaperUpdate(PaperBase):
     size_in_kb: Optional[int] = None
     journal: Optional[str] = None
     publisher: Optional[str] = None
+    attempted_metadata_at: Optional[datetime] = None
 
 
 class PaperDocumentMetadata(BaseModel):
