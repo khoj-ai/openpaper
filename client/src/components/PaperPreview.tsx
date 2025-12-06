@@ -134,7 +134,7 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
                                         </tr>
                                     )}
                                     {
-                                        paper?.doi && (
+                                        loadedPaper?.doi && (
                                             <tr>
                                                 <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">DOI</td>
                                                 <td className="px-3 py-2">
