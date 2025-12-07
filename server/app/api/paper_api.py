@@ -444,7 +444,9 @@ async def get_pdf(
                 obj_in=PaperUpdate(
                     journal=enriched_data.journal,
                     publisher=enriched_data.publisher,
-                    publish_date=publish_datetime,  # type: ignore
+                    publish_date=(
+                        publish_datetime.isoformat() if publish_datetime else None
+                    ),
                 ),
                 user=current_user,
             )
