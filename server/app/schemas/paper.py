@@ -12,3 +12,4 @@ class BulkTagRequest(BaseModel):
 class EnrichedData(BaseModel):
     publisher: Optional[str]
     journal: Optional[str]
+    publication_date: Optional[str]

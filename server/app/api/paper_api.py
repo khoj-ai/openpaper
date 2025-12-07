@@ -18,6 +18,7 @@ from app.database.database import get_db
 from app.database.models import Paper, PaperStatus
 from app.database.telemetry import track_event
 from app.helpers.paper_search import get_doi, get_enriched_data
+from app.helpers.parser import parse_publication_date
 from app.helpers.s3 import s3_service
 from app.schemas.responses import ResponseCitation
 from app.schemas.user import CurrentUser
@@ -428,12 +429,22 @@ async def get_pdf(
             paper_data["journal"] = enriched_data.journal
             paper_data["publisher"] = enriched_data.publisher
 
+            publish_datetime = (
+                parse_publication_date(enriched_data.publication_date)
+                if enriched_data.publication_date
+                else paper.publish_date
+            )
+            paper_data["publish_date"] = (
+                publish_datetime.isoformat() if publish_datetime else None
+            )
+
             paper_crud.update(
                 db=db,
                 db_obj=paper,
                 obj_in=PaperUpdate(
                     journal=enriched_data.journal,
                     publisher=enriched_data.publisher,
+                    publish_date=publish_datetime,  # type: ignore
                 ),
                 user=current_user,
             )

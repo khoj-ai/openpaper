@@ -554,9 +554,12 @@ def get_enriched_data(doi: str) -> Optional[EnrichedData]:
                 if host_organization_id:
                     publisher_name = get_host_organization_name(host_organization_id)
 
+                publication_date = result.publication_date
+
                 return EnrichedData(
                     publisher=publisher_name,
                     journal=journal,
+                    publication_date=publication_date,
                 )
 
         except Exception:
@@ -578,10 +581,24 @@ def get_enriched_data(doi: str) -> Optional[EnrichedData]:
         publisher = message.get("publisher")
         container_titles = message.get("container-title", [])
         journal = container_titles[0] if container_titles else None
+        publication_date_parts = message.get("published-print", {}).get(
+            "date-parts", []
+        ) or message.get("published-online", {}).get("date-parts", [])
+        publication_date = None
+        if publication_date_parts and len(publication_date_parts[0]) >= 3:
+            year, month, day = publication_date_parts[0][:3]
+            publication_date = f"{year:04d}-{month:02d}-{day:02d}"
+        elif publication_date_parts and len(publication_date_parts[0]) == 2:
+            year, month = publication_date_parts[0][:2]
+            publication_date = f"{year:04d}-{month:02d}"
+        elif publication_date_parts and len(publication_date_parts[0]) == 1:
+            year = publication_date_parts[0][0]
+            publication_date = f"{year:04d}"
 
         return EnrichedData(
             publisher=publisher,
             journal=journal,
+            publication_date=publication_date,
         )
 
     if not doi:

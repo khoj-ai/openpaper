@@ -1,5 +1,6 @@
 import io
 import logging
+from datetime import datetime
 from typing import Tuple
 
 import requests
@@ -152,3 +153,17 @@ async def validate_url_and_fetch_pdf(url: str) -> tuple[bool, bytes, str]:
         return False, b"", f"Failed to download PDF from URL: {str(e)}"
     except Exception as e:
         return False, b"", f"Error processing URL: {str(e)}"
+
+
+def parse_publication_date(date_str: str) -> datetime | None:
+    """Parse publication date string in various formats (yyyy-mm-dd, yyyy-mm, yyyy)."""
+    if not date_str:
+        return None
+
+    formats = ["%Y-%m-%d", "%Y-%m", "%Y"]
+    for fmt in formats:
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
+    return None
