@@ -9,6 +9,9 @@ export interface PaperBase {
     authors?: string[];
     status?: PaperStatus;
     created_at?: string;
+    journal?: string;
+    publisher?: string;
+    doi?: string;
 }
 
 // Helper function to format author names based on citation style rules
@@ -121,49 +124,63 @@ export const generateMLA = (paper: PaperBase): string => {
     const authors = formatAuthors(paper.authors, 'MLA');
     const title = paper.title || "[Untitled]";
     const year = getYear(paper.created_at);
-    return `${authors ? authors + '. ' : ''}"${title}." *[Source Placeholder]*, ${year}.`;
+    const source = paper.journal || paper.publisher || "[Source Placeholder]";
+    const doiSuffix = paper.doi ? ` DOI: ${paper.doi}.` : '';
+    return `${authors ? authors + '. ' : ''}"${title}." *${source}*, ${year}.${doiSuffix}`;
 };
 
 export const generateHarvard = (paper: PaperBase): string => {
     const authors = formatAuthors(paper.authors, 'Harvard');
     const year = getYear(paper.created_at);
     const title = paper.title || "[Untitled]";
-    return `${authors ? authors + ' ' : ''}(${year}). *${title}*. [Source Placeholder].`;
+    const source = paper.journal || paper.publisher || "[Source Placeholder]";
+    const doiSuffix = paper.doi ? ` DOI: ${paper.doi}.` : '';
+    return `${authors ? authors + ' ' : ''}(${year}). *${title}*. ${source}.${doiSuffix}`;
 };
 
 export const generateAAA = (paper: PaperBase): string => {
     const authors = formatAuthors(paper.authors, 'AAA');
     const year = getYear(paper.created_at);
     const title = paper.title || "[Untitled]";
-    return `${authors ? authors + ' ' : ''}${year}. "${title}." *[Publication Venue Placeholder]*.`;
+    const venue = paper.journal || paper.publisher || "[Publication Venue Placeholder]";
+    const doiSuffix = paper.doi ? ` DOI: ${paper.doi}.` : '';
+    return `${authors ? authors + ' ' : ''}${year}. "${title}." *${venue}*.${doiSuffix}`;
 };
 
 export const generateIEEE = (paper: PaperBase): string => {
     const authors = formatAuthors(paper.authors, 'IEEE');
     const title = paper.title || "[Untitled]";
     const year = getYear(paper.created_at);
-    return `${authors ? authors + ', ' : ''}"${title}," *[Source Abbr. Placeholder]*, ${year}.`;
+    const source = paper.journal || paper.publisher || "[Source Abbr. Placeholder]";
+    const doiSuffix = paper.doi ? `, doi: ${paper.doi}.` : '.';
+    return `${authors ? authors + ', ' : ''}"${title}," *${source}*, ${year}${doiSuffix}`;
 };
 
 export const generateAMA = (paper: PaperBase): string => {
     const authors = formatAuthors(paper.authors, 'AMA');
     const title = paper.title || "[Untitled]";
     const year = getYear(paper.created_at);
-    return `${authors ? authors + '. ' : ''}${title}. *[Journal Abbr. Placeholder]*. ${year}.`;
+    const journal = paper.journal || "[Journal Abbr. Placeholder]";
+    const doiSuffix = paper.doi ? ` doi:${paper.doi}` : '';
+    return `${authors ? authors + '. ' : ''}${title}. *${journal}*. ${year}.${doiSuffix}`;
 };
 
 export const generateChicago = (paper: PaperBase): string => {
     const authors = formatAuthors(paper.authors, 'Chicago');
     const year = getYear(paper.created_at);
     const title = paper.title || "[Untitled]";
-    return `${authors ? authors + '. ' : ''}${year}. "${title}." *[Source Placeholder]*.`;
+    const source = paper.journal || paper.publisher || "[Source Placeholder]";
+    const doiSuffix = paper.doi ? ` https://doi.org/${paper.doi}.` : '';
+    return `${authors ? authors + '. ' : ''}${year}. "${title}." *${source}*.${doiSuffix}`;
 };
 
 export const generateAPA = (paper: PaperBase): string => {
     const authors = formatAuthors(paper.authors, 'APA');
     const year = getYear(paper.created_at);
     const title = paper.title || "[Untitled]";
-    return `${authors ? authors + ' ' : ''}(${year}). *${title}*. [Source Placeholder].`;
+    const source = paper.journal || paper.publisher || "[Source Placeholder]";
+    const doiSuffix = paper.doi ? ` https://doi.org/${paper.doi}` : '';
+    return `${authors ? authors + ' ' : ''}(${year}). *${title}*. ${source}.${doiSuffix}`;
 };
 
 // Define citation styles and their generators

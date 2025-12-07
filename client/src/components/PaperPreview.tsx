@@ -113,7 +113,7 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         )}
-                        <CitePaperButton paper={paper} minimalist={true} />
+                        <CitePaperButton paper={loadedPaper ?? paper} minimalist={true} />
                     </div>
 
                     {/* Paper Info Section - Tabular Layout */}

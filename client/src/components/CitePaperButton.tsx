@@ -130,6 +130,9 @@ export function CitePaperButton({ paper, paperId: providedPaperId, minimalist = 
                             title: paperData.title,
                             authors: paperData.authors,
                             created_at: paperData.publish_date,
+                            journal: paperData.journal,
+                            publisher: paperData.publisher,
+                            doi: paperData.doi,
                         };
                         const citation = selectedStyleObj.generator(paperBase);
 
