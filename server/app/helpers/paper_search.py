@@ -119,8 +119,8 @@ class OpenAlexWork(BaseOpenAlexModel):
     topics: Optional[List[Topic]]
     authorships: Optional[List[Authorship]]
     cited_by_count: Optional[int]
-    abstract_inverted_index: Optional[dict]
-    abstract: Optional[str]
+    abstract_inverted_index: Optional[dict] = None
+    abstract: Optional[str] = None
 
     @model_validator(mode="before")
     @classmethod
