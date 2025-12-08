@@ -37,14 +37,14 @@ class BaseOpenAlexModel(BaseModel):
 
 class OpenAccess(BaseOpenAlexModel):
     is_oa: bool
-    oa_status: OAStatus
-    oa_url: Optional[str]
+    oa_status: Optional[OAStatus] = None
+    oa_url: Optional[str] = None
 
 
 class Keyword(BaseOpenAlexModel):
     id: str
     display_name: str
-    score: Optional[float]
+    score: Optional[float] = None
 
 
 class PrimaryLocationSource(BaseOpenAlexModel):
@@ -77,48 +77,48 @@ class SubTopic(BaseOpenAlexModel):
 
 class Topic(BaseOpenAlexModel):
     id: str
-    display_name: Optional[str]
-    score: Optional[float]
-    subfield: Optional[SubTopic]
-    field: Optional[SubTopic]
-    domain: Optional[SubTopic]
+    display_name: Optional[str] = None
+    score: Optional[float] = None
+    subfield: Optional[SubTopic] = None
+    field: Optional[SubTopic] = None
+    domain: Optional[SubTopic] = None
 
 
 class Author(BaseOpenAlexModel):
-    id: Optional[str]
-    display_name: Optional[str]
-    orcid: Optional[str]
+    id: Optional[str] = None
+    display_name: Optional[str] = None
+    orcid: Optional[str] = None
 
 
 class Institution(BaseOpenAlexModel):
-    id: Optional[str]
-    display_name: Optional[str]
-    ror: Optional[str]
-    country_code: Optional[str]
-    type: Optional[str]
+    id: Optional[str] = None
+    display_name: Optional[str] = None
+    ror: Optional[str] = None
+    country_code: Optional[str] = None
+    type: Optional[str] = None
 
 
 class Authorship(BaseOpenAlexModel):
-    author_position: Optional[str]
-    author: Optional[Author]
-    institutions: Optional[List[Institution]]
+    author_position: Optional[str] = None
+    author: Optional[Author] = None
+    institutions: Optional[List[Institution]] = None
 
 
 class OpenAlexWork(BaseOpenAlexModel):
     id: str
     title: str
-    doi: Optional[str]
-    display_name: Optional[str]
-    publication_year: int
-    publication_date: str
-    type: Optional[str]
-    open_access: Optional[OpenAccess]
-    keywords: Optional[List[Keyword]]
-    primary_location: Optional[PrimaryLocation]
+    doi: Optional[str] = None
+    display_name: Optional[str] = None
+    publication_year: Optional[int] = None
+    publication_date: Optional[str] = None
+    type: Optional[str] = None
+    open_access: Optional[OpenAccess] = None
+    keywords: Optional[List[Keyword]] = None
+    primary_location: Optional[PrimaryLocation] = None
     biblio: Optional[Biblio] = None
-    topics: Optional[List[Topic]]
-    authorships: Optional[List[Authorship]]
-    cited_by_count: Optional[int]
+    topics: Optional[List[Topic]] = None
+    authorships: Optional[List[Authorship]] = None
+    cited_by_count: Optional[int] = None
     abstract_inverted_index: Optional[dict] = None
     abstract: Optional[str] = None
 
