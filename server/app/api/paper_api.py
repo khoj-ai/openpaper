@@ -410,52 +410,55 @@ async def get_pdf(
         >= CHECK_METADATA_INTERVAL_DAYS
     )
 
-    if should_check_doi and is_cache_stale:
-        doi = get_doi(str(paper.title), list(paper.authors) if paper.authors else None)  # type: ignore
-        if doi:
-            paper_crud.update(
-                db=db, db_obj=paper, obj_in=PaperUpdate(doi=doi), user=current_user
-            )
-        paper_crud.update(
-            db=db,
-            db_obj=paper,
-            obj_in=PaperUpdate(attempted_metadata_at=datetime.now(timezone.utc)),
-            user=current_user,
-        )
-
-    if paper.doi and (not paper.journal and not paper.publisher) and is_cache_stale:
-        enriched_data = get_enriched_data(str(paper.doi))
-        if enriched_data:
-            paper_data["journal"] = enriched_data.journal
-            paper_data["publisher"] = enriched_data.publisher
-
-            publish_datetime = (
-                parse_publication_date(enriched_data.publication_date)
-                if enriched_data.publication_date
-                else paper.publish_date
-            )
-            paper_data["publish_date"] = (
-                publish_datetime.isoformat() if publish_datetime else None
-            )
-
+    try:
+        if should_check_doi and is_cache_stale:
+            doi = get_doi(str(paper.title), list(paper.authors) if paper.authors else None)  # type: ignore
+            if doi:
+                paper_crud.update(
+                    db=db, db_obj=paper, obj_in=PaperUpdate(doi=doi), user=current_user
+                )
             paper_crud.update(
                 db=db,
                 db_obj=paper,
-                obj_in=PaperUpdate(
-                    journal=enriched_data.journal,
-                    publisher=enriched_data.publisher,
-                    publish_date=(
-                        publish_datetime.isoformat() if publish_datetime else None
-                    ),
-                ),
+                obj_in=PaperUpdate(attempted_metadata_at=datetime.now(timezone.utc)),
                 user=current_user,
             )
-        paper_crud.update(
-            db=db,
-            db_obj=paper,
-            obj_in=PaperUpdate(attempted_metadata_at=datetime.now(timezone.utc)),
-            user=current_user,
-        )
+
+        if paper.doi and (not paper.journal and not paper.publisher) and is_cache_stale:
+            enriched_data = get_enriched_data(str(paper.doi))
+            if enriched_data:
+                paper_data["journal"] = enriched_data.journal
+                paper_data["publisher"] = enriched_data.publisher
+
+                publish_datetime = (
+                    parse_publication_date(enriched_data.publication_date)
+                    if enriched_data.publication_date
+                    else paper.publish_date
+                )
+                paper_data["publish_date"] = (
+                    publish_datetime.isoformat() if publish_datetime else None
+                )
+
+                paper_crud.update(
+                    db=db,
+                    db_obj=paper,
+                    obj_in=PaperUpdate(
+                        journal=enriched_data.journal,
+                        publisher=enriched_data.publisher,
+                        publish_date=(
+                            publish_datetime.isoformat() if publish_datetime else None
+                        ),
+                    ),
+                    user=current_user,
+                )
+            paper_crud.update(
+                db=db,
+                db_obj=paper,
+                obj_in=PaperUpdate(attempted_metadata_at=datetime.now(timezone.utc)),
+                user=current_user,
+            )
+    except Exception:
+        logger.exception("Error updating enriched data for paper %s", id, exc_info=True)
 
     paper_data["file_url"] = signed_url
     paper_data["summary_citations"] = [  # type: ignore
