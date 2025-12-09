@@ -71,6 +71,7 @@ export function generateStaticParams() {
         { slug: 'change_june' },
         { slug: 'pdfchat' },
         { slug: 'library' },
+        { slug: 'library2'},
         { slug: 'whatllm' },
         { slug: 'projects' }
     ];

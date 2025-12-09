@@ -1,0 +1,139 @@
+import Image from 'next/image'
+
+export const metadata = {
+    title: "Your Central Hub for Research",
+    description: "Discover how Open Paper's library transforms your paper management with intelligent metadata extraction, seamless organization, and project-based workflows that accelerate your research journey.",
+    date: "12-08-2025",
+    image: "https://assets.khoj.dev/blue_bubbles_abstract.png",
+}
+
+Research is a journey from curiosity to understanding. Every paper you read is a stepping stone, a piece of a larger puzzle you're trying to solve. But managing those pieces - keeping track of dozens or hundreds of papers, remembering what each one contributes, and organizing them into coherent projects — can feel overwhelming.
+
+That's where the Open Paper library helps. It stores all your academic papers in one place. It's your central command center for research, designed to help you upload, organize, and work with papers efficiently.
+
+<div className="my-8 mx-auto">
+<a href="https://assets.khoj.dev/library_view.jpeg" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity">
+<Image
+  src="https://assets.khoj.dev/library_view.jpeg"
+  alt="Screenshot of the Open Paper library interface showing uploaded papers with metadata"
+  width={1200}
+  height={700}
+  className="mx-auto my-8 cursor-pointer rounded-lg shadow-lg"
+/>
+</a>
+</div>
+
+# Every Paper, Organized and Accessible
+
+The Library holds every paper you've uploaded to Open Paper. Whether you're adding one paper at a time or uploading a batch of PDFs all at once, the Library makes it easy to build your research collection. Each paper becomes instantly accessible, searchable, and ready to use.
+
+## Intelligent Metadata Extraction
+
+When you upload a paper, Open Paper doesn't just store the file—it actively works to understand it. We automatically extract critical metadata including:
+
+- **Authors**: Full author lists with proper attribution
+- **Publication venue**: Journal names, conference proceedings, and other publication details
+- **Publication date**: When the research was published
+- **DOI and identifiers**: Persistent links and reference IDs
+- **Abstract and key information**: Core content for quick reference
+
+This happens automatically, saving you hours of manual data entry and ensuring your library is properly organized from the start.
+
+### Technical Details
+
+To make this possible, we leverage two powerful academic APIs:
+
+**OpenAlex**: A comprehensive, open index of scholarly works that provides rich metadata about millions of papers, authors, and institutions. When you upload a paper, we query OpenAlex to find matching records and pull in verified metadata.
+
+**Crossref**: The official DOI registration agency for scholarly content. Crossref helps us create precise associations between your uploaded papers and their official publication records, ensuring citation accuracy.
+
+Together, these APIs allow us to automatically generate accurate citations, build proper bibliographies, and maintain the scholarly integrity of your research library—all without you lifting a finger.
+
+# From Papers to Projects
+
+Individual papers are valuable, but research really comes alive when you can see connections between papers and organize them into meaningful groups. That's why we built [Projects](/projects).
+
+## Effortless Project Creation
+
+With Open Paper, you can select multiple papers from your library and instantly create a project. Projects help you:
+
+- **Organize related papers**: Group papers by topic, research question, or any other criteria that makes sense for your work
+- **Generate insights**: Use AI to synthesize information across all papers in a project
+- **Create artifacts**: Generate literature reviews, summaries, and other research artifacts from your project papers
+- **Collaborate**: Share projects with colleagues and work together on research initiatives
+
+## Transforming Literature Review
+
+Projects fundamentally change how you approach literature review. Instead of reading papers in isolation and trying to remember how they connect, you can:
+
+1. Upload all relevant papers to your library
+2. Select the ones that relate to your current research question
+3. Create a project that brings them together
+4. Use AI tools to analyze themes, identify gaps, and synthesize findings across the entire collection
+
+This workflow **dramatically reduces the time** from initial concept to deep understanding. What used to take weeks of manual reading, note-taking, and synthesis can now happen in hours.
+
+# Powerful Features at Your Fingertips
+
+More than a static list of papers, Open Paper is an interactive workspace designed to help you engage with your research in meaningful ways.
+
+<div className="my-8 mx-auto">
+<a href="https://assets.khoj.dev/library_view_detailed.png" target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity">
+<Image
+  src="https://assets.khoj.dev/library_view_detailed.png"
+  alt="Screenshot of the Open Paper library interface showing uploaded papers with metadata"
+  width={1200}
+  height={700}
+  className="mx-auto my-8 cursor-pointer rounded-lg shadow-lg"
+/>
+</a>
+</div>
+
+
+## Paper Preview and Quick Actions
+
+Click on any paper in your library to open a detailed preview panel that gives you instant access to:
+
+- **Full metadata**: Authors, publication details, DOI, journal, and publisher information displayed in a clean, organized table
+- **Your highlights**: See all the passages you've highlighted while reading, complete with page numbers, so you can quickly recall key insights without reopening the PDF
+- **Reading status**: Track papers as "Todo," "Reading," or "Completed" to manage your reading queue
+- **Quick citations**: Generate properly formatted citations with a single click
+- **Visual previews**: See thumbnail previews of papers to quickly identify them at a glance
+
+## Tags for Custom Organization
+
+Beyond projects, you can create your own organizational system using tags. The Library makes tagging effortless:
+
+- **Bulk tagging**: Select multiple papers and apply tags all at once
+- **Quick filtering**: Click any tag to instantly filter your entire library to papers with that tag
+- **Tag management**: Add or remove tags directly from the paper preview or table view
+- **Custom categories**: Create tags for methodologies, themes, research stages, or any categorization that suits your workflow
+
+Tags give you the flexibility to organize papers in multiple overlapping ways, so the same paper can belong to different conceptual groups without duplication.
+
+## Smart Search and Filtering
+
+Finding the right paper when you need it is crucial. The Library offers powerful search and filtering tools:
+
+- **Multi-field search**: Search across titles, authors, organizations, and keywords simultaneously
+- **Filter by multiple criteria**: Combine filters for authors, keywords, tags, and reading status to narrow down exactly what you're looking for
+- **Sort by relevance**: Order papers by date added, publication date, or title
+- **Real-time results**: See your filtered results update instantly as you type
+
+## Bulk Operations for Efficiency
+
+When managing a large library, efficiency matters. Select multiple papers to:
+
+- **Add to projects**: Create new projects or add papers to existing ones in one action
+- **Apply tags**: Tag entire batches of related papers simultaneously
+- **Delete papers**: Remove multiple papers from your library at once
+
+# Built for Researchers, By Researchers
+
+We designed the Library with one goal in mind: to accelerate your research without getting in your way. Upload papers in bulk. Let us handle the metadata. Organize into projects when you're ready. Generate insights when you need them.
+
+Your research deserves a library that works as hard as you do. Welcome to Open Paper.
+
+---
+
+Ready to supercharge your research workflow? [Start building your library today](/papers) and experience the difference an intelligent research hub can make.
