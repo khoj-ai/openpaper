@@ -59,7 +59,7 @@ export default function Home() {
 				});
 			} else if (isPaperUploadAtLimit(subscription)) {
 				toast.error("Upload limit reached", {
-					description: "You've reached your paper upload limit for this month. Please upgrade your plan to upload more papers.",
+					description: "You've reached your paper upload limit for this plan. Please upgrade your plan to upload more papers.",
 					action: {
 						label: "Upgrade",
 						onClick: () => window.location.href = "/pricing"
@@ -75,7 +75,7 @@ export default function Home() {
 				});
 			} else if (isPaperUploadNearLimit(subscription)) {
 				toast.warning("Upload limit approaching", {
-					description: "You're approaching your monthly paper upload limit. Consider upgrading your plan.",
+					description: "You're approaching your paper upload limit. Consider upgrading your plan.",
 					action: {
 						label: "Plans",
 						onClick: () => window.location.href = "/pricing"
