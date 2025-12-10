@@ -4,8 +4,13 @@ import { PaperItem } from '@/lib/schema';
 
 const fetcher = (url: string) => fetchFromApi(url).then(data => data.papers || data);
 
-export function usePapers() {
-	const { data, error, isLoading, mutate } = useSWR<PaperItem[]>('/api/paper/all', fetcher);
+interface UserPapersProps {
+	detailed?: boolean;
+}
+
+export function usePapers({ detailed = false }: UserPapersProps = {}) {
+	const url = detailed ? '/api/paper/all?detailed=true' : '/api/paper/all';
+	const { data, error, isLoading, mutate } = useSWR<PaperItem[]>(url, fetcher);
 
 	const setPapers = (paperId: string, updatedPaper: PaperItem) => {
 		if (data) {

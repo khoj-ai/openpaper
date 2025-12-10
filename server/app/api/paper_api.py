@@ -55,6 +55,7 @@ class UpdatePaperNoteSchema(BaseModel):
 @paper_router.get("/all")
 async def get_paper_ids(
     db: Session = Depends(get_db),
+    detailed: bool = False,
     current_user: CurrentUser = Depends(get_required_user),
 ):
     """
@@ -63,10 +64,12 @@ async def get_paper_ids(
     papers: List[Paper] = paper_crud.get_multi_uploads_completed(db, user=current_user)
 
     # Bulk retrieve presigned URLs for all papers (optimized with parallelization)
-    file_urls = s3_service.get_cached_presigned_urls_bulk(
-        db=db,
-        papers=papers,
-    )
+    file_urls = {}
+    if detailed:
+        file_urls = s3_service.get_cached_presigned_urls_bulk(
+            db=db,
+            papers=papers,
+        )
 
     data = [
         {
