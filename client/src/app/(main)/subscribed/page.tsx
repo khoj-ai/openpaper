@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { fetchFromApi } from '@/lib/api'
-import { CheckCircle, XCircle, Upload, MessageSquare, Sparkles, ArrowLeft, Clock } from 'lucide-react'
+import { CheckCircle, XCircle, Upload, MessageSquare, Sparkles, ArrowLeft } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import LoadingIndicator from '@/components/utils/Loading'
 import Link from 'next/link'
@@ -87,20 +87,6 @@ function SubscribedPageContent() {
             setConfettiTriggered(true)
         }
     }, [sessionStatus, confettiTriggered])
-
-    const getStatusIcon = () => {
-        if (!sessionStatus) return null
-
-        if (sessionStatus.status === 'complete' && sessionStatus.backend_subscription_found) {
-            return <CheckCircle className="h-16 w-16 text-green-500" />
-        } else if (sessionStatus.status === 'complete' && !sessionStatus.backend_subscription_found) {
-            return <Clock className="h-16 w-16 text-yellow-500" />
-        } else if (sessionStatus.status === 'open') {
-            return <Clock className="h-16 w-16 text-blue-500" />
-        } else {
-            return <XCircle className="h-16 w-16 text-red-500" />
-        }
-    }
 
     const getStatusMessage = () => {
         if (!sessionStatus) return null
@@ -272,7 +258,7 @@ function SubscribedPageContent() {
                     Your subscription is now active{sessionStatus?.customer_email ? ` for ${sessionStatus.customer_email}` : ''}.
                 </p>
                 <p className="text-sm text-muted-foreground mb-8 max-w-md">
-                    You now have access to upgraded features. Here's what you can do:
+                    You now have access to upgraded features. Here&apos;s what you can do:
                 </p>
 
                 {/* Feature highlights */}
