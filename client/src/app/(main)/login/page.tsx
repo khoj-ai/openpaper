@@ -88,6 +88,7 @@ function LoginContent() {
 				body: JSON.stringify({ email }),
 			});
 			if (data.success) {
+				setError(null);
 				if (data.newly_created) {
 					setShowNameInput(true);
 				} else {
