@@ -102,12 +102,13 @@ function getColorForIndex(index: number, type: 'research' | 'job' | 'referral'):
 
 const researchFields = [
 	"AI/ML", "Biological Sciences", "Chemistry", "Civic Research",
-	"Civil Engineering", "Computer Science", "Earth Science",
-	"Education Research", "Electrical Engineering", "Hardware", "History",
-	"Humanities", "Law/Legal Studies", "Literature", "Medical Sciences",
-	"Mathematics", "Neuroscience", "Pharmaceutical / Biotech R&D", "Physics",
-	"Psychology", "Public Health", "Public Policy",
-	"Regulatory Affairs / Compliance", "Social Sciences", "Other"
+	"Civil Engineering", "Clinical Medicine", "Computer Science", "Earth Science",
+	"Education Research", "Electrical Engineering", "Epidemiology", "Hardware", "History",
+	"Humanities", "Immunology", "Law/Legal Studies", "Literature", "Medical Sciences",
+	"Mathematics", "Neuroscience", "Oncology", "Pathology", "Pharmacology",
+	"Pharmaceutical / Biotech R&D", "Physics", "Psychiatry", "Psychology", "Public Health",
+	"Public Policy", "Radiology", "Regulatory Affairs / Compliance", "Social Sciences",
+	"Surgery", "Other"
 ].map((field, index) => ({
 	value: field.toLowerCase(),
 	label: field,
@@ -117,6 +118,7 @@ const researchFields = [
 const jobTitles = [
 	"Academic - Lecturer", "Academic - Postdoc", "Academic - Professor / Faculty",
 	"Academic - Researcher", "Academic - Research Assistant", "Health - Clinician",
+	"Health - Medical Resident", "Health - Medical Student", "Health - Physician",
 	"Health - Public Health", "Health - Research Team Lead", "Industry - Consultant",
 	"Industry - Data Scientist", "Industry - Expert Witness", "Industry - Founder",
 	"Industry - Research Engineer / Scientist", "Industry - Tech Lead", "Industry - Writer",
