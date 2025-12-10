@@ -159,7 +159,7 @@ export function CitePaperButton({ paper, paperId: providedPaperId, minimalist = 
                                     ) : (
                                         <>
                                             <Copy className="h-4 w-4 mr-2" />
-                                            Copy Citation
+                                            Copy
                                         </>
                                     )}
                                 </Button>

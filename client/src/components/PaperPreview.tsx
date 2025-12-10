@@ -139,12 +139,12 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
                                                 <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">DOI</td>
                                                 <td className="px-3 py-2">
                                                     <a
-                                                        href={`https://doi.org/${paper.doi}`}
+                                                        href={`https://doi.org/${loadedPaper.doi}`}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                         className="text-blue-600 hover:underline"
                                                     >
-                                                        {paper.doi}
+                                                        {loadedPaper.doi}
                                                     </a>
                                                 </td>
                                             </tr>
