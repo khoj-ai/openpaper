@@ -37,7 +37,7 @@ function UnderstandPageContent() {
     const searchParams = useSearchParams();
     const { user, loading: authLoading } = useAuth();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const { papers: fetchedPapers, isLoading: isPapersLoading, error: papersError } = usePapers();
+    const { papers: fetchedPapers, isLoading: isPapersLoading, error: papersError } = usePapers({ detailed: true });
 
     const papers = useMemo(() => {
         if (!fetchedPapers) return [];
