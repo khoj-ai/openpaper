@@ -183,6 +183,36 @@ export const generateAPA = (paper: PaperBase): string => {
     return `${authors ? authors + ' ' : ''}(${year}). *${title}*. ${source}.${doiSuffix}`;
 };
 
+export const generateBibTeX = (paper: PaperBase): string => {
+    // Generate a citation key from first author last name and year
+    const firstAuthor = paper.authors?.[0] || "Unknown";
+    const lastName = firstAuthor.trim().split(' ').pop() || "Unknown";
+    const year = getYear(paper.created_at);
+    const citeKey = `${lastName.toLowerCase()}${year}`;
+
+    // Format authors for BibTeX (Last, First and Last, First and ...)
+    const bibtexAuthors = paper.authors?.map(name => {
+        const parts = name.trim().split(' ');
+        const last = parts.pop() || "";
+        const first = parts.join(' ');
+        return `${last}, ${first}`;
+    }).join(' and ') || "";
+
+    const title = paper.title || "[Untitled]";
+    const journal = paper.journal || "";
+    const doi = paper.doi || "";
+
+    let bibtex = `@article{${citeKey},\n`;
+    if (bibtexAuthors) bibtex += `  author = {${bibtexAuthors}},\n`;
+    bibtex += `  title = {${title}},\n`;
+    if (journal) bibtex += `  journal = {${journal}},\n`;
+    bibtex += `  year = {${year}}`;
+    if (doi) bibtex += `,\n  doi = {${doi}}`;
+    bibtex += `\n}`;
+
+    return bibtex;
+};
+
 // Define citation styles and their generators
 export const citationStyles = [
     { name: 'MLA', generator: generateMLA },
@@ -192,6 +222,7 @@ export const citationStyles = [
     { name: 'AMA', generator: generateAMA },
     { name: 'Chicago (Author-Date)', generator: generateChicago },
     { name: 'APA', generator: generateAPA },
+    { name: 'BibTeX', generator: generateBibTeX },
 ];
 
 // Function to copy text to clipboard
