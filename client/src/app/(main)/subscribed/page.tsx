@@ -2,12 +2,12 @@
 
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
 import { fetchFromApi } from '@/lib/api'
-import { CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react'
+import { CheckCircle, XCircle, Upload, MessageSquare, Sparkles, FolderKanban, ArrowLeft, Clock } from 'lucide-react'
 import confetti from 'canvas-confetti'
+import LoadingIndicator from '@/components/utils/Loading'
+import Link from 'next/link'
 
 interface SessionStatusResponse {
     status: string
@@ -23,7 +23,7 @@ function SubscribedPageContent() {
 
     const [sessionStatus, setSessionStatus] = useState<SessionStatusResponse | null>(null)
     const [loading, setLoading] = useState(true)
-    const [error, setError] = useState<string | null>(null)
+    const [error, setError] = useState<string | null>('')
     const [confettiTriggered, setConfettiTriggered] = useState(false)
 
     const triggerConfetti = () => {
@@ -134,146 +134,251 @@ function SubscribedPageContent() {
 
     if (loading) {
         return (
-            <div className="container mx-auto max-w-2xl py-12 px-4">
-                <Card>
-                    <CardHeader className="text-center">
-                        <Skeleton className="h-16 w-16 rounded-full mx-auto mb-4" />
-                        <Skeleton className="h-8 w-64 mx-auto mb-2" />
-                        <Skeleton className="h-4 w-96 mx-auto" />
-                    </CardHeader>
-                    <CardContent className="text-center">
-                        <Skeleton className="h-4 w-full mb-2" />
-                        <Skeleton className="h-4 w-3/4 mx-auto" />
-                    </CardContent>
-                </Card>
+            <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
+                <LoadingIndicator />
+                <p className="mt-4 text-muted-foreground">Verifying your subscription...</p>
             </div>
         )
     }
 
     if (error || !sessionId) {
         return (
-            <div className="container mx-auto max-w-2xl py-12 px-4">
-                <Card>
-                    <CardHeader className="text-center">
-                        <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-                        <CardTitle className="text-2xl">Something went wrong</CardTitle>
-                        <CardDescription>
-                            {error || 'No session ID was provided in the URL'}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-center">
-                        <Button onClick={() => router.push('/pricing')} className="mt-4">
-                            Return to Pricing
-                        </Button>
-                    </CardContent>
-                </Card>
+            <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 text-center max-w-2xl mx-auto">
+                <div className="relative mb-8">
+                    <div className="relative w-32 h-32 mx-auto">
+                        <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 via-red-500/5 to-transparent rounded-full blur-2xl" />
+                        <div className="relative w-full h-full bg-gradient-to-br from-red-500/5 to-red-500/10 dark:from-red-500/10 dark:to-red-500/20 rounded-2xl flex items-center justify-center border border-red-500/10 shadow-sm">
+                            <XCircle className="w-14 h-14 text-red-500" strokeWidth={1.5} />
+                        </div>
+                    </div>
+                </div>
+
+                <h2 className="text-2xl font-bold text-foreground mb-3">
+                    Subscription Error
+                </h2>
+                <p className="text-muted-foreground mb-8 max-w-md">
+                    {error || 'No session ID was provided. Your subscription may not have been processed correctly.'}
+                </p>
+
+                <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm">
+                    <Button
+                        size="lg"
+                        className="flex-1 bg-primary hover:bg-primary/90"
+                        onClick={() => router.push('/pricing')}
+                    >
+                        <ArrowLeft className="h-4 w-4 mr-2" />
+                        Back to Pricing
+                    </Button>
+                    <Button
+                        size="lg"
+                        variant="outline"
+                        className="flex-1"
+                        asChild
+                    >
+                        <Link href="/">
+                            Continue to App
+                        </Link>
+                    </Button>
+                </div>
+
+                <p className="text-sm text-muted-foreground mt-8">
+                    If you believe this is an error, please{' '}
+                    <a href="mailto:saba@openpaper.ai" className="text-primary hover:underline">
+                        contact support
+                    </a>{' '}
+                    with your payment confirmation.
+                </p>
             </div>
         )
     }
 
     const statusMessage = getStatusMessage()
+    const isSuccess = sessionStatus?.status === 'complete' && sessionStatus?.backend_subscription_found
+    const isError = sessionStatus?.status !== 'complete' && sessionStatus?.status !== 'open'
 
+    // Error state (payment failed or expired)
+    if (isError) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 text-center max-w-2xl mx-auto">
+                <div className="relative mb-8">
+                    <div className="relative w-32 h-32 mx-auto">
+                        <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 via-red-500/5 to-transparent rounded-full blur-2xl" />
+                        <div className="relative w-full h-full bg-gradient-to-br from-red-500/5 to-red-500/10 dark:from-red-500/10 dark:to-red-500/20 rounded-2xl flex items-center justify-center border border-red-500/10 shadow-sm">
+                            <XCircle className="w-14 h-14 text-red-500" strokeWidth={1.5} />
+                        </div>
+                    </div>
+                </div>
+
+                <h2 className="text-2xl font-bold text-foreground mb-3">
+                    {statusMessage?.title}
+                </h2>
+                <p className="text-muted-foreground mb-8 max-w-md">
+                    {statusMessage?.description} Please return to the pricing page and try again.
+                </p>
+
+                <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm">
+                    <Button
+                        size="lg"
+                        className="flex-1 bg-primary hover:bg-primary/90"
+                        onClick={() => router.push('/pricing')}
+                    >
+                        <ArrowLeft className="h-4 w-4 mr-2" />
+                        Back to Pricing
+                    </Button>
+                    <Button
+                        size="lg"
+                        variant="outline"
+                        className="flex-1"
+                        asChild
+                    >
+                        <Link href="/">
+                            Continue to App
+                        </Link>
+                    </Button>
+                </div>
+
+                <p className="text-sm text-muted-foreground mt-8">
+                    Having trouble?{' '}
+                    <a href="mailto:saba@openpaper.ai" className="text-primary hover:underline">
+                        Contact support
+                    </a>{' '}
+                    for assistance.
+                </p>
+            </div>
+        )
+    }
+
+    // Success state
+    if (isSuccess) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 text-center max-w-2xl mx-auto">
+                {/* Success Icon */}
+                <div className="relative mb-8">
+                    <div className="relative w-32 h-32 mx-auto">
+                        <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 via-primary/5 to-transparent rounded-full blur-2xl" />
+                        <div className="relative w-full h-full bg-gradient-to-br from-green-500/5 to-primary/10 dark:from-green-500/10 dark:to-primary/20 rounded-2xl flex items-center justify-center border border-green-500/10 shadow-sm">
+                            <CheckCircle className="w-14 h-14 text-green-500" strokeWidth={1.5} />
+                        </div>
+                        <div className="absolute -top-2 -right-2 w-12 h-12 bg-background dark:bg-card rounded-xl flex items-center justify-center border border-green-500/20 shadow-md">
+                            <Sparkles className="w-6 h-6 text-green-500" strokeWidth={2} />
+                        </div>
+                    </div>
+                </div>
+
+                <h2 className="text-2xl font-bold text-foreground mb-3">
+                    Welcome to Open Paper - Researcher!
+                </h2>
+                <p className="text-muted-foreground mb-2 max-w-md">
+                    Your subscription is now active{sessionStatus?.customer_email ? ` for ${sessionStatus.customer_email}` : ''}.
+                </p>
+                <p className="text-sm text-muted-foreground mb-8 max-w-md">
+                    You now have access to upgraded features. Here's what you can do:
+                </p>
+
+                {/* Feature highlights */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8 w-full max-w-lg">
+                    <div className="text-center">
+                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-blue-500/10 text-blue-500 mb-3">
+                            <Upload className="h-6 w-6" />
+                        </div>
+                        <p className="text-sm font-medium">More Papers</p>
+                        <p className="text-xs text-muted-foreground">Enjoy higher upload limits</p>
+                    </div>
+                    <div className="text-center">
+                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-primary/10 text-primary mb-3">
+                            <MessageSquare className="h-6 w-6" />
+                        </div>
+                        <p className="text-sm font-medium">Upgraded Chat</p>
+                        <p className="text-xs text-muted-foreground">Ask anything, anytime</p>
+                    </div>
+                    <div className="text-center">
+                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-green-500/10 text-green-500 mb-3">
+                            <Sparkles className="h-6 w-6" />
+                        </div>
+                        <p className="text-sm font-medium">Intelligent Artifacts</p>
+                        <p className="text-xs text-muted-foreground">Collect insights & audio summaries</p>
+                    </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md">
+                    <Button
+                        size="lg"
+                        className="flex-1 bg-primary hover:bg-primary/90"
+                        onClick={() => router.push('/')}
+                    >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload Papers
+                    </Button>
+                    <Button
+                        size="lg"
+                        variant="outline"
+                        className="flex-1"
+                        asChild
+                    >
+                        <Link href="/projects">
+                            Create Projects
+                        </Link>
+                    </Button>
+                </div>
+
+                <div className="mt-8">
+                    <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                        or go to your library →
+                    </Link>
+                </div>
+            </div>
+        )
+    }
+
+    // Processing/pending state (payment complete but subscription not yet ready, or payment still open)
     return (
-        <div className="container mx-auto max-w-2xl py-12 px-4">
-            <Card>
-                <CardHeader className="text-center">
-                    <div className="mb-4 items-center justify-center mx-auto">
-                        {getStatusIcon()}
+        <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 text-center max-w-2xl mx-auto">
+            <div className="relative mb-8">
+                <div className="relative w-32 h-32 mx-auto">
+                    <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 via-yellow-500/5 to-transparent rounded-full blur-2xl" />
+                    <div className="relative w-full h-full bg-gradient-to-br from-yellow-500/5 to-yellow-500/10 dark:from-yellow-500/10 dark:to-yellow-500/20 rounded-2xl flex items-center justify-center border border-yellow-500/10 shadow-sm">
+                        <LoadingIndicator />
                     </div>
-                    <CardTitle className="text-2xl">{statusMessage?.title}</CardTitle>
-                    <CardDescription className="text-lg">
-                        {statusMessage?.description}
-                    </CardDescription>
-                </CardHeader>
+                </div>
+            </div>
 
-                <CardContent className="space-y-4">
-                    {/* Status Details */}
-                    <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
-                        <div>
-                            <div className="text-sm font-medium text-muted-foreground">Payment Status</div>
-                            <div className="text-sm capitalize">{sessionStatus?.status}</div>
-                        </div>
-                        {sessionStatus?.customer_email && (
-                            <div>
-                                <div className="text-sm font-medium text-muted-foreground">Email</div>
-                                <div className="text-sm">{sessionStatus.customer_email}</div>
-                            </div>
-                        )}
-                        <div>
-                            <div className="text-sm font-medium text-muted-foreground">Backend Status</div>
-                            <div className="text-sm">
-                                {sessionStatus?.backend_subscription_found ? (
-                                    <span className="text-green-600">✓ Found</span>
-                                ) : (
-                                    <span className="text-yellow-600">⏳ Processing</span>
-                                )}
-                            </div>
-                        </div>
-                        {sessionStatus?.backend_subscription_status && (
-                            <div>
-                                <div className="text-sm font-medium text-muted-foreground">Subscription Status</div>
-                                <div className="text-sm capitalize">{sessionStatus.backend_subscription_status}</div>
-                            </div>
-                        )}
-                    </div>
+            <h2 className="text-2xl font-bold text-foreground mb-3">
+                {statusMessage?.title}
+            </h2>
+            <p className="text-muted-foreground mb-8 max-w-md">
+                {statusMessage?.description}
+            </p>
 
-                    {/* Action Buttons */}
-                    <div className="flex gap-4 pt-4">
-                        {statusMessage?.variant === 'success' ? (
-                            <Button onClick={() => router.push('/')} className="flex-1 bg-blue-500">
-                                Start Using Open Paper
-                            </Button>
-                        ) : statusMessage?.variant === 'processing' ? (
-                            <>
-                                <Button
-                                    variant="outline"
-                                    onClick={() => window.location.reload()}
-                                    className="flex-1"
-                                >
-                                    Refresh Status
-                                </Button>
-                                <Button onClick={() => router.push('/')} className="flex-1">
-                                    Continue to App
-                                </Button>
-                            </>
-                        ) : (
-                            <>
-                                <Button
-                                    variant="outline"
-                                    onClick={() => router.push('/pricing')}
-                                    className="flex-1"
-                                >
-                                    Return to Pricing
-                                </Button>
-                                <Button
-                                    onClick={() => router.push('/contact')}
-                                    className="flex-1"
-                                >
-                                    Contact Support
-                                </Button>
-                            </>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
+            <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm">
+                <Button
+                    size="lg"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => window.location.reload()}
+                >
+                    Refresh Status
+                </Button>
+                <Button
+                    size="lg"
+                    className="flex-1 bg-primary hover:bg-primary/90"
+                    onClick={() => router.push('/')}
+                >
+                    Continue to App
+                </Button>
+            </div>
+
+            <p className="text-sm text-muted-foreground mt-8">
+                This usually takes just a few moments. Feel free to continue using the app while we set things up.
+            </p>
         </div>
     )
 }
 
 function SubscribedPageSkeleton() {
     return (
-        <div className="container mx-auto max-w-2xl py-12 px-4">
-            <Card>
-                <CardHeader className="text-center">
-                    <Skeleton className="h-16 w-16 rounded-full mx-auto mb-4" />
-                    <Skeleton className="h-8 w-64 mx-auto mb-2" />
-                    <Skeleton className="h-4 w-96 mx-auto" />
-                </CardHeader>
-                <CardContent className="text-center">
-                    <Skeleton className="h-4 w-full mb-2" />
-                    <Skeleton className="h-4 w-3/4 mx-auto" />
-                </CardContent>
-            </Card>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
+            <LoadingIndicator />
+            <p className="mt-4 text-muted-foreground">Loading...</p>
         </div>
     )
 }
