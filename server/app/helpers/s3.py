@@ -492,31 +492,6 @@ class S3Service:
 
         return result
 
-    def get_cached_presigned_url_by_project(
-        self,
-        db: Session,
-        paper_id: str,
-        object_key: str,
-        project_id: str,
-        current_user: CurrentUser,
-        expiration: int = 28800,
-    ) -> Optional[str]:
-        """
-        Get a cached presigned URL for a paper that's member of a specific project id, verifying that the user has access to the project.
-        """
-        paper: Paper = project_paper_crud.get_paper_by_project(
-            db=db,
-            paper_id=uuid.UUID(paper_id),
-            project_id=uuid.UUID(project_id),
-            user=current_user,
-        )
-
-        if not paper:
-            return None
-
-        # Generate and return the presigned URL
-        return self.generate_presigned_url(object_key, expiration)
-
     def duplicate_file(
         self, source_object_key: str, new_filename: str
     ) -> tuple[str, str]:
