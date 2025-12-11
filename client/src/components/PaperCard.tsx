@@ -102,7 +102,7 @@ export default function PaperCard({ paper, handleDelete, setPaper, minimalist = 
 									{/* Action buttons in top right */}
 									<div className="flex gap-1">
 										{!minimalist && (
-											<CitePaperButton paper={paper} minimalist={true} />
+											<CitePaperButton paper={[paper]} minimalist={true} />
 										)}
 										{
 											handleDelete && is_owner && (
