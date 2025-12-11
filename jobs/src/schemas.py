@@ -5,22 +5,6 @@ from enum import Enum
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
-class PDFImage(BaseModel):
-    """
-    Schema for an image extracted from a PDF.
-    """
-    page_number: int = Field(description="Page number where the image was found (1-indexed)")
-    image_index: int = Field(description="Index of the image on the page")
-    s3_object_key: str = Field(description="S3 object key for the extracted image")
-    image_url: str = Field(description="Public URL to access the image")
-    width: int = Field(description="Width of the image in pixels")
-    height: int = Field(description="Height of the image in pixels")
-    format: str = Field(description="Image format (e.g., 'PNG', 'JPEG')")
-    size_bytes: int = Field(description="Size of the image in bytes")
-    caption: Optional[str] = Field(default=None, description="Extracted caption or subtitle for the image")
-    placeholder_id: Optional[str] = Field(default=None, description="Placeholder ID for the image in the PDF, if applicable")
-
-
 class ResponseCitation(BaseModel):
     """
     Schema for a citation in the paper.
@@ -220,6 +204,5 @@ class PDFProcessingResult(BaseModel):
     file_url: Optional[str] = None
     preview_url: Optional[str] = None
     preview_object_key: Optional[str] = None
-    extracted_images: Optional[List[PDFImage]] = Field(default=None, description="List of images extracted from the PDF")
     error: Optional[str] = None
     duration: Optional[float] = None  # Duration in seconds
