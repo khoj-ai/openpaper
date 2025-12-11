@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Pause, Play, Volume2, RotateCcw } from "lucide-react";
+import { Loader2, Pause, Play, Volume2, RotateCcw, Table } from "lucide-react";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { fetchFromApi } from "@/lib/api";
 import { AudioOverview, PaperItem, AudioOverviewJob, ProjectRole } from "@/lib/schema";
@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { RichAudioOverview } from "./RichAudioOverview";
+import DataTableSchemaModal, { ColumnDefinition } from "./DataTableSchemaModal";
 
 interface ArtifactsProps {
     projectId: string;
@@ -60,6 +61,10 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
     const [audioVolume, setAudioVolume] = useState<{ [key: string]: number }>({});
     const [audioSpeed, setAudioSpeed] = useState<{ [key: string]: number }>({});
     const audioRefs = useRef<{ [key: string]: HTMLAudioElement }>({});
+
+    // Data Table states
+    const [isDataTableSchemaModalOpen, setDataTableSchemaModalOpen] = useState(false);
+    const [isCreatingDataTable, setIsCreatingDataTable] = useState(false);
 
     const getProjectAudioOverviews = useCallback(async () => {
         try {
@@ -318,6 +323,31 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
         return `${minutes}:${seconds.toString().padStart(2, '0')}`;
     };
 
+    const handleCreateDataTable = async (columns: ColumnDefinition[]) => {
+        setDataTableSchemaModalOpen(false);
+        setIsCreatingDataTable(true);
+
+        try {
+            toast.info("Creating data table...");
+
+            // Create the data table via API
+            const response = await fetchFromApi(`/api/projects/tables/${projectId}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ columns }),
+            });
+
+            // Navigate to the data table generation page
+            router.push(`/projects/${projectId}/tables/${response.id}`);
+        } catch (err) {
+            console.error("Failed to create data table:", err);
+            toast.error("Failed to create data table. Please try again.");
+            setIsCreatingDataTable(false);
+        }
+    };
+
     return (
         <div className="mt-8">
             <div className="flex justify-between items-center mb-4">
@@ -325,17 +355,18 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
             </div>
 
             <div className="flex flex-wrap gap-3">
-                {currentUserRole !== ProjectRole.Viewer &&
-                    <Dialog open={isCreateAudioDialogOpen} onOpenChange={setCreateAudioDialogOpen}>
-                        <DialogTrigger asChild>
-                            <button
-                                disabled={papers.length === 0}
-                                className="flex flex-col items-center justify-center p-3 border-2 border-dashed rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed aspect-square w-1/4"
-                            >
-                                <Volume2 className="w-6 h-6 text-gray-400 group-hover:text-blue-500 mb-1 transition-colors" />
-                                <span className="text-xs font-medium text-center leading-tight">Audio Overview</span>
-                            </button>
-                        </DialogTrigger>
+                {currentUserRole !== ProjectRole.Viewer && (
+                    <>
+                        <Dialog open={isCreateAudioDialogOpen} onOpenChange={setCreateAudioDialogOpen}>
+                            <DialogTrigger asChild>
+                                <button
+                                    disabled={papers.length === 0}
+                                    className="flex flex-col items-center justify-center p-3 border-2 border-dashed rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed aspect-square w-1/4"
+                                >
+                                    <Volume2 className="w-6 h-6 text-gray-400 group-hover:text-blue-500 mb-1 transition-colors" />
+                                    <span className="text-xs font-medium text-center leading-tight">Audio Overview</span>
+                                </button>
+                            </DialogTrigger>
                         <DialogContent>
                             <DialogHeader>
                                 <DialogTitle>Create an Audio Overview</DialogTitle>
@@ -398,8 +429,26 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
                             )}
                         </DialogContent>
                     </Dialog>
-                }
+
+                    <button
+                        disabled={papers.length === 0}
+                        onClick={() => setDataTableSchemaModalOpen(true)}
+                        className="flex flex-col items-center justify-center p-3 border-2 border-dashed rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed aspect-square w-1/4"
+                    >
+                        <Table className="w-6 h-6 text-gray-400 group-hover:text-blue-500 mb-1 transition-colors" />
+                        <span className="text-xs font-medium text-center leading-tight">Data Table</span>
+                    </button>
+                </>
+                )}
             </div>
+
+            {/* Data Table Schema Modal */}
+            <DataTableSchemaModal
+                open={isDataTableSchemaModalOpen}
+                onOpenChange={setDataTableSchemaModalOpen}
+                onSubmit={handleCreateDataTable}
+                isCreating={isCreatingDataTable}
+            />
 
             {/* Audio Overview Generation Jobs */}
             {audioJobs.length > 0 && (
