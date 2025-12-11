@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { PaperItem } from "@/lib/schema";
 import DataTableGenerationView from "@/components/DataTableGenerationView";
 import { ColumnDefinition } from "@/components/DataTableSchemaModal";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
     Breadcrumb,
@@ -15,6 +15,8 @@ import {
     BreadcrumbPage,
     BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { PdfViewer } from "@/components/PdfViewer";
+import { useIsMobile } from "@/lib/useMobile";
 
 interface DataTable {
     id: string;
@@ -91,6 +93,10 @@ export default function DataTablePage() {
     const [papers, setPapers] = useState<PaperItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+    const [searchTerm, setSearchTerm] = useState<string | null>(null);
+    const [isPdfVisible, setIsPdfVisible] = useState(false);
+    const isMobile = useIsMobile();
 
     useEffect(() => {
         // Simulate loading delay for realistic testing
@@ -102,6 +108,15 @@ export default function DataTablePage() {
 
         return () => clearTimeout(timer);
     }, [projectId, tableId]);
+
+    const handleCitationClick = (paperId: string, searchTerm: string) => {
+        const paper = papers.find(p => p.id === paperId);
+        if (paper && paper.file_url) {
+            setPdfUrl(paper.file_url);
+            setSearchTerm(searchTerm);
+            setIsPdfVisible(true);
+        }
+    };
 
     const handleClose = () => {
         router.push(`/projects/${projectId}`);
@@ -148,32 +163,84 @@ export default function DataTablePage() {
     }
 
     return (
-        <div className="container mx-auto py-8 px-4 max-w-7xl">
-            <div className="mb-6">
-                <Breadcrumb>
-                    <BreadcrumbList>
-                        <BreadcrumbItem>
-                            <BreadcrumbLink href="/projects">Projects</BreadcrumbLink>
-                        </BreadcrumbItem>
-                        <BreadcrumbSeparator />
-                        <BreadcrumbItem>
-                            <BreadcrumbLink href={`/projects/${projectId}`}>
-                                Project
-                            </BreadcrumbLink>
-                        </BreadcrumbItem>
-                        <BreadcrumbSeparator />
-                        <BreadcrumbItem>
-                            <BreadcrumbPage>Data Table</BreadcrumbPage>
-                        </BreadcrumbItem>
-                    </BreadcrumbList>
-                </Breadcrumb>
+        <div className="flex flex-row w-full h-screen">
+            <div className={`flex flex-col transition-all duration-500 ease-in-out ${isMobile ? (isPdfVisible ? 'hidden' : 'w-full') : (isPdfVisible ? 'w-1/2' : 'w-full')} overflow-y-auto`}>
+                <div className="container mx-auto py-8 px-4 max-w-7xl">
+                    <div className="mb-6">
+                        <Breadcrumb>
+                            <BreadcrumbList>
+                                <BreadcrumbItem>
+                                    <BreadcrumbLink href="/projects">Projects</BreadcrumbLink>
+                                </BreadcrumbItem>
+                                <BreadcrumbSeparator />
+                                <BreadcrumbItem>
+                                    <BreadcrumbLink href={`/projects/${projectId}`}>
+                                        Project
+                                    </BreadcrumbLink>
+                                </BreadcrumbItem>
+                                <BreadcrumbSeparator />
+                                <BreadcrumbItem>
+                                    <BreadcrumbPage>Data Table</BreadcrumbPage>
+                                </BreadcrumbItem>
+                            </BreadcrumbList>
+                        </Breadcrumb>
+                    </div>
+
+                    <DataTableGenerationView
+                        columns={dataTable.columns}
+                        papers={papers}
+                        onClose={handleClose}
+                        onCitationClick={handleCitationClick}
+                    />
+                </div>
             </div>
 
-            <DataTableGenerationView
-                columns={dataTable.columns}
-                papers={papers}
-                onClose={handleClose}
-            />
+            {isPdfVisible && (
+                <div className={`${isMobile ? 'w-full fixed inset-0 z-50 bg-background' : 'w-1/2 border-l-2'} flex flex-col animate-in slide-in-from-right-5 duration-500 ease-in-out`}>
+                    {isMobile && (
+                        <div className="flex items-center justify-between p-4 border-b">
+                            <h3 className="text-lg font-semibold">Paper Reference</h3>
+                            <Button onClick={() => setIsPdfVisible(false)} variant="ghost" size="icon">
+                                <X className="h-6 w-6" />
+                            </Button>
+                        </div>
+                    )}
+                    {!isMobile && (
+                        <div className="flex items-center justify-end p-2 border-b">
+                            <Button onClick={() => setIsPdfVisible(false)} variant="ghost" size="sm">
+                                <X className="h-4 w-4 mr-2" />
+                                Close
+                            </Button>
+                        </div>
+                    )}
+                    <div className="flex-grow transition-all duration-300 ease-in-out overflow-y-auto">
+                        {pdfUrl && (
+                            <PdfViewer
+                                pdfUrl={pdfUrl}
+                                explicitSearchTerm={searchTerm || undefined}
+                                highlights={[]}
+                                activeHighlight={null}
+                                setUserMessageReferences={() => { }}
+                                setSelectedText={() => { }}
+                                setTooltipPosition={() => { }}
+                                setIsAnnotating={() => { }}
+                                setIsHighlightInteraction={() => { }}
+                                isHighlightInteraction={false}
+                                setHighlights={() => { }}
+                                selectedText={''}
+                                tooltipPosition={null}
+                                setActiveHighlight={() => { }}
+                                addHighlight={async () => { throw new Error("Read-only"); }}
+                                loadHighlights={async () => { }}
+                                removeHighlight={() => { }}
+                                handleTextSelection={() => { }}
+                                renderAnnotations={() => { }}
+                                annotations={[]}
+                            />
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

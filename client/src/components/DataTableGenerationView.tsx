@@ -1,15 +1,19 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Loader2, Download, Table as TableIcon, CheckCircle2 } from "lucide-react";
+import { Loader2, Download, Table as TableIcon, CheckCircle2, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ColumnDefinition } from "./DataTableSchemaModal";
-import { PaperItem } from "@/lib/schema";
+import { PaperItem, Citation, Reference } from "@/lib/schema";
+import ReferencePaperCards from "@/components/ReferencePaperCards";
+import CustomCitationLink from "@/components/utils/CustomCitationLink";
+import Markdown from "react-markdown";
 
 export interface DataTableRow {
     paperId: string;
     paperTitle: string;
     data: { [columnId: string]: string | number };
+    references?: { [columnId: string]: Reference };
     isLoading: boolean;
     isComplete: boolean;
 }
@@ -18,16 +22,19 @@ interface DataTableGenerationViewProps {
     columns: ColumnDefinition[];
     papers: PaperItem[];
     onClose: () => void;
+    onCitationClick?: (paperId: string, searchTerm: string) => void;
 }
 
 export default function DataTableGenerationView({
     columns,
     papers,
-    onClose
+    onClose,
+    onCitationClick
 }: DataTableGenerationViewProps) {
     const [rows, setRows] = useState<DataTableRow[]>([]);
     const [currentPaperIndex, setCurrentPaperIndex] = useState(0);
     const [isComplete, setIsComplete] = useState(false);
+    const [highlightedCitation, setHighlightedCitation] = useState<{ paperId: string; citationKey: string } | null>(null);
 
     // Initialize rows
     useEffect(() => {
@@ -35,6 +42,7 @@ export default function DataTableGenerationView({
             paperId: paper.id,
             paperTitle: paper.title,
             data: {},
+            references: {},
             isLoading: false,
             isComplete: false,
         }));
@@ -60,6 +68,7 @@ export default function DataTableGenerationView({
         // Simulate data extraction for each column
         const generateColumnData = async () => {
             const newData: { [columnId: string]: string | number } = {};
+            const newReferences: { [columnId: string]: Reference } = {};
 
             for (const column of columns) {
                 // Simulate processing time
@@ -68,27 +77,45 @@ export default function DataTableGenerationView({
                 // Generate mock data based on type
                 if (column.type === 'number') {
                     newData[column.id] = Math.floor(Math.random() * 1000);
+                    // Add mock citation for numbers
+                    newReferences[column.id] = {
+                        citations: [{
+                            key: '1',
+                            paper_id: paper.id,
+                            reference: `This value was extracted from the methodology section of ${paper.title}.`
+                        }]
+                    };
                 } else {
                     const mockStrings = [
-                        'Example value',
-                        'Sample result',
-                        'Test data',
-                        'Extracted content',
-                        'N/A',
-                        'See paper for details',
-                        'Multiple findings',
-                        'Yes',
-                        'No',
-                        'Partial',
+                        'Randomized controlled trial with double-blind methodology [^1]',
+                        'Sample included 150 participants from diverse backgrounds [^1]',
+                        'Results showed statistically significant improvement (p < 0.05) [^1]',
+                        'Data collected over 6-month period [^1]',
+                        'Analysis performed using standard statistical methods [^1]',
+                        'Findings consistent with previous research [^1]',
+                        'Novel approach demonstrated in experimental setup [^1]',
+                        'Longitudinal study design with quarterly assessments [^1]',
+                        'Meta-analysis of 25 previous studies [^1]',
+                        'Qualitative analysis using thematic coding [^1]',
                     ];
-                    newData[column.id] = mockStrings[Math.floor(Math.random() * mockStrings.length)];
+                    const selectedString = mockStrings[Math.floor(Math.random() * mockStrings.length)];
+                    newData[column.id] = selectedString;
+
+                    // Add mock citation for text fields
+                    newReferences[column.id] = {
+                        citations: [{
+                            key: '1',
+                            paper_id: paper.id,
+                            reference: `Extracted from: "${selectedString.replace(/\[\^\d+\]/g, '').trim()}" - ${paper.title}`
+                        }]
+                    };
                 }
 
                 // Update the row with new column data progressively
                 setRows(prevRows =>
                     prevRows.map((row, idx) =>
                         idx === currentPaperIndex
-                            ? { ...row, data: { ...row.data, ...newData } }
+                            ? { ...row, data: { ...row.data, ...newData }, references: { ...row.references, ...newReferences } }
                             : row
                     )
                 );
@@ -233,22 +260,55 @@ export default function DataTableGenerationView({
                                                 </span>
                                             </div>
                                         </td>
-                                        {columns.map((column) => (
-                                            <td key={column.id} className="p-3 min-w-[150px]">
-                                                {row.data[column.id] !== undefined ? (
-                                                    <span className="text-foreground">
-                                                        {String(row.data[column.id])}
-                                                    </span>
-                                                ) : row.isLoading ? (
-                                                    <div className="flex items-center gap-2 text-muted-foreground">
-                                                        <Loader2 className="w-3 h-3 animate-spin" />
-                                                        <span className="text-xs">Extracting...</span>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-muted-foreground">—</span>
-                                                )}
-                                            </td>
-                                        ))}
+                                        {columns.map((column) => {
+                                            const cellReferences = row.references?.[column.id];
+
+                                            return (
+                                                <td key={column.id} className="p-3 min-w-[150px] align-top">
+                                                    {row.data[column.id] !== undefined ? (
+                                                        <div className="text-foreground prose prose-sm dark:prose-invert max-w-none">
+                                                            <Markdown
+                                                                components={{
+                                                                    p: (props) => (
+                                                                        <CustomCitationLink
+                                                                            {...props}
+                                                                            handleCitationClick={(key) => {
+                                                                                const citation = cellReferences?.citations.find(c => c.key === key);
+                                                                                if (citation && citation.paper_id) {
+                                                                                    setHighlightedCitation({ paperId: citation.paper_id, citationKey: key });
+
+                                                                                    // Scroll to reference section
+                                                                                    const refElement = document.getElementById(`ref-${citation.paper_id}-${key}`);
+                                                                                    if (refElement) {
+                                                                                        refElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                                                    }
+
+                                                                                    if (onCitationClick) {
+                                                                                        onCitationClick(citation.paper_id, citation.reference);
+                                                                                    }
+                                                                                }
+                                                                            }}
+                                                                            messageIndex={rowIndex}
+                                                                            citations={cellReferences?.citations || []}
+                                                                            papers={papers}
+                                                                        />
+                                                                    ),
+                                                                }}
+                                                            >
+                                                                {String(row.data[column.id])}
+                                                            </Markdown>
+                                                        </div>
+                                                    ) : row.isLoading ? (
+                                                        <div className="flex items-center gap-2 text-muted-foreground">
+                                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                                            <span className="text-xs">Extracting...</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-muted-foreground">—</span>
+                                                    )}
+                                                </td>
+                                            );
+                                        })}
                                     </tr>
                                 ))}
                             </tbody>
@@ -256,9 +316,101 @@ export default function DataTableGenerationView({
                     </div>
                 </div>
 
+            {/* References Section */}
+            {completedRows > 0 && (() => {
+                // Collect all citations from completed rows
+                const allCitations: { citation: Citation; paper: PaperItem }[] = [];
+                rows.filter(row => row.isComplete).forEach(row => {
+                    if (row.references) {
+                        Object.values(row.references).forEach(ref => {
+                            ref.citations.forEach(citation => {
+                                const paper = papers.find(p => p.id === citation.paper_id);
+                                if (paper && !allCitations.some(c => c.citation.key === citation.key && c.citation.paper_id === citation.paper_id)) {
+                                    allCitations.push({ citation, paper });
+                                }
+                            });
+                        });
+                    }
+                });
+
+                if (allCitations.length === 0) return null;
+
+                // Group by paper
+                const citationsByPaper = allCitations.reduce((acc, { citation, paper }) => {
+                    if (!acc[paper.id]) {
+                        acc[paper.id] = { paper, citations: [] };
+                    }
+                    acc[paper.id].citations.push(citation);
+                    return acc;
+                }, {} as Record<string, { paper: PaperItem; citations: Citation[] }>);
+
+                return (
+                    <div className="mt-6 space-y-4">
+                        <div className="border-t pt-6">
+                            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <BookOpen className="w-5 h-5" />
+                                References
+                            </h3>
+                            <div className="space-y-6">
+                                {Object.values(citationsByPaper).map(({ paper, citations }) => {
+                                    const isHighlighted = highlightedCitation?.paperId === paper.id;
+                                    return (
+                                        <div
+                                            key={paper.id}
+                                            className={`space-y-3 p-4 rounded-lg border transition-all duration-500 ${
+                                                isHighlighted
+                                                    ? 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800'
+                                                    : 'bg-card border-border'
+                                            }`}
+                                        >
+                                            {/* Paper Info */}
+                                            <div className="flex items-start gap-3 pb-3 border-b">
+                                                <div className="flex-1">
+                                                    <h4 className="font-medium text-sm line-clamp-2">{paper.title}</h4>
+                                                    {paper.authors && paper.authors.length > 0 && (
+                                                        <p className="text-xs text-muted-foreground mt-1">
+                                                            {paper.authors.join(', ')}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Citations */}
+                                            <div className="space-y-2">
+                                                {citations.map((citation) => {
+                                                    const isCitationHighlighted =
+                                                        highlightedCitation?.paperId === paper.id &&
+                                                        highlightedCitation?.citationKey === citation.key;
+                                                    return (
+                                                        <div
+                                                            key={citation.key}
+                                                            id={`ref-${citation.paper_id}-${citation.key}`}
+                                                            className={`p-3 rounded-md transition-all duration-500 ${
+                                                                isCitationHighlighted
+                                                                    ? 'bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 shadow-sm'
+                                                                    : 'bg-muted/30 hover:bg-muted/50'
+                                                            }`}
+                                                        >
+                                                            <span className="font-mono text-xs font-semibold text-blue-600 dark:text-blue-400 mr-2">
+                                                                [{citation.key}]
+                                                            </span>
+                                                            <span className="text-sm text-foreground">{citation.reference}</span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
             {/* Summary */}
             {isComplete && (
-                <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/30 rounded-lg">
+                <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/30 rounded-lg">
                     <div className="flex items-start gap-3">
                         <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5" />
                         <div>
