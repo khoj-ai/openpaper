@@ -225,6 +225,12 @@ async def get_project_papers(
                         "institutions": paper.institutions,
                         "keywords": paper.keywords,
                         "status": paper.status,
+                        "journal": paper.journal,
+                        "publisher": paper.publisher,
+                        "doi": paper.doi,
+                        "publish_date": (
+                            str(paper.publish_date) if paper.publish_date else None
+                        ),
                         "file_url": s3_service.get_cached_presigned_url_by_project(
                             db,
                             str(paper.id),
