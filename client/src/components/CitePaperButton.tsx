@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { fetchFromApi } from '@/lib/api';
 import { PaperData, PaperItem } from '@/lib/schema';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { citationStyles, copyToClipboard } from '@/components/utils/paperUtils';
+import { citationStyles, copyToClipboard, PaperBase } from '@/components/utils/paperUtils';
 import {
     Select,
     SelectContent,
@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 
 interface CitePaperButtonProps {
-    paper?: PaperData | PaperItem;
+    paper?: (PaperData | PaperItem)[];
     paperId?: string;
     minimalist?: boolean;
 }
@@ -28,7 +28,7 @@ interface CitePaperButtonProps {
 export function CitePaperButton({ paper, paperId: providedPaperId, minimalist = false }: CitePaperButtonProps) {
     const pathname = usePathname();
     const [derivedPaperId, setDerivedPaperId] = useState<string | null>(null);
-    const [paperData, setPaperData] = useState<PaperData | PaperItem | null>(paper || null);
+    const [paperData, setPaperData] = useState<(PaperData | PaperItem)[] | null>(paper || null);
     const [isOpen, setIsOpen] = useState(false);
     const [selectedStyle, setSelectedStyle] = useState<string>(() => {
         if (typeof window !== 'undefined') {
@@ -40,7 +40,10 @@ export function CitePaperButton({ paper, paperId: providedPaperId, minimalist = 
     const [copied, setCopied] = useState(false);
     const isMobile = useIsMobile();
 
-    // Determine the paper ID to use
+    // Check if we're in bibliography mode (more than one paper)
+    const isBibliography = paperData && paperData.length > 1;
+
+    // Determine the paper ID to use (only for single paper mode)
     const effectivePaperId = providedPaperId || derivedPaperId;
 
     // Save selected style to localStorage whenever it changes
@@ -57,7 +60,7 @@ export function CitePaperButton({ paper, paperId: providedPaperId, minimalist = 
             return;
         }
 
-        // Otherwise, try to derive paper ID from pathname
+        // Otherwise, try to derive paper ID from pathname (single paper mode only)
         if (pathname && !providedPaperId) {
             const segments = pathname.split('/');
             if (segments[1] === 'paper' && segments.length === 3 && segments[2]) {
@@ -70,14 +73,15 @@ export function CitePaperButton({ paper, paperId: providedPaperId, minimalist = 
 
     useEffect(() => {
         // Skip fetch if we already have paper data from props
-        if (paper) return;
+        if (paper && paper.length > 0) return;
 
         if (!effectivePaperId || !isOpen) return;
 
         const fetchPaperData = async () => {
             try {
                 const data = await fetchFromApi(`/api/paper?id=${effectivePaperId}`);
-                setPaperData(data);
+                // Wrap single paper in array
+                setPaperData([data]);
             } catch {
                 toast.error("Failed to fetch paper details.");
             }
@@ -93,7 +97,7 @@ export function CitePaperButton({ paper, paperId: providedPaperId, minimalist = 
     const triggerButton = (
         <Button variant="ghost" size="sm">
             {!minimalist && <Quote className="h-4 w-4 mr-2" />}
-            <span className={minimalist ? "text-sm" : ""}>Cite</span>
+            <span className={minimalist ? "text-sm" : ""}>{isBibliography ? 'Bibliography' : 'Cite'}</span>
         </Button>
     );
 
@@ -123,22 +127,44 @@ export function CitePaperButton({ paper, paperId: providedPaperId, minimalist = 
 
                     {(() => {
                         const selectedStyleObj = citationStyles.find(s => s.name === selectedStyle);
-                        if (!selectedStyleObj) return null;
+                        if (!selectedStyleObj || !paperData) return null;
 
-                        const paperBase = {
-                            id: effectivePaperId || '',
-                            title: paperData.title,
-                            authors: paperData.authors,
-                            created_at: paperData.publish_date,
-                            journal: paperData.journal,
-                            publisher: paperData.publisher,
-                            doi: paperData.doi,
+                        const paperAsPaperBase = (p: PaperData | PaperItem, id?: string): PaperBase => {
+                            const combined = p as Partial<PaperData> & Partial<PaperItem>;
+                            return {
+                                id: id || combined.id || '',
+                                title: combined.title || '',
+                                authors: combined.authors || [],
+                                created_at: combined.publish_date || combined.created_at,
+                                journal: combined.journal,
+                                publisher: combined.publisher,
+                                doi: combined.doi,
+                            };
                         };
-                        const citation = selectedStyleObj.generator(paperBase);
+
+                        // Generate citation(s) - special handling for single paper (length === 1)
+                        let citation: string;
+                        if (paperData.length === 1) {
+                            // Single paper citation
+                            const singlePaper = paperData[0];
+                            const paperBase = paperAsPaperBase(singlePaper, effectivePaperId || undefined);
+                            citation = selectedStyleObj.generator(paperBase);
+                        } else {
+                            // Generate bibliography from multiple papers
+                            citation = paperData.map((p, index) => {
+                                const paperBase = paperAsPaperBase(p);
+                                const singleCitation = selectedStyleObj.generator(paperBase);
+                                // For numbered styles like IEEE, add numbering
+                                if (selectedStyle === 'IEEE') {
+                                    return `[${index + 1}] ${singleCitation}`;
+                                }
+                                return singleCitation;
+                            }).join('\n\n');
+                        }
 
                         return (
                             <div className="space-y-2">
-                                <div className="text-xs bg-muted p-3 rounded overflow-x-auto">
+                                <div className="text-xs bg-muted p-3 rounded overflow-x-auto overflow-y-auto max-h-96 whitespace-pre-wrap">
                                     {citation}
                                 </div>
                                 <Button
@@ -179,7 +205,7 @@ export function CitePaperButton({ paper, paperId: providedPaperId, minimalist = 
                 </DrawerTrigger>
                 <DrawerContent>
                     <DrawerHeader>
-                        <DrawerTitle>Cite Paper</DrawerTitle>
+                        <DrawerTitle>{isBibliography ? 'Bibliography' : 'Cite Paper'}</DrawerTitle>
                     </DrawerHeader>
                     <div className="px-4 pb-4">
                         {content}
@@ -196,7 +222,7 @@ export function CitePaperButton({ paper, paperId: providedPaperId, minimalist = 
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Cite Paper</DialogTitle>
+                    <DialogTitle>{isBibliography ? 'Bibliography' : 'Cite Paper'}</DialogTitle>
                 </DialogHeader>
                 {content}
             </DialogContent>

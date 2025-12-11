@@ -212,6 +212,12 @@ async def get_project_papers(
             db, project_id=uuid.UUID(project_id), user=current_user
         )
 
+        # Bulk retrieve presigned URLs for all papers (optimized with parallelization)
+        file_urls = s3_service.get_cached_presigned_urls_bulk(
+            db=db,
+            papers=papers,
+        )
+
         return JSONResponse(
             status_code=200,
             content={
@@ -225,13 +231,13 @@ async def get_project_papers(
                         "institutions": paper.institutions,
                         "keywords": paper.keywords,
                         "status": paper.status,
-                        "file_url": s3_service.get_cached_presigned_url_by_project(
-                            db,
-                            str(paper.id),
-                            str(paper.s3_object_key),
-                            project_id,
-                            current_user,
+                        "journal": paper.journal,
+                        "publisher": paper.publisher,
+                        "doi": paper.doi,
+                        "publish_date": (
+                            str(paper.publish_date) if paper.publish_date else None
                         ),
+                        "file_url": file_urls.get(str(paper.id)),
                         "is_owner": paper.user_id == current_user.id,
                     }
                     for paper in papers

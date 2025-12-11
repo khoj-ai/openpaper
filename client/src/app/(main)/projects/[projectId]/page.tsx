@@ -8,6 +8,7 @@ import { Project, PaperItem, Conversation } from "@/lib/schema";
 import { PdfDropzone } from "@/components/PdfDropzone";
 import PaperCard from "@/components/PaperCard";
 import PdfUploadTracker from "@/components/PdfUploadTracker";
+import { CitePaperButton } from "@/components/CitePaperButton";
 import { MinimalJob } from "@/lib/schema";
 import {
 	Sheet,
@@ -551,7 +552,11 @@ export default function ProjectPage() {
 				<div className="w-full lg:w-1/3 px-4">
 					<div className="flex justify-between items-center mb-4">
 						<h2 className="text-2xl font-bold">Papers</h2>
-						{project?.role !== 'viewer' && (
+						<div className="flex gap-2">
+							{papers.length > 0 && (
+								<CitePaperButton paper={papers} minimalist={true} />
+							)}
+							{project?.role !== 'viewer' && (
 							<Sheet open={isAddPapersSheetOpen} onOpenChange={(isOpen) => {
 								setIsAddPapersSheetOpen(isOpen);
 								if (!isOpen) {
@@ -649,7 +654,8 @@ export default function ProjectPage() {
 									</div>
 								</SheetContent>
 							</Sheet>
-						)}
+							)}
+						</div>
 					</div>
 
 					{papers && papers.length > 0 ? (
@@ -670,8 +676,8 @@ export default function ProjectPage() {
 												)
 											}
 											<div className="grid grid-cols-1 gap-4">
-												{ownedPapers.slice(0, showAllOwnedPapers ? ownedPapers.length : papersToShow).map((paper, index) => (
-													<div key={paper.id} className="animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
+												{ownedPapers.slice(0, showAllOwnedPapers ? ownedPapers.length : papersToShow).map((paper) => (
+													<div key={paper.id}>
 														<PaperCard paper={paper} minimalist={true} projectId={projectId} onUnlink={getProjectPapers} is_owner={paper.is_owner} />
 													</div>
 												))}
