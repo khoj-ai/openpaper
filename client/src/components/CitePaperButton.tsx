@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { fetchFromApi } from '@/lib/api';
 import { PaperData, PaperItem } from '@/lib/schema';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { citationStyles, copyToClipboard } from '@/components/utils/paperUtils';
+import { citationStyles, copyToClipboard, PaperBase } from '@/components/utils/paperUtils';
 import {
     Select,
     SelectContent,
@@ -129,33 +129,30 @@ export function CitePaperButton({ paper, paperId: providedPaperId, minimalist = 
                         const selectedStyleObj = citationStyles.find(s => s.name === selectedStyle);
                         if (!selectedStyleObj || !paperData) return null;
 
+                        const paperAsPaperBase = (p: PaperData | PaperItem, id?: string): PaperBase => {
+                            const combined = p as Partial<PaperData> & Partial<PaperItem>;
+                            return {
+                                id: id || combined.id || '',
+                                title: combined.title || '',
+                                authors: combined.authors || [],
+                                created_at: combined.publish_date || combined.created_at,
+                                journal: combined.journal,
+                                publisher: combined.publisher,
+                                doi: combined.doi,
+                            };
+                        };
+
                         // Generate citation(s) - special handling for single paper (length === 1)
                         let citation: string;
                         if (paperData.length === 1) {
                             // Single paper citation
                             const singlePaper = paperData[0];
-                            const paperBase = {
-                                id: effectivePaperId || (singlePaper as any).id || '',
-                                title: singlePaper.title,
-                                authors: singlePaper.authors,
-                                created_at: (singlePaper as any).publish_date || (singlePaper as any).created_at,
-                                journal: (singlePaper as any).journal,
-                                publisher: (singlePaper as any).publisher,
-                                doi: (singlePaper as any).doi,
-                            };
+                            const paperBase = paperAsPaperBase(singlePaper, effectivePaperId || undefined);
                             citation = selectedStyleObj.generator(paperBase);
                         } else {
                             // Generate bibliography from multiple papers
                             citation = paperData.map((p, index) => {
-                                const paperBase = {
-                                    id: (p as any).id || '',
-                                    title: p.title,
-                                    authors: p.authors,
-                                    created_at: (p as any).publish_date || (p as any).created_at,
-                                    journal: (p as any).journal,
-                                    publisher: (p as any).publisher,
-                                    doi: (p as any).doi,
-                                };
+                                const paperBase = paperAsPaperBase(p);
                                 const singleCitation = selectedStyleObj.generator(paperBase);
                                 // For numbered styles like IEEE, add numbering
                                 if (selectedStyle === 'IEEE') {

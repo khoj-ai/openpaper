@@ -676,7 +676,7 @@ export default function ProjectPage() {
 												)
 											}
 											<div className="grid grid-cols-1 gap-4">
-												{ownedPapers.slice(0, showAllOwnedPapers ? ownedPapers.length : papersToShow).map((paper, index) => (
+												{ownedPapers.slice(0, showAllOwnedPapers ? ownedPapers.length : papersToShow).map((paper) => (
 													<div key={paper.id}>
 														<PaperCard paper={paper} minimalist={true} projectId={projectId} onUnlink={getProjectPapers} is_owner={paper.is_owner} />
 													</div>
