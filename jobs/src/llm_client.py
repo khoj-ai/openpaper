@@ -13,6 +13,7 @@ from typing import Optional, Type, TypeVar, Callable
 
 from pydantic import BaseModel
 
+from src.prompts import SYSTEM_INSTRUCTIONS_CACHE, EXTRACT_METADATA_PROMPT_TEMPLATE, SYSTEM_INSTRUCTIONS_IMAGE_CAPTION_CACHE
 from src.schemas import (
     PaperMetadataExtraction,
     TitleAuthorsAbstract,
@@ -31,36 +32,6 @@ CACHE_TTL_SECONDS = 3600
 
 # Pydantic model type variable
 T = TypeVar("T", bound=BaseModel)
-
-
-SYSTEM_INSTRUCTIONS_CACHE = """
-You are a metadata extraction assistant. Your task is to extract specific information from the provided academic paper content. Pay special attention ot the details and ensure accuracy in the extracted metadata.
-
-Always think deeply and step-by-step when making a determination with respect to the contents of the paper. If you are unsure about a specific field, provide a best guess based on the content available.
-
-You will be rewarded for your accuracy and attention to detail. You are helping to facilitate humanity's understanding of scientific knowledge by delivering accurate and reliable metadata extraction.
-"""
-
-# LLM Prompts
-EXTRACT_METADATA_PROMPT_TEMPLATE = """
-You are a metadata extraction assistant. Your task is to extract specific information from the provided academic paper content. You must be thorough in your approach and ensure that all relevant metadata is captured accurately.
-
-Please extract the following fields and structure them in a JSON format according to the provided schema.
-"""
-
-SYSTEM_INSTRUCTIONS_IMAGE_CAPTION_CACHE = """
-You are an image captioning assistant for academic papers. Your task is to extract exact captions for images.
-
-Return only the caption text with no additional commentary or explanations.
-
-Rules:
-- For figures, graphs, or charts: Return the exact caption from the paper
-- Return an empty string if the image is:
-  • Not a graph, chart, or figure
-  • Not useful for understanding the paper
-  • A partial portion of a larger figure, thus not a standalone or complete figure
-  • Has no caption and is not useful for understanding the paper
-"""
 
 
 class JSONParser:
@@ -428,28 +399,28 @@ class PaperOperations(AsyncLLMClient):
                 # Run all extraction tasks concurrently
                 async with time_it("Running all metadata extraction tasks concurrently", job_id=job_id):
                     tasks = [
-                        asyncio.create_task(time_it("Extracting title, authors, and abstract", job_id=job_id)                        (
+                        asyncio.create_task(time_it("Extracting title, authors, and abstract", job_id=job_id)(
                             self.extract_title_authors_abstract
                         )(
                             paper_content=paper_content,
                             cache_key=cache_key,
                             status_callback=status_callback
                         )),
-                        asyncio.create_task(time_it("Extracting institutions and keywords", job_id=job_id)                        (
+                        asyncio.create_task(time_it("Extracting institutions and keywords", job_id=job_id)(
                             self.extract_institutions_keywords
                         )(
                             paper_content=paper_content,
                             cache_key=cache_key,
                             status_callback=status_callback
                         )),
-                        asyncio.create_task(time_it("Extracting summary and citations", job_id=job_id)                        (
+                        asyncio.create_task(time_it("Extracting summary and citations", job_id=job_id)(
                             self.extract_summary_and_citations
                         )(
                             paper_content=paper_content,
                             cache_key=cache_key,
                             status_callback=status_callback
                         )),
-                        asyncio.create_task(time_it("Extracting highlights", job_id=job_id)                        (
+                        asyncio.create_task(time_it("Extracting highlights", job_id=job_id)(
                             self.extract_highlights
                         )(
                             paper_content=paper_content,
@@ -494,44 +465,6 @@ class PaperOperations(AsyncLLMClient):
                 # Set client to None to allow for proper garbage collection
                 self.client = None
 
-    async def extract_image_captions(
-        self,
-        cache_key: Optional[str],
-        image_data: bytes,
-        image_mime_type: Optional[str] = None,
-    ) -> str:
-        """
-        Extract caption for an image in a PDF using LLM.
-
-        Args:
-            cache_key: Optional cache key for the LLM
-            image_data: Bytes of the image to extract captions for
-            image_mime_type: Optional MIME type of the image
-
-        Returns:
-            The caption for the image as a string
-        """
-        # Create a new client for this operation
-        self.client = genai.Client(api_key=self.api_key)
-
-        try:
-            system_instructions = SYSTEM_INSTRUCTIONS_IMAGE_CAPTION_CACHE
-
-            response = await self.generate_content(
-                system_instructions,
-                cache_key=cache_key,
-                image_bytes=image_data,
-                image_mime_type=image_mime_type
-            )
-
-            return response
-
-        except Exception as e:
-            logger.error(f"Error extracting image captions: {e}", exc_info=True)
-            return ""
-        finally:
-            # Set client to None to allow for proper garbage collection
-            self.client = None
 
 # Create a single instance to use throughout the application
 api_key = os.getenv("GOOGLE_API_KEY")
