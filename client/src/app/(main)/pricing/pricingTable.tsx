@@ -43,12 +43,6 @@ const features: PricingFeature[] = [
         teams: "50 GB"
     },
     {
-        name: "Models",
-        basic: "Basic",
-        researcher: "Advanced",
-        teams: "Advanced"
-    },
-    {
         name: "Chat credits (weekly)",
         basic: "5000",
         researcher: "100,000",
@@ -66,18 +60,6 @@ const features: PricingFeature[] = [
         researcher: "100",
         teams: "500"
     },
-    {
-        name: "Team annotations",
-        basic: false,
-        researcher: false,
-        teams: true
-    },
-    {
-        name: "Team chat",
-        basic: false,
-        researcher: false,
-        teams: true
-    }
 ];
 
 
@@ -209,7 +191,6 @@ export default function PricingTable({
                         <tbody>
                             {features.map((feature, index) => {
                                 const isComingSoon = false; //feature.name === "Projects";
-                                const isTeamsOnly = feature.name === "Team annotations" || feature.name === "Team chat";
 
                                 return (
                                     <tr key={feature.name} className={cn(
@@ -236,16 +217,7 @@ export default function PricingTable({
                                             {renderFeatureValue(feature.researcher, isComingSoon)}
                                         </td>
                                         <td className="p-2 sm:p-4 text-center text-sm sm:text-base text-muted-foreground">
-                                            {isTeamsOnly ? (
-                                                <div className="flex flex-col items-center justify-center gap-1">
-                                                    <Check className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
-                                                    <Badge variant="secondary" className="text-xs">
-                                                        Coming Soon
-                                                    </Badge>
-                                                </div>
-                                            ) : (
-                                                renderFeatureValue(feature.teams, isComingSoon)
-                                            )}
+                                            {renderFeatureValue(feature.teams, isComingSoon)}
                                         </td>
                                     </tr>
                                 );
@@ -269,7 +241,6 @@ export default function PricingTable({
                         <CardContent className="space-y-4">
                             {features.map((feature, index) => {
                                 const isComingSoon = feature.name === "Projects";
-                                const isTeamsOnly = feature.name === "Team annotations" || feature.name === "Team chat";
                                 const featureValue = getFeatureValueForPlan(feature, selectedPlan);
 
                                 return (
@@ -286,16 +257,7 @@ export default function PricingTable({
                                             )}
                                         </div>
                                         <div className="text-right">
-                                            {isTeamsOnly && selectedPlan === "teams" ? (
-                                                <div className="flex flex-col items-end gap-1">
-                                                    <Check className="h-4 w-4 text-green-500" />
-                                                    <Badge variant="secondary" className="text-xs">
-                                                        Coming Soon
-                                                    </Badge>
-                                                </div>
-                                            ) : (
-                                                renderFeatureValue(featureValue, isComingSoon)
-                                            )}
+                                            {renderFeatureValue(featureValue, isComingSoon)}
                                         </div>
                                     </div>
                                 );
