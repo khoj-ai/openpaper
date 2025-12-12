@@ -258,73 +258,75 @@ export default function PricingPage() {
             {/* Current Subscription Card */}
             {isCurrentlySubscribed && !loading && (
                 <Card className={cn(
-                    "border-2 transition-all duration-200",
+                    "relative overflow-hidden border transition-all duration-200",
                     isActiveSubscription
-                        ? "border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50"
-                        : "border-slate-200 dark:border-slate-700 bg-slate-50/30 dark:bg-slate-900/30"
+                        ? "border-blue-500/20 bg-gradient-to-br from-blue-500/5 via-primary/5 to-transparent dark:from-blue-500/10 dark:via-primary/10 dark:to-transparent shadow-md"
+                        : "border-border bg-card"
                 )}>
-                    <CardHeader className="py-4">
-                        <div className="flex items-center gap-3">
+                    {/* Decorative background blur */}
+                    {isActiveSubscription && (
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-500/10 to-primary/5 rounded-full blur-3xl -z-10" />
+                    )}
+
+                    <CardHeader className="pb-4">
+                        <div className="flex items-center gap-4">
                             <div className={cn(
-                                "p-2 rounded-full",
+                                "p-3 rounded-xl flex items-center justify-center transition-colors",
                                 isActiveSubscription
-                                    ? "bg-slate-100 dark:bg-slate-800"
-                                    : "bg-slate-100 dark:bg-slate-800"
+                                    ? "bg-blue-500/10 dark:bg-blue-500/20"
+                                    : "bg-muted"
                             )}>
                                 <CheckCircle className={cn(
-                                    "h-4 w-4",
+                                    "h-6 w-6",
                                     isActiveSubscription
-                                        ? "text-slate-700 dark:text-slate-300"
-                                        : "text-slate-500 dark:text-slate-400"
-                                )} />
+                                        ? "text-blue-500"
+                                        : "text-muted-foreground"
+                                )} strokeWidth={1.5} />
                             </div>
                             <div className="flex-1">
-                                <CardTitle className="text-lg font-medium text-slate-900 dark:text-slate-100">
-                                    Your Research Plan
+                                <CardTitle className="text-xl font-semibold">
+                                    Your Plan
                                 </CardTitle>
-                                <CardDescription className="text-sm text-slate-600 dark:text-slate-400">
-                                    {isActiveSubscription ? "Currently active" : "Subscription not active"}
-                                </CardDescription>
                             </div>
                             <Badge className={cn("font-normal", getStatusBadgeColor(subscriptionStatus))}>
                                 {getStatusDisplay(subscriptionStatus)}
                             </Badge>
                         </div>
                     </CardHeader>
-                    <CardContent className="space-y-6 my-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
-                            <div className="text-center sm:text-left space-y-1">
-                                <div className="text-lg sm:text-xl font-medium text-slate-900 dark:text-slate-100">
+                    <CardContent className="space-y-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                            <div className="space-y-2">
+                                <div className="text-xl font-semibold">
                                     Researcher Plan
                                 </div>
-                                <div className="text-sm text-slate-500 dark:text-slate-400">
+                                <div className="text-sm text-muted-foreground">
                                     Full access to all features
                                 </div>
                             </div>
-                            <div className="text-center space-y-1">
-                                <div className="text-lg sm:text-xl font-medium text-slate-900 dark:text-slate-100">
+                            <div className="space-y-2 text-center sm:text-left">
+                                <div className="text-xl font-semibold">
                                     ${userSubscription?.subscription.interval === "year" ? annualPrice : monthlyPrice}
-                                    <span className="text-sm sm:text-base font-normal text-slate-500 dark:text-slate-400">/month</span>
+                                    <span className="text-base font-normal text-muted-foreground">/month</span>
                                 </div>
-                                <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                                <div className="text-sm text-muted-foreground flex items-center gap-2 justify-center sm:justify-start">
                                     Billed {userSubscription?.subscription.interval === "year" ? "annually" : "monthly"}
                                     {isIntervalChangeLoading && (
-                                        <Badge variant="secondary" className="ml-2 text-xs">
+                                        <Badge variant="secondary" className="text-xs">
                                             Updating...
                                         </Badge>
                                     )}
                                 </div>
                             </div>
-                            <div className="text-center sm:text-right space-y-1 sm:col-span-2 md:col-span-1">
-                                <div className="flex items-center justify-center sm:justify-end gap-2 text-sm sm:text-lg font-medium text-slate-900 dark:text-slate-100">
-                                    <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <div className="space-y-2 text-center sm:text-right sm:col-span-2 md:col-span-1">
+                                <div className="flex items-center justify-center sm:justify-end gap-2 text-lg font-semibold">
+                                    <Calendar className="h-4 w-4 text-muted-foreground" />
                                     <span className="break-words">
                                         {userSubscription?.subscription.current_period_end &&
                                             formatDate(userSubscription.subscription.current_period_end)
                                         }
                                     </span>
                                 </div>
-                                <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                                <div className="text-sm text-muted-foreground">
                                     {subscriptionStatus === 'canceled' || userSubscription?.subscription.cancel_at_period_end ? "Expires" : "Renews"}
                                 </div>
                             </div>
@@ -332,62 +334,79 @@ export default function PricingPage() {
 
                         {/* Status-specific alerts */}
                         {subscriptionStatus === 'canceled' && (
-                            <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 sm:p-4">
-                                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-                                    <Clock className="h-4 w-4 flex-shrink-0" />
-                                    <span className="font-medium text-sm sm:text-base">Subscription Canceled</span>
+                            <div className="bg-muted/50 border border-border rounded-xl p-4">
+                                <div className="flex items-start gap-3">
+                                    <div className="p-2 rounded-lg bg-background">
+                                        <Clock className="h-4 w-4 text-muted-foreground" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <span className="font-medium text-sm">Subscription Canceled</span>
+                                        <p className="text-sm text-muted-foreground mt-1">
+                                            Your subscription will end on {userSubscription?.subscription.current_period_end &&
+                                                formatDate(userSubscription.subscription.current_period_end)}.
+                                            You can reactivate anytime before this date.
+                                        </p>
+                                    </div>
                                 </div>
-                                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
-                                    Your subscription will end on {userSubscription?.subscription.current_period_end &&
-                                        formatDate(userSubscription.subscription.current_period_end)}.
-                                    You can reactivate anytime before this date.
-                                </p>
                             </div>
                         )}
 
                         {userSubscription?.subscription.cancel_at_period_end && subscriptionStatus === 'active' && (
-                            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 sm:p-4">
-                                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
-                                    <Clock className="h-4 w-4 flex-shrink-0" />
-                                    <span className="font-medium text-sm sm:text-base">Subscription Ending</span>
+                            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 rounded-xl p-4">
+                                <div className="flex items-start gap-3">
+                                    <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/50">
+                                        <Clock className="h-4 w-4 text-amber-700 dark:text-amber-300" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <span className="font-medium text-sm text-amber-900 dark:text-amber-100">Subscription Ending</span>
+                                        <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                                            Your subscription will end on {userSubscription?.subscription.current_period_end &&
+                                                formatDate(userSubscription.subscription.current_period_end)}.
+                                            You can reactivate anytime before this date.
+                                        </p>
+                                    </div>
                                 </div>
-                                <p className="text-xs sm:text-sm text-amber-600 dark:text-amber-400 mt-1">
-                                    Your subscription will end on {userSubscription?.subscription.current_period_end &&
-                                        formatDate(userSubscription.subscription.current_period_end)}.
-                                    You can reactivate anytime before this date.
-                                </p>
                             </div>
                         )}
 
                         {subscriptionStatus === 'past_due' && (
-                            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 sm:p-4">
-                                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
-                                    <Clock className="h-4 w-4 flex-shrink-0" />
-                                    <span className="font-medium text-sm sm:text-base">Payment Past Due</span>
+                            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 rounded-xl p-4">
+                                <div className="flex items-start gap-3">
+                                    <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/50">
+                                        <Clock className="h-4 w-4 text-amber-700 dark:text-amber-300" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <span className="font-medium text-sm text-amber-900 dark:text-amber-100">Payment Past Due</span>
+                                        <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                                            Your payment is past due. Please update your payment method to continue your subscription.
+                                        </p>
+                                    </div>
                                 </div>
-                                <p className="text-xs sm:text-sm text-amber-600 dark:text-amber-400 mt-1">
-                                    Your payment is past due. Please update your payment method to continue your subscription.
-                                </p>
                             </div>
                         )}
 
                         {subscriptionStatus === 'incomplete' && (
-                            <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 sm:p-4">
-                                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-                                    <Clock className="h-4 w-4 flex-shrink-0" />
-                                    <span className="font-medium text-sm sm:text-base">Payment Incomplete</span>
+                            <div className="bg-muted/50 border border-border rounded-xl p-4">
+                                <div className="flex items-start gap-3">
+                                    <div className="p-2 rounded-lg bg-background">
+                                        <Clock className="h-4 w-4 text-muted-foreground" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <span className="font-medium text-sm">Payment Incomplete</span>
+                                        <p className="text-sm text-muted-foreground mt-1">
+                                            Your payment is incomplete. Please complete the payment process to activate your subscription.
+                                        </p>
+                                    </div>
                                 </div>
-                                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
-                                    Your payment is incomplete. Please complete the payment process to activate your subscription.
-                                </p>
                             </div>
                         )}
 
                         {/* Action buttons based on subscription status */}
-                        <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                        <div className="pt-2 float-end">
                             {canResubscribe ? (
                                 <Button
-                                    className="w-full bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-medium"
+                                    size="lg"
+                                    className="w-fit bg-primary hover:bg-primary/90 font-medium"
                                     onClick={handleResubscribe}
                                     disabled={isResubscribeLoading}
                                 >
@@ -395,7 +414,8 @@ export default function PricingPage() {
                                 </Button>
                             ) : (
                                 <Button
-                                    className="w-full bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-medium"
+                                    size="lg"
+                                    className="w-fit bg-primary hover:bg-primary/90 font-medium"
                                     onClick={handleManageSubscription}
                                     disabled={isPortalLoading}
                                 >
