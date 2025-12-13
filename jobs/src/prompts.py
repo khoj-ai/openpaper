@@ -33,6 +33,7 @@ EXTRACT_COLS_INSTRUCTION = """You are a data extraction assistant specializing i
 - Citations should be the exact text from the paper
 - Include an index number for each citation (sequential numbering starting from 1)
 - If a value appears in multiple places, cite the most relevant occurrence
+- If you are referencing content from a figure or table, simply note "Figure X" or "Table Y" in the citation
 
 **Guidelines:**
 - Look in tables, figures, results sections, abstract, and supplementary materials
