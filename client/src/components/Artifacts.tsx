@@ -331,12 +331,15 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
             toast.info("Creating data table...");
 
             // Create the data table via API
-            const response = await fetchFromApi(`/api/projects/tables/${projectId}`, {
+            const response = await fetchFromApi(`/api/projects/tables/`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ columns }),
+                body: JSON.stringify({
+                    project_id: projectId,
+                    columns: columns.map(col => col.label),
+                }),
             });
 
             // Navigate to the data table generation page
