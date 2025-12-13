@@ -32,8 +32,8 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
-class PDFJobsClient:
-    """Client for submitting PDF processing jobs to the separate Celery service."""
+class JobsClient:
+    """Client for submitting processing jobs to the separate Celery service."""
 
     def __init__(
         self,
@@ -429,4 +429,4 @@ class PDFJobsClient:
 
 
 # Create a client instance to use throughout the application
-pdf_jobs_client = PDFJobsClient()
+jobs_client = JobsClient()

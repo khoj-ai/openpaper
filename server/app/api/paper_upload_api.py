@@ -27,10 +27,10 @@ from app.database.crud.paper_upload_crud import (
     paper_upload_job_crud,
 )
 from app.database.database import get_db
-from app.database.models import PaperUploadJob
+from app.database.models import JobStatus, PaperUploadJob
 from app.database.telemetry import track_event
 from app.helpers.parser import validate_pdf_content, validate_url_and_fetch_pdf
-from app.helpers.pdf_jobs import pdf_jobs_client
+from app.helpers.pdf_jobs import jobs_client
 from app.helpers.s3 import s3_service
 from app.helpers.subscription_limits import (
     can_user_access_knowledge_base,
@@ -73,7 +73,7 @@ async def get_upload_status(
         db=db, upload_job_id=str(paper_upload_job.id), user=current_user
     )
 
-    if paper_upload_job.status == "completed":
+    if paper_upload_job.status == JobStatus.COMPLETED:
         # Verify the paper exists
         if not paper:
             return JSONResponse(status_code=404, content={"message": "Paper not found"})
@@ -82,7 +82,7 @@ async def get_upload_status(
     celery_task_status = None
     if paper_upload_job.task_id:
         try:
-            celery_task_status = pdf_jobs_client.check_celery_task_status(
+            celery_task_status = jobs_client.check_celery_task_status(
                 str(paper_upload_job.task_id)
             )
         except Exception as e:
@@ -317,7 +317,7 @@ async def upload_raw_file_microservice(
 
     try:
         # Submit to microservice
-        task_id = await pdf_jobs_client.submit_pdf_processing_job_with_upload(
+        task_id = await jobs_client.submit_pdf_processing_job_with_upload(
             pdf_bytes=file_contents,
             paper_upload_job=paper_upload_job,
             db=db,
