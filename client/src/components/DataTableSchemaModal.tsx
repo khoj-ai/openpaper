@@ -13,18 +13,10 @@ import {
     DialogDescription,
     DialogClose
 } from "@/components/ui/dialog";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 
 export interface ColumnDefinition {
     id: string;
     label: string;
-    type: 'string' | 'number';
 }
 
 interface DataTableSchemaModalProps {
@@ -41,12 +33,12 @@ export default function DataTableSchemaModal({
     isCreating = false
 }: DataTableSchemaModalProps) {
     const [columns, setColumns] = useState<ColumnDefinition[]>([
-        { id: '1', label: '', type: 'string' }
+        { id: '1', label: '' }
     ]);
 
     const addColumn = () => {
         const newId = (Math.max(...columns.map(c => parseInt(c.id)), 0) + 1).toString();
-        setColumns([...columns, { id: newId, label: '', type: 'string' }]);
+        setColumns([...columns, { id: newId, label: '' }]);
     };
 
     const removeColumn = (id: string) => {
@@ -55,9 +47,9 @@ export default function DataTableSchemaModal({
         }
     };
 
-    const updateColumn = (id: string, field: 'label' | 'type', value: string) => {
+    const updateColumn = (id: string, value: string) => {
         setColumns(columns.map(col =>
-            col.id === id ? { ...col, [field]: value } : col
+            col.id === id ? { ...col, label: value } : col
         ));
     };
 
@@ -68,7 +60,7 @@ export default function DataTableSchemaModal({
         }
         onSubmit(validColumns);
         // Reset state
-        setColumns([{ id: '1', label: '', type: 'string' }]);
+        setColumns([{ id: '1', label: '' }]);
     };
 
     const canSubmit = columns.some(col => col.label.trim() !== '');
@@ -89,32 +81,15 @@ export default function DataTableSchemaModal({
                             <div key={column.id} className="flex gap-2 items-end">
                                 <div className="flex-1">
                                     <Label htmlFor={`label-${column.id}`} className="text-sm font-medium">
-                                        Column {index + 1} Label
+                                        Column {index + 1}
                                     </Label>
                                     <Input
                                         id={`label-${column.id}`}
                                         placeholder="e.g., Author, Year, Sample Size, Key Finding..."
                                         value={column.label}
-                                        onChange={(e) => updateColumn(column.id, 'label', e.target.value)}
+                                        onChange={(e) => updateColumn(column.id, e.target.value)}
                                         className="mt-1"
                                     />
-                                </div>
-                                <div className="w-32">
-                                    <Label htmlFor={`type-${column.id}`} className="text-sm font-medium">
-                                        Type
-                                    </Label>
-                                    <Select
-                                        value={column.type}
-                                        onValueChange={(value) => updateColumn(column.id, 'type', value as 'string' | 'number')}
-                                    >
-                                        <SelectTrigger id={`type-${column.id}`} className="mt-1">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="string">String</SelectItem>
-                                            <SelectItem value="number">Number</SelectItem>
-                                        </SelectContent>
-                                    </Select>
                                 </div>
                                 {columns.length > 1 && (
                                     <Button

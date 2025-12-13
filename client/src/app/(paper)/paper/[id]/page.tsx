@@ -23,7 +23,7 @@ import { useAnnotations } from '@/components/hooks/PdfAnnotation';
 import {
     PaperData,
     PaperHighlight,
-    JobStatusResponse,
+    PaperUploadJobStatusResponse,
 } from '@/lib/schema';
 
 import { PaperStatus, PaperStatusEnum } from '@/components/utils/PdfStatus';
@@ -198,7 +198,7 @@ export default function PaperView() {
 
     const pollJobStatus = async (jobId: string) => {
         try {
-            const response: JobStatusResponse = await fetchFromApi(`/api/paper/upload/status/${jobId}`);
+            const response: PaperUploadJobStatusResponse = await fetchFromApi(`/api/paper/upload/status/${jobId}`);
             setLoadingMessage(response.celery_progress_message);
 
             if (response.status === 'completed') {

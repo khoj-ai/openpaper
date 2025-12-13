@@ -213,6 +213,9 @@ export interface JobStatusResponse {
     status: JobStatusType;
     started_at: string;
     completed_at: string | null;
+}
+
+export interface PaperUploadJobStatusResponse extends JobStatusResponse {
     paper_id: string | null;
     has_file_url: boolean;
     has_metadata: boolean;
@@ -269,13 +272,10 @@ export interface AudioOverview {
     job_id: string;
 }
 
-export interface AudioOverviewJob {
+export interface AudioOverviewJob extends JobStatusResponse {
     id: string;
-    status: JobStatusType;
     conversable_id: string;
     conversable_type: string;
-    started_at: string;
-    completed_at: string | null;
 }
 
 export interface Project {
@@ -331,4 +331,9 @@ export interface ProjectInvitation {
 	role: string;
 	accepted_at?: string;
 	invited_at: string;
+}
+
+export interface DataTableJobStatusResponse extends JobStatusResponse {
+    celery_progress_message: string | null;
+    job_id: string;
 }
