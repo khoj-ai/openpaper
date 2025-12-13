@@ -110,6 +110,52 @@ The summary should be accessible to readers with basic domain knowledge while ma
 
 
 ################################
+# Data-table related Schemas   #
+################################
+
+
+class DocumentMapping(BaseModel):
+    title: str
+    s3_object_key: str
+    id: str
+
+
+class DataTableSchema(BaseModel):
+    columns: List[str] = Field(description="List of column names in the data table.")
+    job_id: str = Field(description="Job ID for tracking the data table extraction.")
+    papers: List[DocumentMapping] = Field(
+        description="List of papers included in the data table."
+    )
+
+
+class DataTableCellValue(BaseModel):
+    """Value for a single cell in the data table with supporting citations."""
+
+    value: str = Field(description="The extracted value for this column")
+    citations: List[ResponseCitation] = Field(
+        default=[],
+        description="List of citations that support this specific value. These should be direct quotes or paraphrases from the paper.",
+    )
+
+
+class DataTableRow(BaseModel):
+    """A row in the data table representing extracted values for a single paper."""
+
+    paper_id: str = Field(description="The ID of the paper this row corresponds to")
+    values: dict[str, DataTableCellValue] = Field(
+        description="Mapping of column name to cell value with citations"
+    )
+
+
+class DataTableResult(BaseModel):
+    """Result of a data table extraction job."""
+
+    success: bool = Field(description="Whether the extraction was successful")
+    columns: List[str] = Field(description="List of column names in the data table.")
+    rows: List[DataTableRow] = Field(default=[], description="Row data per paper")
+
+
+################################
 # Hypothesis-related Schemas   #
 ################################
 

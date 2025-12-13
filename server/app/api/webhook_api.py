@@ -16,7 +16,7 @@ from app.database.models import JobStatus
 from app.database.telemetry import track_event
 from app.helpers.paper_search import get_doi
 from app.helpers.s3 import s3_service
-from app.schemas.responses import PaperMetadataExtraction
+from app.schemas.responses import DataTableResult, PaperMetadataExtraction
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -103,7 +103,7 @@ class PDFProcessingResult(BaseModel):
     duration: Optional[float] = None
 
 
-class WebhookData(BaseModel):
+class PdfProcessingWebhookData(BaseModel):
     """Schema for webhook data from PDF processing service"""
 
     task_id: str
@@ -113,7 +113,7 @@ class WebhookData(BaseModel):
 
 @webhook_router.post("/paper-processing/{job_id}")
 async def handle_paper_processing_webhook(
-    job_id: str, webhook_data: WebhookData, db: Session = Depends(get_db)
+    job_id: str, webhook_data: PdfProcessingWebhookData, db: Session = Depends(get_db)
 ):
     """Handle webhook from paper processing jobs service."""
 
@@ -311,3 +311,65 @@ async def handle_paper_processing_webhook(
         raise HTTPException(status_code=500, detail="Error processing webhook")
 
     return {"status": "webhook processed"}
+
+
+class DataTableProcessingResultWebhookData(BaseModel):
+    """Schema for webhook data from data table processing service."""
+
+    task_id: str
+    status: str
+    result: DataTableResult
+    error: Optional[str] = None
+
+
+@webhook_router.post("/data-table-processing/{job_id}")
+async def handle_data_table_processing_webhook(
+    job_id: str,
+    webhook_data: DataTableProcessingResultWebhookData,
+    db: Session = Depends(get_db),
+):
+    """Handle webhook from data table processing jobs service."""
+
+    logger.info(
+        f"Received data table processing webhook for job {job_id} with status {webhook_data.status}"
+    )
+
+    result = webhook_data.result
+    task_id = webhook_data.task_id
+    status = webhook_data.status
+    error = webhook_data.error
+
+    try:
+        if status == "completed" and result.success:
+            # Processing was successful
+            logger.info(
+                f"Data table processing completed for job {job_id}, "
+                f"extracted {len(result.rows)} rows with columns: {result.columns}"
+            )
+
+            # TODO: Store the result in the database or notify the user
+            # For now, just log the success
+
+        else:
+            # Processing failed
+            error_message = error if error else "Unknown error"
+            logger.error(
+                f"Data table processing failed for job {job_id}: {error_message}"
+            )
+
+            # TODO: Update job status in database and notify user of failure
+
+    except Exception as e:
+        logger.error(
+            f"Error processing data table webhook for job {job_id}: {str(e)}",
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Error processing webhook")
+
+    return {
+        "status": "data table webhook processed",
+        "job_id": job_id,
+        "task_id": task_id,
+        "success": result.success,
+        "rows_count": len(result.rows),
+    }

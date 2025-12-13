@@ -19,6 +19,7 @@ from app.api.project_audio_api import project_audio_router
 from app.api.projects.project_conversations_api import project_conversations_router
 from app.api.projects.project_papers_api import project_papers_router
 from app.api.projects.projects_api import projects_router
+from app.api.projects.projects_data_table_api import projects_data_table_router
 from app.api.projects.projects_invitation_api import (
     router as projects_invitation_router,
 )
@@ -74,6 +75,7 @@ app.include_router(paper_search_router, prefix="/api/search/global")
 app.include_router(search_router, prefix="/api/search/local")
 app.include_router(paper_audio_router, prefix="/api/paper/audio")
 app.include_router(paper_image_router, prefix="/api/paper/image")
+app.include_router(projects_data_table_router, prefix="/api/projects/tables")
 app.include_router(paper_upload_router, prefix="/api/paper/upload")
 app.include_router(project_audio_router, prefix="/api/projects/audio")
 app.include_router(paper_tag_router, prefix="/api/paper/tag")
