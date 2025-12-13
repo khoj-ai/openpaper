@@ -9,17 +9,19 @@ import io
 import asyncio
 from google import genai
 from google.genai import types
-from typing import Optional, Type, TypeVar, Callable
+from typing import Any, Dict, List, Optional, Type, TypeVar, Callable
 
-from pydantic import BaseModel
+from pydantic import BaseModel, create_model, Field, ConfigDict
 
-from src.prompts import SYSTEM_INSTRUCTIONS_CACHE, EXTRACT_METADATA_PROMPT_TEMPLATE, SYSTEM_INSTRUCTIONS_IMAGE_CAPTION_CACHE
+from src.prompts import EXTRACT_COLS_INSTRUCTION, SYSTEM_INSTRUCTIONS_CACHE, EXTRACT_METADATA_PROMPT_TEMPLATE
 from src.schemas import (
+    DataTableRow,
     PaperMetadataExtraction,
     TitleAuthorsAbstract,
     InstitutionsKeywords,
     SummaryAndCitations,
     Highlights,
+    DataTableCellValue,
 )
 from src.utils import retry_llm_operation, time_it
 
@@ -183,6 +185,7 @@ class AsyncLLMClient:
         cache_key: Optional[str] = None,
         model: Optional[str] = None,
         schema: Optional[Type[BaseModel]] = None,
+        file_path: Optional[str] = None,
     ) -> str:
         """
         Generate content using the LLM.
@@ -203,6 +206,12 @@ class AsyncLLMClient:
         parts = []
         if image_bytes:
             parts.append(types.Part.from_bytes(data=image_bytes, mime_type=image_mime_type or 'image/png'))
+
+        if file_path:
+            with open(file_path, "rb") as f:
+                file_data = f.read()
+            parts.append(types.Part.from_bytes(data=file_data, mime_type='application/pdf'))
+
 
         parts.append(types.Part.from_text(text=prompt))
 
@@ -464,6 +473,74 @@ class PaperOperations(AsyncLLMClient):
             finally:
                 # Set client to None to allow for proper garbage collection
                 self.client = None
+
+    async def extract_data_table(
+        self,
+        columns: List[str],
+        file_path: str,
+        paper_id: str,
+    ) -> DataTableRow:
+        """
+        Extract structured data table from paper content.
+
+        Args:
+            columns: List of column names for the data table
+            file_path: The file path to the PDF
+        Returns:
+            str: JSON string representing the data table
+        """
+        try:
+            if not self.client:
+                self.refresh_client()
+
+            cols_str = "\n".join(f"- {col}" for col in columns)
+            prompt = EXTRACT_COLS_INSTRUCTION.format(
+                cols_str=cols_str,
+                n_cols=len(columns)
+            )
+
+            # Create the dynamic schema that matches DataTableRow structure
+            # Each column maps to a DataTableCellValue (value + citations)
+            field_definitions: Dict[str, Any] = {
+                col: (DataTableCellValue, Field(description=f"Value and citations for column '{col}'"))
+                for col in columns
+            }
+
+            # Create the values model that enforces all column names as required fields
+            ValuesModel = create_model(
+                'ValuesModel',
+                __config__=ConfigDict(),  # Prevent extra fields
+                **field_definitions
+            )
+
+            response = await self.generate_content(
+                prompt,
+                model=self.default_model,
+                file_path=file_path,
+                schema=ValuesModel,
+            )
+
+            # Parse and validate the response
+            response_json = JSONParser.validate_and_extract_json(response)
+            values_instance = ValuesModel.model_validate(response_json)
+
+            # Convert the Pydantic model to a dict for DataTableRow
+            values_dict: Dict[str, DataTableCellValue] = {
+                col: getattr(values_instance, col)
+                for col in columns
+            }
+
+            # Create and return the DataTableRow
+            return DataTableRow(
+                paper_id=paper_id,
+                values=values_dict
+            )
+        except Exception as e:
+            logger.error(f"Error extracting data table: {str(e)}", exc_info=True)
+            raise ValueError(f"Failed to extract data table: {str(e)}")
+        finally:
+            # Reset client to avoid issues with closed event loops on subsequent calls
+            self.client = None
 
 
 # Create a single instance to use throughout the application

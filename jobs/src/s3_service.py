@@ -5,7 +5,6 @@ import logging
 import os
 import uuid
 from typing import Tuple
-from urllib.parse import urlparse
 
 import boto3 # type: ignore
 from botocore.exceptions import ClientError # type: ignore

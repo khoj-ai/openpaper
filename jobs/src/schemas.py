@@ -206,3 +206,35 @@ class PDFProcessingResult(BaseModel):
     preview_object_key: Optional[str] = None
     error: Optional[str] = None
     duration: Optional[float] = None  # Duration in seconds
+
+class DocumentMapping(BaseModel):
+    title: str
+    s3_object_key: str
+    id: str
+
+class DataTableSchema(BaseModel):
+    columns: List[str] = Field(
+        description="List of column names in the data table."
+    )
+    papers: List[DocumentMapping] = Field(
+        description="List of papers included in the data table."
+    )
+
+class DataTableCellValue(BaseModel):
+    """Value for a single cell in the data table with supporting citations."""
+    value: str = Field(description="The extracted value for this column")
+    citations: List[ResponseCitation] = Field(
+        default=[],
+        description="List of citations that support this specific value. These should be direct quotes or paraphrases from the paper."
+    )
+
+class DataTableRow(BaseModel):
+    paper_id: str
+    values: dict[str, DataTableCellValue]  # column_name -> cell value with citations
+
+class DataTableResult(BaseModel):
+    success: bool
+    columns: List[str] = Field(
+        description="List of column names in the data table."
+    )
+    rows: List[DataTableRow] = Field(default=[], description="Row data per paper")

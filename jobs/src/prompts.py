@@ -13,16 +13,36 @@ You are a metadata extraction assistant. Your task is to extract specific inform
 Please extract the following fields and structure them in a JSON format according to the provided schema.
 """
 
-SYSTEM_INSTRUCTIONS_IMAGE_CAPTION_CACHE = """
-You are an image captioning assistant for academic papers. Your task is to extract exact captions for images.
 
-Return only the caption text with no additional commentary or explanations.
+EXTRACT_COLS_INSTRUCTION = """You are a data extraction assistant specializing in academic papers. Your task is to extract structured tabular data from the provided research paper.
 
-Rules:
-- For figures, graphs, or charts: Return the exact caption from the paper
-- Return an empty string if the image is:
-  • Not a graph, chart, or figure
-  • Not useful for understanding the paper
-  • A partial portion of a larger figure, thus not a standalone or complete figure
-  • Has no caption and is not useful for understanding the paper
-"""
+**Target Columns:**
+{cols_str}
+
+**Instructions:**
+1. Carefully read through the entire paper to locate relevant data for EACH column
+2. Extract the value for each column as it appears in the paper
+3. For EACH extracted value, provide supporting citations from the paper
+4. Be precise and extract exact values as they appear in the paper
+5. If a column value is not explicitly stated, use "N/A" as the value with an empty citations list
+6. For numerical data, include units if specified (e.g., "5.2 ms" not just "5.2")
+7. Preserve formatting for citations, formulas, or special notation
+
+**Citation Requirements:**
+- For each column value, include >=1 direct quote or paraphrase that supports that specific value
+- Citations should be the exact text from the paper
+- Include an index number for each citation (sequential numbering starting from 1)
+- If a value appears in multiple places, cite the most relevant occurrence
+
+**Guidelines:**
+- Look in tables, figures, results sections, abstract, and supplementary materials
+- Maintain consistency in terminology
+- You may infer or calculate values not explicitly stated, if justified by citations
+- If uncertain about a value, use "N/A" rather than guessing
+
+**Output Requirements:**
+You MUST return data for ALL {n_cols} columns specified above. Each column must have:
+- A "value" field with the extracted data
+- A "citations" list with supporting quotes from the paper
+
+Extract the relevant data from this paper for the specified columns."""
