@@ -122,7 +122,6 @@ class DocumentMapping(BaseModel):
 
 class DataTableSchema(BaseModel):
     columns: List[str] = Field(description="List of column names in the data table.")
-    job_id: str = Field(description="Job ID for tracking the data table extraction.")
     papers: List[DocumentMapping] = Field(
         description="List of papers included in the data table."
     )

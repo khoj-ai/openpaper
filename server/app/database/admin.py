@@ -6,6 +6,9 @@ from app.database.database import aget_db, engine
 from app.database.models import (
     Annotation,
     Conversation,
+    DataTableExtractionJob,
+    DataTableExtractionResult,
+    DataTableRow,
     Highlight,
     Message,
     Onboarding,
@@ -14,6 +17,7 @@ from app.database.models import (
     Project,
     ProjectPaper,
     ProjectRole,
+    ProjectRoleInvitation,
     Subscription,
     User,
 )
@@ -158,6 +162,59 @@ class MessageAdmin(ModelView, model=Message):
     column_searchable_list = [Message.content]
 
 
+class DataTableExtractionJobAdmin(ModelView, model=DataTableExtractionJob):
+    column_list = [
+        DataTableExtractionJob.id,
+        DataTableExtractionJob.project_id,
+        DataTableExtractionJob.status,
+        DataTableExtractionJob.created_at,
+    ]
+    column_searchable_list = [
+        DataTableExtractionJob.project_id,
+        DataTableExtractionJob.status,
+    ]
+
+
+class DataTableExtractionResultAdmin(ModelView, model=DataTableExtractionResult):
+    column_list = [
+        DataTableExtractionResult.id,
+        DataTableExtractionResult.success,
+        DataTableExtractionResult.created_at,
+    ]
+    column_searchable_list = [
+        DataTableExtractionResult.success,
+    ]
+
+
+class DataTableRowAdmin(ModelView, model=DataTableRow):
+    column_list = [
+        DataTableRow.id,
+        DataTableRow.data_table_id,
+        DataTableRow.paper_id,
+        DataTableRow.values,
+        DataTableRow.created_at,
+    ]
+    column_searchable_list = [
+        DataTableRow.data_table_id,
+        DataTableRow.paper_id,
+    ]
+
+
+class ProjectRoleInvitationAdmin(ModelView, model=ProjectRoleInvitation):
+    column_list = [
+        ProjectRoleInvitation.id,
+        ProjectRoleInvitation.project_id,
+        ProjectRoleInvitation.email,
+        ProjectRoleInvitation.role,
+        ProjectRoleInvitation.created_at,
+    ]
+    column_searchable_list = [
+        ProjectRoleInvitation.project_id,
+        ProjectRoleInvitation.email,
+        ProjectRoleInvitation.role,
+    ]
+
+
 class AdminAuthenticationBackend(AuthenticationBackend):
     super_password = os.getenv("SUPER_PASSWORD", "admin")
     root_email = os.getenv("ROOT_EMAIL", None)
@@ -241,14 +298,18 @@ def setup_admin(app: FastAPI):
     )
 
     admin.add_view(UserAdmin)
-    admin.add_view(HighlightAdmin)
+    admin.add_view(OnboardingAdmin)
     admin.add_view(PaperAdmin)
+    admin.add_view(HighlightAdmin)
     admin.add_view(AnnotationAdmin)
     admin.add_view(PaperNoteAdmin)
     admin.add_view(ConversationAdmin)
     admin.add_view(MessageAdmin)
     admin.add_view(ProjectAdmin)
+    admin.add_view(ProjectRoleInvitationAdmin)
     admin.add_view(ProjectRoleAdmin)
     admin.add_view(ProjectPaperAdmin)
-    admin.add_view(OnboardingAdmin)
     admin.add_view(SubscriptionAdmin)
+    admin.add_view(DataTableExtractionJobAdmin)
+    admin.add_view(DataTableExtractionResultAdmin)
+    admin.add_view(DataTableRowAdmin)

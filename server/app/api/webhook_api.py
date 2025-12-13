@@ -8,8 +8,14 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 from app.database.crud.paper_crud import PaperUpdate, paper_crud
-from app.database.crud.paper_image_crud import PaperImageCreate, paper_image_crud
 from app.database.crud.paper_upload_crud import paper_upload_job_crud
+from app.database.crud.projects.project_data_table_crud import (
+    DataTableResultCreate,
+    DataTableRowCreate,
+    data_table_job_crud,
+    data_table_result_crud,
+    data_table_row_crud,
+)
 from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
 from app.database.models import JobStatus
@@ -347,8 +353,53 @@ async def handle_data_table_processing_webhook(
                 f"extracted {len(result.rows)} rows with columns: {result.columns}"
             )
 
-            # TODO: Store the result in the database or notify the user
-            # For now, just log the success
+            # Update job status to completed
+            data_table_job_crud.update_status(
+                db=db,
+                job_id=uuid.UUID(job_id),
+                status=JobStatus.COMPLETED,
+            )
+
+            # Post-Processing
+            # Augment the DataCellValue citations with the paper_id
+            # The job only returns citation info without paper_id, but we can fill it in here
+            for col in result.columns:
+                for row in result.rows:
+                    cell_value = row.values.get(col)
+                    if cell_value:
+                        for citation in cell_value.citations:
+                            citation.paper_id = row.paper_id
+
+            # Create the data table result
+            table_result = data_table_result_crud.create(
+                db=db,
+                obj_in=DataTableResultCreate(
+                    job_id=uuid.UUID(job_id),
+                    success=result.success,
+                    columns=result.columns,
+                ),
+            )
+
+            if table_result:
+                # Create all rows using create_many
+                # Convert DataTableCellValue objects to dicts for JSON serialization
+                row_creates = [
+                    DataTableRowCreate(
+                        data_table_id=uuid.UUID(str(table_result.id)),
+                        paper_id=uuid.UUID(row.paper_id),
+                        values={
+                            col: cell.model_dump() for col, cell in row.values.items()
+                        },
+                    )
+                    for row in result.rows
+                ]
+                if row_creates:
+                    data_table_row_crud.create_many(db=db, rows=row_creates)
+                    logger.info(
+                        f"Created {len(row_creates)} rows for data table result {table_result.id}"
+                    )
+            else:
+                logger.error(f"Failed to create data table result for job {job_id}")
 
         else:
             # Processing failed
@@ -357,7 +408,13 @@ async def handle_data_table_processing_webhook(
                 f"Data table processing failed for job {job_id}: {error_message}"
             )
 
-            # TODO: Update job status in database and notify user of failure
+            # Update job status to failed
+            data_table_job_crud.update_status(
+                db=db,
+                job_id=uuid.UUID(job_id),
+                status=JobStatus.FAILED,
+                error_message=error_message,
+            )
 
     except Exception as e:
         logger.error(
