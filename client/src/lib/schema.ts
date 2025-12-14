@@ -211,7 +211,9 @@ export interface PaperImage {
 export interface JobStatusResponse {
     job_id: string;
     status: JobStatusType;
+    title: string | null;
     started_at: string;
+    created_at: string;
     completed_at: string | null;
 }
 
@@ -336,4 +338,5 @@ export interface ProjectInvitation {
 export interface DataTableJobStatusResponse extends JobStatusResponse {
     celery_progress_message: string | null;
     job_id: string;
+    result_id: string | null;
 }

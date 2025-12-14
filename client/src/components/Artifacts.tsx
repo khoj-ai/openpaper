@@ -3,8 +3,9 @@
 import { Loader2, Pause, Play, Volume2, RotateCcw, Table } from "lucide-react";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { fetchFromApi } from "@/lib/api";
-import { AudioOverview, PaperItem, AudioOverviewJob, ProjectRole } from "@/lib/schema";
+import { AudioOverview, PaperItem, AudioOverviewJob, ProjectRole, DataTableJobStatusResponse } from "@/lib/schema";
 import AudioOverviewGenerationJobCard from "@/components/AudioOverviewGenerationJobCard";
+import DataTableGenerationJobCard from "@/components/DataTableGenerationJobCard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -65,6 +66,7 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
     // Data Table states
     const [isDataTableSchemaModalOpen, setDataTableSchemaModalOpen] = useState(false);
     const [isCreatingDataTable, setIsCreatingDataTable] = useState(false);
+    const [dataTableJobs, setDataTableJobs] = useState<DataTableJobStatusResponse[]>([]);
 
     const getProjectAudioOverviews = useCallback(async () => {
         try {
@@ -87,6 +89,17 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
         }
     }, [projectId]);
 
+    const fetchDataTableJobs = useCallback(async () => {
+        try {
+            const fetchedJobs = await fetchFromApi(`/api/projects/tables/jobs/${projectId}`);
+            setDataTableJobs(fetchedJobs.jobs);
+            return fetchedJobs.jobs;
+        } catch (err) {
+            console.error("Failed to fetch data table jobs:", err);
+            return [];
+        }
+    }, [projectId]);
+
     const stopPolling = useCallback(() => {
         if (pollingInterval.current) {
             clearInterval(pollingInterval.current);
@@ -98,10 +111,14 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
         stopPolling();
 
         const interval = setInterval(async () => {
-            const jobs = await getProjectAudioJobs();
-            const hasPendingJobs = jobs.some((job: AudioOverviewJob) => job.status === 'pending' || job.status === 'running');
+            const [audioJobs, dataTableJobs] = await Promise.all([
+                getProjectAudioJobs(),
+                fetchDataTableJobs()
+            ]);
+            const hasPendingAudioJobs = audioJobs.some((job: AudioOverviewJob) => job.status === 'pending' || job.status === 'running');
+            const hasPendingDataTableJobs = dataTableJobs.some((job: DataTableJobStatusResponse) => job.status === 'pending' || job.status === 'running');
 
-            if (!hasPendingJobs) {
+            if (!hasPendingAudioJobs && !hasPendingDataTableJobs) {
                 // No more pending jobs, stop polling and refresh overviews
                 stopPolling();
                 getProjectAudioOverviews();
@@ -109,14 +126,18 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
         }, 20000); // Poll every 20 seconds
 
         pollingInterval.current = interval;
-    }, [getProjectAudioJobs, getProjectAudioOverviews, stopPolling]);
+    }, [getProjectAudioJobs, fetchDataTableJobs, getProjectAudioOverviews, stopPolling]);
 
     useEffect(() => {
         if (projectId) {
             getProjectAudioOverviews();
-            getProjectAudioJobs().then(jobs => {
-                const hasPendingJobs = jobs.some((job: AudioOverviewJob) => job.status === 'pending' || job.status === 'running');
-                if (hasPendingJobs) {
+            Promise.all([
+                getProjectAudioJobs(),
+                fetchDataTableJobs()
+            ]).then(([audioJobs, dataTableJobs]) => {
+                const hasPendingAudioJobs = audioJobs.some((job: AudioOverviewJob) => job.status === 'pending' || job.status === 'running');
+                const hasPendingDataTableJobs = dataTableJobs.some((job: DataTableJobStatusResponse) => job.status === 'pending' || job.status === 'running');
+                if (hasPendingAudioJobs || hasPendingDataTableJobs) {
                     startPolling();
                 }
             });
@@ -331,7 +352,7 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
             toast.info("Creating data table...");
 
             // Create the data table via API
-            const response = await fetchFromApi(`/api/projects/tables/`, {
+            const response: DataTableJobStatusResponse = await fetchFromApi(`/api/projects/tables/`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -342,12 +363,14 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
                 }),
             });
 
-            // Navigate to the data table generation page
-            router.push(`/projects/${projectId}/tables/${response.id}`);
+            // Fetch updated jobs and start polling
+            await fetchDataTableJobs();
+            startPolling();
+            setIsCreatingDataTable(false);
+            toast.success("Data table generation started!");
         } catch (err) {
             console.error("Failed to create data table:", err);
             toast.error("Failed to create data table. Please try again.");
-            setIsCreatingDataTable(false);
         }
     };
 
@@ -452,6 +475,15 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
                 onSubmit={handleCreateDataTable}
                 isCreating={isCreatingDataTable}
             />
+
+            {/* Data Table Generation Jobs */}
+            {dataTableJobs.length > 0 && (
+                <div className="mt-4 space-y-3">
+                    {dataTableJobs.map((job) => (
+                        <DataTableGenerationJobCard key={job.job_id} job={job} projectId={projectId} />
+                    ))}
+                </div>
+            )}
 
             {/* Audio Overview Generation Jobs */}
             {audioJobs.length > 0 && (

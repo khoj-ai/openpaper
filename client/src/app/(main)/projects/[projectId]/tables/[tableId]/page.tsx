@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { PaperItem } from "@/lib/schema";
 import DataTableGenerationView from "@/components/DataTableGenerationView";
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { PdfViewer } from "@/components/PdfViewer";
 import { useIsMobile } from "@/lib/useMobile";
+import { fetchFromApi } from "@/lib/api";
 
 interface DataTable {
     id: string;
@@ -34,54 +35,23 @@ const mockDataTable: DataTable = {
         {
             id: "col-1",
             label: "Sample Size",
-            type: "number"
         },
         {
             id: "col-2",
             label: "Study Type",
-            type: "string"
         },
         {
             id: "col-3",
             label: "Publication Year",
-            type: "number"
         },
         {
             id: "col-4",
             label: "Conclusion",
-            type: "string"
         }
     ],
     created_at: new Date().toISOString(),
     status: 'completed'
 };
-
-const mockPapers: PaperItem[] = [
-    {
-        id: "paper-1",
-        title: "Deep Learning Approaches to Natural Language Processing",
-        authors: ["Smith, J.", "Johnson, A."],
-        abstract: "This paper explores various deep learning architectures for NLP tasks...",
-        file_url: "/sample1.pdf",
-        created_at: new Date().toISOString(),
-    },
-    {
-        id: "paper-2",
-        title: "Transformers in Computer Vision: A Survey",
-        authors: ["Chen, L.", "Wang, M.", "Li, X."],
-        abstract: "A comprehensive survey of transformer-based models in computer vision applications...",
-        file_url: "/sample2.pdf",
-        created_at: new Date().toISOString(),
-    },
-    {
-        id: "paper-3",
-        title: "Neural Architecture Search for Image Classification",
-        authors: ["Brown, T.", "Davis, K."],
-        abstract: "Automated methods for discovering optimal neural network architectures...",
-        file_url: "/sample3.pdf",
-        created_at: new Date().toISOString(),
-    }
-];
 
 export default function DataTablePage() {
     const params = useParams();
@@ -102,12 +72,27 @@ export default function DataTablePage() {
         // Simulate loading delay for realistic testing
         const timer = setTimeout(() => {
             setDataTable(mockDataTable);
-            setPapers(mockPapers);
             setIsLoading(false);
         }, 500);
 
         return () => clearTimeout(timer);
     }, [projectId, tableId]);
+
+    const getProjectPapers = useCallback(async () => {
+        try {
+            const fetchedPapers = await fetchFromApi(`/api/projects/papers/${projectId}`);
+            setPapers(fetchedPapers.papers);
+        } catch (err) {
+            setError("Failed to fetch project papers. Please try again.");
+            console.error(err);
+        }
+    }, [projectId]);
+
+	useEffect(() => {
+		if (projectId) {
+			getProjectPapers();
+		}
+	}, [projectId, getProjectPapers]);
 
     const handleCitationClick = (paperId: string, searchTerm: string) => {
         const paper = papers.find(p => p.id === paperId);
