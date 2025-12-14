@@ -5,7 +5,7 @@ Webhook handlers for PDF processing service integration.
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Optional
 
 from app.database.crud.paper_crud import PaperUpdate, paper_crud
 from app.database.crud.paper_upload_crud import paper_upload_job_crud
@@ -22,6 +22,7 @@ from app.database.models import JobStatus
 from app.database.telemetry import track_event
 from app.helpers.paper_search import get_doi
 from app.helpers.s3 import s3_service
+from app.llm.operations import operations
 from app.schemas.responses import DataTableResult, PaperMetadataExtraction
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends, HTTPException
@@ -370,11 +371,28 @@ async def handle_data_table_processing_webhook(
                         for citation in cell_value.citations:
                             citation.paper_id = row.paper_id
 
+            paper_titles = []
+            for row in result.rows:
+                paper = paper_crud.get(db=db, id=uuid.UUID(row.paper_id))
+                if paper and paper.title:
+                    paper_titles.append(paper.title)
+                else:
+                    paper_titles.append("")
+
+            title = (
+                operations.name_data_table(
+                    paper_titles=paper_titles,
+                    column_labels=result.columns,
+                )
+                or f'Data Table ({", ".join(result.columns)})'
+            )
+
             # Create the data table result
             table_result = data_table_result_crud.create(
                 db=db,
                 obj_in=DataTableResultCreate(
                     job_id=uuid.UUID(job_id),
+                    title=title,
                     success=result.success,
                     columns=result.columns,
                 ),

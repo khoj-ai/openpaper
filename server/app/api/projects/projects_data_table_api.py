@@ -108,6 +108,46 @@ async def create_data_table(
         )
 
 
+@projects_data_table_router.get("/jobs/{project_id}")
+async def list_data_table_jobs(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+) -> JSONResponse:
+    """
+    List all pending data table extraction jobs for a given project.
+    """
+    try:
+        jobs = data_table_job_crud.get_by_project(
+            db=db,
+            project_id=uuid.UUID(project_id),
+            user=current_user,
+        )
+
+        job_list = [
+            {
+                "job_id": str(job.id),
+                "columns": job.columns,
+                "result_id": str(job.result.id) if job.result else None,
+                "status": job.status,
+                "task_id": job.task_id,
+                "created_at": job.created_at.isoformat() if job.created_at else None,
+            }
+            for job in jobs
+        ]
+
+        return JSONResponse(
+            status_code=200,
+            content={"jobs": job_list},
+        )
+    except Exception as e:
+        logger.error(f"Error listing data table jobs: {e}")
+        return JSONResponse(
+            status_code=400,
+            content={"message": f"Failed to list data table jobs: {str(e)}"},
+        )
+
+
 @projects_data_table_router.get("/{job_id}")
 async def get_data_table_job_status(
     job_id: str,
@@ -146,6 +186,7 @@ async def get_data_table_job_status(
         response_content = {
             "job_id": str(job.id),
             "status": job.status,
+            "columns": job.columns,
             "task_id": job.task_id,
             "created_at": job.created_at.isoformat() if job.created_at else None,
             "completed_at": job.completed_at.isoformat() if job.completed_at else None,
@@ -216,6 +257,7 @@ async def get_data_table_job_results(
             status_code=200,
             content={
                 "success": result.success,
+                "title": result.title,
                 "columns": result.columns,
                 "rows": result.rows,
                 "created_at": (

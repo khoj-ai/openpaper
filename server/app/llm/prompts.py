@@ -406,6 +406,21 @@ RENAME_CONVERSATION_SYSTEM_PROMPT = """
 You are an expert at summarizing conversations. Your task is to generate a concise and descriptive title for the given chat history. The title should be no more than 5 words and should accurately reflect the main topic of the conversation.
 """
 
+NAME_DATA_TABLE_SYSTEM_PROMPT = """
+You are an expert at creating concise, descriptive titles. Your task is to generate a title for a data table that summarizes information extracted from research papers. The title should be no more than 10 words and should reflect both the papers' subject matter and the type of data being extracted.
+"""
+
+NAME_DATA_TABLE_USER_MESSAGE = """
+Generate a concise title (10 words or less) for a data table that extracts the following information from research papers.
+
+Papers included:
+{paper_titles}
+
+Columns being extracted: {column_labels}
+
+Title:
+"""
+
 RENAME_CONVERSATION_USER_MESSAGE = """
 Given the following chat history, generate a new title for the conversation:
 

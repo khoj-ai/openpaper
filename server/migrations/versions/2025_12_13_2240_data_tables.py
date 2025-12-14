@@ -1,8 +1,8 @@
-"""data table storage
+"""data tables
 
-Revision ID: 8cea75d1fea1
+Revision ID: 8698e90090c3
 Revises: 580b29285cba
-Create Date: 2025-12-13 05:38:01.094815+00:00
+Create Date: 2025-12-13 22:40:44.081392+00:00
 
 """
 
@@ -13,7 +13,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = "8cea75d1fea1"
+revision: str = "8698e90090c3"
 down_revision: Union[str, None] = "580b29285cba"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -52,6 +52,7 @@ def upgrade() -> None:
     op.create_table(
         "data_table_extraction_results",
         sa.Column("id", sa.UUID(), nullable=False),
+        sa.Column("title", sa.String(), nullable=True),
         sa.Column("job_id", sa.UUID(), nullable=False),
         sa.Column("success", sa.Boolean(), nullable=False),
         sa.Column("columns", sa.ARRAY(sa.String()), nullable=False),

@@ -45,6 +45,7 @@ class DataTableJobUpdate(BaseModel):
 
 class DataTableResultCreate(BaseModel):
     job_id: UUID
+    title: str
     success: bool
     columns: List[str]
 
@@ -124,7 +125,7 @@ class DataTableJobCRUD(
         project_id: UUID,
         user: CurrentUser,
     ) -> List[DataTableExtractionJob]:
-        """Get all data table jobs for a project"""
+        """Get all data table jobs for a project with their associated results"""
         # Check if user has access to the project
         project_role = (
             db.query(ProjectRole)
@@ -139,6 +140,7 @@ class DataTableJobCRUD(
 
         return (
             db.query(DataTableExtractionJob)
+            .options(joinedload(DataTableExtractionJob.result))
             .filter(DataTableExtractionJob.project_id == project_id)
             .order_by(DataTableExtractionJob.created_at.desc())
             .all()
@@ -285,6 +287,7 @@ class DataTableJobCRUD(
             "created_at": job.created_at.isoformat() if job.created_at else None,
             "updated_at": job.updated_at.isoformat() if job.updated_at else None,
             "error_message": job.error_message,
+            "result_id": str(job.result.id) if job.result else None,
         }
 
 
@@ -308,6 +311,7 @@ class DataTableResultCRUD(
         """Create a new data table result"""
         try:
             db_obj = DataTableExtractionResult(
+                title=obj_in.title,
                 job_id=obj_in.job_id,
                 success=obj_in.success,
                 columns=obj_in.columns,
@@ -374,6 +378,7 @@ class DataTableResultCRUD(
         data: Dict[str, Any] = {
             "id": str(result.id),
             "job_id": str(result.job_id),
+            "title": result.title,
             "success": result.success,
             "columns": result.columns,
             "created_at": result.created_at.isoformat() if result.created_at else None,

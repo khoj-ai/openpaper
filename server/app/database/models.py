@@ -1011,6 +1011,7 @@ class DataTableExtractionResult(Base):
     __tablename__ = "data_table_extraction_results"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    title = Column(String, nullable=True)
     job_id = Column(
         UUID(as_uuid=True),
         ForeignKey("data_table_extraction_jobs.id", ondelete="CASCADE"),
