@@ -129,6 +129,7 @@ async def list_data_table_jobs(
                 "job_id": str(job.id),
                 "columns": job.columns,
                 "result_id": str(job.result.id) if job.result else None,
+                "title": job.result.title if job.result else None,
                 "status": job.status,
                 "task_id": job.task_id,
                 "created_at": job.created_at.isoformat() if job.created_at else None,
