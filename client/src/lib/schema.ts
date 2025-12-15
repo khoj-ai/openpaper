@@ -392,6 +392,8 @@ export interface SubscriptionUsage {
     audio_overviews_remaining: number;
     projects: number;
     projects_remaining: number;
+    data_tables_used: number;
+    data_tables_remaining: number;
 }
 
 export interface SubscriptionData {

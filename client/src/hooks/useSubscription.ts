@@ -128,6 +128,23 @@ export const isProjectAtLimit = (subscription: SubscriptionData | null): boolean
     return getProjectUsagePercentage(subscription) >= 100;
 };
 
+// Data table usage helper functions
+export const getDataTableUsagePercentage = (subscription: SubscriptionData | null): number => {
+    if (!subscription) return 0;
+    const { data_tables_used, data_tables_remaining } = subscription.usage;
+    const total = data_tables_used + data_tables_remaining;
+    if (total === 0) return 0;
+    return (data_tables_used / total) * 100;
+};
+
+export const isDataTableNearLimit = (subscription: SubscriptionData | null, threshold: number = 75): boolean => {
+    return getDataTableUsagePercentage(subscription) >= threshold;
+};
+
+export const isDataTableAtLimit = (subscription: SubscriptionData | null): boolean => {
+    return getDataTableUsagePercentage(subscription) >= 100;
+};
+
 // Calculate next Monday at 12 AM UTC for credit reset
 export const nextMonday = (() => {
     const now = new Date();

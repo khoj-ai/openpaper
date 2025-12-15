@@ -25,7 +25,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { useSubscription, isAudioOverviewAtLimit, isAudioOverviewNearLimit } from "@/hooks/useSubscription";
+import { useSubscription, isAudioOverviewAtLimit, isAudioOverviewNearLimit, isDataTableAtLimit, isDataTableNearLimit } from "@/hooks/useSubscription";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -48,6 +48,7 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
     const router = useRouter();
     const { subscription, refetch: refetchSubscription } = useSubscription();
     const atAudioLimit = subscription ? isAudioOverviewAtLimit(subscription) : false;
+    const atDataTableLimit = subscription ? isDataTableAtLimit(subscription) : false;
     const [audioInstructions, setAudioInstructions] = useState("");
     const [selectedAudioLength, setSelectedAudioLength] = useState("medium");
     const [isCreatingAudio, setIsCreatingAudio] = useState(false);
@@ -345,6 +346,11 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
     };
 
     const handleCreateDataTable = async (columns: ColumnDefinition[]) => {
+        if (atDataTableLimit) {
+            toast.error("You have reached your data table limit. Please upgrade to create more.");
+            setDataTableSchemaModalOpen(false);
+            return;
+        }
         setDataTableSchemaModalOpen(false);
         setIsCreatingDataTable(true);
 
@@ -368,6 +374,39 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
             startPolling();
             setIsCreatingDataTable(false);
             toast.success("Data table generation started!");
+
+            // Refetch subscription and warn if near limit
+            refetchSubscription();
+            if (subscription) {
+                const newUsage = {
+                    ...subscription.usage,
+                    data_tables_used: subscription.usage.data_tables_used + 1,
+                    data_tables_remaining: subscription.usage.data_tables_remaining - 1,
+                };
+                const tempUpdatedSubscription = {
+                    ...subscription,
+                    usage: newUsage,
+                };
+
+                const newAtLimit = isDataTableAtLimit(tempUpdatedSubscription);
+                const newNearLimit = isDataTableNearLimit(tempUpdatedSubscription);
+
+                if (newAtLimit) {
+                    toast.warning("You've used all of your data tables for the week.", {
+                        action: {
+                            label: "Upgrade",
+                            onClick: () => router.push('/pricing'),
+                        }
+                    });
+                } else if (newNearLimit) {
+                    toast.info(`You have ${newUsage.data_tables_remaining} data tables remaining this week.`, {
+                        action: {
+                            label: "Upgrade",
+                            onClick: () => router.push('/pricing'),
+                        }
+                    });
+                }
+            }
         } catch (err) {
             console.error("Failed to create data table:", err);
             toast.error("Failed to create data table. Please try again.");
@@ -457,9 +496,10 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
                     </Dialog>
 
                     <button
-                        disabled={papers.length === 0}
+                        disabled={papers.length === 0 || atDataTableLimit}
                         onClick={() => setDataTableSchemaModalOpen(true)}
                         className="flex flex-col items-center justify-center p-3 border-2 border-dashed rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed aspect-square w-1/4"
+                        title={atDataTableLimit ? "You have reached your data table limit" : undefined}
                     >
                         <Table className="w-6 h-6 text-gray-400 group-hover:text-blue-500 mb-1 transition-colors" />
                         <span className="text-xs font-medium text-center leading-tight">Data Table</span>
