@@ -1,6 +1,6 @@
 import re
 from enum import Enum
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Union
 
 from app.schemas.responses import ToolCall
 from pydantic import BaseModel, Field

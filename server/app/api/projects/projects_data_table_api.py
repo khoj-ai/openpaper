@@ -10,6 +10,7 @@ from app.database.crud.projects.project_data_table_crud import (
 )
 from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
+from app.database.models import JobStatus
 from app.helpers.pdf_jobs import jobs_client
 from app.schemas.responses import DataTableSchema, DocumentMapping
 from app.schemas.user import CurrentUser
@@ -83,6 +84,13 @@ async def create_data_table(
         task_id = jobs_client.submit_data_table_processing_job(
             data_table=data_table,
             job_id=job_id,
+        )
+
+        # Update status to running
+        data_table_job_crud.update_status(
+            db=db,
+            job_id=uuid.UUID(job_id),
+            status=JobStatus.RUNNING,
         )
 
         # Update the job with the task ID
