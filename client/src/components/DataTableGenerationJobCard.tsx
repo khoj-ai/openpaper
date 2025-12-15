@@ -102,7 +102,7 @@ export default function DataTableGenerationJobCard({ job, projectId }: DataTable
 
     if (job.status === JobStatus.COMPLETED && job.result_id) {
         return (
-            <Link href={`/projects/${projectId}/tables/${job.result_id}`}>
+            <Link href={`/projects/${projectId}/tables/${job.result_id}`} className="block">
                 <CardContent />
             </Link>
         );
