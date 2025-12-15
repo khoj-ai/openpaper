@@ -346,11 +346,6 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
     };
 
     const handleCreateDataTable = async (columns: ColumnDefinition[]) => {
-        if (atDataTableLimit) {
-            toast.error("You have reached your data table limit. Please upgrade to create more.");
-            setDataTableSchemaModalOpen(false);
-            return;
-        }
         setDataTableSchemaModalOpen(false);
         setIsCreatingDataTable(true);
 
@@ -496,10 +491,9 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
                     </Dialog>
 
                     <button
-                        disabled={papers.length === 0 || atDataTableLimit}
+                        disabled={papers.length === 0}
                         onClick={() => setDataTableSchemaModalOpen(true)}
                         className="flex flex-col items-center justify-center p-3 border-2 border-dashed rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed aspect-square w-1/4"
-                        title={atDataTableLimit ? "You have reached your data table limit" : undefined}
                     >
                         <Table className="w-6 h-6 text-gray-400 group-hover:text-blue-500 mb-1 transition-colors" />
                         <span className="text-xs font-medium text-center leading-tight">Data Table</span>
@@ -514,6 +508,7 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
                 onOpenChange={setDataTableSchemaModalOpen}
                 onSubmit={handleCreateDataTable}
                 isCreating={isCreatingDataTable}
+                atLimit={atDataTableLimit}
             />
 
             {/* Data Table Generation Jobs */}
