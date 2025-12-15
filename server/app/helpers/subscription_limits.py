@@ -14,6 +14,7 @@ from app.database.crud.audio_overview_crud import audio_overview_crud
 from app.database.crud.message_crud import message_crud
 from app.database.crud.paper_crud import paper_crud
 from app.database.crud.projects.project_crud import project_crud
+from app.database.crud.projects.project_data_table_crud import data_table_job_crud
 from app.database.crud.subscription_crud import subscription_crud
 from app.database.models import SubscriptionPlan, SubscriptionStatus
 from app.database.telemetry import track_event
@@ -25,6 +26,7 @@ logger = logging.getLogger(__name__)
 PAPER_UPLOAD_KEY = "paper_uploads"
 KB_SIZE_KEY = "knowledge_base_size"
 CHAT_CREDITS_KEY = "chat_credits_weekly"
+DATA_TABLES_KEY = "data_tables_weekly"
 AUDIO_OVERVIEWS_KEY = "audio_overviews_weekly"
 PROJECTS_KEY = "projects"
 
@@ -36,6 +38,7 @@ SUBSCRIPTION_LIMITS = {
         CHAT_CREDITS_KEY: 5000,
         AUDIO_OVERVIEWS_KEY: 5,
         PROJECTS_KEY: 2,
+        DATA_TABLES_KEY: 1,
     },
     SubscriptionPlan.RESEARCHER: {
         PAPER_UPLOAD_KEY: 500,
@@ -43,6 +46,7 @@ SUBSCRIPTION_LIMITS = {
         CHAT_CREDITS_KEY: 100000,
         AUDIO_OVERVIEWS_KEY: 100,
         PROJECTS_KEY: 100,
+        DATA_TABLES_KEY: 1,
     },
 }
 
@@ -121,6 +125,19 @@ def get_user_audio_overviews_limit(db: Session, user: CurrentUser) -> int:
     limits = get_plan_limits(plan)
 
     return limits[AUDIO_OVERVIEWS_KEY]
+
+
+def get_user_data_tables_limit(db: Session, user: CurrentUser) -> int:
+    """
+    Get the data table extraction job limits for a user based on their subscription plan.
+
+    Returns:
+        int: The data table extraction job limit per week.
+    """
+    plan = get_user_subscription_plan(db, user)
+    limits = get_plan_limits(plan)
+
+    return limits[DATA_TABLES_KEY]
 
 
 def can_user_upload_paper(db: Session, user: CurrentUser) -> tuple[bool, Optional[str]]:
@@ -295,6 +312,51 @@ def can_user_access_knowledge_base(
     return True, None
 
 
+def can_user_create_data_table_job(
+    db: Session, user: CurrentUser
+) -> tuple[bool, Optional[str]]:
+    """
+    Check if a user can create a new data table extraction job based on their subscription limits.
+
+    Returns:
+        tuple: (can_create: bool, error_message: Optional[str])
+    """
+    plan = get_user_subscription_plan(db, user)
+    limits = get_plan_limits(plan)
+
+    current_data_tables_used = data_table_job_crud.get_data_table_jobs_used_this_week(
+        db, user=user
+    )
+    data_table_limit = limits[DATA_TABLES_KEY]
+
+    # Handle unlimited plans
+    if data_table_limit == float("inf"):
+        return True, None
+
+    # If the user has reached their data table extraction job limit
+    if current_data_tables_used >= data_table_limit:
+        track_event(
+            "action_blocked_limit_reached",
+            user_id=str(user.id),
+            properties={
+                "current_data_tables_used": current_data_tables_used,
+                "data_table_limit": data_table_limit,
+                "type": "data_tables",
+                "plan": plan.value,
+            },
+        )
+        plan_name = {
+            SubscriptionPlan.BASIC: "Basic",
+            SubscriptionPlan.RESEARCHER: "Researcher",
+        }.get(plan, "Basic")
+        return (
+            False,
+            f"You have reached your data table extraction job limit ({int(data_table_limit)} jobs per week) for the {plan_name} plan. Please upgrade your subscription to create more data table extraction jobs.",
+        )
+
+    return True, None
+
+
 def get_user_chat_credits_used_this_week(db: Session, user: CurrentUser) -> int:
     """
     Get the number of chat credits used by the user today.
@@ -330,6 +392,11 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
     audio_overviews_allowed = limits[AUDIO_OVERVIEWS_KEY]
     audio_overviews_used_this_month = get_user_audio_overviews_used_this_month(db, user)
 
+    data_tables_allowed = limits[DATA_TABLES_KEY]
+    data_tables_used_this_week = data_table_job_crud.get_data_table_jobs_used_this_week(
+        db, user=user
+    )
+
     current_project_count = len(
         project_crud.get_all_projects_by_user_with_metadata(db=db, user=user)
     )
@@ -359,9 +426,16 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
         if project_limit != float("inf")
         else 0
     )
+    data_table_usage_percentage = (
+        (data_tables_used_this_week / data_tables_allowed) * 100
+        if data_tables_allowed != float("inf")
+        else 0
+    )
+
+    HIGH_USAGE_THRESHOLD = 75
 
     # Track event if usage is > 75%
-    if paper_usage_percentage > 75:
+    if paper_usage_percentage > HIGH_USAGE_THRESHOLD:
         track_event(
             "high_usage_limit",
             user_id=str(user.id),
@@ -372,7 +446,7 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
                 "plan": plan.value,
             },
         )
-    if kb_usage_percentage > 75:
+    if kb_usage_percentage > HIGH_USAGE_THRESHOLD:
         track_event(
             "high_usage_limit",
             user_id=str(user.id),
@@ -383,7 +457,7 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
                 "plan": plan.value,
             },
         )
-    if chat_credits_usage_percentage > 75:
+    if chat_credits_usage_percentage > HIGH_USAGE_THRESHOLD:
         track_event(
             "high_usage_limit",
             user_id=str(user.id),
@@ -394,7 +468,7 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
                 "plan": plan.value,
             },
         )
-    if audio_overviews_usage_percentage > 75:
+    if audio_overviews_usage_percentage > HIGH_USAGE_THRESHOLD:
         track_event(
             "high_usage_limit",
             user_id=str(user.id),
@@ -405,7 +479,7 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
                 "plan": plan.value,
             },
         )
-    if project_usage_percentage > 75:
+    if project_usage_percentage > HIGH_USAGE_THRESHOLD:
         track_event(
             "high_usage_limit",
             user_id=str(user.id),
@@ -413,6 +487,18 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
                 "metric": "projects",
                 "usage": current_project_count,
                 "limit": project_limit,
+                "plan": plan.value,
+            },
+        )
+
+    if data_table_usage_percentage > HIGH_USAGE_THRESHOLD:
+        track_event(
+            "high_usage_limit",
+            user_id=str(user.id),
+            properties={
+                "metric": "data_tables",
+                "usage": data_tables_used_this_week,
+                "limit": data_tables_allowed,
                 "plan": plan.value,
             },
         )
@@ -448,6 +534,12 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
         else max(0, int(project_limit) - current_project_count)
     )
 
+    data_tables_remaining = (
+        None
+        if data_tables_allowed == float("inf")
+        else max(0, int(data_tables_allowed) - data_tables_used_this_week)
+    )
+
     return {
         "plan": plan.value,
         "limits": {
@@ -464,5 +556,7 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
             "audio_overviews_remaining": audio_overviews_remaining,
             "projects": current_project_count,
             "projects_remaining": projects_remaining,
+            "data_tables_used": data_tables_used_this_week,
+            "data_tables_remaining": data_tables_remaining,
         },
     }

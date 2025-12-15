@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, cast
 from uuid import UUID
 
@@ -117,6 +117,27 @@ class DataTableJobCRUD(
                 f"Error creating DataTableExtractionJob: {str(e)}", exc_info=True
             )
             return None
+
+    def get_data_table_jobs_used_this_week(
+        self,
+        db: Session,
+        *,
+        user: CurrentUser,
+    ) -> int:
+        """Get the number of data table jobs created by the user in the current week"""
+        start_of_week = datetime.now(timezone.utc)
+        start_of_week -= timedelta(days=start_of_week.weekday())
+        start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        count = (
+            db.query(DataTableExtractionJob)
+            .filter(
+                DataTableExtractionJob.user_id == user.id,
+                DataTableExtractionJob.created_at >= start_of_week,
+            )
+            .count()
+        )
+        return count
 
     def get_by_project(
         self,

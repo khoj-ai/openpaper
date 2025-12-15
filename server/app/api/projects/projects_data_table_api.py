@@ -12,6 +12,7 @@ from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
 from app.database.models import JobStatus
 from app.helpers.pdf_jobs import jobs_client
+from app.helpers.subscription_limits import can_user_create_data_table_job
 from app.schemas.responses import DataTableSchema, DocumentMapping
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends
@@ -40,6 +41,14 @@ async def create_data_table(
     Create a data table extraction job for a project.
     """
     try:
+
+        can_create, error_message = can_user_create_data_table_job(db, current_user)
+        if not can_create:
+            return JSONResponse(
+                status_code=403,
+                content={"message": error_message},
+            )
+
         papers: List[DocumentMapping] = []
 
         project_papers = project_paper_crud.get_all_papers_by_project_id(
