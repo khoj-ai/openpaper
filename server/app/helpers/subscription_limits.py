@@ -38,7 +38,7 @@ SUBSCRIPTION_LIMITS = {
         CHAT_CREDITS_KEY: 5000,
         AUDIO_OVERVIEWS_KEY: 5,
         PROJECTS_KEY: 2,
-        DATA_TABLES_KEY: 1,
+        DATA_TABLES_KEY: 2,
     },
     SubscriptionPlan.RESEARCHER: {
         PAPER_UPLOAD_KEY: 500,
@@ -46,7 +46,7 @@ SUBSCRIPTION_LIMITS = {
         CHAT_CREDITS_KEY: 100000,
         AUDIO_OVERVIEWS_KEY: 100,
         PROJECTS_KEY: 100,
-        DATA_TABLES_KEY: 1,
+        DATA_TABLES_KEY: 50,
     },
 }
 
