@@ -47,10 +47,10 @@ import {
 } from "@/components/ui/sheet";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useIsDarkMode } from "@/hooks/useDarkMode";
-import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isStorageNearLimit, isPaperUploadNearLimit, isChatCreditAtLimit, isChatCreditNearLimit, formatFileSize, getStorageUsagePercentage, getPaperUploadPercentage, getChatCreditUsagePercentage, getAudioOverviewUsagePercentage, getProjectUsagePercentage, type SubscriptionData } from "@/hooks/useSubscription";
+import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isStorageNearLimit, isPaperUploadNearLimit, isChatCreditAtLimit, isChatCreditNearLimit, formatFileSize, getStorageUsagePercentage, getPaperUploadPercentage, getChatCreditUsagePercentage, getAudioOverviewUsagePercentage, getProjectUsagePercentage } from "@/hooks/useSubscription";
 import Link from "next/link";
 import OnboardingChecklist from "@/components/OnboardingChecklist";
-import { Conversation, PaperItem, Project } from "@/lib/schema";
+import { Conversation, PaperItem, Project, SubscriptionData } from "@/lib/schema";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { CollapsibleSidebarMenu } from "./CollapsibleSidebarMenu";
 

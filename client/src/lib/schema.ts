@@ -335,14 +335,14 @@ export interface PendingInvite {
 }
 
 export interface ProjectInvitation {
-	id: string;
-	project_id: string;
-	project_name: string;
-	invited_by: string;
-	email: string;
-	role: string;
-	accepted_at?: string;
-	invited_at: string;
+    id: string;
+    project_id: string;
+    project_name: string;
+    invited_by: string;
+    email: string;
+    role: string;
+    accepted_at?: string;
+    invited_at: string;
 }
 
 export interface DataTableJobStatusResponse extends JobStatusResponse {
@@ -370,4 +370,39 @@ export interface DataTableResult {
     columns: string[];
     rows: DataTableRow[];
     created_at: string | null;
+}
+
+export interface SubscriptionLimits {
+    paper_uploads: number;
+    knowledge_base_size: number;
+    chat_credits_daily: number;
+    audio_overviews_weekly: number;
+    projects: number;
+    model: string[];
+}
+
+export interface SubscriptionUsage {
+    paper_uploads: number;
+    paper_uploads_remaining: number;
+    knowledge_base_size: number;
+    knowledge_base_size_remaining: number;
+    chat_credits_used: number;
+    chat_credits_remaining: number;
+    audio_overviews_used: number;
+    audio_overviews_remaining: number;
+    projects: number;
+    projects_remaining: number;
+}
+
+export interface SubscriptionData {
+    plan: 'basic' | 'researcher';
+    limits: SubscriptionLimits;
+    usage: SubscriptionUsage;
+}
+
+export interface UseSubscriptionReturn {
+    subscription: SubscriptionData | null;
+    loading: boolean;
+    error: string | null;
+    refetch: () => Promise<void>;
 }
