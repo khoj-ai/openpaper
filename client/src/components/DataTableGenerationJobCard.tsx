@@ -95,14 +95,6 @@ export default function DataTableGenerationJobCard({ job, projectId }: DataTable
                             </p>
                         </div>
                     )}
-                    {job.status === JobStatus.COMPLETED && job.result_id && (
-                        <Link
-                            href={`/projects/${projectId}/tables/${job.result_id}`}
-                            className="inline-block mt-2 text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                        >
-                            View Data Table →
-                        </Link>
-                    )}
                 </div>
             </div>
         </div>
