@@ -140,6 +140,14 @@ export interface OpenAlexMatchResponse {
     cited_by: OpenAlexResponse;
 }
 
+export enum JobStatus {
+    PENDING = 'pending',
+    RUNNING = 'running',
+    COMPLETED = 'completed',
+    FAILED = 'failed',
+    CANCELLED = 'cancelled'
+}
+
 export type JobStatusType = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
 
 export type SubscriptionStatusType = 'active' | 'canceled' | 'past_due' | 'incomplete' | 'trialing' | 'unpaid';
