@@ -340,3 +340,29 @@ export interface DataTableJobStatusResponse extends JobStatusResponse {
     job_id: string;
     result_id: string | null;
 }
+
+export interface DataTableCitation {
+    text: string;
+    index: number;
+}
+
+export interface DataTableCellValue {
+    value: string;
+    citations: DataTableCitation[];
+}
+
+export interface DataTableRow {
+    id: string;
+    paper_id: string;
+    values: {
+        [columnName: string]: DataTableCellValue;
+    };
+}
+
+export interface DataTableResult {
+    success: boolean;
+    title: string;
+    columns: string[];
+    rows: DataTableRow[];
+    created_at: string | null;
+}

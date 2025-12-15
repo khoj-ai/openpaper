@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { PaperItem } from "@/lib/schema";
+import { PaperItem, DataTableResult } from "@/lib/schema";
 import DataTableGenerationView from "@/components/DataTableGenerationView";
-import { ColumnDefinition } from "@/components/DataTableSchemaModal";
 import { Loader2, ArrowLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,47 +18,13 @@ import { PdfViewer } from "@/components/PdfViewer";
 import { useIsMobile } from "@/lib/useMobile";
 import { fetchFromApi } from "@/lib/api";
 
-interface DataTable {
-    id: string;
-    project_id: string;
-    columns: ColumnDefinition[];
-    created_at: string;
-    status: 'pending' | 'running' | 'completed' | 'failed';
-}
-
-// Mock data for testing
-const mockDataTable: DataTable = {
-    id: "table-1",
-    project_id: "project-1",
-    columns: [
-        {
-            id: "col-1",
-            label: "Sample Size",
-        },
-        {
-            id: "col-2",
-            label: "Study Type",
-        },
-        {
-            id: "col-3",
-            label: "Publication Year",
-        },
-        {
-            id: "col-4",
-            label: "Conclusion",
-        }
-    ],
-    created_at: new Date().toISOString(),
-    status: 'completed'
-};
-
 export default function DataTablePage() {
     const params = useParams();
     const router = useRouter();
     const projectId = params.projectId as string;
     const tableId = params.tableId as string;
 
-    const [dataTable, setDataTable] = useState<DataTable | null>(null);
+    const [dataTableResult, setDataTableResult] = useState<DataTableResult | null>(null);
     const [papers, setPapers] = useState<PaperItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -68,15 +33,25 @@ export default function DataTablePage() {
     const [isPdfVisible, setIsPdfVisible] = useState(false);
     const isMobile = useIsMobile();
 
-    useEffect(() => {
-        // Simulate loading delay for realistic testing
-        const timer = setTimeout(() => {
-            setDataTable(mockDataTable);
+    const fetchDataTableResult = useCallback(async () => {
+        try {
+            setIsLoading(true);
+            const result = await fetchFromApi(`/api/projects/tables/results/${tableId}`);
+            setDataTableResult(result.data);
+            setError(null);
+        } catch (err) {
+            console.error("Failed to fetch data table result:", err);
+            setError("Failed to load data table. Please try again.");
+        } finally {
             setIsLoading(false);
-        }, 500);
+        }
+    }, [tableId]);
 
-        return () => clearTimeout(timer);
-    }, [projectId, tableId]);
+    useEffect(() => {
+        if (tableId) {
+            fetchDataTableResult();
+        }
+    }, [tableId, fetchDataTableResult]);
 
     const getProjectPapers = useCallback(async () => {
         try {
@@ -120,7 +95,7 @@ export default function DataTablePage() {
         );
     }
 
-    if (error || !dataTable) {
+    if (error || !dataTableResult) {
         return (
             <div className="container mx-auto py-8 px-4 max-w-7xl">
                 <div className="mb-6">
@@ -165,14 +140,14 @@ export default function DataTablePage() {
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator />
                                 <BreadcrumbItem>
-                                    <BreadcrumbPage>Data Table</BreadcrumbPage>
+                                    <BreadcrumbPage>{dataTableResult.title || "Data Table"}</BreadcrumbPage>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
                         </Breadcrumb>
                     </div>
 
                     <DataTableGenerationView
-                        columns={dataTable.columns}
+                        dataTableResult={dataTableResult}
                         papers={papers}
                         onClose={handleClose}
                         onCitationClick={handleCitationClick}

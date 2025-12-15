@@ -53,11 +53,10 @@ export default function ReferencePaperCards({ citations, papers, messageId, mess
                     <div
                         key={`${paper.id}-${messageId || messageIndex}`}
                         id={cardId}
-                        className={`space-y-3 p-4 rounded-lg border transition-all duration-500 ${
-                            isHighlighted
-                                ? 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800'
-                                : 'bg-card border-border'
-                        }`}
+                        className={`space-y-3 p-4 rounded-lg border transition-all duration-500 ${isHighlighted
+                            ? 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800'
+                            : 'bg-card border-border'
+                            }`}
                     >
                         {/* Paper Info - Clickable */}
                         <div
@@ -68,7 +67,7 @@ export default function ReferencePaperCards({ citations, papers, messageId, mess
                                 <span className="text-xs font-bold text-gray-500">{groupConsecutiveNumbers(citationNumbers)}</span>
                             </div>
                             <div className="flex-1 min-w-0">
-                                <h4 className="font-medium text-sm line-clamp-2">{paper.title}</h4>
+                                <p className="font-medium text-sm line-clamp-2 mt-0 mb-0">{paper.title}</p>
                                 {paper.authors && paper.authors.length > 0 && (
                                     <p className="text-xs text-muted-foreground mt-1">
                                         {paper.authors.join(', ')}
