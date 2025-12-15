@@ -4,8 +4,10 @@ from typing import List, Optional
 from app.database.crud.projects.project_base_crud import ProjectBaseCRUD
 from app.database.crud.user_crud import user as user_crud
 from app.database.models import (
+    AudioOverviewJob,
     ConversableType,
     Conversation,
+    DataTableExtractionJob,
     Project,
     ProjectPaper,
     ProjectRole,
@@ -38,6 +40,8 @@ class AnnotatedProject(ProjectBase):
     id: Optional[str] = None
     num_papers: int = 0
     num_conversations: int = 0
+    num_audio_overviews: int = 0
+    num_data_tables: int = 0
     num_roles: int = 0
     updated_at: Optional[str] = None
     created_at: Optional[str] = None
@@ -105,6 +109,12 @@ class ProjectCRUD(ProjectBaseCRUD[Project, ProjectCreate, ProjectUpdate]):
                     func.coalesce(func.count(Conversation.id.distinct()), 0).label(
                         "num_conversations"
                     ),
+                    func.coalesce(func.count(AudioOverviewJob.id.distinct()), 0).label(
+                        "num_audio_overviews"
+                    ),
+                    func.coalesce(
+                        func.count(DataTableExtractionJob.id.distinct()), 0
+                    ).label("num_data_tables"),
                     ProjectRole.role.label("role"),
                     func.coalesce(roles_subquery.c.num_roles, 0).label("num_roles"),
                 )
@@ -116,6 +126,18 @@ class ProjectCRUD(ProjectBaseCRUD[Project, ProjectCreate, ProjectUpdate]):
                     (Conversation.conversable_id == Project.id)
                     & (Conversation.conversable_type == ConversableType.PROJECT.value),
                 )
+                .outerjoin(
+                    AudioOverviewJob,
+                    (AudioOverviewJob.conversable_id == Project.id)
+                    & (
+                        AudioOverviewJob.conversable_type
+                        == ConversableType.PROJECT.value
+                    ),
+                )
+                .outerjoin(
+                    DataTableExtractionJob,
+                    (DataTableExtractionJob.project_id == Project.id),
+                )
                 .filter(ProjectRole.user_id == user.id)
                 .group_by(Project.id, ProjectRole.role, roles_subquery.c.num_roles)
                 .order_by(Project.updated_at.desc())
@@ -125,13 +147,23 @@ class ProjectCRUD(ProjectBaseCRUD[Project, ProjectCreate, ProjectUpdate]):
 
             # Convert the results to AnnotatedProject objects
             annotated_projects = []
-            for project, num_papers, num_conversations, role, num_roles in query:
+            for (
+                project,
+                num_papers,
+                num_conversations,
+                num_audio_overviews,
+                num_data_tables,
+                role,
+                num_roles,
+            ) in query:
                 annotated_project = AnnotatedProject(
                     id=str(project.id),
                     title=project.title,
                     description=project.description,
                     num_papers=num_papers,
                     num_conversations=num_conversations,
+                    num_audio_overviews=num_audio_overviews,
+                    num_data_tables=num_data_tables,
                     num_roles=num_roles,
                     updated_at=str(project.updated_at) if project.updated_at else None,
                     created_at=str(project.created_at) if project.created_at else None,

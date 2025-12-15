@@ -294,6 +294,8 @@ export interface Project {
     description: string;
     num_papers?: number;
     num_conversations?: number;
+    num_audio_overviews?: number;
+    num_data_tables?: number;
     created_at: string;
     updated_at: string;
     role?: ProjectRole;

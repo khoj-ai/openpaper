@@ -3,7 +3,7 @@ import { Project, ProjectRole } from "@/lib/schema";
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, ArrowRight, FileText, MessageCircle, X, Users } from "lucide-react";
+import { MoreHorizontal, ArrowRight, FileText, MessageCircle, X, Users, Headphones, Table } from "lucide-react";
 import { useState } from "react";
 import {
 	AlertDialog,
@@ -145,6 +145,18 @@ export function ProjectCard({ project, onProjectUpdate, onUnlink }: {
 										<MessageCircle className="h-3 w-3" />
 										<span>{project.num_conversations ?? 0}</span>
 									</div>
+									{(project.num_audio_overviews ?? 0) > 0 && (
+										<div className="flex items-center gap-1">
+											<Headphones className="h-3 w-3" />
+											<span>{project.num_audio_overviews}</span>
+										</div>
+									)}
+									{(project.num_data_tables ?? 0) > 0 && (
+										<div className="flex items-center gap-1">
+											<Table className="h-3 w-3" />
+											<span>{project.num_data_tables}</span>
+										</div>
+									)}
 									{project.num_roles !== undefined && project.num_roles > 1 && (
 										<div className="flex items-center gap-1">
 											<Users className="h-3 w-3" />
