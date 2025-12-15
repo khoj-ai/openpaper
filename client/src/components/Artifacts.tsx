@@ -258,6 +258,10 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
                 }),
             });
 
+            if (!response.job_id) {
+                throw new Error("No job ID returned from API");
+            }
+
             // Fetch updated jobs and start polling
             await fetchDataTableJobs();
             startPolling();
