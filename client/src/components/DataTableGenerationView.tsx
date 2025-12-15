@@ -1,14 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Loader2, Download, Table as TableIcon, CheckCircle2, BookOpen } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Download, Table as TableIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PaperItem, DataTableResult, DataTableCitation } from "@/lib/schema";
+import { PaperItem, DataTableResult, Citation } from "@/lib/schema";
 import ReferencePaperCards from "@/components/ReferencePaperCards";
-import CustomCitationLink from "@/components/utils/CustomCitationLink";
-import Markdown from "react-markdown";
 import Link from "next/link";
-import { groupConsecutiveNumbers } from "@/lib/utils";
 
 interface DataTableGenerationViewProps {
     dataTableResult: DataTableResult;
@@ -21,15 +18,34 @@ export default function DataTableGenerationView({
     dataTableResult,
     papers,
     onClose,
-    onCitationClick
+    onCitationClick,
 }: DataTableGenerationViewProps) {
-    const [highlightedCitation, setHighlightedCitation] = useState<{ rowIndex: number; columnName: string; citationIndex: number } | null>(null);
-    const [expandedPaper, setExpandedPaper] = useState<string | null>(null);
+    const [highlightedPaper, setHighlightedPaper] = useState<string | null>(null);
 
     const { columns, rows, title } = dataTableResult;
 
     // Create a map of paper_id to paper for quick lookup
     const paperMap = new Map(papers.map(paper => [paper.id, paper]));
+
+    // Convert DataTableCitations to Citation format for ReferencePaperCards
+    const citations = useMemo(() => {
+        const result: Citation[] = [];
+        rows.forEach((row) => {
+            columns.forEach((columnName) => {
+                const cellValue = row.values?.[columnName];
+                if (cellValue && cellValue.citations.length > 0) {
+                    cellValue.citations.forEach((citation) => {
+                        result.push({
+                            key: String(citation.index),
+                            paper_id: row.paper_id,
+                            reference: citation.text
+                        });
+                    });
+                }
+            });
+        });
+        return result;
+    }, [rows, columns]);
 
     const downloadCSV = () => {
         // Create CSV content
@@ -60,8 +76,6 @@ export default function DataTableGenerationView({
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     };
-
-    console.log("DataTableGenerationView rendered with dataTableResult:", dataTableResult);
 
     return (
         <div className="mt-6 space-y-6">
@@ -119,7 +133,7 @@ export default function DataTableGenerationView({
                                             {paper ? (
                                                 <Link
                                                     href={`/paper/${paper.id}`}
-                                                    className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                                                    className="hover:underline font-medium"
                                                     target="_blank"
                                                 >
                                                     {paper.title}
@@ -130,7 +144,7 @@ export default function DataTableGenerationView({
                                         </td>
                                         {columns.map((columnName) => {
                                             const cellValue = row.values?.[columnName];
-                                            const citations = cellValue?.citations || [];
+                                            const cellCitations = cellValue?.citations || [];
 
                                             return (
                                                 <td key={columnName} className="p-3 align-top">
@@ -139,38 +153,29 @@ export default function DataTableGenerationView({
                                                             <div className="text-foreground">
                                                                 {cellValue.value}
                                                             </div>
-                                                            {citations.length > 0 && (
+                                                            {cellCitations.length > 0 && (
                                                                 <div className="flex flex-wrap gap-1">
-                                                                    {citations.map((citation, citationIdx) => {
-                                                                        const isHighlighted =
-                                                                            highlightedCitation?.rowIndex === rowIndex &&
-                                                                            highlightedCitation?.columnName === columnName &&
-                                                                            highlightedCitation?.citationIndex === citationIdx;
-
-                                                                        return (
-                                                                            <button
-                                                                                key={citationIdx}
-                                                                                onClick={() => {
-                                                                                    setHighlightedCitation({ rowIndex, columnName, citationIndex: citationIdx });
-                                                                                    if (onCitationClick) {
-                                                                                        onCitationClick('', citation.text);
-                                                                                    }
-
-                                                                                    // Scroll to citation in references
-                                                                                    const refElement = document.getElementById(`citation-${rowIndex}-${columnName}-${citationIdx}`);
-                                                                                    if (refElement) {
-                                                                                        refElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                                                                    }
-                                                                                }}
-                                                                                className={`text-xs px-1.5 py-0.5 rounded transition-colors ${isHighlighted
-                                                                                    ? 'bg-blue-500 text-white'
-                                                                                    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50'
-                                                                                    }`}
-                                                                            >
-                                                                                [{citation.index}]
-                                                                            </button>
-                                                                        );
-                                                                    })}
+                                                                    {cellCitations.map((citation, citationIdx) => (
+                                                                        <button
+                                                                            key={citationIdx}
+                                                                            onClick={() => {
+                                                                                // Open PDF viewer with the citation text
+                                                                                if (onCitationClick) {
+                                                                                    onCitationClick(row.paper_id, citation.text);
+                                                                                }
+                                                                                // Also highlight the paper card and scroll to it
+                                                                                setHighlightedPaper(row.paper_id);
+                                                                                const cardId = `datatable-reference-paper-card-${row.paper_id}`;
+                                                                                const refElement = document.getElementById(cardId);
+                                                                                if (refElement) {
+                                                                                    refElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                                                }
+                                                                            }}
+                                                                            className="text-xs px-1.5 py-0.5 rounded transition-colors bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50"
+                                                                        >
+                                                                            [{citation.index}]
+                                                                        </button>
+                                                                    ))}
                                                                 </div>
                                                             )}
                                                         </div>
@@ -189,121 +194,23 @@ export default function DataTableGenerationView({
             </div>
 
             {/* References Section */}
-            {(() => {
-                // Collect all citations grouped by paper
-                const citationsByPaper = new Map<string, Array<{
-                    rowIndex: number;
-                    columnName: string;
-                    citationIndex: number;
-                    citation: DataTableCitation
-                }>>();
-
-                rows.forEach((row, rowIndex) => {
-                    columns.forEach((columnName) => {
-                        const cellValue = row.values?.[columnName];
-                        if (cellValue && cellValue.citations.length > 0) {
-                            if (!citationsByPaper.has(row.paper_id)) {
-                                citationsByPaper.set(row.paper_id, []);
-                            }
-                            cellValue.citations.forEach((citation, citationIndex) => {
-                                citationsByPaper.get(row.paper_id)!.push({
-                                    rowIndex,
-                                    columnName,
-                                    citationIndex,
-                                    citation
-                                });
-                            });
-                        }
-                    });
-                });
-
-                if (citationsByPaper.size === 0) return null;
-
-                const toggleExpanded = (paperId: string) => {
-                    setExpandedPaper(expandedPaper === paperId ? null : paperId);
-                };
-
-                return (
-                    <div className="mt-6 space-y-4">
-                        <div className="border-t pt-6">
-                            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                                <BookOpen className="w-5 h-5" />
-                                References
-                            </h3>
-                            <div className="space-y-4">
-                                {Array.from(citationsByPaper.entries()).map(([paperId, citations]) => {
-                                    const paper = paperMap.get(paperId);
-                                    const citationNumbers = citations.map(c => c.citation.index);
-                                    const isExpanded = expandedPaper === paperId;
-
-                                    return (
-                                        <div
-                                            key={paperId}
-                                            className="space-y-3 p-4 rounded-lg border transition-all duration-500 bg-card border-border"
-                                        >
-                                            {/* Paper Info - Clickable */}
-                                            <div
-                                                className="flex items-start gap-3 pb-3 border-b cursor-pointer hover:opacity-80 transition-opacity"
-                                                onClick={() => toggleExpanded(paperId)}
-                                            >
-                                                <div className="flex-shrink-0 bg-secondary rounded-lg px-2 py-1">
-                                                    <span className="text-xs font-bold text-gray-500">
-                                                        {groupConsecutiveNumbers(citationNumbers)}
-                                                    </span>
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    {paper ? (
-                                                        <h4 className="font-medium text-sm line-clamp-2">
-                                                            {paper.title}
-                                                        </h4>
-                                                    ) : (
-                                                        <h4 className="font-medium text-sm text-muted-foreground">
-                                                            Unknown Paper
-                                                        </h4>
-                                                    )}
-                                                    {paper?.authors && paper.authors.length > 0 && (
-                                                        <p className="text-xs text-muted-foreground mt-1">
-                                                            {paper.authors.join(', ')}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {/* Citations - Expandable */}
-                                            {isExpanded && (
-                                                <div className="space-y-2">
-                                                    {citations.map(({ rowIndex, columnName, citationIndex, citation }) => {
-                                                        const isHighlighted =
-                                                            highlightedCitation?.rowIndex === rowIndex &&
-                                                            highlightedCitation?.columnName === columnName &&
-                                                            highlightedCitation?.citationIndex === citationIndex;
-
-                                                        return (
-                                                            <div
-                                                                key={`${rowIndex}-${columnName}-${citationIndex}`}
-                                                                id={`citation-${rowIndex}-${columnName}-${citationIndex}`}
-                                                                className={`p-3 rounded-md transition-all duration-300 ${isHighlighted
-                                                                    ? 'bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700'
-                                                                    : 'bg-muted/30 hover:bg-muted/50'
-                                                                    }`}
-                                                            >
-                                                                <span className="font-mono text-xs font-semibold text-blue-600 dark:text-blue-400 mr-2">
-                                                                    [{citation.index}]
-                                                                </span>
-                                                                <span className="text-sm text-foreground">{citation.text}</span>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
+            {citations.length > 0 && (
+                <div className="mt-6 space-y-4">
+                    <div className="border-t pt-6">
+                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                            References
+                        </h3>
+                        <ReferencePaperCards
+                            citations={citations}
+                            papers={papers}
+                            messageId="datatable"
+                            messageIndex={0}
+                            highlightedPaper={highlightedPaper}
+                            onHighlightClear={() => setHighlightedPaper(null)}
+                        />
                     </div>
-                );
-            })()}
+                </div>
+            )}
         </div>
     );
 }
