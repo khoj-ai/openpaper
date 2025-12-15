@@ -215,9 +215,9 @@ async def get_data_table_job_status(
         )
 
 
-@projects_data_table_router.get("/results/{job_id}")
+@projects_data_table_router.get("/results/{result_id}")
 async def get_data_table_job_results(
-    job_id: str,
+    result_id: str,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_required_user),
 ) -> JSONResponse:
@@ -225,46 +225,23 @@ async def get_data_table_job_results(
     Get the results of a completed data table extraction job.
     """
     try:
-        job = data_table_job_crud.get(
+        result = data_table_result_crud.get(
             db=db,
-            id=uuid.UUID(job_id),
+            id=uuid.UUID(result_id),
             user=current_user,
-        )
-
-        if not job:
-            return JSONResponse(
-                status_code=404,
-                content={"message": "Data table job not found"},
-            )
-
-        if job.status != "completed":
-            return JSONResponse(
-                status_code=400,
-                content={"message": "Data table job is not yet completed"},
-            )
-
-        result = data_table_result_crud.get_by_job_id(
-            db=db,
-            job_id=uuid.UUID(job_id),
         )
 
         if not result:
             return JSONResponse(
                 status_code=404,
-                content={"message": "Data table job results not found"},
+                content={"message": "Data table results not found"},
             )
+
+        data = data_table_result_crud.result_to_dict(result)
 
         return JSONResponse(
             status_code=200,
-            content={
-                "success": result.success,
-                "title": result.title,
-                "columns": result.columns,
-                "rows": result.rows,
-                "created_at": (
-                    result.created_at.isoformat() if result.created_at else None
-                ),
-            },
+            content={"data": data},
         )
     except Exception as e:
         logger.error(f"Error fetching data table job results: {e}")
