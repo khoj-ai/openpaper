@@ -502,12 +502,18 @@ export function LibraryTable({
 								(() => {
 									const virtualItems = rowVirtualizer.getVirtualItems();
 									const totalSize = rowVirtualizer.getTotalSize();
+									const paddingTop = virtualItems.length > 0 ? virtualItems[0].start : 0;
+									// Ensure paddingBottom is at least 0 and accounts for any size mismatches
+									const paddingBottom = virtualItems.length > 0
+										? Math.max(0, totalSize - virtualItems[virtualItems.length - 1].end)
+										: 0;
 									return (
 									<>
-									{/* Top padding spacer for virtual scroll */}
-									<tr aria-hidden="true" style={{ height: virtualItems[0]?.start ?? 0 }}>
-										<td style={{ padding: 0, border: 'none' }} />
-									</tr>
+									{paddingTop > 0 && (
+										<tr aria-hidden="true">
+											<td style={{ height: paddingTop, padding: 0, border: 'none' }} />
+										</tr>
+									)}
 									{virtualItems.map((virtualRow) => {
 										const paper = processedPapers[virtualRow.index];
 										const index = virtualRow.index;
@@ -518,7 +524,6 @@ export function LibraryTable({
 													data-index={virtualRow.index}
 													style={{
 														height: 72,
-														contain: 'layout style paint',
 													}}
 													onClick={() => {
 														if (selectable && !isAlreadyInProject) {
@@ -651,12 +656,11 @@ export function LibraryTable({
 												</TableRow>
 											)
 										})}
-									{/* Bottom padding spacer for virtual scroll */}
-									<tr aria-hidden="true" style={{
-										height: totalSize - (virtualItems[virtualItems.length - 1]?.end ?? 0)
-									}}>
-										<td style={{ padding: 0, border: 'none' }} />
-									</tr>
+									{paddingBottom > 0 && (
+										<tr aria-hidden="true">
+											<td style={{ height: paddingBottom, padding: 0, border: 'none' }} />
+										</tr>
+									)}
 									</>
 									);
 								})()
