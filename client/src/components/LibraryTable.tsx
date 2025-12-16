@@ -8,7 +8,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { fetchFromApi } from "@/lib/api";
 import { PaperItem } from "@/lib/schema";
@@ -39,7 +39,6 @@ interface LibraryTableProps extends React.HTMLAttributes<HTMLDivElement> {
 	handleDelete?: (paperId: string) => Promise<void>;
 	setPapers?: (papers: PaperItem[]) => void;
 	onUploadClick?: () => void;
-	maxHeight?: string;
 }
 
 export function LibraryTable({
@@ -49,7 +48,6 @@ export function LibraryTable({
 	projectPaperIds = [],
 	handleDelete,
 	onUploadClick,
-	maxHeight = 'calc(100vh - 16rem)',
 	...props
 }: LibraryTableProps) {
 	const selectable = selectableProp ?? (onSelectFiles ? true : false);
@@ -65,6 +63,8 @@ export function LibraryTable({
 	const [taggingPopoverOpen, setTaggingPopoverOpen] = useState(false);
 	const [expandedTags, setExpandedTags] = useState<Set<string>>(new Set());
 	const tableContainerRef = useRef<HTMLDivElement>(null);
+
+	const maxHeight = 'calc(100vh - 16rem)';
 
 	const sort: Sort = { type: "publish_date", order: "desc" };
 
@@ -153,12 +153,16 @@ export function LibraryTable({
 		return processedPapers.filter(p => !projectPaperIds.includes(p.id));
 	}, [processedPapers, projectPaperIds]);
 
-	// Virtualization setup
+	// Memoized callbacks for virtualization to prevent unnecessary re-renders
+	const getScrollElement = useCallback(() => tableContainerRef.current, []);
+
+	// Virtualization setup - using fixed row height for stability during fast scroll
+	// Dynamic measurement can cause strobing/jitter feedback loops
 	const rowVirtualizer = useVirtualizer({
 		count: processedPapers.length,
-		getScrollElement: () => tableContainerRef.current,
-		estimateSize: () => 80, // Estimated row height in pixels
-		overscan: 10, // Number of items to render outside visible area
+		getScrollElement,
+		estimateSize: () => 72, // Fixed row height - more stable than dynamic measurement
+		overscan: 8, // Higher overscan helps with fast scrolling
 	});
 
 	const requestSort = (key: SortKey) => {
@@ -408,7 +412,15 @@ export function LibraryTable({
 					: '1fr'
 			}}>
 				<div className="border bg-card transition-all duration-300 ease-in-out min-w-0 overflow-hidden">
-					<div ref={tableContainerRef} className="overflow-y-auto" style={{ height: maxHeight }}>
+					<div
+						ref={tableContainerRef}
+						className="overflow-y-auto"
+						style={{
+							height: maxHeight,
+							willChange: 'scroll-position',
+							contain: 'strict',
+						}}
+					>
 						<Table>
 							<TableHeader className="sticky top-0 bg-card z-10">
 								<TableRow className="hover:bg-transparent border-b-2">
@@ -486,27 +498,35 @@ export function LibraryTable({
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{processedPapers.length > 0 ? (
+							{processedPapers.length > 0 ? (
+								(() => {
+									const virtualItems = rowVirtualizer.getVirtualItems();
+									const totalSize = rowVirtualizer.getTotalSize();
+									return (
 									<>
-										{/* Spacer for virtual scroll */}
-										{rowVirtualizer.getVirtualItems().length > 0 && (
-											<tr style={{ height: `${rowVirtualizer.getVirtualItems()[0]?.start ?? 0}px` }} />
-										)}
-										{rowVirtualizer.getVirtualItems().map((virtualRow) => {
-											const paper = processedPapers[virtualRow.index];
-											const index = virtualRow.index;
-											const isAlreadyInProject = projectPaperIds.includes(paper.id);
-											return (
-												<TableRow
+									{/* Top padding spacer for virtual scroll */}
+									<tr aria-hidden="true" style={{ height: virtualItems[0]?.start ?? 0 }}>
+										<td style={{ padding: 0, border: 'none' }} />
+									</tr>
+									{virtualItems.map((virtualRow) => {
+										const paper = processedPapers[virtualRow.index];
+										const index = virtualRow.index;
+										const isAlreadyInProject = projectPaperIds.includes(paper.id);
+										return (
+											<TableRow
 													key={paper.id}
 													data-index={virtualRow.index}
+													style={{
+														height: 72,
+														contain: 'layout style paint',
+													}}
 													onClick={() => {
 														if (selectable && !isAlreadyInProject) {
 															handleSelect(paper.id)
 														}
 													}}
 													className={`
-														border-b transition-colors hover:bg-muted/50
+														border-b hover:bg-muted/50
 														${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'}
 														${selectable && !isAlreadyInProject ? 'cursor-pointer' : ''}
 														${!selectable ? 'cursor-pointer' : ''}
@@ -631,15 +651,15 @@ export function LibraryTable({
 												</TableRow>
 											)
 										})}
-										{/* Bottom spacer */}
-										{rowVirtualizer.getVirtualItems().length > 0 && (
-											<tr style={{
-												height: `${rowVirtualizer.getTotalSize() -
-													(rowVirtualizer.getVirtualItems()[rowVirtualizer.getVirtualItems().length - 1]?.end ?? 0)
-													}px`
-											}} />
-										)}
+									{/* Bottom padding spacer for virtual scroll */}
+									<tr aria-hidden="true" style={{
+										height: totalSize - (virtualItems[virtualItems.length - 1]?.end ?? 0)
+									}}>
+										<td style={{ padding: 0, border: 'none' }} />
+									</tr>
 									</>
+									);
+								})()
 								) : (
 									<TableRow>
 										<TableCell colSpan={numCols} className="h-32 text-center">
