@@ -20,19 +20,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/lib/auth";
 import { useSubscription, getStorageUsagePercentage, isStorageNearLimit, isStorageAtLimit, formatFileSize, getPaperUploadPercentage, isPaperUploadNearLimit, isPaperUploadAtLimit, isProjectAtLimit } from "@/hooks/useSubscription";
-import { FileText, Upload, Search, AlertTriangle, Grid, List, BookOpen, Highlighter, Quote, FolderKanban } from "lucide-react";
+import { FileText, Upload, Search, AlertTriangle, BookOpen, Highlighter, Quote, FolderKanban } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Filter, Sort } from "@/components/PaperFiltering";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LibraryTable } from "@/components/LibraryTable";
 import { CreateProjectDialog } from "@/components/CreateProjectDialog";
 import { useRouter } from "next/navigation";
-import { LibraryGrid } from "@/components/LibraryGrid";
 import { UploadModal } from "@/components/UploadModal";
 import { usePapers } from "@/hooks/usePapers";
-
-// TODO: We could add a search look-up for the paper journal name to avoid placeholders
 
 export default function PapersPage() {
     const { papers, isLoading, mutate } = usePapers();
@@ -46,19 +42,13 @@ export default function PapersPage() {
     const { subscription, loading: subscriptionLoading } = useSubscription();
     const [filters, setFilters] = useState<Filter[]>([]);
     const [sort, setSort] = useState<Sort>({ type: "publish_date", order: "desc" });
-    const [viewMode, setViewMode] = useState("table");
     const router = useRouter();
     const [isCreateProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
     const [isProjectLimitDialogOpen, setProjectLimitDialogOpen] = useState(false);
     const [papersForNewProject, setPapersForNewProject] = useState<PaperItem[]>([]);
     const [isUploadModalOpen, setUploadModalOpen] = useState(false);
 
-    useEffect(() => {
-        const savedViewMode = localStorage.getItem("papersViewMode");
-        if (savedViewMode) {
-            setViewMode(savedViewMode);
-        }
-    }, []);
+
 
     useEffect(() => {
         if (papers) {
@@ -597,59 +587,28 @@ export default function PapersPage() {
             />
             <UploadModal open={isUploadModalOpen} onOpenChange={setUploadModalOpen} onUploadComplete={() => { mutate(); }} />
             <UsageDisplay />
-            <Tabs value={viewMode} onValueChange={setViewMode} className="w-full flex flex-col flex-1 min-h-0">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 flex-shrink-0">
-                    <h1 className="text-3xl font-bold tracking-tight">Library</h1>
-                    <div className="flex items-center gap-x-4 mt-2 md:mt-0">
-                        <Button onClick={() => setUploadModalOpen(true)}>
-                            <Upload className="h-4 w-4 mr-2" />
-                            Upload
-                        </Button>
-                        <TabsList>
-                            <TabsTrigger value="table" onClick={() => localStorage.setItem('papersViewMode', 'table')}>
-                                <List className="h-4 w-4 mr-2" />
-                                Table
-                            </TabsTrigger>
-                            <TabsTrigger value="card" onClick={() => localStorage.setItem('papersViewMode', 'card')}>
-                                <Grid className="h-4 w-4 mr-2" />
-                                Card
-                            </TabsTrigger>
-                        </TabsList>
-                    </div>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 flex-shrink-0">
+                <h1 className="text-3xl font-bold tracking-tight">Library</h1>
+                <div className="flex items-center gap-x-4 mt-2 md:mt-0">
+                    <Button onClick={() => setUploadModalOpen(true)}>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload
+                    </Button>
                 </div>
-                <TabsContent value="card" className="flex-1 min-h-0">
-                    <LibraryGrid
-                        papers={papers || []}
-                        filteredPapers={filteredPapers}
-                        searchResults={searchResults}
-                        searchTerm={searchTerm}
-                        searching={searching}
-                        searchInputRef={searchInputRef}
-                        handleSearch={handleSearch}
-                        setFilters={setFilters}
-                        setSort={setSort}
-                        filters={filters}
-                        sort={sort}
-                        deletePaper={deletePaper}
-                        handlePaperSet={handlePaperSet}
-                        SearchStatsDisplay={SearchStatsDisplay}
-                        EmptyState={EmptyState}
+            </div>
+            <div className="flex-1 min-h-0">
+                {papers && papers.length === 0 ? (
+                    <EmptyState />
+                ) : (
+                    <LibraryTable
+                        handleDelete={deletePaper}
+                        selectable={true}
+                        actionOptions={["Make Project"]}
+                        onSelectFiles={handleTableAction}
+                        onUploadClick={() => setUploadModalOpen(true)}
                     />
-                </TabsContent>
-                <TabsContent value="table" className="flex-1 min-h-0">
-                    {papers && papers.length === 0 ? (
-                        <EmptyState />
-                    ) : (
-                        <LibraryTable
-                            handleDelete={deletePaper}
-                            selectable={true}
-                            actionOptions={["Make Project"]}
-                            onSelectFiles={handleTableAction}
-                            onUploadClick={() => setUploadModalOpen(true)}
-                        />
-                    )}
-                </TabsContent>
-            </Tabs>
+                )}
+            </div>
         </div>
     )
 }
