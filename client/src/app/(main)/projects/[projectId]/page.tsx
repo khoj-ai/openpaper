@@ -442,18 +442,26 @@ export default function ProjectPage() {
 
 
 			<div className="group relative">
-				<div className="flex items-center">
-					<h1 className="text-3xl font-bold text-primary p-2 rounded-lg px-0">{project.title}</h1>
-					<Button
-						variant="ghost"
-						size="icon"
-						className="opacity-0 group-hover:opacity-100 ml-2"
-						onClick={handleEditClick}
-					>
-						<Pencil className="h-4 w-4" />
-					</Button>
+				<div className="flex items-start justify-between gap-4">
+					<div className="flex-1">
+						<div className="flex items-center">
+							<h1 className="text-3xl font-bold text-primary p-2 rounded-lg px-0">{project.title}</h1>
+							<Button
+								variant="ghost"
+								size="icon"
+								className="opacity-0 group-hover:opacity-100 ml-2"
+								onClick={handleEditClick}
+							>
+								<Pencil className="h-4 w-4" />
+							</Button>
+						</div>
+						<p className="text-lg text-secondary-foreground mb-6">{project.description}</p>
+					</div>
+					<ProjectCollaborators
+						projectId={projectId}
+						setHasCollaborators={setHasCollaborators}
+						currentUserIsAdmin={project.role === "admin"} />
 				</div>
-				<p className="text-lg text-secondary-foreground mb-6">{project.description}</p>
 			</div>
 
 
@@ -557,103 +565,103 @@ export default function ProjectPage() {
 								<CitePaperButton paper={papers} minimalist={true} />
 							)}
 							{project?.role !== 'viewer' && (
-							<Sheet open={isAddPapersSheetOpen} onOpenChange={(isOpen) => {
-								setIsAddPapersSheetOpen(isOpen);
-								if (!isOpen) {
-									setAddPapersView('initial');
-								}
-							}}>
-								<SheetTrigger asChild>
-									<Button variant="outline">
-										<PlusCircle className="mr-2 h-4 w-4" />
-										Add
-									</Button>
-								</SheetTrigger>
-								<SheetContent className="sm:max-w-[90vw]! w-[90vw] overflow-y-auto">
-									<SheetHeader className="px-6">
-										<SheetTitle>Add Papers to Project</SheetTitle>
-									</SheetHeader>
-									<div className="mt-0 px-6">
-										{addPapersView === 'initial' && (
-											<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-												<button
-													onClick={() => setAddPapersView('upload')}
-													className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
-												>
-													<div className="relative">
-														<UploadCloud className="w-12 h-12 text-gray-400 group-hover:text-blue-500 mb-4 transition-colors" />
-														<div className="absolute -top-1 -right-1 w-5 h-5 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-															<span className="text-xs font-medium text-blue-600 dark:text-blue-300"><PlusCircle className="h-4 w-4" /></span>
+								<Sheet open={isAddPapersSheetOpen} onOpenChange={(isOpen) => {
+									setIsAddPapersSheetOpen(isOpen);
+									if (!isOpen) {
+										setAddPapersView('initial');
+									}
+								}}>
+									<SheetTrigger asChild>
+										<Button variant="outline">
+											<PlusCircle className="mr-2 h-4 w-4" />
+											Add
+										</Button>
+									</SheetTrigger>
+									<SheetContent className="sm:max-w-[90vw]! w-[90vw] overflow-y-auto">
+										<SheetHeader className="px-6">
+											<SheetTitle>Add Papers to Project</SheetTitle>
+										</SheetHeader>
+										<div className="mt-0 px-6">
+											{addPapersView === 'initial' && (
+												<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+													<button
+														onClick={() => setAddPapersView('upload')}
+														className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
+													>
+														<div className="relative">
+															<UploadCloud className="w-12 h-12 text-gray-400 group-hover:text-blue-500 mb-4 transition-colors" />
+															<div className="absolute -top-1 -right-1 w-5 h-5 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+																<span className="text-xs font-medium text-blue-600 dark:text-blue-300"><PlusCircle className="h-4 w-4" /></span>
+															</div>
 														</div>
-													</div>
-													<h3 className="text-lg font-semibold group-hover:text-blue-600 transition-colors">Upload New Papers</h3>
-													<p className="text-sm text-gray-500 text-center mt-1">
-														Upload PDFs from your computer or URL
-													</p>
-													<p className="text-xs mt-2 font-medium">
-														Drag & drop or browse →
-													</p>
-												</button>
-												<button
-													onClick={() => setAddPapersView('library')}
-													className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
-												>
-													<div className="relative">
-														<Library className="w-12 h-12 text-gray-400 group-hover:text-blue-500 mb-4 transition-colors" />
-														<div className="absolute -top-1 -right-1 w-5 h-5 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-															<span className="text-xs font-medium text-blue-600 dark:text-blue-300"><BookOpen className="h-4 w-4" /></span>
+														<h3 className="text-lg font-semibold group-hover:text-blue-600 transition-colors">Upload New Papers</h3>
+														<p className="text-sm text-gray-500 text-center mt-1">
+															Upload PDFs from your computer or URL
+														</p>
+														<p className="text-xs mt-2 font-medium">
+															Drag & drop or browse →
+														</p>
+													</button>
+													<button
+														onClick={() => setAddPapersView('library')}
+														className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
+													>
+														<div className="relative">
+															<Library className="w-12 h-12 text-gray-400 group-hover:text-blue-500 mb-4 transition-colors" />
+															<div className="absolute -top-1 -right-1 w-5 h-5 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+																<span className="text-xs font-medium text-blue-600 dark:text-blue-300"><BookOpen className="h-4 w-4" /></span>
+															</div>
 														</div>
-													</div>
-													<h3 className="text-lg font-semibold group-hover:text-blue-600 transition-colors">Add from Library</h3>
-													<p className="text-sm text-gray-500 text-center mt-1">
-														Choose from papers already in your library
-													</p>
-													<p className="text-xs mt-2 font-medium">
-														Browse existing papers →
-													</p>
-												</button>
-											</div>
-										)}
+														<h3 className="text-lg font-semibold group-hover:text-blue-600 transition-colors">Add from Library</h3>
+														<p className="text-sm text-gray-500 text-center mt-1">
+															Choose from papers already in your library
+														</p>
+														<p className="text-xs mt-2 font-medium">
+															Browse existing papers →
+														</p>
+													</button>
+												</div>
+											)}
 
-										{addPapersView === 'upload' && (
-											<div>
-												<Button variant="ghost" onClick={() => setAddPapersView('initial')} className="mb-4">
-													<ArrowLeft className="mr-2 h-4 w-4" />
-													Back
-												</Button>
-												<h3 className="text-lg font-semibold mb-2">Upload New Papers</h3>
-												<p className="text-sm text-gray-500 mb-4">Upload papers to your library. They will be automatically added to this project.</p>
-												<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} disabled={isPaperUploadAtLimit(subscription)} />
-												{isPaperUploadAtLimit(subscription) && (
-													<Alert variant="destructive" className="mt-4">
-														<AlertCircle className="h-4 w-4" />
-														<AlertTitle>Upload Limit Reached</AlertTitle>
-														<AlertDescription>
-															You have reached your paper upload limit. Please{" "}
-															<Link href="/pricing" className="font-bold underline">
-																upgrade your plan
-															</Link>{" "}
-															to upload more papers.
-														</AlertDescription>
-													</Alert>
-												)}
-												{uploadError && <p className="text-red-500 mt-4">{uploadError}</p>}
-											</div>
-										)}
+											{addPapersView === 'upload' && (
+												<div>
+													<Button variant="ghost" onClick={() => setAddPapersView('initial')} className="mb-4">
+														<ArrowLeft className="mr-2 h-4 w-4" />
+														Back
+													</Button>
+													<h3 className="text-lg font-semibold mb-2">Upload New Papers</h3>
+													<p className="text-sm text-gray-500 mb-4">Upload papers to your library. They will be automatically added to this project.</p>
+													<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} disabled={isPaperUploadAtLimit(subscription)} />
+													{isPaperUploadAtLimit(subscription) && (
+														<Alert variant="destructive" className="mt-4">
+															<AlertCircle className="h-4 w-4" />
+															<AlertTitle>Upload Limit Reached</AlertTitle>
+															<AlertDescription>
+																You have reached your paper upload limit. Please{" "}
+																<Link href="/pricing" className="font-bold underline">
+																	upgrade your plan
+																</Link>{" "}
+																to upload more papers.
+															</AlertDescription>
+														</Alert>
+													)}
+													{uploadError && <p className="text-red-500 mt-4">{uploadError}</p>}
+												</div>
+											)}
 
-										{addPapersView === 'library' && (
-											<div>
-												<Button variant="ghost" onClick={() => setAddPapersView('initial')} className="mb-4">
-													<ArrowLeft className="mr-2 h-4 w-4" />
-													Back
-												</Button>
-												<h3 className="text-lg font-semibold mb-2">Add from Library</h3>
-												<AddFromLibrary projectId={projectId} onPapersAdded={getProjectPapers} projectPaperIds={papers.map(p => p.id)} />
-											</div>
-										)}
-									</div>
-								</SheetContent>
-							</Sheet>
+											{addPapersView === 'library' && (
+												<div>
+													<Button variant="ghost" onClick={() => setAddPapersView('initial')} className="mb-4">
+														<ArrowLeft className="mr-2 h-4 w-4" />
+														Back
+													</Button>
+													<h3 className="text-lg font-semibold mb-2">Add from Library</h3>
+													<AddFromLibrary projectId={projectId} onPapersAdded={getProjectPapers} projectPaperIds={papers.map(p => p.id)} />
+												</div>
+											)}
+										</div>
+									</SheetContent>
+								</Sheet>
 							)}
 						</div>
 					</div>
@@ -751,12 +759,7 @@ export default function ProjectPage() {
 							</Dialog>
 						</div>
 					)}
-					<div className="mt-6">
-						<ProjectCollaborators
-							projectId={projectId}
-							setHasCollaborators={setHasCollaborators}
-							currentUserIsAdmin={project.role === "admin"} />
-					</div>
+
 				</div>
 			</div>
 

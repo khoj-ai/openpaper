@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import {
@@ -13,7 +12,6 @@ import {
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
-	DialogTrigger,
 } from "@/components/ui/dialog";
 import {
 	AlertDialog,
@@ -40,11 +38,17 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
-import { X } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import { Collaborator, PendingInvite, ProjectRole } from '@/lib/schema';
 import { fetchFromApi } from '@/lib/api';
 import { Badge } from './ui/badge';
 import { getAlphaHashToBackgroundColor, getInitials } from '@/lib/utils';
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface ProjectCollaboratorsProps {
 	projectId: string;
@@ -55,9 +59,9 @@ interface ProjectCollaboratorsProps {
 export function ProjectCollaborators({ projectId, currentUserIsAdmin, setHasCollaborators }: ProjectCollaboratorsProps) {
 	const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
 	const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+	const [isManageModalOpen, setIsManageModalOpen] = useState(false);
 	const [draftInvites, setDraftInvites] = useState<PendingInvite[]>([{ email: '', role: ProjectRole.Viewer, invited_at: '' }]);
 	const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
-	const [isExpanded, setIsExpanded] = useState(false);
 	const [isSending, setIsSending] = useState(false);
 	const [isLoading, setIsLoading] = useState(true);
 
@@ -227,7 +231,10 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin, setHasColl
 		return emailRegex.test(email);
 	}
 
-	const displayedCollaborators = isExpanded ? collaborators : collaborators.slice(0, 3);
+	// Maximum number of avatars to show before "+X more"
+	const MAX_VISIBLE_AVATARS = 4;
+	const visibleCollaborators = collaborators.slice(0, MAX_VISIBLE_AVATARS);
+	const remainingCount = collaborators.length - MAX_VISIBLE_AVATARS;
 
 	// Role Badge Component - clickable dropdown for admins, static for others
 	const RoleBadgeDropdown = ({ collaborator }: { collaborator: Collaborator }) => {
@@ -269,121 +276,118 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin, setHasColl
 	};
 
 	return (
-		<Card>
-			<CardHeader className="flex flex-row items-center justify-between">
-				<CardTitle className="flex items-center gap-2">
-					Collaborators
-					<span className="text-xs text-yellow-500 bg-yellow-100 dark:bg-yellow-800 dark:text-yellow-200 px-1 rounded">
-						new
-					</span>
-				</CardTitle>
-				{currentUserIsAdmin && (
-					<Dialog open={isInviteModalOpen} onOpenChange={setIsInviteModalOpen}>
-						<DialogTrigger asChild>
-							<Button variant="outline">Invite</Button>
-						</DialogTrigger>
-						<DialogContent>
-							<DialogHeader>
-								<DialogTitle>Invite Collaborators</DialogTitle>
-								<DialogDescription>
-									Add collaborators to your project. They will be notified by email.<br />If they do not have an Open Paper account, they will first receive an invitation to create one.
-								</DialogDescription>
-							</DialogHeader>
-							<div className="space-y-4 py-2">
-								{draftInvites.map((invite: PendingInvite, index: number) => (
-									<div key={index} className="flex items-end space-x-2">
-										<div className="grid flex-1 gap-2">
-											<Label htmlFor={`email-${index}`} className="sr-only">Email</Label>
-											<Input
-												id={`email-${index}`}
-												type="email"
-												placeholder="name@example.com"
-												value={invite.email}
-												onChange={(e) => handleDraftInviteChange(index, 'email', e.target.value)}
-											/>
-										</div>
-										<div className="grid gap-2">
-											<Label htmlFor={`role-${index}`} className="sr-only">Role</Label>
-											<Select
-												value={invite.role}
-												onValueChange={(value) => handleDraftInviteChange(index, 'role', value)}
-											>
-												<SelectTrigger id={`role-${index}`}>
-													<SelectValue placeholder="Role" />
-												</SelectTrigger>
-												<SelectContent>
-													<SelectItem value="viewer">Viewer</SelectItem>
-													<SelectItem value="editor">Editor</SelectItem>
-													{/* Don't allow Admin selection for now for simplicity */}
-													{/* <SelectItem value="admin">Admin</SelectItem> */}
-												</SelectContent>
-											</Select>
-										</div>
-										<Button
-											variant="ghost"
-											size="icon"
-											onClick={() => removeDraftInvite(index)}
-											disabled={draftInvites.length === 1}
-										>
-											<X className="h-4 w-4" />
-										</Button>
-									</div>
-								))}
-							</div>
-							<p className="text-sm text-muted-foreground pt-2">
-								<strong>Viewers</strong> can see all papers, chats, and artifacts, but cannot create new ones. <strong>Editors</strong> can do all that, plus add papers and create new chats and artifacts.
-							</p>
-							<Button variant="outline" onClick={addDraftInvite} className="mt-2">
-								Add another
-							</Button>
-							<DialogFooter>
-								<Button variant="secondary" onClick={() => setIsInviteModalOpen(false)} disabled={isSending}>Cancel</Button>
-								<Button
-									disabled={draftInvites.every((invite) => !isValidEmail(invite.email)) || isSending}
-									onClick={handleSendInvites}
-								>
-									{isSending ? 'Sending...' : 'Send Invites'}
-								</Button>
-							</DialogFooter>
-						</DialogContent>
-					</Dialog>
-				)}
-			</CardHeader>
-			<CardContent>
-				{isLoading ? (
-					<div className="space-y-4">
-						{[1, 2, 3].map((i) => (
-							<div key={i} className="flex items-center space-x-4 animate-pulse">
-								<div className="h-10 w-10 rounded-full bg-muted" />
-								<div className="flex-1 space-y-2">
-									<div className="h-4 bg-muted rounded w-1/3" />
-									<div className="h-3 bg-muted rounded w-1/2" />
-								</div>
-							</div>
-						))}
-					</div>
-				) : (
-					<div className="space-y-4">
-						{displayedCollaborators.map((collaborator: Collaborator) => (
+		<div className="flex items-center gap-3 ml-auto">
+			{/* Stacked Avatars */}
+			<TooltipProvider>
+				<div
+					className="flex items-center -space-x-2 cursor-pointer hover:opacity-80 transition-opacity"
+					onClick={() => setIsManageModalOpen(true)}
+				>
+					{isLoading ? (
+						<>
+							{[1, 2, 3].map((i) => (
+								<div
+									key={i}
+									className="h-8 w-8 rounded-full bg-muted border-2 border-background animate-pulse"
+								/>
+							))}
+						</>
+					) : (
+						<>
+							{visibleCollaborators.map((collaborator: Collaborator) => (
+								<Tooltip key={collaborator.id}>
+									<TooltipTrigger asChild>
+										<Avatar className="h-8 w-8 border-2 border-background ring-0">
+											<AvatarImage src={collaborator.picture} alt={collaborator.name} />
+											<AvatarFallback className={`text-xs ${getAlphaHashToBackgroundColor(collaborator.name)}`}>
+												{getInitials(collaborator.name)}
+											</AvatarFallback>
+										</Avatar>
+									</TooltipTrigger>
+									<TooltipContent>
+										<p>{collaborator.name}</p>
+									</TooltipContent>
+								</Tooltip>
+							))}
+							{remainingCount > 0 && (
+								<Tooltip>
+									<TooltipTrigger asChild>
+										<Avatar className="h-8 w-8 border-2 border-background ring-0">
+											<AvatarFallback className="text-xs bg-muted">
+												+{remainingCount}
+											</AvatarFallback>
+										</Avatar>
+									</TooltipTrigger>
+									<TooltipContent>
+										<p>{remainingCount} more collaborator{remainingCount > 1 ? 's' : ''}</p>
+									</TooltipContent>
+								</Tooltip>
+							)}
+							{pendingInvites.length > 0 && (
+								<Tooltip>
+									<TooltipTrigger asChild>
+										<Avatar className="h-8 w-8 border-2 border-background ring-0 opacity-60">
+											<AvatarFallback className="text-xs bg-muted text-muted-foreground">
+												+{pendingInvites.length}
+											</AvatarFallback>
+										</Avatar>
+									</TooltipTrigger>
+									<TooltipContent>
+										<p>{pendingInvites.length} pending invite{pendingInvites.length > 1 ? 's' : ''}</p>
+									</TooltipContent>
+								</Tooltip>
+							)}
+						</>
+					)}
+				</div>
+			</TooltipProvider>
+
+			{/* Invite Button */}
+			{currentUserIsAdmin && (
+				<Button
+					variant="outline"
+					size="sm"
+					onClick={() => setIsInviteModalOpen(true)}
+					className="h-8"
+				>
+					<Plus className="h-4 w-4 mr-1" />
+					Invite
+				</Button>
+			)}
+
+			{/* Manage Collaborators Modal */}
+			<Dialog open={isManageModalOpen} onOpenChange={setIsManageModalOpen}>
+				<DialogContent className="max-w-md">
+					<DialogHeader>
+						<DialogTitle>Collaborators</DialogTitle>
+						<DialogDescription>
+							{currentUserIsAdmin
+								? "Manage team members and their roles in this project."
+								: "View team members in this project."}
+						</DialogDescription>
+					</DialogHeader>
+					<div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto">
+						{/* Active Collaborators */}
+						{collaborators.map((collaborator: Collaborator) => (
 							<div key={collaborator.id} className="flex items-center justify-between">
-								<div className="flex items-center space-x-4">
-									<Avatar>
+								<div className="flex items-center space-x-3">
+									<Avatar className="h-9 w-9">
 										<AvatarImage src={collaborator.picture} alt={collaborator.name} />
 										<AvatarFallback className={getAlphaHashToBackgroundColor(collaborator.name)}>
 											{getInitials(collaborator.name)}
 										</AvatarFallback>
 									</Avatar>
-									<div>
-										<p className="font-medium">{collaborator.name}</p>
-										<p className="text-sm text-muted-foreground">{collaborator.email}</p>
+									<div className="min-w-0">
+										<p className="font-medium text-sm truncate">{collaborator.name}</p>
+										<p className="text-xs text-muted-foreground truncate">{collaborator.email}</p>
 									</div>
 								</div>
-								<div className="flex items-center space-x-2">
+								<div className="flex items-center space-x-2 flex-shrink-0">
 									<RoleBadgeDropdown collaborator={collaborator} />
 									{currentUserIsAdmin && collaborator.role !== ProjectRole.Admin && (
 										<AlertDialog>
 											<AlertDialogTrigger asChild>
-												<Button variant="ghost" size="sm" className='h-auto p-0 w-auto'>
+												<Button variant="ghost" size="sm" className='h-auto p-1 w-auto'>
 													<X className="h-4 w-4" />
 												</Button>
 											</AlertDialogTrigger>
@@ -409,93 +413,136 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin, setHasColl
 
 						{/* Pending Invites Section */}
 						{pendingInvites.length > 0 && (
-							<>
-								<div className="border-t pt-4 mt-4">
-									<p className="text-sm font-medium text-muted-foreground mb-3">Pending Invites</p>
-									<div className="space-y-3">
-										{pendingInvites.map((invite: PendingInvite, index: number) => (
-											<div key={`pending-${index}`} className="opacity-60">
-												<div className="flex items-start gap-4">
-													<Avatar className="opacity-50 mt-1">
-														<AvatarFallback className="bg-muted">
-															{invite.email.charAt(0).toUpperCase()}
-														</AvatarFallback>
-													</Avatar>
-													<div className="flex-1 min-w-0">
-														<p className="font-medium text-muted-foreground break-words">{invite.email}</p>
-														<p className="text-xs text-muted-foreground">Invite sent • Not yet accepted</p>
-														{/* Role and actions on mobile */}
-														<div className="flex items-center gap-2 mt-2 md:hidden">
-															<span className="text-sm text-muted-foreground">{invite.role}</span>
-															{currentUserIsAdmin && (
-																<AlertDialog>
-																	<AlertDialogTrigger asChild>
-																		<Button variant="ghost" size="sm" className='h-auto p-0 w-auto'>
-																			<X className="h-4 w-4" />
-																		</Button>
-																	</AlertDialogTrigger>
-																	<AlertDialogContent>
-																		<AlertDialogHeader>
-																			<AlertDialogTitle>Cancel Invitation</AlertDialogTitle>
-																			<AlertDialogDescription>
-																				Are you sure you want to cancel the invitation to {invite.email}?
-																			</AlertDialogDescription>
-																		</AlertDialogHeader>
-																		<AlertDialogFooter>
-																			<AlertDialogCancel>Cancel</AlertDialogCancel>
-																			<AlertDialogAction onClick={() => invite.id && removePendingInvite(invite.id)}>
-																				Cancel Invitation
-																			</AlertDialogAction>
-																		</AlertDialogFooter>
-																	</AlertDialogContent>
-																</AlertDialog>
-															)}
-														</div>
-													</div>
-													{/* Role and actions on desktop */}
-													<div className="hidden md:flex items-center gap-2">
-														<span className="text-sm text-muted-foreground">{invite.role}</span>
-														{currentUserIsAdmin && (
-															<AlertDialog>
-																<AlertDialogTrigger asChild>
-																	<Button variant="ghost" size="sm" className='h-auto p-0 w-auto'>
-																		<X className="h-4 w-4" />
-																	</Button>
-																</AlertDialogTrigger>
-																<AlertDialogContent>
-																	<AlertDialogHeader>
-																		<AlertDialogTitle>Cancel Invitation</AlertDialogTitle>
-																		<AlertDialogDescription>
-																			Are you sure you want to cancel the invitation to {invite.email}?
-																		</AlertDialogDescription>
-																	</AlertDialogHeader>
-																	<AlertDialogFooter>
-																		<AlertDialogCancel>Cancel</AlertDialogCancel>
-																		<AlertDialogAction onClick={() => invite.id && removePendingInvite(invite.id)}>
-																			Cancel Invitation
-																		</AlertDialogAction>
-																	</AlertDialogFooter>
-																</AlertDialogContent>
-															</AlertDialog>
-														)}
-													</div>
+							<div className="border-t pt-4 mt-4">
+								<p className="text-sm font-medium text-muted-foreground mb-3">Pending Invites</p>
+								<div className="space-y-3">
+									{pendingInvites.map((invite: PendingInvite, index: number) => (
+										<div key={`pending-${index}`} className="flex items-center justify-between opacity-60">
+											<div className="flex items-center space-x-3">
+												<Avatar className="h-9 w-9 opacity-50">
+													<AvatarFallback className="bg-muted text-xs">
+														{invite.email.charAt(0).toUpperCase()}
+													</AvatarFallback>
+												</Avatar>
+												<div className="min-w-0">
+													<p className="font-medium text-sm text-muted-foreground truncate">{invite.email}</p>
+													<p className="text-xs text-muted-foreground">Invite sent • Not yet accepted</p>
 												</div>
 											</div>
-										))}
-									</div>
+											<div className="flex items-center space-x-2 flex-shrink-0">
+												<span className="text-xs text-muted-foreground">{invite.role}</span>
+												{currentUserIsAdmin && (
+													<AlertDialog>
+														<AlertDialogTrigger asChild>
+															<Button variant="ghost" size="sm" className='h-auto p-1 w-auto'>
+																<X className="h-4 w-4" />
+															</Button>
+														</AlertDialogTrigger>
+														<AlertDialogContent>
+															<AlertDialogHeader>
+																<AlertDialogTitle>Cancel Invitation</AlertDialogTitle>
+																<AlertDialogDescription>
+																	Are you sure you want to cancel the invitation to {invite.email}?
+																</AlertDialogDescription>
+															</AlertDialogHeader>
+															<AlertDialogFooter>
+																<AlertDialogCancel>Cancel</AlertDialogCancel>
+																<AlertDialogAction onClick={() => invite.id && removePendingInvite(invite.id)}>
+																	Cancel Invitation
+																</AlertDialogAction>
+															</AlertDialogFooter>
+														</AlertDialogContent>
+													</AlertDialog>
+												)}
+											</div>
+										</div>
+									))}
 								</div>
-							</>
+							</div>
 						)}
 					</div>
-				)}
-				{!isLoading && collaborators.length > 3 && (
-					<div className="mt-4">
-						<Button variant="link" onClick={() => setIsExpanded(!isExpanded)} className="p-0 h-auto">
-							{isExpanded ? 'Show less' : `See all (${collaborators.length})`}
-						</Button>
+					<DialogFooter>
+						{currentUserIsAdmin && (
+							<Button
+								variant="outline"
+								onClick={() => {
+									setIsManageModalOpen(false);
+									setIsInviteModalOpen(true);
+								}}
+							>
+								<Plus className="h-4 w-4 mr-1" />
+								Invite More
+							</Button>
+						)}
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			{/* Invite Modal */}
+			<Dialog open={isInviteModalOpen} onOpenChange={setIsInviteModalOpen}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Invite Collaborators</DialogTitle>
+						<DialogDescription>
+							Add collaborators to your project. They will be notified by email.<br />If they do not have an Open Paper account, they will first receive an invitation to create one.
+						</DialogDescription>
+					</DialogHeader>
+					<div className="space-y-4 py-2">
+						{draftInvites.map((invite: PendingInvite, index: number) => (
+							<div key={index} className="flex items-end space-x-2">
+								<div className="grid flex-1 gap-2">
+									<Label htmlFor={`email-${index}`} className="sr-only">Email</Label>
+									<Input
+										id={`email-${index}`}
+										type="email"
+										placeholder="name@example.com"
+										value={invite.email}
+										onChange={(e) => handleDraftInviteChange(index, 'email', e.target.value)}
+									/>
+								</div>
+								<div className="grid gap-2">
+									<Label htmlFor={`role-${index}`} className="sr-only">Role</Label>
+									<Select
+										value={invite.role}
+										onValueChange={(value) => handleDraftInviteChange(index, 'role', value)}
+									>
+										<SelectTrigger id={`role-${index}`}>
+											<SelectValue placeholder="Role" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="viewer">Viewer</SelectItem>
+											<SelectItem value="editor">Editor</SelectItem>
+										</SelectContent>
+									</Select>
+								</div>
+								<Button
+									variant="ghost"
+									size="icon"
+									onClick={() => removeDraftInvite(index)}
+									disabled={draftInvites.length === 1}
+								>
+									<X className="h-4 w-4" />
+								</Button>
+							</div>
+						))}
 					</div>
-				)}
-			</CardContent>
-		</Card>
+					<p className="text-sm text-muted-foreground pt-2">
+						<strong>Viewers</strong> can see all papers, chats, and artifacts, but cannot create new ones. <strong>Editors</strong> can do all that, plus add papers and create new chats and artifacts.
+					</p>
+					<Button variant="outline" onClick={addDraftInvite} className="mt-2">
+						Add another
+					</Button>
+					<DialogFooter>
+						<Button variant="secondary" onClick={() => setIsInviteModalOpen(false)} disabled={isSending}>Cancel</Button>
+						<Button
+							disabled={draftInvites.every((invite) => !isValidEmail(invite.email)) || isSending}
+							onClick={handleSendInvites}
+						>
+							{isSending ? 'Sending...' : 'Send Invites'}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+		</div>
 	);
 }
