@@ -11,6 +11,50 @@ from app.helpers.s3 import s3_service
 MAX_CHUNK_SIZE = 10000
 
 
+def clean_markdown_for_speech(text: str) -> str:
+    """
+    Remove markdown-like formatting from text to prepare it for TTS processing.
+
+    Args:
+        text: The text containing markdown formatting.
+
+    Returns:
+        Clean text with markdown formatting removed.
+    """
+    cleaned = text
+
+    # Remove headers (# ## ### etc.)
+    cleaned = re.sub(r"^#{1,6}\s*", "", cleaned, flags=re.MULTILINE)
+    # Remove bold (**text** or __text__)
+    cleaned = re.sub(r"\*\*(.+?)\*\*", r"\1", cleaned)
+    cleaned = re.sub(r"__(.+?)__", r"\1", cleaned)
+    # Remove italic (*text* or _text_) - be careful not to match underscores in words
+    cleaned = re.sub(r"(?<!\w)\*(.+?)\*(?!\w)", r"\1", cleaned)
+    cleaned = re.sub(r"(?<!\w)_(.+?)_(?!\w)", r"\1", cleaned)
+    # Remove strikethrough (~~text~~)
+    cleaned = re.sub(r"~~(.+?)~~", r"\1", cleaned)
+    # Remove inline code (`code`)
+    cleaned = re.sub(r"`([^`]+)`", r"\1", cleaned)
+    # Remove code blocks (```...```)
+    cleaned = re.sub(r"```[\s\S]*?```", "", cleaned)
+    # Remove blockquotes (> at start of lines)
+    cleaned = re.sub(r"^>\s*", "", cleaned, flags=re.MULTILINE)
+    # Remove horizontal rules (---, ***, ___)
+    cleaned = re.sub(r"^[-*_]{3,}\s*$", "", cleaned, flags=re.MULTILINE)
+    # Remove link syntax [text](url) -> text
+    cleaned = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", cleaned)
+    # Remove image syntax ![alt](url)
+    cleaned = re.sub(r"!\[([^\]]*)\]\([^)]+\)", r"\1", cleaned)
+    # Remove bullet points (* or - or + at start of lines)
+    cleaned = re.sub(r"^[\*\-\+]\s+", "", cleaned, flags=re.MULTILINE)
+    # Remove numbered lists (1. 2. etc.)
+    cleaned = re.sub(r"^\d+\.\s+", "", cleaned, flags=re.MULTILINE)
+    # Clean up extra whitespace
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+
+    return cleaned
+
+
 def chunk_text(text: str, max_chunk_size: int = MAX_CHUNK_SIZE) -> List[str]:
     """
     Split long text into smaller chunks at natural boundaries (paragraphs, sentences).
@@ -217,8 +261,11 @@ class OpenAISpeaker:
         Returns:
             Tuple[str, str]: The object key and URL to the generated speech audio in s3 storage.
         """
+        # Clean markdown formatting for better TTS output
+        cleaned_text = clean_markdown_for_speech(text)
+
         # Split text into chunks if necessary
-        chunks = chunk_text(text)
+        chunks = chunk_text(cleaned_text)
 
         temp_files: List[str] = []
         final_output_path: str | None = None
