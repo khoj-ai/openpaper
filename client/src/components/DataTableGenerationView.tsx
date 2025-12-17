@@ -3,8 +3,11 @@
 import { useState, useMemo } from "react";
 import { Download, Table as TableIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { PaperItem, DataTableResult, Citation } from "@/lib/schema";
 import ReferencePaperCards from "@/components/ReferencePaperCards";
+import { ProjectPaperPreview } from "@/components/ProjectPaperPreview";
 import Link from "next/link";
 
 interface DataTableGenerationViewProps {
@@ -12,13 +15,54 @@ interface DataTableGenerationViewProps {
     papers: PaperItem[];
     onClose: () => void;
     onCitationClick?: (paperId: string, searchTerm: string) => void;
+    projectId?: string;
 }
+
+// Wrapper component to handle owned vs non-owned papers
+const PaperLinkWrapper = ({
+    paper,
+    projectId,
+    children
+}: {
+    paper: PaperItem;
+    projectId?: string;
+    children: React.ReactNode;
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const isOwner = paper.is_owner !== false; // Default to true if not specified
+
+    if (isOwner) {
+        return (
+            <Link
+                href={`/paper/${paper.id}`}
+                className="hover:underline font-medium"
+                target="_blank"
+            >
+                {children}
+            </Link>
+        );
+    }
+
+    return (
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>
+                <button className="hover:underline font-medium text-left cursor-pointer">
+                    {children}
+                </button>
+            </DialogTrigger>
+            <DialogContent className="max-w-[90vw] sm:max-w-[90vw] h-[90vh] overflow-y-auto p-0">
+                <ProjectPaperPreview paper={paper} projectId={projectId!} />
+            </DialogContent>
+        </Dialog>
+    );
+};
 
 export default function DataTableGenerationView({
     dataTableResult,
     papers,
     onClose,
     onCitationClick,
+    projectId,
 }: DataTableGenerationViewProps) {
     const [highlightedPaper, setHighlightedPaper] = useState<string | null>(null);
 
@@ -131,13 +175,9 @@ export default function DataTableGenerationView({
                                     >
                                         <td className="p-3 align-top sticky left-0 bg-card z-10">
                                             {paper ? (
-                                                <Link
-                                                    href={`/paper/${paper.id}`}
-                                                    className="hover:underline font-medium"
-                                                    target="_blank"
-                                                >
+                                                <PaperLinkWrapper paper={paper} projectId={projectId}>
                                                     {paper.title}
-                                                </Link>
+                                                </PaperLinkWrapper>
                                             ) : (
                                                 <span className="text-muted-foreground">Unknown Paper</span>
                                             )}
@@ -156,25 +196,36 @@ export default function DataTableGenerationView({
                                                             {cellCitations.length > 0 && (
                                                                 <div className="flex flex-wrap gap-1">
                                                                     {cellCitations.map((citation, citationIdx) => (
-                                                                        <button
+                                                                        <HoverCard
                                                                             key={citationIdx}
-                                                                            onClick={() => {
-                                                                                // Open PDF viewer with the citation text
-                                                                                if (onCitationClick) {
-                                                                                    onCitationClick(row.paper_id, citation.text);
-                                                                                }
-                                                                                // Also highlight the paper card and scroll to it
-                                                                                setHighlightedPaper(row.paper_id);
-                                                                                const cardId = `datatable-reference-paper-card-${row.paper_id}`;
-                                                                                const refElement = document.getElementById(cardId);
-                                                                                if (refElement) {
-                                                                                    refElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                                                                }
-                                                                            }}
-                                                                            className="text-xs px-1.5 py-0.5 rounded transition-colors bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50"
+                                                                            openDelay={100}
+                                                                            closeDelay={100}
                                                                         >
-                                                                            [{citation.index}]
-                                                                        </button>
+                                                                            <HoverCardTrigger asChild>
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        // Open PDF viewer with the citation text
+                                                                                        if (onCitationClick) {
+                                                                                            onCitationClick(row.paper_id, citation.text);
+                                                                                        }
+                                                                                        // Also highlight the paper card and scroll to it
+                                                                                        setHighlightedPaper(row.paper_id);
+                                                                                        const cardId = `datatable-reference-paper-card-${row.paper_id}`;
+                                                                                        const refElement = document.getElementById(cardId);
+                                                                                        if (refElement) {
+                                                                                            refElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                                                        }
+                                                                                    }}
+                                                                                    className="text-xs px-1.5 py-0.5 rounded transition-colors bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50"
+                                                                                >
+                                                                                    [{citation.index}]
+                                                                                </button>
+                                                                            </HoverCardTrigger>
+                                                                            <HoverCardContent className="w-80 p-2 shadow-md bg-accent">
+                                                                                {paper && <p className="text-sm font-bold text-accent-foreground mb-1">{paper.title}</p>}
+                                                                                <p className="text-sm text-accent-foreground">{citation.text}</p>
+                                                                            </HoverCardContent>
+                                                                        </HoverCard>
                                                                     ))}
                                                                 </div>
                                                             )}

@@ -151,6 +151,7 @@ export default function DataTablePage() {
                         papers={papers}
                         onClose={handleClose}
                         onCitationClick={handleCitationClick}
+                        projectId={projectId}
                     />
                 </div>
             </div>
