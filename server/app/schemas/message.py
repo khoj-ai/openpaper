@@ -118,32 +118,6 @@ class EvidenceCollection(BaseModel):
         return bool(self.previous_tool_calls)
 
 
-class EvidenceCleaningInstructions(BaseModel):
-    """Instructions for cleaning evidence from a single paper"""
-
-    keep: List[int] = Field(
-        default_factory=list,
-        description="List of indices to keep from the paper's evidence",
-    )
-    drop: List[int] = Field(
-        default_factory=list,
-        description="List of indices to drop from the paper's evidence",
-    )
-
-
-class EvidenceCleaningResponse(BaseModel):
-    """Complete response structure for evidence cleaning
-
-    Maps paper IDs to their respective cleaning instructions.
-    Each paper_id should correspond to cleaning instructions for that paper's evidence snippets.
-    """
-
-    papers: Dict[str, EvidenceCleaningInstructions] = Field(
-        default_factory=dict,
-        description="Mapping of paper IDs to their respective cleaning instructions",
-    )
-
-
 class EvidenceSummaryResponse(BaseModel):
     """Response structure for evidence summarization
 

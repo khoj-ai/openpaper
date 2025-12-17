@@ -206,21 +206,6 @@ PREVIOUS_TOOL_CALLS_MESSAGE = """
 You are on iteration {iteration}/{total_iterations}:
 """
 
-EVIDENCE_CLEANING_PROMPT = """You are tasked with filtering evidence snippets for relevance to a research question.
-
-Original Question: {question}
-
-For each paper's evidence snippets, classify each as:
-- KEEP: Directly relevant to answering the question
-- SUMMARIZE: Contains some relevant information but is verbose/redundant
-- DROP: Not relevant to the question
-
-Evidence to filter:
-{evidence}
-
-Respond with a JSON object structured as:
-{schema}
-"""
 
 EVIDENCE_SUMMARIZATION_PROMPT = """You are a research assistant that summarizes collected evidence snippets from research papers into a coherent summary for each paper, focusing on information relevant to the user's question.
 
