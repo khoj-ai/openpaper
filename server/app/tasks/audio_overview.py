@@ -111,7 +111,6 @@ async def generate_audio_overview(
                 project_id=str(project_id),
                 length=length,
                 current_user=user,
-                llm_provider=LLMProvider.GROQ,
                 additional_instructions=additional_instructions,
                 db=db,
             )
@@ -183,7 +182,7 @@ async def generate_audio_overview(
         )
 
         logger.info(
-            f"Successfully completed audio overview generation for paper {paper_id}"
+            f"Successfully completed audio overview generation for paper/project {paper_id or project_id}"
         )
 
         track_event(
@@ -198,7 +197,7 @@ async def generate_audio_overview(
 
     except Exception as e:
         logger.error(
-            f"Error generating audio overview for paper {paper_id}: {str(e)}",
+            f"Error generating audio overview for paper/project {paper_id or project_id}: {str(e)}",
             exc_info=True,
         )
 

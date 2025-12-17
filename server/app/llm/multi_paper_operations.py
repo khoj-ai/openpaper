@@ -696,7 +696,6 @@ class MultiPaperOperations(BaseLLMClient):
         additional_instructions: Optional[str] = None,
         length: Optional[Literal["short", "medium", "long"]] = "medium",
         project_id: Optional[str] = None,
-        llm_provider: Optional[LLMProvider] = None,
         db: Session = Depends(get_db),
     ) -> AudioOverviewForLLM:
         """
@@ -705,10 +704,10 @@ class MultiPaperOperations(BaseLLMClient):
         # First, gather evidence based on the summary request
         evidence_collection = EvidenceCollection()
 
-        summary_request = f"Provide a comprehensive narrative summary of the key findings, contributions, and insights from the papers in this collection. Synthesize the information to highlight overarching themes and significant advancements."
-
-        if additional_instructions:
-            summary_request += f" Additionally, {additional_instructions}"
+        summary_request = (
+            additional_instructions
+            or f"Provide a comprehensive narrative summary of the key findings, contributions, and insights from the papers in this collection. Synthesize the information to highlight overarching themes and significant advancements."
+        )
 
         word_count_map = {
             "short": 5000,
@@ -720,7 +719,7 @@ class MultiPaperOperations(BaseLLMClient):
         async for result in self.gather_evidence(
             question=f"{summary_request}",
             current_user=current_user,
-            llm_provider=llm_provider,
+            llm_provider=LLMProvider.GROQ,
             project_id=project_id,
             db=db,
         ):
@@ -729,14 +728,6 @@ class MultiPaperOperations(BaseLLMClient):
                 for paper_id, snippets in evidence_dict.items():
                     evidence_collection.add_evidence(paper_id, snippets)
                 break
-
-        # Clean the evidence to focus on summary-relevant content
-        cleaned_evidence = await self.clean_evidence(
-            evidence_collection=evidence_collection,
-            original_question=summary_request,
-            current_user=current_user,
-            llm_provider=llm_provider,
-        )
 
         # Get paper metadata for context
         if project_id:
@@ -763,7 +754,7 @@ class MultiPaperOperations(BaseLLMClient):
 
         formatted_prompt = GENERATE_MULTI_PAPER_NARRATIVE_SUMMARY.format(
             summary_request=summary_request,
-            evidence_gathered=cleaned_evidence.get_evidence_dict(),
+            evidence_gathered=evidence_collection.get_evidence_dict(),
             length=word_count_map.get(str(length), word_count_map["short"]),
             paper_metadata=paper_metadata,
             additional_instructions=additional_instructions or "",
@@ -776,7 +767,7 @@ class MultiPaperOperations(BaseLLMClient):
         response = self.generate_content(
             contents=message_content,
             model_type=ModelType.DEFAULT,
-            provider=llm_provider,
+            provider=LLMProvider.GEMINI,
         )
 
         try:
