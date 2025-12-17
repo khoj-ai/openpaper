@@ -1,5 +1,6 @@
 import logging
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import List
 
 from app.auth.dependencies import get_required_user
@@ -128,6 +129,7 @@ async def create_data_table(
 @projects_data_table_router.get("/jobs/{project_id}")
 async def list_data_table_jobs(
     project_id: str,
+    all: bool = False,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_required_user),
 ) -> JSONResponse:
@@ -141,18 +143,18 @@ async def list_data_table_jobs(
             user=current_user,
         )
 
-        job_list = [
-            {
-                "job_id": str(job.id),
-                "columns": job.columns,
-                "result_id": str(job.result.id) if job.result else None,
-                "title": job.result.title if job.result else None,
-                "status": job.status,
-                "task_id": job.task_id,
-                "created_at": job.created_at.isoformat() if job.created_at else None,
-            }
-            for job in jobs
-        ]
+        if not all:
+            # Filter out failed jobs from more than 1 hour ago
+            one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+            jobs = [
+                job
+                for job in jobs
+                if not (
+                    job.status == JobStatus.FAILED and job.started_at < one_hour_ago
+                )
+            ]
+
+        job_list = [data_table_job_crud.job_to_dict(job) for job in jobs]
 
         return JSONResponse(
             status_code=200,

@@ -302,6 +302,7 @@ class DataTableJobCRUD(
             "project_id": str(job.project_id) if job.project_id else None,
             "columns": job.columns,
             "task_id": job.task_id,
+            "title": job.result.title if job.result else None,
             "status": job.status,
             "started_at": job.started_at.isoformat() if job.started_at else None,
             "completed_at": job.completed_at.isoformat() if job.completed_at else None,
