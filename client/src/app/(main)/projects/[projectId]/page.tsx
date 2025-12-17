@@ -4,7 +4,7 @@ import { AlertCircle, ArrowLeft, ArrowRight, BookOpen, Library, Loader2, Message
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { fetchFromApi } from "@/lib/api";
-import { Project, PaperItem, Conversation } from "@/lib/schema";
+import { Project, PaperItem, Conversation, ProjectRole } from "@/lib/schema";
 import { PdfDropzone } from "@/components/PdfDropzone";
 import PaperCard from "@/components/PaperCard";
 import PdfUploadTracker from "@/components/PdfUploadTracker";
@@ -312,14 +312,16 @@ export default function ProjectPage() {
 				<div className="group relative">
 					<div className="flex items-center">
 						<h1 className="text-3xl font-bold text-primary rounded-lg px-0">{project.title}</h1>
-						<Button
-							variant="ghost"
-							size="icon"
-							className="opacity-0 group-hover:opacity-100 ml-2"
-							onClick={handleEditClick}
-						>
-							<Pencil className="h-4 w-4" />
-						</Button>
+						{project.role !== ProjectRole.Viewer && (
+							<Button
+								variant="ghost"
+								size="icon"
+								className="opacity-0 group-hover:opacity-100 ml-2"
+								onClick={handleEditClick}
+							>
+								<Pencil className="h-4 w-4" />
+							</Button>
+						)}
 					</div>
 					<p className="text-lg text-secondary-foreground mb-8">{project.description}</p>
 				</div>
@@ -446,14 +448,16 @@ export default function ProjectPage() {
 					<div className="flex-1">
 						<div className="flex items-center">
 							<h1 className="text-3xl font-bold text-primary p-2 rounded-lg px-0">{project.title}</h1>
-							<Button
-								variant="ghost"
-								size="icon"
-								className="opacity-0 group-hover:opacity-100 ml-2"
-								onClick={handleEditClick}
-							>
-								<Pencil className="h-4 w-4" />
-							</Button>
+							{project.role !== ProjectRole.Viewer && (
+								<Button
+									variant="ghost"
+									size="icon"
+									className="opacity-0 group-hover:opacity-100 ml-2"
+									onClick={handleEditClick}
+								>
+									<Pencil className="h-4 w-4" />
+								</Button>
+							)}
 						</div>
 						<p className="text-lg text-secondary-foreground mb-6">{project.description}</p>
 					</div>
