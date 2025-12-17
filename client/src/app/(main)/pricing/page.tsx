@@ -167,44 +167,6 @@ export default function PricingPage() {
     const isCanceled = subscriptionStatus === 'canceled' || userSubscription?.subscription?.cancel_at_period_end;
     const canResubscribe = userSubscription?.has_subscription && isCanceled;
 
-    const getStatusBadgeColor = (status: string | undefined) => {
-        switch (status) {
-            case 'active':
-                return 'bg-green-600 text-white border-green-600';
-            case 'trialing':
-                return 'bg-yellow-600 text-white border-yellow-600';
-            case 'canceled':
-                return 'bg-red-400 text-white border-red-400';
-            case 'past_due':
-                return 'bg-amber-600 text-white border-amber-600';
-            case 'incomplete':
-                return 'bg-amber-400 text-white border-amber-400';
-            case 'unpaid':
-                return 'bg-amber-400 text-white border-amber-400';
-            default:
-                return 'bg-slate-400 text-white border-slate-400';
-        }
-    };
-
-    const getStatusDisplay = (status: string | undefined) => {
-        switch (status) {
-            case 'active':
-                return 'Active';
-            case 'trialing':
-                return 'Trial';
-            case 'canceled':
-                return 'Canceled';
-            case 'past_due':
-                return 'Past Due';
-            case 'incomplete':
-                return 'Incomplete';
-            case 'unpaid':
-                return 'Unpaid';
-            default:
-                return 'Unknown';
-        }
-    };
-
     return (
         <div className="max-w-6xl mx-auto p-2 sm:p-8 space-y-16">
             {/* Header */}
