@@ -3,8 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Clock, Calendar, CheckCircle } from "lucide-react";
+import { Clock, CheckCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -220,212 +219,7 @@ export default function PricingPage() {
                 </div>
             </div>
 
-            {/* Loading Skeleton for Subscription Card */}
-            {loading && (
-                <Card className="border-2 border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
-                    <CardHeader className="py-4">
-                        <div className="flex items-center gap-3">
-                            <Skeleton className="h-8 w-8 rounded-full" />
-                            <div className="flex-1 space-y-2">
-                                <Skeleton className="h-5 w-32" />
-                                <Skeleton className="h-4 w-24" />
-                            </div>
-                            <Skeleton className="h-6 w-16 rounded-full" />
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-6 my-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
-                            <div className="text-center sm:text-left space-y-2">
-                                <Skeleton className="h-6 w-28 mx-auto sm:mx-0" />
-                                <Skeleton className="h-4 w-36 mx-auto sm:mx-0" />
-                            </div>
-                            <div className="text-center space-y-2">
-                                <Skeleton className="h-6 w-20 mx-auto" />
-                                <Skeleton className="h-4 w-24 mx-auto" />
-                            </div>
-                            <div className="text-center sm:text-right space-y-2 sm:col-span-2 md:col-span-1">
-                                <Skeleton className="h-5 w-32 mx-auto sm:ml-auto sm:mr-0" />
-                                <Skeleton className="h-4 w-16 mx-auto sm:ml-auto sm:mr-0" />
-                            </div>
-                        </div>
-                        <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
-                            <Skeleton className="h-10 w-full" />
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
 
-            {/* Current Subscription Card */}
-            {isCurrentlySubscribed && !loading && (
-                <Card className={cn(
-                    "relative overflow-hidden border transition-all duration-200",
-                    isActiveSubscription
-                        ? "border-blue-500/20 bg-gradient-to-br from-blue-500/5 via-primary/5 to-transparent dark:from-blue-500/10 dark:via-primary/10 dark:to-transparent shadow-md"
-                        : "border-border bg-card"
-                )}>
-                    {/* Decorative background blur */}
-                    {isActiveSubscription && (
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-500/10 to-primary/5 rounded-full blur-3xl -z-10" />
-                    )}
-
-                    <CardHeader className="pb-4">
-                        <div className="flex items-center gap-4">
-                            <div className={cn(
-                                "p-3 rounded-xl flex items-center justify-center transition-colors",
-                                isActiveSubscription
-                                    ? "bg-blue-500/10 dark:bg-blue-500/20"
-                                    : "bg-muted"
-                            )}>
-                                <CheckCircle className={cn(
-                                    "h-6 w-6",
-                                    isActiveSubscription
-                                        ? "text-blue-500"
-                                        : "text-muted-foreground"
-                                )} strokeWidth={1.5} />
-                            </div>
-                            <div className="flex-1">
-                                <CardTitle className="text-xl font-semibold">
-                                    Your Plan
-                                </CardTitle>
-                            </div>
-                            <Badge className={cn("font-normal", getStatusBadgeColor(subscriptionStatus))}>
-                                {getStatusDisplay(subscriptionStatus)}
-                            </Badge>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                            <div className="space-y-2">
-                                <div className="text-xl font-semibold">
-                                    Researcher Plan
-                                </div>
-                                <div className="text-sm text-muted-foreground">
-                                    Full access to all features
-                                </div>
-                            </div>
-                            <div className="space-y-2 text-center sm:text-left">
-                                <div className="text-xl font-semibold">
-                                    ${userSubscription?.subscription.interval === "year" ? annualPrice : monthlyPrice}
-                                    <span className="text-base font-normal text-muted-foreground">/month</span>
-                                </div>
-                                <div className="text-sm text-muted-foreground flex items-center gap-2 justify-center sm:justify-start">
-                                    Billed {userSubscription?.subscription.interval === "year" ? "annually" : "monthly"}
-                                    {isIntervalChangeLoading && (
-                                        <Badge variant="secondary" className="text-xs">
-                                            Updating...
-                                        </Badge>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="space-y-2 text-center sm:text-right sm:col-span-2 md:col-span-1">
-                                <div className="flex items-center justify-center sm:justify-end gap-2 text-lg font-semibold">
-                                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                                    <span className="break-words">
-                                        {userSubscription?.subscription.current_period_end &&
-                                            formatDate(userSubscription.subscription.current_period_end)
-                                        }
-                                    </span>
-                                </div>
-                                <div className="text-sm text-muted-foreground">
-                                    {subscriptionStatus === 'canceled' || userSubscription?.subscription.cancel_at_period_end ? "Expires" : "Renews"}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Status-specific alerts */}
-                        {subscriptionStatus === 'canceled' && (
-                            <div className="bg-muted/50 border border-border rounded-xl p-4">
-                                <div className="flex items-start gap-3">
-                                    <div className="p-2 rounded-lg bg-background">
-                                        <Clock className="h-4 w-4 text-muted-foreground" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <span className="font-medium text-sm">Subscription Canceled</span>
-                                        <p className="text-sm text-muted-foreground mt-1">
-                                            Your subscription will end on {userSubscription?.subscription.current_period_end &&
-                                                formatDate(userSubscription.subscription.current_period_end)}.
-                                            You can reactivate anytime before this date.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {userSubscription?.subscription.cancel_at_period_end && subscriptionStatus === 'active' && (
-                            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 rounded-xl p-4">
-                                <div className="flex items-start gap-3">
-                                    <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/50">
-                                        <Clock className="h-4 w-4 text-amber-700 dark:text-amber-300" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <span className="font-medium text-sm text-amber-900 dark:text-amber-100">Subscription Ending</span>
-                                        <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                                            Your subscription will end on {userSubscription?.subscription.current_period_end &&
-                                                formatDate(userSubscription.subscription.current_period_end)}.
-                                            You can reactivate anytime before this date.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {subscriptionStatus === 'past_due' && (
-                            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 rounded-xl p-4">
-                                <div className="flex items-start gap-3">
-                                    <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/50">
-                                        <Clock className="h-4 w-4 text-amber-700 dark:text-amber-300" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <span className="font-medium text-sm text-amber-900 dark:text-amber-100">Payment Past Due</span>
-                                        <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                                            Your payment is past due. Please update your payment method to continue your subscription.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {subscriptionStatus === 'incomplete' && (
-                            <div className="bg-muted/50 border border-border rounded-xl p-4">
-                                <div className="flex items-start gap-3">
-                                    <div className="p-2 rounded-lg bg-background">
-                                        <Clock className="h-4 w-4 text-muted-foreground" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <span className="font-medium text-sm">Payment Incomplete</span>
-                                        <p className="text-sm text-muted-foreground mt-1">
-                                            Your payment is incomplete. Please complete the payment process to activate your subscription.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Action buttons based on subscription status */}
-                        <div className="pt-2 float-end">
-                            {canResubscribe ? (
-                                <Button
-                                    size="lg"
-                                    className="w-fit bg-primary hover:bg-primary/90 font-medium"
-                                    onClick={handleResubscribe}
-                                    disabled={isResubscribeLoading}
-                                >
-                                    {isResubscribeLoading ? "Reactivating..." : "Reactivate Subscription"}
-                                </Button>
-                            ) : (
-                                <Button
-                                    size="lg"
-                                    className="w-fit bg-primary hover:bg-primary/90 font-medium"
-                                    onClick={handleManageSubscription}
-                                    disabled={isPortalLoading}
-                                >
-                                    {isPortalLoading ? "Loading..." : "Manage Subscription"}
-                                </Button>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
 
             {/* Billing Toggle */}
             {!loading && (
@@ -602,39 +396,112 @@ export default function PricingPage() {
                                 </p>
                             )}
                         </div>
-                        {isActiveSubscription && (
-                            <Badge variant="outline" className="w-fit mt-2 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400">
-                                Active since {userSubscription?.subscription.current_period_start &&
-                                    formatDate(userSubscription.subscription.current_period_start)
-                                }
-                            </Badge>
+                        {isCurrentlySubscribed && (
+                            <div className="flex flex-wrap items-center gap-2 mt-2">
+                                <Badge variant="outline" className="border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400">
+                                    {isCanceled ? "Expires" : "Renews"} {userSubscription?.subscription.current_period_end &&
+                                        formatDate(userSubscription.subscription.current_period_end)
+                                    }
+                                </Badge>
+                                {isIntervalChangeLoading && (
+                                    <Badge variant="secondary" className="text-xs">
+                                        Updating...
+                                    </Badge>
+                                )}
+                            </div>
                         )}
                     </CardHeader>
-                    <CardContent>
-                        <Button
-                            className={cn(
-                                "w-full font-medium transition-colors",
-                                isActiveSubscription
-                                    ? "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 cursor-default"
-                                    : "bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900"
-                            )}
-                            onClick={() => {
-                                if (!user) {
-                                    setIsModalOpen(true);
-                                } else if (canResubscribe) {
-                                    handleResubscribe();
-                                } else {
-                                    setIsCheckoutOpen(true);
-                                }
-                            }}
-                            disabled={isActiveSubscription || isResubscribeLoading}
-                        >
-                            {isActiveSubscription
-                                ? "Current Plan"
-                                : canResubscribe
-                                    ? (isResubscribeLoading ? "Reactivating..." : "Reactivate Subscription")
-                                    : "Upgrade to Researcher"}
-                        </Button>
+                    <CardContent className="space-y-4">
+                        {/* Status-specific alerts */}
+                        {subscriptionStatus === 'canceled' && (
+                            <div className="bg-muted/50 border border-border rounded-lg p-3 text-sm">
+                                <div className="flex items-start gap-2">
+                                    <Clock className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                                    <div>
+                                        <span className="font-medium">Subscription Canceled</span>
+                                        <p className="text-muted-foreground mt-0.5">
+                                            Ends on {userSubscription?.subscription.current_period_end &&
+                                                formatDate(userSubscription.subscription.current_period_end)}. Reactivate anytime before this date.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {userSubscription?.subscription.cancel_at_period_end && subscriptionStatus === 'active' && (
+                            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 rounded-lg p-3 text-sm">
+                                <div className="flex items-start gap-2">
+                                    <Clock className="h-4 w-4 text-amber-700 dark:text-amber-300 mt-0.5 shrink-0" />
+                                    <div>
+                                        <span className="font-medium text-amber-900 dark:text-amber-100">Subscription Ending</span>
+                                        <p className="text-amber-700 dark:text-amber-300 mt-0.5">
+                                            Ends on {userSubscription?.subscription.current_period_end &&
+                                                formatDate(userSubscription.subscription.current_period_end)}. Reactivate anytime before this date.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {subscriptionStatus === 'past_due' && (
+                            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 rounded-lg p-3 text-sm">
+                                <div className="flex items-start gap-2">
+                                    <Clock className="h-4 w-4 text-amber-700 dark:text-amber-300 mt-0.5 shrink-0" />
+                                    <div>
+                                        <span className="font-medium text-amber-900 dark:text-amber-100">Payment Past Due</span>
+                                        <p className="text-amber-700 dark:text-amber-300 mt-0.5">
+                                            Please update your payment method to continue your subscription.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {subscriptionStatus === 'incomplete' && (
+                            <div className="bg-muted/50 border border-border rounded-lg p-3 text-sm">
+                                <div className="flex items-start gap-2">
+                                    <Clock className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                                    <div>
+                                        <span className="font-medium">Payment Incomplete</span>
+                                        <p className="text-muted-foreground mt-0.5">
+                                            Please complete the payment process to activate your subscription.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Action buttons */}
+                        {isActiveSubscription && !isCanceled ? (
+                            <Button
+                                className="w-full font-medium bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600"
+                                onClick={handleManageSubscription}
+                                disabled={isPortalLoading}
+                            >
+                                {isPortalLoading ? "Loading..." : "Manage Subscription"}
+                            </Button>
+                        ) : canResubscribe ? (
+                            <Button
+                                className="w-full font-medium bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900"
+                                onClick={handleResubscribe}
+                                disabled={isResubscribeLoading}
+                            >
+                                {isResubscribeLoading ? "Reactivating..." : "Reactivate Subscription"}
+                            </Button>
+                        ) : (
+                            <Button
+                                className="w-full font-medium bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900"
+                                onClick={() => {
+                                    if (!user) {
+                                        setIsModalOpen(true);
+                                    } else {
+                                        setIsCheckoutOpen(true);
+                                    }
+                                }}
+                            >
+                                Upgrade to Researcher
+                            </Button>
+                        )}
                     </CardContent>
                 </Card>
 
