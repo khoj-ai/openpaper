@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { fetchFromApi } from "@/lib/api";
-import { JobStatusResponse, JobStatusType, MinimalJob } from "@/lib/schema";
+import { PaperUploadJobStatusResponse, JobStatusType, MinimalJob } from "@/lib/schema";
 import { CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 
 interface Job extends MinimalJob {
 	status: JobStatusType;
-	details?: JobStatusResponse;
+	details?: PaperUploadJobStatusResponse;
 	paperId?: string;
 }
 
@@ -34,7 +34,7 @@ const PdfUploadTracker: React.FC<PdfUploadTrackerProps> = ({ initialJobs, onComp
 				if (job.status === 'pending' || job.status === 'running') {
 					hasPendingJobs = true;
 					try {
-						const statusResponse: JobStatusResponse = await fetchFromApi(`/api/paper/upload/status/${job.jobId}`);
+						const statusResponse: PaperUploadJobStatusResponse = await fetchFromApi(`/api/paper/upload/status/${job.jobId}`);
 						setJobs(prevJobs => prevJobs.map(j => j.jobId === job.jobId ? {
 							...j,
 							status: statusResponse.status,

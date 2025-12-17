@@ -47,10 +47,10 @@ import {
 } from "@/components/ui/sheet";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useIsDarkMode } from "@/hooks/useDarkMode";
-import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isStorageNearLimit, isPaperUploadNearLimit, isChatCreditAtLimit, isChatCreditNearLimit, formatFileSize, getStorageUsagePercentage, getPaperUploadPercentage, getChatCreditUsagePercentage, getAudioOverviewUsagePercentage, getProjectUsagePercentage, type SubscriptionData } from "@/hooks/useSubscription";
+import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isStorageNearLimit, isPaperUploadNearLimit, isChatCreditAtLimit, isChatCreditNearLimit, formatFileSize, getStorageUsagePercentage, getPaperUploadPercentage, getChatCreditUsagePercentage, getAudioOverviewUsagePercentage, getProjectUsagePercentage, getDataTableUsagePercentage } from "@/hooks/useSubscription";
 import Link from "next/link";
 import OnboardingChecklist from "@/components/OnboardingChecklist";
-import { Conversation, PaperItem, Project } from "@/lib/schema";
+import { Conversation, PaperItem, Project, SubscriptionData } from "@/lib/schema";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { CollapsibleSidebarMenu } from "./CollapsibleSidebarMenu";
 
@@ -233,6 +233,13 @@ const UsageLimitCard = ({
                     used={subscription.usage.audio_overviews_used}
                     total={subscription.usage.audio_overviews_used + subscription.usage.audio_overviews_remaining}
                     percentage={getAudioOverviewUsagePercentage(subscription)}
+                />
+
+                <UsageItem
+                    label="Weekly Data Tables"
+                    used={subscription.usage.data_tables_used}
+                    total={subscription.usage.data_tables_used + subscription.usage.data_tables_remaining}
+                    percentage={getDataTableUsagePercentage(subscription)}
                 />
 
                 <UsageItem

@@ -1,40 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchFromApi } from '@/lib/api';
-
-export interface SubscriptionLimits {
-    paper_uploads: number;
-    knowledge_base_size: number;
-    chat_credits_daily: number;
-    audio_overviews_weekly: number;
-    projects: number;
-    model: string[];
-}
-
-export interface SubscriptionUsage {
-    paper_uploads: number;
-    paper_uploads_remaining: number;
-    knowledge_base_size: number;
-    knowledge_base_size_remaining: number;
-    chat_credits_used: number;
-    chat_credits_remaining: number;
-    audio_overviews_used: number;
-    audio_overviews_remaining: number;
-    projects: number;
-    projects_remaining: number;
-}
-
-export interface SubscriptionData {
-    plan: 'basic' | 'researcher';
-    limits: SubscriptionLimits;
-    usage: SubscriptionUsage;
-}
-
-export interface UseSubscriptionReturn {
-    subscription: SubscriptionData | null;
-    loading: boolean;
-    error: string | null;
-    refetch: () => Promise<void>;
-}
+import { SubscriptionData, UseSubscriptionReturn } from '@/lib/schema';
 
 export const useSubscription = (): UseSubscriptionReturn => {
     const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
@@ -160,6 +126,23 @@ export const isProjectNearLimit = (subscription: SubscriptionData | null, thresh
 
 export const isProjectAtLimit = (subscription: SubscriptionData | null): boolean => {
     return getProjectUsagePercentage(subscription) >= 100;
+};
+
+// Data table usage helper functions
+export const getDataTableUsagePercentage = (subscription: SubscriptionData | null): number => {
+    if (!subscription) return 0;
+    const { data_tables_used, data_tables_remaining } = subscription.usage;
+    const total = data_tables_used + data_tables_remaining;
+    if (total === 0) return 0;
+    return (data_tables_used / total) * 100;
+};
+
+export const isDataTableNearLimit = (subscription: SubscriptionData | null, threshold: number = 75): boolean => {
+    return getDataTableUsagePercentage(subscription) >= threshold;
+};
+
+export const isDataTableAtLimit = (subscription: SubscriptionData | null): boolean => {
+    return getDataTableUsagePercentage(subscription) >= 100;
 };
 
 // Calculate next Monday at 12 AM UTC for credit reset

@@ -134,16 +134,27 @@ function ProjectsPage() {
 
 			{/* CTA buttons */}
 			<div className="flex flex-col sm:flex-row gap-3">
-				<Button
-					asChild
-					size="lg"
-					className="px-8 shadow-sm"
-				>
-					<Link href="/projects/create">
+				{atProjectLimit ? (
+					<Button
+						size="lg"
+						className="px-8 shadow-sm"
+						disabled
+					>
 						<PlusCircle className="mr-2 w-5 h-5" />
 						Create Your First Project
-					</Link>
-				</Button>
+					</Button>
+				) : (
+					<Button
+						asChild
+						size="lg"
+						className="px-8 shadow-sm"
+					>
+						<Link href="/projects/create">
+							<PlusCircle className="mr-2 w-5 h-5" />
+							Create Your First Project
+						</Link>
+					</Button>
+				)}
 				<Button variant="outline" size="lg" className="px-8" asChild>
 					<Link href="/blog/projects">
 						<BookOpen className="mr-2 w-4 h-4" />
@@ -196,12 +207,19 @@ function ProjectsPage() {
 				<div className="flex gap-2">
 					<ProjectInvitations onInvitationAccepted={getProjects} defaultOpen={openInvites} />
 					{projects.length > 0 && (
-						<Button asChild className="bg-blue-500 dark:text-card-foreground hover:bg-blue-600 dark:hover:bg-blue-400" disabled={atProjectLimit}>
-							<Link href="/projects/create">
+						atProjectLimit ? (
+							<Button className="bg-blue-500 dark:text-card-foreground hover:bg-blue-600 dark:hover:bg-blue-400" disabled>
 								<PlusCircle className="mr-2" />
 								New Project
-							</Link>
-						</Button>
+							</Button>
+						) : (
+							<Button asChild className="bg-blue-500 dark:text-card-foreground hover:bg-blue-600 dark:hover:bg-blue-400">
+								<Link href="/projects/create">
+									<PlusCircle className="mr-2" />
+									New Project
+								</Link>
+							</Button>
+						)
 					)}
 				</div>
 			</div>

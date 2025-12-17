@@ -17,7 +17,6 @@ from app.llm.json_parser import JSONParser
 from app.llm.prompts import (
     ANSWER_EVIDENCE_BASED_QUESTION_MESSAGE,
     ANSWER_EVIDENCE_BASED_QUESTION_SYSTEM_PROMPT,
-    EVIDENCE_CLEANING_PROMPT,
     EVIDENCE_GATHERING_MESSAGE,
     EVIDENCE_GATHERING_SYSTEM_PROMPT,
     EVIDENCE_SUMMARIZATION_PROMPT,
@@ -39,11 +38,7 @@ from app.llm.tools.file_tools import (
 )
 from app.llm.tools.meta_tools import stop_function
 from app.llm.utils import retry_llm_operation
-from app.schemas.message import (
-    EvidenceCleaningResponse,
-    EvidenceCollection,
-    EvidenceSummaryResponse,
-)
+from app.schemas.message import EvidenceCollection, EvidenceSummaryResponse
 from app.schemas.responses import AudioOverviewForLLM
 from app.schemas.user import CurrentUser
 from fastapi import Depends
@@ -410,83 +405,6 @@ class MultiPaperOperations(BaseLLMClient):
             )
             return evidence_collection
 
-    async def clean_evidence(
-        self,
-        evidence_collection: EvidenceCollection,
-        original_question: str,
-        current_user: CurrentUser,
-        llm_provider: Optional[LLMProvider] = None,
-    ) -> EvidenceCollection:
-        """
-        Clean and filter evidence to remove irrelevant snippets before final answer generation
-        """
-        start_time = time.time()
-        evidence_dict = evidence_collection.get_evidence_dict()
-
-        formatted_prompt = EVIDENCE_CLEANING_PROMPT.format(
-            question=original_question,
-            evidence=json.dumps(evidence_dict, indent=2),
-            schema=EvidenceCleaningResponse.model_json_schema(),
-        )
-
-        message_content = [TextContent(text=formatted_prompt)]
-
-        # Get LLM assessment of evidence relevance
-        llm_response = self.generate_content(
-            system_prompt="You are a research assistant that filters evidence for relevance.",
-            contents=message_content,
-            model_type=ModelType.DEFAULT,
-            provider=llm_provider,
-        )
-
-        try:
-            if llm_response and llm_response.text:
-                filtering_instructions = JSONParser.validate_and_extract_json(
-                    llm_response.text
-                )
-                filtering_instructions = EvidenceCleaningResponse.model_validate(
-                    filtering_instructions
-                )
-                cleaned_collection = EvidenceCollection()
-
-                # Apply filtering instructions
-                for paper_id, instructions in filtering_instructions.papers.items():
-                    if paper_id in evidence_dict:
-                        original_snippets = evidence_dict[paper_id]
-
-                        # Keep specified snippets
-                        for idx in instructions.keep:
-                            if 0 <= idx < len(original_snippets):
-                                cleaned_collection.add_evidence(
-                                    paper_id, [original_snippets[idx]]
-                                )
-
-                logger.info(
-                    f"Evidence cleaning complete. Original: {len(evidence_dict)} papers, "
-                    f"Cleaned: {len(cleaned_collection.get_evidence_dict())} papers"
-                )
-
-                track_event(
-                    "evidence_cleaned",
-                    {
-                        "duration_ms": (time.time() - start_time) * 1000,
-                        "original_papers": len(evidence_dict),
-                        "cleaned_papers": len(cleaned_collection.get_evidence_dict()),
-                    },
-                    user_id=str(current_user.id),
-                )
-
-                return cleaned_collection
-            else:
-                logger.warning("Empty response from LLM during evidence cleaning.")
-                return evidence_collection
-
-        except Exception as e:
-            logger.warning(
-                f"Evidence cleaning failed: {e}. Returning original evidence."
-            )
-            return evidence_collection
-
     async def chat_with_papers(
         self,
         conversation_id: str,
@@ -696,7 +614,6 @@ class MultiPaperOperations(BaseLLMClient):
         additional_instructions: Optional[str] = None,
         length: Optional[Literal["short", "medium", "long"]] = "medium",
         project_id: Optional[str] = None,
-        llm_provider: Optional[LLMProvider] = None,
         db: Session = Depends(get_db),
     ) -> AudioOverviewForLLM:
         """
@@ -705,10 +622,10 @@ class MultiPaperOperations(BaseLLMClient):
         # First, gather evidence based on the summary request
         evidence_collection = EvidenceCollection()
 
-        summary_request = f"Provide a comprehensive narrative summary of the key findings, contributions, and insights from the papers in this collection. Synthesize the information to highlight overarching themes and significant advancements."
-
-        if additional_instructions:
-            summary_request += f" Additionally, {additional_instructions}"
+        summary_request = (
+            additional_instructions
+            or f"Provide a comprehensive narrative summary of the key findings, contributions, and insights from the papers in this collection. Synthesize the information to highlight overarching themes and significant advancements."
+        )
 
         word_count_map = {
             "short": 5000,
@@ -720,7 +637,7 @@ class MultiPaperOperations(BaseLLMClient):
         async for result in self.gather_evidence(
             question=f"{summary_request}",
             current_user=current_user,
-            llm_provider=llm_provider,
+            llm_provider=LLMProvider.GROQ,
             project_id=project_id,
             db=db,
         ):
@@ -729,14 +646,6 @@ class MultiPaperOperations(BaseLLMClient):
                 for paper_id, snippets in evidence_dict.items():
                     evidence_collection.add_evidence(paper_id, snippets)
                 break
-
-        # Clean the evidence to focus on summary-relevant content
-        cleaned_evidence = await self.clean_evidence(
-            evidence_collection=evidence_collection,
-            original_question=summary_request,
-            current_user=current_user,
-            llm_provider=llm_provider,
-        )
 
         # Get paper metadata for context
         if project_id:
@@ -763,7 +672,7 @@ class MultiPaperOperations(BaseLLMClient):
 
         formatted_prompt = GENERATE_MULTI_PAPER_NARRATIVE_SUMMARY.format(
             summary_request=summary_request,
-            evidence_gathered=cleaned_evidence.get_evidence_dict(),
+            evidence_gathered=evidence_collection.get_evidence_dict(),
             length=word_count_map.get(str(length), word_count_map["short"]),
             paper_metadata=paper_metadata,
             additional_instructions=additional_instructions or "",
@@ -776,7 +685,7 @@ class MultiPaperOperations(BaseLLMClient):
         response = self.generate_content(
             contents=message_content,
             model_type=ModelType.DEFAULT,
-            provider=llm_provider,
+            provider=LLMProvider.GEMINI,
         )
 
         try:

@@ -8,6 +8,8 @@ from app.database.database import get_db
 from app.database.models import Conversation
 from app.llm.base import BaseLLMClient, ModelType
 from app.llm.prompts import (
+    NAME_DATA_TABLE_SYSTEM_PROMPT,
+    NAME_DATA_TABLE_USER_MESSAGE,
     RENAME_CONVERSATION_SYSTEM_PROMPT,
     RENAME_CONVERSATION_USER_MESSAGE,
 )
@@ -85,4 +87,47 @@ class ConversationOperations(BaseLLMClient):
             logger.error(
                 f"Failed to generate a new title for conversation {conversation_id}."
             )
+            return None
+
+
+class DataTableOperations(BaseLLMClient):
+    """Operations related to data tables"""
+
+    def name_data_table(
+        self,
+        paper_titles: list[str],
+        column_labels: list[str],
+    ) -> str | None:
+        """
+        Generate a concise title for a data table based on paper titles and column labels.
+
+        Args:
+            paper_titles: List of paper titles included in the data table
+            column_labels: List of column labels in the data table
+
+        Returns:
+            A title of 10 words or less, or None if generation fails
+        """
+        formatted_papers = "\n".join([f"- {title}" for title in paper_titles])
+        formatted_columns = ", ".join(column_labels)
+
+        formatted_prompt = NAME_DATA_TABLE_USER_MESSAGE.format(
+            paper_titles=formatted_papers,
+            column_labels=formatted_columns,
+        )
+
+        message_content = [
+            TextContent(text=formatted_prompt),
+        ]
+
+        response = self.generate_content(
+            contents=message_content,
+            system_prompt=NAME_DATA_TABLE_SYSTEM_PROMPT,
+            model_type=ModelType.FAST,
+        )
+
+        if response and response.text:
+            return response.text.strip()
+        else:
+            logger.error("Failed to generate a title for the data table.")
             return None

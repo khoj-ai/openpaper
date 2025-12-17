@@ -5,18 +5,25 @@ Webhook handlers for PDF processing service integration.
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Optional
 
 from app.database.crud.paper_crud import PaperUpdate, paper_crud
-from app.database.crud.paper_image_crud import PaperImageCreate, paper_image_crud
 from app.database.crud.paper_upload_crud import paper_upload_job_crud
+from app.database.crud.projects.project_data_table_crud import (
+    DataTableResultCreate,
+    DataTableRowCreate,
+    data_table_job_crud,
+    data_table_result_crud,
+    data_table_row_crud,
+)
 from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
 from app.database.models import JobStatus
 from app.database.telemetry import track_event
 from app.helpers.paper_search import get_doi
 from app.helpers.s3 import s3_service
-from app.schemas.responses import PaperMetadataExtraction
+from app.llm.operations import operations
+from app.schemas.responses import DataTableResult, PaperMetadataExtraction
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -101,10 +108,9 @@ class PDFProcessingResult(BaseModel):
     preview_object_key: Optional[str] = None
     error: Optional[str] = None
     duration: Optional[float] = None
-    extracted_images: Optional[List[PDFImage]] = None
 
 
-class WebhookData(BaseModel):
+class PdfProcessingWebhookData(BaseModel):
     """Schema for webhook data from PDF processing service"""
 
     task_id: str
@@ -114,7 +120,7 @@ class WebhookData(BaseModel):
 
 @webhook_router.post("/paper-processing/{job_id}")
 async def handle_paper_processing_webhook(
-    job_id: str, webhook_data: WebhookData, db: Session = Depends(get_db)
+    job_id: str, webhook_data: PdfProcessingWebhookData, db: Session = Depends(get_db)
 ):
     """Handle webhook from paper processing jobs service."""
 
@@ -246,41 +252,6 @@ async def handle_paper_processing_webhook(
                     )
                     # Don't fail the whole process for annotation errors
 
-            # Create images if any
-            if result.extracted_images and paper:
-                try:
-                    # Create all PaperImageCreate objects in memory first
-                    paper_image_creates = []
-                    for image in result.extracted_images:
-                        paper_image_creates.append(
-                            PaperImageCreate(
-                                paper_id=uuid.UUID(str(paper.id)),
-                                s3_object_key=image.s3_object_key,
-                                image_url=image.image_url,
-                                format=image.format,
-                                size_bytes=image.size_bytes,
-                                width=image.width,
-                                height=image.height,
-                                page_number=image.page_number,
-                                image_index=image.image_index,
-                                caption=image.caption,
-                                placeholder_id=image.placeholder_id,
-                            )
-                        )
-
-                    # Create all images in a single batch operation
-                    paper_image_crud.create_multiple_with_paper_validation(
-                        db=db,
-                        images=paper_image_creates,
-                        user=job_user,
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"Error creating images for job {job_id}: {str(e)}",
-                        exc_info=True,
-                    )
-                    # Don't fail the whole process for image errors
-
             # Post-processing: attempt to get DOI
             doi = get_doi(metadata.title, metadata.authors)
 
@@ -347,3 +318,133 @@ async def handle_paper_processing_webhook(
         raise HTTPException(status_code=500, detail="Error processing webhook")
 
     return {"status": "webhook processed"}
+
+
+class DataTableProcessingResultWebhookData(BaseModel):
+    """Schema for webhook data from data table processing service."""
+
+    task_id: str
+    status: str
+    result: DataTableResult
+    error: Optional[str] = None
+
+
+@webhook_router.post("/data-table-processing/{job_id}")
+async def handle_data_table_processing_webhook(
+    job_id: str,
+    webhook_data: DataTableProcessingResultWebhookData,
+    db: Session = Depends(get_db),
+):
+    """Handle webhook from data table processing jobs service."""
+
+    logger.info(
+        f"Received data table processing webhook for job {job_id} with status {webhook_data.status}"
+    )
+
+    result = webhook_data.result
+    task_id = webhook_data.task_id
+    status = webhook_data.status
+    error = webhook_data.error
+
+    try:
+        if status == "completed" and result.success:
+            # Processing was successful
+            logger.info(
+                f"Data table processing completed for job {job_id}, "
+                f"extracted {len(result.rows)} rows with columns: {result.columns}"
+            )
+
+            # Update job status to completed
+            data_table_job_crud.update_status(
+                db=db,
+                job_id=uuid.UUID(job_id),
+                status=JobStatus.COMPLETED,
+            )
+
+            # Post-Processing
+            # Augment the DataCellValue citations with the paper_id
+            # The job only returns citation info without paper_id, but we can fill it in here
+            for col in result.columns:
+                for row in result.rows:
+                    cell_value = row.values.get(col)
+                    if cell_value:
+                        for citation in cell_value.citations:
+                            citation.paper_id = row.paper_id
+
+            paper_titles = []
+            for row in result.rows:
+                paper = paper_crud.get(db=db, id=uuid.UUID(row.paper_id))
+                if paper and paper.title:
+                    paper_titles.append(paper.title)
+                else:
+                    paper_titles.append("")
+
+            title = (
+                operations.name_data_table(
+                    paper_titles=paper_titles,
+                    column_labels=result.columns,
+                )
+                or f'Data Table ({", ".join(result.columns)})'
+            )
+
+            # Create the data table result
+            table_result = data_table_result_crud.create(
+                db=db,
+                obj_in=DataTableResultCreate(
+                    job_id=uuid.UUID(job_id),
+                    title=title,
+                    success=result.success,
+                    columns=result.columns,
+                ),
+            )
+
+            if table_result:
+                # Create all rows using create_many
+                # Convert DataTableCellValue objects to dicts for JSON serialization
+                row_creates = [
+                    DataTableRowCreate(
+                        data_table_id=uuid.UUID(str(table_result.id)),
+                        paper_id=uuid.UUID(row.paper_id),
+                        values={
+                            col: cell.model_dump() for col, cell in row.values.items()
+                        },
+                    )
+                    for row in result.rows
+                ]
+                if row_creates:
+                    data_table_row_crud.create_many(db=db, rows=row_creates)
+                    logger.info(
+                        f"Created {len(row_creates)} rows for data table result {table_result.id}"
+                    )
+            else:
+                logger.error(f"Failed to create data table result for job {job_id}")
+
+        else:
+            # Processing failed
+            error_message = error if error else "Unknown error"
+            logger.error(
+                f"Data table processing failed for job {job_id}: {error_message}"
+            )
+
+            # Update job status to failed
+            data_table_job_crud.update_status(
+                db=db,
+                job_id=uuid.UUID(job_id),
+                status=JobStatus.FAILED,
+                error_message=error_message,
+            )
+
+    except Exception as e:
+        logger.error(
+            f"Error processing data table webhook for job {job_id}: {str(e)}",
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Error processing webhook")
+
+    return {
+        "status": "data table webhook processed",
+        "job_id": job_id,
+        "task_id": task_id,
+        "success": result.success,
+        "rows_count": len(result.rows),
+    }

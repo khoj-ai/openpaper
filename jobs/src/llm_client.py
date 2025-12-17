@@ -9,16 +9,19 @@ import io
 import asyncio
 from google import genai
 from google.genai import types
-from typing import Optional, Type, TypeVar, Callable
+from typing import Any, Dict, List, Optional, Type, TypeVar, Callable
 
-from pydantic import BaseModel
+from pydantic import BaseModel, create_model, Field, ConfigDict
 
+from src.prompts import EXTRACT_COLS_INSTRUCTION, SYSTEM_INSTRUCTIONS_CACHE, EXTRACT_METADATA_PROMPT_TEMPLATE
 from src.schemas import (
+    DataTableRow,
     PaperMetadataExtraction,
     TitleAuthorsAbstract,
     InstitutionsKeywords,
     SummaryAndCitations,
     Highlights,
+    DataTableCellValue,
 )
 from src.utils import retry_llm_operation, time_it
 
@@ -31,36 +34,6 @@ CACHE_TTL_SECONDS = 3600
 
 # Pydantic model type variable
 T = TypeVar("T", bound=BaseModel)
-
-
-SYSTEM_INSTRUCTIONS_CACHE = """
-You are a metadata extraction assistant. Your task is to extract specific information from the provided academic paper content. Pay special attention ot the details and ensure accuracy in the extracted metadata.
-
-Always think deeply and step-by-step when making a determination with respect to the contents of the paper. If you are unsure about a specific field, provide a best guess based on the content available.
-
-You will be rewarded for your accuracy and attention to detail. You are helping to facilitate humanity's understanding of scientific knowledge by delivering accurate and reliable metadata extraction.
-"""
-
-# LLM Prompts
-EXTRACT_METADATA_PROMPT_TEMPLATE = """
-You are a metadata extraction assistant. Your task is to extract specific information from the provided academic paper content. You must be thorough in your approach and ensure that all relevant metadata is captured accurately.
-
-Please extract the following fields and structure them in a JSON format according to the provided schema.
-"""
-
-SYSTEM_INSTRUCTIONS_IMAGE_CAPTION_CACHE = """
-You are an image captioning assistant for academic papers. Your task is to extract exact captions for images.
-
-Return only the caption text with no additional commentary or explanations.
-
-Rules:
-- For figures, graphs, or charts: Return the exact caption from the paper
-- Return an empty string if the image is:
-  • Not a graph, chart, or figure
-  • Not useful for understanding the paper
-  • A partial portion of a larger figure, thus not a standalone or complete figure
-  • Has no caption and is not useful for understanding the paper
-"""
 
 
 class JSONParser:
@@ -212,6 +185,7 @@ class AsyncLLMClient:
         cache_key: Optional[str] = None,
         model: Optional[str] = None,
         schema: Optional[Type[BaseModel]] = None,
+        file_path: Optional[str] = None,
     ) -> str:
         """
         Generate content using the LLM.
@@ -232,6 +206,12 @@ class AsyncLLMClient:
         parts = []
         if image_bytes:
             parts.append(types.Part.from_bytes(data=image_bytes, mime_type=image_mime_type or 'image/png'))
+
+        if file_path:
+            with open(file_path, "rb") as f:
+                file_data = f.read()
+            parts.append(types.Part.from_bytes(data=file_data, mime_type='application/pdf'))
+
 
         parts.append(types.Part.from_text(text=prompt))
 
@@ -428,28 +408,28 @@ class PaperOperations(AsyncLLMClient):
                 # Run all extraction tasks concurrently
                 async with time_it("Running all metadata extraction tasks concurrently", job_id=job_id):
                     tasks = [
-                        asyncio.create_task(time_it("Extracting title, authors, and abstract", job_id=job_id)                        (
+                        asyncio.create_task(time_it("Extracting title, authors, and abstract", job_id=job_id)(
                             self.extract_title_authors_abstract
                         )(
                             paper_content=paper_content,
                             cache_key=cache_key,
                             status_callback=status_callback
                         )),
-                        asyncio.create_task(time_it("Extracting institutions and keywords", job_id=job_id)                        (
+                        asyncio.create_task(time_it("Extracting institutions and keywords", job_id=job_id)(
                             self.extract_institutions_keywords
                         )(
                             paper_content=paper_content,
                             cache_key=cache_key,
                             status_callback=status_callback
                         )),
-                        asyncio.create_task(time_it("Extracting summary and citations", job_id=job_id)                        (
+                        asyncio.create_task(time_it("Extracting summary and citations", job_id=job_id)(
                             self.extract_summary_and_citations
                         )(
                             paper_content=paper_content,
                             cache_key=cache_key,
                             status_callback=status_callback
                         )),
-                        asyncio.create_task(time_it("Extracting highlights", job_id=job_id)                        (
+                        asyncio.create_task(time_it("Extracting highlights", job_id=job_id)(
                             self.extract_highlights
                         )(
                             paper_content=paper_content,
@@ -494,44 +474,74 @@ class PaperOperations(AsyncLLMClient):
                 # Set client to None to allow for proper garbage collection
                 self.client = None
 
-    async def extract_image_captions(
+    async def extract_data_table(
         self,
-        cache_key: Optional[str],
-        image_data: bytes,
-        image_mime_type: Optional[str] = None,
-    ) -> str:
+        columns: List[str],
+        file_path: str,
+        paper_id: str,
+    ) -> DataTableRow:
         """
-        Extract caption for an image in a PDF using LLM.
+        Extract structured data table from paper content.
 
         Args:
-            cache_key: Optional cache key for the LLM
-            image_data: Bytes of the image to extract captions for
-            image_mime_type: Optional MIME type of the image
-
+            columns: List of column names for the data table
+            file_path: The file path to the PDF
         Returns:
-            The caption for the image as a string
+            str: JSON string representing the data table
         """
-        # Create a new client for this operation
-        self.client = genai.Client(api_key=self.api_key)
-
         try:
-            system_instructions = SYSTEM_INSTRUCTIONS_IMAGE_CAPTION_CACHE
+            if not self.client:
+                self.refresh_client()
 
-            response = await self.generate_content(
-                system_instructions,
-                cache_key=cache_key,
-                image_bytes=image_data,
-                image_mime_type=image_mime_type
+            cols_str = "\n".join(f"- {col}" for col in columns)
+            prompt = EXTRACT_COLS_INSTRUCTION.format(
+                cols_str=cols_str,
+                n_cols=len(columns)
             )
 
-            return response
+            # Create the dynamic schema that matches DataTableRow structure
+            # Each column maps to a DataTableCellValue (value + citations)
+            field_definitions: Dict[str, Any] = {
+                col: (DataTableCellValue, Field(description=f"Value and citations for column '{col}'"))
+                for col in columns
+            }
 
+            # Create the values model that enforces all column names as required fields
+            ValuesModel = create_model(
+                'ValuesModel',
+                __config__=ConfigDict(),  # Prevent extra fields
+                **field_definitions
+            )
+
+            response = await self.generate_content(
+                prompt,
+                model=self.default_model,
+                file_path=file_path,
+                schema=ValuesModel,
+            )
+
+            # Parse and validate the response
+            response_json = JSONParser.validate_and_extract_json(response)
+            values_instance = ValuesModel.model_validate(response_json)
+
+            # Convert the Pydantic model to a dict for DataTableRow
+            values_dict: Dict[str, DataTableCellValue] = {
+                col: getattr(values_instance, col)
+                for col in columns
+            }
+
+            # Create and return the DataTableRow
+            return DataTableRow(
+                paper_id=paper_id,
+                values=values_dict
+            )
         except Exception as e:
-            logger.error(f"Error extracting image captions: {e}", exc_info=True)
-            return ""
+            logger.error(f"Error extracting data table: {str(e)}", exc_info=True)
+            raise ValueError(f"Failed to extract data table: {str(e)}")
         finally:
-            # Set client to None to allow for proper garbage collection
+            # Reset client to avoid issues with closed event loops on subsequent calls
             self.client = None
+
 
 # Create a single instance to use throughout the application
 api_key = os.getenv("GOOGLE_API_KEY")

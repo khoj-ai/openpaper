@@ -9,7 +9,6 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { useState, useMemo, useRef } from "react";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { fetchFromApi } from "@/lib/api";
 import { PaperItem } from "@/lib/schema";
 import { Checkbox } from "./ui/checkbox";
@@ -39,7 +38,6 @@ interface LibraryTableProps extends React.HTMLAttributes<HTMLDivElement> {
 	handleDelete?: (paperId: string) => Promise<void>;
 	setPapers?: (papers: PaperItem[]) => void;
 	onUploadClick?: () => void;
-	maxHeight?: string;
 }
 
 export function LibraryTable({
@@ -49,7 +47,6 @@ export function LibraryTable({
 	projectPaperIds = [],
 	handleDelete,
 	onUploadClick,
-	maxHeight = 'calc(100vh - 16rem)',
 	...props
 }: LibraryTableProps) {
 	const selectable = selectableProp ?? (onSelectFiles ? true : false);
@@ -65,6 +62,8 @@ export function LibraryTable({
 	const [taggingPopoverOpen, setTaggingPopoverOpen] = useState(false);
 	const [expandedTags, setExpandedTags] = useState<Set<string>>(new Set());
 	const tableContainerRef = useRef<HTMLDivElement>(null);
+
+	const maxHeight = 'calc(100vh - 16rem)';
 
 	const sort: Sort = { type: "publish_date", order: "desc" };
 
@@ -152,14 +151,6 @@ export function LibraryTable({
 	const availablePapers = useMemo(() => {
 		return processedPapers.filter(p => !projectPaperIds.includes(p.id));
 	}, [processedPapers, projectPaperIds]);
-
-	// Virtualization setup
-	const rowVirtualizer = useVirtualizer({
-		count: processedPapers.length,
-		getScrollElement: () => tableContainerRef.current,
-		estimateSize: () => 80, // Estimated row height in pixels
-		overscan: 10, // Number of items to render outside visible area
-	});
 
 	const requestSort = (key: SortKey) => {
 		let direction: 'ascending' | 'descending' = 'ascending';
@@ -408,7 +399,11 @@ export function LibraryTable({
 					: '1fr'
 			}}>
 				<div className="border bg-card transition-all duration-300 ease-in-out min-w-0 overflow-hidden">
-					<div ref={tableContainerRef} className="overflow-y-auto" style={{ height: maxHeight }}>
+					<div
+						ref={tableContainerRef}
+						className="overflow-y-auto"
+						style={{ maxHeight }}
+					>
 						<Table>
 							<TableHeader className="sticky top-0 bg-card z-10">
 								<TableRow className="hover:bg-transparent border-b-2">
@@ -486,179 +481,162 @@ export function LibraryTable({
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{processedPapers.length > 0 ? (
-									<>
-										{/* Spacer for virtual scroll */}
-										{rowVirtualizer.getVirtualItems().length > 0 && (
-											<tr style={{ height: `${rowVirtualizer.getVirtualItems()[0]?.start ?? 0}px` }} />
-										)}
-										{rowVirtualizer.getVirtualItems().map((virtualRow) => {
-											const paper = processedPapers[virtualRow.index];
-											const index = virtualRow.index;
-											const isAlreadyInProject = projectPaperIds.includes(paper.id);
-											return (
-												<TableRow
-													key={paper.id}
-													data-index={virtualRow.index}
-													onClick={() => {
-														if (selectable && !isAlreadyInProject) {
-															handleSelect(paper.id)
-														}
-													}}
-													className={`
-														border-b transition-colors hover:bg-muted/50
-														${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'}
-														${selectable && !isAlreadyInProject ? 'cursor-pointer' : ''}
-														${!selectable ? 'cursor-pointer' : ''}
-														${isAlreadyInProject ? 'opacity-60' : ''}
-													`}
+							{processedPapers.length > 0 ? (
+								processedPapers.map((paper, index) => {
+									const isAlreadyInProject = projectPaperIds.includes(paper.id);
+									return (
+										<TableRow
+											key={paper.id}
+											onClick={() => {
+												if (selectable && !isAlreadyInProject) {
+													handleSelect(paper.id)
+												}
+											}}
+											className={`
+												border-b hover:bg-muted/50
+												${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'}
+												${selectable && !isAlreadyInProject ? 'cursor-pointer' : ''}
+												${!selectable ? 'cursor-pointer' : ''}
+												${isAlreadyInProject ? 'opacity-60' : ''}
+											`}
+										>
+											{selectable && (
+												<TableCell
+													className="text-center py-4"
+													onClick={(e) => e.stopPropagation()}
 												>
-													{selectable && (
-														<TableCell
-															className="text-center py-4"
-															onClick={(e) => e.stopPropagation()}
-														>
-															{isAlreadyInProject ? (
-																<CheckCheck className="h-5 w-5 text-green-500 mx-auto" />
-															) : (
-																<Checkbox
-																	checked={selectedPapers.has(paper.id)}
-																	onCheckedChange={(checked) =>
-																		handleSelect(paper.id, !!checked)
-																	}
-																/>
-															)}
-														</TableCell>
+													{isAlreadyInProject ? (
+														<CheckCheck className="h-5 w-5 text-green-500 mx-auto" />
+													) : (
+														<Checkbox
+															checked={selectedPapers.has(paper.id)}
+															onCheckedChange={(checked) =>
+																handleSelect(paper.id, !!checked)
+															}
+														/>
 													)}
-													<TableCell className="py-4 pr-4 whitespace-normal">
-														<div
-															className="font-medium text-sm leading-relaxed break-words hyphens-auto line-clamp-3 underline cursor-pointer"
-															onClick={(e: React.MouseEvent<HTMLDivElement>) => {
-																e.stopPropagation();
-																setSelectedPaperForPreview(paper);
-															}}
-														>
-															{paper.title || 'Untitled'}
-														</div>
-													</TableCell>
-													<TableCell className="py-4 pr-4 whitespace-normal">
-														<div className="text-sm text-muted-foreground leading-relaxed break-words hyphens-auto line-clamp-2">
-															{paper.authors?.length ? paper.authors.join(", ") : 'No authors'}
-														</div>
-													</TableCell>
-													<TableCell className="py-4 pr-4 whitespace-normal">
-														<div className="text-sm text-muted-foreground leading-relaxed break-words hyphens-auto line-clamp-2">
-															{paper.institutions?.length ? paper.institutions.join(", ") : 'No organizations'}
-														</div>
-													</TableCell>
-													<TableCell className="py-4 pr-4">
-														<div className="text-xs leading-relaxed">
-															{paper.keywords?.length ? (
-																<div className="flex flex-wrap gap-1">
-																	{paper.keywords.slice(0, 3).map((keyword, i) => (
-																		<span
-																			key={i}
-																			className="inline-block px-2 py-1 bg-secondary text-secondary-foreground rounded-sm"
-																		>
-																			{keyword}
-																		</span>
-																	))}
-																	{paper.keywords.length > 3 && (
-																		<span className="text-muted-foreground text-xs">
-																			+{paper.keywords.length - 3} more
-																		</span>
-																	)}
-																</div>
-															) : (
-																<span className="text-muted-foreground">No keywords</span>
-															)}
-														</div>
-													</TableCell>
-													<TableCell className="py-4 pr-4">
-														<div className="text-xs leading-relaxed">
-															{paper.tags?.length ? (
-																<div className="flex flex-wrap gap-1 items-center">
-																	{(expandedTags.has(paper.id) ? paper.tags : paper.tags.slice(0, 3)).map((tag) => (
-																		<span
-																			key={tag.id}
-																			onClick={(e) => { e.stopPropagation(); handleTagClick(tag.name); }}
-																			className="group relative inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-sm dark:bg-blue-900 dark:text-blue-200 cursor-pointer"
-																		>
-																			{tag.name}
-																			<button
-																				onClick={(e) => {
-																					e.stopPropagation();
-																					handleRemoveTag(paper.id, tag.id);
-																				}}
-																				className="ml-1.5 -mr-1 p-0.5 bg-blue-200/50 dark:bg-blue-800/50 text-blue-700 dark:text-blue-100 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-																			>
-																				<X className="h-2.5 w-2.5" />
-																			</button>
-																		</span>
-																	))}
-																	{paper.tags.length > 3 && !expandedTags.has(paper.id) && (
-																		<button
-																			onClick={(e) => { e.stopPropagation(); toggleExpandedTags(paper.id); }}
-																			className="text-muted-foreground text-xs hover:underline"
-																		>
-																			+ {paper.tags.length - 3} more
-																		</button>
-																	)}
-																</div>
-															) : (
-																<span className="text-muted-foreground">No tags</span>
-															)}
-														</div>
-													</TableCell>
-													<TableCell className="py-4 pr-4">
-														<div className="text-sm text-muted-foreground whitespace-nowrap">
-															{paper.created_at ? new Date(paper.created_at).toLocaleDateString('en-US', {
-																month: 'short',
-																day: 'numeric',
-																year: 'numeric'
-															}) : 'N/A'}
-														</div>
-													</TableCell>
-													<TableCell className="py-4">
-														<div className="text-sm text-muted-foreground whitespace-nowrap">
-															{paper.publish_date ? new Date(paper.publish_date).toLocaleDateString('en-US', {
-																month: 'short',
-																day: 'numeric',
-																year: 'numeric'
-															}) : 'N/A'}
-														</div>
-													</TableCell>
-												</TableRow>
-											)
-										})}
-										{/* Bottom spacer */}
-										{rowVirtualizer.getVirtualItems().length > 0 && (
-											<tr style={{
-												height: `${rowVirtualizer.getTotalSize() -
-													(rowVirtualizer.getVirtualItems()[rowVirtualizer.getVirtualItems().length - 1]?.end ?? 0)
-													}px`
-											}} />
-										)}
-									</>
-								) : (
-									<TableRow>
-										<TableCell colSpan={numCols} className="h-32 text-center">
-											{searchTerm || filters.length > 0 ? (
-												"No papers match your search criteria."
-											) : (
-												<div className="flex flex-col items-center gap-4 py-8">
-													<div className="text-muted-foreground text-center">
-														<p className="text-lg font-medium mb-2">No papers in your library yet</p>
-														<p className="text-sm">Upload your first research paper to get started. All your papers will appear here for easy access and organization.</p>
-													</div>
-													<Button variant="default" className="bg-blue-500 hover:bg-blue-600 text-white" onClick={onUploadClick}>
-														Upload Your First Paper
-													</Button>
-												</div>
+												</TableCell>
 											)}
-										</TableCell>
-									</TableRow>
-								)}
+											<TableCell className="py-4 pr-4 whitespace-normal">
+												<div
+													className="font-medium text-sm leading-relaxed break-words hyphens-auto line-clamp-3 underline cursor-pointer"
+													onClick={(e: React.MouseEvent<HTMLDivElement>) => {
+														e.stopPropagation();
+														setSelectedPaperForPreview(paper);
+													}}
+												>
+													{paper.title || 'Untitled'}
+												</div>
+											</TableCell>
+											<TableCell className="py-4 pr-4 whitespace-normal">
+												<div className="text-sm text-muted-foreground leading-relaxed break-words hyphens-auto line-clamp-2">
+													{paper.authors?.length ? paper.authors.join(", ") : 'No authors'}
+												</div>
+											</TableCell>
+											<TableCell className="py-4 pr-4 whitespace-normal">
+												<div className="text-sm text-muted-foreground leading-relaxed break-words hyphens-auto line-clamp-2">
+													{paper.institutions?.length ? paper.institutions.join(", ") : 'No organizations'}
+												</div>
+											</TableCell>
+											<TableCell className="py-4 pr-4">
+												<div className="text-xs leading-relaxed">
+													{paper.keywords?.length ? (
+														<div className="flex flex-wrap gap-1">
+															{paper.keywords.slice(0, 3).map((keyword, i) => (
+																<span
+																	key={i}
+																	className="inline-block px-2 py-1 bg-secondary text-secondary-foreground rounded-sm"
+																>
+																	{keyword}
+																</span>
+															))}
+															{paper.keywords.length > 3 && (
+																<span className="text-muted-foreground text-xs">
+																	+{paper.keywords.length - 3} more
+																</span>
+															)}
+														</div>
+													) : (
+														<span className="text-muted-foreground">No keywords</span>
+													)}
+												</div>
+											</TableCell>
+											<TableCell className="py-4 pr-4">
+												<div className="text-xs leading-relaxed">
+													{paper.tags?.length ? (
+														<div className="flex flex-wrap gap-1 items-center">
+															{(expandedTags.has(paper.id) ? paper.tags : paper.tags.slice(0, 3)).map((tag) => (
+																<span
+																	key={tag.id}
+																	onClick={(e) => { e.stopPropagation(); handleTagClick(tag.name); }}
+																	className="group relative inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-sm dark:bg-blue-900 dark:text-blue-200 cursor-pointer"
+																>
+																	{tag.name}
+																	<button
+																		onClick={(e) => {
+																			e.stopPropagation();
+																			handleRemoveTag(paper.id, tag.id);
+																		}}
+																		className="ml-1.5 -mr-1 p-0.5 bg-blue-200/50 dark:bg-blue-800/50 text-blue-700 dark:text-blue-100 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+																	>
+																		<X className="h-2.5 w-2.5" />
+																	</button>
+																</span>
+															))}
+															{paper.tags.length > 3 && !expandedTags.has(paper.id) && (
+																<button
+																	onClick={(e) => { e.stopPropagation(); toggleExpandedTags(paper.id); }}
+																	className="text-muted-foreground text-xs hover:underline"
+																>
+																	+ {paper.tags.length - 3} more
+																</button>
+															)}
+														</div>
+													) : (
+														<span className="text-muted-foreground">No tags</span>
+													)}
+												</div>
+											</TableCell>
+											<TableCell className="py-4 pr-4">
+												<div className="text-sm text-muted-foreground whitespace-nowrap">
+													{paper.created_at ? new Date(paper.created_at).toLocaleDateString('en-US', {
+														month: 'short',
+														day: 'numeric',
+														year: 'numeric'
+													}) : 'N/A'}
+												</div>
+											</TableCell>
+											<TableCell className="py-4">
+												<div className="text-sm text-muted-foreground whitespace-nowrap">
+													{paper.publish_date ? new Date(paper.publish_date).toLocaleDateString('en-US', {
+														month: 'short',
+														day: 'numeric',
+														year: 'numeric'
+													}) : 'N/A'}
+												</div>
+											</TableCell>
+										</TableRow>
+									);
+								})
+							) : (
+								<TableRow>
+									<TableCell colSpan={numCols} className="h-32 text-center">
+										{searchTerm || filters.length > 0 ? (
+											"No papers match your search criteria."
+										) : (
+											<div className="flex flex-col items-center gap-4 py-8">
+												<div className="text-muted-foreground text-center">
+													<p className="text-lg font-medium mb-2">No papers in your library yet</p>
+													<p className="text-sm">Upload your first research paper to get started. All your papers will appear here for easy access and organization.</p>
+												</div>
+												<Button variant="default" className="bg-blue-500 hover:bg-blue-600 text-white" onClick={onUploadClick}>
+													Upload Your First Paper
+												</Button>
+											</div>
+										)}
+									</TableCell>
+								</TableRow>
+							)}
 							</TableBody>
 						</Table>
 					</div>

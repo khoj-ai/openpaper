@@ -21,6 +21,7 @@ from app.database.crud.projects.project_paper_crud import (
 from app.database.models import PaperUploadJob
 from app.database.telemetry import track_event
 from app.helpers.s3 import s3_service
+from app.schemas.responses import DataTableSchema
 from app.schemas.user import CurrentUser
 from celery import Celery
 from dotenv import load_dotenv
@@ -31,8 +32,8 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
-class PDFJobsClient:
-    """Client for submitting PDF processing jobs to the separate Celery service."""
+class JobsClient:
+    """Client for submitting processing jobs to the separate Celery service."""
 
     def __init__(
         self,
@@ -131,6 +132,69 @@ class PDFJobsClient:
                 raise Exception(
                     f"Failed to submit PDF processing job: {error_msg}"
                 ) from e
+
+    def submit_data_table_processing_job(
+        self, data_table: DataTableSchema, job_id: str
+    ) -> str:
+        """
+        Submit a data table processing job to the separate Celery service.
+
+        Args:
+            data_table: The data table to process
+            job_id: Your internal job ID for tracking
+
+        Returns:
+            str: Celery task ID
+        """
+        # Validate input data
+        if data_table is None:
+            raise ValueError("data_table cannot be None")
+        if not isinstance(data_table, DataTableSchema):
+            raise ValueError(
+                f"data_table must be DataTableSchema, got {type(data_table)}"
+            )
+
+        print(f"DEBUG: Submitting Data Table job - Job ID: {job_id}")
+
+        # Connect to Celery broker directly to submit task
+        try:
+            # Create Celery app instance (this connects to the broker, not the worker code)
+            celery_app = Celery("openpaper_tasks", broker=self.celery_broker_url)
+
+            # Configure Celery to be more tolerant of connection issues
+            celery_app.conf.update(
+                broker_connection_retry_on_startup=True,
+                broker_connection_retry=True,
+                broker_connection_max_retries=3,
+                task_serializer="json",
+                accept_content=["json"],
+                result_serializer="json",
+                task_always_eager=False,
+            )
+
+            # Build webhook URL that includes your job ID
+            webhook_url = (
+                f"{self.webhook_base_url}/api/webhooks/data-table-processing/{job_id}"
+            )
+            print(f"DEBUG: Webhook URL: {webhook_url}")
+
+            # Submit the task to the queue (the separate jobs service will pick it up)
+            task = celery_app.send_task(
+                "process_data_table",  # Task name as registered by the worker
+                kwargs={
+                    "data_table": data_table.model_dump(),
+                    "webhook_url": webhook_url,
+                },
+            )
+
+            print(f"DEBUG: Task submitted successfully with ID: {task.id}")
+            return task.id
+        except Exception as e:
+            error_msg = str(e)
+            print(f"DEBUG: Task submission failed: {error_msg}")
+            raise Exception(
+                f"Failed to submit data table processing job: {error_msg}"
+            ) from e
 
     def check_celery_task_status(self, task_id: str) -> Dict[str, Any]:
         """
@@ -365,4 +429,4 @@ class PDFJobsClient:
 
 
 # Create a client instance to use throughout the application
-pdf_jobs_client = PDFJobsClient()
+jobs_client = JobsClient()

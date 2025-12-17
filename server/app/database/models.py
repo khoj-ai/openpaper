@@ -966,3 +966,101 @@ class Onboarding(Base):
     referral_source_other = Column(String, nullable=True)
 
     user = relationship("User", back_populates="onboarding")
+
+
+class DataTableExtractionJob(Base):
+    __tablename__ = "data_table_extraction_jobs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+
+    project_id = Column(
+        UUID(as_uuid=True), ForeignKey("project.id", ondelete="CASCADE"), nullable=True
+    )
+
+    columns = Column(ARRAY(String), nullable=True)  # Columns to extract
+
+    task_id = Column(String, nullable=True)  # For tracking task in Celery
+
+    status = Column(String, nullable=False, default=JobStatus.PENDING)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    error_message = Column(Text, nullable=True)
+
+    user = relationship("User")
+    project = relationship("Project")
+
+    # Relationship to results
+    result = relationship(
+        "DataTableExtractionResult",
+        back_populates="job",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+
+class DataTableExtractionResult(Base):
+    """
+    Stores the result of a data table extraction job.
+    Contains the columns extracted and links to individual row results.
+    """
+
+    __tablename__ = "data_table_extraction_results"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    title = Column(String, nullable=True)
+    job_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("data_table_extraction_jobs.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    success = Column(Boolean, nullable=False, default=True)
+    columns = Column(ARRAY(String), nullable=False)  # List of column names
+
+    job = relationship("DataTableExtractionJob", back_populates="result")
+    rows = relationship(
+        "DataTableRow",
+        back_populates="data_table",
+        cascade="all, delete-orphan",
+    )
+
+
+class DataTableRow(Base):
+    """
+    Stores a single row of extracted data for a paper.
+    The 'values' field is JSONB containing: {column_name: {value: str, citations: [{text, index}]}}
+    """
+
+    __tablename__ = "data_table_rows"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    data_table_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("data_table_extraction_results.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    paper_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("papers.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    values = Column(JSONB, nullable=False, default={})
+    # values schema: {
+    #   "column_name": {
+    #     "value": "extracted value",
+    #     "citations": [{"text": "citation text", "index": 1}, ...]
+    #   }
+    # }
+
+    data_table = relationship("DataTableExtractionResult", back_populates="rows")
+    paper = relationship("Paper")
+
+    # Index for efficient lookups by paper
+    __table_args__ = (
+        Index("ix_data_table_rows_paper_id", "paper_id"),
+        Index("ix_data_table_rows_data_table_id", "data_table_id"),
+    )

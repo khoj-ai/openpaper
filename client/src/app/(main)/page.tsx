@@ -15,7 +15,7 @@ import { Loader2, MessageCircleWarning, File } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
 import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience";
-import { PaperItem, JobStatusType, JobStatusResponse, Project } from "@/lib/schema";
+import { PaperItem, JobStatusType, PaperUploadJobStatusResponse, Project } from "@/lib/schema";
 import { toast } from "sonner";
 import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isPaperUploadNearLimit, isStorageNearLimit } from "@/hooks/useSubscription";
 import { uploadFiles, uploadFromUrlWithFallback } from "@/lib/uploadUtils";
@@ -163,7 +163,7 @@ export default function Home() {
 	// Poll job status
 	const pollJobStatus = async (jobId: string) => {
 		try {
-			const response: JobStatusResponse = await fetchFromApi(`/api/paper/upload/status/${jobId}`);
+			const response: PaperUploadJobStatusResponse = await fetchFromApi(`/api/paper/upload/status/${jobId}`);
 			setJobUploadStatus(response.status);
 
 			if (response.celery_progress_message) {

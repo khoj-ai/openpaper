@@ -140,6 +140,14 @@ export interface OpenAlexMatchResponse {
     cited_by: OpenAlexResponse;
 }
 
+export enum JobStatus {
+    PENDING = 'pending',
+    RUNNING = 'running',
+    COMPLETED = 'completed',
+    FAILED = 'failed',
+    CANCELLED = 'cancelled'
+}
+
 export type JobStatusType = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
 
 export type SubscriptionStatusType = 'active' | 'canceled' | 'past_due' | 'incomplete' | 'trialing' | 'unpaid';
@@ -211,8 +219,13 @@ export interface PaperImage {
 export interface JobStatusResponse {
     job_id: string;
     status: JobStatusType;
+    title: string | null;
     started_at: string;
+    created_at: string;
     completed_at: string | null;
+}
+
+export interface PaperUploadJobStatusResponse extends JobStatusResponse {
     paper_id: string | null;
     has_file_url: boolean;
     has_metadata: boolean;
@@ -269,13 +282,10 @@ export interface AudioOverview {
     job_id: string;
 }
 
-export interface AudioOverviewJob {
+export interface AudioOverviewJob extends JobStatusResponse {
     id: string;
-    status: JobStatusType;
     conversable_id: string;
     conversable_type: string;
-    started_at: string;
-    completed_at: string | null;
 }
 
 export interface Project {
@@ -284,6 +294,8 @@ export interface Project {
     description: string;
     num_papers?: number;
     num_conversations?: number;
+    num_audio_overviews?: number;
+    num_data_tables?: number;
     created_at: string;
     updated_at: string;
     role?: ProjectRole;
@@ -323,12 +335,76 @@ export interface PendingInvite {
 }
 
 export interface ProjectInvitation {
-	id: string;
-	project_id: string;
-	project_name: string;
-	invited_by: string;
-	email: string;
-	role: string;
-	accepted_at?: string;
-	invited_at: string;
+    id: string;
+    project_id: string;
+    project_name: string;
+    invited_by: string;
+    email: string;
+    role: string;
+    accepted_at?: string;
+    invited_at: string;
+}
+
+export interface DataTableJobStatusResponse extends JobStatusResponse {
+    celery_progress_message: string | null;
+    job_id: string;
+    result_id: string | null;
+}
+
+export interface DataTableCellValue {
+    value: string;
+    citations: ReferenceCitation[];
+}
+
+export interface DataTableRow {
+    id: string;
+    paper_id: string;
+    values: {
+        [columnName: string]: DataTableCellValue;
+    };
+}
+
+export interface DataTableResult {
+    success: boolean;
+    title: string;
+    columns: string[];
+    rows: DataTableRow[];
+    created_at: string | null;
+}
+
+export interface SubscriptionLimits {
+    paper_uploads: number;
+    knowledge_base_size: number;
+    chat_credits_daily: number;
+    audio_overviews_weekly: number;
+    projects: number;
+    model: string[];
+}
+
+export interface SubscriptionUsage {
+    paper_uploads: number;
+    paper_uploads_remaining: number;
+    knowledge_base_size: number;
+    knowledge_base_size_remaining: number;
+    chat_credits_used: number;
+    chat_credits_remaining: number;
+    audio_overviews_used: number;
+    audio_overviews_remaining: number;
+    projects: number;
+    projects_remaining: number;
+    data_tables_used: number;
+    data_tables_remaining: number;
+}
+
+export interface SubscriptionData {
+    plan: 'basic' | 'researcher';
+    limits: SubscriptionLimits;
+    usage: SubscriptionUsage;
+}
+
+export interface UseSubscriptionReturn {
+    subscription: SubscriptionData | null;
+    loading: boolean;
+    error: string | null;
+    refetch: () => Promise<void>;
 }
