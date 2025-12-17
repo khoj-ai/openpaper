@@ -319,10 +319,10 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
                             <DialogTrigger asChild>
                                 <button
                                     disabled={papers.length === 0}
-                                    className="flex flex-col items-center justify-center p-3 border-2 border-dashed rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed aspect-square w-1/4"
+                                    className="flex items-center gap-2 px-3 py-2 text-sm text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    <Volume2 className="w-6 h-6 text-gray-400 group-hover:text-blue-500 mb-1 transition-colors" />
-                                    <span className="text-xs font-medium text-center leading-tight">Audio Overview</span>
+                                    <Volume2 className="w-4 h-4" />
+                                    <span>Audio Overview</span>
                                 </button>
                             </DialogTrigger>
                         <DialogContent>
@@ -391,10 +391,10 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
                     <button
                         disabled={papers.length === 0}
                         onClick={() => setDataTableSchemaModalOpen(true)}
-                        className="flex flex-col items-center justify-center p-3 border-2 border-dashed rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed aspect-square w-1/4"
+                        className="flex items-center gap-2 px-3 py-2 text-sm text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        <Table className="w-6 h-6 text-gray-400 group-hover:text-blue-500 mb-1 transition-colors" />
-                        <span className="text-xs font-medium text-center leading-tight">Data Table</span>
+                        <Table className="w-4 h-4" />
+                        <span>Data Table</span>
                     </button>
                 </>
                 )}
