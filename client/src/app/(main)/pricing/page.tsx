@@ -428,14 +428,14 @@ export default function PricingPage() {
                             </div>
                         )}
 
-                        {userSubscription?.subscription.cancel_at_period_end && subscriptionStatus === 'active' && (
+                        {userSubscription?.subscription?.cancel_at_period_end && subscriptionStatus === 'active' && (
                             <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 rounded-lg p-3 text-sm">
                                 <div className="flex items-start gap-2">
                                     <Clock className="h-4 w-4 text-amber-700 dark:text-amber-300 mt-0.5 shrink-0" />
                                     <div>
                                         <span className="font-medium text-amber-900 dark:text-amber-100">Subscription Ending</span>
                                         <p className="text-amber-700 dark:text-amber-300 mt-0.5">
-                                            Ends on {userSubscription?.subscription.current_period_end &&
+                                            Ends on {userSubscription?.subscription?.current_period_end &&
                                                 formatDate(userSubscription.subscription.current_period_end)}. Reactivate anytime before this date.
                                         </p>
                                     </div>
