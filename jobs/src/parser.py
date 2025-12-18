@@ -1,15 +1,10 @@
-import os
-import re
-import tempfile
 import pymupdf # type: ignore
 import pymupdf4llm # type: ignore
 from markitdown import MarkItDown
-from typing import Dict, Tuple, List
+from typing import Tuple
 from io import BytesIO
 import logging
 import uuid
-import asyncio
-import numpy as np
 from PIL import Image # type: ignore
 
 md = MarkItDown()
