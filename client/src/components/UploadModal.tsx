@@ -1,6 +1,7 @@
 
 "use client"
 
+import { z } from "zod";
 import {
     Dialog,
     DialogContent,
@@ -38,17 +39,32 @@ function UrlImportDialog({
     onImport: (url: string) => void
 }) {
     const [url, setUrl] = useState("");
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+    const urlSchema = z.string().url({ message: "Please enter a valid URL." });
 
     const handleSubmit = () => {
-        if (url) {
+        const result = urlSchema.safeParse(url);
+        if (result.success) {
             onImport(url);
             onOpenChange(false);
             setUrl("");
+            setErrorMessage(null);
+        } else {
+            setErrorMessage(result.error.issues[0].message);
         }
     }
 
+    const handleOpenChange = (newOpen: boolean) => {
+        if (!newOpen) {
+            setUrl("");
+            setErrorMessage(null);
+        }
+        onOpenChange(newOpen);
+    }
+
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Import from URL</DialogTitle>
@@ -63,6 +79,7 @@ function UrlImportDialog({
                         onChange={e => setUrl(e.target.value)}
                         onKeyDown={e => e.key === "Enter" && handleSubmit()}
                     />
+                    {errorMessage && <p className="text-red-500 text-sm">{errorMessage}</p>}
                     <Button onClick={handleSubmit}>Import</Button>
                 </div>
             </DialogContent>

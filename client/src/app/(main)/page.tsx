@@ -257,10 +257,18 @@ export default function Home() {
 		} catch (error) {
 			console.error('Error uploading file:', error);
 			setShowErrorAlert(true);
-			setErrorAlertMessage(error instanceof Error ? error.message : DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE);
-			if (error instanceof Error && error.message.includes('upgrade') && error.message.includes('upload limit')) {
-				setShowPricingOnError(true);
+			if (error instanceof Error) {
+				setErrorAlertMessage(error.message);
+				if (error.message.includes('upgrade') && error.message.includes('upload limit')) {
+					setShowPricingOnError(true);
+				} else {
+					setShowPricingOnError(false);
+				}
+			} else if (typeof error === 'object' && error !== null) {
+				setErrorAlertMessage(JSON.stringify(error));
+				setShowPricingOnError(false);
 			} else {
+				setErrorAlertMessage(String(error));
 				setShowPricingOnError(false);
 			}
 			setIsUploading(false);
@@ -278,9 +286,14 @@ export default function Home() {
 			const job = await uploadFromUrlWithFallback(url);
 			pollJobStatus(job.jobId);
 		} catch (error) {
-			console.error('Error importing from URL:', error);
 			setShowErrorAlert(true);
-			setErrorAlertMessage(error instanceof Error ? error.message : "Failed to import from URL. Please check the URL and try again.");
+			if (error instanceof Error) {
+				setErrorAlertMessage(error.message);
+			} else if (typeof error === 'object' && error !== null) {
+				setErrorAlertMessage(JSON.stringify(error));
+			} else {
+				setErrorAlertMessage(String(error));
+			}
 			setShowPricingOnError(false);
 			setIsUploading(false);
 		}
