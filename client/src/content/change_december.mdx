@@ -1,0 +1,48 @@
+export const metadata = {
+    title: "Changelog (December 2025)",
+    description: "Complete list of changes made between July - December 2025.",
+    date: "12-18-2025",
+    image: "https://assets.khoj.dev/matte_realistic_waves_blue.jpg",
+}
+
+The past six months have been SO busy shipping some really exciting features to making Open Paper more useful for researchers.
+
+I was hoping that these changelog posts would be a lot more frequent than they're turning out to be. Because of how infrequent they've been, I'm making this a big update (July - December) with less granularity than I would ordinarily hope to have on a monthly basis.
+
+## New Features & Improvements
+
+- [305558](https://github.com/khoj-ai/openpaper/commit/3055585c3b3f327e4288a7fa56bbf1340ca0bca4) Enforce pricing plans across OP - with Basic and Researcher
+- [e8da20](https://github.com/khoj-ai/openpaper/commit/e8da20c6438dc3b4cac0e4c112b69f0074a036b2) Improve the quality of PDF highlights in the viewer
+- [501ea9](https://github.com/khoj-ai/openpaper/commit/501ea942e5364b8e35b1de4f074a49eb56973df7) Update dropzone limit to 10 PDFs at once (usable from the [library](/papers))
+- [b95a59](https://github.com/khoj-ai/openpaper/commit/b95a59dce97504d7f705c8931f4c85841592e96a) Improve relevance and quality of AI-generated annotations during indexing
+- [b8d927](https://github.com/khoj-ai/openpaper/commit/b8d927ddb70bfa8b6b57f478187f79861cda9654) Improve uploading speeds in the backend [jobs service](https://github.com/khoj-ai/openpaper/tree/master/jobs) - slash latency by 50%
+- [cc2269](https://github.com/khoj-ai/openpaper/commit/cc2269596740e4ff44bfdcf8e0bbe95a5ce33066) Everything chat - allow users to chat across their entire library of papers via the [understand](/understand) page
+- [581079](https://github.com/khoj-ai/openpaper/commit/581079fb101564b8357d43fd00731f3cd20fbe8b) Disable a small experiment to extract and display images from PDFs in the viewer. Wasn't meeting the quality bar I was hoping for. TBD on if/when we'll bring it back.
+- [98d9a1](https://github.com/khoj-ai/openpaper/commit/98d9a1534f5a9cb40195dc9611af8cdfd6de7aa0) Misc improvements - e.g., scrolling to selected text from a highlight in the viewer
+- [09de4f](https://github.com/khoj-ai/openpaper/commit/09de4f40bb929ee4f5704d857382f24f4f04cb79) Add [projects](/blog/projects), making it easier to organize groups of papers together to create artifacts, citations, etc.
+- [daf18b](https://github.com/khoj-ai/openpaper/commit/daf18b7036961616b1921551bc48192615637696) Support uploads for multiple papers in the library page and track live progress
+- [6c8cda](https://github.com/khoj-ai/openpaper/commit/6c8cda4ab3e445616f7dcef9aba2da3920c13a64) Update the per file upload limit to 15MB. We're planning to increase this to 30MB pending some performance improvements - stay tuned.
+- [d59a79](https://github.com/khoj-ai/openpaper/commit/d59a799175b049a13676c4323be7ecd9257932cb) Similar to other places, use proactive warnings/toast notifications to notify user that they're approaching billing limits.
+- [78302a](https://github.com/khoj-ai/openpaper/commit/78302a532423b01de588a7be7641f3820cbd81b4) Improve search speeds for the multi-paper agent by giving it a more efficient function to search against the database - 10x speed up, avoiding common timeout issues that users were experiencing. We migrated to using native Postgres full text search capabilities.
+- [2a1791](https://github.com/khoj-ai/openpaper/commit/2a1791bb240ad3acb3319a0189d5cde6c24fb442) Support email-only sign-in using a 6-digit login code, rather than only Google auth.
+- [dc619a](https://github.com/khoj-ai/openpaper/commit/dc619ad8650c55c05ab791ee779d973f917338a8) Misc. improvements - improve deletion logic from the library table.
+- [dc619a](https://github.com/khoj-ai/openpaper/commit/dc619ad8650c55c05ab791ee779d973f917338a8) Add support for tags for papers - making it easier for users to organize and search for specific papers based on tags.
+- [4c326e](https://github.com/khoj-ai/openpaper/commit/4c326e8bc7d84523b3bb277d2f92ad553143382c) Use common hook with SWR for fetching papers from the db - improves performance and reduces latency. Code re-use is an easy win.
+- [14eac5](https://github.com/khoj-ai/openpaper/commit/14eac505fdd6e3198a19e8005ec7437229b473eb) Major performance improvements for the multi paper agent functionality. Improve query times for search terms in the DB, as well as improve the overall function calling speed of the agent (migrated to using the [Kimi K2](https://artificialanalysis.ai/models/kimi-k2) model on [Groq](https://groq.com), away from the previous [gpt 4.1](https://artificialanalysis.ai/models/gpt-4-1)). Also, add automatic compaction when context window limits are approaching.
+- [cc3419](https://github.com/khoj-ai/openpaper/commit/cc3419f22ef3b8367ce9f5f50bea2450a879e649) Add support for having collaborators within projects - allowing multiple users to work on the same project together. Admin (owner) can control permissions for each collaborator.
+- [0f41fe](https://github.com/khoj-ai/openpaper/commit/0f41fe412de5fb05d9cdae1829fa17f5c59d48fb) Start running automatic association between papers and their DOIs to create higher quality citations. This will also be used later to help users explore related papers.
+- [c71afd](https://github.com/khoj-ai/openpaper/commit/c71afd681fc80aefb89ca6cb2e04f3e9f47f3f68) Add support for generating data tables within a project. Data Tables allow users to extract and organize data from their papers in a structured format, making it easier to analyze and visualize the information. Can be exported to a CSV file.
+
+## Research Agent Architecture
+
+Research agents need the right harnesses to provide useful results to users. Without the correct scaffolding for optimally useful information, they're liable to hallucinate, produce incorrect results, and generally be less useful. We've done a deep dive into the architecture of our research agents, and we've ultimately landed on this design:
+
+![Research Agent Architecture](/dec_research_agent_dg.png)
+
+You can find the code for the core agent [in this file](https://github.com/khoj-ai/openpaper/blob/7d34756bc61b984831287b974d6f3a6a4c2a7a6a/server/app/llm/multi_paper_operations.py).
+
+To try it out yourself, create a [project](/projects) and ask a question that allows the agent to harness an answer from multiple papers in your library.
+
+## Coming Soon
+
+We've got some fun stuff in the works. We're working on improving collaboration features within OP, improving quality of artifact generation (incl. new types), and adding more graph search capabilities for discovering related works.
