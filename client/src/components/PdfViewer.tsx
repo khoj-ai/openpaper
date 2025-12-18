@@ -73,13 +73,12 @@ export function PdfViewer(props: PdfViewerProps) {
 		handleStatusChange = () => { },
 	} = props;
 
-	const [currentPage, setCurrentPage] = useState<number>(1);
 	const [currSearchText, setCurrSearchText] = useState<string>(explicitSearchTerm || "");
 	const [showScrollToTop, setShowScrollToTop] = useState(false);
 	const [textLayerExtractionFailed, setTextLayerExtractionFailed] = useState(false);
 
 	const { numPages, allPagesLoaded, onDocumentLoadSuccess, handlePageLoadSuccess } = usePdfLoader();
-	const { scale, width, pagesRef, containerRef, goToPreviousPage, goToNextPage, zoomIn, zoomOut } = usePdfNavigation(numPages);
+	const { currentPage, setCurrentPage, scale, width, pagesRef, containerRef, goToPreviousPage, goToNextPage, zoomIn, zoomOut } = usePdfNavigation(numPages);
 
 	const searchInputRef = useRef<HTMLInputElement>(null);
 

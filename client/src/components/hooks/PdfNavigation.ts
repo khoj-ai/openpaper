@@ -81,6 +81,7 @@ export function usePdfNavigation(numPages: number | null) {
 
     return {
         currentPage,
+        setCurrentPage,
         scale,
         width,
         pagesRef,
