@@ -157,12 +157,21 @@ export function PdfViewer(props: PdfViewerProps) {
 	}, [tooltipPosition]);
 
 
-	// Add an effect to update current page when scrolling
+	// Combines scroll handling for current page and scroll-to-top button
 	useEffect(() => {
-		const handleScroll = () => {
-			if (!containerRef.current || pagesRef.current.length === 0) return;
+		if (!allPagesLoaded) {
+			return;
+		}
 
-			// Find the page that's most visible in the viewport
+		const handleScroll = () => {
+			if (!containerRef.current) return;
+
+			// For scroll-to-top button
+			setShowScrollToTop(containerRef.current.scrollTop > 200);
+
+			if (pagesRef.current.length === 0) return;
+
+			// For current page tracking
 			let maxVisiblePage = 1;
 			let maxVisibleArea = 0;
 
@@ -185,27 +194,18 @@ export function PdfViewer(props: PdfViewerProps) {
 				}
 			});
 
-			if (maxVisiblePage !== currentPage) {
-				setCurrentPage(maxVisiblePage);
-			}
+			setCurrentPage(maxVisiblePage);
 		};
 
-		containerRef.current?.addEventListener('scroll', handleScroll);
-		return () => containerRef.current?.removeEventListener('scroll', handleScroll);
-	}, [currentPage]);
+		const scroller = containerRef.current;
+		// Using capture: true to catch the event before it might be stopped by a child component.
+		scroller?.addEventListener('scroll', handleScroll, { capture: true });
 
-	// Monitor scroll position for scroll-to-top button
-	useEffect(() => {
-		const handleScrollTop = () => {
-			if (!containerRef.current) return;
-
-			// Show scroll-to-top button when scrolled down more than 200px
-			setShowScrollToTop(containerRef.current.scrollTop > 200);
+		return () => {
+			// The options object must also be passed to removeEventListener
+			scroller?.removeEventListener('scroll', handleScroll, { capture: true });
 		};
-
-		containerRef.current?.addEventListener('scroll', handleScrollTop);
-		return () => containerRef.current?.removeEventListener('scroll', handleScrollTop);
-	}, []);
+	}, [allPagesLoaded, setCurrentPage, setShowScrollToTop]);
 
 	const scrollToTop = () => {
 		if (containerRef.current) {
