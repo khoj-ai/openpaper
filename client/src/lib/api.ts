@@ -18,7 +18,7 @@ export async function fetchFromApi(endpoint: string, options: RequestInit = {}) 
     });
 
     if (!response.ok) {
-        let errorMessage: any = `API error: ${response.status}`;
+        let errorMessage: unknown = `API error: ${response.status}`;
 
         try {
             const errorData = await response.json();
@@ -38,7 +38,7 @@ export async function fetchFromApi(endpoint: string, options: RequestInit = {}) 
             errorMessage = JSON.stringify(errorMessage);
         }
 
-        throw new Error(errorMessage)
+        throw new Error(errorMessage as string)
     }
 
     if (response.status === 204) {
