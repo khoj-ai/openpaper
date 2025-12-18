@@ -85,3 +85,27 @@ The response agent works by sending off an agent with access to a series of rese
 - `search_all_files`
 
 ![knowledge base research diagram](./lr_research_diagram.png)
+
+Multi-paper chat workflow:
+
+```
++----------------+      +-------------------------------------------------+    +-------------------+
+|      User      |----->|             FastAPI Server                    |----->|        LLM        |
++----------------+      |       (multi_paper_operations.py)             |      +-------------------+
+        ^             |                                                 |              ^
+        |             |  1. gather_evidence(question)                   |              |
+        |             |     - Iteratively calls LLM with tools:         |              |
+        |             |       - search_all_files(query)                 |--------------+
+        |             |       - read_file(paper_id, query)              |
+        |             |       - ...                                     |
+        |             |     - Compacts evidence if it gets too large    |
+        |             |                                                 |
+        |             |  2. chat_with_papers(question, evidence)        |
+        |             |     - Sends evidence and question to LLM        |--------------+
+        |             |     - Streams response back to user             |              |
+        |             |     - Parses citations from response            |              |
+        |             +-------------------------------------------------+              |
+        |                           |                                                  |
+        +---------------------------+--------------------------------------------------+
+                              (Streamed response with citations)
+```
