@@ -28,10 +28,69 @@ import { useRouter } from "next/navigation";
 import { UploadModal } from "@/components/UploadModal";
 import { usePapers } from "@/hooks/usePapers";
 
-export default function PapersPage() {
+const PageSkeleton = () => (
+    <div className="w-full mx-auto p-4">
+        {/* Header skeleton */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
+            <Skeleton className="h-9 w-32 mb-2 md:mb-0" />
+            <div className="flex items-center gap-x-4">
+                <Skeleton className="h-10 w-24" />
+                <Skeleton className="h-10 w-32" />
+            </div>
+        </div>
+        {/* Search/filter bar skeleton */}
+        <div className="flex flex-col md:flex-row md:items-center gap-4 mb-4">
+            <Skeleton className="h-10 w-full md:max-w-xl" />
+            <Skeleton className="h-10 w-24" />
+        </div>
+        {/* Table skeleton */}
+        <div className="border bg-card rounded-md overflow-hidden">
+            {/* Table header */}
+            <div className="border-b-2 bg-card p-4">
+                <div className="flex items-center gap-4">
+                    <Skeleton className="h-4 w-4" />
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-4 w-32 hidden md:block" />
+                    <Skeleton className="h-4 w-32 hidden lg:block" />
+                    <Skeleton className="h-4 w-24 hidden lg:block" />
+                    <Skeleton className="h-4 w-20 hidden xl:block" />
+                    <Skeleton className="h-4 w-20 hidden xl:block" />
+                    <Skeleton className="h-4 w-20 hidden xl:block" />
+                </div>
+            </div>
+            {/* Table rows */}
+            {Array.from({ length: 8 }).map((_, index) => (
+                <div
+                    key={index}
+                    className={`p-4 border-b ${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'}`}
+                >
+                    <div className="flex items-center gap-4">
+                        <Skeleton className="h-4 w-4 flex-shrink-0" />
+                        <div className="flex-1 min-w-0 space-y-2">
+                            <Skeleton className="h-4 w-full max-w-md" />
+                            <Skeleton className="h-3 w-3/4 max-w-sm md:hidden" />
+                        </div>
+                        <Skeleton className="h-4 w-32 hidden md:block flex-shrink-0" />
+                        <Skeleton className="h-4 w-32 hidden lg:block flex-shrink-0" />
+                        <div className="hidden lg:flex gap-1 flex-shrink-0">
+                            <Skeleton className="h-6 w-16 rounded-sm" />
+                            <Skeleton className="h-6 w-14 rounded-sm" />
+                        </div>
+                        <div className="hidden xl:flex gap-1 flex-shrink-0">
+                            <Skeleton className="h-6 w-14 rounded-sm" />
+                        </div>
+                        <Skeleton className="h-4 w-20 hidden xl:block flex-shrink-0" />
+                        <Skeleton className="h-4 w-20 hidden xl:block flex-shrink-0" />
+                    </div>
+                </div>
+            ))}
+        </div>
+    </div>
+);
+
+function PapersPageContent() {
     const { papers, isLoading, mutate } = usePapers();
     const [filteredPapers, setFilteredPapers] = useState<PaperItem[]>([]);
-    const { user, loading: authLoading } = useAuth();
     const { subscription, loading: subscriptionLoading } = useSubscription();
     const router = useRouter();
     const [isCreateProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
@@ -47,13 +106,6 @@ export default function PapersPage() {
             setFilteredPapers(sortedPapers);
         }
     }, [papers]);
-
-    useEffect(() => {
-        if (!authLoading && !user) {
-            // Redirect to login if user is not authenticated
-            window.location.href = `/login`;
-        }
-    }, [authLoading, user]);
 
     const deletePaper = async (paperId: string) => {
         try {
@@ -256,66 +308,8 @@ export default function PapersPage() {
         return null;
     }
 
-    if (isLoading || authLoading) {
-        return (
-            <div className="w-full mx-auto p-4">
-                {/* Header skeleton */}
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
-                    <Skeleton className="h-9 w-32 mb-2 md:mb-0" />
-                    <div className="flex items-center gap-x-4">
-                        <Skeleton className="h-10 w-24" />
-                        <Skeleton className="h-10 w-32" />
-                    </div>
-                </div>
-                {/* Search/filter bar skeleton */}
-                <div className="flex flex-col md:flex-row md:items-center gap-4 mb-4">
-                    <Skeleton className="h-10 w-full md:max-w-xl" />
-                    <Skeleton className="h-10 w-24" />
-                </div>
-                {/* Table skeleton */}
-                <div className="border bg-card rounded-md overflow-hidden">
-                    {/* Table header */}
-                    <div className="border-b-2 bg-card p-4">
-                        <div className="flex items-center gap-4">
-                            <Skeleton className="h-4 w-4" />
-                            <Skeleton className="h-4 w-48" />
-                            <Skeleton className="h-4 w-32 hidden md:block" />
-                            <Skeleton className="h-4 w-32 hidden lg:block" />
-                            <Skeleton className="h-4 w-24 hidden lg:block" />
-                            <Skeleton className="h-4 w-20 hidden xl:block" />
-                            <Skeleton className="h-4 w-20 hidden xl:block" />
-                            <Skeleton className="h-4 w-20 hidden xl:block" />
-                        </div>
-                    </div>
-                    {/* Table rows */}
-                    {Array.from({ length: 8 }).map((_, index) => (
-                        <div
-                            key={index}
-                            className={`p-4 border-b ${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'}`}
-                        >
-                            <div className="flex items-center gap-4">
-                                <Skeleton className="h-4 w-4 flex-shrink-0" />
-                                <div className="flex-1 min-w-0 space-y-2">
-                                    <Skeleton className="h-4 w-full max-w-md" />
-                                    <Skeleton className="h-3 w-3/4 max-w-sm md:hidden" />
-                                </div>
-                                <Skeleton className="h-4 w-32 hidden md:block flex-shrink-0" />
-                                <Skeleton className="h-4 w-32 hidden lg:block flex-shrink-0" />
-                                <div className="hidden lg:flex gap-1 flex-shrink-0">
-                                    <Skeleton className="h-6 w-16 rounded-sm" />
-                                    <Skeleton className="h-6 w-14 rounded-sm" />
-                                </div>
-                                <div className="hidden xl:flex gap-1 flex-shrink-0">
-                                    <Skeleton className="h-6 w-14 rounded-sm" />
-                                </div>
-                                <Skeleton className="h-4 w-20 hidden xl:block flex-shrink-0" />
-                                <Skeleton className="h-4 w-20 hidden xl:block flex-shrink-0" />
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        )
+    if (isLoading || subscriptionLoading) {
+        return <PageSkeleton />;
     }
 
     return (
@@ -367,4 +361,21 @@ export default function PapersPage() {
             </div>
         </div>
     )
+}
+
+export default function PapersPage() {
+    const { user, loading: authLoading } = useAuth();
+
+    useEffect(() => {
+        if (!authLoading && !user) {
+            // Redirect to login if user is not authenticated
+            window.location.href = `/login`;
+        }
+    }, [authLoading, user]);
+
+    if (authLoading || !user) {
+        return <PageSkeleton />;
+    }
+
+    return <PapersPageContent />
 }
