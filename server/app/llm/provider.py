@@ -137,8 +137,8 @@ class GeminiProvider(BaseLLMProvider):
             raise ValueError("GEMINI_API_KEY environment variable is required")
 
         self._client = genai.Client(api_key=self.api_key)
-        self._default_model = "gemini-2.5-pro"
-        self._fast_model = "gemini-2.5-flash"
+        self._default_model = "gemini-3-flash-preview"
+        self._fast_model = "gemini-3-flash-preview"
 
     @property
     def client(self) -> genai.Client:

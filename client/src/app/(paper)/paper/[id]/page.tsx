@@ -64,11 +64,9 @@ const AudioTool = {
 
 const PaperToolset = {
     nav: [
-        OverviewTool,
         ChatTool,
         AudioTool,
         AnnotationsTool,
-
         FocusTool,
     ],
 }
@@ -128,7 +126,12 @@ export default function PaperView() {
             const toolName = PaperToolset.nav.find(tool => tool.name.toLowerCase() === rsf);
             return toolName ? toolName.name : 'Overview';
         }
-        return 'Overview';
+        if (paperData && paperData.summary_citations && paperData.summary_citations.length > 0) {
+            PaperToolset.nav.push(OverviewTool);
+            return 'Overview';
+        }
+
+        return 'Chat';
     });
 
     useEffect(() => {

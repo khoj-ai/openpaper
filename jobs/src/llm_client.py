@@ -28,8 +28,8 @@ from src.utils import retry_llm_operation, time_it
 logger = logging.getLogger(__name__)
 
 # Constants
-DEFAULT_CHAT_MODEL = "gemini-2.5-pro"
-FAST_CHAT_MODEL = "gemini-2.5-flash"
+DEFAULT_CHAT_MODEL = "gemini-3-flash-preview"
+FAST_CHAT_MODEL = "gemini-3-flash-preview"
 CACHE_TTL_SECONDS = 3600
 
 # Pydantic model type variable

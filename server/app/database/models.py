@@ -242,7 +242,7 @@ class Message(Base):
     role = Column(String, nullable=False)  # 'user' or 'assistant'
     content = Column(Text, nullable=False)
 
-    # References from the paper
+    # References from the paper. Key 'citations' maps to list of ResponseCitation dicts
     references = Column(JSONB, nullable=True)
 
     bucket = Column(JSONB, nullable=True)  # For any additional attributes

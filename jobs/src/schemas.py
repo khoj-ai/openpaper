@@ -69,40 +69,30 @@ class InstitutionsKeywords(BaseModel):
 class SummaryAndCitations(BaseModel):
     """Schema for summary and citations extraction."""
     summary_citations: List[ResponseCitation] = Field(
-        description="List of citations that are relevant to the summary. These should be direct quotes or paraphrases from the paper that support the summary provided. Remember to include the citation index (e.g., [^1], [^2]) in the summary.",
+        description="List of citations supporting the summary. Include direct quotes or paraphrases with the citation index. The index should match the inline citations used in the summary. Only include citations that are directly relevant to the summary content. Use sequential numbering starting from 1."
     )
     summary: str = Field(
         description="""
-    Generate a comprehensive yet concise summary of the research paper in markdown format that captures the essential contributions and findings for readers with basic domain knowledge.
+            Generate a concise single-paragraph summary of the research paper (150-250 words) that captures the essential contribution for readers with basic domain knowledge.
 
-    ## Content Requirements:
-    - **Opening overview**: 2-4 sentences establishing the research problem, approach, and primary contribution
-    - **Core sections**: Organize using clear headings such as:
-    - **Motivation**: Why this research matters
-    - **Methodology**: Key experimental design, datasets, models, or theoretical approaches
-    - **Key Findings**: Primary results with specific metrics, performance improvements, or discoveries
-    - **Implications**: Significance for the field, limitations, and future directions
+            ## Structure:
+            Write 4-6 sentences covering:
+            1. **Research problem and approach**: What gap or question does this address?
+            2. **Methodology**: What methods, datasets, or techniques were used?
+            3. **Key findings**: What were the main results? Include specific metrics when available.
+            4. **Implications**: Why does this matter or what are the limitations?
 
-    ## Technical Specifications:
-    - **Length**: 400-800 words (prioritize clarity over brevity)
-    - **Precision**: Include quantitative results (accuracy scores, effect sizes, sample sizes) when available
-    - **Accessibility**: Use plain language explanations for technical concepts while preserving scientific accuracy
-    - **Structure**: Use markdown headers (##, ###), bullet points, and tables to enhance readability
+            ## Citation Requirements:
+            - Use inline citations [^1], [^2] to support factual claims, especially numerical results. The citation index should match the corresponding entry in the `summary_citations` field.
+            - Use sequential numbering starting from [^1]
 
-    ## Citation Integration:
-    - Embed inline citations [^1], [^2], [^6, ^7] to support all factual claims about methodology, results, and conclusions
-    - Use sequential numbering starting from [^1]
-    - Cite particularly important findings, novel methodologies, and key numerical results
-    - Ensure every major claim can be traced back to specific paper content
+            ## Quality Standards:
+            - Write in clear, accessible language while maintaining technical accuracy
+            - Focus on the paper's primary contribution—omit secondary findings
+            - Present findings objectively, including limitations when relevant
 
-    ## Quality Standards:
-    - **Completeness**: Address all major contributions mentioned in the abstract/conclusion
-    - **Balance**: Give appropriate weight to different sections based on their importance to the paper's contribution
-    - **Objectivity**: Present findings neutrally, including limitations or negative results when discussed
-    - **Coherence**: Ensure logical flow between sections that tells a complete research story
-
-    Do not include a title or repeat the paper's title in the summary.
-    """,
+            The goal is a focused, readable paragraph that gives someone a quick understanding of what the paper accomplishes.
+                    """,
     )
 
 
