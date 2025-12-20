@@ -15,6 +15,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { ProjectInvitation } from "@/lib/schema";
 import { fetchFromApi } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { useSubscription, isProjectAtLimit } from "@/hooks/useSubscription";
 
 interface ProjectInvitationsProps {
@@ -29,6 +30,7 @@ export function ProjectInvitations({ onInvitationAccepted, defaultOpen = false }
 	const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
 	const [acceptedIds, setAcceptedIds] = useState<Set<string>>(new Set());
 	const { subscription } = useSubscription();
+	const { user } = useAuth();
 
 	const atProjectLimit = subscription ? isProjectAtLimit(subscription) : false;
 
@@ -41,7 +43,9 @@ export function ProjectInvitations({ onInvitationAccepted, defaultOpen = false }
 			setInvitations(data.invitations || []);
 		} catch (error) {
 			console.error('Failed to fetch invitations:', error);
-			toast.error('Failed to load invitations');
+			if (user) {
+				toast.error('Failed to load invitations');
+			}
 			setInvitations([]);
 		} finally {
 			setIsLoading(false);
@@ -80,7 +84,9 @@ export function ProjectInvitations({ onInvitationAccepted, defaultOpen = false }
 			}
 		} catch (error) {
 			console.error('Failed to accept invitation:', error);
-			toast.error(error instanceof Error ? error.message : 'Failed to accept invitation');
+			if (user) {
+				toast.error(error instanceof Error ? error.message : 'Failed to accept invitation');
+			}
 		} finally {
 			setProcessingIds(prev => {
 				const next = new Set(prev);
@@ -104,7 +110,9 @@ export function ProjectInvitations({ onInvitationAccepted, defaultOpen = false }
 			setInvitations(prev => prev.filter(inv => inv.id !== invitationId));
 		} catch (error) {
 			console.error('Failed to reject invitation:', error);
-			toast.error(error instanceof Error ? error.message : 'Failed to reject invitation');
+			if (user) {
+				toast.error(error instanceof Error ? error.message : 'Failed to reject invitation');
+			}
 		} finally {
 			setProcessingIds(prev => {
 				const next = new Set(prev);
