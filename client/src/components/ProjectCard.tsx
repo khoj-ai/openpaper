@@ -3,7 +3,7 @@ import { Project, ProjectRole } from "@/lib/schema";
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, ArrowRight, FileText, MessageCircle, X, Users, Headphones, Table } from "lucide-react";
+import { MoreHorizontal, ArrowRight, FileText, MessageCircle, X, Users, Headphones, Table, FolderKanban } from "lucide-react";
 import { useState } from "react";
 import {
 	AlertDialog,
@@ -22,10 +22,11 @@ import { formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 
 
-export function ProjectCard({ project, onProjectUpdate, onUnlink }: {
+export function ProjectCard({ project, onProjectUpdate, onUnlink, compact = false }: {
 	project: Project;
 	onProjectUpdate?: () => void;
 	onUnlink?: () => void;
+	compact?: boolean;
 }) {
 	const [showDeleteAlert, setShowDeleteAlert] = useState(false);
 	const [showEditAlert, setShowEditAlert] = useState(false);
@@ -117,6 +118,78 @@ export function ProjectCard({ project, onProjectUpdate, onUnlink }: {
 			e.preventDefault();
 		}
 	};
+
+	if (compact) {
+		const updatedAt = project.updated_at
+			? formatDate(project.updated_at)
+			: null;
+
+		return (
+			<Link
+				href={`/projects/${project.id}`}
+				className="group flex items-center gap-4 p-4 rounded-xl border border-border/50 bg-card hover:border-border hover:shadow-sm transition-all"
+			>
+				<div className="flex-1 min-w-0">
+					<h3 className="font-medium truncate group-hover:text-primary transition-colors">
+						{project.title}
+					</h3>
+					<div className="flex items-center gap-3 text-sm text-muted-foreground mt-0.5">
+						{project.num_papers !== undefined && (
+							<span className="flex items-center gap-1">
+								<FileText className="h-3.5 w-3.5" />
+								{project.num_papers} {project.num_papers === 1 ? "paper" : "papers"}
+							</span>
+						)}
+						{project.num_conversations !== undefined && project.num_conversations > 0 && (
+							<span className="flex items-center gap-1">
+								<MessageCircle className="h-3.5 w-3.5" />
+								{project.num_conversations}
+							</span>
+						)}
+						{project.num_roles !== undefined && project.num_roles > 1 && (
+							<span className="flex items-center gap-1">
+								<Users className="h-3.5 w-3.5" />
+								{project.num_roles}
+							</span>
+						)}
+						{(project.num_audio_overviews ?? 0) > 0 && (
+							<span className="flex items-center gap-1">
+								<Headphones className="h-3.5 w-3.5" />
+								{project.num_audio_overviews}
+							</span>
+						)}
+						{(project.num_data_tables ?? 0) > 0 && (
+							<span className="flex items-center gap-1">
+								<Table className="h-3.5 w-3.5" />
+								{project.num_data_tables}
+							</span>
+						)}
+					</div>
+				</div>
+
+				{updatedAt && (
+					<span className="text-xs text-muted-foreground hidden sm:block">
+						{updatedAt}
+					</span>
+				)}
+
+				<ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+				{onUnlink && (
+					<Button
+						variant="ghost"
+						size="icon"
+						onClick={(e) => {
+							e.preventDefault();
+							setShowUnlinkAlert(true);
+						}}
+						className="h-8 w-8 text-muted-foreground hover:text-foreground flex-shrink-0"
+					>
+						<X className="h-4 w-4" />
+					</Button>
+				)}
+			</Link>
+		);
+	}
 
 	return (
 		<div className="relative group">

@@ -115,30 +115,9 @@ function PaperMetadata({ paperData, hasMessages, readonly = false }: IPaperMetad
                         )
                     }
                     {/* Conditional rendering for Tabs vs direct Metadata */}
-                    {readonly ? (
-                        // Readonly mode: Only show metadata section
-                        <div className="pt-4">
-                            {renderMetadataContent()}
-                        </div>
-                    ) : (
-                        // Normal mode: Show Tabs
-                        <Tabs defaultValue={hasMessages ? 'questions' : 'abstract'} className="w-full">
-                            <TabsList>
-                                <TabsTrigger value="abstract">Abstract</TabsTrigger>
-                                <TabsTrigger value="metadata">Metadata</TabsTrigger>
-                            </TabsList>
-                            <TabsContent value="metadata">
-                                {renderMetadataContent()}
-                            </TabsContent>
-                            <TabsContent value="abstract">
-                                {paperData.abstract ? (
-                                    <div className="prose dark:prose-invert !max-w-full text-sm">
-                                        {paperData.abstract}
-                                    </div>
-                                ) : <p className="text-sm text-muted-foreground">No abstract available.</p>}
-                            </TabsContent>
-                        </Tabs>
-                    )}
+                    <div className="pt-4">
+                        {renderMetadataContent()}
+                    </div>
                 </div>
             </CollapsibleContent>
         </Collapsible >

@@ -119,20 +119,27 @@ export default function PaperView() {
     const [sidePanelDisplayedText, setSidePanelDisplayedText] = useState('');
     const [elapsedTime, setElapsedTime] = useState(0);
 
-    const [rightSideFunction, setRightSideFunction] = useState<string>(() => {
-        const rsf = searchParams.get('rsf')?.toLowerCase();
-        const validTools = PaperToolset.nav.map(tool => tool.name.toLowerCase());
-        if (rsf && validTools.includes(rsf)) {
-            const toolName = PaperToolset.nav.find(tool => tool.name.toLowerCase() === rsf);
-            return toolName ? toolName.name : 'Overview';
-        }
-        if (paperData && paperData.summary_citations && paperData.summary_citations.length > 0) {
-            PaperToolset.nav.push(OverviewTool);
-            return 'Overview';
-        }
+    const [rightSideFunction, setRightSideFunction] = useState<string>('Chat');
+    const [initialRightSideFunctionSet, setInitialRightSideFunctionSet] = useState(false);
+    const [toolset, setToolset] = useState(PaperToolset);
 
-        return 'Chat';
-    });
+    useEffect(() => {
+        if (paperData && !initialRightSideFunctionSet) {
+            const rsf = searchParams.get('rsf')?.toLowerCase();
+            const newToolset = { ...toolset };
+            const validTools = newToolset.nav.map(tool => tool.name.toLowerCase());
+
+            if (rsf && validTools.includes(rsf)) {
+                const toolName = newToolset.nav.find(tool => tool.name.toLowerCase() === rsf);
+                setRightSideFunction(toolName ? toolName.name : 'Overview');
+            } else if (paperData.summary_citations && paperData.summary_citations.length > 0) {
+                newToolset.nav.unshift(OverviewTool);
+                setRightSideFunction('Overview');
+            }
+            setToolset(newToolset);
+            setInitialRightSideFunctionSet(true);
+        }
+    }, [paperData, initialRightSideFunctionSet, searchParams]);
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -145,7 +152,7 @@ export default function PaperView() {
     const [mobileView, setMobileView] = useState<'reader' | 'panel'>('reader');
 
     if (isMobile) {
-        PaperToolset.nav = PaperToolset.nav.filter(tool => tool.name !== 'Focus');
+        toolset.nav = toolset.nav.filter(tool => tool.name !== 'Focus');
     }
 
     useEffect(() => {
@@ -489,7 +496,7 @@ export default function PaperView() {
                                         <PaperSidebar
                                             rightSideFunction={rightSideFunction}
                                             setRightSideFunction={setRightSideFunction}
-                                            PaperToolset={PaperToolset}
+                                            PaperToolset={toolset}
                                         />
                                     </>
                                 )}
@@ -588,9 +595,8 @@ export default function PaperView() {
                             <PaperSidebar
                                 rightSideFunction={rightSideFunction}
                                 setRightSideFunction={setRightSideFunction}
-                                PaperToolset={PaperToolset}
-                            />
-                        </>
+                                PaperToolset={toolset}
+                            />                        </>
                     )}
                 </div>
             </div>

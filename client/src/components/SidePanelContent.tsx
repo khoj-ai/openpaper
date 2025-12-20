@@ -912,6 +912,7 @@ export function SidePanelContent({
                         {
                             rightSideFunction === 'Chat' && (
                                 <div className={`flex flex-col ${heightClass} overflow-y-auto`}>
+                                    <PaperMetadata paperData={paperData} hasMessages={messages.length > 0} />
                                     {/* Paper Chat Section */}
                                     <div
                                         className={`flex-1 overflow-y-auto space-y-2 transition-all duration-300 mt-2 ease-in-out ${isStreaming ? 'pb-24' : ''}`}
@@ -937,13 +938,12 @@ export function SidePanelContent({
                                                 <>
                                                     {messages.length === 0 && !hasMoreMessages && (
                                                         <div className="text-center text-gray-500 my-4">
-                                                            What do you want to understand about this paper?
-                                                            <div className='grid grid-cols-1 gap-2 mt-2'>
+                                                            <div className='flex overflow-x-auto gap-2 mt-2 pb-2'>
                                                                 {starterQuestions.slice(0, 5).map((question, i) => (
                                                                     <Button
                                                                         key={i}
                                                                         variant="outline"
-                                                                        className="text-sm font-medium p-2 max-w-full whitespace-normal h-auto text-left justify-start break-words bg-background text-secondary-foreground hover:bg-secondary/50 border-1 hover:translate-y-0.5 transition-transform duration-200"
+                                                                        className="text-sm font-normal p-2 bg-background text-secondary-foreground hover:bg-secondary/50 border rounded-full whitespace-nowrap"
                                                                         onClick={() => {
                                                                             setCurrentMessage(question);
                                                                             inputMessageRef.current?.focus();
@@ -964,13 +964,13 @@ export function SidePanelContent({
                                                     {memoizedMessages}
                                                     {messages.length === 1 && !hasMoreMessages && (
                                                         <div className="text-center text-gray-500 my-4">
-                                                            What else do you want to understand about this paper?
-                                                            <div className='grid grid-cols-1 gap-2 mt-2'>
+
+                                                            <div className='flex overflow-x-auto gap-2 mt-2 pb-2'>
                                                                 {starterQuestions.slice(0, 5).map((question, i) => (
                                                                     <Button
                                                                         key={i}
                                                                         variant="outline"
-                                                                        className="text-sm font-medium p-2 max-w-full whitespace-normal h-auto text-left justify-start break-words bg-background text-secondary-foreground hover:bg-secondary/50 border-1 hover:translate-y-0.5 transition-transform duration-200"
+                                                                        className="text-sm font-normal p-2 bg-background text-secondary-foreground hover:bg-secondary/50 border rounded-full whitespace-nowrap"
                                                                         onClick={() => {
                                                                             setCurrentMessage(question);
                                                                             inputMessageRef.current?.focus();
