@@ -117,7 +117,7 @@ Extract 3-5 standout highlights that capture the most compelling and unique aspe
 ## Quality Guidelines:
 - **Selectivity**: Choose only the most essential "must-read" elements—what would experts in the field find most noteworthy?
 - **Specificity**: Prefer concrete findings over general statements
-- **Diversity**: Ensure highlights span different aspects (methods, results, implications) and types
+- **Diversity**: Ensure highlights span different aspects (methods, results, implications) and types, without referencing the abstract
 - **Authenticity**: Use direct quotes or faithful paraphrases from the source material
 - **Context**: Each annotation should explain *why* this highlight matters to the broader research landscape
 
@@ -127,6 +127,7 @@ Extract 3-5 standout highlights that capture the most compelling and unique aspe
 - Routine experimental procedures or common practices
 - Abstract-level summaries that don't reveal paper specifics
 - Redundant highlights that convey similar information
+- Snippets that are pulled directly from the abstract or summary
 
 Think: "If I could only share 3-5 insights from this paper with a colleague, what would make them most excited to read the full work?"
 """,
