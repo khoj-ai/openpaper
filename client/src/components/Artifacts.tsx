@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Volume2, Table } from "lucide-react";
+import { Loader2, Volume2, Table, PlusCircle } from "lucide-react";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { fetchFromApi } from "@/lib/api";
 import { AudioOverview, PaperItem, AudioOverviewJob, ProjectRole, DataTableJobStatusResponse } from "@/lib/schema";
@@ -74,7 +74,9 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
         skipForward,
         formatTime,
         getProgressPercentage,
-    } = useAudioPlayback(projectId);    // Data Table states
+    } = useAudioPlayback(projectId);
+
+    // Extraction Table states
     const [isDataTableSchemaModalOpen, setDataTableSchemaModalOpen] = useState(false);
     const [isCreatingDataTable, setIsCreatingDataTable] = useState(false);
     const [dataTableJobs, setDataTableJobs] = useState<DataTableJobStatusResponse[]>([]);
@@ -106,7 +108,7 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
             setDataTableJobs(fetchedJobs.jobs);
             return fetchedJobs.jobs;
         } catch (err) {
-            console.error("Failed to fetch data table jobs:", err);
+            console.error("Failed to fetch extraction table jobs:", err);
             return [];
         }
     }, [projectId]);
@@ -244,9 +246,9 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
         setIsCreatingDataTable(true);
 
         try {
-            toast.info("Creating data table...");
+            toast.info("Creating extraction table...");
 
-            // Create the data table via API
+            // Create the extraction table via API
             const response: DataTableJobStatusResponse = await fetchFromApi(`/api/projects/tables/`, {
                 method: "POST",
                 headers: {
@@ -285,14 +287,14 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
                 const newNearLimit = isDataTableNearLimit(tempUpdatedSubscription);
 
                 if (newAtLimit) {
-                    toast.warning("You've used all of your data tables for the week.", {
+                    toast.warning("You've used all of your extraction tables for the week.", {
                         action: {
                             label: "Upgrade",
                             onClick: () => router.push('/pricing'),
                         }
                     });
                 } else if (newNearLimit) {
-                    toast.info(`You have ${newUsage.data_tables_remaining} data tables remaining this week.`, {
+                    toast.info(`You have ${newUsage.data_tables_remaining} extraction tables remaining this week.`, {
                         action: {
                             label: "Upgrade",
                             onClick: () => router.push('/pricing'),
@@ -301,8 +303,8 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
                 }
             }
         } catch (err) {
-            console.error("Failed to create data table:", err);
-            toast.error("Failed to create data table. Please try again.");
+            console.error("Failed to create extraction table:", err);
+            toast.error("Failed to create extraction table. Please try again.");
         }
     };
 
@@ -316,16 +318,16 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
                 {currentUserRole !== ProjectRole.Viewer && (
                     <>
                         <Dialog open={isCreateAudioDialogOpen} onOpenChange={setCreateAudioDialogOpen}>
-                            <DialogTrigger asChild>
-                                <button
-                                    disabled={papers.length === 0}
-                                    className="flex items-center gap-2 px-3 py-2 text-sm text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    <Volume2 className="w-4 h-4" />
-                                    <span>Audio Overview</span>
-                                </button>
-                            </DialogTrigger>
-                        <DialogContent>
+                                                    <DialogTrigger asChild>
+                                                        <button
+                                                            disabled={papers.length === 0}
+                                                            className="relative flex items-center gap-2 px-3 py-2 text-sm text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        >
+                                                            <PlusCircle className="absolute -top-1.5 -right-1.5 w-3 h-3 text-gray-400 dark:text-gray-500" />
+                                                            <Volume2 className="w-4 h-4" />
+                                                            <span>Audio Overview</span>
+                                                        </button>
+                                                    </DialogTrigger>                        <DialogContent>
                             <DialogHeader>
                                 <DialogTitle>Create an Audio Overview</DialogTitle>
                                 <DialogDescription>
@@ -391,16 +393,17 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
                     <button
                         disabled={papers.length === 0}
                         onClick={() => setDataTableSchemaModalOpen(true)}
-                        className="flex items-center gap-2 px-3 py-2 text-sm text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="relative flex items-center gap-2 px-3 py-2 text-sm text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
+                        <PlusCircle className="absolute -top-1.5 -right-1.5 w-3 h-3 text-gray-400 dark:text-gray-500" />
                         <Table className="w-4 h-4" />
-                        <span>Data Table</span>
+                        <span>Extraction Table</span>
                     </button>
                 </>
                 )}
             </div>
 
-            {/* Data Table Schema Modal */}
+            {/* Extraction Table Schema Modal */}
             <DataTableSchemaModal
                 open={isDataTableSchemaModalOpen}
                 onOpenChange={setDataTableSchemaModalOpen}
@@ -409,7 +412,7 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
                 atLimit={atDataTableLimit}
             />
 
-            {/* Data Table Generation Jobs */}
+            {/* Extraction Table Generation Jobs */}
             {dataTableJobs.length > 0 && (
                 <div className="mt-4 space-y-3">
                     {dataTableJobs.map((job) => (

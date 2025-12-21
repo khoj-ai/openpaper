@@ -61,7 +61,7 @@ const features: PricingFeature[] = [
         teams: "500"
     },
     {
-        name: "Data tables",
+        name: "Extraction tables",
         basic: "2",
         researcher: "50",
         teams: "100"

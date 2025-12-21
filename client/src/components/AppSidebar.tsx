@@ -236,7 +236,7 @@ const UsageLimitCard = ({
                 />
 
                 <UsageItem
-                    label="Weekly Data Tables"
+                    label="Weekly Extraction Tables"
                     used={subscription.usage.data_tables_used}
                     total={subscription.usage.data_tables_used + subscription.usage.data_tables_remaining}
                     percentage={getDataTableUsagePercentage(subscription)}

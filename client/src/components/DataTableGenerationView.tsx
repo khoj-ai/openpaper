@@ -131,7 +131,7 @@ export default function DataTableGenerationView({
                             <TableIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                         </div>
                         <div>
-                            <h3 className="text-lg font-semibold">{title || 'Data Table'}</h3>
+                            <h3 className="text-lg font-semibold">{title || 'Extraction Table'}</h3>
                             <p className="text-sm text-muted-foreground">
                                 {rows.length} {rows.length === 1 ? 'row' : 'rows'} extracted
                             </p>

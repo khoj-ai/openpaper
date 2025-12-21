@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import Link from "next/link";
 
-export interface ColumnDefinition {
+export interface FieldDefinition {
     id: string;
     label: string;
 }
@@ -23,7 +23,7 @@ export interface ColumnDefinition {
 interface DataTableSchemaModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onSubmit: (columns: ColumnDefinition[]) => void;
+    onSubmit: (fields: FieldDefinition[]) => void;
     isCreating?: boolean;
     atLimit?: boolean;
 }
@@ -35,52 +35,52 @@ export default function DataTableSchemaModal({
     isCreating = false,
     atLimit = false
 }: DataTableSchemaModalProps) {
-    const [columns, setColumns] = useState<ColumnDefinition[]>([
+    const [fields, setFields] = useState<FieldDefinition[]>([
         { id: '1', label: '' }
     ]);
 
-    const addColumn = () => {
-        const newId = (Math.max(...columns.map(c => parseInt(c.id)), 0) + 1).toString();
-        setColumns([...columns, { id: newId, label: '' }]);
+    const addField = () => {
+        const newId = (Math.max(...fields.map(f => parseInt(f.id)), 0) + 1).toString();
+        setFields([...fields, { id: newId, label: '' }]);
     };
 
-    const removeColumn = (id: string) => {
-        if (columns.length > 1) {
-            setColumns(columns.filter(col => col.id !== id));
+    const removeField = (id: string) => {
+        if (fields.length > 1) {
+            setFields(fields.filter(field => field.id !== id));
         }
     };
 
-    const updateColumn = (id: string, value: string) => {
-        setColumns(columns.map(col =>
-            col.id === id ? { ...col, label: value } : col
+    const updateField = (id: string, value: string) => {
+        setFields(fields.map(field =>
+            field.id === id ? { ...field, label: value } : field
         ));
     };
 
     const handleSubmit = () => {
-        const validColumns = columns.filter(col => col.label.trim() !== '');
-        if (validColumns.length === 0) {
+        const validFields = fields.filter(field => field.label.trim() !== '');
+        if (validFields.length === 0) {
             return;
         }
-        onSubmit(validColumns);
+        onSubmit(validFields);
         // Reset state
-        setColumns([{ id: '1', label: '' }]);
+        setFields([{ id: '1', label: '' }]);
     };
 
-    const canSubmit = columns.some(col => col.label.trim() !== '');
+    const canSubmit = fields.some(field => field.label.trim() !== '');
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Define Data Table Schema</DialogTitle>
+                    <DialogTitle>Define Extraction Table Schema</DialogTitle>
                     <DialogDescription>
-                        Create a custom data table by defining columns. The AI will extract this information from each paper in your project.
+                        Define the fields for a custom extraction table. The AI will then extract the corresponding information from each paper in your project.
                     </DialogDescription>
                 </DialogHeader>
 
                 {atLimit ? (
                     <div className="mt-4 text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/30 rounded-md">
-                        <p className="text-sm text-yellow-800 dark:text-yellow-200">You&apos;ve used all your data tables for this week.</p>
+                        <p className="text-sm text-yellow-800 dark:text-yellow-200">You&apos;ve used all your extraction tables for this week.</p>
                         <Link href="/pricing" passHref>
                             <Button variant="link" className="p-0 h-auto text-sm">Upgrade your plan to create more.</Button>
                         </Link>
@@ -89,26 +89,26 @@ export default function DataTableSchemaModal({
                     <>
                         <div className="mt-4 space-y-4">
                             <div className="space-y-3">
-                                {columns.map((column, index) => (
-                                    <div key={column.id} className="flex gap-2 items-end">
+                                {fields.map((field, index) => (
+                                    <div key={field.id} className="flex gap-2 items-end">
                                         <div className="flex-1">
-                                            <Label htmlFor={`label-${column.id}`} className="text-sm font-medium">
-                                                Column {index + 1}
+                                            <Label htmlFor={`label-${field.id}`} className="text-sm font-medium">
+                                                Field {index + 1}
                                             </Label>
                                             <Input
-                                                id={`label-${column.id}`}
+                                                id={`label-${field.id}`}
                                                 placeholder="e.g., Author, Year, Sample Size, Key Finding..."
-                                                value={column.label}
-                                                onChange={(e) => updateColumn(column.id, e.target.value)}
+                                                value={field.label}
+                                                onChange={(e) => updateField(field.id, e.target.value)}
                                                 className="mt-1"
                                             />
                                         </div>
-                                        {columns.length > 1 && (
+                                        {fields.length > 1 && (
                                             <Button
                                                 type="button"
                                                 variant="ghost"
                                                 size="icon"
-                                                onClick={() => removeColumn(column.id)}
+                                                onClick={() => removeField(field.id)}
                                                 className="flex-shrink-0"
                                             >
                                                 <X className="h-4 w-4" />
@@ -121,16 +121,16 @@ export default function DataTableSchemaModal({
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={addColumn}
+                                onClick={addField}
                                 className="w-full"
                             >
                                 <Plus className="mr-2 h-4 w-4" />
-                                Add Column
+                                Add Field
                             </Button>
 
                             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/30 rounded-md p-3">
                                 <p className="text-xs text-blue-800 dark:text-blue-200">
-                                    <strong>Tip:</strong> Be specific with column labels for better results. For example, use &quot;Sample Size (n)&quot; instead of just &quot;Size&quot;.
+                                    <strong>Tip:</strong> Be specific with field labels for better results. For example, use &quot;Sample Size (n)&quot; instead of just &quot;Size&quot;.
                                 </p>
                             </div>
                         </div>

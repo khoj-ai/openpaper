@@ -70,7 +70,7 @@ export default function DataTableGenerationJobCard({ job, projectId }: DataTable
                 </div>
                 <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
-                        {job.title || 'Creating Data Table'}
+                        {job.title || 'Creating Extraction Table'}
                     </h3>
                     {job.status !== JobStatus.COMPLETED && (
                         <p className={`text-xs font-medium mb-1 ${getStatusColor(job.status)}`}>
