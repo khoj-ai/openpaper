@@ -30,7 +30,7 @@ import { useSubscription, isAudioOverviewAtLimit, isAudioOverviewNearLimit, isDa
 import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import DataTableSchemaModal, { ColumnDefinition } from "./DataTableSchemaModal";
+import DataTableSchemaModal, { FieldDefinition } from "./DataTableSchemaModal";
 import { useAudioPlayback } from "./hooks/useAudioPlayback";
 
 interface ArtifactsProps {
@@ -241,7 +241,7 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
         }
     };
 
-    const handleCreateDataTable = async (columns: ColumnDefinition[]) => {
+    const handleCreateDataTable = async (columns: FieldDefinition[]) => {
         setDataTableSchemaModalOpen(false);
         setIsCreatingDataTable(true);
 
