@@ -3,7 +3,7 @@ import { Project, ProjectRole } from "@/lib/schema";
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, ArrowRight, FileText, MessageCircle, X, Users, Headphones, Table, FolderKanban } from "lucide-react";
+import { MoreHorizontal, ArrowRight, FileText, MessageCircle, X, Users, Headphones, Table } from "lucide-react";
 import { useState } from "react";
 import {
 	AlertDialog,

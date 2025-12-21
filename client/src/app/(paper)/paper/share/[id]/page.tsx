@@ -386,13 +386,10 @@ export default function SharedPaperView() {
                                     </>
                                 )}
                                 {rightSideFunction === 'Overview' && (
-                                    <div className={'flex flex-col md:px-2 m-2 relative animate-fade-in'}>
-                                        <PaperMetadata
-                                            paperData={paperData}
-                                            hasMessages={false}
-                                            readonly={true}
-                                        />
-                                        {paperData.summary && (
+                                                                        <div className={'flex flex-col md:px-2 m-2 relative animate-fade-in'}>
+                                                                             <PaperMetadata
+                                                                                paperData={paperData}
+                                                                             />                                        {paperData.summary && (
                                             <div className="prose dark:prose-invert !max-w-full text-sm mt-4">
                                                 {memoizedOverviewContent}
                                                 {paperData.summary_citations && paperData.summary_citations.length > 0 && (
@@ -502,8 +499,6 @@ export default function SharedPaperView() {
                             <>
                                 <PaperMetadata
                                     paperData={paperData}
-                                    hasMessages={false}
-                                    readonly={true}
                                 />
                                 <AnnotationsView
                                     highlights={highlights}
@@ -518,12 +513,9 @@ export default function SharedPaperView() {
                         {rightSideFunction === 'Overview' && paperData.summary && (
                             <div className={`flex flex-col ${heightClass} md:px-2 overflow-y-auto m-2 relative animate-fade-in`}>
                                 {/* Paper Metadata Section */}
-                                <PaperMetadata
-                                    paperData={paperData}
-                                    hasMessages={false}
-                                    readonly={true}
-                                />
-                                <div className="prose dark:prose-invert !max-w-full text-sm">
+                                                                 <PaperMetadata
+                                                                    paperData={paperData}
+                                                                />                                <div className="prose dark:prose-invert !max-w-full text-sm">
                                     {memoizedOverviewContent}
                                     {
                                         paperData.summary_citations && paperData.summary_citations.length > 0 && (

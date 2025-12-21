@@ -912,8 +912,7 @@ export function SidePanelContent({
                         {
                             rightSideFunction === 'Chat' && (
                                 <div className={`flex flex-col ${heightClass} overflow-y-auto`}>
-                                    <PaperMetadata paperData={paperData} hasMessages={messages.length > 0} />
-                                    {/* Paper Chat Section */}
+                                                                         <PaperMetadata paperData={paperData} />                                    {/* Paper Chat Section */}
                                     <div
                                         className={`flex-1 overflow-y-auto space-y-2 transition-all duration-300 mt-2 ease-in-out ${isStreaming ? 'pb-24' : ''}`}
                                         ref={messagesContainerRef}

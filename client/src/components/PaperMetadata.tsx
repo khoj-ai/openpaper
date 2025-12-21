@@ -4,12 +4,6 @@ import {
     CollapsibleTrigger
 } from "@/components/ui/collapsible";
 
-import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-} from "@/components/ui/tabs";
 
 import {
     Accordion,
@@ -24,8 +18,6 @@ import { isDateValid } from "@/lib/utils";
 
 interface IPaperMetadata {
     paperData: PaperData;
-    hasMessages: boolean;
-    readonly?: boolean; // Add readonly prop
 }
 
 const googleScholarUrl = (searchTerm: string) => {
@@ -33,7 +25,7 @@ const googleScholarUrl = (searchTerm: string) => {
 }
 
 // Set default for readonly to false
-function PaperMetadata({ paperData, hasMessages, readonly = false }: IPaperMetadata) {
+function PaperMetadata({ paperData }: IPaperMetadata) {
     const [isOpen, setIsOpen] = useState(false);
 
     const showAccordion = paperData.authors?.length > 0 || paperData.institutions?.length > 0;
