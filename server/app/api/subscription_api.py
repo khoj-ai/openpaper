@@ -15,6 +15,7 @@ from app.database.telemetry import track_event
 from app.helpers.email import (
     notify_billing_issue,
     notify_converted_billing_interval,
+    send_confirmation_cancellation_email,
     send_subscription_welcome_email,
 )
 from app.helpers.subscription_limits import get_user_usage_info
@@ -537,27 +538,38 @@ async def handle_stripe_webhook(
                         is_scheduled_for_cancellation
                         and not was_scheduled_for_cancellation
                     ):
-                        track_event(
-                            event_name="subscription_canceled",
-                            properties={
-                                "subscription_id": subscription_id,
-                                "customer_id": stripe_sub.get("customer"),
-                                "interval": (
-                                    "yearly"
-                                    if stripe_received_price_id == YEARLY_PRICE_ID
-                                    else "monthly"
-                                ),
-                                "canceled_at": (
-                                    datetime.fromtimestamp(
-                                        stripe_sub.get("canceled_at", 0)
-                                    ).isoformat()
-                                    if stripe_sub.get("canceled_at")
-                                    else None
-                                ),
-                                "cancel_at_period_end": True,
-                            },
-                            user_id=str(subscription.user_id),
-                        )
+                        user_obj = user_crud.get(db, id=subscription.user_id)
+                        if user_obj:
+                            user_display_name = (
+                                str(user_obj.name).split(" ")[0]
+                                if user_obj.name
+                                else None
+                            )
+                            send_confirmation_cancellation_email(
+                                to_email=str(user_obj.email),
+                                name=user_display_name,
+                            )
+                            track_event(
+                                event_name="subscription_canceled",
+                                properties={
+                                    "subscription_id": subscription_id,
+                                    "customer_id": stripe_sub.get("customer"),
+                                    "interval": (
+                                        "yearly"
+                                        if stripe_received_price_id == YEARLY_PRICE_ID
+                                        else "monthly"
+                                    ),
+                                    "canceled_at": (
+                                        datetime.fromtimestamp(
+                                            stripe_sub.get("canceled_at", 0)
+                                        ).isoformat()
+                                        if stripe_sub.get("canceled_at")
+                                        else None
+                                    ),
+                                    "cancel_at_period_end": True,
+                                },
+                                user_id=str(subscription.user_id),
+                            )
                         logger.info(
                             f"Subscription {subscription_id} scheduled for cancellation at period end"
                         )

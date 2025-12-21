@@ -172,7 +172,7 @@ def notify_billing_issue(email: str, issue: str, name: Union[str, None] = None) 
             "from": "Open Paper <support@updates.openpaper.ai>",
             "reply_to": REPLY_TO_DEFAULT_EMAIL,
             "to": [email],
-            "subject": "Fulfillment Issue Detected",
+            "subject": "Open Paper - Fulfillment Issue Detected",
             "text": f"Hello {name},\n\nWe have detected an issue with your account. {issue}.\n\nVisit {manage_url} for assistance.\n\n- Open Paper",
         }
 
@@ -318,6 +318,42 @@ def send_project_invite_email(
             "to": to_email,
             "subject": subject,
             "html": html_content,
+        }
+
+        resend.Emails.send(payload)  # type: ignore
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to send invite email to {to_email}: {e}", exc_info=True)
+        return False
+
+
+def send_confirmation_cancellation_email(
+    to_email: str,
+    name: Union[str, None] = None,
+) -> bool:
+    """
+    Send a confirmation email when user has cancelled their paid subscription.
+
+    Args:
+        to_email: Recipient email address
+        from_name: Name of the person cancelling the invite
+
+    Returns:
+        bool: True if email was sent successfully, False otherwise
+    """
+    try:
+
+        user_name_str = f", {name}" if name else ""
+
+        subject = f"Sorry to see you go{user_name_str} - Open Paper"
+
+        payload = resend.Emails.SendParams = {  # type: ignore
+            "from": "Open Paper <support@updates.openpaper.ai>",
+            "reply_to": REPLY_TO_DEFAULT_EMAIL,
+            "to": to_email,
+            "subject": subject,
+            "text": f"Hello{user_name_str},\n\nThis email is to confirm that your subscription has been successfully cancelled. We're sorry to see you go!\n\nIf you have any feedback or if there's anything we can do to improve your experience, please let us know. You can reply to this email - I check every reply.\n\nThank you for being a part of Open Paper.\n\nHappy researching!\n- Saba (Founder, Open Paper)",
         }
 
         resend.Emails.send(payload)  # type: ignore
