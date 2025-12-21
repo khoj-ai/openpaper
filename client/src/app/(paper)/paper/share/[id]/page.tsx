@@ -33,13 +33,7 @@ interface SharedPaperResponse {
     owner: BasicUser;
 }
 
-const SharedPaperToolset = {
-    nav: [
-        { name: 'Overview', icon: Lightbulb },
-        { name: 'Chat', icon: MessageCircle },
-        { name: 'Annotations', icon: Highlighter },
-    ],
-};
+
 
 export default function SharedPaperView() {
     const params = useParams();
@@ -62,6 +56,18 @@ export default function SharedPaperView() {
     const [activeCitationKey, setActiveCitationKey] = useState<string | null>(null);
     const [activeCitationMessageIndex, setActiveCitationMessageIndex] = useState<number | null>(null);
     const [explicitSearchTerm, setExplicitSearchTerm] = useState<string>();
+
+    const dynamicPaperToolset = useMemo(() => {
+        const navItems = [
+            { name: 'Chat', icon: MessageCircle },
+            { name: 'Annotations', icon: Highlighter },
+        ];
+        if (paperData?.summary) {
+            navItems.unshift({ name: 'Overview', icon: Lightbulb });
+        }
+        return { nav: navItems };
+    }, [paperData?.summary]);
+
 
     const handleHighlightClick = useCallback((highlight: PaperHighlight) => {
         // Allow clicking highlights to potentially scroll/focus, but no editing
@@ -294,6 +300,10 @@ export default function SharedPaperView() {
                 setHighlights(response.highlights || []);
                 setAnnotations(response.annotations || []);
                 setOwner(response.owner);
+                // Set default rightSideFunction based on summary availability
+                if (!response.paper.summary) {
+                    setRightSideFunction('Chat');
+                }
             } catch (err) {
                 console.error("Error fetching shared paper data:", err);
                 setError("Failed to load shared paper. The link might be invalid or expired.");
@@ -434,7 +444,7 @@ export default function SharedPaperView() {
                             <PaperSidebar
                                 rightSideFunction={rightSideFunction}
                                 setRightSideFunction={setRightSideFunction}
-                                PaperToolset={SharedPaperToolset}
+                                PaperToolset={dynamicPaperToolset}
                             />
                         </div>
                     )}
@@ -559,7 +569,7 @@ export default function SharedPaperView() {
                     <PaperSidebar
                         rightSideFunction={rightSideFunction}
                         setRightSideFunction={setRightSideFunction}
-                        PaperToolset={SharedPaperToolset}
+                        PaperToolset={dynamicPaperToolset}
                     />
                 </div>
             </div>

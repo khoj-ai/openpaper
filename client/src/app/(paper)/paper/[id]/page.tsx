@@ -64,6 +64,7 @@ const AudioTool = {
 
 const PaperToolset = {
     nav: [
+        OverviewTool,
         ChatTool,
         AudioTool,
         AnnotationsTool,
@@ -119,27 +120,31 @@ export default function PaperView() {
     const [sidePanelDisplayedText, setSidePanelDisplayedText] = useState('');
     const [elapsedTime, setElapsedTime] = useState(0);
 
-    const [rightSideFunction, setRightSideFunction] = useState<string>('Chat');
-    const [initialRightSideFunctionSet, setInitialRightSideFunctionSet] = useState(false);
+    const [rightSideFunction, setRightSideFunction] = useState<string>('Overview');
     const [toolset, setToolset] = useState(PaperToolset);
 
     useEffect(() => {
-        if (paperData && !initialRightSideFunctionSet) {
+        if (paperData) {
             const rsf = searchParams.get('rsf')?.toLowerCase();
             const newToolset = { ...toolset };
             const validTools = newToolset.nav.map(tool => tool.name.toLowerCase());
 
             if (rsf && validTools.includes(rsf)) {
                 const toolName = newToolset.nav.find(tool => tool.name.toLowerCase() === rsf);
-                setRightSideFunction(toolName ? toolName.name : 'Overview');
+                setRightSideFunction(toolName ? toolName.name : 'Chat');
             } else if (paperData.summary_citations && paperData.summary_citations.length > 0) {
-                newToolset.nav.unshift(OverviewTool);
                 setRightSideFunction('Overview');
+            } else {
+                setRightSideFunction('Chat');
             }
-            setToolset(newToolset);
-            setInitialRightSideFunctionSet(true);
+
+            // Remove Overview tool if there are no summary citations
+            if (!paperData.summary_citations || paperData.summary_citations.length === 0) {
+                newToolset.nav = newToolset.nav.filter(tool => tool.name !== 'Overview');
+                setToolset(newToolset);
+            }
         }
-    }, [paperData, initialRightSideFunctionSet, searchParams]);
+    }, [paperData, searchParams]);
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
