@@ -32,13 +32,13 @@ const features: PricingFeature[] = [
     },
     {
         name: "Paper uploads",
-        basic: "50",
+        basic: "10",
         researcher: "500",
         teams: "unlimited"
     },
     {
         name: "Knowledge base size",
-        basic: "500 MB",
+        basic: "200 MB",
         researcher: "3 GB",
         teams: "50 GB"
     },

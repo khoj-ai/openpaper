@@ -1,5 +1,7 @@
 import re
-from typing import Dict, List, Optional, Sequence, Union
+from typing import List, Optional, Sequence, Union
+
+from app.schemas.responses import ResponseCitation
 
 
 class CitationHandler:
@@ -87,6 +89,21 @@ class CitationHandler:
             citations.append(current_citation)
 
         return citations
+
+    @staticmethod
+    def convert_response_citation_to_paper_citation(
+        response_citations: List[ResponseCitation],
+    ):
+        """Convert ResponseCitation objects to structured citation dicts"""
+        citations = []
+        for resp_citation in response_citations:
+            citation = {
+                "key": resp_citation.index,
+                "reference": resp_citation.text,
+                "paper_id": resp_citation.paper_id,
+            }
+            citations.append(citation)
+        return {"citations": citations}
 
     @staticmethod
     def parse_multi_paper_evidence_block(evidence_text: str) -> list[dict]:

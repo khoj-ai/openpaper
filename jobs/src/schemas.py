@@ -47,7 +47,7 @@ class AIHighlight(BaseModel):
 
 class TitleAuthorsAbstract(BaseModel):
     """Schema for title, authors, and abstract extraction."""
-    title: str = Field(description="Title of the paper in normal case")
+    title: str = Field(description="Title of the paper **in normal case**")
     authors: List[str] = Field(default=[], description="List of authors")
     abstract: str = Field(default="", description="Abstract of the paper")
     publish_date: Optional[str] = Field(
@@ -63,46 +63,33 @@ class InstitutionsKeywords(BaseModel):
     keywords: List[str] = Field(default=[], description="List of keywords")
 
 
-# Extracted images are referenced here! Refer to parser.py to see how place holder IDs are generated and inserted. This logic is super convoluted unfortunately, but the best workaround for image understanding in the PDF + LLM flow.
-# Update (7/22/2025) - image extraction has some serious edge cases that need to be figured out. It's not extracting incredibly useful images, so let's remove the line to encourage inline image rendering for now. For posterity:
-# - You may include images of figures if they are helpful to the summary. You may reference them in markdown image format inline using the placeholder IDs. Example: ![Figure 1](IMG_placeholder_1)
 class SummaryAndCitations(BaseModel):
     """Schema for summary and citations extraction."""
     summary_citations: List[ResponseCitation] = Field(
-        description="List of citations that are relevant to the summary. These should be direct quotes or paraphrases from the paper that support the summary provided. Remember to include the citation index (e.g., [^1], [^2]) in the summary.",
+        description="List of citations supporting the summary. Include direct quotes or paraphrases with the citation index. The index should match the inline citations used in the summary. Only include citations that are directly relevant to the summary content. Use sequential numbering starting from 1."
     )
     summary: str = Field(
         description="""
-    Generate a comprehensive yet concise summary of the research paper in markdown format that captures the essential contributions and findings for readers with basic domain knowledge.
+            Generate a concise summary of the research paper (< 200 words) that captures the essential contribution for readers with basic domain knowledge. Break each of the sections up for clarity. Separate sections with blank lines to ensure proper paragraph breaks in markdown. Do not use literal `\n` characters for line breaks. Do not use separate headings for each section.
 
-    ## Content Requirements:
-    - **Opening overview**: 2-4 sentences establishing the research problem, approach, and primary contribution
-    - **Core sections**: Organize using clear headings such as:
-    - **Motivation**: Why this research matters
-    - **Methodology**: Key experimental design, datasets, models, or theoretical approaches
-    - **Key Findings**: Primary results with specific metrics, performance improvements, or discoveries
-    - **Implications**: Significance for the field, limitations, and future directions
+            ## Structure:
+            Write 1-2 sentences on each section covering:
+            1. **Background**: What gap or question does this address?
+            2. **Methodology**: What methods, datasets, or techniques were used?
+            3. **Findings**: What were the main results? What are the implications? Include specific metrics when available.
 
-    ## Technical Specifications:
-    - **Length**: 400-800 words (prioritize clarity over brevity)
-    - **Precision**: Include quantitative results (accuracy scores, effect sizes, sample sizes) when available
-    - **Accessibility**: Use plain language explanations for technical concepts while preserving scientific accuracy
-    - **Structure**: Use markdown headers (##, ###), bullet points, and tables to enhance readability
+            ## Citation Requirements:
+            - Use inline citations [^1], [^2] to support factual claims, especially numerical results. The citation index should match the corresponding entry in the `summary_citations` field.
+            - Use sequential numbering starting from [^1]
 
-    ## Citation Integration:
-    - Embed inline citations [^1], [^2], [^6, ^7] to support all factual claims about methodology, results, and conclusions
-    - Use sequential numbering starting from [^1]
-    - Cite particularly important findings, novel methodologies, and key numerical results
-    - Ensure every major claim can be traced back to specific paper content
+            ## Quality Standards:
+            - Write in clear, accessible language while maintaining technical accuracy
+            - Focus on the paper's primary contribution—omit secondary findings
+            - Present findings objectively, including limitations when relevant
+            - If constrained for length, prioritize key results and implications
 
-    ## Quality Standards:
-    - **Completeness**: Address all major contributions mentioned in the abstract/conclusion
-    - **Balance**: Give appropriate weight to different sections based on their importance to the paper's contribution
-    - **Objectivity**: Present findings neutrally, including limitations or negative results when discussed
-    - **Coherence**: Ensure logical flow between sections that tells a complete research story
-
-    Do not include a title or repeat the paper's title in the summary.
-    """,
+            The goal is a focused, readable paragraph that gives someone a quick understanding of what the paper accomplishes.
+                    """,
     )
 
 

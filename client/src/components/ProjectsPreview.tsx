@@ -2,66 +2,16 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, FolderKanban, FileText, MessageCircle, Users } from "lucide-react";
 import { fetchFromApi } from "@/lib/api";
 import { Project } from "@/lib/schema";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatDate } from "@/lib/utils";
 
 interface ProjectsPreviewProps {
     limit?: number;
 }
 
-function ProjectCardCompact({ project }: { project: Project }) {
-    const updatedAt = project.updated_at
-        ? formatDate(project.updated_at)
-        : null;
-
-    return (
-        <Link
-            href={`/projects/${project.id}`}
-            className="group flex items-center gap-4 p-4 rounded-xl border border-border/50 bg-card hover:border-border hover:shadow-sm transition-all"
-        >
-            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-primary flex-shrink-0">
-                <FolderKanban className="h-5 w-5" />
-            </div>
-
-            <div className="flex-1 min-w-0">
-                <h3 className="font-medium truncate group-hover:text-primary transition-colors">
-                    {project.title}
-                </h3>
-                <div className="flex items-center gap-3 text-sm text-muted-foreground mt-0.5">
-                    {project.num_papers !== undefined && (
-                        <span className="flex items-center gap-1">
-                            <FileText className="h-3.5 w-3.5" />
-                            {project.num_papers} {project.num_papers === 1 ? "paper" : "papers"}
-                        </span>
-                    )}
-                    {project.num_conversations !== undefined && project.num_conversations > 0 && (
-                        <span className="flex items-center gap-1">
-                            <MessageCircle className="h-3.5 w-3.5" />
-                            {project.num_conversations}
-                        </span>
-                    )}
-                    {project.num_roles !== undefined && project.num_roles > 1 && (
-                        <span className="flex items-center gap-1">
-                            <Users className="h-3.5 w-3.5" />
-                            {project.num_roles}
-                        </span>
-                    )}
-                </div>
-            </div>
-
-            {updatedAt && (
-                <span className="text-xs text-muted-foreground hidden sm:block">
-                    {updatedAt}
-                </span>
-            )}
-
-            <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-        </Link>
-    );
-}
+import { ProjectCard } from "@/components/ProjectCard";
+import { ArrowRight, FolderKanban } from "lucide-react";
 
 function ProjectCardSkeleton() {
     return (
@@ -136,7 +86,7 @@ export function ProjectsPreview({ limit = 4 }: ProjectsPreviewProps) {
 
             <div className="space-y-2">
                 {projects.map((project) => (
-                    <ProjectCardCompact key={project.id} project={project} />
+                    <ProjectCard key={project.id} project={project} compact={true} />
                 ))}
             </div>
         </div>

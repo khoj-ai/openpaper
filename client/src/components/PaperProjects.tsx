@@ -6,6 +6,7 @@ import {
 import {
     Loader,
     ArrowRight,
+    CirclePlus,
 } from 'lucide-react';
 import Link from 'next/link';
 import React, { useState, useEffect } from 'react';
@@ -25,6 +26,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Input } from './ui/input';
 import { ProjectCard } from './ProjectCard';
 
 interface PaperProjectsProps {
@@ -39,6 +41,7 @@ export function PaperProjects({ id, view = 'full' }: PaperProjectsProps) {
     const [addingToProjectId, setAddingToProjectId] = useState<string | null>(null);
     const [isCreateProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
     const [isProjectLimitDialogOpen, setProjectLimitDialogOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
     const { subscription } = useSubscription();
     const router = useRouter();
 
@@ -120,6 +123,11 @@ export function PaperProjects({ id, view = 'full' }: PaperProjectsProps) {
     };
 
     const projectsToAdd = allProjects.filter(p => !projects.some(pp => pp.id === p.id));
+    const filteredProjectsToAdd = projectsToAdd.filter(project =>
+        project.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (project.description && project.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+
 
     if (view === 'compact' && !isLoadingProjects && projects.length === 0) {
         return null;
@@ -165,6 +173,7 @@ export function PaperProjects({ id, view = 'full' }: PaperProjectsProps) {
                             <ProjectCard
                                 key={project.id}
                                 project={project}
+                                compact={true}
                                 onUnlink={() => handleUnlink(project.id)}
                             />
                         ))}
@@ -200,32 +209,41 @@ export function PaperProjects({ id, view = 'full' }: PaperProjectsProps) {
                         <div className="flex items-center justify-center py-4">
                             <Loader className="animate-spin mr-2 h-4 w-4" />
                         </div>
-                    ) : projectsToAdd.length > 0 ? (
-                        <div className="space-y-2">
-                            {projectsToAdd.map(project => (
-                                <div key={project.id} className="flex items-center justify-between p-2 border rounded-md">
-                                    <div className='pr-2'>
-                                        <div className="font-semibold">{project.title}</div>
-                                        {project.description && <div className="text-sm text-muted-foreground">{project.description}</div>}
-                                    </div>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => handleAddPaperToProject(project.id)}
-                                        disabled={addingToProjectId === project.id}
-                                        className="flex-shrink-0"
-                                    >
-                                        {addingToProjectId === project.id ? (
-                                            <Loader className="animate-spin h-4 w-4" />
-                                        ) : (
-                                            "Add"
-                                        )}
-                                    </Button>
-                                </div>
-                            ))}
-                        </div>
                     ) : (
-                        <p className="text-sm text-muted-foreground">This paper has been added to all available projects.</p>
+                        <div className="space-y-2">
+                            <Input
+                                placeholder="Search projects..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="mb-2"
+                            />
+                            <div className="space-y-2 max-h-60 overflow-y-auto">
+                                {filteredProjectsToAdd.map(project => (
+                                    <div key={project.id} className="flex items-center justify-between p-2 border rounded-md">
+                                        <div className='pr-2'>
+                                            <div className="font-semibold">{project.title}</div>
+                                            {project.description && <div className="text-sm text-muted-foreground">{project.description}</div>}
+                                        </div>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => handleAddPaperToProject(project.id)}
+                                            disabled={addingToProjectId === project.id}
+                                            className="flex-shrink-0"
+                                        >
+                                            {addingToProjectId === project.id ? (
+                                                <Loader className="animate-spin h-4 w-4" />
+                                            ) : (
+                                                <CirclePlus className="h-4 w-4" />
+                                            )}
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                            {filteredProjectsToAdd.length === 0 && (
+                                <p className="text-sm text-muted-foreground text-center">No projects found.</p>
+                            )}
+                        </div>
                     )}
                 </div>
             )}

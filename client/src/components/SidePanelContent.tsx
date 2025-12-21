@@ -29,6 +29,7 @@ import {
     DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import { Input } from '@/components/ui/input';
+import { ChatHistorySkeleton } from '@/components/ChatHistorySkeleton';
 import { Button } from '@/components/ui/button';
 import { AnnotationsView } from '@/components/AnnotationsView';
 import { AudioOverviewPanel } from '@/components/AudioOverview';
@@ -49,7 +50,6 @@ import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useSubscription, getChatCreditUsagePercentage, isChatCreditAtLimit, isChatCreditNearLimit } from '@/hooks/useSubscription';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { PaperProjects } from './PaperProjects';
 import { getAlphaHashToBackgroundColor, getInitials } from '@/lib/utils';
 
 
@@ -130,6 +130,7 @@ export function SidePanelContent({
     const [isTyping, setIsTyping] = useState(false);
     const [currentLoadingMessageIndex, setCurrentLoadingMessageIndex] = useState(0);
     const [errorState, setErrorState] = useState<{ failedUserMessage: string } | null>(null);
+    const [isFetchingHistory, setIsFetchingHistory] = useState(true);
 
 
 
@@ -168,7 +169,12 @@ export function SidePanelContent({
     ]
 
     const fetchMoreMessages = async () => {
-        if (!hasMoreMessages || isLoadingMoreMessages || !conversationId) return;
+        if (!hasMoreMessages || isLoadingMoreMessages || !conversationId) {
+            if (isFetchingHistory) {
+                setIsFetchingHistory(false);
+            }
+            return;
+        }
 
         setIsLoadingMoreMessages(true);
         try {
@@ -208,6 +214,9 @@ export function SidePanelContent({
             console.error('Error fetching more messages:', error);
         } finally {
             setIsLoadingMoreMessages(false);
+            if (isFetchingHistory) {
+                setIsFetchingHistory(false);
+            }
         }
     };
 
@@ -830,11 +839,6 @@ export function SidePanelContent({
                                 </div>
                             )
                         }
-                        {
-                            rightSideFunction === 'Projects' && (
-                                <PaperProjects id={id} />
-                            )
-                        }
 
                         {/* Paper Images Section - Disabled pending extraction improvements */}
                         {/* {
@@ -908,20 +912,14 @@ export function SidePanelContent({
                         {
                             rightSideFunction === 'Chat' && (
                                 <div className={`flex flex-col ${heightClass} overflow-y-auto`}>
-                                    {/* Paper Metadata Section */}
-                                    {paperData && (
-                                        <PaperMetadata
-                                            paperData={paperData}
-                                            hasMessages={messages.length > 0}
-                                        />
-                                    )}
-
+                                    <PaperMetadata paperData={paperData} hasMessages={messages.length > 0} />
+                                    {/* Paper Chat Section */}
                                     <div
                                         className={`flex-1 overflow-y-auto space-y-2 transition-all duration-300 mt-2 ease-in-out ${isStreaming ? 'pb-24' : ''}`}
                                         ref={messagesContainerRef}
                                         onScroll={handleScroll}
                                     >
-                                        {hasMoreMessages && messages.length > 0 && (
+                                        {hasMoreMessages && messages.length > 0 && !isFetchingHistory && (
                                             <div className="text-center py-2">
                                                 {isLoadingMoreMessages ? (
                                                     <div className="text-sm text-gray-500">Loading messages...</div>
@@ -935,35 +933,15 @@ export function SidePanelContent({
                                                 )}
                                             </div>
                                         )}
+                                        {isFetchingHistory ? <ChatHistorySkeleton /> :
+                                            (
+                                                <>
 
-                                        {messages.length === 0 ? (
-                                            <div className="text-center text-gray-500 my-4">
-                                                What do you want to understand about this paper?
-                                                <div className='grid grid-cols-1 gap-2 mt-2'>
-                                                    {starterQuestions.slice(0, 5).map((question, i) => (
-                                                        <Button
-                                                            key={i}
-                                                            variant="outline"
-                                                            className="text-sm font-medium p-2 max-w-full whitespace-normal h-auto text-left justify-start break-words bg-background text-secondary-foreground hover:bg-secondary/50 border-1 hover:translate-y-0.5 transition-transform duration-200"
-                                                            onClick={() => {
-                                                                setCurrentMessage(question);
-                                                                inputMessageRef.current?.focus();
-                                                                chatInputFormRef.current?.scrollIntoView({
-                                                                    behavior: 'smooth',
-                                                                    block: 'nearest',
-                                                                    inline: 'nearest',
-                                                                });
-                                                                setPendingStarterQuestion(question);
-                                                            }}
-                                                        >
-                                                            {question}
-                                                        </Button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            memoizedMessages
-                                        )}
+                                                    {memoizedMessages}
+
+                                                </>
+                                            )
+                                        }
                                         {errorState && !isStreaming && (
                                             <div className="relative group prose dark:prose-invert p-2 !max-w-full rounded-lg w-full text-primary dark:text-primary-foreground">
                                                 <div className="text-red-500">
@@ -1056,6 +1034,31 @@ export function SidePanelContent({
                                         }
                                         <div ref={messagesEndRef} />
                                     </div>
+                                    {(messages.length === 0 || messages.length === 1) && !hasMoreMessages && (
+                                        <div className="text-center text-gray-500 my-4">
+                                                <div className='flex overflow-x-auto gap-2 mt-2 pb-2 scrollbar-hide'>
+                                                {starterQuestions.slice(0, 5).map((question, i) => (
+                                                    <Button
+                                                        key={i}
+                                                        variant="outline"
+                                                        className="text-sm font-normal p-2 bg-background text-secondary-foreground hover:bg-secondary/50 border rounded-full whitespace-nowrap"
+                                                        onClick={() => {
+                                                            setCurrentMessage(question);
+                                                            inputMessageRef.current?.focus();
+                                                            chatInputFormRef.current?.scrollIntoView({
+                                                                behavior: 'smooth',
+                                                                block: 'nearest',
+                                                                inline: 'nearest',
+                                                            });
+                                                            setPendingStarterQuestion(question);
+                                                        }}
+                                                    >
+                                                        {question}
+                                                    </Button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                     <form onSubmit={handleSubmit} className="flex flex-col gap-2" ref={chatInputFormRef}>
                                         {
                                             userMessageReferences.length > 0 && (
