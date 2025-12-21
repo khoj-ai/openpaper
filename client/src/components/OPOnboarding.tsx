@@ -133,7 +133,7 @@ const jobTitles = [
 
 const referralSourceOptions = [
 	"Recommendation from Friend / Colleague", "Search Engine (Google, Bing)",
-	"Social Media (LinkedIn, Twitter)", "Social Media (TikTok)", "Blog Post or Article",
+	"Social Media (LinkedIn, Twitter)", "Social Media (TikTok)", "Social Media (YouTube)", "Blog Post or Article",
 	"Conference / Webinar / Workshop", "University / Institution Resource",
 	"AI Recommendation (Copilot, ChatGPT)", "Other"
 ].map((option, index) => ({
