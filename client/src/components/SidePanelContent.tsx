@@ -936,58 +936,9 @@ export function SidePanelContent({
                                         {isFetchingHistory ? <ChatHistorySkeleton /> :
                                             (
                                                 <>
-                                                    {messages.length === 0 && !hasMoreMessages && (
-                                                        <div className="text-center text-gray-500 my-4">
-                                                            <div className='flex overflow-x-auto gap-2 mt-2 pb-2'>
-                                                                {starterQuestions.slice(0, 5).map((question, i) => (
-                                                                    <Button
-                                                                        key={i}
-                                                                        variant="outline"
-                                                                        className="text-sm font-normal p-2 bg-background text-secondary-foreground hover:bg-secondary/50 border rounded-full whitespace-nowrap"
-                                                                        onClick={() => {
-                                                                            setCurrentMessage(question);
-                                                                            inputMessageRef.current?.focus();
-                                                                            chatInputFormRef.current?.scrollIntoView({
-                                                                                behavior: 'smooth',
-                                                                                block: 'nearest',
-                                                                                inline: 'nearest',
-                                                                            });
-                                                                            setPendingStarterQuestion(question);
-                                                                        }}
-                                                                    >
-                                                                        {question}
-                                                                    </Button>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {memoizedMessages}
-                                                    {messages.length === 1 && !hasMoreMessages && (
-                                                        <div className="text-center text-gray-500 my-4">
 
-                                                            <div className='flex overflow-x-auto gap-2 mt-2 pb-2'>
-                                                                {starterQuestions.slice(0, 5).map((question, i) => (
-                                                                    <Button
-                                                                        key={i}
-                                                                        variant="outline"
-                                                                        className="text-sm font-normal p-2 bg-background text-secondary-foreground hover:bg-secondary/50 border rounded-full whitespace-nowrap"
-                                                                        onClick={() => {
-                                                                            setCurrentMessage(question);
-                                                                            inputMessageRef.current?.focus();
-                                                                            chatInputFormRef.current?.scrollIntoView({
-                                                                                behavior: 'smooth',
-                                                                                block: 'nearest',
-                                                                                inline: 'nearest',
-                                                                            });
-                                                                            setPendingStarterQuestion(question);
-                                                                        }}
-                                                                    >
-                                                                        {question}
-                                                                    </Button>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
+                                                    {memoizedMessages}
+
                                                 </>
                                             )
                                         }
@@ -1083,6 +1034,31 @@ export function SidePanelContent({
                                         }
                                         <div ref={messagesEndRef} />
                                     </div>
+                                    {(messages.length === 0 || messages.length === 1) && !hasMoreMessages && (
+                                        <div className="text-center text-gray-500 my-4">
+                                                <div className='flex overflow-x-auto gap-2 mt-2 pb-2 scrollbar-hide'>
+                                                {starterQuestions.slice(0, 5).map((question, i) => (
+                                                    <Button
+                                                        key={i}
+                                                        variant="outline"
+                                                        className="text-sm font-normal p-2 bg-background text-secondary-foreground hover:bg-secondary/50 border rounded-full whitespace-nowrap"
+                                                        onClick={() => {
+                                                            setCurrentMessage(question);
+                                                            inputMessageRef.current?.focus();
+                                                            chatInputFormRef.current?.scrollIntoView({
+                                                                behavior: 'smooth',
+                                                                block: 'nearest',
+                                                                inline: 'nearest',
+                                                            });
+                                                            setPendingStarterQuestion(question);
+                                                        }}
+                                                    >
+                                                        {question}
+                                                    </Button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                     <form onSubmit={handleSubmit} className="flex flex-col gap-2" ref={chatInputFormRef}>
                                         {
                                             userMessageReferences.length > 0 && (
