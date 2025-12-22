@@ -401,12 +401,12 @@ export function LibraryTable({
 				<div className="border bg-card transition-all duration-300 ease-in-out min-w-0 overflow-hidden">
 					<div
 						ref={tableContainerRef}
-						className="overflow-y-auto"
+						className="overflow-auto"
 						style={{ maxHeight }}
 					>
-						<Table>
+						<Table noWrapperOverflow>
 							<TableHeader className="sticky top-0 bg-card z-10">
-								<TableRow className="hover:bg-transparent border-b-2">
+								<TableRow className="border-b-2 bg-card">
 									{selectable && (
 										<TableHead className="w-12 text-center">
 											<Checkbox
@@ -651,7 +651,9 @@ export function LibraryTable({
 							</SheetContent>
 						</Sheet>
 					) : (
-						<PaperPreview paper={selectedPaperForPreview} onClose={() => setSelectedPaperForPreview(null)} setPaper={setPaper} />
+						<div className="overflow-hidden" style={{ maxHeight }}>
+							<PaperPreview paper={selectedPaperForPreview} onClose={() => setSelectedPaperForPreview(null)} setPaper={setPaper} />
+						</div>
 					)
 				)}
 			</div>

@@ -60,182 +60,180 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
     };
 
     return (
-        <div className="border bg-card rounded-lg transition-all duration-300 ease-in-out min-w-0 overflow-hidden">
-            <div className="h-full">
-                <div className="p-4 relative overflow-y-auto">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute top-2 right-2 z-10"
-                        onClick={onClose}
-                    >
-                        <X className="h-4 w-4" />
-                    </Button>
-                    <Link href={`/paper/${paper.id}`} passHref>
-                        <h3 className="font-bold text-lg mb-2 pr-8 hover:underline cursor-pointer flex items-center gap-2">
-                            {paper.title}
-                            <ExternalLink className="h-4 w-4 flex-shrink-0" />
-                        </h3>
-                    </Link>
-                    {paper.preview_url && (
-                        <>
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={paper.preview_url}
-                                alt="Paper preview"
-                                className="w-full h-auto my-4 rounded-md"
-                            />
-                        </>
+        <div className="h-full border bg-card rounded-none transition-all duration-300 ease-in-out min-w-0 overflow-hidden flex flex-col">
+            <div className="flex-grow p-4 relative overflow-y-auto">
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-2 right-2 z-10"
+                    onClick={onClose}
+                >
+                    <X className="h-4 w-4" />
+                </Button>
+                <Link href={`/paper/${paper.id}`} passHref>
+                    <h3 className="font-bold text-lg mb-2 pr-8 hover:underline cursor-pointer flex items-center gap-2">
+                        {paper.title}
+                        <ExternalLink className="h-4 w-4 flex-shrink-0" />
+                    </h3>
+                </Link>
+                {paper.preview_url && (
+                    <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={paper.preview_url}
+                            alt="Paper preview"
+                            className="w-full h-auto my-4 rounded-md"
+                        />
+                    </>
+                )}
+                <div className="flex items-center gap-2 flex-wrap">
+                    {paper.status && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="outline" className="h-8 px-3 text-xs capitalize">
+                                    <span className="flex items-center gap-2">
+                                        {getStatusIcon(paper.status)}
+                                        {paper.status}
+                                    </span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleStatusChange(paper, PaperStatusEnum.TODO, setPaper)}>
+                                    {getStatusIcon(PaperStatusEnum.TODO)}
+                                    Todo
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleStatusChange(paper, PaperStatusEnum.READING, setPaper)}>
+                                    {getStatusIcon(PaperStatusEnum.READING)}
+                                    Reading
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleStatusChange(paper, PaperStatusEnum.COMPLETED, setPaper)}>
+                                    {getStatusIcon(PaperStatusEnum.COMPLETED)}
+                                    Completed
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     )}
-                    <div className="flex items-center gap-2 flex-wrap">
-                        {paper.status && (
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button size="sm" variant="outline" className="h-8 px-3 text-xs capitalize">
-                                        <span className="flex items-center gap-2">
-                                            {getStatusIcon(paper.status)}
-                                            {paper.status}
-                                        </span>
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => handleStatusChange(paper, PaperStatusEnum.TODO, setPaper)}>
-                                        {getStatusIcon(PaperStatusEnum.TODO)}
-                                        Todo
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleStatusChange(paper, PaperStatusEnum.READING, setPaper)}>
-                                        {getStatusIcon(PaperStatusEnum.READING)}
-                                        Reading
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleStatusChange(paper, PaperStatusEnum.COMPLETED, setPaper)}>
-                                        {getStatusIcon(PaperStatusEnum.COMPLETED)}
-                                        Completed
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        )}
-                        <CitePaperButton paper={[loadedPaper ?? paper]} minimalist={true} />
-                    </div>
-
-                    {/* Paper Info Section - Tabular Layout */}
-                    {(paper?.authors?.length || loadedPaper?.journal || loadedPaper?.publisher || loadedPaper?.publish_date) && (
-                        <div className="mt-4 mb-2 text-sm border rounded-md overflow-hidden">
-                            <table className="w-full">
-                                <tbody className="divide-y divide-border">
-                                    {paper?.authors && paper.authors.length > 0 && (
-                                        <tr>
-                                            <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">Author</td>
-                                            <td className="px-3 py-2">{paper.authors.join(', ')}</td>
-                                        </tr>
-                                    )}
-                                    {paper?.publish_date && (
-                                        <tr>
-                                            <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">Published</td>
-                                            <td className="px-3 py-2">{new Date(paper.publish_date).toLocaleDateString()}</td>
-                                        </tr>
-                                    )}
-                                    {
-                                        loadedPaper?.doi && (
-                                            <tr>
-                                                <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">DOI</td>
-                                                <td className="px-3 py-2">
-                                                    <a
-                                                        href={`https://doi.org/${loadedPaper.doi}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-600 hover:underline"
-                                                    >
-                                                        {loadedPaper.doi}
-                                                    </a>
-                                                </td>
-                                            </tr>
-                                        )
-                                    }
-                                    {loadedPaper?.journal && (
-                                        <tr>
-                                            <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">Publication</td>
-                                            <td className="px-3 py-2">{loadedPaper.journal}</td>
-                                        </tr>
-                                    )}
-                                    {loadedPaper?.publisher && (
-                                        <tr>
-                                            <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">Publisher</td>
-                                            <td className="px-3 py-2">{loadedPaper.publisher}</td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-
-                    {/* Highlights Section */}
-                    {highlightCount > 0 && (
-                        <div className="space-y-2 mb-4">
-                            <h4 className="font-semibold text-sm flex items-center gap-2 mt-2">
-                                <Highlighter className="h-4 w-4 text-yellow-600" />
-                                Highlights ({highlightCount})
-                            </h4>
-                            <div className="space-y-3">
-                                {highlights.filter(highlight => highlight.role === 'user').slice(0, showAllHighlights ? undefined : 3).map((highlight) => (
-                                    <div key={highlight.id} className="p-2 border-l-2 border-yellow-400 bg-yellow-50/50 dark:bg-yellow-950/20 rounded-r">
-                                        <p className="text-sm">
-                                            {truncateText(highlight.raw_text, 200)}
-                                        </p>
-                                        {highlight.page_number != null && (
-                                            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                                                <span>Page {highlight.page_number + 1}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                                {highlightCount > 3 && (
-                                    <Button
-                                        variant="link"
-                                        size="sm"
-                                        className="h-auto p-0 text-xs"
-                                        onClick={() => setShowAllHighlights(!showAllHighlights)}
-                                    >
-                                        {showAllHighlights
-                                            ? 'Show less'
-                                            : `+${highlightCount - 3} more highlight${highlightCount - 3 !== 1 ? 's' : ''}`
-                                        }
-                                    </Button>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="space-y-2 my-4">
-                        <div className="flex items-center justify-between mb-1">
-                            <h4 className="font-semibold text-sm">Tags</h4>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="sm" className="h-7 text-xs"><Plus className="h-2.5 w-2.5" /></Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent className="w-80" align="start">
-                                    <TagSelector
-                                        paperIds={[paper.id]}
-                                        onTagsApplied={onTagsApplied}
-                                    />
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-                        <div className="flex flex-wrap gap-2 items-center">
-                            {paper.tags?.map(tag => (
-                                <span key={tag.id} className="group relative inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-sm dark:bg-blue-900 dark:text-blue-200 text-xs">
-                                    {tag.name}
-                                    <button
-                                        onClick={() => handleRemoveTag(tag.id)}
-                                        className="ml-1.5 -mr-1 p-0.5 bg-blue-200/50 dark:bg-blue-800/50 text-blue-700 dark:text-blue-100 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                                    >
-                                        <X className="h-2.5 w-2.5" />
-                                    </button>
-                                </span>
-                            ))}
-
-                        </div>
-                    </div>
-                    <PaperProjects id={paper.id} view='compact' />
+                    <CitePaperButton paper={[loadedPaper ?? paper]} minimalist={true} />
                 </div>
+
+                {/* Paper Info Section - Tabular Layout */}
+                {(paper?.authors?.length || loadedPaper?.journal || loadedPaper?.publisher || loadedPaper?.publish_date) && (
+                    <div className="mt-4 mb-2 text-sm border rounded-md overflow-hidden">
+                        <table className="w-full">
+                            <tbody className="divide-y divide-border">
+                                {paper?.authors && paper.authors.length > 0 && (
+                                    <tr>
+                                        <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">Author</td>
+                                        <td className="px-3 py-2">{paper.authors.join(', ')}</td>
+                                    </tr>
+                                )}
+                                {paper?.publish_date && (
+                                    <tr>
+                                        <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">Published</td>
+                                        <td className="px-3 py-2">{new Date(paper.publish_date).toLocaleDateString()}</td>
+                                    </tr>
+                                )}
+                                {
+                                    loadedPaper?.doi && (
+                                        <tr>
+                                            <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">DOI</td>
+                                            <td className="px-3 py-2">
+                                                <a
+                                                    href={`https://doi.org/${loadedPaper.doi}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-600 hover:underline"
+                                                >
+                                                    {loadedPaper.doi}
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    )
+                                }
+                                {loadedPaper?.journal && (
+                                    <tr>
+                                        <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">Publication</td>
+                                        <td className="px-3 py-2">{loadedPaper.journal}</td>
+                                    </tr>
+                                )}
+                                {loadedPaper?.publisher && (
+                                    <tr>
+                                        <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">Publisher</td>
+                                        <td className="px-3 py-2">{loadedPaper.publisher}</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                {/* Highlights Section */}
+                {highlightCount > 0 && (
+                    <div className="space-y-2 mb-4">
+                        <h4 className="font-semibold text-sm flex items-center gap-2 mt-2">
+                            <Highlighter className="h-4 w-4 text-yellow-600" />
+                            Highlights ({highlightCount})
+                        </h4>
+                        <div className="space-y-3">
+                            {highlights.filter(highlight => highlight.role === 'user').slice(0, showAllHighlights ? undefined : 3).map((highlight) => (
+                                <div key={highlight.id} className="p-2 border-l-2 border-yellow-400 bg-yellow-50/50 dark:bg-yellow-950/20 rounded-r">
+                                    <p className="text-sm">
+                                        {truncateText(highlight.raw_text, 200)}
+                                    </p>
+                                    {highlight.page_number != null && (
+                                        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                                            <span>Page {highlight.page_number + 1}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                            {highlightCount > 3 && (
+                                <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="h-auto p-0 text-xs"
+                                    onClick={() => setShowAllHighlights(!showAllHighlights)}
+                                >
+                                    {showAllHighlights
+                                        ? 'Show less'
+                                        : `+${highlightCount - 3} more highlight${highlightCount - 3 !== 1 ? 's' : ''}`
+                                    }
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                <div className="space-y-2 my-4">
+                    <div className="flex items-center justify-between mb-1">
+                        <h4 className="font-semibold text-sm">Tags</h4>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-7 text-xs"><Plus className="h-2.5 w-2.5" /></Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-80" align="start">
+                                <TagSelector
+                                    paperIds={[paper.id]}
+                                    onTagsApplied={onTagsApplied}
+                                />
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                    <div className="flex flex-wrap gap-2 items-center">
+                        {paper.tags?.map(tag => (
+                            <span key={tag.id} className="group relative inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-sm dark:bg-blue-900 dark:text-blue-200 text-xs">
+                                {tag.name}
+                                <button
+                                    onClick={() => handleRemoveTag(tag.id)}
+                                    className="ml-1.5 -mr-1 p-0.5 bg-blue-200/50 dark:bg-blue-800/50 text-blue-700 dark:text-blue-100 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                    <X className="h-2.5 w-2.5" />
+                                </button>
+                            </span>
+                        ))}
+
+                    </div>
+                </div>
+                <PaperProjects id={paper.id} view='compact' />
             </div>
         </div>
     );
