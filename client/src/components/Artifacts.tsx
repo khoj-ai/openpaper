@@ -318,88 +318,89 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
                 {currentUserRole !== ProjectRole.Viewer && (
                     <>
                         <Dialog open={isCreateAudioDialogOpen} onOpenChange={setCreateAudioDialogOpen}>
-                                                    <DialogTrigger asChild>
-                                                        <button
-                                                            disabled={papers.length === 0}
-                                                            className="relative flex items-center gap-2 px-3 py-2 text-sm text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                                        >
-                                                            <PlusCircle className="absolute -top-1.5 -right-1.5 w-3 h-3 text-gray-400 dark:text-gray-500" />
-                                                            <Volume2 className="w-4 h-4" />
-                                                            <span>Audio Overview</span>
-                                                        </button>
-                                                    </DialogTrigger>                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Create an Audio Overview</DialogTitle>
-                                <DialogDescription>
-                                    Generate an audio overview of your project papers. Add custom instructions to guide the content.
-                                </DialogDescription>
-                            </DialogHeader>
-                            {atAudioLimit ? (
-                                <div className="mt-4 text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/30 rounded-md">
-                                    <p className="text-sm text-yellow-800 dark:text-yellow-200">You&apos;ve used all your audio overviews for this week.</p>
-                                    <Link href="/pricing" passHref>
-                                        <Button variant="link" className="p-0 h-auto text-sm">Upgrade your plan to create more.</Button>
-                                    </Link>
-                                </div>
-                            ) : (
-                                <div className="space-y-4 mt-4">
-                                    <div>
-                                        <Label htmlFor="audio-length" className="text-sm font-medium">
-                                            Audio Length
-                                        </Label>
-                                        <Select value={selectedAudioLength} onValueChange={setSelectedAudioLength}>
-                                            <SelectTrigger className="mt-2">
-                                                <SelectValue placeholder="Select audio length" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {audioLengthOptions.map((option) => (
-                                                    <SelectItem key={option.value} value={option.value}>
-                                                        {option.label}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                            <DialogTrigger asChild>
+                                <button
+                                    disabled={papers.length === 0}
+                                    className="relative flex items-center gap-2 px-3 py-2 text-sm text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <PlusCircle className="absolute -top-1.5 -right-1.5 w-3 h-3 text-gray-400 dark:text-gray-500" />
+                                    <Volume2 className="w-4 h-4" />
+                                    <span>Audio Overview</span>
+                                </button>
+                            </DialogTrigger>                        <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Create an Audio Overview</DialogTitle>
+                                    <DialogDescription>
+                                        Generate an audio overview of your project papers. Add custom instructions to guide the content.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                {atAudioLimit ? (
+                                    <div className="mt-4 text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/30 rounded-md">
+                                        <p className="text-sm text-yellow-800 dark:text-yellow-200">You&apos;ve used all your audio overviews for this week.</p>
+                                        <Link href="/pricing" passHref>
+                                            <Button variant="link" className="p-0 h-auto text-sm">Upgrade your plan to create more.</Button>
+                                        </Link>
                                     </div>
-                                    <div>
-                                        <Label htmlFor="audio-instructions" className="text-sm font-medium">
-                                            Custom Instructions (Optional)
-                                        </Label>
-                                        <Textarea
-                                            id="audio-instructions"
-                                            placeholder="Add any specific topics, focus areas, or instructions for the audio overview..."
-                                            value={audioInstructions}
-                                            onChange={(e) => setAudioInstructions(e.target.value)}
-                                            className="mt-2 min-h-[100px] resize-none"
-                                        />
+                                ) : (
+                                    <div className="space-y-4 mt-4">
+                                        <div>
+                                            <Label htmlFor="audio-length" className="text-sm font-medium">
+                                                Audio Length
+                                            </Label>
+                                            <Select value={selectedAudioLength} onValueChange={setSelectedAudioLength}>
+                                                <SelectTrigger className="mt-2">
+                                                    <SelectValue placeholder="Select audio length" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {audioLengthOptions.map((option) => (
+                                                        <SelectItem key={option.value} value={option.value}>
+                                                            {option.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div>
+                                            <Label htmlFor="audio-instructions" className="text-sm font-medium">
+                                                Custom Instructions (Optional)
+                                            </Label>
+                                            <Textarea
+                                                id="audio-instructions"
+                                                placeholder="Add any specific topics, focus areas, or instructions for the audio overview..."
+                                                value={audioInstructions}
+                                                onChange={(e) => setAudioInstructions(e.target.value)}
+                                                className="mt-2 min-h-[100px] resize-none"
+                                            />
+                                        </div>
                                     </div>
-                                </div>
-                            )}
-                            {!atAudioLimit && (
-                                <div className="flex justify-end gap-2 mt-6">
-                                    <DialogClose asChild>
-                                        <Button variant="secondary">
-                                            Cancel
+                                )}
+                                {!atAudioLimit && (
+                                    <div className="flex justify-end gap-2 mt-6">
+                                        <DialogClose asChild>
+                                            <Button variant="secondary">
+                                                Cancel
+                                            </Button>
+                                        </DialogClose>
+                                        <Button onClick={handleCreateAudioOverview} disabled={isCreatingAudio || atAudioLimit}>
+                                            {isCreatingAudio ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Volume2 className="mr-2 h-4 w-4" />}
+                                            Create
                                         </Button>
-                                    </DialogClose>
-                                    <Button onClick={handleCreateAudioOverview} disabled={isCreatingAudio || atAudioLimit}>
-                                        {isCreatingAudio ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Volume2 className="mr-2 h-4 w-4" />}
-                                        Create
-                                    </Button>
-                                </div>
-                            )}
-                        </DialogContent>
-                    </Dialog>
+                                    </div>
+                                )}
+                            </DialogContent>
+                        </Dialog>
 
-                    <button
-                        disabled={papers.length === 0}
-                        onClick={() => setDataTableSchemaModalOpen(true)}
-                        className="relative flex items-center gap-2 px-3 py-2 text-sm text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <PlusCircle className="absolute -top-1.5 -right-1.5 w-3 h-3 text-gray-400 dark:text-gray-500" />
-                        <Table className="w-4 h-4" />
-                        <span>Extraction Table</span>
-                    </button>
-                </>
+                        <button
+                            disabled={papers.length === 0}
+                            onClick={() => setDataTableSchemaModalOpen(true)}
+                            className="relative flex items-center gap-2 px-3 py-2 text-sm text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <PlusCircle className="absolute -top-1.5 -right-1.5 w-3 h-3 text-gray-400 dark:text-gray-500" />
+                            <Table className="w-4 h-4" />
+                            <span>Extraction Table</span>
+                            <span className="ml-2 px-1.5 py-0.5 text-xs font-semibold text-blue-800 bg-blue-100 rounded-full">New</span>
+                        </button>
+                    </>
                 )}
             </div>
 
