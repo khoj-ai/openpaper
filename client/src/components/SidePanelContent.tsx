@@ -132,8 +132,6 @@ export function SidePanelContent({
     const [errorState, setErrorState] = useState<{ failedUserMessage: string } | null>(null);
     const [isFetchingHistory, setIsFetchingHistory] = useState(true);
 
-
-
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const chatInputFormRef = useRef<HTMLFormElement | null>(null);
     const inputMessageRef = useRef<HTMLTextAreaElement | null>(null);
@@ -168,9 +166,14 @@ export function SidePanelContent({
         "Synthesizing findings...",
     ]
 
-    const fetchMoreMessages = async () => {
-        if (!hasMoreMessages || isLoadingMoreMessages || !conversationId) {
-            if (isFetchingHistory) {
+    const fetchMoreMessages = useCallback(async () => {
+        if (!conversationId) {
+            return;
+        }
+
+        if (!hasMoreMessages || isLoadingMoreMessages) {
+            if (!isLoadingMoreMessages && isFetchingHistory) {
+                console.log("No more messages to fetch or already loading.");
                 setIsFetchingHistory(false);
             }
             return;
@@ -218,7 +221,7 @@ export function SidePanelContent({
                 setIsFetchingHistory(false);
             }
         }
-    };
+    }, [hasMoreMessages, isLoadingMoreMessages, conversationId, pageNumberConversationHistory, isFetchingHistory]);
 
 
 
@@ -764,9 +767,8 @@ export function SidePanelContent({
         date.setDate(date.getDate() + (1 + 7 - date.getDay()) % 7);
         setNextMonday(date);
     }, []);
+
     const heightClass = isMobile ? "h-[calc(100vh-128px)]" : "h-[calc(100vh-64px)]";
-
-
 
     return (
         <>
