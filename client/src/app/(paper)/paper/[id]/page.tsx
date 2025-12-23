@@ -126,23 +126,25 @@ export default function PaperView() {
     useEffect(() => {
         if (paperData) {
             const rsf = searchParams.get('rsf')?.toLowerCase();
-            const newToolset = { ...toolset };
-            const validTools = newToolset.nav.map(tool => tool.name.toLowerCase());
 
+            // Derive the available tools first
+            const hasOverview = paperData.summary_citations && paperData.summary_citations.length > 0;
+            const newNav = PaperToolset.nav.filter(tool => tool.name !== 'Overview' || hasOverview);
+
+            const validTools = newNav.map(tool => tool.name.toLowerCase());
+
+            // Now decide the function
             if (rsf && validTools.includes(rsf)) {
-                const toolName = newToolset.nav.find(tool => tool.name.toLowerCase() === rsf);
+                const toolName = newNav.find(tool => tool.name.toLowerCase() === rsf);
                 setRightSideFunction(toolName ? toolName.name : 'Chat');
-            } else if (paperData.summary_citations && paperData.summary_citations.length > 0) {
+            } else if (hasOverview) {
                 setRightSideFunction('Overview');
             } else {
                 setRightSideFunction('Chat');
             }
 
-            // Remove Overview tool if there are no summary citations
-            if (!paperData.summary_citations || paperData.summary_citations.length === 0) {
-                newToolset.nav = newToolset.nav.filter(tool => tool.name !== 'Overview');
-                setToolset(newToolset);
-            }
+            // Update the toolset state for the UI
+            setToolset({ nav: newNav });
         }
     }, [paperData, searchParams]);
 
