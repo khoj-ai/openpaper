@@ -59,7 +59,7 @@ export default function ReferencePaperCards({ citations, papers, messageId, mess
                     >
                         {/* Paper Info - Clickable */}
                         <div
-                            className="flex items-start gap-3 pb-3 border-b cursor-pointer hover:opacity-80 transition-opacity"
+                            className={`flex items-start gap-3 pb-3 cursor-pointer hover:opacity-80 transition-opacity ${isExpanded ? 'border-b' : ''}`}
                             onClick={() => toggleExpanded(paper.id)}
                         >
                             <div className="flex-shrink-0 bg-secondary rounded-lg px-2 py-1">
