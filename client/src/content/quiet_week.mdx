@@ -1,0 +1,88 @@
+export const metadata = {
+    title: "A Quiet Week of Polish",
+    description: "A mid-December run of changes focused on one thing: keeping you in flow while you read, extract, and write.",
+    date: "12-24-2025",
+    image: "https://assets.khoj.dev/blue_bubbles_abstract.png",
+}
+
+Mid-December (roughly Dec 15–23) was one of those stretches where the most important work doesn’t look like a “feature.”
+
+It looks like a session that *doesn’t break*.
+
+You open a paper, highlight a paragraph, ask a question, pull a couple citations into your notes, and keep going—without the app turning into the main thing you’re thinking about.
+
+That’s the product story of the week: Open Paper getting quieter, so your research can be louder.
+
+## Reading should feel like reading
+
+The fastest way to lose momentum is a tiny UI fight at the wrong moment.
+
+So we put time into the PDF reading loop: page tracking that behaves, scroll behavior that’s less surprising, fewer edge cases when a PDF URL is invalid, and small but meaningful fixes like sticky table headers that stay sticky and preview panels that scroll the way you expect.
+
+None of this changes what Open Paper *is*.
+
+It changes what it feels like to spend an hour inside it.
+
+## When you ask for help, the first answer should be light
+
+A lot of people don’t want an AI essay the moment they open a paper. They want a quick orientation:
+
+- What is this paper actually doing?
+- Where should I look first?
+- What are the claims I might reuse later?
+
+So we nudged the initial summary to be more “minimal but useful,” and cleaned up how citations and extracted references show up in the UI.
+
+The goal isn’t to impress you with volume. It’s to help you decide whether to read deeply, skim strategically, or move on.
+
+And we polished chat rendering + message fetching so conversations feel continuous—because research chat only works if it feels like a thread you can trust.
+
+## Extraction tables: evidence you can carry forward
+
+One of the most expensive parts of research is the handoff from reading to writing.
+
+You *find* the key result… and then you lose it in a pile of highlights.
+
+This week we leaned further into the idea that extraction isn’t “a spreadsheet feature,” it’s a bridge: pull structured claims, numbers, and snippets out of papers and turn them into something you can actually reuse.
+
+That’s part of why we started calling them **extraction tables** (instead of “data tables”). The name points to the job: extracting evidence from PDFs in a way that survives the next step—notes, drafts, and citations.
+
+We also tightened the UI around creating artifacts so it feels less experimental and more like a natural continuation of reading.
+
+## Sharing work without losing context
+
+Research is rarely solo for long.
+
+We made the permissions story more predictable (what a viewer can do, what an owner controls) and improved how the product behaves when you’re collaborating: fewer weird states, clearer affordances, and better behavior around project limits.
+
+This is the unglamorous part of collaboration: it’s not “invite a teammate,” it’s “make sure the teammate can actually be productive once they’re here.”
+
+## Audio that sounds less like a template
+
+Audio overviews are only useful if they feel like an overview—something you can play while walking, not something that reminds you it came from markdown.
+
+So we focused on the workflow and quality details: more reliable generation, better separation of playback components, and cleaner text-to-speech inputs.
+
+The product bet remains the same: audio is a *mode switch* that helps you keep up with your own research when you can’t be staring at a PDF.
+
+## Quiet engineering that keeps the pace up
+
+Some of this week’s work was purely about keeping the project healthy:
+
+- clearer local setup docs (DEVELOPMENT.md)
+- lint + dead code cleanup
+- safer API wrapper / error typing improvements
+
+You don’t “use” these changes directly, but you feel them as fewer regressions and faster iteration.
+
+## The throughline
+
+Open Paper is at its best when it’s a tight loop:
+
+read → highlight → ask → extract → cite → write.
+
+This mid-December stretch was about protecting that loop.
+
+Not by adding more steps.
+
+By removing the little things that steal attention right when you’re trying to think.

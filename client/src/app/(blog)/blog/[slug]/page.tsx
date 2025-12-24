@@ -71,10 +71,11 @@ export function generateStaticParams() {
         { slug: 'change_june' },
         { slug: 'pdfchat' },
         { slug: 'library' },
-        { slug: 'library2'},
+        { slug: 'library2' },
         { slug: 'whatllm' },
         { slug: 'projects' },
         { slug: 'change_december' },
+        { slug: 'quiet_week' },
     ];
 }
 
