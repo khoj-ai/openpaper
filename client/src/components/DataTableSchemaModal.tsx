@@ -72,15 +72,15 @@ export default function DataTableSchemaModal({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Define Extraction Table Schema</DialogTitle>
+                    <DialogTitle>Define Data Table Schema</DialogTitle>
                     <DialogDescription>
-                        Define the fields for a custom extraction table. The AI will then extract the corresponding information from each paper in your project.
+                        Define the fields for a custom data table. The AI will then extract the corresponding information from each paper in your project.
                     </DialogDescription>
                 </DialogHeader>
 
                 {atLimit ? (
                     <div className="mt-4 text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/30 rounded-md">
-                        <p className="text-sm text-yellow-800 dark:text-yellow-200">You&apos;ve used all your extraction tables for this week.</p>
+                        <p className="text-sm text-yellow-800 dark:text-yellow-200">You&apos;ve used all your data tables for this week.</p>
                         <Link href="/pricing" passHref>
                             <Button variant="link" className="p-0 h-auto text-sm">Upgrade your plan to create more.</Button>
                         </Link>

@@ -841,15 +841,6 @@ export function SidePanelContent({
                                 </div>
                             )
                         }
-
-                        {/* Paper Images Section - Disabled pending extraction improvements */}
-                        {/* {
-                rightSideFunction === 'Figures' && (
-                    <div className={`flex flex-col ${heightClass} md:px-2 overflow-y-auto`}>
-                        <PaperImageView paperId={id} />
-                    </div>
-                )
-            } */}
                         {
                             rightSideFunction === 'Overview' && paperData.summary && (
                                 <div className={`flex flex-col ${heightClass} md:px-2 overflow-y-auto m-2 relative animate-fade-in`}>

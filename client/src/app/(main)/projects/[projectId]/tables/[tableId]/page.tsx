@@ -42,8 +42,8 @@ export default function DataTablePage() {
             setDataTableResult(result.data);
             setError(null);
         } catch (err) {
-            console.error("Failed to fetch extraction table result:", err);
-            setError("Failed to load extraction table. Please try again.");
+            console.error("Failed to fetch data table result:", err);
+            setError("Failed to load data table. Please try again.");
         } finally {
             setIsLoading(false);
         }
@@ -90,7 +90,7 @@ export default function DataTablePage() {
                 <div className="flex items-center justify-center min-h-[400px]">
                     <div className="flex flex-col items-center gap-4">
                         <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-                        <p className="text-muted-foreground">Loading extraction table...</p>
+                        <p className="text-muted-foreground">Loading data table...</p>
                     </div>
                 </div>
             </div>
@@ -113,7 +113,7 @@ export default function DataTablePage() {
                 <div className="flex items-center justify-center min-h-[400px]">
                     <div className="text-center">
                         <p className="text-red-600 dark:text-red-400 mb-4">
-                            {error || "Extraction table not found"}
+                            {error || "Data table not found"}
                         </p>
                         <Button onClick={handleClose}>
                             Return to Project
@@ -142,7 +142,7 @@ export default function DataTablePage() {
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator />
                                 <BreadcrumbItem>
-                                    <BreadcrumbPage>{dataTableResult.title || "Extraction Table"}</BreadcrumbPage>
+                                    <BreadcrumbPage>{dataTableResult.title || "Data Table"}</BreadcrumbPage>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
                         </Breadcrumb>

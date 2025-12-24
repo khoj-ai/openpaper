@@ -76,7 +76,7 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
         getProgressPercentage,
     } = useAudioPlayback(projectId);
 
-    // Extraction Table states
+    // Data Table states
     const [isDataTableSchemaModalOpen, setDataTableSchemaModalOpen] = useState(false);
     const [isCreatingDataTable, setIsCreatingDataTable] = useState(false);
     const [dataTableJobs, setDataTableJobs] = useState<DataTableJobStatusResponse[]>([]);
@@ -108,7 +108,7 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
             setDataTableJobs(fetchedJobs.jobs);
             return fetchedJobs.jobs;
         } catch (err) {
-            console.error("Failed to fetch extraction table jobs:", err);
+            console.error("Failed to fetch data table jobs:", err);
             return [];
         }
     }, [projectId]);
@@ -246,9 +246,9 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
         setIsCreatingDataTable(true);
 
         try {
-            toast.info("Creating extraction table...");
+            toast.info("Creating data table...");
 
-            // Create the extraction table via API
+            // Create the data table via API
             const response: DataTableJobStatusResponse = await fetchFromApi(`/api/projects/tables/`, {
                 method: "POST",
                 headers: {
@@ -287,14 +287,14 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
                 const newNearLimit = isDataTableNearLimit(tempUpdatedSubscription);
 
                 if (newAtLimit) {
-                    toast.warning("You've used all of your extraction tables for the week.", {
+                    toast.warning("You've used all of your data tables for the week.", {
                         action: {
                             label: "Upgrade",
                             onClick: () => router.push('/pricing'),
                         }
                     });
                 } else if (newNearLimit) {
-                    toast.info(`You have ${newUsage.data_tables_remaining} extraction tables remaining this week.`, {
+                    toast.info(`You have ${newUsage.data_tables_remaining} data tables remaining this week.`, {
                         action: {
                             label: "Upgrade",
                             onClick: () => router.push('/pricing'),
@@ -303,8 +303,8 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
                 }
             }
         } catch (err) {
-            console.error("Failed to create extraction table:", err);
-            toast.error("Failed to create extraction table. Please try again.");
+            console.error("Failed to create data table:", err);
+            toast.error("Failed to create data table. Please try again.");
         }
     };
 
@@ -397,14 +397,14 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
                         >
                             <PlusCircle className="absolute -top-1.5 -right-1.5 w-3 h-3 text-gray-400 dark:text-gray-500" />
                             <Table className="w-4 h-4" />
-                            <span>Extraction Table</span>
+                            <span>Data Table</span>
                             <span className="ml-2 px-1.5 py-0.5 text-xs font-semibold text-blue-800 bg-blue-100 rounded-full">New</span>
                         </button>
                     </>
                 )}
             </div>
 
-            {/* Extraction Table Schema Modal */}
+            {/* Data Table Schema Modal */}
             <DataTableSchemaModal
                 open={isDataTableSchemaModalOpen}
                 onOpenChange={setDataTableSchemaModalOpen}
@@ -413,7 +413,7 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
                 atLimit={atDataTableLimit}
             />
 
-            {/* Extraction Table Generation Jobs */}
+            {/* Data Table Generation Jobs */}
             {dataTableJobs.length > 0 && (
                 <div className="mt-4 space-y-3">
                     {dataTableJobs.map((job) => (
