@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { PdfViewer } from "@/components/PdfViewer";
 import { useIsMobile } from "@/lib/useMobile";
+import { useProject } from "@/hooks/useProjects";
 import { fetchFromApi } from "@/lib/api";
 
 export default function DataTablePage() {
@@ -23,6 +24,7 @@ export default function DataTablePage() {
     const router = useRouter();
     const projectId = params.projectId as string;
     const tableId = params.tableId as string;
+    const { project } = useProject(projectId);
 
     const [dataTableResult, setDataTableResult] = useState<DataTableResult | null>(null);
     const [papers, setPapers] = useState<PaperItem[]>([]);
@@ -135,7 +137,7 @@ export default function DataTablePage() {
                                 <BreadcrumbSeparator />
                                 <BreadcrumbItem>
                                     <BreadcrumbLink href={`/projects/${projectId}`}>
-                                        Project
+                                        {project?.title || "Project"}
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator />

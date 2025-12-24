@@ -41,3 +41,46 @@ export function useProjects(): UseProjectsResult {
         refetch: fetchProjects,
     };
 }
+
+interface UseProjectResult {
+    project: Project | null;
+    isLoading: boolean;
+    error: Error | null;
+    refetch: () => Promise<void>;
+}
+
+export function useProject(projectId?: string): UseProjectResult {
+    const [project, setProject] = useState<Project | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<Error | null>(null);
+
+    const fetchProject = async () => {
+        if (!projectId) {
+            setProject(null);
+            setIsLoading(false);
+            return;
+        }
+        setIsLoading(true);
+        setError(null);
+        try {
+            const response = await fetchFromApi(`/api/projects/${projectId}`);
+            setProject(response);
+        } catch (err) {
+            setError(err instanceof Error ? err : new Error(`Failed to fetch project ${projectId}`));
+            console.error(`Error fetching project ${projectId}:`, err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchProject();
+    }, [projectId]);
+
+    return {
+        project,
+        isLoading,
+        error,
+        refetch: fetchProject,
+    };
+}

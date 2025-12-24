@@ -18,6 +18,7 @@ import {
     Reference,
 } from '@/lib/schema';
 import { useAuth } from '@/lib/auth';
+import { useProject } from '@/hooks/useProjects';
 import { PaperItem } from "@/lib/schema";
 import { toast } from "sonner";
 import { ConversationView } from '@/components/ConversationView';
@@ -46,6 +47,7 @@ function ProjectConversationPageContent() {
     const conversationIdFromUrl = params.conversationId as string;
 
     const { user, loading: authLoading } = useAuth();
+    const { project } = useProject(projectId);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isOwner, setIsOwner] = useState<boolean>(true);
     const [papers, setPapers] = useState<PaperItem[]>([]);
@@ -62,7 +64,6 @@ function ProjectConversationPageContent() {
     const [highlightedInfo, setHighlightedInfo] = useState<{ paperId: string; messageIndex: number } | null>(null);
     const [isCentered, setIsCentered] = useState(false);
     const [isSessionLoading, setIsSessionLoading] = useState(true);
-    const [projectName, setProjectName] = useState<string>('');
     const [conversationName, setConversationName] = useState<string>('');
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -74,12 +75,6 @@ function ProjectConversationPageContent() {
 
     useEffect(() => {
         if (projectId) {
-            fetchFromApi(`/api/projects/${projectId}`)
-                .then(data => {
-                    setProjectName(data.title);
-                })
-                .catch(err => console.error("Failed to fetch project name", err));
-
             fetchFromApi(`/api/projects/conversations/${projectId}`)
                 .then(data => {
                     const conversation: Conversation = data.find((c: Conversation) => c.id === conversationIdFromUrl);
@@ -467,7 +462,7 @@ function ProjectConversationPageContent() {
                     </BreadcrumbItem>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
-                        <BreadcrumbLink href={`/projects/${projectId}`}>{projectName}</BreadcrumbLink>
+                        <BreadcrumbLink href={`/projects/${projectId}`}>{project?.title}</BreadcrumbLink>
                     </BreadcrumbItem>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
