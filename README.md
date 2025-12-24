@@ -43,10 +43,6 @@ Takes notes directly in context with your paper. You can use the toggle at the t
 
 ## Run it Locally
 
-This project uses a separate server & client to run the web application
+This project uses a separate server & client to run the web application. While Open Paper is open-source, it is not optimized for self-hosting. Our main focus is to make the most useful AI-assisted assistant for research.
 
-```bash
-git clone git@github.com:sabaimran/openpaper.git
-```
-
-To start the server, see instructions in `/server`. To start the client, see instructions in `/client`.
+For instructions on how to set up the project for local development, see [DEVELOPMENT.md](./DEVELOPMENT.md).
