@@ -69,7 +69,7 @@ export default function ReferencePaperCards({ citations, papers, messageId, mess
                                 <p className="font-medium text-sm line-clamp-2 mt-0 mb-0">{paper.title}</p>
                                 {paper.authors && paper.authors.length > 0 && (
                                     <p className="text-xs text-muted-foreground mt-1">
-                                        {paper.authors.join(', ')}
+                                        {paper.authors.slice(0, 5).join(', ')}{paper.authors.length > 5 ? ' et al.' : ''}
                                     </p>
                                 )}
                             </div>
