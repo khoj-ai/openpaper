@@ -76,6 +76,7 @@ export function generateStaticParams() {
         { slug: 'projects' },
         { slug: 'change_december' },
         { slug: 'quiet_week' },
+        { slug: 'extraction_tables' },
     ];
 }
 
