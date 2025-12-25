@@ -15,6 +15,7 @@ from app.llm.provider import (
     MessageParam,
     OpenAIProvider,
     StreamChunk,
+    ToolCallResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -102,6 +103,7 @@ class BaseLLMClient:
         system_prompt: Optional[str] = None,
         history: Optional[List[Message]] = None,
         function_declarations: Optional[List[Dict]] = None,
+        tool_call_results: Optional[List[ToolCallResult]] = None,
         model_type: ModelType = ModelType.DEFAULT,
         provider: Optional[LLMProvider] = None,
         enable_thinking: bool = True,
@@ -118,6 +120,7 @@ class BaseLLMClient:
                 contents,
                 system_prompt=system_prompt,
                 function_declarations=function_declarations,
+                tool_call_results=tool_call_results,
                 history=history,
                 enable_thinking=enable_thinking,
                 **kwargs,

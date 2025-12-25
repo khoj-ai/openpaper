@@ -19,9 +19,8 @@ from app.llm.prompts import (
     ANSWER_EVIDENCE_BASED_QUESTION_SYSTEM_PROMPT,
     EVIDENCE_GATHERING_MESSAGE,
     EVIDENCE_GATHERING_SYSTEM_PROMPT,
-    EVIDENCE_SUMMARIZATION_PROMPT,
     GENERATE_MULTI_PAPER_NARRATIVE_SUMMARY,
-    PREVIOUS_TOOL_CALLS_MESSAGE,
+    TOOL_RESULT_COMPACTION_PROMPT,
 )
 from app.llm.provider import LLMProvider, StreamChunk, TextContent
 from app.llm.tools.file_tools import (
@@ -38,7 +37,7 @@ from app.llm.tools.file_tools import (
 )
 from app.llm.tools.meta_tools import stop_function
 from app.llm.utils import retry_llm_operation
-from app.schemas.message import EvidenceCollection, EvidenceSummaryResponse
+from app.schemas.message import EvidenceCollection, ToolResultCompactionResponse
 from app.schemas.responses import AudioOverviewForLLM
 from app.schemas.user import CurrentUser
 from fastapi import Depends
@@ -146,42 +145,25 @@ class MultiPaperOperations(BaseLLMClient):
         while n_iterations < max_iterations and not should_stop:
             n_iterations += 1
 
-            # If the collected evidence is very large (over 100,000 characters), we may want to stop gathering more evidence
-            total_evidence_length = sum(
-                sum(len(ev) for ev in ec.content)
-                for ec in evidence_collection.evidence.values()
-            )
+            # If tool call results are very large, compact them to avoid context overflow
+            tool_results_size = evidence_collection.get_tool_results_size()
 
-            if total_evidence_length > CONTENT_LIMIT_EVIDENCE_GATHERING:
+            if tool_results_size > CONTENT_LIMIT_EVIDENCE_GATHERING:
                 yield {
                     "type": "status",
-                    "content": "Gathered a lot of data. Compacting evidence...",
+                    "content": "Gathered a lot of data. Compacting tool results...",
                 }
                 logger.info(
-                    f"Total evidence length exceeded {CONTENT_LIMIT_EVIDENCE_GATHERING} characters, compacting evidence."
+                    f"Tool results size exceeded {CONTENT_LIMIT_EVIDENCE_GATHERING} characters ({tool_results_size}), compacting."
                 )
-                evidence_collection = await self.compact_evidence_collection(
+                await self.compact_tool_call_results(
                     evidence_collection, question, current_user, llm_provider
                 )
 
-            prev_tool_calls_message = (
-                PREVIOUS_TOOL_CALLS_MESSAGE.format(
-                    previous_tool_calls=json.dumps(
-                        evidence_collection.get_previous_tool_calls_dict()
-                    ),
-                    iteration=n_iterations,
-                    total_iterations=max_iterations,
-                )
-                if evidence_collection.has_previous_tool_calls()
-                else ""
-            )
-
             evidence_gathering_prompt = EVIDENCE_GATHERING_SYSTEM_PROMPT.format(
                 available_papers=formatted_paper_options,
-                previous_tool_calls=prev_tool_calls_message,
-                gathered_evidence=json.dumps(
-                    evidence_collection.get_evidence_dict_with_metadata()
-                ),
+                n_iteration=n_iterations,
+                max_iterations=max_iterations,
             )
 
             formatted_prompt = EVIDENCE_GATHERING_MESSAGE.format(
@@ -197,12 +179,20 @@ class MultiPaperOperations(BaseLLMClient):
                 "content": f"Reviewing collected evidence (iteration {n_iterations}/{max_iterations})...",
             }
 
+            # Get tool call results from previous iterations for proper multi-turn function calling
+            tool_call_results = (
+                evidence_collection.get_tool_call_results()
+                if evidence_collection.has_previous_tool_calls()
+                else None
+            )
+
             llm_response = self.generate_content(
                 system_prompt=evidence_gathering_prompt,
                 history=conversation_history,
                 contents=message_content,
                 model_type=ModelType.FAST,
                 function_declarations=function_declarations,
+                tool_call_results=tool_call_results,
                 provider=llm_provider,
                 enable_thinking=True,
             )
@@ -215,6 +205,7 @@ class MultiPaperOperations(BaseLLMClient):
 
             for fn_selected in llm_response.tool_calls:
                 start_time = time.time()
+
                 # Normalize function name to handle variants like "STOP" vs "stop"
                 fn_name_raw = fn_selected.name
                 fn_name = fn_name_raw.lower() if fn_name_raw else fn_name_raw
@@ -254,6 +245,11 @@ class MultiPaperOperations(BaseLLMClient):
                             logger.warning(
                                 f"Paper ID {paper_id_arg} not found in available papers."
                             )
+
+                            # Track the error result for proper multi-turn function calling
+                            evidence_collection.add_tool_call_result(
+                                fn_selected, f"Error: Paper ID {paper_id_arg} not found"
+                            )
                             continue
 
                         display_query = f" '{query_arg}'" if query_arg else ""
@@ -273,6 +269,9 @@ class MultiPaperOperations(BaseLLMClient):
                             project_id=project_id,
                             db=db,
                         )
+
+                        # Track the tool call result for proper multi-turn function calling
+                        evidence_collection.add_tool_call_result(fn_selected, result)
 
                         # Determine if we should preserve line numbers based on function type
                         preserve_line_numbers = fn_name in [
@@ -300,6 +299,10 @@ class MultiPaperOperations(BaseLLMClient):
 
                     except Exception as e:
                         logger.error(f"Error executing function {fn_name}: {e}")
+                        # Track the error result for proper multi-turn function calling
+                        evidence_collection.add_tool_call_result(
+                            fn_selected, f"Error: {str(e)}"
+                        )
                         yield {"type": "error", "content": str(e)}
                 else:
                     # Log original function name for easier debugging when the LLM returns unexpected tool names
@@ -324,33 +327,37 @@ class MultiPaperOperations(BaseLLMClient):
             "content": evidence_collection.get_evidence_dict(),
         }
 
-    async def compact_evidence_collection(
+    async def compact_tool_call_results(
         self,
         evidence_collection: EvidenceCollection,
         original_question: str,
         current_user: CurrentUser,
         llm_provider: Optional[LLMProvider] = None,
-    ) -> EvidenceCollection:
+    ) -> None:
         """
-        Compact the evidence collection by summarizing evidence for each paper.
+        Compact tool call results by summarizing them to reduce context size.
+        Modifies the evidence_collection in place.
         """
-
-        # TODO what should we do if the evidence being passed in is already too big for inference? break up into chunks?
-
         start_time = time.time()
-        evidence_dict = evidence_collection.get_evidence_dict()
+        original_size = evidence_collection.get_tool_results_size()
+        original_count = len(evidence_collection.tool_call_results)
 
-        formatted_prompt = EVIDENCE_SUMMARIZATION_PROMPT.format(
+        # Get tool results in a format suitable for LLM compaction
+        tool_results_for_compaction = (
+            evidence_collection.get_tool_results_for_compaction()
+        )
+
+        formatted_prompt = TOOL_RESULT_COMPACTION_PROMPT.format(
             question=original_question,
-            evidence=json.dumps(evidence_dict, indent=2),
-            schema=EvidenceSummaryResponse.model_json_schema(),
+            tool_results=json.dumps(tool_results_for_compaction, indent=2),
+            schema=ToolResultCompactionResponse.model_json_schema(),
         )
 
         message_content = [TextContent(text=formatted_prompt)]
 
-        # Get LLM assessment of evidence relevance
+        # Get LLM to compact the tool results
         llm_response = self.generate_content(
-            system_prompt="You are a research assistant that summarizes evidence.",
+            system_prompt="You are a research assistant that summarizes tool call results while preserving key information.",
             contents=message_content,
             model_type=ModelType.DEFAULT,
             provider=llm_provider,
@@ -358,52 +365,43 @@ class MultiPaperOperations(BaseLLMClient):
 
         try:
             if llm_response and llm_response.text:
-                summarization_instructions = JSONParser.validate_and_extract_json(
+                compaction_response = JSONParser.validate_and_extract_json(
                     llm_response.text
                 )
-                summarization_instructions = EvidenceSummaryResponse.model_validate(
-                    summarization_instructions
+                compaction_response = ToolResultCompactionResponse.model_validate(
+                    compaction_response
                 )
-                compacted_collection = EvidenceCollection()
 
-                # Apply summarization
-                for (
-                    paper_id,
-                    summary_data,
-                ) in summarization_instructions.summaries.items():
-                    if paper_id in evidence_dict:
-                        # The new "evidence" is the summary.
-                        compacted_collection.add_evidence(
-                            paper_id, [summary_data], preserve_line_numbers=False
-                        )
+                # Apply the compacted results
+                evidence_collection.apply_compacted_results(
+                    compaction_response.compacted_results
+                )
 
+                new_size = evidence_collection.get_tool_results_size()
                 logger.info(
-                    f"Evidence compaction complete. Original: {len(evidence_dict)} papers, "
-                    f"Compacted: {len(compacted_collection.get_evidence_dict())} papers"
+                    f"Tool result compaction complete. "
+                    f"Original: {original_count} results ({original_size} chars), "
+                    f"Compacted: {len(compaction_response.compacted_results)} results ({new_size} chars)"
                 )
 
                 track_event(
-                    "evidence_compacted",
+                    "tool_results_compacted",
                     {
                         "duration_ms": (time.time() - start_time) * 1000,
-                        "original_papers": len(evidence_dict),
-                        "compacted_papers": len(
-                            compacted_collection.get_evidence_dict()
-                        ),
+                        "original_count": original_count,
+                        "original_size": original_size,
+                        "compacted_count": len(compaction_response.compacted_results),
+                        "compacted_size": new_size,
                     },
                     user_id=str(current_user.id),
                 )
-
-                return compacted_collection
             else:
-                logger.warning("Empty response from LLM during evidence compaction.")
-                return evidence_collection
+                logger.warning("Empty response from LLM during tool result compaction.")
 
         except Exception as e:
             logger.warning(
-                f"Evidence compaction failed: {e}. Returning original evidence."
+                f"Tool result compaction failed: {e}. Keeping original results."
             )
-            return evidence_collection
 
     async def chat_with_papers(
         self,

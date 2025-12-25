@@ -283,8 +283,29 @@ class HypothesisResearchResults(BaseModel):
 class ToolCall(BaseModel):
     """Standardized tool call format"""
 
+    id: Optional[str] = Field(
+        default=None,
+        description="Unique identifier for the tool call. Returned by OpenAI, generated for Gemini.",
+    )
     name: str
     args: Dict[str, Any]
+
+
+class ToolCallResult(BaseModel):
+    """Standardized tool call result format for passing back to LLM providers"""
+
+    id: Optional[str] = Field(
+        default=None,
+        description="Unique identifier for the tool call. Required for OpenAI, optional for Gemini.",
+    )
+    name: str = Field(description="The name of the tool/function that was called")
+    args: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="The arguments that were passed to the tool/function call.",
+    )
+    result: Any = Field(
+        description="The result returned by the tool. Will be serialized to string for the API."
+    )
 
 
 class TextContent(BaseModel):

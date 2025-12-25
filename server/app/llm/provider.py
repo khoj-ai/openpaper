@@ -5,12 +5,12 @@ import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Iterator, List, Literal, Optional, Sequence, Union
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Union
 
 import openai
 from app.database.models import Message
 from app.llm.citation_handler import CitationHandler
-from app.schemas.responses import FileContent, TextContent, ToolCall
+from app.schemas.responses import FileContent, TextContent, ToolCall, ToolCallResult
 from google import genai
 from google.genai.types import (
     AutomaticFunctionCallingConfig,
@@ -21,6 +21,7 @@ from google.genai.types import (
     FunctionDeclaration,
     GenerateContentConfig,
     GenerateContentResponse,
+    Part,
     ThinkingConfig,
     Tool,
     ToolConfig,
@@ -28,7 +29,9 @@ from google.genai.types import (
 from openai.types.chat import (
     ChatCompletionAssistantMessageParam,
     ChatCompletionMessageParam,
+    ChatCompletionMessageToolCallParam,
     ChatCompletionSystemMessageParam,
+    ChatCompletionToolMessageParam,
     ChatCompletionToolParam,
     ChatCompletionUserMessageParam,
 )
@@ -94,9 +97,20 @@ class BaseLLMProvider(ABC):
         system_prompt: Optional[str] = None,
         history: Optional[List[Message]] = None,
         function_declarations: Optional[List[Dict]] = None,
+        tool_call_results: Optional[List[ToolCallResult]] = None,
         **kwargs,
     ) -> LLMResponse:
-        """Generate content using the provider's API"""
+        """Generate content using the provider's API
+
+        Args:
+            model: The model identifier to use
+            contents: The message content to send
+            system_prompt: Optional system prompt
+            history: Optional conversation history
+            function_declarations: Optional list of tool/function declarations
+            tool_call_results: Optional list of tool call results from previous calls
+            **kwargs: Additional provider-specific arguments
+        """
         pass
 
     @abstractmethod
@@ -151,6 +165,7 @@ class GeminiProvider(BaseLLMProvider):
         system_prompt: Optional[str] = None,
         history: Optional[List[Message]] = None,
         function_declarations: Optional[List[Dict]] = None,
+        tool_call_results: Optional[List[ToolCallResult]] = None,
         enable_thinking: bool = False,
         **kwargs,
     ) -> LLMResponse:
@@ -196,6 +211,7 @@ class GeminiProvider(BaseLLMProvider):
         all_contents = self._prepare_gemini_messages(
             history=history or [],
             new_message=contents,
+            tool_call_results=tool_call_results,
         )
 
         response = self.client.models.generate_content(
@@ -205,14 +221,24 @@ class GeminiProvider(BaseLLMProvider):
         if not response or (not response.text and not response.function_calls):
             raise ValueError("Empty response from Gemini API")
 
-        # Extract tool calls from Gemini response
+        # Extract tool calls from Gemini response, generating IDs for tracking
         tool_calls = []
         if response.function_calls:
+            import uuid
+
             for fn in response.function_calls:
                 if fn.name and fn.args:
-                    tool_calls.append(ToolCall(name=fn.name, args=dict(fn.args)))
+                    tool_calls.append(
+                        ToolCall(
+                            id=str(uuid.uuid4()),
+                            name=fn.name,
+                            args=dict(fn.args),
+                        )
+                    )
                 elif fn.name == "STOP":
-                    tool_calls.append(ToolCall(name="stop", args={}))
+                    tool_calls.append(
+                        ToolCall(id=str(uuid.uuid4()), name="stop", args={})
+                    )
 
         thinking = get_thought(response)
 
@@ -266,8 +292,16 @@ class GeminiProvider(BaseLLMProvider):
         history: List[Message],
         new_message: MessageParam,
         file: FileContent | None = None,
+        tool_call_results: Optional[List[ToolCallResult]] = None,
     ) -> ContentListUnion:
-        """Prepare Gemini messages format including history and new message with front-loading for caching"""
+        """Prepare Gemini messages format including history and new message with front-loading for caching
+
+        For tool calling, the message structure is:
+        1. User message (original query)
+        2. Model message with function calls (reconstructed from tool_call_results)
+        3. User message with function responses
+        4. New user message (current query/continuation)
+        """
         messages: List[Content] = []
 
         if file:
@@ -277,6 +311,31 @@ class GeminiProvider(BaseLLMProvider):
         # Add history after file
         formatted_history = self._convert_chat_history_to_api_format(history)
         messages.extend(formatted_history)
+
+        # Add tool call results if present (multi-turn function calling)
+        if tool_call_results:
+            # Create function response parts for each tool result
+            function_response_parts = []
+            for result in tool_call_results:
+                # Serialize result to a format Gemini can handle
+                result_value = result.result
+                if isinstance(result_value, (dict, list)):
+                    import json
+
+                    result_value = json.dumps(result_value)
+                elif not isinstance(result_value, str):
+                    result_value = str(result_value)
+
+                function_response_parts.append(
+                    Part.from_function_response(
+                        name=result.name,
+                        response={"result": result_value},
+                    )
+                )
+
+            # Add as a user message containing all function responses
+            if function_response_parts:
+                messages.append(Content(role="user", parts=function_response_parts))
 
         # Add the new message last
         converted_message = self._convert_message_content(new_message)
@@ -375,6 +434,7 @@ class OpenAIProvider(BaseLLMProvider):
         system_prompt: Optional[str] = None,
         history: Optional[List[Message]] = None,
         function_declarations: Optional[List[Dict]] = None,
+        tool_call_results: Optional[List[ToolCallResult]] = None,
         enable_thinking: bool = True,
         **kwargs,
     ) -> LLMResponse:
@@ -383,6 +443,7 @@ class OpenAIProvider(BaseLLMProvider):
             history=history or [],
             new_message=contents,
             system_prompt=system_prompt or "",
+            tool_call_results=tool_call_results,
         )
 
         tools = (
@@ -411,12 +472,13 @@ class OpenAIProvider(BaseLLMProvider):
 
         message = response.choices[0].message
 
-        # Extract tool calls from OpenAI response
+        # Extract tool calls from OpenAI response (preserving the ID)
         tool_calls = []
         if message.tool_calls:
             for tool_call in message.tool_calls:
                 tool_calls.append(
                     ToolCall(
+                        id=tool_call.id,
                         name=tool_call.function.name,
                         args=json.loads(tool_call.function.arguments),
                     )
@@ -498,8 +560,16 @@ class OpenAIProvider(BaseLLMProvider):
         new_message: MessageParam,
         system_prompt: str = "",
         file: FileContent | None = None,
+        tool_call_results: Optional[List[ToolCallResult]] = None,
     ) -> list[ChatCompletionMessageParam]:
-        """Prepare OpenAI messages format including history and new message with front-loading for caching"""
+        """Prepare OpenAI messages format including history and new message with front-loading for caching
+
+        For tool calling, the message structure is:
+        1. Previous messages (system, history)
+        2. Assistant message with tool_calls (reconstructed from tool_call_results)
+        3. Tool messages for each result
+        4. New user message
+        """
         messages: list[ChatCompletionMessageParam] = []
 
         # Follow with system prompt for caching
@@ -533,6 +603,48 @@ class OpenAIProvider(BaseLLMProvider):
                     "content": str(hist_msg.content),
                 }
                 messages.append(assistant_msg)
+
+        # Add tool call results if present (multi-turn function calling)
+        if tool_call_results:
+            # First, add an assistant message with the tool calls
+            # This reconstructs what the model "said" when it made the tool calls
+            tool_calls_for_assistant: List[ChatCompletionMessageToolCallParam] = []
+            for result in tool_call_results:
+                tool_calls_for_assistant.append(
+                    {
+                        "id": result.id or "",
+                        "type": "function",
+                        "function": {
+                            "name": result.name,
+                            "arguments": json.dumps(result.args),
+                        },
+                    }
+                )
+
+            assistant_with_tools: ChatCompletionAssistantMessageParam = {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": tool_calls_for_assistant,
+            }
+            messages.append(assistant_with_tools)
+
+            # Then add tool messages with the results
+            for result in tool_call_results:
+                # Serialize result to string for OpenAI
+                result_value = result.result
+                if isinstance(result_value, (dict, list)):
+                    result_str = json.dumps(result_value)
+                elif not isinstance(result_value, str):
+                    result_str = str(result_value)
+                else:
+                    result_str = result_value
+
+                tool_msg: ChatCompletionToolMessageParam = {
+                    "role": "tool",
+                    "tool_call_id": result.id or "",
+                    "content": result_str,
+                }
+                messages.append(tool_msg)
 
         # Handle new message using the generic converter
         converted_content = self._convert_message_content(new_message)

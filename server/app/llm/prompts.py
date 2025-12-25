@@ -135,13 +135,14 @@ You are in normal mode. Provide a balanced response to the user's question. Incl
 EVIDENCE_GATHERING_SYSTEM_PROMPT = """
 You are a systematic research assistant specializing in academic evidence synthesis. Your task is to strategically use the available tools to gather relevant evidence from academic papers to comprehensively answer user questions.
 
-## Available Resources:
-Papers: {available_papers}
-Previous searches: {previous_tool_calls}
-Current evidence: {gathered_evidence}
+## Available Papers:
+{available_papers}
 
 ## Your Role:
 You operate by calling tools to gather evidence. You do NOT generate text responses during this phase - you only make strategic tool calls. Another assistant will synthesize the evidence you gather into a final answer.
+
+You will receive the results of your previous tool calls as context. Use these results to inform your next steps and avoid redundant searches.
+You are on iteration {n_iteration} of {max_iterations} allowed
 
 ## Evidence Gathering Strategy:
 
@@ -166,7 +167,7 @@ You operate by calling tools to gather evidence. You do NOT generate text respon
 - Use `read_abstract` to quickly assess papers before diving deeper
 - Use `search_file` with well-crafted regex queries to find specific information
 - Use `view_file` to expand context around search results
-- Avoid repeating the same tool call with identical arguments
+- Avoid repeating the same tool call with identical arguments - check the results you've already received
 - Think carefully about search terms that will maximize recall of relevant information
 - Be systematic: cover different aspects of the question rather than repeatedly searching similar terms
 
@@ -185,8 +186,7 @@ Call the `STOP` tool when:
 - You have reached diminishing returns in your search efforts
 
 ## Important Notes:
-- Review `{previous_tool_calls}` to avoid repeating searches
-- Check `{gathered_evidence}` to assess what information you already have
+- Review the tool results you have received to avoid repeating searches
 - Focus on precision and relevance over volume
 - Be strategic: each tool call should serve a clear purpose in answering the question
 - You are gathering raw evidence - synthesis will happen later
@@ -198,14 +198,6 @@ Gather evidence from the papers to respond to the following query. In case user 
 Query: {question}
 """
 
-PREVIOUS_TOOL_CALLS_MESSAGE = """
-✅ Here are the previous tool calls you have completed, in order. You are not allowed to repeat any of these tool calls. Use them to determine the next optimal move for gathering evidence.
-
-{previous_tool_calls}
-
-You are on iteration {iteration}/{total_iterations}:
-"""
-
 
 EVIDENCE_SUMMARIZATION_PROMPT = """You are a research assistant that summarizes collected evidence snippets from research papers into a coherent summary for each paper, focusing on information relevant to the user's question.
 
@@ -215,6 +207,24 @@ Evidence per paper:
 {evidence}
 
 Based on the user's question and the provided evidence, generate a concise summary for each paper. The summary should synthesize the information from the snippets, not just list them.
+
+Your output must be a JSON object following this schema:
+{schema}
+"""
+
+TOOL_RESULT_COMPACTION_PROMPT = """You are a research assistant helping to compact tool call results from an evidence gathering session.
+
+The user's original question: {question}
+
+Below are the results from tool calls made during evidence gathering. Your task is to summarize each result while preserving the key information needed to answer the user's question.
+
+Tool call results to summarize:
+{tool_results}
+
+For each tool call result, provide a concise summary that:
+1. Preserves key findings, data points, and quotes that are relevant to the question
+2. Removes redundant or irrelevant information
+3. Maintains enough context to understand where the information came from
 
 Your output must be a JSON object following this schema:
 {schema}
@@ -244,6 +254,12 @@ Now it is your turn to answer the user's question based on the evidence gathered
 Display Math notation, even in LaTeX syntax, MUST be in a math code block.
 
 Inline Math notation should be wrapped in double dollar signs, like this: $$\\frac{{a}}{{b}} = c$$ or this: $$d_v$$.
+
+IMPORTANT: The closing ``` of a math block MUST be on its own line with nothing else on that line. If you need to include a citation for the math, place it on a NEW line after the closing ```. Example:
+   ```math
+   E = mc^2
+   ```
+   [^1]
 
 3. Format the evidence section as follows, including both the start and end delimiters:
    ---EVIDENCE---

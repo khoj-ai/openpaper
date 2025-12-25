@@ -1,8 +1,8 @@
 import re
 from enum import Enum
-from typing import Dict, List, Union
+from typing import Any, Dict, List, Union
 
-from app.schemas.responses import ToolCall
+from app.schemas.responses import ToolCall, ToolCallResult
 from pydantic import BaseModel, Field
 
 
@@ -66,6 +66,10 @@ class EvidenceCollection(BaseModel):
         default_factory=list,
         description="List of previous tool calls made during evidence gathering",
     )
+    tool_call_results: List[ToolCallResult] = Field(
+        default_factory=list,
+        description="List of tool call results for proper multi-turn function calling",
+    )
 
     def load_from_dict(self, evidence_dict: Dict[str, List[str]]) -> None:
         """Load evidence from a dictionary format"""
@@ -89,6 +93,23 @@ class EvidenceCollection(BaseModel):
         """Add a tool call to the collection"""
         self.previous_tool_calls.append(tool_call)
 
+    def add_tool_call_result(
+        self, tool_call: ToolCall, result: Union[str, List, Dict, None]
+    ) -> None:
+        """Add a tool call result for proper multi-turn function calling"""
+        self.tool_call_results.append(
+            ToolCallResult(
+                id=tool_call.id,
+                name=tool_call.name,
+                args=tool_call.args,
+                result=result,
+            )
+        )
+
+    def get_tool_call_results(self) -> List[ToolCallResult]:
+        """Get all tool call results for passing to LLM"""
+        return self.tool_call_results
+
     def get_evidence_dict(self) -> Dict[str, List[str]]:
         """Convert to dictionary format for backward compatibility - returns clean content without line numbers"""
         return {
@@ -105,10 +126,6 @@ class EvidenceCollection(BaseModel):
             for paper_id, evidence in self.evidence.items()
         }
 
-    def get_previous_tool_calls_dict(self) -> List[Dict]:
-        """Convert previous tool calls to dictionary format"""
-        return [tool_call.model_dump() for tool_call in self.previous_tool_calls]
-
     def has_evidence(self) -> bool:
         """Check if any evidence has been collected"""
         return bool(self.evidence)
@@ -116,6 +133,61 @@ class EvidenceCollection(BaseModel):
     def has_previous_tool_calls(self) -> bool:
         """Check if there are any previous tool calls"""
         return bool(self.previous_tool_calls)
+
+    def get_tool_results_size(self) -> int:
+        """Calculate the total character size of all tool call results"""
+        import json
+
+        total_size = 0
+        for result in self.tool_call_results:
+            result_value = result.result
+            if isinstance(result_value, (dict, list)):
+                total_size += len(json.dumps(result_value))
+            elif result_value is not None:
+                total_size += len(str(result_value))
+        return total_size
+
+    def get_tool_results_for_compaction(self) -> List[Dict[str, Any]]:
+        """Get tool results in a format suitable for LLM compaction"""
+        import json
+
+        results = []
+        for result in self.tool_call_results:
+            result_value = result.result
+            if isinstance(result_value, (dict, list)):
+                result_str = json.dumps(result_value)
+            elif result_value is not None:
+                result_str = str(result_value)
+            else:
+                result_str = "None"
+
+            results.append(
+                {
+                    "id": result.id or "",
+                    "name": result.name,
+                    "result": result_str[
+                        :10000
+                    ],  # Truncate very long individual results
+                }
+            )
+        return results
+
+    def apply_compacted_results(
+        self, compacted_results: List["CompactedToolResult"]
+    ) -> None:
+        """Replace tool call results with compacted versions, preserving original args"""
+        # Build a lookup of original args by id
+        original_args_by_id = {r.id: r.args for r in self.tool_call_results if r.id}
+
+        self.tool_call_results = [
+            ToolCallResult(
+                id=cr.id,
+                name=cr.name,
+                args=original_args_by_id.get(cr.id, {}),
+                result=cr.summary,
+            )
+            for cr in compacted_results
+        ]
 
 
 class EvidenceSummaryResponse(BaseModel):
@@ -128,4 +200,23 @@ class EvidenceSummaryResponse(BaseModel):
     summaries: Dict[str, str] = Field(
         default_factory=dict,
         description="Mapping of paper IDs to their respective summaries",
+    )
+
+
+class CompactedToolResult(BaseModel):
+    """A single compacted tool result"""
+
+    id: str = Field(description="The original tool call ID")
+    name: str = Field(description="The tool/function name that was called")
+    summary: str = Field(
+        description="Concise summary of the result, preserving key information"
+    )
+
+
+class ToolResultCompactionResponse(BaseModel):
+    """Response structure for tool result compaction"""
+
+    compacted_results: List[CompactedToolResult] = Field(
+        default_factory=list,
+        description="List of compacted tool results with summaries",
     )
