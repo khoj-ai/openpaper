@@ -4,7 +4,7 @@ import { AlertCircle, ArrowLeft, ArrowRight, BookOpen, Library, Loader2, Message
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { fetchFromApi } from "@/lib/api";
-import { Project, PaperItem, Conversation, ProjectRole } from "@/lib/schema";
+import { ProjectRole } from "@/lib/schema";
 import { PdfDropzone } from "@/components/PdfDropzone";
 import PaperCard from "@/components/PaperCard";
 import PdfUploadTracker from "@/components/PdfUploadTracker";
@@ -52,10 +52,14 @@ import {
 	BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { useSubscription, isPaperUploadAtLimit, isChatCreditAtLimit } from "@/hooks/useSubscription";
+import { useProject, useProjectPapers, useProjectConversations } from "@/hooks/useProjects";
 import { toast } from "sonner";
 import ConversationCard from "@/components/ConversationCard";
 import Artifacts from "@/components/Artifacts";
 import { ProjectCollaborators } from "@/components/ProjectCollaborators";
+import ProjectPageSkeleton from "@/components/ProjectPageSkeleton";
+import { ConversationListSkeleton } from "@/components/ConversationListSkeleton";
+import { PaperListSkeleton } from "@/components/PaperListSkeleton";
 
 interface PdfUploadResponse {
 	message: string;
@@ -66,11 +70,10 @@ export default function ProjectPage() {
 	const params = useParams();
 	const router = useRouter();
 	const projectId = params.projectId as string;
-	const [project, setProject] = useState<Project | null>(null);
-	const [papers, setPapers] = useState<PaperItem[]>([]);
+	const { project, isLoading, error: projectError, refetch: refetchProject } = useProject(projectId);
+	const { papers, isLoading: isPapersLoading, refetch: refetchPapers } = useProjectPapers(projectId);
+	const { conversations, isLoading: isConversationsLoading, refetch: refetchConversations } = useProjectConversations(projectId);
 	const [hasCollaborators, setHasCollaborators] = useState<boolean>(false);
-	const [conversations, setConversations] = useState<Conversation[]>([]);
-	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [uploadError, setUploadError] = useState<string | null>(null);
 	const [initialJobs, setInitialJobs] = useState<MinimalJob[]>([]);
@@ -103,57 +106,17 @@ export default function ProjectPage() {
 	}, [chatDisabled, router]);
 
 
-	const getProject = useCallback(async () => {
-		try {
-			const fetchedProject = await fetchFromApi(`/api/projects/${projectId}`);
-			setProject(fetchedProject);
-		} catch (err) {
-			setError("Failed to fetch project. Please try again.");
-			console.error(err);
-		} finally {
-			setIsLoading(false);
-		}
-	}, [projectId]);
-
-	const getProjectPapers = useCallback(async () => {
-		try {
-			const fetchedPapers = await fetchFromApi(`/api/projects/papers/${projectId}`);
-			setPapers(fetchedPapers.papers);
-		} catch (err) {
-			setError("Failed to fetch project papers. Please try again.");
-			console.error(err);
-		}
-	}, [projectId]);
-
-	const getProjectConversations = useCallback(async () => {
-		try {
-			const fetchedConversations = await fetchFromApi(`/api/projects/conversations/${projectId}`);
-			setConversations(fetchedConversations);
-		} catch (err) {
-			setError("Failed to fetch project conversations. Please try again.");
-			console.error(err);
-		}
-	}, [projectId]);
-
 	const handleDeleteConversation = async (conversationId: string) => {
 		try {
 			await fetchFromApi(`/api/conversation/${conversationId}`, {
 				method: "DELETE",
 			});
-			setConversations(conversations.filter((c) => c.id !== conversationId));
+			refetchConversations();
 		} catch (err) {
 			setError("Failed to delete conversation. Please try again.");
 			console.error(err);
 		}
 	};
-
-	useEffect(() => {
-		if (projectId) {
-			getProject();
-			getProjectPapers();
-			getProjectConversations();
-		}
-	}, [projectId, getProject, getProjectPapers, getProjectConversations]);
 
 	const handleFileSelect = async (files: File[]) => {
 		if (isPaperUploadAtLimit(subscription)) {
@@ -189,8 +152,8 @@ export default function ProjectPage() {
 			method: "POST",
 			body: JSON.stringify({ paper_ids: [paperId] }),
 		});
-		getProjectPapers(); // Refresh project data
-	}, [projectId, getProjectPapers]);
+		refetchPapers(); // Refresh project data
+	}, [projectId, refetchPapers]);
 
 	const handlePdfUrl = async (url: string) => {
 		if (isPaperUploadAtLimit(subscription)) {
@@ -274,7 +237,7 @@ export default function ProjectPage() {
 				}),
 			});
 			if (response) {
-				setProject(response);
+				refetchProject();
 				setShowEditAlert(false);
 			} else {
 				console.error('Failed to update project');
@@ -292,11 +255,11 @@ export default function ProjectPage() {
 	};
 
 	if (isLoading) {
-		return <div className="container mx-auto p-4">Loading project...</div>;
+		return <ProjectPageSkeleton />;
 	}
 
-	if (error) {
-		return <div className="container mx-auto p-4 text-red-500">{error}</div>;
+	if (projectError || error) {
+		return <div className="container mx-auto p-4 text-red-500">{projectError?.message || error}</div>;
 	}
 
 	if (!project) {
@@ -357,7 +320,7 @@ export default function ProjectPage() {
 							</DialogContent>
 						</Dialog>
 					</div>
-					<AddFromLibrary projectId={projectId} onPapersAdded={getProjectPapers} projectPaperIds={papers.map(p => p.id)} />
+					<AddFromLibrary projectId={projectId} onPapersAdded={refetchPapers} projectPaperIds={papers.map(p => p.id)} />
 				</div>
 				<Dialog open={isUrlDialogOpen} onOpenChange={setIsUrlDialogOpen}>
 					<DialogContent>
@@ -514,7 +477,14 @@ export default function ProjectPage() {
 
 					{/* Conversations List */}
 					<div>
-						{conversations.length > 0 ? (
+						{isConversationsLoading ? (
+							<>
+								<div className="flex justify-between items-center mb-4">
+									<h2 className="text-2xl font-bold">Chats</h2>
+								</div>
+								<ConversationListSkeleton count={3} />
+							</>
+						) : conversations.length > 0 ? (
 							<>
 								<div className="flex justify-between items-center mb-4">
 									<h2 className="text-2xl font-bold">Chats</h2>
@@ -660,7 +630,7 @@ export default function ProjectPage() {
 														Back
 													</Button>
 													<h3 className="text-lg font-semibold mb-2">Add from Library</h3>
-													<AddFromLibrary projectId={projectId} onPapersAdded={getProjectPapers} projectPaperIds={papers.map(p => p.id)} />
+													<AddFromLibrary projectId={projectId} onPapersAdded={refetchPapers} projectPaperIds={papers.map(p => p.id)} />
 												</div>
 											)}
 										</div>
@@ -670,7 +640,9 @@ export default function ProjectPage() {
 						</div>
 					</div>
 
-					{papers && papers.length > 0 ? (
+					{isPapersLoading ? (
+						<PaperListSkeleton count={3} />
+					) : papers && papers.length > 0 ? (
 						(() => {
 							const ownedPapers = papers.filter(p => p.is_owner);
 							const otherPapers = papers.filter(p => !p.is_owner);
@@ -690,7 +662,7 @@ export default function ProjectPage() {
 											<div className="grid grid-cols-1 gap-4">
 												{ownedPapers.slice(0, showAllOwnedPapers ? ownedPapers.length : papersToShow).map((paper) => (
 													<div key={paper.id}>
-														<PaperCard paper={paper} minimalist={true} projectId={projectId} onUnlink={getProjectPapers} is_owner={paper.is_owner} />
+														<PaperCard paper={paper} minimalist={true} projectId={projectId} onUnlink={refetchPapers} is_owner={paper.is_owner} />
 													</div>
 												))}
 											</div>
@@ -712,7 +684,7 @@ export default function ProjectPage() {
 											<div className="grid grid-cols-1 gap-4">
 												{otherPapers.slice(0, showAllOtherPapers ? otherPapers.length : papersToShow).map((paper, index) => (
 													<div key={paper.id} className="animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
-														<PaperCard paper={paper} minimalist={true} projectId={projectId} onUnlink={getProjectPapers} is_owner={paper.is_owner} />
+														<PaperCard paper={paper} minimalist={true} projectId={projectId} onUnlink={refetchPapers} is_owner={paper.is_owner} />
 													</div>
 												))}
 											</div>
