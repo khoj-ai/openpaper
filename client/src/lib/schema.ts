@@ -95,6 +95,23 @@ export interface OpenAlexPaper {
         display_name: string
         score?: number
     }>
+    primary_location?: {
+        is_oa: boolean
+        landing_page_url: string
+        pdf_url?: string
+        source?: {
+            id: string
+            display_name: string
+            type?: string
+            host_organization?: string
+        }
+    }
+    biblio?: {
+        volume?: string
+        issue?: string
+        first_page?: string
+        last_page?: string
+    }
     authorships?: Array<{
         author?: {
             id: string
