@@ -721,6 +721,9 @@ export default function OpenPaperLanding() {
                     <Link href="https://github.com/khoj-ai/openpaper" className="text-xs hover:underline underline-offset-4 text-muted-foreground hover:text-primary">
                         GitHub
                     </Link>
+                    <Link href="/blog" className="text-xs hover:underline underline-offset-4 text-muted-foreground hover:text-primary">
+                        Blog
+                    </Link>
                     <Link href="/blog/manifesto" className="text-xs hover:underline underline-offset-4 text-muted-foreground hover:text-primary">
                         Manifesto
                     </Link>

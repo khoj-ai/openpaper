@@ -375,6 +375,9 @@ export default function Home() {
 							<Link href="/blog/manifesto" className="hover:text-foreground transition-colors">
 								Manifesto
 							</Link>
+							<Link href="/blog" className="hover:text-foreground transition-colors">
+								Blog
+							</Link>
 							<Link href="/about" className="hover:text-foreground transition-colors">
 								About
 							</Link>
