@@ -1,12 +1,12 @@
 import { OpenAlexPaper } from "@/lib/schema";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
-interface PaperResultCardProps {
+interface PaperPreviewPanelProps {
     paper: OpenAlexPaper;
-    isSelected?: boolean;
-    onSelect?: (paper: OpenAlexPaper) => void;
+    onClose?: () => void;
 }
 
 const makeSciHubUrl = (doi: string) => {
@@ -19,10 +19,7 @@ function SciHubLink({ doiLink, className }: { doiLink: string | undefined; class
     return (
         <Dialog>
             <DialogTrigger asChild>
-                <button
-                    className={className}
-                    onClick={(e) => e.stopPropagation()}
-                >
+                <button className={className}>
                     [PDF]
                 </button>
             </DialogTrigger>
@@ -67,36 +64,31 @@ function SciHubLink({ doiLink, className }: { doiLink: string | undefined; class
     );
 }
 
-export default function PaperResultCard({ paper, isSelected, onSelect }: PaperResultCardProps) {
+export default function PaperPreviewPanel({ paper, onClose }: PaperPreviewPanelProps) {
     const numAuthors = paper.authorships?.length || 0;
-
-    // Format authors for the metadata line
-    const authorLine = paper.authorships?.slice(0, 3).map(a => a.author?.display_name).filter(Boolean).join(", ") || "";
-    const hasMoreAuthors = numAuthors > 3;
-
-    // Get source/journal name if available
+    const authorLine = paper.authorships?.slice(0, 5).map(a => a.author?.display_name).filter(Boolean).join(", ") || "";
+    const hasMoreAuthors = numAuthors > 5;
     const sourceName = paper.primary_location?.source?.display_name;
 
     return (
-        <div
-            className={`group py-4 cursor-pointer border-b border-slate-200 dark:border-slate-800 last:border-b-0 transition-colors overflow-hidden ${
-                isSelected
-                    ? "bg-blue-50 dark:bg-blue-950/30 border-l-2 border-l-blue-500 pl-3"
-                    : "hover:bg-slate-50 dark:hover:bg-slate-900/50"
-            }`}
-            onClick={() => onSelect?.(paper)}
-        >
+        <div className="h-full overflow-y-auto p-5 bg-secondary text-slate-900 dark:text-slate-100">
             {/* Title */}
-            <h3 className={`text-lg leading-snug mb-1 break-words ${
-                isSelected
-                    ? "text-blue-800 dark:text-blue-300"
-                    : "text-blue-700 dark:text-blue-400 group-hover:underline"
-            }`}>
-                {paper.title}
-            </h3>
+            <div className="flex items-start gap-2 mb-2">
+                <h2 className="text-lg leading-snug font-semibold text-slate-900 dark:text-slate-100 flex-1">
+                    {paper.title}
+                </h2>
+                {onClose && (
+                    <button
+                        onClick={onClose}
+                        className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors flex-shrink-0"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                )}
+            </div>
 
             {/* Author/Source/Year line */}
-            <div className="text-sm text-blue-600 dark:text-blue-400 mb-1 break-words">
+            <div className="text-sm text-blue-600 dark:text-blue-400 mb-2">
                 {authorLine}
                 {hasMoreAuthors && <span>...</span>}
                 {sourceName && (
@@ -113,15 +105,8 @@ export default function PaperResultCard({ paper, isSelected, onSelect }: PaperRe
                 )}
             </div>
 
-            {/* Abstract snippet */}
-            {paper.abstract && (
-                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-2 line-clamp-2 break-words">
-                    {paper.abstract}
-                </p>
-            )}
-
             {/* Action links row */}
-            <div className="flex items-center gap-3 text-sm flex-wrap">
+            <div className="flex items-center gap-3 text-sm flex-wrap mb-4">
                 {paper.cited_by_count !== undefined && paper.cited_by_count > 0 && (
                     <span className="text-slate-500 dark:text-slate-400">
                         Cited by {paper.cited_by_count}
@@ -137,26 +122,59 @@ export default function PaperResultCard({ paper, isSelected, onSelect }: PaperRe
                         href={paper.open_access.oa_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-600 dark:text-blue-400 hover:underline"
-                        onClick={(e) => e.stopPropagation()}
+                        className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
                     >
                         [PDF]
                     </a>
                 ) : (
-                    <SciHubLink doiLink={paper.doi} className="text-blue-600 dark:text-blue-400 hover:underline" />
+                    <SciHubLink doiLink={paper.doi} className="font-medium text-blue-600 dark:text-blue-400 hover:underline" />
                 )}
                 {paper.doi && (
                     <a
                         href={`https://doi.org/${paper.doi}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-600 dark:text-blue-400 hover:underline"
-                        onClick={(e) => e.stopPropagation()}
+                        className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
                     >
                         View
                     </a>
                 )}
             </div>
+
+            {/* Abstract */}
+            {paper.abstract && (
+                <div className="mb-4">
+                    <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                        {paper.abstract}
+                    </p>
+                </div>
+            )}
+
+            {/* Keywords */}
+            {paper.keywords && paper.keywords.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-4">
+                    {paper.keywords.slice(0, 8).map((keyword, i) => (
+                        <Badge key={i} variant="secondary" className="text-xs bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                            {keyword.display_name}
+                        </Badge>
+                    ))}
+                    {paper.keywords.length > 8 && (
+                        <span className="text-xs text-slate-400">+{paper.keywords.length - 8} more</span>
+                    )}
+                </div>
+            )}
+
+            {/* Topics */}
+            {paper.topics && paper.topics.length > 0 && (
+                <div className="text-xs text-slate-500 dark:text-slate-400">
+                    {paper.topics.slice(0, 3).map((topic, i) => (
+                        <span key={i}>
+                            {i > 0 && " · "}
+                            {topic.display_name}
+                        </span>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

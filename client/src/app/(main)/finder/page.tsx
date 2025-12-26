@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { Suspense, useEffect, useRef, useState, useCallback } from "react"
+import { useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
@@ -17,10 +18,15 @@ import {
     PaginationNext,
     PaginationPrevious,
 } from "@/components/ui/pagination";
+import {
+    Sheet,
+    SheetContent,
+} from "@/components/ui/sheet";
 import Link from "next/link";
 import { getOpenAlexTypeAheadAuthors, getOpenAlexTypeAheadInstitutions, OpenAlexTypeAheadAuthor, OpenAlexTypeAheadInstitution } from "./utils";
-import { OpenAlexResponse } from "@/lib/schema";
+import { OpenAlexPaper, OpenAlexResponse } from "@/lib/schema";
 import PaperResultCard from "./PaperResultCard";
+import PaperPreviewPanel from "./PaperPreviewPanel";
 import { FinderIntro } from "./FinderIntro";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -37,7 +43,9 @@ interface SearchPaperRequest {
     only_oa?: boolean;
 }
 
-export default function FinderPage() {
+function FinderPageContent() {
+    const searchParams = useSearchParams();
+
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<OpenAlexResponse | null>(null);
     const [loading, setLoading] = useState(false);
@@ -48,6 +56,90 @@ export default function FinderPage() {
     const [authors, setAuthors] = useState<OpenAlexTypeAheadAuthor[]>([]);
     const [institutions, setInstitutions] = useState<OpenAlexTypeAheadInstitution[]>([]);
     const [onlyOpenAccess, setOnlyOpenAccess] = useState(false);
+    const [selectedPaper, setSelectedPaper] = useState<OpenAlexPaper | null>(null);
+    const [isMobile, setIsMobile] = useState(false);
+    const [initializedFromUrl, setInitializedFromUrl] = useState(false);
+
+    // Check for mobile viewport
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
+    // Update URL with current search state
+    const updateUrl = useCallback((searchQuery: string, pageNum: number, authorList: OpenAlexTypeAheadAuthor[], institutionList: OpenAlexTypeAheadInstitution[], openAccess: boolean) => {
+        const params = new URLSearchParams();
+        if (searchQuery) params.set('q', searchQuery);
+        if (pageNum > 1) params.set('page', pageNum.toString());
+        if (openAccess) params.set('oa', '1');
+
+        // Store authors as JSON with id and display_name
+        if (authorList.length > 0) {
+            params.set('authors', JSON.stringify(authorList.map(a => ({ id: a.id, display_name: a.display_name, hint: a.hint }))));
+        }
+
+        // Store institutions as JSON with id and display_name
+        if (institutionList.length > 0) {
+            params.set('institutions', JSON.stringify(institutionList.map(i => ({ id: i.id, display_name: i.display_name, hint: i.hint }))));
+        }
+
+        const queryString = params.toString();
+        const newUrl = queryString ? `/finder?${queryString}` : '/finder';
+        window.history.pushState({}, '', newUrl);
+    }, []);
+
+    // Initialize state from URL params on mount
+    useEffect(() => {
+        if (initializedFromUrl) return;
+
+        const urlQuery = searchParams.get('q');
+        const urlPage = searchParams.get('page');
+        const urlOa = searchParams.get('oa');
+        const urlAuthors = searchParams.get('authors');
+        const urlInstitutions = searchParams.get('institutions');
+
+        if (urlQuery) {
+            setQuery(urlQuery);
+        }
+
+        if (urlPage) {
+            setPage(parseInt(urlPage, 10));
+        }
+
+        if (urlOa === '1') {
+            setOnlyOpenAccess(true);
+        }
+
+        if (urlAuthors) {
+            try {
+                const parsedAuthors = JSON.parse(urlAuthors) as OpenAlexTypeAheadAuthor[];
+                setAuthors(parsedAuthors);
+            } catch (e) {
+                console.error('Failed to parse authors from URL:', e);
+            }
+        }
+
+        if (urlInstitutions) {
+            try {
+                const parsedInstitutions = JSON.parse(urlInstitutions) as OpenAlexTypeAheadInstitution[];
+                setInstitutions(parsedInstitutions);
+            } catch (e) {
+                console.error('Failed to parse institutions from URL:', e);
+            }
+        }
+
+        setInitializedFromUrl(true);
+
+    }, [searchParams, initializedFromUrl]);
+
+    // Trigger search when initialized from URL with a query
+    useEffect(() => {
+        if (initializedFromUrl && query && !results && !loading) {
+            handleSearchFromUrl();
+        }
+    }, [initializedFromUrl, query]);
 
     // Autocomplete states
     const [authorSuggestions, setAuthorSuggestions] = useState<OpenAlexTypeAheadAuthor[]>([]);
@@ -67,25 +159,33 @@ export default function FinderPage() {
         setInstitutions(prev => prev.filter(i => i.id !== institutionId));
     };
 
-    const handleSearch = async (pageNumber = page) => {
-        if (!query.trim()) return;
+    // Core search function
+    const performSearch = async (
+        searchQuery: string,
+        pageNumber: number,
+        authorList: OpenAlexTypeAheadAuthor[],
+        institutionList: OpenAlexTypeAheadInstitution[],
+        openAccess: boolean,
+        shouldUpdateUrl: boolean = true
+    ) => {
+        if (!searchQuery.trim()) return;
 
         setResults(null);
         setLoading(true);
-        inputRef.current?.blur(); // Remove focus from input
-        setError(null); // Clear any previous errors
+        inputRef.current?.blur();
+        setError(null);
 
         try {
             const filter: SearchPaperRequest = {
-                authors: authors.map(author => author.id),
-                institutions: institutions.map(institution => institution.id),
-                only_oa: onlyOpenAccess,
+                authors: authorList.map(author => author.id),
+                institutions: institutionList.map(institution => institution.id),
+                only_oa: openAccess,
             };
 
             const hasFilters = (filter.authors?.length ?? 0 > 0) || (filter.institutions?.length ?? 0 > 0) || filter.only_oa;
 
             const response: OpenAlexResponse = await fetchFromApi(
-                `/api/search/global/search?query=${encodeURIComponent(query)}&page=${pageNumber}&per_page=${perPage}`,
+                `/api/search/global/search?query=${encodeURIComponent(searchQuery)}&page=${pageNumber}&per_page=${perPage}`,
                 {
                     method: "POST",
                     ...(hasFilters && { body: JSON.stringify(filter) }),
@@ -96,19 +196,36 @@ export default function FinderPage() {
             setTotalResults(response.meta.count);
             setPerPage(response.meta.per_page);
             setPage(pageNumber);
+
+            // Update URL after successful search
+            if (shouldUpdateUrl) {
+                updateUrl(searchQuery, pageNumber, authorList, institutionList, openAccess);
+            }
         } catch (error) {
             console.error("Search failed:", error);
             setError("Failed to fetch results. Please try again.");
         } finally {
             setLoading(false);
         }
-    }
+    };
+
+    // Search triggered by user action (updates URL)
+    const handleSearch = async (pageNumber = page) => {
+        await performSearch(query, pageNumber, authors, institutions, onlyOpenAccess, true);
+    };
+
+    // Search triggered from URL params (doesn't update URL)
+    const handleSearchFromUrl = async () => {
+        await performSearch(query, page, authors, institutions, onlyOpenAccess, false);
+    };
 
     const totalPages = Math.ceil(totalResults / perPage);
 
     // Handle page change
     const handlePageChange = (newPage: number) => {
-        if (newPage < 1 || newPage > totalPages) return;
+        if (newPage < 1 || newPage > totalPages) {
+            return;
+        }
         handleSearch(newPage);
     }
 
@@ -210,7 +327,7 @@ export default function FinderPage() {
 
 
     return (
-        <div className="container mx-auto p-6 space-y-6">
+        <div className="w-full px-4 py-6 space-y-6 overflow-x-hidden">
             <div className="space-y-4">
                 {/* Main search bar */}
                 <div className="flex gap-4">
@@ -423,30 +540,57 @@ export default function FinderPage() {
                     />
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {loading && [...Array(6)].map((_, i) => (
-                    <Card key={`skeleton-${i}`} className="flex flex-col">
-                        <CardHeader>
-                            <Skeleton className="h-4 w-3/4" />
-                            <Skeleton className="h-4 w-1/2" />
-                        </CardHeader>
-                        <CardContent>
-                            <Skeleton className="h-4 w-full" />
-                            <Skeleton className="h-4 w-full mt-2" />
-                        </CardContent>
-                    </Card>
-                ))}
+            {/* Split pane layout - results on left, preview on right (desktop) */}
+            <div className="flex gap-6 overflow-hidden">
+                {/* Results column */}
+                <div className={`${selectedPaper ? 'hidden lg:block lg:flex-1 lg:h-[calc(100vh-8rem)] lg:overflow-y-auto lg:overflow-x-hidden lg:pr-2 min-w-0' : 'w-full max-w-5xl'} overflow-x-hidden`}>
+                    {loading && [...Array(6)].map((_, i) => (
+                        <div key={`skeleton-${i}`} className="py-4 border-b border-slate-200 dark:border-slate-800">
+                            <Skeleton className="h-5 w-3/4 mb-2" />
+                            <Skeleton className="h-4 w-1/2 mb-2" />
+                            <Skeleton className="h-4 w-full mb-1" />
+                            <Skeleton className="h-4 w-2/3" />
+                        </div>
+                    ))}
 
-                {results?.results.map((paper) => (
-                    <PaperResultCard key={paper.id} paper={paper} />
-                ))}
+                    {results?.results.map((paper) => (
+                        <PaperResultCard
+                            key={paper.id}
+                            paper={paper}
+                            isSelected={selectedPaper?.id === paper.id}
+                            onSelect={setSelectedPaper}
+                        />
+                    ))}
+
+                    {results?.results.length === 0 && (
+                        <div className="text-center text-muted-foreground py-8">
+                            No results found
+                        </div>
+                    )}
+                </div>
+
+                {/* Preview panel - desktop only */}
+                {selectedPaper && (
+                    <div className="hidden lg:block lg:w-80 xl:w-96 flex-shrink-0 sticky top-6 h-[calc(100vh-8rem)] border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
+                        <PaperPreviewPanel
+                            paper={selectedPaper}
+                            onClose={() => setSelectedPaper(null)}
+                        />
+                    </div>
+                )}
             </div>
 
-            {results?.results.length === 0 && (
-                <div className="text-center text-muted-foreground">
-                    No results found
-                </div>
-            )}
+            {/* Mobile sheet for paper preview */}
+            <Sheet open={selectedPaper !== null && isMobile} onOpenChange={(open) => !open && setSelectedPaper(null)}>
+                <SheetContent side="right" className="w-full sm:w-3/4 p-0">
+                    {selectedPaper && (
+                        <PaperPreviewPanel
+                            paper={selectedPaper}
+                            onClose={() => setSelectedPaper(null)}
+                        />
+                    )}
+                </SheetContent>
+            </Sheet>
 
             {
                 error && (
@@ -480,7 +624,11 @@ export default function FinderPage() {
                     <PaginationContent>
                         <PaginationItem>
                             <PaginationPrevious
-                                onClick={() => handlePageChange(page - 1)}
+                                href="#"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    handlePageChange(page - 1);
+                                }}
                                 className={page <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
                             />
                         </PaginationItem>
@@ -493,8 +641,12 @@ export default function FinderPage() {
                             ) : (
                                 <PaginationItem key={`page-${pageNum}`}>
                                     <PaginationLink
+                                        href="#"
                                         isActive={pageNum === page}
-                                        onClick={() => handlePageChange(pageNum as number)}
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            handlePageChange(pageNum as number);
+                                        }}
                                     >
                                         {pageNum}
                                     </PaginationLink>
@@ -504,7 +656,11 @@ export default function FinderPage() {
 
                         <PaginationItem>
                             <PaginationNext
-                                onClick={() => handlePageChange(page + 1)}
+                                href="#"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    handlePageChange(page + 1);
+                                }}
                                 className={page >= totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
                             />
                         </PaginationItem>
@@ -512,5 +668,13 @@ export default function FinderPage() {
                 </Pagination>
             )}
         </div>
+    )
+}
+
+export default function FinderPage() {
+    return (
+        <Suspense fallback={<div className="w-full px-4 py-6">Loading...</div>}>
+            <FinderPageContent />
+        </Suspense>
     )
 }
