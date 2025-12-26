@@ -337,7 +337,7 @@ function FinderPageContent() {
                             placeholder="Search by topic, title, keywords..."
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                            onKeyDown={(e) => e.key === "Enter" && handleSearch(1)}
                         />
                     </div>
 
