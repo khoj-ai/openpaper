@@ -368,7 +368,7 @@ export default function PapersPage() {
 
     useEffect(() => {
         if (!authLoading && !user) {
-            // Redirect to login if user is not authenticated
+            localStorage.setItem('returnTo', window.location.pathname);
             window.location.href = `/login`;
         }
     }, [authLoading, user]);

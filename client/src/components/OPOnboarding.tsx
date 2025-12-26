@@ -210,7 +210,9 @@ export function OPOnboarding() {
 			});
 
 			toast.success("Profile complete! Welcome to Open Paper.");
-			router.push("/");
+			const returnTo = localStorage.getItem('returnTo') || '/';
+			localStorage.removeItem('returnTo');
+			router.push(returnTo);
 
 		} catch (error) {
 			if (error instanceof Error) {
