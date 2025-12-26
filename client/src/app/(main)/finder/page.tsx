@@ -90,7 +90,7 @@ function FinderPageContent() {
         window.history.pushState({}, '', newUrl);
     }, []);
 
-    // Initialize state from URL params on mount
+    // Initialize state from URL params on mount and trigger search if needed
     useEffect(() => {
         if (initializedFromUrl) return;
 
@@ -100,21 +100,26 @@ function FinderPageContent() {
         const urlAuthors = searchParams.get('authors');
         const urlInstitutions = searchParams.get('institutions');
 
+        let parsedAuthors: OpenAlexTypeAheadAuthor[] = [];
+        let parsedInstitutions: OpenAlexTypeAheadInstitution[] = [];
+        const parsedPage = urlPage ? parseInt(urlPage, 10) : 1;
+        const parsedOa = urlOa === '1';
+
         if (urlQuery) {
             setQuery(urlQuery);
         }
 
         if (urlPage) {
-            setPage(parseInt(urlPage, 10));
+            setPage(parsedPage);
         }
 
-        if (urlOa === '1') {
+        if (parsedOa) {
             setOnlyOpenAccess(true);
         }
 
         if (urlAuthors) {
             try {
-                const parsedAuthors = JSON.parse(urlAuthors) as OpenAlexTypeAheadAuthor[];
+                parsedAuthors = JSON.parse(urlAuthors) as OpenAlexTypeAheadAuthor[];
                 setAuthors(parsedAuthors);
             } catch (e) {
                 console.error('Failed to parse authors from URL:', e);
@@ -123,7 +128,7 @@ function FinderPageContent() {
 
         if (urlInstitutions) {
             try {
-                const parsedInstitutions = JSON.parse(urlInstitutions) as OpenAlexTypeAheadInstitution[];
+                parsedInstitutions = JSON.parse(urlInstitutions) as OpenAlexTypeAheadInstitution[];
                 setInstitutions(parsedInstitutions);
             } catch (e) {
                 console.error('Failed to parse institutions from URL:', e);
@@ -132,14 +137,11 @@ function FinderPageContent() {
 
         setInitializedFromUrl(true);
 
-    }, [searchParams, initializedFromUrl]);
-
-    // Trigger search when initialized from URL with a query
-    useEffect(() => {
-        if (initializedFromUrl && query && !results && !loading) {
-            handleSearchFromUrl();
+        // If there's a URL query, trigger search directly with parsed values
+        if (urlQuery) {
+            performSearch(urlQuery, parsedPage, parsedAuthors, parsedInstitutions, parsedOa, false);
         }
-    }, [initializedFromUrl, query]);
+    }, [searchParams, initializedFromUrl]);
 
     // Autocomplete states
     const [authorSuggestions, setAuthorSuggestions] = useState<OpenAlexTypeAheadAuthor[]>([]);
@@ -212,11 +214,6 @@ function FinderPageContent() {
     // Search triggered by user action (updates URL)
     const handleSearch = async (pageNumber = page) => {
         await performSearch(query, pageNumber, authors, institutions, onlyOpenAccess, true);
-    };
-
-    // Search triggered from URL params (doesn't update URL)
-    const handleSearchFromUrl = async () => {
-        await performSearch(query, page, authors, institutions, onlyOpenAccess, false);
     };
 
     const totalPages = Math.ceil(totalResults / perPage);
