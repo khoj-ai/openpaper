@@ -6,6 +6,7 @@ import { AudioOverview } from '@/lib/schema';
 import CustomCitationLink from '@/components/utils/CustomCitationLink';
 import { ChatMessageActions } from '@/components/ChatMessageActions';
 import Markdown from 'react-markdown';
+import { CopyableTable } from '@/components/AnimatedMarkdown';
 
 interface EnhancedAudioPlayerProps {
     audioOverview: AudioOverview;
@@ -365,11 +366,7 @@ export function EnhancedAudioPlayer({ audioOverview, paper_title, setExplicitSea
                             messageIndex={0}
                             citations={audioOverview.citations.map(c => ({ key: String(c.index), reference: c.text }))}
                         />,
-                        table: (props) => (
-                            <div className="w-full overflow-x-auto">
-                                <table {...props} className="min-w-full border-collapse" />
-                            </div>
-                        ),
+                        table: CopyableTable,
                     }}
                 >
                     {audioOverview.transcript}

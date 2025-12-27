@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { useIsMobile } from "@/lib/useMobile";
 import { Button } from "@/components/ui/button";
 import Markdown from "react-markdown";
+import { CopyableTable } from "@/components/AnimatedMarkdown";
 import remarkGfm from "remark-gfm";
 import rehypeKatex from "rehype-katex";
 import remarkMath from "remark-math";
@@ -135,11 +136,7 @@ export const RichAudioOverview = ({
                                             papers={papers || []}
                                         />
                                     ),
-                                    table: (props) => (
-                                        <div className="overflow-x-auto">
-                                            <table {...props} className="min-w-full border-collapse" />
-                                        </div>
-                                    ),
+                                    table: CopyableTable,
                                 }}
                             >
                                 {audioOverview.transcript}

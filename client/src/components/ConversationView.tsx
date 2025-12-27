@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useRef, useState, useEffect } from "react";
 import { useIsMobile } from "@/lib/useMobile";
-import { AnimatedMarkdown } from "@/components/AnimatedMarkdown";
+import { AnimatedMarkdown, CopyableTable } from "@/components/AnimatedMarkdown";
 import { Button } from "@/components/ui/button";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -216,11 +216,7 @@ export const ConversationView = ({
 								papers={papers}
 							/>
 						),
-						table: (props) => (
-							<div className="overflow-x-auto">
-								<table {...props} className="min-w-full border-collapse" />
-							</div>
-						),
+						table: CopyableTable,
 					}}
 				>
 					{msg.content}
@@ -339,11 +335,7 @@ export const ConversationView = ({
 												citations={streamingReferences?.citations || []}
 											/>
 										),
-										table: (props) => (
-											<div className="w-full overflow-x-auto">
-												<table {...props} className="min-w-full border-collapse" />
-											</div>
-										),
+										table: CopyableTable,
 									}}
 								/>
 								<ChatMessageActions

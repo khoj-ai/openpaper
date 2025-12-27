@@ -19,6 +19,7 @@ import 'katex/dist/katex.min.css' // `rehype-katex` does not import the CSS for 
 import { PaperSidebar } from '@/components/PaperSidebar';
 import { Lightbulb, Highlighter, MessageCircle } from 'lucide-react';
 import Markdown from 'react-markdown';
+import { CopyableTable } from '@/components/AnimatedMarkdown';
 import CustomCitationLink from '@/components/utils/CustomCitationLink';
 import { ChatMessageActions } from '@/components/ChatMessageActions';
 import { BasicUser } from '@/lib/auth';
@@ -169,11 +170,7 @@ export default function SharedPaperView() {
                             })) || []
                         }
                     />,
-                    table: (props) => (
-                        <div className="overflow-x-auto">
-                            <table {...props} className="min-w-full border-collapse" />
-                        </div>
-                    ),
+                    table: CopyableTable,
                 }}
             >
                 {paperData.summary}
@@ -231,11 +228,7 @@ export default function SharedPaperView() {
                                 messageIndex={0}
                                 citations={msg.references?.citations || []}
                             />,
-                            table: (props) => (
-                                <div className="overflow-x-auto">
-                                    <table {...props} className="min-w-full border-collapse" />
-                                </div>
-                            ),
+                            table: CopyableTable,
                         }}>
                         {msg.content}
                     </Markdown>

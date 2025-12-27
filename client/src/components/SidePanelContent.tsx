@@ -35,7 +35,7 @@ import { AnnotationsView } from '@/components/AnnotationsView';
 import { AudioOverviewPanel } from '@/components/AudioOverview';
 import PaperMetadata from '@/components/PaperMetadata';
 import { ChatMessageActions } from '@/components/ChatMessageActions';
-import { AnimatedMarkdown } from '@/components/AnimatedMarkdown';
+import { AnimatedMarkdown, CopyableTable } from '@/components/AnimatedMarkdown';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
@@ -647,11 +647,7 @@ export function SidePanelContent({
                             })) || []
                         }
                     />,
-                    table: (props) => (
-                        <div className="overflow-x-auto">
-                            <table {...props} className="min-w-full border-collapse" />
-                        </div>
-                    ),
+                    table: CopyableTable,
                 }}
             >
                 {paperData.summary}
@@ -712,11 +708,7 @@ export function SidePanelContent({
                                 messageIndex={0}
                                 citations={msg.references?.citations || []}
                             />,
-                            table: (props) => (
-                                <div className="overflow-x-auto">
-                                    <table {...props} className="min-w-full border-collapse" />
-                                </div>
-                            ),
+                            table: CopyableTable,
                         }}>
                         {msg.content}
                     </Markdown>
@@ -989,11 +981,7 @@ export function SidePanelContent({
                                                                 messageIndex={0}
                                                                 citations={streamingReferences?.citations || []}
                                                             />,
-                                                            table: (props) => (
-                                                                <div className="w-full overflow-x-auto">
-                                                                    <table {...props} className="min-w-full border-collapse" />
-                                                                </div>
-                                                            ),
+                                                            table: CopyableTable,
                                                         }}
                                                     />
                                                     {streamingReferences && streamingReferences.citations && streamingReferences.citations.length > 0 && (
