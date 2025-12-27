@@ -19,24 +19,6 @@ const cursorStyle = `
   }
 `;
 
-// Extract text content from React children recursively
-function extractTextFromChildren(children: React.ReactNode): string {
-    if (typeof children === 'string') return children;
-    if (typeof children === 'number') return String(children);
-    if (!children) return '';
-
-    if (Array.isArray(children)) {
-        return children.map(extractTextFromChildren).join('');
-    }
-
-    if (React.isValidElement(children)) {
-        const props = children.props as { children?: React.ReactNode };
-        return extractTextFromChildren(props.children);
-    }
-
-    return '';
-}
-
 // Extract table data as TSV (tab-separated values)
 function extractTableData(tableElement: HTMLTableElement): string {
     const rows: string[][] = [];
