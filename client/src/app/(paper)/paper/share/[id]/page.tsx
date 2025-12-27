@@ -103,10 +103,13 @@ export default function SharedPaperView() {
             const refValueElement = document.getElementById(`citation-ref-${key}-${messageIndex}`);
             if (refValueElement) {
                 const refValueText = refValueElement.innerText;
-                const refValue = refValueText.replace(/^\[\^(\d+|[a-zA-Z]+)\]/, '').trim();
+                let searchTerm = refValueText.replace(/^\[\^(\d+|[a-zA-Z]+)\]/, '').trim();
 
-                // since the first and last terms are quotes, remove them
-                const searchTerm = refValue.substring(1, refValue.length - 1);
+                // Only remove quotes if the text is actually wrapped in quotes
+                if ((searchTerm.startsWith('"') && searchTerm.endsWith('"')) ||
+                    (searchTerm.startsWith("'") && searchTerm.endsWith("'"))) {
+                    searchTerm = searchTerm.substring(1, searchTerm.length - 1);
+                }
                 setExplicitSearchTerm(searchTerm);
             }
         }
