@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
 
 from app.database.crud.base_crud import CRUDBase
@@ -16,6 +16,7 @@ class HighlightBase(BaseModel):
     page_number: Optional[int] = None
     role: Optional[str] = None
     type: Optional[str] = None  # HighlightType enum value
+    position: Optional[dict[str, Any]] = None  # ScaledPosition JSON
 
 
 class HighlightCreate(HighlightBase):

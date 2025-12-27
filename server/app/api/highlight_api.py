@@ -1,5 +1,6 @@
 import logging
 import uuid
+from typing import Any, Optional
 
 from app.auth.dependencies import get_required_user
 from app.database.crud.highlight_crud import (
@@ -25,15 +26,19 @@ highlight_router = APIRouter()
 class CreateHighlightRequest(BaseModel):
     paper_id: str
     raw_text: str
-    start_offset: int
-    end_offset: int
-    page_number: int
+    position: Optional[dict[str, Any]] = None  # ScaledPosition JSON
+    # Legacy fields - kept for backwards compatibility
+    start_offset: Optional[int] = None
+    end_offset: Optional[int] = None
+    page_number: Optional[int] = None
 
 
 class UpdateHighlightRequest(BaseModel):
     raw_text: str
-    start_offset: int
-    end_offset: int
+    position: Optional[dict[str, Any]] = None  # ScaledPosition JSON
+    # Legacy fields - kept for backwards compatibility
+    start_offset: Optional[int] = None
+    end_offset: Optional[int] = None
 
 
 @highlight_router.post("")
@@ -52,6 +57,7 @@ async def create_highlight(
                 start_offset=request.start_offset,
                 end_offset=request.end_offset,
                 page_number=request.page_number,
+                position=request.position,
                 role=RoleType.USER,
             ),
             user=current_user,
@@ -161,6 +167,7 @@ async def update_highlight(
                 raw_text=request.raw_text,
                 start_offset=request.start_offset,
                 end_offset=request.end_offset,
+                position=request.position,
             ),
         )
 
