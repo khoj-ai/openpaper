@@ -211,17 +211,115 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
     '\ufb01': 'fi', '\ufb02': 'fl', '\ufb03': 'ffi', '\ufb04': 'ffl',
   };
 
+  // Greek letters and common math symbols - maps Unicode to ASCII representation
+  // This allows matching between PDF-rendered symbols and LaTeX input
+  const greekLetterMap: Record<string, string> = {
+    // Lowercase Greek
+    'α': 'alpha', 'β': 'beta', 'γ': 'gamma', 'δ': 'delta', 'ε': 'epsilon',
+    'ζ': 'zeta', 'η': 'eta', 'θ': 'theta', 'ι': 'iota', 'κ': 'kappa',
+    'λ': 'lambda', 'μ': 'mu', 'ν': 'nu', 'ξ': 'xi', 'ο': 'omicron',
+    'π': 'pi', 'ρ': 'rho', 'σ': 'sigma', 'ς': 'sigma', 'τ': 'tau',
+    'υ': 'upsilon', 'φ': 'phi', 'χ': 'chi', 'ψ': 'psi', 'ω': 'omega',
+    // Uppercase Greek
+    'Α': 'Alpha', 'Β': 'Beta', 'Γ': 'Gamma', 'Δ': 'Delta', 'Ε': 'Epsilon',
+    'Ζ': 'Zeta', 'Η': 'Eta', 'Θ': 'Theta', 'Ι': 'Iota', 'Κ': 'Kappa',
+    'Λ': 'Lambda', 'Μ': 'Mu', 'Ν': 'Nu', 'Ξ': 'Xi', 'Ο': 'Omicron',
+    'Π': 'Pi', 'Ρ': 'Rho', 'Σ': 'Sigma', 'Τ': 'Tau', 'Υ': 'Upsilon',
+    'Φ': 'Phi', 'Χ': 'Chi', 'Ψ': 'Psi', 'Ω': 'Omega',
+    // Common math symbols
+    '∞': 'infinity', '∂': 'partial', '∇': 'nabla', '∑': 'sum',
+    '∏': 'prod', '∫': 'int', '√': 'sqrt', '≈': 'approx',
+    '≠': 'neq', '≤': 'leq', '≥': 'geq', '±': 'pm',
+    '×': 'times', '÷': 'div', '∈': 'in', '∉': 'notin',
+    '⊂': 'subset', '⊃': 'supset', '∪': 'cup', '∩': 'cap',
+    '∧': 'land', '∨': 'lor', '¬': 'neg', '→': 'to',
+    '←': 'leftarrow', '↔': 'leftrightarrow', '⇒': 'Rightarrow',
+    '⇐': 'Leftarrow', '⇔': 'Leftrightarrow',
+  };
+
+  // LaTeX commands to their Unicode equivalents (for input normalization)
+  const latexCommandMap: Record<string, string> = {
+    '\\alpha': 'alpha', '\\beta': 'beta', '\\gamma': 'gamma', '\\delta': 'delta',
+    '\\epsilon': 'epsilon', '\\varepsilon': 'epsilon', '\\zeta': 'zeta',
+    '\\eta': 'eta', '\\theta': 'theta', '\\vartheta': 'theta', '\\iota': 'iota',
+    '\\kappa': 'kappa', '\\lambda': 'lambda', '\\mu': 'mu', '\\nu': 'nu',
+    '\\xi': 'xi', '\\pi': 'pi', '\\varpi': 'pi', '\\rho': 'rho',
+    '\\varrho': 'rho', '\\sigma': 'sigma', '\\varsigma': 'sigma', '\\tau': 'tau',
+    '\\upsilon': 'upsilon', '\\phi': 'phi', '\\varphi': 'phi', '\\chi': 'chi',
+    '\\psi': 'psi', '\\omega': 'omega',
+    '\\Alpha': 'Alpha', '\\Beta': 'Beta', '\\Gamma': 'Gamma', '\\Delta': 'Delta',
+    '\\Epsilon': 'Epsilon', '\\Zeta': 'Zeta', '\\Eta': 'Eta', '\\Theta': 'Theta',
+    '\\Iota': 'Iota', '\\Kappa': 'Kappa', '\\Lambda': 'Lambda', '\\Mu': 'Mu',
+    '\\Nu': 'Nu', '\\Xi': 'Xi', '\\Pi': 'Pi', '\\Rho': 'Rho', '\\Sigma': 'Sigma',
+    '\\Tau': 'Tau', '\\Upsilon': 'Upsilon', '\\Phi': 'Phi', '\\Chi': 'Chi',
+    '\\Psi': 'Psi', '\\Omega': 'Omega',
+    '\\infty': 'infinity', '\\partial': 'partial', '\\nabla': 'nabla',
+    '\\sum': 'sum', '\\prod': 'prod', '\\int': 'int', '\\sqrt': 'sqrt',
+    '\\approx': 'approx', '\\neq': 'neq', '\\leq': 'leq', '\\geq': 'geq',
+    '\\pm': 'pm', '\\times': 'times', '\\div': 'div', '\\in': 'in',
+    '\\notin': 'notin', '\\subset': 'subset', '\\supset': 'supset',
+    '\\cup': 'cup', '\\cap': 'cap', '\\land': 'land', '\\lor': 'lor',
+    '\\neg': 'neg', '\\to': 'to', '\\rightarrow': 'to',
+    '\\leftarrow': 'leftarrow', '\\leftrightarrow': 'leftrightarrow',
+    '\\Rightarrow': 'Rightarrow', '\\Leftarrow': 'Leftarrow',
+    '\\Leftrightarrow': 'Leftrightarrow',
+  };
+
+  // Quote normalization - all quote types map to empty (removed)
+  // Using unicode escapes for special characters to avoid parser issues
+  const quoteChars = new Set([
+    '"', "'", '`',
+    '\u201C', '\u201D',  // " "  left/right double quotation marks
+    '\u2018', '\u2019',  // ' '  left/right single quotation marks
+    '\u201A', '\u201E',  // ‚ „  low-9 quotation marks
+    '\u2039', '\u203A',  // ‹ ›  single angle quotation marks
+    '\u00AB', '\u00BB',  // « »  double angle quotation marks
+    '\u300C', '\u300D',  // 「 」 CJK corner brackets
+    '\u300E', '\u300F',  // 『 』 CJK white corner brackets
+    '\u301D', '\u301E', '\u301F',  // 〝 〞 〟 double prime quotation marks
+    '\uFF02', '\uFF07',  // ＂ ＇ fullwidth quotation marks
+  ]);
+
+  // Expand LaTeX commands in the input text
+  const expandLatexCommands = useCallback((text: string): string => {
+    let result = text;
+    // Sort by length descending to match longer commands first (e.g., \varepsilon before \epsilon)
+    const sortedCommands = Object.keys(latexCommandMap).sort((a, b) => b.length - a.length);
+    for (const cmd of sortedCommands) {
+      // Use regex to match the command followed by a non-letter (or end of string)
+      // This prevents matching \alpha inside \alphaXYZ
+      const regex = new RegExp(cmd.replace(/\\/g, '\\\\') + '(?![a-zA-Z])', 'g');
+      result = result.replace(regex, latexCommandMap[cmd]);
+    }
+    return result;
+  }, []);
+
   // Normalize text for search matching:
+  // - Expand LaTeX commands to ASCII equivalents
   // - Expand ligatures
+  // - Expand Greek letters to ASCII equivalents
+  // - Remove all quote characters entirely
   // - Keep only alphanumeric characters and spaces
-  // - This handles all special character variations automatically
   const normalizeForSearch = useCallback((text: string): string => {
+    // First expand LaTeX commands
+    const expandedText = expandLatexCommands(text);
+
     let result = '';
-    for (const char of text) {
+    for (const char of expandedText) {
       // Handle ligatures first
       if (ligatureMap[char]) {
         result += ligatureMap[char];
-      } else if (/[\p{L}\p{N}]/u.test(char)) {
+      }
+      // Handle Greek letters and math symbols
+      else if (greekLetterMap[char]) {
+        result += greekLetterMap[char];
+      }
+      // Remove quote characters entirely (don't convert to space)
+      else if (quoteChars.has(char)) {
+        // Skip quotes - don't add anything
+        continue;
+      }
+      else if (/[\p{L}\p{N}]/u.test(char)) {
         // Keep letters and numbers (Unicode-aware)
         result += char;
       } else {
@@ -231,7 +329,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
     }
     // Collapse multiple spaces into one
     return result.replace(/\s+/g, ' ').trim();
-  }, []);
+  }, [expandLatexCommands]);
 
   // Search for a single term in a text layer and return match groups
   // Each match group contains all highlight elements for a single logical match
@@ -280,6 +378,16 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
               charMappings.push({ span, originalCharIndex: i, textNode });
             }
             prevWasSpace = false;
+          } else if (greekLetterMap[char]) {
+            // Greek letter/math symbol expands to ASCII equivalent
+            for (const expandedChar of greekLetterMap[char]) {
+              normalizedCombined += expandedChar;
+              charMappings.push({ span, originalCharIndex: i, textNode });
+            }
+            prevWasSpace = false;
+          } else if (quoteChars.has(char)) {
+            // Skip quote characters entirely - no mapping entry, no output
+            continue;
           } else if (/[\p{L}\p{N}]/u.test(char)) {
             // Regular letter/number
             normalizedCombined += char;
@@ -313,10 +421,48 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 
       if (!normalizedTerm || charMappings.length === 0) return;
 
+      // Create space-stripped versions for fuzzy matching
+      // This handles PDFs with weird spacing like "h e l l o" matching "hello"
+      let spaceStrippedText = "";
+      const spaceStrippedToNormalizedIndex: number[] = []; // maps space-stripped index -> normalized index
+
+      for (let i = 0; i < normalizedLower.length; i++) {
+        if (normalizedLower[i] !== ' ') {
+          spaceStrippedToNormalizedIndex.push(i);
+          spaceStrippedText += normalizedLower[i];
+        }
+      }
+
+      // Also strip spaces from search term
+      const spaceStrippedTerm = normalizedTerm.replace(/\s+/g, '');
+
+      if (!spaceStrippedTerm) return;
+
+      // Try exact match first (with spaces), then fall back to space-stripped match
       let searchIndex = normalizedLower.indexOf(normalizedTerm);
+      let useSpaceStripped = false;
+
+      if (searchIndex === -1) {
+        // No exact match, try space-stripped matching
+        searchIndex = spaceStrippedText.indexOf(spaceStrippedTerm);
+        useSpaceStripped = true;
+      }
 
       while (searchIndex !== -1) {
-        const searchEndIndex = searchIndex + normalizedTerm.length;
+        // Convert indices based on whether we're using space-stripped matching
+        let normalizedStartIndex: number;
+        let normalizedEndIndex: number;
+
+        if (useSpaceStripped) {
+          // Map space-stripped indices back to normalized indices
+          normalizedStartIndex = spaceStrippedToNormalizedIndex[searchIndex];
+          const endInStripped = searchIndex + spaceStrippedTerm.length - 1;
+          normalizedEndIndex = spaceStrippedToNormalizedIndex[endInStripped] + 1;
+        } else {
+          normalizedStartIndex = searchIndex;
+          normalizedEndIndex = searchIndex + normalizedTerm.length;
+        }
+
         const textLayerRect = textLayer.getBoundingClientRect();
 
         // Collect all highlight elements for this single logical match
@@ -334,7 +480,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
         const ranges: HighlightRange[] = [];
         let currentRange: HighlightRange | null = null;
 
-        for (let i = searchIndex; i < searchEndIndex && i < charMappings.length; i++) {
+        for (let i = normalizedStartIndex; i < normalizedEndIndex && i < charMappings.length; i++) {
           const mapping = charMappings[i];
 
           // Skip virtual characters (separator spaces that don't exist in the DOM)
@@ -419,7 +565,11 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
         }
 
         // Find next occurrence
-        searchIndex = normalizedLower.indexOf(normalizedTerm, searchIndex + 1);
+        if (useSpaceStripped) {
+          searchIndex = spaceStrippedText.indexOf(spaceStrippedTerm, searchIndex + 1);
+        } else {
+          searchIndex = normalizedLower.indexOf(normalizedTerm, searchIndex + 1);
+        }
       }
     },
     [normalizeForSearch]
@@ -799,7 +949,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
                 )}
               </div>
               {/* Match count and navigation */}
-              {searchMatches.length > 0 && (
+              {searchMatches.length > 0 ? (
                 <>
                   <span className="text-xs text-muted-foreground whitespace-nowrap">
                     {currentMatchIndex + 1} of {searchMatches.length}
@@ -825,7 +975,11 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
                     <ChevronDown size={14} />
                   </Button>
                 </>
-              )}
+              ) : searchText && lastSearchTermRef.current === searchText ? (
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  No results
+                </span>
+              ) : null}
             </form>
           ) : (
             <Button

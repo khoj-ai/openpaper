@@ -89,18 +89,116 @@ function calculateSimilarity(str1: string, str2: string): number {
     return 1 - (matrix[str1.length][str2.length] / Math.max(str1.length, str2.length));
 }
 
-function prepareTextForFuzzyMatch(text: string): string {
-    return text
-        // Remove quotes and apostrophes but keep numbers
-        .replace(/['"''"]/g, '')
+// Greek letters and common math symbols - maps Unicode to ASCII representation
+const greekLetterMap: Record<string, string> = {
+    // Lowercase Greek
+    'α': 'alpha', 'β': 'beta', 'γ': 'gamma', 'δ': 'delta', 'ε': 'epsilon',
+    'ζ': 'zeta', 'η': 'eta', 'θ': 'theta', 'ι': 'iota', 'κ': 'kappa',
+    'λ': 'lambda', 'μ': 'mu', 'ν': 'nu', 'ξ': 'xi', 'ο': 'omicron',
+    'π': 'pi', 'ρ': 'rho', 'σ': 'sigma', 'ς': 'sigma', 'τ': 'tau',
+    'υ': 'upsilon', 'φ': 'phi', 'χ': 'chi', 'ψ': 'psi', 'ω': 'omega',
+    // Uppercase Greek
+    'Α': 'Alpha', 'Β': 'Beta', 'Γ': 'Gamma', 'Δ': 'Delta', 'Ε': 'Epsilon',
+    'Ζ': 'Zeta', 'Η': 'Eta', 'Θ': 'Theta', 'Ι': 'Iota', 'Κ': 'Kappa',
+    'Λ': 'Lambda', 'Μ': 'Mu', 'Ν': 'Nu', 'Ξ': 'Xi', 'Ο': 'Omicron',
+    'Π': 'Pi', 'Ρ': 'Rho', 'Σ': 'Sigma', 'Τ': 'Tau', 'Υ': 'Upsilon',
+    'Φ': 'Phi', 'Χ': 'Chi', 'Ψ': 'Psi', 'Ω': 'Omega',
+    // Common math symbols
+    '∞': 'infinity', '∂': 'partial', '∇': 'nabla', '∑': 'sum',
+    '∏': 'prod', '∫': 'int', '√': 'sqrt', '≈': 'approx',
+    '≠': 'neq', '≤': 'leq', '≥': 'geq', '±': 'pm',
+    '×': 'times', '÷': 'div', '∈': 'in', '∉': 'notin',
+    '⊂': 'subset', '⊃': 'supset', '∪': 'cup', '∩': 'cap',
+    '∧': 'land', '∨': 'lor', '¬': 'neg', '→': 'to',
+    '←': 'leftarrow', '↔': 'leftrightarrow', '⇒': 'Rightarrow',
+    '⇐': 'Leftarrow', '⇔': 'Leftrightarrow',
+};
+
+// LaTeX commands to their Unicode equivalents (for input normalization)
+const latexCommandMap: Record<string, string> = {
+    '\\alpha': 'alpha', '\\beta': 'beta', '\\gamma': 'gamma', '\\delta': 'delta',
+    '\\epsilon': 'epsilon', '\\varepsilon': 'epsilon', '\\zeta': 'zeta',
+    '\\eta': 'eta', '\\theta': 'theta', '\\vartheta': 'theta', '\\iota': 'iota',
+    '\\kappa': 'kappa', '\\lambda': 'lambda', '\\mu': 'mu', '\\nu': 'nu',
+    '\\xi': 'xi', '\\pi': 'pi', '\\varpi': 'pi', '\\rho': 'rho',
+    '\\varrho': 'rho', '\\sigma': 'sigma', '\\varsigma': 'sigma', '\\tau': 'tau',
+    '\\upsilon': 'upsilon', '\\phi': 'phi', '\\varphi': 'phi', '\\chi': 'chi',
+    '\\psi': 'psi', '\\omega': 'omega',
+    '\\Alpha': 'Alpha', '\\Beta': 'Beta', '\\Gamma': 'Gamma', '\\Delta': 'Delta',
+    '\\Epsilon': 'Epsilon', '\\Zeta': 'Zeta', '\\Eta': 'Eta', '\\Theta': 'Theta',
+    '\\Iota': 'Iota', '\\Kappa': 'Kappa', '\\Lambda': 'Lambda', '\\Mu': 'Mu',
+    '\\Nu': 'Nu', '\\Xi': 'Xi', '\\Pi': 'Pi', '\\Rho': 'Rho', '\\Sigma': 'Sigma',
+    '\\Tau': 'Tau', '\\Upsilon': 'Upsilon', '\\Phi': 'Phi', '\\Chi': 'Chi',
+    '\\Psi': 'Psi', '\\Omega': 'Omega',
+    '\\infty': 'infinity', '\\partial': 'partial', '\\nabla': 'nabla',
+    '\\sum': 'sum', '\\prod': 'prod', '\\int': 'int', '\\sqrt': 'sqrt',
+    '\\approx': 'approx', '\\neq': 'neq', '\\leq': 'leq', '\\geq': 'geq',
+    '\\pm': 'pm', '\\times': 'times', '\\div': 'div', '\\in': 'in',
+    '\\notin': 'notin', '\\subset': 'subset', '\\supset': 'supset',
+    '\\cup': 'cup', '\\cap': 'cap', '\\land': 'land', '\\lor': 'lor',
+    '\\neg': 'neg', '\\to': 'to', '\\rightarrow': 'to',
+    '\\leftarrow': 'leftarrow', '\\leftrightarrow': 'leftrightarrow',
+    '\\Rightarrow': 'Rightarrow', '\\Leftarrow': 'Leftarrow',
+    '\\Leftrightarrow': 'Leftrightarrow',
+};
+
+// All quote character types to remove
+// Using unicode escapes for special characters to avoid parser issues
+const quoteChars = new Set([
+    '"', "'", '`',
+    '\u201C', '\u201D',  // " "  left/right double quotation marks
+    '\u2018', '\u2019',  // ' '  left/right single quotation marks
+    '\u201A', '\u201E',  // ‚ „  low-9 quotation marks
+    '\u2039', '\u203A',  // ‹ ›  single angle quotation marks
+    '\u00AB', '\u00BB',  // « »  double angle quotation marks
+    '\u300C', '\u300D',  // 「 」 CJK corner brackets
+    '\u300E', '\u300F',  // 『 』 CJK white corner brackets
+    '\u301D', '\u301E', '\u301F',  // 〝 〞 〟 double prime quotation marks
+    '\uFF02', '\uFF07',  // ＂ ＇ fullwidth quotation marks
+]);
+
+// Expand LaTeX commands in the input text
+function expandLatexCommands(text: string): string {
+    let result = text;
+    // Sort by length descending to match longer commands first
+    const sortedCommands = Object.keys(latexCommandMap).sort((a, b) => b.length - a.length);
+    for (const cmd of sortedCommands) {
+        const regex = new RegExp(cmd.replace(/\\/g, '\\\\') + '(?![a-zA-Z])', 'g');
+        result = result.replace(regex, latexCommandMap[cmd]);
+    }
+    return result;
+}
+
+function prepareTextForFuzzyMatch(text: string, stripAllSpaces: boolean = false): string {
+    // First expand LaTeX commands
+    let processed = expandLatexCommands(text);
+
+    // Expand Greek letters and math symbols
+    let result = '';
+    for (const char of processed) {
+        if (greekLetterMap[char]) {
+            result += greekLetterMap[char];
+        } else if (quoteChars.has(char)) {
+            // Remove quotes entirely
+            continue;
+        } else {
+            result += char;
+        }
+    }
+
+    result = result
         // Remove special characters but keep numbers and basic punctuation
         .replace(/[,\/#!$%\^&\*;:{}=\-_`~()\\[\]]/g, ' ')
-        // Replace multiple spaces with single space
-        .replace(/\s+/g, ' ')
         // Convert to lowercase
-        .toLowerCase()
-        // Trim leading/trailing whitespace
-        .trim();
+        .toLowerCase();
+
+    if (stripAllSpaces) {
+        // Remove all whitespace for space-insensitive matching
+        return result.replace(/\s+/g, '');
+    } else {
+        // Replace multiple spaces with single space and trim
+        return result.replace(/\s+/g, ' ').trim();
+    }
 }
 
 export function tryDirectOffsetMatch(sourceHighlight: PaperHighlight): Element[] {
@@ -170,10 +268,15 @@ export const getFuzzyMatchingNodesInPdf = (originalTerm: string) => {
         similarity: number;
     }> = [];
 
-    // Prepare the search term for fuzzy matching
+    // Prepare the search term for fuzzy matching (with spaces preserved for mapping)
     const fuzzySearchTerm = prepareTextForFuzzyMatch(originalTerm);
-    const searchSeed = fuzzySearchTerm.slice(0, 15).toLowerCase();
     const fullSearchTermLower = fuzzySearchTerm.toLowerCase();
+
+    // Also prepare a space-stripped version for fallback matching
+    const spaceStrippedSearchTerm = prepareTextForFuzzyMatch(originalTerm, true);
+
+    // Use first 15 chars as seed, but from space-stripped version for better matching
+    const searchSeed = spaceStrippedSearchTerm.slice(0, 15).toLowerCase();
 
     const textLayers = document.querySelectorAll('.react-pdf__Page__textContent');
 
@@ -188,33 +291,47 @@ export const getFuzzyMatchingNodesInPdf = (originalTerm: string) => {
         const charMapping = createCharacterMapping(fullPageText);
         const preparedPageText = prepareTextForFuzzyMatch(fullPageText);
 
+        // Create space-stripped version for matching PDFs with weird spacing
+        const spaceStrippedPageText = prepareTextForFuzzyMatch(fullPageText, true);
+
+        // Create mapping from space-stripped positions back to prepared text positions
+        const spaceStrippedToPreparedIndex: number[] = [];
+        for (let i = 0; i < preparedPageText.length; i++) {
+            if (preparedPageText[i] !== ' ') {
+                spaceStrippedToPreparedIndex.push(i);
+            }
+        }
+
         let startIndex = 0;
         let matchIndex = 0;
 
-        while (startIndex < preparedPageText.length) {
-            const foundIndex = preparedPageText.indexOf(searchSeed, startIndex);
+        while (startIndex < spaceStrippedPageText.length) {
+            const foundIndex = spaceStrippedPageText.indexOf(searchSeed, startIndex);
             if (foundIndex === -1) break;
 
             // Create a more precise window for the full search term
-            const searchTermLength = fullSearchTermLower.length;
+            const searchTermLength = spaceStrippedSearchTerm.length;
             const seedLength = searchSeed.length;
 
-            // Start from where we found the seed
-            const windowStart = foundIndex;
-            // Extend the window to accommodate the full search term length, plus a small buffer
-            const windowEnd = Math.min(
-                preparedPageText.length,
+            // Calculate window in space-stripped text
+            const spaceStrippedWindowStart = foundIndex;
+            const spaceStrippedWindowEnd = Math.min(
+                spaceStrippedPageText.length,
                 foundIndex + Math.max(searchTermLength, seedLength * 2)
             );
-            const textWindow = preparedPageText.slice(windowStart, windowEnd);
+            const spaceStrippedWindow = spaceStrippedPageText.slice(spaceStrippedWindowStart, spaceStrippedWindowEnd);
 
-            // Calculate similarity between search term and found text
-            const similarity = calculateSimilarity(fullSearchTermLower, textWindow);
+            // Calculate similarity using space-stripped versions
+            const similarity = calculateSimilarity(spaceStrippedSearchTerm, spaceStrippedWindow);
 
             if (similarity > 0.5) {
+                // Map back: space-stripped -> prepared -> original
+                const preparedWindowStart = spaceStrippedToPreparedIndex[spaceStrippedWindowStart] ?? 0;
+                const preparedWindowEnd = (spaceStrippedToPreparedIndex[spaceStrippedWindowEnd - 1] ?? preparedWindowStart) + 1;
+
                 // Map back to original text positions using character mapping
-                const originalWindowStart = mapPreparedToOriginal(windowStart, charMapping);
-                const originalWindowEnd = mapPreparedToOriginal(windowEnd, charMapping);
+                const originalWindowStart = mapPreparedToOriginal(preparedWindowStart, charMapping);
+                const originalWindowEnd = mapPreparedToOriginal(preparedWindowEnd, charMapping);
 
                 // Find nodes that intersect with the original text window
                 let currentPosition = 0;
@@ -269,8 +386,20 @@ function createCharacterMapping(originalText: string): { preparedToOriginal: num
     for (let originalIndex = 0; originalIndex < originalText.length; originalIndex++) {
         const char = originalText[originalIndex];
 
-        // Skip quotes and apostrophes entirely
-        if (/['"''"]/g.test(char)) {
+        // Skip all quote characters entirely
+        if (quoteChars.has(char)) {
+            continue;
+        }
+
+        // Handle Greek letters and math symbols - they expand to multiple chars
+        if (greekLetterMap[char]) {
+            const expanded = greekLetterMap[char].toLowerCase();
+            for (let i = 0; i < expanded.length; i++) {
+                preparedToOriginal[preparedIndex] = originalIndex;
+                originalToPrepared[originalIndex] = preparedIndex;
+                preparedIndex++;
+            }
+            lastWasSpace = false;
             continue;
         }
 
