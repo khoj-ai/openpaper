@@ -4,7 +4,7 @@ import { PdfViewer } from '@/components/PdfViewer';
 import { Button } from '@/components/ui/button';
 import { fetchFromApi } from '@/lib/api';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 
 import {
@@ -122,10 +122,20 @@ export default function PaperView() {
 
     const [rightSideFunction, setRightSideFunction] = useState<string>('Overview');
     const [toolset, setToolset] = useState(PaperToolset);
+    const initialRsfRef = useRef<string | null>(null);
+    const hasInitializedRsf = useRef(false);
+
+    // Capture the initial rsf from URL on first render
+    useEffect(() => {
+        if (initialRsfRef.current === null) {
+            initialRsfRef.current = searchParams.get('rsf')?.toLowerCase() || null;
+        }
+    }, [searchParams]);
 
     useEffect(() => {
         if (paperData) {
-            const rsf = searchParams.get('rsf')?.toLowerCase();
+            // Use the captured initial rsf value, not the current searchParams
+            const rsf = hasInitializedRsf.current ? null : initialRsfRef.current;
 
             // Derive the available tools first
             const hasOverview = paperData.summary_citations && paperData.summary_citations.length > 0;
@@ -133,22 +143,28 @@ export default function PaperView() {
 
             const validTools = newNav.map(tool => tool.name.toLowerCase());
 
-            // Now decide the function
-            if (rsf && validTools.includes(rsf)) {
-                const toolName = newNav.find(tool => tool.name.toLowerCase() === rsf);
-                setRightSideFunction(toolName ? toolName.name : 'Chat');
-            } else if (hasOverview) {
-                setRightSideFunction('Overview');
-            } else {
-                setRightSideFunction('Chat');
+            // Only set from URL on first initialization
+            if (!hasInitializedRsf.current) {
+                hasInitializedRsf.current = true;
+                if (rsf && validTools.includes(rsf)) {
+                    const toolName = newNav.find(tool => tool.name.toLowerCase() === rsf);
+                    setRightSideFunction(toolName ? toolName.name : 'Chat');
+                } else if (hasOverview) {
+                    setRightSideFunction('Overview');
+                } else {
+                    setRightSideFunction('Chat');
+                }
             }
 
             // Update the toolset state for the UI
             setToolset({ nav: newNav });
         }
-    }, [paperData, searchParams]);
+    }, [paperData]);
 
     useEffect(() => {
+        // Only update URL after we've initialized from the original rsf
+        if (!hasInitializedRsf.current) return;
+
         const params = new URLSearchParams(window.location.search);
         params.set('rsf', rightSideFunction.toLowerCase());
         router.replace(`${window.location.pathname}?${params.toString()}`);
