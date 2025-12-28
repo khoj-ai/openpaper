@@ -59,6 +59,18 @@ def create_checkout_session(
         subscription = subscription_crud.get_by_user_id(db, current_user.id)
         customer_id = None
 
+        # Prevent duplicate subscriptions - if user already has an active or past_due subscription,
+        # they should use the customer portal to manage it instead of creating a new one
+        if subscription and subscription.status in [
+            SubscriptionStatus.ACTIVE,
+            SubscriptionStatus.PAST_DUE,
+            SubscriptionStatus.TRIALING,
+        ]:
+            raise HTTPException(
+                status_code=400,
+                detail="You already have an active subscription. Please use the customer portal to manage your subscription or update your payment method.",
+            )
+
         # Create a Stripe Checkout session
         price_id = (
             MONTHLY_PRICE_ID
@@ -267,8 +279,18 @@ async def get_user_subscription(
             and current_period_end > datetime.now(tz=timezone.utc)
         )
 
+        # Determine if user had a subscription (has a record with stripe_subscription_id)
+        # This helps the frontend know to show "Manage Subscription" instead of "Subscribe"
+        # for users with expired/past_due subscriptions
+        had_subscription = subscription.stripe_subscription_id is not None
+
+        # Check if the subscription needs payment attention (past_due or payment failed)
+        requires_payment_update = status in ["past_due", "unpaid"]
+
         return {
             "has_subscription": is_valid_subscription,
+            "had_subscription": had_subscription,
+            "requires_payment_update": requires_payment_update,
             "subscription": {
                 "status": status,
                 "interval": plan_interval,

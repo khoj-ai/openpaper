@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import CheckoutSheet from "./checkout";
 import { fetchFromApi } from "@/lib/api";
-import { UserSubscription } from "@/lib/schema";
+import { SubscriptionStatus, UserSubscription } from "@/lib/schema";
 import PricingTable from "./pricingTable";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -163,9 +163,12 @@ export default function PricingPage() {
 
     const isCurrentlySubscribed = userSubscription?.has_subscription;
     const subscriptionStatus = userSubscription?.subscription?.status;
-    const isActiveSubscription = subscriptionStatus === 'active' || subscriptionStatus === 'trialing';
-    const isCanceled = subscriptionStatus === 'canceled' || userSubscription?.subscription?.cancel_at_period_end;
+    const isActiveSubscription = subscriptionStatus === SubscriptionStatus.ACTIVE || subscriptionStatus === SubscriptionStatus.TRIALING;
+    const isCanceled = subscriptionStatus === SubscriptionStatus.CANCELED || userSubscription?.subscription?.cancel_at_period_end;
     const canResubscribe = userSubscription?.has_subscription && isCanceled;
+
+    // User had a subscription but needs to manage it (payment failed, past_due, etc.)
+    const needsSubscriptionManagement = userSubscription?.had_subscription && userSubscription?.requires_payment_update;
 
     return (
         <div className="max-w-6xl mx-auto p-2 sm:p-8 space-y-16">
@@ -375,7 +378,7 @@ export default function PricingPage() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {/* Status-specific alerts */}
-                        {subscriptionStatus === 'canceled' && (
+                        {subscriptionStatus === SubscriptionStatus.CANCELED && (
                             <div className="bg-muted/50 border border-border rounded-lg p-3 text-sm">
                                 <div className="flex items-start gap-2">
                                     <Clock className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
@@ -390,7 +393,7 @@ export default function PricingPage() {
                             </div>
                         )}
 
-                        {userSubscription?.subscription?.cancel_at_period_end && subscriptionStatus === 'active' && (
+                        {userSubscription?.subscription?.cancel_at_period_end && subscriptionStatus === SubscriptionStatus.ACTIVE && (
                             <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 rounded-lg p-3 text-sm">
                                 <div className="flex items-start gap-2">
                                     <Clock className="h-4 w-4 text-amber-700 dark:text-amber-300 mt-0.5 shrink-0" />
@@ -405,7 +408,7 @@ export default function PricingPage() {
                             </div>
                         )}
 
-                        {subscriptionStatus === 'past_due' && (
+                        {subscriptionStatus === SubscriptionStatus.PAST_DUE && (
                             <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 rounded-lg p-3 text-sm">
                                 <div className="flex items-start gap-2">
                                     <Clock className="h-4 w-4 text-amber-700 dark:text-amber-300 mt-0.5 shrink-0" />
@@ -419,7 +422,7 @@ export default function PricingPage() {
                             </div>
                         )}
 
-                        {subscriptionStatus === 'incomplete' && (
+                        {subscriptionStatus === SubscriptionStatus.INCOMPLETE && (
                             <div className="bg-muted/50 border border-border rounded-lg p-3 text-sm">
                                 <div className="flex items-start gap-2">
                                     <Clock className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
@@ -441,6 +444,14 @@ export default function PricingPage() {
                                 disabled={isPortalLoading}
                             >
                                 {isPortalLoading ? "Loading..." : "Manage Subscription"}
+                            </Button>
+                        ) : needsSubscriptionManagement ? (
+                            <Button
+                                className="w-full font-medium bg-amber-600 dark:bg-amber-500 hover:bg-amber-700 dark:hover:bg-amber-600 text-white"
+                                onClick={handleManageSubscription}
+                                disabled={isPortalLoading}
+                            >
+                                {isPortalLoading ? "Loading..." : "Update Payment Method"}
                             </Button>
                         ) : canResubscribe ? (
                             <Button

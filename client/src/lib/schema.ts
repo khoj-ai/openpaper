@@ -185,10 +185,21 @@ export enum JobStatus {
 
 export type JobStatusType = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
 
-export type SubscriptionStatusType = 'active' | 'canceled' | 'past_due' | 'incomplete' | 'trialing' | 'unpaid';
+export const SubscriptionStatus = {
+    ACTIVE: 'active',
+    CANCELED: 'canceled',
+    PAST_DUE: 'past_due',
+    INCOMPLETE: 'incomplete',
+    TRIALING: 'trialing',
+    UNPAID: 'unpaid',
+} as const;
+
+export type SubscriptionStatusType = typeof SubscriptionStatus[keyof typeof SubscriptionStatus];
 
 export interface UserSubscription {
     has_subscription: boolean;
+    had_subscription: boolean;
+    requires_payment_update: boolean;
     subscription: {
         status: SubscriptionStatusType;
         interval: "month" | "year";
