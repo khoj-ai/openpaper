@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import {
 	PdfLoader,
 	PdfHighlighter,
@@ -114,9 +114,13 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 	});
 
 	// Convert PaperHighlights to ExtendedHighlights
-	const extendedHighlights: ExtendedHighlight[] = highlights
-		.map(paperHighlightToExtended)
-		.filter((h): h is ExtendedHighlight => h !== null);
+	// Memoize to prevent the scroll-to-highlight effect from re-running on every render
+	const extendedHighlights: ExtendedHighlight[] = useMemo(
+		() => highlights
+			.map(paperHighlightToExtended)
+			.filter((h): h is ExtendedHighlight => h !== null),
+		[highlights]
+	);
 
 	// Zoom controls
 	const zoomIn = useCallback(() => {
