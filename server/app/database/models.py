@@ -651,7 +651,6 @@ class Highlight(Base):
     end_offset = Column(Integer, nullable=True)
     page_number = Column(Integer, nullable=True)
 
-    # NEW: Store position as JSON (ScaledPosition format)
     position = Column(JSONB, nullable=True)
 
     # Role
