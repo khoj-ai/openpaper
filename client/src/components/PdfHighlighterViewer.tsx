@@ -356,24 +356,25 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 	// Cache for highlight page mappings
 	const highlightPageMapRef = useRef<Map<string, number[]>>(new Map());
 
-	// Create DOM-based overlays for assistant highlights without position data
+	// Create DOM-based overlays for highlights without position data
+	// This handles both assistant highlights and legacy user highlights (backwards compatibility)
 	// Uses MutationObserver to detect when text layers are added/recreated
 	useEffect(() => {
 		if (!pdfReady || !pdfDocumentRef.current) return;
 
-		// Get assistant highlights without positions
-		const assistantHighlightsWithoutPosition = highlights.filter(
-			(h) => h.role === "assistant" && !h.position && h.raw_text
+		// Get all highlights without positions (assistant or legacy user highlights)
+		const highlightsWithoutPosition = highlights.filter(
+			(h) => !h.position && h.raw_text
 		);
 
-		if (assistantHighlightsWithoutPosition.length === 0) {
+		if (highlightsWithoutPosition.length === 0) {
 			highlightPageMapRef.current.clear();
 			return;
 		}
 
 		// Function to create overlays for a specific text layer
 		const createOverlaysForTextLayer = (textLayer: Element, pageNumber: number) => {
-			for (const highlight of assistantHighlightsWithoutPosition) {
+			for (const highlight of highlightsWithoutPosition) {
 				const key = highlight.id || highlight.raw_text;
 				const pages = highlightPageMapRef.current.get(key);
 
@@ -382,15 +383,20 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 
 				// Check if overlay already exists
 				const existingOverlay = textLayer.querySelector(
-					`.assistant-highlight-overlay[data-highlight-key="${CSS.escape(key)}"]`
+					`.text-match-highlight-overlay[data-highlight-key="${CSS.escape(key)}"]`
 				);
 				if (existingOverlay) continue;
+
+				// Use different colors based on role
+				const backgroundColor = highlight.role === "assistant"
+					? "rgba(168, 85, 247, 0.3)"  // Purple for assistant
+					: "rgba(59, 130, 246, 0.3)"; // Blue for user
 
 				const overlays = createTextHighlightOverlays(
 					textLayer,
 					highlight.raw_text,
-					"assistant-highlight-overlay",
-					"rgba(168, 85, 247, 0.3)"
+					"text-match-highlight-overlay",
+					backgroundColor
 				);
 				overlays.forEach((el) => el.setAttribute("data-highlight-key", key));
 			}
@@ -410,7 +416,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 
 		// Initialize: find pages for each highlight, then create overlays
 		const initialize = async () => {
-			for (const highlight of assistantHighlightsWithoutPosition) {
+			for (const highlight of highlightsWithoutPosition) {
 				const key = highlight.id || highlight.raw_text;
 				if (!highlightPageMapRef.current.has(key)) {
 					const pages = await findTextPages(
