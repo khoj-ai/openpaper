@@ -278,8 +278,8 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
             // Check if highlights have the required fields
             const validHighlights: PaperHighlight[] = data.filter(
                 (h: PaperHighlight) => h.raw_text &&
-                    typeof h.start_offset === 'number' &&
-                    typeof h.end_offset === 'number'
+                    ((typeof h.start_offset === 'number' &&
+                    typeof h.end_offset === 'number') || h.position)
             );
 
             const deduplicatedHighlights = validHighlights.filter((highlight, index, self) =>
