@@ -171,7 +171,7 @@ function expandLatexCommands(text: string): string {
 
 function prepareTextForFuzzyMatch(text: string, stripAllSpaces: boolean = false): string {
     // First expand LaTeX commands
-    let processed = expandLatexCommands(text);
+    const processed = expandLatexCommands(text);
 
     // Expand Greek letters and math symbols
     let result = '';
@@ -268,10 +268,7 @@ export const getFuzzyMatchingNodesInPdf = (originalTerm: string) => {
         similarity: number;
     }> = [];
 
-    // Prepare the search term for fuzzy matching (with spaces preserved for mapping)
-    const fuzzySearchTerm = prepareTextForFuzzyMatch(originalTerm);
-    const fullSearchTermLower = fuzzySearchTerm.toLowerCase();
-
+    // Prepare the search term for fuzzy matching (space-stripped version for matching)
     // Also prepare a space-stripped version for fallback matching
     const spaceStrippedSearchTerm = prepareTextForFuzzyMatch(originalTerm, true);
 

@@ -48,7 +48,6 @@ export function usePdfSearch({
 }: UsePdfSearchOptions): UsePdfSearchReturn {
 	const [searchText, setSearchText] = useState(explicitSearchTerm || "");
 	const [showSearchInput, setShowSearchInput] = useState(false);
-	const [searchMatches, setSearchMatches] = useState<HTMLElement[][]>([]);
 	const [matchPages, setMatchPages] = useState<number[]>([]);
 	const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
 	const [isSearching, setIsSearching] = useState(false);
@@ -277,7 +276,6 @@ export function usePdfSearch({
 		existingHighlights.forEach((el) => el.remove());
 
 		if (!term || term.trim() === "") {
-			setSearchMatches([]);
 			setMatchPages([]);
 			matchPagesRef.current = [];
 			setCurrentMatchIndex(0);
@@ -296,7 +294,6 @@ export function usePdfSearch({
 			.filter((part) => part.length > 3);
 
 		if (searchParts.length === 0) {
-			setSearchMatches([]);
 			setMatchPages([]);
 			matchPagesRef.current = [];
 			setCurrentMatchIndex(0);
@@ -412,8 +409,6 @@ export function usePdfSearch({
 				searchInTextLayer(textLayer, searchPart, matchGroups);
 			}
 
-			setSearchMatches(matchGroups);
-
 			let matchesBeforeThisPage = 0;
 			for (let i = 0; i < matchIndex; i++) {
 				if (effectivePages[i] < targetPage) {
@@ -518,7 +513,6 @@ export function usePdfSearch({
 	// Clear search
 	const handleClearSearch = useCallback(() => {
 		setSearchText("");
-		setSearchMatches([]);
 		setMatchPages([]);
 		matchPagesRef.current = [];
 		setCurrentMatchIndex(0);
