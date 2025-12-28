@@ -282,6 +282,80 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		}
 	}, [activeHighlight, extendedHighlights]);
 
+	// Update current page when user scrolls through the PDF
+	useEffect(() => {
+		if (!pdfReady) return;
+
+		const pdfViewer = document.querySelector(".pdfViewer");
+		if (!pdfViewer) return;
+
+		// Track visibility ratio for each page
+		const pageVisibility = new Map<number, number>();
+		let lastReportedPage = 1;
+
+		const observer = new IntersectionObserver(
+			(entries) => {
+				entries.forEach((entry) => {
+					const pageNum = parseInt(
+						entry.target.getAttribute("data-page-number") || "0",
+						10
+					);
+					if (pageNum > 0) {
+						if (entry.isIntersecting) {
+							pageVisibility.set(pageNum, entry.intersectionRatio);
+						} else {
+							pageVisibility.delete(pageNum);
+						}
+					}
+				});
+
+				// Find the page with the highest visibility
+				let maxVisibility = 0;
+				let mostVisiblePage = lastReportedPage;
+				pageVisibility.forEach((ratio, pageNum) => {
+					if (ratio > maxVisibility) {
+						maxVisibility = ratio;
+						mostVisiblePage = pageNum;
+					}
+				});
+
+				if (mostVisiblePage !== lastReportedPage && maxVisibility > 0) {
+					lastReportedPage = mostVisiblePage;
+					setCurrentPage(mostVisiblePage);
+				}
+			},
+			{
+				root: pdfViewer.closest(".pdfViewerContainer") || pdfViewer.parentElement,
+				threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
+			}
+		);
+
+		// Observe all page elements
+		const pages = pdfViewer.querySelectorAll(".page[data-page-number]");
+		pages.forEach((page) => observer.observe(page));
+
+		// Also observe new pages as they're added (for lazy loading)
+		const mutationObserver = new MutationObserver((mutations) => {
+			mutations.forEach((mutation) => {
+				mutation.addedNodes.forEach((node) => {
+					if (node instanceof Element) {
+						const newPages = node.matches(".page[data-page-number]")
+							? [node]
+							: node.querySelectorAll(".page[data-page-number]");
+						newPages.forEach((page) => observer.observe(page));
+					}
+				});
+			});
+		});
+
+		mutationObserver.observe(pdfViewer, { childList: true, subtree: true });
+
+		return () => {
+			observer.disconnect();
+			mutationObserver.disconnect();
+		};
+	}, [pdfReady]);
+
 	// Intercept external links in PDF annotations for security
 	useEffect(() => {
 		const container = containerRef.current;
