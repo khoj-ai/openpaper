@@ -94,6 +94,8 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	const pdfDocumentRef = useRef<any>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
+	// When true, skip scrolling on the next activeHighlight change (e.g., when clicking directly on a highlight)
+	const blockScrollOnNextHighlight = useRef(false);
 
 	// State
 	const [currentSelection, setCurrentSelection] = useState<PdfSelection | null>(null);
@@ -228,6 +230,8 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			const originalHighlight = extendedHighlights.find(h => h.id === viewportHighlight.id);
 			if (originalHighlight) {
 				const paperHighlight = extendedToPaperHighlight(originalHighlight);
+				// Don't scroll - the highlight is already in view since user just clicked it
+				blockScrollOnNextHighlight.current = true;
 				setActiveHighlight(paperHighlight);
 			}
 		},
@@ -275,9 +279,13 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		setIsAnnotating,
 	]);
 
-	// Scroll to active highlight when it changes
+	// Scroll to active highlight when it changes (unless blocked, e.g., when clicking directly on a highlight)
 	useEffect(() => {
 		if (activeHighlight?.id && highlighterUtilsRef.current) {
+			if (blockScrollOnNextHighlight.current) {
+				blockScrollOnNextHighlight.current = false;
+				return;
+			}
 			const extendedHighlight = extendedHighlights.find(
 				(h) => h.id === activeHighlight.id
 			);
@@ -485,6 +493,8 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 					el.style.cursor = "pointer";
 					el.addEventListener("click", (e) => {
 						e.stopPropagation();
+						// Don't scroll - the highlight is already in view since user just clicked it
+						blockScrollOnNextHighlight.current = true;
 						setActiveHighlight(highlight);
 						setIsHighlightInteraction(true);
 						setSelectedText(highlight.raw_text);
