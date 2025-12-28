@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { PdfViewer } from '@/components/PdfViewer';
+import { PdfHighlighterViewer } from '@/components/PdfHighlighterViewer';
 import { AnnotationsView } from '@/components/AnnotationsView';
 import { fetchFromApi } from '@/lib/api';
 import { PaperData, PaperHighlight, PaperHighlightAnnotation, ChatMessage } from '@/lib/schema';
@@ -350,7 +350,7 @@ export default function SharedPaperView() {
                     {mobileView === 'reader' ? (
                         <div className="w-full h-full">
                             {paperData.file_url ? (
-                                <PdfViewer
+                                <PdfHighlighterViewer
                                     pdfUrl={paperData.file_url}
                                     highlights={highlights}
                                     activeHighlight={activeHighlight}
@@ -365,10 +365,9 @@ export default function SharedPaperView() {
                                     selectedText={''}
                                     tooltipPosition={null}
                                     setActiveHighlight={setActiveHighlight}
-                                    addHighlight={async () => { throw new Error("Read-only"); }}
+                                    addHighlight={() => { }}
                                     loadHighlights={async () => { }}
                                     removeHighlight={() => { }}
-                                    handleTextSelection={() => { }}
                                     renderAnnotations={() => { }}
                                     annotations={[]}
                                 />
@@ -467,12 +466,10 @@ export default function SharedPaperView() {
                 {/* Left Side: PDF Viewer */}
                 <div className="w-3/5 border-r dark:border-gray-800 border-gray-200 h-full overflow-hidden">
                     {paperData.file_url ? (
-                        <PdfViewer
+                        <PdfHighlighterViewer
                             pdfUrl={paperData.file_url}
                             highlights={highlights}
                             activeHighlight={activeHighlight}
-                            // Pass empty/dummy handlers or flags to disable interactions
-                            // Assuming PdfViewer can operate read-only without these handlers
                             setUserMessageReferences={() => { }}
                             setSelectedText={() => { }}
                             setTooltipPosition={() => { }}
@@ -483,15 +480,12 @@ export default function SharedPaperView() {
                             setHighlights={() => { }}
                             selectedText={''}
                             tooltipPosition={null}
-                            setActiveHighlight={setActiveHighlight} // Allow setting active for viewing
-                            addHighlight={async () => { throw new Error("Read-only"); }}
-                            loadHighlights={async () => { }} // Load is done initially
+                            setActiveHighlight={setActiveHighlight}
+                            addHighlight={() => { }}
+                            loadHighlights={async () => { }}
                             removeHighlight={() => { }}
-                            handleTextSelection={() => { }} // Disable text selection interaction
                             renderAnnotations={() => { }}
-                            annotations={[]} // Pass empty or actual annotations if viewer uses them
-                        // Add a specific readOnly prop if your PdfViewer supports it
-                        // readOnly={true}
+                            annotations={[]}
                         />
                     ) : (
                         <div className="flex justify-center items-center h-full">PDF could not be loaded.</div>
