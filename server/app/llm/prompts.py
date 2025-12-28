@@ -80,6 +80,8 @@ Inline Math notation should be wrapped in double dollar signs, like this: $$\\fr
    - Have a unique citation number `n` for each piece of evidence
    - Include only relevant quotes that directly support your claims
    - Be in plaintext
+   - Use the exact text from the paper without any modifications
+   - Start with 1 and increment by 1 for each new piece of evidence
 
 5. If you're not sure about the answer, let the user know you're uncertain. Provide your best guess, but do not fabricate information.
 
