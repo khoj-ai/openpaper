@@ -472,7 +472,20 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 					"text-match-highlight-overlay",
 					backgroundColor
 				);
-				overlays.forEach((el) => el.setAttribute("data-highlight-key", key));
+
+				// Make overlays clickable and navigate to annotation panel
+				overlays.forEach((el) => {
+					el.setAttribute("data-highlight-key", key);
+					el.style.pointerEvents = "auto";
+					el.style.cursor = "pointer";
+					el.addEventListener("click", (e) => {
+						e.stopPropagation();
+						setActiveHighlight(highlight);
+						setIsHighlightInteraction(true);
+						setSelectedText(highlight.raw_text);
+						setTooltipPosition({ x: e.clientX, y: e.clientY });
+					});
+				});
 			}
 		};
 
