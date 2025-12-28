@@ -100,28 +100,31 @@ class Highlights(BaseModel):
         description="""
 Extract 3-5 standout highlights that capture the most compelling and unique aspects of this research paper. Focus on what makes this paper distinctive rather than summarizing standard content.
 
-## Selection Criteria:
-**Prioritize highlights that are:**
-- **Novel or surprising**: Unexpected findings, counterintuitive results, or breakthrough discoveries
-- **Methodologically innovative**: New techniques, creative experimental designs, or unique approaches
-- **High-impact insights**: Findings that could change how the field thinks about a problem
-- **Quantitatively significant**: Impressive performance gains, large effect sizes, or notable statistical findings
-- **Practically valuable**: Real-world applications, actionable implications, or scalable solutions
+Requirements for Highlights:
+- Each highlight should be a direct, exact quote from the paper
+- Each highlight must be accompanied by a brief annotation (1-2 sentences) explaining its significance or relevance to the paper's contributions
 
-## Content Sources:
-- **Key results from tables/figures**: Extract specific metrics, comparisons, or visual insights
-- **Critical methodology details**: Novel algorithms, experimental setups, or analytical approaches
-- **Standout conclusions**: Bold claims, important limitations, or paradigm-shifting implications
-- **Notable observations**: Interesting patterns, unexpected behaviors, or important caveats
+Selection Criteria:
+Prioritize highlights that are:
+- Novel or surprising: Unexpected findings, counterintuitive results, or breakthrough discoveries
+- Methodologically innovative: New techniques, creative experimental designs, or unique approaches
+- High-impact insights: Findings that could change how the field thinks about a problem
+- Quantitatively significant: Impressive performance gains, large effect sizes, or notable statistical findings
+- Practically valuable: Real-world applications, actionable implications, or scalable solutions
 
-## Quality Guidelines:
-- **Selectivity**: Choose only the most essential "must-read" elements—what would experts in the field find most noteworthy?
-- **Specificity**: Prefer concrete findings over general statements
-- **Diversity**: Ensure highlights span different aspects (methods, results, implications) and types, without referencing the abstract
-- **Authenticity**: Use direct quotes or faithful paraphrases from the source material
-- **Context**: Each annotation should explain *why* this highlight matters to the broader research landscape
+Content Sources:
+- Key results from tables/figures: Extract specific metrics, comparisons, or visual insights
+- Critical methodology details: Novel algorithms, experimental setups, or analytical approaches
+- Standout conclusions: Bold claims, important limitations, or paradigm-shifting implications
+- Notable observations: Interesting patterns, unexpected behaviors, or important caveats
 
-## What to Avoid:
+Quality Guidelines:
+- Selectivity: Choose only the most essential "must-read" elements—what would experts in the field find most noteworthy?
+- Specificity: Prefer concrete findings over general statements
+- Diversity: Ensure highlights span different aspects (methods, results, implications) and types, without referencing the abstract
+- Context: Each annotation should explain *why* this highlight matters to the broader research landscape
+
+What to Avoid:
 - Generic background information or literature review content
 - Standard methodology descriptions unless truly innovative
 - Routine experimental procedures or common practices
