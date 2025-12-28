@@ -355,37 +355,54 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 
 		initialize();
 
+		// Track pending timeouts per page to debounce rapid mutations
+		const pendingTimeouts = new Map<number, ReturnType<typeof setTimeout>>();
+
 		// Use MutationObserver to detect when text layers are added/modified
 		const observer = new MutationObserver((mutations) => {
+			const textLayersToProcess = new Set<Element>();
+
 			for (const mutation of mutations) {
 				// Check added nodes for text layers
 				mutation.addedNodes.forEach((node) => {
 					if (node instanceof Element) {
 						// Check if the node itself is a textLayer
 						if (node.classList?.contains("textLayer")) {
-							const pageEl = node.closest(".page");
-							const pageNum = pageEl?.getAttribute("data-page-number");
-							if (pageNum) {
-								// Small delay to ensure spans are populated
-								setTimeout(() => {
-									createOverlaysForTextLayer(node, parseInt(pageNum, 10));
-								}, 50);
-							}
+							textLayersToProcess.add(node);
 						}
 						// Check if any descendants are textLayers
 						const textLayers = node.querySelectorAll?.(".textLayer");
 						textLayers?.forEach((textLayer) => {
-							const pageEl = textLayer.closest(".page");
-							const pageNum = pageEl?.getAttribute("data-page-number");
-							if (pageNum) {
-								setTimeout(() => {
-									createOverlaysForTextLayer(textLayer, parseInt(pageNum, 10));
-								}, 50);
-							}
+							textLayersToProcess.add(textLayer);
 						});
+						// Check if the node was added to an existing textLayer (spans being repopulated)
+						const parentTextLayer = node.closest?.(".textLayer");
+						if (parentTextLayer) {
+							textLayersToProcess.add(parentTextLayer);
+						}
 					}
 				});
 			}
+
+			// Process each unique textLayer once with debounced delay
+			textLayersToProcess.forEach((textLayer) => {
+				const pageEl = textLayer.closest(".page");
+				const pageNum = pageEl?.getAttribute("data-page-number");
+				if (pageNum) {
+					const pageNumber = parseInt(pageNum, 10);
+					// Clear any pending timeout for this page to debounce
+					const existingTimeout = pendingTimeouts.get(pageNumber);
+					if (existingTimeout) {
+						clearTimeout(existingTimeout);
+					}
+					// Schedule overlay creation with delay to ensure spans are populated
+					const timeout = setTimeout(() => {
+						pendingTimeouts.delete(pageNumber);
+						createOverlaysForTextLayer(textLayer, pageNumber);
+					}, 100);
+					pendingTimeouts.set(pageNumber, timeout);
+				}
+			});
 		});
 
 		// Observe the PDF viewer container for changes
@@ -399,6 +416,9 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 
 		return () => {
 			observer.disconnect();
+			// Clear any pending timeouts
+			pendingTimeouts.forEach((timeout) => clearTimeout(timeout));
+			pendingTimeouts.clear();
 		};
 	}, [pdfReady, highlights, scale]);
 
