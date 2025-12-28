@@ -78,9 +78,9 @@ export function PdfToolbar({
 	handleStatusChange = () => { },
 }: PdfToolbarProps) {
 	return (
-		<div className="sticky top-0 z-10 flex items-center justify-between bg-white/80 dark:bg-black/80 backdrop-blur-sm p-2 rounded-none w-full border-b border-gray-300">
-			{/* Page navigation */}
-			<div className="flex items-center gap-1 mx-2">
+		<div className="sticky top-0 z-10 flex items-center bg-white/80 dark:bg-black/80 backdrop-blur-sm px-3 py-2 w-full border-b border-gray-300">
+			{/* Left section: Page navigation */}
+			<div className="flex items-center gap-1">
 				<Button
 					onClick={goToPreviousPage}
 					size="sm"
@@ -90,8 +90,8 @@ export function PdfToolbar({
 				>
 					<ArrowLeft size={16} />
 				</Button>
-				<span className="text-xs text-secondary-foreground">
-					{currentPage} of {numPages || "?"}
+				<span className="text-xs text-secondary-foreground min-w-[4rem] text-center">
+					{currentPage} / {numPages || "?"}
 				</span>
 				<Button
 					onClick={goToNextPage}
@@ -104,10 +104,13 @@ export function PdfToolbar({
 				</Button>
 			</div>
 
-			{/* Search */}
+			{/* Separator */}
+			<div className="h-5 w-px bg-gray-300 mx-3" />
+
+			{/* Center section: Search */}
 			<div className="flex items-center gap-1">
 				{showSearchInput ? (
-					<form onSubmit={handleSearchSubmit} className="flex items-center gap-1">
+					<form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
 						<div className="relative">
 							<Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
 							<Input
@@ -131,15 +134,14 @@ export function PdfToolbar({
 								</Button>
 							)}
 						</div>
-						{/* Match count and navigation */}
 						{isSearching ? (
-							<span className="text-xs text-muted-foreground whitespace-nowrap">
+							<span className="text-xs text-muted-foreground">
 								Searching...
 							</span>
 						) : matchPages.length > 0 ? (
-							<>
-								<span className="text-xs text-muted-foreground whitespace-nowrap">
-									{currentMatchIndex + 1} of {matchPages.length}
+							<div className="flex items-center gap-1">
+								<span className="text-xs text-muted-foreground">
+									{currentMatchIndex + 1}/{matchPages.length}
 								</span>
 								<Button
 									type="button"
@@ -161,9 +163,9 @@ export function PdfToolbar({
 								>
 									<ChevronDown size={14} />
 								</Button>
-							</>
+							</div>
 						) : searchText && lastSearchTermRef.current === searchText ? (
-							<span className="text-xs text-muted-foreground whitespace-nowrap">
+							<span className="text-xs text-muted-foreground">
 								No results
 							</span>
 						) : null}
@@ -184,39 +186,41 @@ export function PdfToolbar({
 				)}
 			</div>
 
-			{/* Zoom controls */}
-			<div className="flex items-center gap-1">
-				<Button
-					onClick={zoomOut}
-					size="sm"
-					variant="ghost"
-					className="h-8 w-8 p-0"
-				>
-					<Minus size={16} />
-				</Button>
-				<span className="text-xs w-12 text-center">
-					{Math.round(scale * 100)}%
-				</span>
-				<Button
-					onClick={zoomIn}
-					size="sm"
-					variant="ghost"
-					className="h-8 w-8 p-0"
-				>
-					<Plus size={16} />
-				</Button>
-			</div>
+			{/* Spacer */}
+			<div className="flex-1" />
 
-			{/* Status dropdown */}
-			{paperStatus && (
-				<div className="flex items-center gap-2">
+			{/* Right section: Zoom + Status */}
+			<div className="flex items-center gap-3">
+				{/* Zoom controls */}
+				<div className="flex items-center gap-1">
+					<Button
+						onClick={zoomOut}
+						size="sm"
+						variant="ghost"
+						className="h-8 w-8 p-0"
+					>
+						<Minus size={16} />
+					</Button>
+					<span className="text-xs w-10 text-center tabular-nums">
+						{Math.round(scale * 100)}%
+					</span>
+					<Button
+						onClick={zoomIn}
+						size="sm"
+						variant="ghost"
+						className="h-8 w-8 p-0"
+					>
+						<Plus size={16} />
+					</Button>
+				</div>
+
+				{/* Status dropdown */}
+				{paperStatus && (
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
-							<Button size="sm" variant="outline" className="h-8 px-2">
-								<span className="ml-1 text-xs text-muted-foreground flex items-center gap-1">
-									{getStatusIcon(paperStatus)}
-									{paperStatus}
-								</span>
+							<Button size="sm" variant="outline" className="h-8 px-2 gap-1">
+								{getStatusIcon(paperStatus)}
+								<span className="text-xs capitalize">{paperStatus}</span>
 							</Button>
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="end">
@@ -234,8 +238,8 @@ export function PdfToolbar({
 							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
-				</div>
-			)}
+				)}
+			</div>
 		</div>
 	);
 }
