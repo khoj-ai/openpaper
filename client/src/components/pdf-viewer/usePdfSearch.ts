@@ -14,6 +14,7 @@ interface UsePdfSearchOptions {
 	pdfDocumentRef: MutableRefObject<unknown>;
 	setCurrentPage: (page: number) => void;
 	explicitSearchTerm?: string;
+	pdfReady?: boolean;
 }
 
 interface UsePdfSearchReturn {
@@ -43,6 +44,7 @@ export function usePdfSearch({
 	pdfDocumentRef,
 	setCurrentPage,
 	explicitSearchTerm,
+	pdfReady = false,
 }: UsePdfSearchOptions): UsePdfSearchReturn {
 	const [searchText, setSearchText] = useState(explicitSearchTerm || "");
 	const [showSearchInput, setShowSearchInput] = useState(false);
@@ -455,6 +457,9 @@ export function usePdfSearch({
 
 	// Handle explicit search term from props
 	useEffect(() => {
+		// Wait for PDF to be ready before searching
+		if (!pdfReady) return;
+
 		if (explicitSearchTerm === lastSearchTermRef.current) return;
 		lastSearchTermRef.current = explicitSearchTerm;
 
@@ -470,7 +475,7 @@ export function usePdfSearch({
 			}
 		};
 		doSearch();
-	}, [explicitSearchTerm, performSearch, goToMatch]);
+	}, [explicitSearchTerm, pdfReady, performSearch, goToMatch]);
 
 	// Handle keyboard shortcut for search (Cmd/Ctrl + F)
 	useEffect(() => {

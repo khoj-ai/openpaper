@@ -110,6 +110,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		pdfDocumentRef,
 		setCurrentPage,
 		explicitSearchTerm,
+		pdfReady,
 	});
 
 	// Convert PaperHighlights to ExtendedHighlights
