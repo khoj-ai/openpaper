@@ -26,7 +26,7 @@ export function HighlightContainer({ onHighlightClick }: HighlightContainerProps
 	const highlightColor =
 		highlight.role === "assistant"
 			? "rgba(168, 85, 247, 0.3)" // purple for AI highlights
-			: "rgba(59, 130, 246, 0.3)"; // blue for user highlights
+			: "rgba(59, 130, 246, 0.2)"; // blue for user highlights
 
 	if (isTextHighlight) {
 		return (

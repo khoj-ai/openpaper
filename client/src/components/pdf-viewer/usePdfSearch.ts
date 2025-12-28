@@ -423,7 +423,7 @@ export function usePdfSearch({
 			const matchIndexOnPage = matchIndex - matchesBeforeThisPage;
 
 			matchGroups.forEach((group, idx) => {
-				const color = idx === matchIndexOnPage ? "rgba(255, 152, 0, 0.6)" : "rgba(255, 235, 59, 0.4)";
+				const color = idx === matchIndexOnPage ? "rgba(255, 235, 59, 0.6)" : "rgba(255, 235, 59, 0.4)";
 				group.forEach(el => {
 					el.style.backgroundColor = color;
 				});

@@ -30,6 +30,8 @@ import {
 	HighlightContainer,
 	usePdfSearch,
 	PdfToolbar,
+	findTextPages,
+	createTextHighlightOverlays,
 } from "./pdf-viewer";
 
 // Re-export types for external use
@@ -100,6 +102,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 	const [currentPage, setCurrentPage] = useState(1);
 	const [numPages, setNumPages] = useState<number | null>(null);
 	const [showScrollToTop] = useState(false);
+	const [pdfReady, setPdfReady] = useState(false);
 
 	// Search hook
 	const search = usePdfSearch({
@@ -279,6 +282,126 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		}
 	}, [activeHighlight, extendedHighlights]);
 
+	// Cache for highlight page mappings
+	const highlightPageMapRef = useRef<Map<string, number[]>>(new Map());
+
+	// Create DOM-based overlays for assistant highlights without position data
+	// Uses MutationObserver to detect when text layers are added/recreated
+	useEffect(() => {
+		if (!pdfReady || !pdfDocumentRef.current) return;
+
+		// Get assistant highlights without positions
+		const assistantHighlightsWithoutPosition = highlights.filter(
+			(h) => h.role === "assistant" && !h.position && h.raw_text
+		);
+
+		if (assistantHighlightsWithoutPosition.length === 0) {
+			highlightPageMapRef.current.clear();
+			return;
+		}
+
+		// Function to create overlays for a specific text layer
+		const createOverlaysForTextLayer = (textLayer: Element, pageNumber: number) => {
+			for (const highlight of assistantHighlightsWithoutPosition) {
+				const key = highlight.id || highlight.raw_text;
+				const pages = highlightPageMapRef.current.get(key);
+
+				// Check if this highlight belongs on this page
+				if (!pages || !pages.includes(pageNumber)) continue;
+
+				// Check if overlay already exists
+				const existingOverlay = textLayer.querySelector(
+					`.assistant-highlight-overlay[data-highlight-key="${CSS.escape(key)}"]`
+				);
+				if (existingOverlay) continue;
+
+				const overlays = createTextHighlightOverlays(
+					textLayer,
+					highlight.raw_text,
+					"assistant-highlight-overlay",
+					"rgba(168, 85, 247, 0.3)"
+				);
+				overlays.forEach((el) => el.setAttribute("data-highlight-key", key));
+			}
+		};
+
+		// Create overlays for all currently rendered text layers
+		const createOverlaysForAllRenderedPages = () => {
+			const textLayers = document.querySelectorAll(".page .textLayer");
+			textLayers.forEach((textLayer) => {
+				const pageEl = textLayer.closest(".page");
+				const pageNum = pageEl?.getAttribute("data-page-number");
+				if (pageNum) {
+					createOverlaysForTextLayer(textLayer, parseInt(pageNum, 10));
+				}
+			});
+		};
+
+		// Initialize: find pages for each highlight, then create overlays
+		const initialize = async () => {
+			for (const highlight of assistantHighlightsWithoutPosition) {
+				const key = highlight.id || highlight.raw_text;
+				if (!highlightPageMapRef.current.has(key)) {
+					const pages = await findTextPages(
+						highlight.raw_text,
+						pdfDocumentRef.current,
+						highlight.page_number
+					);
+					highlightPageMapRef.current.set(key, pages);
+				}
+			}
+			createOverlaysForAllRenderedPages();
+		};
+
+		initialize();
+
+		// Use MutationObserver to detect when text layers are added/modified
+		const observer = new MutationObserver((mutations) => {
+			for (const mutation of mutations) {
+				// Check added nodes for text layers
+				mutation.addedNodes.forEach((node) => {
+					if (node instanceof Element) {
+						// Check if the node itself is a textLayer
+						if (node.classList?.contains("textLayer")) {
+							const pageEl = node.closest(".page");
+							const pageNum = pageEl?.getAttribute("data-page-number");
+							if (pageNum) {
+								// Small delay to ensure spans are populated
+								setTimeout(() => {
+									createOverlaysForTextLayer(node, parseInt(pageNum, 10));
+								}, 50);
+							}
+						}
+						// Check if any descendants are textLayers
+						const textLayers = node.querySelectorAll?.(".textLayer");
+						textLayers?.forEach((textLayer) => {
+							const pageEl = textLayer.closest(".page");
+							const pageNum = pageEl?.getAttribute("data-page-number");
+							if (pageNum) {
+								setTimeout(() => {
+									createOverlaysForTextLayer(textLayer, parseInt(pageNum, 10));
+								}, 50);
+							}
+						});
+					}
+				});
+			}
+		});
+
+		// Observe the PDF viewer container for changes
+		const pdfViewer = document.querySelector(".pdfViewer");
+		if (pdfViewer) {
+			observer.observe(pdfViewer, {
+				childList: true,
+				subtree: true,
+			});
+		}
+
+		return () => {
+			observer.disconnect();
+		};
+	}, [pdfReady, highlights, scale]);
+
 	return (
 		<div
 			ref={containerRef}
@@ -327,6 +450,9 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 						// Store PDF document ref for text extraction
 						if (pdfDocumentRef.current !== pdfDocument) {
 							pdfDocumentRef.current = pdfDocument;
+							if (!pdfReady) {
+								setPdfReady(true);
+							}
 						}
 						// Set numPages when document loads
 						if (pdfDocument.numPages !== numPages) {
