@@ -260,3 +260,60 @@
 		transform: translateY(calc(-100% - var(--gap)));
 	}
 }
+
+/* ==========================================================================
+   PDF Annotation Security Filtering
+   Disable potentially dangerous annotation types while preserving useful ones.
+   ========================================================================== */
+
+/* Hide form widgets (text inputs, checkboxes, dropdowns) - can submit data externally */
+.annotationLayer .textWidgetAnnotation,
+.annotationLayer .choiceWidgetAnnotation,
+.annotationLayer .buttonWidgetAnnotation {
+	display: none !important;
+}
+
+/* Hide file attachment annotations - potential malware vector */
+.annotationLayer .fileAttachmentAnnotation {
+	display: none !important;
+}
+
+/* Hide popup annotations (comments can contain scripts in some viewers) */
+.annotationLayer .popupAnnotation {
+	display: none !important;
+}
+
+/* Hide stamp annotations */
+.annotationLayer .stampAnnotation {
+	display: none !important;
+}
+
+/* Hide rich media annotations (video, audio, Flash - legacy exploit vectors) */
+.annotationLayer .richMediaAnnotation,
+.annotationLayer .screenAnnotation {
+	display: none !important;
+}
+
+/* Keep link annotations visible but style external links differently */
+.annotationLayer .linkAnnotation {
+	/* Links are kept - we handle external link filtering in JS */
+}
+
+/* Keep text/highlight annotations (author notes, comments display) */
+.annotationLayer .textAnnotation,
+.annotationLayer .highlightAnnotation,
+.annotationLayer .underlineAnnotation,
+.annotationLayer .strikeoutAnnotation,
+.annotationLayer .squigglyAnnotation {
+	/* These are safe and often contain useful metadata */
+}
+
+/* Visual indicator for external links - subtle border */
+.annotationLayer .linkAnnotation[data-external-link="true"]::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border: 1px dashed rgba(239, 68, 68, 0.4);
+	border-radius: 2px;
+	pointer-events: none;
+}

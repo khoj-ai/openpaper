@@ -282,6 +282,77 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		}
 	}, [activeHighlight, extendedHighlights]);
 
+	// Intercept external links in PDF annotations for security
+	useEffect(() => {
+		const container = containerRef.current;
+		if (!container) return;
+
+		const handleLinkClick = (event: MouseEvent) => {
+			const target = event.target as HTMLElement;
+			const link = target.closest("a");
+
+			if (!link) return;
+
+			// Check if this is inside the annotation layer
+			const annotationLayer = link.closest(".annotationLayer");
+			if (!annotationLayer) return;
+
+			const href = link.getAttribute("href");
+			if (!href) return;
+
+			// Internal document links start with # (page anchors, named destinations)
+			if (href.startsWith("#")) {
+				// Allow internal links to work normally
+				return;
+			}
+
+			// External link detected - intercept and warn
+			event.preventDefault();
+			event.stopPropagation();
+
+			// Mark it visually as external
+			const linkSection = link.closest("section");
+			if (linkSection) {
+				linkSection.setAttribute("data-external-link", "true");
+			}
+
+			const proceed = window.confirm(
+				`This PDF contains a link to an external website:\n\n${href}\n\nDo you want to open it in a new tab?`
+			);
+
+			if (proceed) {
+				window.open(href, "_blank", "noopener,noreferrer");
+			}
+		};
+
+		// Mark external links on render for visual styling
+		const markExternalLinks = () => {
+			const links = container.querySelectorAll(".annotationLayer a[href]");
+			links.forEach((link) => {
+				const href = link.getAttribute("href");
+				if (href && !href.startsWith("#")) {
+					const section = link.closest("section");
+					if (section) {
+						section.setAttribute("data-external-link", "true");
+					}
+				}
+			});
+		};
+
+		// Use capture phase to intercept before PDF.js handles the click
+		container.addEventListener("click", handleLinkClick, true);
+
+		// Mark existing external links and watch for new ones
+		markExternalLinks();
+		const observer = new MutationObserver(markExternalLinks);
+		observer.observe(container, { childList: true, subtree: true });
+
+		return () => {
+			container.removeEventListener("click", handleLinkClick, true);
+			observer.disconnect();
+		};
+	}, [pdfReady]);
+
 	// Cache for highlight page mappings
 	const highlightPageMapRef = useRef<Map<string, number[]>>(new Map());
 
