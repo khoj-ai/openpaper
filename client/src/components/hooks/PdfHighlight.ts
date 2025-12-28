@@ -16,8 +16,6 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
     const [activeHighlight, setActiveHighlight] = useState<PaperHighlight | null>(null);
     const blockScrollOnNextHighlight = useRef(false);
 
-    const highlightsStorageName = `highlights-${paperId}`;
-
     // Apply highlights whenever they change
     useEffect(() => {
         if (highlights.length > 0) {
@@ -173,7 +171,6 @@ export function useHighlights(paperId: string, readOnlyHighlights: Array<PaperHi
     };
     // Clear all highlights
     const clearHighlights = () => {
-        localStorage.removeItem(highlightsStorageName);
         setHighlights([]);
     };
 

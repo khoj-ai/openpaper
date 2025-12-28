@@ -15,6 +15,8 @@ interface UsePdfSearchOptions {
 	setCurrentPage: (page: number) => void;
 	explicitSearchTerm?: string;
 	pdfReady?: boolean;
+	// When set, indicates we're navigating to an existing highlight (skip yellow search overlay)
+	activeHighlightId?: string | null;
 }
 
 interface UsePdfSearchReturn {
@@ -45,6 +47,7 @@ export function usePdfSearch({
 	setCurrentPage,
 	explicitSearchTerm,
 	pdfReady = false,
+	activeHighlightId,
 }: UsePdfSearchOptions): UsePdfSearchReturn {
 	const [searchText, setSearchText] = useState(explicitSearchTerm || "");
 	const [showSearchInput, setShowSearchInput] = useState(false);
@@ -57,6 +60,8 @@ export function usePdfSearch({
 	const searchPartsRef = useRef<string[]>([]);
 	const isNavigatingRef = useRef(false);
 	const matchPagesRef = useRef<number[]>([]);
+	// When true, skip creating visual search highlights (e.g., when navigating to an existing highlight)
+	const skipVisualHighlightRef = useRef(false);
 
 	// Search for a single term in a text layer and return match groups
 	const searchInTextLayer = useCallback(
@@ -234,6 +239,11 @@ export function usePdfSearch({
 							for (let i = 0; i < rects.length; i++) {
 								const rect = rects[i];
 								if (rect.width === 0 || rect.height === 0) continue;
+
+								// Skip creating visual highlights when navigating to an existing highlight
+								if (skipVisualHighlightRef.current) {
+									continue;
+								}
 
 								const highlight = document.createElement("div");
 								highlight.className = "search-highlight-overlay";
@@ -458,6 +468,9 @@ export function usePdfSearch({
 		if (explicitSearchTerm === lastSearchTermRef.current) return;
 		lastSearchTermRef.current = explicitSearchTerm;
 
+		// Skip yellow highlight overlay when navigating to an existing highlight
+		skipVisualHighlightRef.current = !!activeHighlightId;
+
 		if (explicitSearchTerm) {
 			setSearchText(explicitSearchTerm);
 			setShowSearchInput(true);
@@ -466,11 +479,13 @@ export function usePdfSearch({
 		const doSearch = async () => {
 			const pages = await performSearch(explicitSearchTerm || "");
 			if (pages.length > 0) {
-				goToMatch(0, pages);
+				await goToMatch(0, pages);
 			}
+			// Reset the flag after search completes
+			skipVisualHighlightRef.current = false;
 		};
 		doSearch();
-	}, [explicitSearchTerm, pdfReady, performSearch, goToMatch]);
+	}, [explicitSearchTerm, pdfReady, performSearch, goToMatch, activeHighlightId]);
 
 	// Handle keyboard shortcut for search (Cmd/Ctrl + F)
 	useEffect(() => {

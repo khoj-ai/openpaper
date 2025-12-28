@@ -113,6 +113,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		setCurrentPage,
 		explicitSearchTerm,
 		pdfReady,
+		activeHighlightId: activeHighlight?.id,
 	});
 
 	// Convert PaperHighlights to ExtendedHighlights
