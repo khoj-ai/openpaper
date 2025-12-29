@@ -134,6 +134,15 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		setScale((prev) => Math.max(prev - 0.25, 0.5));
 	}, []);
 
+	// Apply scale changes directly to the viewer
+	// (workaround for react-pdf-highlighter-extended not responding to pdfScaleValue prop changes)
+	useEffect(() => {
+		const viewer = highlighterUtilsRef.current?.getViewer();
+		if (viewer) {
+			viewer.currentScaleValue = String(scale);
+		}
+	}, [scale]);
+
 	// Page navigation
 	const goToPreviousPage = useCallback(() => {
 		if (currentPage > 1) {
