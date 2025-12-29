@@ -6,7 +6,6 @@ import { PdfHighlighterViewer } from '@/components/PdfHighlighterViewer';
 import { AnnotationsView } from '@/components/AnnotationsView';
 import { fetchFromApi } from '@/lib/api';
 import { PaperData, PaperHighlight, PaperHighlightAnnotation, ChatMessage } from '@/lib/schema';
-import { useHighlights } from '@/components/hooks/PdfHighlight';
 import PaperMetadata from '@/components/PaperMetadata';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Book, Box, User } from 'lucide-react';
@@ -47,10 +46,7 @@ export default function SharedPaperView() {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const {
-        activeHighlight,
-        setActiveHighlight,
-    } = useHighlights(shareId);
+    const [activeHighlight, setActiveHighlight] = useState<PaperHighlight | null>(null);
     const isMobile = useIsMobile();
     const [mobileView, setMobileView] = useState<'reader' | 'panel'>('reader');
     const [rightSideFunction, setRightSideFunction] = useState('Overview');

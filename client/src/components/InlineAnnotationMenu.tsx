@@ -2,7 +2,6 @@ import {
     PaperHighlight,
 } from '@/lib/schema';
 
-import { getSelectionOffsets } from "./utils/PdfTextUtils";
 import { useEffect, useState, useRef } from "react";
 import { Button } from "./ui/button";
 import { CommandShortcut, localizeCommandToOS } from "./ui/command";
@@ -42,7 +41,6 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
         setUserMessageReferences,
     } = props;
 
-    const [offsets, setOffsets] = useState<{ start: number; end: number, pageNumber: number } | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
     const [menuPosition, setMenuPosition] = useState<{ left: number; top: number } | null>(null);
 
@@ -80,13 +78,6 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
     }, [tooltipPosition]);
 
     useEffect(() => {
-        if (selectedText) {
-            const offsets = getSelectionOffsets();
-            if (offsets) {
-                setOffsets(offsets);
-            }
-        }
-
         const handleMouseDown = (e: KeyboardEvent) => {
             if (e.key === "Escape") {
                 setSelectedText("");
@@ -100,8 +91,7 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                     return Array.from(new Set(newReferences)); // Remove duplicates
                 });
             } else if (e.key === "h" && (e.ctrlKey || e.metaKey)) {
-                // Page offsets are zero-indexed, so inc. by 1 for consistency
-                addHighlight(selectedText, offsets?.start, offsets?.end, (offsets?.pageNumber || 0) + 1);
+                addHighlight(selectedText);
                 e.stopPropagation();
             } else if (e.key === "d" && (e.ctrlKey || e.metaKey) && isHighlightInteraction && activeHighlight) {
                 removeHighlight(activeHighlight);
@@ -167,7 +157,7 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={(e) => {
                                 e.stopPropagation();
-                                addHighlight(selectedText, offsets?.start, offsets?.end, offsets?.pageNumber, false);
+                                addHighlight(selectedText, undefined, undefined, undefined, false);
                             }}
                         >
                             <div className="flex items-center gap-2">
@@ -193,7 +183,7 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                             setTooltipPosition(null);
                             setSelectedText("");
                             if (!isHighlightInteraction) {
-                                addHighlight(selectedText, offsets?.start, offsets?.end, offsets?.pageNumber, true);
+                                addHighlight(selectedText, undefined, undefined, undefined, true);
                             }
                         }}
                     >

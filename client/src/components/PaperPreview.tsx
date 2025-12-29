@@ -11,7 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { PaperProjects } from "./PaperProjects";
 import { TagSelector } from "./TagSelector";
 import { fetchFromApi } from "@/lib/api";
-import { useHighlights } from "./hooks/PdfHighlight";
+import { useHighlighterHighlights } from "./hooks/PdfHighlighterHighlights";
 import { useEffect, useState } from "react";
 import { CitePaperButton } from "./CitePaperButton";
 
@@ -22,7 +22,7 @@ interface PaperPreviewProps {
 }
 
 export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
-    const { highlights } = useHighlights(paper.id);
+    const { highlights } = useHighlighterHighlights(paper.id);
     const [showAllHighlights, setShowAllHighlights] = useState(false);
     const [loadedPaper, setLoadedPaper] = useState<PaperData | null>(null);
 
