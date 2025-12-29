@@ -5,6 +5,8 @@ import createMDX from '@next/mdx'
 const nextConfig = {
     // Configure `pageExtensions` to include markdown and MDX files
     pageExtensions: ['js', 'jsx', 'md', 'mdx', 'ts', 'tsx'],
+    // Transpile packages that import CSS from node_modules
+    transpilePackages: ['react-pdf-highlighter-extended', 'pdfjs-dist'],
     // Add image remote patterns configuration
     images: {
         remotePatterns: [

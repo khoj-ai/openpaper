@@ -55,9 +55,9 @@ class Base(DeclarativeBase):
 
         def _to_json_friendly(value):
             if isinstance(value, list):
-                return [str(item) for item in value]
+                return [_to_json_friendly(item) for item in value]
             elif isinstance(value, dict):
-                return {key: str(val) for key, val in value.items()}
+                return {key: _to_json_friendly(val) for key, val in value.items()}
             elif isinstance(value, (int, float, bool)):
                 return value
             elif isinstance(value, NoneType):
@@ -650,6 +650,8 @@ class Highlight(Base):
     start_offset = Column(Integer, nullable=True)
     end_offset = Column(Integer, nullable=True)
     page_number = Column(Integer, nullable=True)
+
+    position = Column(JSONB, nullable=True)
 
     # Role
     # This can be user for user-created highlights or assistant for AI-generated highlights

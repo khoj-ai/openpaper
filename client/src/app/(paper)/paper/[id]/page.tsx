@@ -1,6 +1,6 @@
 'use client';
 
-import { PdfViewer } from '@/components/PdfViewer';
+import { PdfHighlighterViewer } from '@/components/PdfHighlighterViewer';
 import { Button } from '@/components/ui/button';
 import { fetchFromApi } from '@/lib/api';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { toast } from "sonner";
 
-import { useHighlights } from '@/components/hooks/PdfHighlight';
+import { useHighlighterHighlights } from '@/components/hooks/PdfHighlighterHighlights';
 import { useAnnotations } from '@/components/hooks/PdfAnnotation';
 
 import {
@@ -94,11 +94,10 @@ export default function PaperView() {
         setIsHighlightInteraction,
         activeHighlight,
         setActiveHighlight,
-        handleTextSelection,
         addHighlight,
         removeHighlight,
         fetchHighlights
-    } = useHighlights(id);
+    } = useHighlighterHighlights(id);
 
     const {
         annotations,
@@ -266,10 +265,13 @@ export default function PaperView() {
             const refValueElement = document.getElementById(`citation-ref-${key}-${messageIndex}`);
             if (refValueElement) {
                 const refValueText = refValueElement.innerText;
-                const refValue = refValueText.replace(/^\[\^(\d+|[a-zA-Z]+)\]/, '').trim();
+                let searchTerm = refValueText.replace(/^\[\^(\d+|[a-zA-Z]+)\]/, '').trim();
 
-                // since the first and last terms are quotes, remove them
-                const searchTerm = refValue.substring(1, refValue.length - 1);
+                // Only remove quotes if the text is actually wrapped in quotes
+                if ((searchTerm.startsWith('"') && searchTerm.endsWith('"')) ||
+                    (searchTerm.startsWith("'") && searchTerm.endsWith("'"))) {
+                    searchTerm = searchTerm.substring(1, searchTerm.length - 1);
+                }
                 setExplicitSearchTerm(searchTerm);
             }
         }
@@ -293,6 +295,10 @@ export default function PaperView() {
 
     const handleHighlightClick = useCallback((highlight: PaperHighlight) => {
         setActiveHighlight(highlight);
+        // Use search to navigate to the highlight text in the PDF
+        if (highlight.raw_text) {
+            setExplicitSearchTerm(highlight.raw_text);
+        }
     }, []);
 
 
@@ -469,7 +475,7 @@ export default function PaperView() {
                     {mobileView === 'reader' ? (
                         <div className="w-full h-full">
                             {paperData.file_url && (
-                                <PdfViewer
+                                <PdfHighlighterViewer
                                     pdfUrl={paperData.file_url}
                                     explicitSearchTerm={explicitSearchTerm}
                                     setUserMessageReferences={setUserMessageReferences}
@@ -486,7 +492,6 @@ export default function PaperView() {
                                     addHighlight={addHighlight}
                                     loadHighlights={fetchHighlights}
                                     removeHighlight={removeHighlight}
-                                    handleTextSelection={handleTextSelection}
                                     renderAnnotations={renderAnnotations}
                                     annotations={annotations}
                                     setHighlights={setHighlights}
@@ -555,7 +560,7 @@ export default function PaperView() {
                 >
                     {paperData.file_url && (
                         <div className="w-full h-full">
-                            <PdfViewer
+                            <PdfHighlighterViewer
                                 pdfUrl={paperData.file_url}
                                 explicitSearchTerm={explicitSearchTerm}
                                 setUserMessageReferences={setUserMessageReferences}
@@ -572,7 +577,6 @@ export default function PaperView() {
                                 addHighlight={addHighlight}
                                 loadHighlights={fetchHighlights}
                                 removeHighlight={removeHighlight}
-                                handleTextSelection={handleTextSelection}
                                 renderAnnotations={renderAnnotations}
                                 annotations={annotations}
                                 setHighlights={setHighlights}

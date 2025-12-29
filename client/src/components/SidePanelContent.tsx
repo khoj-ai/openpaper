@@ -897,7 +897,8 @@ export function SidePanelContent({
                         {
                             rightSideFunction === 'Chat' && (
                                 <div className={`flex flex-col ${heightClass} overflow-y-auto`}>
-                                                                         <PaperMetadata paperData={paperData} />                                    {/* Paper Chat Section */}
+                                    <PaperMetadata paperData={paperData} />
+                                    {/* Paper Chat Section */}
                                     <div
                                         className={`flex-1 overflow-y-auto space-y-2 transition-all duration-300 mt-2 ease-in-out ${isStreaming ? 'pb-24' : ''}`}
                                         ref={messagesContainerRef}
@@ -1016,7 +1017,7 @@ export function SidePanelContent({
                                     </div>
                                     {(messages.length === 0 || messages.length === 1) && !hasMoreMessages && (
                                         <div className="text-center text-gray-500 my-4">
-                                                <div className='flex overflow-x-auto gap-2 mt-2 pb-2 scrollbar-hide'>
+                                            <div className='flex overflow-x-auto gap-2 mt-2 pb-2 scrollbar-hide'>
                                                 {starterQuestions.slice(0, 5).map((question, i) => (
                                                     <Button
                                                         key={i}

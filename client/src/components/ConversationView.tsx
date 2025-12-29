@@ -26,7 +26,7 @@ import Link from "next/link";
 import { TopicBubbles } from "@/components/TopicBubbles";
 import { AnimatedGradientText } from "@/components/magicui/animated-gradient-text";
 import { ChatHistorySkeleton } from "@/components/ChatHistorySkeleton";
-import { PdfViewer } from "@/components/PdfViewer";
+import { PdfHighlighterViewer } from "@/components/PdfHighlighterViewer";
 
 interface ConversationViewProps {
 	messages: ChatMessage[];
@@ -137,7 +137,14 @@ export const ConversationView = ({
 
 		if (paper && paper.file_url) {
 			setPdfUrl(paper.file_url);
-			setSearchTerm(citation.reference);
+
+			// Strip quotes from the reference if wrapped in them
+			let searchText = citation.reference;
+			if ((searchText.startsWith('"') && searchText.endsWith('"')) ||
+				(searchText.startsWith("'") && searchText.endsWith("'"))) {
+				searchText = searchText.substring(1, searchText.length - 1);
+			}
+			setSearchTerm(searchText);
 			setIsPdfVisible(true);
 		}
 	};
@@ -461,7 +468,7 @@ export const ConversationView = ({
 					)}
 					<div className="flex-grow transition-all duration-300 ease-in-out overflow-y-auto">
 						{pdfUrl && (
-							<PdfViewer
+							<PdfHighlighterViewer
 								pdfUrl={pdfUrl}
 								explicitSearchTerm={searchTerm || undefined}
 								highlights={[]}
@@ -476,10 +483,9 @@ export const ConversationView = ({
 								selectedText={''}
 								tooltipPosition={null}
 								setActiveHighlight={() => { }}
-								addHighlight={async () => { throw new Error("Read-only"); }}
+								addHighlight={() => { }}
 								loadHighlights={async () => { }}
 								removeHighlight={() => { }}
-								handleTextSelection={() => { }}
 								renderAnnotations={() => { }}
 								annotations={[]}
 							/>

@@ -35,6 +35,23 @@ export interface ChatMessage {
     references?: Reference;
 }
 
+// Position types for react-pdf-highlighter-extended
+export interface ScaledRect {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    width: number;
+    height: number;
+    pageNumber: number;
+}
+
+export interface ScaledPosition {
+    boundingRect: ScaledRect;
+    rects: ScaledRect[];
+    usePdfCoordinates?: boolean;
+}
+
 export interface PaperHighlight {
     id?: string;
     raw_text: string;
@@ -43,6 +60,7 @@ export interface PaperHighlight {
     end_offset?: number;
     page_number?: number;
     type?: HighlightType;
+    position?: ScaledPosition;
 }
 
 export interface PaperHighlightAnnotation {
