@@ -17,7 +17,7 @@ interface InlineAnnotationMenuProps {
     setHighlights: (highlights: Array<PaperHighlight>) => void;
     isHighlightInteraction: boolean;
     activeHighlight: PaperHighlight | null;
-    addHighlight: (selectedText: string, startOffset?: number, endOffset?: number, pageNumber?: number, doAnnotate?: boolean) => void;
+    addHighlight: (selectedText: string, doAnnotate?: boolean) => void;
     removeHighlight: (highlight: PaperHighlight) => void;
     setUserMessageReferences: React.Dispatch<React.SetStateAction<string[]>>;
 }
@@ -157,7 +157,7 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={(e) => {
                                 e.stopPropagation();
-                                addHighlight(selectedText, undefined, undefined, undefined, false);
+                                addHighlight(selectedText, false);
                             }}
                         >
                             <div className="flex items-center gap-2">
@@ -183,7 +183,7 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                             setTooltipPosition(null);
                             setSelectedText("");
                             if (!isHighlightInteraction) {
-                                addHighlight(selectedText, undefined, undefined, undefined, true);
+                                addHighlight(selectedText, true);
                             }
                         }}
                     >

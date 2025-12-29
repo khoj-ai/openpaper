@@ -229,13 +229,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 
 	// Handle adding a highlight from the menu
 	const handleAddHighlightFromMenu = useCallback(
-		(
-			text: string,
-			startOffset?: number,
-			endOffset?: number,
-			pageNumber?: number,
-			doAnnotate?: boolean
-		) => {
+		(text: string, doAnnotate?: boolean) => {
 			if (currentSelection) {
 				const ghostHighlight = currentSelection.makeGhostHighlight();
 				addHighlight(
