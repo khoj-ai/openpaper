@@ -96,6 +96,8 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	// When true, skip scrolling on the next activeHighlight change (e.g., when clicking directly on a highlight)
 	const blockScrollOnNextHighlight = useRef(false);
+	// Track previous scale to detect scale changes (for overlay recreation timing)
+	const prevScaleRef = useRef<number | null>(null);
 
 	// State
 	const [currentSelection, setCurrentSelection] = useState<PdfSelection | null>(null);
@@ -459,6 +461,9 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 	useEffect(() => {
 		if (!pdfReady || !pdfDocumentRef.current) return;
 
+		// Clear existing overlays (needed when scale changes so they can be recreated at new positions)
+		document.querySelectorAll(".text-match-highlight-overlay").forEach((el) => el.remove());
+
 		// Get all highlights without positions (assistant or legacy user highlights)
 		const highlightsWithoutPosition = highlights.filter(
 			(h) => !h.position && h.raw_text
@@ -526,8 +531,8 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			});
 		};
 
-		// Initialize: find pages for each highlight, then create overlays
-		const initialize = async () => {
+		// Populate page cache for highlights (needed for both immediate creation and MutationObserver)
+		const ensurePageMappings = async () => {
 			for (const highlight of highlightsWithoutPosition) {
 				const key = highlight.id || highlight.raw_text;
 				if (!highlightPageMapRef.current.has(key)) {
@@ -539,10 +544,18 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 					highlightPageMapRef.current.set(key, pages);
 				}
 			}
-			createOverlaysForAllRenderedPages();
 		};
 
-		initialize();
+		// On scale change, skip immediate overlay creation - let MutationObserver handle it
+		// after pdf.js finishes re-rendering text layers at the new scale
+		const isScaleChange = prevScaleRef.current !== null && prevScaleRef.current !== scale;
+		prevScaleRef.current = scale;
+
+		ensurePageMappings().then(() => {
+			if (!isScaleChange) {
+				createOverlaysForAllRenderedPages();
+			}
+		});
 
 		// Track pending timeouts per page to debounce rapid mutations
 		const pendingTimeouts = new Map<number, ReturnType<typeof setTimeout>>();
