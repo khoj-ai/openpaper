@@ -145,6 +145,26 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		}
 	}, [scale]);
 
+	// Re-apply scale after container resizes to override the library's stale ResizeObserver
+	// (the library's ResizeObserver captures a stale pdfScaleValue due to missing dependency)
+	useEffect(() => {
+		const container = containerRef.current;
+		if (!container) return;
+
+		const resizeObserver = new ResizeObserver(() => {
+			// Use setTimeout to ensure our scale setting comes after the library's
+			setTimeout(() => {
+				const viewer = highlighterUtilsRef.current?.getViewer();
+				if (viewer && viewer.currentScaleValue !== String(scale)) {
+					viewer.currentScaleValue = String(scale);
+				}
+			}, 0);
+		});
+
+		resizeObserver.observe(container);
+		return () => resizeObserver.disconnect();
+	}, [scale]);
+
 	// Page navigation
 	const goToPreviousPage = useCallback(() => {
 		if (currentPage > 1) {
