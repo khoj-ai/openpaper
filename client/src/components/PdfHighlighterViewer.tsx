@@ -566,16 +566,19 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			}
 		};
 
-		// On scale change, skip immediate overlay creation - let MutationObserver handle it
-		// after pdf.js finishes re-rendering text layers at the new scale
+		// Track if this is a scale change for delayed overlay creation
 		const isScaleChange = prevScaleRef.current !== null && prevScaleRef.current !== scale;
 		prevScaleRef.current = scale;
 
-		ensurePageMappings().then(() => {
-			if (!isScaleChange) {
+		// On scale change, delay overlay creation to let pdf.js apply CSS transforms
+		// On initial load or highlight changes, create immediately
+		const creationDelay = isScaleChange ? 50 : 0;
+
+		const timeoutId = setTimeout(() => {
+			ensurePageMappings().then(() => {
 				createOverlaysForAllRenderedPages();
-			}
-		});
+			});
+		}, creationDelay);
 
 		// Track pending timeouts per page to debounce rapid mutations
 		const pendingTimeouts = new Map<number, ReturnType<typeof setTimeout>>();
@@ -638,6 +641,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 
 		return () => {
 			observer.disconnect();
+			clearTimeout(timeoutId);
 			// Clear any pending timeouts
 			pendingTimeouts.forEach((timeout) => clearTimeout(timeout));
 			pendingTimeouts.clear();
