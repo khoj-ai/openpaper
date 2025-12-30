@@ -179,7 +179,7 @@ export default function PricingPage() {
                         Research Plans
                     </h1>
                     <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed">
-                        Choose the plan that fits your research workflow. All plans include unlimited annotations and comprehensive note-taking capabilities.
+                        Choose the plan that fits your research workflow.
                     </p>
                 </div>
             </div>
