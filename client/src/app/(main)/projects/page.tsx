@@ -6,7 +6,7 @@ import { ProjectCard } from "@/components/ProjectCard";
 import { Button } from "@/components/ui/button";
 import { Project } from "@/lib/schema";
 import { fetchFromApi } from "@/lib/api";
-import { PlusCircle, FolderOpen, Target, BookOpen, FileText, AlertTriangle, Search, Headphones, MessageCircle, Table, Users, X, Plus } from "lucide-react";
+import { PlusCircle, Target, BookOpen, FileText, AlertTriangle, Search, Headphones, MessageCircle, Table, Users, X, Plus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useSubscription, isProjectNearLimit, isProjectAtLimit, getProjectUsagePercentage } from "@/hooks/useSubscription";
@@ -126,94 +126,63 @@ function ProjectsPage() {
 		}
 	}, [atProjectLimit, nearProjectLimit, subscription, router]);
 
-	// Enhanced empty state component
+	// Empty state component
 	const EmptyState = () => (
-		<div className="flex flex-col items-center justify-center py-16 px-4 text-center max-w-3xl mx-auto">
-			{/* Floating Icon Group */}
-			<div className="relative mb-8">
-				<div className="relative w-32 h-32 mx-auto">
-					{/* Background gradient circle */}
-					<div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-primary/5 to-transparent rounded-full blur-2xl" />
-
-					{/* Main icon container */}
-					<div className="relative w-full h-full bg-gradient-to-br from-blue-500/5 to-primary/10 dark:from-blue-500/10 dark:to-primary/20 rounded-2xl flex items-center justify-center border border-blue-500/10 shadow-sm">
-						<FolderOpen className="w-14 h-14 text-primary" strokeWidth={1.5} />
-					</div>
-
-					{/* Floating accent icons */}
-					<div className="absolute -top-2 -right-2 w-12 h-12 bg-background dark:bg-card rounded-xl flex items-center justify-center border border-blue-500/20 shadow-md">
-						<Target className="w-6 h-6 text-blue-500" strokeWidth={2} />
-					</div>
-					<div className="absolute -bottom-1 -left-2 w-10 h-10 bg-background dark:bg-card rounded-lg flex items-center justify-center border border-border shadow-md">
-						<FileText className="w-5 h-5 text-muted-foreground" strokeWidth={2} />
-					</div>
-				</div>
-			</div>
-
-			<h2 className="text-3xl font-bold text-foreground mb-3">
-				Ready to organize your research?
+		<div className="flex flex-col items-center justify-center py-16 px-4 text-center max-w-2xl mx-auto min-h-[60vh]">
+			<h2 className="text-2xl font-bold text-foreground mb-3">
+				Organize Your Research
 			</h2>
-
-			<p className="text-muted-foreground text-lg mb-10 leading-relaxed max-w-xl">
-				Projects help you organize your library, get targeted AI assistance, and keep your research focused.
+			<p className="text-muted-foreground mb-8 max-w-md">
+				Group papers by topic, get focused AI assistance, and streamline your literature reviews.
 			</p>
 
-			{/* Feature cards */}
-			<div className="grid sm:grid-cols-3 gap-4 mb-10 w-full max-w-2xl">
-				<div className="group flex flex-col items-center p-6 bg-card border border-border rounded-xl hover:shadow-md hover:border-primary/20 transition-all duration-200">
-					<div className="w-12 h-12 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-						<Target className="w-6 h-6 text-primary" strokeWidth={2} />
-					</div>
-					<h3 className="font-semibold text-sm text-foreground mb-2">Stay Focused</h3>
-					<p className="text-xs text-muted-foreground leading-relaxed">Organize resources by topic or goal</p>
-				</div>
-
-				<div className="group flex flex-col items-center p-6 bg-card border border-border rounded-xl hover:shadow-md hover:border-primary/20 transition-all duration-200">
-					<div className="w-12 h-12 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-						<BookOpen className="w-6 h-6 text-primary" strokeWidth={2} />
-					</div>
-					<h3 className="font-semibold text-sm text-foreground mb-2">Smart AI Help</h3>
-					<p className="text-xs text-muted-foreground leading-relaxed">Get context-aware assistance</p>
-				</div>
-
-				<div className="group flex flex-col items-center p-6 bg-card border border-border rounded-xl hover:shadow-md hover:border-primary/20 transition-all duration-200">
-					<div className="w-12 h-12 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-						<FileText className="w-6 h-6 text-primary" strokeWidth={2} />
-					</div>
-					<h3 className="font-semibold text-sm text-foreground mb-2">Collate Research</h3>
-					<p className="text-xs text-muted-foreground leading-relaxed">Streamline literature reviews</p>
-				</div>
-			</div>
-
 			{/* CTA buttons */}
-			<div className="flex flex-col sm:flex-row gap-3">
+			<div className="flex flex-col sm:flex-row gap-3 mb-12">
 				{atProjectLimit ? (
 					<Button
 						size="lg"
-						className="px-8 shadow-sm"
+						className="bg-primary hover:bg-primary/90"
 						disabled
 					>
-						<PlusCircle className="mr-2 w-5 h-5" />
-						Create Your First Project
+						<PlusCircle className="mr-2 h-4 w-4" />
+						Create your first project
 					</Button>
 				) : (
 					<Button
 						asChild
 						size="lg"
-						className="px-8 shadow-sm"
+						className="bg-primary hover:bg-primary/90"
 					>
 						<Link href="/projects/create">
-							<PlusCircle className="mr-2 w-5 h-5" />
-							Create Your First Project
+							<PlusCircle className="mr-2 h-4 w-4" />
+							Create your first project
 						</Link>
 					</Button>
 				)}
-				<Button variant="outline" size="lg" className="px-8" asChild>
+				<Button variant="outline" size="lg" asChild>
 					<Link href="/blog/projects">
-						<BookOpen className="mr-2 w-4 h-4" />
-						Learn More
+						Learn more
 					</Link>
 				</Button>
+			</div>
+
+			{/* Feature highlights */}
+			<div className="flex items-center justify-center gap-8 text-blue-500">
+				<div className="flex flex-col items-center gap-1 max-w-24">
+					<Target className="h-5 w-5" />
+					<span className="text-xs font-medium text-foreground">Focus</span>
+					<span className="text-xs text-muted-foreground text-center">Organize by topic or goal</span>
+				</div>
+				<div className="flex flex-col items-center gap-1 max-w-24">
+					<BookOpen className="h-5 w-5" />
+					<span className="text-xs font-medium text-foreground">AI Chat</span>
+					<span className="text-xs text-muted-foreground text-center">Context-aware assistance</span>
+				</div>
+				<div className="flex flex-col items-center gap-1 max-w-24">
+					<FileText className="h-5 w-5" />
+					<span className="text-xs font-medium text-foreground">Research</span>
+					<span className="text-xs text-muted-foreground text-center">Streamline lit reviews</span>
+				</div>
 			</div>
 		</div>
 	);
