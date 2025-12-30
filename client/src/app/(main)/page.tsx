@@ -353,10 +353,14 @@ export default function Home() {
 
 						{/* Two Column Layout for Projects and Papers */}
 						<div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-							{/* Projects Section */}
-							<section>
-								<ProjectsPreview limit={4} />
-							</section>
+							{
+								projects.length > 0 && (
+									<section>
+										{/* Projects Section */}
+										<ProjectsPreview limit={4} />
+									</section>
+								)
+							}
 
 							{/* Recent Papers Section */}
 							<section>
