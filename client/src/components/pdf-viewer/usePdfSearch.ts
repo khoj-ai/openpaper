@@ -491,6 +491,10 @@ export function usePdfSearch({
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
 			if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+				// If search input is already focused, allow browser's default find
+				if (document.activeElement === searchInputRef.current) {
+					return;
+				}
 				e.preventDefault();
 				setShowSearchInput(true);
 				setTimeout(() => searchInputRef.current?.focus(), 0);
