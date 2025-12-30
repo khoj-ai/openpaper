@@ -371,6 +371,17 @@ export default function Home() {
 			<footer className="mt-auto border-t border-border/40">
 				<div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 					<div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
+						<p>
+							Made by{" "}
+							<a
+								href="https://khoj.dev"
+								target="_blank"
+								rel="noopener noreferrer"
+								className="underline hover:text-foreground transition-colors"
+							>
+								Khoj Inc.
+							</a>
+						</p>
 						<div className="flex items-center gap-4">
 							<Link href="/blog/manifesto" className="hover:text-foreground transition-colors">
 								Manifesto

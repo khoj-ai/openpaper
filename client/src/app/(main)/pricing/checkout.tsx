@@ -70,7 +70,15 @@ export default function CheckoutSheet({ open, onOpenChange, interval, planName, 
                         {planName && ` - ${planName}`}
                     </SheetTitle>
                     <SheetDescription>
-                        You will be billed {interval === 'month' ? 'monthly' : 'annually'}.
+                        You will be billed {interval === 'month' ? 'monthly' : 'annually'} by{" "}
+                        <a
+                            href="https://khoj.dev"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline hover:text-foreground transition-colors"
+                        >
+                            Khoj Inc.
+                        </a>
                         {interval === 'year' ? ` You are saving $${annualSavings} with annual billing!` : ` Save $${annualSavings} with annual billing!`}
                         {isResubscription && " Your subscription will be reactivated immediately upon successful payment."}
                     </SheetDescription>

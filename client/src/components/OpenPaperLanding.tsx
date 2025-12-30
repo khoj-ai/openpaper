@@ -710,6 +710,15 @@ export default function OpenPaperLanding() {
                     >
                         San Francisco
                     </a>
+                    {" "}by{" "}
+                    <a
+                        href="https://khoj.dev"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline hover:text-foreground transition-colors"
+                    >
+                        Khoj Inc.
+                    </a>
                 </p>
                 <nav className="sm:ml-auto flex flex-wrap justify-center sm:justify-end gap-4 sm:gap-6">
                     <Link href="/privacy" className="text-xs hover:underline underline-offset-4 text-muted-foreground hover:text-primary">
