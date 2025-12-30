@@ -657,6 +657,7 @@ class Highlight(Base):
     # This can be user for user-created highlights or assistant for AI-generated highlights
     role = Column(String, nullable=False, default="user")  # 'user' or 'assistant'
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    color = Column(String, nullable=True, default="blue")
 
     # Relationships
     user = relationship("User", back_populates="highlights")

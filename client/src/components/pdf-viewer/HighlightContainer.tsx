@@ -7,6 +7,16 @@ import {
 } from "react-pdf-highlighter-extended";
 import type { ViewportHighlight } from "react-pdf-highlighter-extended";
 import { ExtendedHighlight } from "./types";
+import { HighlightColor } from "@/lib/schema";
+
+// Map highlight color names to rgba values
+const HIGHLIGHT_COLOR_MAP: Record<HighlightColor, string> = {
+	yellow: "rgba(255, 235, 59, 0.4)",
+	green: "rgba(76, 175, 80, 0.4)",
+	blue: "rgba(66, 165, 245, 0.4)",
+	pink: "rgba(236, 64, 122, 0.4)",
+	purple: "rgba(171, 71, 188, 0.4)",
+};
 
 interface HighlightContainerProps {
 	onHighlightClick: (highlight: ViewportHighlight<ExtendedHighlight>, event: MouseEvent) => void;
@@ -23,10 +33,11 @@ export function HighlightContainer({ onHighlightClick }: HighlightContainerProps
 		onHighlightClick(highlight, event.nativeEvent);
 	};
 
+	// Determine highlight color: assistant highlights use purple, user highlights use their selected color
 	const highlightColor =
 		highlight.role === "assistant"
 			? "rgba(168, 85, 247, 0.3)" // purple for AI highlights
-			: "rgba(59, 130, 246, 0.2)"; // blue for user highlights
+			: HIGHLIGHT_COLOR_MAP[highlight.color || "blue"]; // user's selected color, default to blue
 
 	if (isTextHighlight) {
 		return (

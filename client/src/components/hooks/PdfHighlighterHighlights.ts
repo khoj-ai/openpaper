@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { PaperHighlight, ScaledPosition } from "@/lib/schema";
+import { PaperHighlight, ScaledPosition, HighlightColor } from "@/lib/schema";
 import { fetchFromApi } from "@/lib/api";
 
 export function useHighlighterHighlights(
@@ -80,6 +80,7 @@ export function useHighlighterHighlights(
 			page_number: highlight.page_number,
 			position: highlight.position,
 			role: highlight.role || "user",
+			color: highlight.color,
 		};
 
 		try {
@@ -120,7 +121,8 @@ export function useHighlighterHighlights(
 			selectedText: string,
 			position?: ScaledPosition,
 			pageNumber?: number,
-			doAnnotate?: boolean
+			doAnnotate?: boolean,
+			color?: HighlightColor
 		) => {
 			if (!position) {
 				console.error("Position is required for highlights");
@@ -132,6 +134,7 @@ export function useHighlighterHighlights(
 				role: "user",
 				page_number: pageNumber || position.boundingRect.pageNumber,
 				position: position,
+				color: color,
 			};
 
 			try {

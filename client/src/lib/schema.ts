@@ -52,6 +52,8 @@ export interface ScaledPosition {
     usePdfCoordinates?: boolean;
 }
 
+export type HighlightColor = 'yellow' | 'green' | 'blue' | 'pink' | 'purple';
+
 export interface PaperHighlight {
     id?: string;
     raw_text: string;
@@ -61,6 +63,7 @@ export interface PaperHighlight {
     page_number?: number;
     type?: HighlightType;
     position?: ScaledPosition;
+    color?: HighlightColor;
 }
 
 export interface PaperHighlightAnnotation {

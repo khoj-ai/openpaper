@@ -12,6 +12,7 @@ import {
 	ChevronDown,
 	Search,
 	X,
+	Highlighter,
 } from "lucide-react";
 import {
 	DropdownMenu,
@@ -20,6 +21,16 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getStatusIcon, PaperStatus } from "@/components/utils/PdfStatus";
+import { HighlightColor } from "@/lib/schema";
+
+// Color configuration for highlights
+const HIGHLIGHT_COLORS: { color: HighlightColor; bg: string; label: string }[] = [
+	{ color: "yellow", bg: "bg-yellow-300", label: "Yellow" },
+	{ color: "green", bg: "bg-green-400", label: "Green" },
+	{ color: "blue", bg: "bg-blue-400", label: "Blue" },
+	{ color: "pink", bg: "bg-pink-400", label: "Pink" },
+	{ color: "purple", bg: "bg-purple-400", label: "Purple" },
+];
 
 interface PdfToolbarProps {
 	// Page navigation
@@ -51,6 +62,10 @@ interface PdfToolbarProps {
 	// Status
 	paperStatus?: PaperStatus;
 	handleStatusChange?: (status: PaperStatus) => void;
+
+	// Highlight color
+	highlightColor: HighlightColor;
+	setHighlightColor: (color: HighlightColor) => void;
 }
 
 export function PdfToolbar({
@@ -76,7 +91,10 @@ export function PdfToolbar({
 	zoomOut,
 	paperStatus,
 	handleStatusChange = () => { },
+	highlightColor,
+	setHighlightColor,
 }: PdfToolbarProps) {
+	const currentColorConfig = HIGHLIGHT_COLORS.find((c) => c.color === highlightColor) || HIGHLIGHT_COLORS[2];
 	return (
 		<div className="sticky top-0 z-10 flex items-center bg-white/80 dark:bg-black/80 backdrop-blur-sm px-3 py-2 w-full border-b border-gray-300">
 			{/* Left section: Page navigation */}
@@ -185,6 +203,40 @@ export function PdfToolbar({
 					</Button>
 				)}
 			</div>
+
+			{/* Separator */}
+			<div className="h-5 w-px bg-gray-300 mx-3" />
+
+			{/* Highlight color picker */}
+			<DropdownMenu>
+				<DropdownMenuTrigger asChild>
+					<Button
+						size="sm"
+						variant="ghost"
+						className="h-8 px-2 gap-1.5"
+						title="Highlight color"
+					>
+						<Highlighter size={16} />
+						<div
+							className={`w-3 h-3 rounded-sm ${currentColorConfig.bg}`}
+						/>
+					</Button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="start" className="min-w-0">
+					<div className="flex gap-1 p-1">
+						{HIGHLIGHT_COLORS.map(({ color, bg }) => (
+							<button
+								key={color}
+								onClick={() => setHighlightColor(color)}
+								className={`w-6 h-6 rounded-sm ${bg} hover:scale-110 transition-transform ${
+									highlightColor === color ? "ring-2 ring-offset-1 ring-gray-400" : ""
+								}`}
+								title={color}
+							/>
+						))}
+					</div>
+				</DropdownMenuContent>
+			</DropdownMenu>
 
 			{/* Spacer */}
 			<div className="flex-1" />

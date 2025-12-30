@@ -17,6 +17,7 @@ class HighlightBase(BaseModel):
     role: Optional[str] = None
     type: Optional[str] = None  # HighlightType enum value
     position: Optional[dict[str, Any]] = None  # ScaledPosition JSON
+    color: Optional[str] = None  # Highlight color: yellow, green, blue, pink, purple
 
 
 class HighlightCreate(HighlightBase):

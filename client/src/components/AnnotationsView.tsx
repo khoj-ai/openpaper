@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import {
 	PaperHighlight,
 	PaperHighlightAnnotation,
+	HighlightColor,
 } from '@/lib/schema';
 
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,15 @@ import { BasicUser } from "@/lib/auth";
 import { User as UserIcon } from 'lucide-react';
 import { smoothScrollTo } from '@/lib/animation';
 import Annotation from './Annotation';
+
+// Map highlight color names to Tailwind border classes
+const HIGHLIGHT_BORDER_COLOR_MAP: Record<HighlightColor, string> = {
+	yellow: "border-yellow-400",
+	green: "border-green-500",
+	blue: "border-blue-400",
+	pink: "border-pink-400",
+	purple: "border-purple-400",
+};
 
 // Function to get badge styling based on highlight type
 function getHighlightTypeStyling(type: string) {
@@ -125,7 +135,9 @@ function HighlightThread({
 	readonly
 }: HighlightThreadProps) {
 
-	const highlightBorderColor = highlight.role === 'assistant' ? 'border-blue-500' : 'border-blue-200 dark:border-blue-800';
+	const highlightBorderColor = highlight.role === 'assistant'
+		? 'border-purple-500'
+		: HIGHLIGHT_BORDER_COLOR_MAP[highlight.color || 'blue'];
 	const activeBgColor = isActive ? 'bg-secondary' : 'hover:bg-secondary/50';
 
 	return (

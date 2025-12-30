@@ -18,7 +18,17 @@ import {
 	PaperHighlight,
 	PaperHighlightAnnotation,
 	ScaledPosition,
+	HighlightColor,
 } from "@/lib/schema";
+
+// Map highlight color names to rgba values (shared with HighlightContainer)
+const HIGHLIGHT_COLOR_MAP: Record<HighlightColor, string> = {
+	yellow: "rgba(255, 235, 59, 0.4)",
+	green: "rgba(76, 175, 80, 0.4)",
+	blue: "rgba(66, 165, 245, 0.4)",
+	pink: "rgba(236, 64, 122, 0.4)",
+	purple: "rgba(171, 71, 188, 0.4)",
+};
 import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience";
 import { PaperStatus } from "./utils/PdfStatus";
 import InlineAnnotationMenu from "./InlineAnnotationMenu";
@@ -56,7 +66,8 @@ interface PdfHighlighterViewerProps {
 		selectedText: string,
 		position?: ScaledPosition,
 		pageNumber?: number,
-		doAnnotate?: boolean
+		doAnnotate?: boolean,
+		color?: HighlightColor
 	) => void;
 	removeHighlight: (highlight: PaperHighlight) => void;
 	loadHighlights: () => Promise<void>;
@@ -107,6 +118,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 	const [numPages, setNumPages] = useState<number | null>(null);
 	const [showScrollToTop] = useState(false);
 	const [pdfReady, setPdfReady] = useState(false);
+	const [highlightColor, setHighlightColor] = useState<HighlightColor>("blue");
 
 	// Search hook
 	const search = usePdfSearch({
@@ -231,19 +243,25 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 	const handleAddHighlightFromMenu = useCallback(
 		(text: string, doAnnotate?: boolean) => {
 			if (currentSelection) {
+				// Block scroll-to-highlight since we're creating a new one at the current location
+				blockScrollOnNextHighlight.current = true;
+				// Clear active highlight to prevent scroll back when highlights array updates
+				setActiveHighlight(null);
+
 				const ghostHighlight = currentSelection.makeGhostHighlight();
 				addHighlight(
 					text,
 					ghostHighlight.position as ScaledPosition,
 					ghostHighlight.position.boundingRect.pageNumber,
-					doAnnotate
+					doAnnotate,
+					highlightColor
 				);
 				setCurrentSelection(null);
 				setSelectedText("");
 				setTooltipPosition(null);
 			}
 		},
-		[currentSelection, addHighlight, setSelectedText, setTooltipPosition]
+		[currentSelection, addHighlight, setSelectedText, setTooltipPosition, highlightColor, setActiveHighlight]
 	);
 
 	// Handle highlight click
@@ -503,10 +521,10 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 				);
 				if (existingOverlay) continue;
 
-				// Use different colors based on role
+				// Use different colors based on role and user's color selection
 				const backgroundColor = highlight.role === "assistant"
 					? "rgba(168, 85, 247, 0.3)"  // Purple for assistant
-					: "rgba(59, 130, 246, 0.3)"; // Blue for user
+					: HIGHLIGHT_COLOR_MAP[highlight.color || "blue"]; // User's selected color
 
 				const overlays = createTextHighlightOverlays(
 					textLayer,
@@ -672,6 +690,8 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 				zoomOut={zoomOut}
 				paperStatus={paperStatus}
 				handleStatusChange={handleStatusChange}
+				highlightColor={highlightColor}
+				setHighlightColor={setHighlightColor}
 			/>
 
 			{/* PDF Viewer */}

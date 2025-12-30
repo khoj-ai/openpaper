@@ -27,6 +27,7 @@ class CreateHighlightRequest(BaseModel):
     paper_id: str
     raw_text: str
     position: Optional[dict[str, Any]] = None  # ScaledPosition JSON
+    color: Optional[str] = None  # Highlight color: yellow, green, blue, pink, purple
     # Legacy fields - kept for backwards compatibility
     start_offset: Optional[int] = None
     end_offset: Optional[int] = None
@@ -36,6 +37,7 @@ class CreateHighlightRequest(BaseModel):
 class UpdateHighlightRequest(BaseModel):
     raw_text: str
     position: Optional[dict[str, Any]] = None  # ScaledPosition JSON
+    color: Optional[str] = None  # Highlight color: yellow, green, blue, pink, purple
     # Legacy fields - kept for backwards compatibility
     start_offset: Optional[int] = None
     end_offset: Optional[int] = None
@@ -59,6 +61,7 @@ async def create_highlight(
                 page_number=request.page_number,
                 position=request.position,
                 role=RoleType.USER,
+                color=request.color,
             ),
             user=current_user,
         )
@@ -168,6 +171,7 @@ async def update_highlight(
                 start_offset=request.start_offset,
                 end_offset=request.end_offset,
                 position=request.position,
+                color=request.color,
             ),
         )
 

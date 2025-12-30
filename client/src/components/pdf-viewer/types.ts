@@ -1,5 +1,5 @@
 import type { Highlight, Content } from "react-pdf-highlighter-extended";
-import { PaperHighlight, ScaledPosition } from "@/lib/schema";
+import { PaperHighlight, ScaledPosition, HighlightColor } from "@/lib/schema";
 
 // Extended highlight type that includes our custom properties
 export interface ExtendedHighlight extends Highlight {
@@ -7,6 +7,7 @@ export interface ExtendedHighlight extends Highlight {
 	comment?: string;
 	role?: "user" | "assistant";
 	raw_text?: string;
+	color?: HighlightColor;
 }
 
 // Convert PaperHighlight to ExtendedHighlight
@@ -22,6 +23,7 @@ export function paperHighlightToExtended(
 		content: { text: highlight.raw_text },
 		role: highlight.role,
 		raw_text: highlight.raw_text,
+		color: highlight.color,
 	};
 }
 
@@ -35,5 +37,6 @@ export function extendedToPaperHighlight(
 		role: highlight.role || "user",
 		page_number: highlight.position.boundingRect.pageNumber,
 		position: highlight.position as ScaledPosition,
+		color: highlight.color,
 	};
 }
