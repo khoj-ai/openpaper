@@ -344,9 +344,15 @@ export function HomeSearch() {
                                                 {hasMatches && isExpanded && (
                                                     <div className="ml-10 mr-3 mb-2 space-y-2">
                                                         {matchingHighlights.slice(0, 3).map((highlight) => (
-                                                            <div
+                                                            <button
                                                                 key={highlight.id}
-                                                                className="p-2 text-sm border-l-2 border-yellow-400 bg-yellow-50/50 dark:bg-yellow-950/20 rounded-r"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setIsOpen(false);
+                                                                    setQuery("");
+                                                                    router.push(`/paper/${paper.id}?rsf=annotations`);
+                                                                }}
+                                                                className="w-full p-2 text-sm border-l-2 border-yellow-400 bg-yellow-50/50 dark:bg-yellow-950/20 rounded-r text-left hover:bg-yellow-100 dark:hover:bg-yellow-900/30 transition-colors"
                                                             >
                                                                 <div className="flex items-start gap-2">
                                                                     <Highlighter className="h-3 w-3 text-yellow-600 mt-0.5 flex-shrink-0" />
@@ -359,7 +365,7 @@ export function HomeSearch() {
                                                                         Page {highlight.page_number}
                                                                     </p>
                                                                 )}
-                                                            </div>
+                                                            </button>
                                                         ))}
                                                         {matchingHighlights.length > 3 && (
                                                             <p className="text-xs text-muted-foreground ml-5">
