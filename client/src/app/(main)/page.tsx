@@ -303,8 +303,12 @@ export default function Home() {
 		return null;
 	}
 
-	if (!user && !authLoading) {
+	if (!user) {
 		router.push('/home');
+		return null;
+	}
+
+	if (isLoadingData) {
 		return null;
 	}
 
