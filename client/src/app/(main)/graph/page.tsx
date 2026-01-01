@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Search, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, ChevronRight, SquareLibrary, ExternalLink, Loader2, User, History } from "lucide-react";
 import { fetchFromApi } from "@/lib/api";
 import { OpenAlexPaper, OpenAlexMatchResponse, OpenAlexResponse } from "@/lib/schema";
+import { CitationGraphSkeleton } from "./CitationGraphSkeleton";
 
 type ViewMode = "paper" | "author";
 
@@ -347,12 +348,7 @@ function CitationGraphContent() {
 
             <main className="max-w-5xl mx-auto p-4">
                 {/* Loading State */}
-                {loading && (
-                    <div className="flex flex-col items-center justify-center py-20 gap-4">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                        <span className="text-muted-foreground">Fetching data...</span>
-                    </div>
-                )}
+                {loading && <CitationGraphSkeleton />}
 
                 {/* Error State */}
                 {error && !loading && (
