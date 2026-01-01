@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import time
 from enum import Enum
 from typing import List, Optional
 from urllib.parse import quote, unquote
@@ -10,6 +11,56 @@ from app.schemas.paper import EnrichedData
 from pydantic import BaseModel, ConfigDict, model_validator
 
 logger = logging.getLogger(__name__)
+
+OPENALEX_MAX_RETRIES = 3
+OPENALEX_RETRY_DELAY = 1  # seconds
+
+
+def _request_with_retry(
+    url: str,
+    method: str = "GET",
+    max_retries: int = OPENALEX_MAX_RETRIES,
+    retry_delay: float = OPENALEX_RETRY_DELAY,
+    timeout: int = 10,
+) -> requests.Response:
+    """
+    Make an HTTP request with automatic retry on failure.
+
+    Args:
+        url: The URL to request.
+        method: HTTP method (GET, POST, etc.).
+        max_retries: Maximum number of retry attempts.
+        retry_delay: Delay between retries in seconds.
+        timeout: Request timeout in seconds.
+
+    Returns:
+        requests.Response: The response object.
+
+    Raises:
+        requests.RequestException: If all retries fail.
+    """
+    last_exception = None
+
+    for attempt in range(max_retries):
+        try:
+            response = requests.request(method, url, timeout=timeout)
+            response.raise_for_status()
+            return response
+        except requests.RequestException as e:
+            last_exception = e
+            if attempt < max_retries - 1:
+                logger.warning(
+                    f"OpenAlex API request failed (attempt {attempt + 1}/{max_retries}): {e}. "
+                    f"Retrying in {retry_delay}s..."
+                )
+                time.sleep(retry_delay)
+            else:
+                logger.error(
+                    f"OpenAlex API request failed after {max_retries} attempts: {e}"
+                )
+
+    raise last_exception  # type: ignore
+
 
 SEMANTIC_SCHOLAR_API_KEY = os.getenv("SEMANTIC_SCHOLAR_API_KEY")
 
@@ -223,9 +274,7 @@ def search_open_alex(
 
     logger.debug(f"Constructed URL: {constructed_url}")
 
-    # Add a timeout to the request
-    response = requests.get(constructed_url, timeout=10)
-    response.raise_for_status()  # Raise an error for bad responses
+    response = _request_with_retry(constructed_url)
 
     logger.info(f"Response Status: {response.status_code}")
     logger.debug(f"Response JSON: {response.json()}")
@@ -264,18 +313,26 @@ def get_host_organization_name(host_organization_url: str) -> Optional[str]:
         return None
 
     url = f"https://api.openalex.org/{entity_type}/{org_id}"
-    try:
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            return data.get("display_name")
-        elif response.status_code == 404:
-            return None
-        else:
-            response.raise_for_status()
-    except requests.RequestException:
-        logger.exception(f"Error fetching host organization: {url}")
-        return None
+    for attempt in range(OPENALEX_MAX_RETRIES):
+        try:
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("display_name")
+            elif response.status_code == 404:
+                return None
+            else:
+                response.raise_for_status()
+        except requests.RequestException as e:
+            if attempt < OPENALEX_MAX_RETRIES - 1:
+                logger.warning(
+                    f"Error fetching host organization (attempt {attempt + 1}): {e}. Retrying..."
+                )
+                time.sleep(OPENALEX_RETRY_DELAY)
+            else:
+                logger.exception(f"Error fetching host organization: {url}")
+                return None
+    return None
 
 
 def build_abstract_from_inverted_index(inverted_index: dict) -> str:
@@ -309,13 +366,24 @@ def get_paper_by_open_alex_id(open_alex_id: str) -> Optional[OpenAlexWork]:
         Optional[OpenAlexWork]: The OpenAlexWork object if found, otherwise None.
     """
     url = f"https://api.openalex.org/works/{quote(open_alex_id)}"
-    response = requests.get(url, timeout=10)
-    if response.status_code == 200:
-        return OpenAlexWork(**response.json())
-    elif response.status_code == 404:
-        return None
-    else:
-        response.raise_for_status()
+    for attempt in range(OPENALEX_MAX_RETRIES):
+        try:
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                return OpenAlexWork(**response.json())
+            elif response.status_code == 404:
+                return None
+            else:
+                response.raise_for_status()
+        except requests.RequestException as e:
+            if attempt < OPENALEX_MAX_RETRIES - 1:
+                logger.warning(
+                    f"Error fetching paper by OpenAlex ID (attempt {attempt + 1}): {e}. Retrying..."
+                )
+                time.sleep(OPENALEX_RETRY_DELAY)
+            else:
+                raise
+    return None
 
 
 def get_work_by_doi(doi: str) -> Optional[OpenAlexWork]:
@@ -338,13 +406,24 @@ def get_work_by_doi(doi: str) -> Optional[OpenAlexWork]:
         doi = f"https://doi.org/{doi}"
 
     url = f"https://api.openalex.org/works/{doi}"
-    response = requests.get(url, timeout=10)
-    if response.status_code == 200:
-        return OpenAlexWork(**response.json())
-    elif response.status_code == 404:
-        return None
-    else:
-        response.raise_for_status()
+    for attempt in range(OPENALEX_MAX_RETRIES):
+        try:
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                return OpenAlexWork(**response.json())
+            elif response.status_code == 404:
+                return None
+            else:
+                response.raise_for_status()
+        except requests.RequestException as e:
+            if attempt < OPENALEX_MAX_RETRIES - 1:
+                logger.warning(
+                    f"Error fetching work by DOI (attempt {attempt + 1}): {e}. Retrying..."
+                )
+                time.sleep(OPENALEX_RETRY_DELAY)
+            else:
+                raise
+    return None
 
 
 def construct_citation_graph(open_alex_id: str) -> OpenAlexCitationGraph:
@@ -362,14 +441,11 @@ def construct_citation_graph(open_alex_id: str) -> OpenAlexCitationGraph:
         raise ValueError(f"Paper with OpenAlex ID {open_alex_id} not found.")
 
     # Construct the citation graph
-
     cites_url = f"https://api.openalex.org/works?filter=cites:{quote(open_alex_id)}&page=1&per_page=20"
-    cites_response = requests.get(cites_url, timeout=10)
-    cites_response.raise_for_status()
+    cites_response = _request_with_retry(cites_url)
 
     cited_by_url = f"https://api.openalex.org/works?filter=cited_by:{quote(open_alex_id)}&page=1&per_page=20"
-    cited_by_response = requests.get(cited_by_url, timeout=10)
-    cited_by_response.raise_for_status()
+    cited_by_response = _request_with_retry(cited_by_url)
 
     cites_data = cites_response.json()
     cited_by_data = cited_by_response.json()
