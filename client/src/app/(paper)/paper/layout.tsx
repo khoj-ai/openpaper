@@ -10,6 +10,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { PostHogProvider, ThemeProvider } from "@/lib/providers";
 import { SharePaperButton } from '@/components/SharePaperButton';
 import { CitePaperButton } from '@/components/CitePaperButton';
+import { CitationGraphButton } from '@/components/CitationGraphButton';
 
 import { SidebarController } from "@/components/utils/SidebarAutoCollapse";
 import Image from "next/image";
@@ -102,6 +103,7 @@ export default function RootLayout({
 									{/* Desktop buttons */}
 									<div className="hidden md:flex items-center gap-2">
 										<ManageProjectsButton />
+										<CitationGraphButton />
 										<CitePaperButton />
 										<SharePaperButton />
 									</div>

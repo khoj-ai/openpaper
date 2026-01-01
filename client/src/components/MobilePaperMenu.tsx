@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/sheet';
 import { SharePaperButton } from '@/components/SharePaperButton';
 import { CitePaperButton } from '@/components/CitePaperButton';
+import { CitationGraphButton } from '@/components/CitationGraphButton';
 import { ManageProjectsButton } from '@/components/ManageProjectsButton';
 
 export function MobilePaperMenu() {
@@ -32,6 +33,9 @@ export function MobilePaperMenu() {
                     </SheetHeader>
                     <div className="m-0">
                         {/* Mobile-styled buttons that take full width and are left-aligned */}
+                        <div className="w-full [&>*]:w-full [&>*>button]:w-full [&>*>button]:justify-start [&>*>button]:text-left [&>*>button]:px-4 [&>*>button]:py-3 [&>*>button]:h-auto [&>*>button]:flex [&>*>button]:items-center [&>*>a]:w-full [&>*>a]:justify-start [&>*>a]:text-left [&>*>a]:px-4 [&>*>a]:py-3 [&>*>a]:h-auto [&>*>a]:flex [&>*>a]:items-center">
+                            <CitationGraphButton />
+                        </div>
                         <div className="w-full [&>*]:w-full [&>*>button]:w-full [&>*>button]:justify-start [&>*>button]:text-left [&>*>button]:px-4 [&>*>button]:py-3 [&>*>button]:h-auto [&>*>button]:flex [&>*>button]:items-center">
                             <CitePaperButton />
                         </div>
