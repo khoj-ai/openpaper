@@ -65,7 +65,6 @@ class PaperUpdate(PaperBase):
     presigned_url_expires_at: Optional[datetime] = None
     preview_url: Optional[str] = None
     raw_content: Optional[str] = None
-    open_alex_id: Optional[str] = None
     doi: Optional[str] = None
     size_in_kb: Optional[int] = None
     journal: Optional[str] = None
