@@ -113,6 +113,14 @@ async def get_paper_graph(
             paper_crud.update(db=db, db_obj=paper, obj_in=update_data)
 
         graph = construct_citation_graph(work.id)
+        track_event(
+            "citation_graph_view",
+            user_id=current_user.id,
+            properties={
+                "cited_by_count": graph.cited_by.meta.get("count", 0),
+                "cites_count": graph.cites.meta.get("count", 0),
+            },
+        )
         return Response(content=graph.model_dump_json(), media_type="application/json")
     except HTTPException:
         raise
@@ -137,6 +145,15 @@ async def get_author_works(
     try:
         author_filter = OpenAlexFilter(authors=[author_id])
         results = search_open_alex(search_term=None, filter=author_filter, page=page)
+        track_event(
+            "author_works_view",
+            user_id=current_user.id,
+            properties={
+                "page": page,
+                "results_count": len(results.results),
+                "total_count": results.meta.get("count", 0),
+            },
+        )
         return Response(
             content=results.model_dump_json(), media_type="application/json"
         )
