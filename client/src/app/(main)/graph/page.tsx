@@ -38,6 +38,7 @@ function CitationGraphContent() {
     const [historyIndex, setHistoryIndex] = useState(-1);
     const [initializedFromUrl, setInitializedFromUrl] = useState(false);
     const [historyExpanded, setHistoryExpanded] = useState(false);
+    const [abstractExpanded, setAbstractExpanded] = useState(false);
 
     // Initialize from URL params (only once on mount)
     useEffect(() => {
@@ -79,6 +80,7 @@ function CitationGraphContent() {
         setViewMode("paper");
         setAuthorData(null);
         setCurrentAuthor(null);
+        setAbstractExpanded(false);
 
         try {
             const response: OpenAlexMatchResponse = await fetchFromApi(
@@ -448,64 +450,84 @@ function CitationGraphContent() {
                 {viewMode === "paper" && graphData && !loading && (
                     <div className="space-y-6">
                         {/* Current Paper Card */}
-                        <div className="bg-card border rounded-xl p-6">
-                            <div className="flex items-start gap-4">
-                                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                    <SquareLibrary className="h-6 w-6 text-primary" />
+                        <div className="bg-card border rounded-xl p-6 space-y-4">
+                            {/* Title row with icon */}
+                            <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                    <SquareLibrary className="h-5 w-5 text-primary" />
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                    <h1 className="text-xl font-semibold mb-2 leading-tight">
-                                        {graphData.center.title}
-                                    </h1>
-                                    <div className="flex flex-wrap gap-1 mb-3">
-                                        {graphData.center.authorships?.map((authorship, i) => (
-                                            <span key={authorship.author?.id || i}>
-                                                {authorship.author?.id ? (
-                                                    <button
-                                                        onClick={(e) => navigateToAuthor(
-                                                            authorship.author!.id!,
-                                                            authorship.author!.display_name || "Author",
-                                                            e
-                                                        )}
-                                                        className="text-sm text-blue-500 hover:underline"
-                                                    >
-                                                        {authorship.author?.display_name}
-                                                    </button>
-                                                ) : (
-                                                    <span className="text-sm text-muted-foreground">
-                                                        {authorship.author?.display_name}
-                                                    </span>
-                                                )}
-                                                {i < (graphData.center.authorships?.length || 0) - 1 && (
-                                                    <span className="text-muted-foreground">, </span>
-                                                )}
-                                            </span>
-                                        ))}
-                                    </div>
-                                    <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                                        {graphData.center.primary_location?.source?.display_name && (
-                                            <span className="bg-secondary px-2 py-1 rounded">
-                                                {graphData.center.primary_location.source.display_name} {graphData.center.publication_year}
-                                            </span>
-                                        )}
-                                        <span className="flex items-center gap-1">
-                                            <ChevronUp className="h-4 w-4" />
-                                            {graphData.center.cited_by_count?.toLocaleString() || 0} citations
-                                        </span>
-                                        {graphData.center.doi && (
-                                            <a
-                                                href={`https://doi.org/${graphData.center.doi}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="flex items-center gap-1 text-blue-500 hover:underline"
-                                            >
-                                                <ExternalLink className="h-3 w-3" />
-                                                DOI
-                                            </a>
-                                        )}
-                                    </div>
-                                </div>
+                                <h1 className="text-xl font-semibold leading-tight">
+                                    {graphData.center.title}
+                                </h1>
                             </div>
+
+                            {/* Authors */}
+                            <div className="flex flex-wrap gap-1">
+                                {graphData.center.authorships?.map((authorship, i) => (
+                                    <span key={authorship.author?.id || i}>
+                                        {authorship.author?.id ? (
+                                            <button
+                                                onClick={(e) => navigateToAuthor(
+                                                    authorship.author!.id!,
+                                                    authorship.author!.display_name || "Author",
+                                                    e
+                                                )}
+                                                className="text-sm text-blue-500 hover:underline"
+                                            >
+                                                {authorship.author?.display_name}
+                                            </button>
+                                        ) : (
+                                            <span className="text-sm text-muted-foreground">
+                                                {authorship.author?.display_name}
+                                            </span>
+                                        )}
+                                        {i < (graphData.center.authorships?.length || 0) - 1 && (
+                                            <span className="text-muted-foreground">, </span>
+                                        )}
+                                    </span>
+                                ))}
+                            </div>
+
+                            {/* Metadata */}
+                            <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+                                {graphData.center.primary_location?.source?.display_name && (
+                                    <span className="bg-secondary px-2 py-1 rounded">
+                                        {graphData.center.primary_location.source.display_name} {graphData.center.publication_year}
+                                    </span>
+                                )}
+                                <span className="flex items-center gap-1">
+                                    <ChevronUp className="h-4 w-4" />
+                                    {graphData.center.cited_by_count?.toLocaleString() || 0} citations
+                                </span>
+                                {graphData.center.doi && (
+                                    <a
+                                        href={`https://doi.org/${graphData.center.doi}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-1 text-blue-500 hover:underline"
+                                    >
+                                        <ExternalLink className="h-3 w-3" />
+                                        DOI
+                                    </a>
+                                )}
+                            </div>
+
+                            {/* Abstract */}
+                            {graphData.center.abstract && (
+                                <div className="text-sm text-muted-foreground">
+                                    <p className={abstractExpanded ? "" : "line-clamp-3"}>
+                                        {graphData.center.abstract}
+                                    </p>
+                                    {graphData.center.abstract.length > 300 && (
+                                        <button
+                                            onClick={() => setAbstractExpanded(!abstractExpanded)}
+                                            className="text-blue-500 hover:underline mt-1"
+                                        >
+                                            {abstractExpanded ? "Show less" : "Show more"}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         {/* Tabs */}

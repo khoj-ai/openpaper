@@ -2,6 +2,7 @@ import { OpenAlexPaper } from "@/lib/schema";
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import Link from "next/link";
 
 interface PaperResultCardProps {
     paper: OpenAlexPaper;
@@ -155,6 +156,15 @@ export default function PaperResultCard({ paper, isSelected, onSelect }: PaperRe
                     >
                         View
                     </a>
+                )}
+                {paper.doi && (
+                    <Link
+                        href={`/graph?doi=${encodeURIComponent(paper.doi)}`}
+                        className="text-blue-600 dark:text-blue-400 hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        Graph
+                    </Link>
                 )}
             </div>
         </div>
