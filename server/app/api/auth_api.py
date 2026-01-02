@@ -192,11 +192,9 @@ async def google_callback(
         user_with_different_provider = user_crud.get_by_email(db, email=user_info.email)
 
         if user_with_different_provider and not existing_user:
-            # User exists but with a different provider
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="User logged in with different method",
-            )
+            # User exists but with a different provider - redirect with specific error
+            redirect_url = f"{client_domain}/login?error=different_provider"
+            return RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
 
         # Create or update user
         user_data = UserCreateWithProvider(
@@ -313,7 +311,7 @@ async def email_signin(
             # User exists but with a different provider
             return AuthResponse(
                 success=False,
-                message="You previously used a different sign in method. Please try again.",
+                message="This email is already associated with a different sign-in method. Please use your original sign-in method.",
             )
 
         newly_created = False

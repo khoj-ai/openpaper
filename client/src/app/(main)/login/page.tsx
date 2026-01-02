@@ -52,6 +52,9 @@ function LoginContent() {
 				case 'missing_code':
 					setError('Authentication code missing. Please try again.');
 					break;
+				case 'different_provider':
+					setError('This email is already associated with a different sign-in method. Please use your original sign-in method.');
+					break;
 				default:
 					setError('An error occurred during login. Please try again.');
 			}
