@@ -1,5 +1,5 @@
 import { fetchFromApi } from '@/lib/api';
-import { Download, Clock, FileAudio, History, ChevronDown, Plus, HelpCircle, Sparkles } from 'lucide-react';
+import { Download, Clock, FileAudio, History, ChevronDown, Plus, HelpCircle } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -533,9 +533,8 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
                                     setShowGenerationForm(false);
                                 }}
                                 disabled={isLoading || isAudioOverviewAtLimit(subscription)}
-                                className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-400 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-medium text-sm shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+                                className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-400 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-medium text-sm shadow-lg hover:shadow-xl transition-all duration-200"
                             >
-                                <Sparkles className="w-4 h-4" />
                                 {isLoading ? 'Creating...' : isAudioOverviewAtLimit(subscription) ? 'Limit Reached' : 'Create'}
                             </button>
                         </div>
