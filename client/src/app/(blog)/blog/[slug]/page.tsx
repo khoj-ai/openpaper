@@ -78,6 +78,7 @@ export function generateStaticParams() {
         { slug: 'quiet_week' },
         { slug: 'data_tables' },
         { slug: 'citation_manager' },
+        { slug: 'why_open_source' },
     ];
 }
 

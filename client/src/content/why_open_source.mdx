@@ -1,0 +1,58 @@
+export const metadata = {
+    title: "Why is Open Paper Open Source?",
+    description: "Open-source isn't just a distribution model for us. It's a commitment to transparency, user alignment, and the belief that research tools should be as verifiable as the research they support.",
+    date: "01-02-2026",
+    image: "https://assets.khoj.dev/blue_shapes_abstract.png",
+}
+
+The "open" in Open Paper isn't just branding. Our entire codebase is [available on GitHub](https://github.com/khoj-ai/openpaper), and we believe this is how research tools should be built. Here's why.
+
+## What Open Source Means
+
+Open source is often conflated with "free software," but it's more precise than that. Open source means the source code is publicly available, can be inspected by anyone, and can be modified and redistributed under the terms of the license. It's a commitment to transparency at the most fundamental level: you can see exactly what the software does, because you can read the code that makes it work.
+
+This is distinct from "source available" (where code is visible but not freely modifiable) or proprietary software with published APIs. Open source is a stronger commitment. It means we're not hiding anything, and we're inviting scrutiny.
+
+## Why Research Tools Should Be Open Source
+
+Research has a reproducibility problem. Studies should be verifiable, methodologies should be transparent, and claims should be backed by evidence. We believe the tools researchers use should meet the same standard.
+
+When you use Open Paper to chat with a PDF, you're trusting our citation protocol to accurately ground AI responses in the source material. You're trusting that when we say "this response comes from page 7," it actually does. With closed-source software, that trust is a leap of faith. With open source, it's verifiable. You can read our [citation grounding implementation](https://github.com/khoj-ai/openpaper) and confirm it works the way we claim.
+
+This matters more for AI tools than for traditional software. Large language models are probabilistic systems that can hallucinate, confabulate, and confidently state falsehoods. When we build guardrails and citation protocols to mitigate these risks, you shouldn't have to take our word that they work. You should be able to see for yourself.
+
+### Transparency in Methods
+
+Every choice we make in how we process papers, generate summaries, or construct AI prompts is visible in the codebase. If you want to understand why the AI responds a certain way, you can trace it back to the system prompts and retrieval logic. If you disagree with a design decision, you can open an issue or submit a pull request.
+
+This level of transparency is rare in AI tooling, where companies often treat their prompts and fine-tuning approaches as trade secrets. We think this is backwards. For research tools especially, the methodology should be as open as the research it supports.
+
+### No Hidden Corners
+
+Open source means we can't cut corners without it being visible. There's no temptation to log data we shouldn't, implement dark patterns, or make claims about privacy that don't hold up to inspection. The code is the ground truth, and anyone can audit it.
+
+This creates accountability. When we say your papers aren't being used to train models, you don't have to trust a privacy policy written by lawyers. You can verify it in the code.
+
+### User Alignment
+
+AI tools for research need to be aligned with the interests of researchers, not advertisers or data brokers. Open source is a structural guarantee of this alignment. The incentives are clear: we build something useful, researchers use it, and the community helps improve it. There's no hidden agenda because there's nowhere to hide it.
+
+We think this is table stakes for AI research tools. The stakes are too high, and the potential for misalignment too great, to accept anything less than full transparency.
+
+## Standing on the Shoulders of Giants
+
+We're not the first to believe research tools should be open. We're following in the footsteps of projects that have shaped how research is conducted:
+
+**[Zotero](https://www.zotero.org/)** has been the gold standard for reference management for nearly two decades. It's open source, community-driven, and has remained focused on researcher needs despite the rise of commercial alternatives. Zotero proved that open-source research tools can achieve widespread adoption while maintaining their values.
+
+**[OpenAlex](https://openalex.org/)** provides an open catalog of the world's scholarly works, replacing the proprietary Microsoft Academic Graph. It's a public good: free, open, and built to serve the research community. We use OpenAlex to power our paper discovery features, and we're grateful for their commitment to openness.
+
+**[Hugging Face](https://huggingface.co/)** has become the central hub for open machine learning. By making models, datasets, and tools freely available, they've accelerated AI research in ways that closed ecosystems never could. Their success demonstrates that openness and viability aren't mutually exclusive.
+
+These projects share a belief that tools for advancing human knowledge should themselves be open. We share that belief.
+
+## An Invitation
+
+Open source is also an invitation. If you find a bug, you can report it. If you want a feature, you can propose it. If you have the skills, you can build it yourself. The barrier between user and contributor is permeable by design.
+
+We're building Open Paper because we think researchers deserve better tools. Open source is how we ensure those tools remain worthy of trust.
