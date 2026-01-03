@@ -1,5 +1,5 @@
 import { fetchFromApi } from '@/lib/api';
-import { Download, Clock, FileAudio, History, ChevronDown, Plus, Mic, HelpCircle, Play, Volume2 } from 'lucide-react';
+import { Download, Clock, FileAudio, History, ChevronDown, Plus, HelpCircle, Play } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -39,9 +39,9 @@ interface JobStatus {
 
 // Curated voice options - 3 distinct voices to reduce decision fatigue
 const VOICE_OPTIONS = [
-    { id: 'nova', name: 'Nova', description: 'Warm & friendly', sampleText: 'Hello! I\'m Nova, a warm and friendly voice perfect for engaging summaries.' },
-    { id: 'onyx', name: 'Onyx', description: 'Deep & authoritative', sampleText: 'Hello. I\'m Onyx, a deep and authoritative voice ideal for formal content.' },
-    { id: 'shimmer', name: 'Shimmer', description: 'Clear & bright', sampleText: 'Hi there! I\'m Shimmer, a clear and bright voice great for detailed explanations.' },
+    { id: 'nova', name: 'Nova', description: 'Warm & friendly' },
+    { id: 'onyx', name: 'Onyx', description: 'Deep & authoritative' },
+    { id: 'shimmer', name: 'Shimmer', description: 'Clear & bright' },
 ] as const;
 
 // Length options for audio overview
@@ -118,7 +118,6 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
     const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
     const [selectedFocus, setSelectedFocus] = useState<FocusOption>('summary');
     const [additionalInstructions, setAdditionalInstructions] = useState<string>(DEFAULT_INSTRUCTIONS);
-    const [previewingVoice, setPreviewingVoice] = useState<VoiceOption | null>(null);
     const [selectedVoice, setSelectedVoice] = useState<VoiceOption>('nova');
     const [selectedLength, setSelectedLength] = useState<LengthOption>('medium');
 
@@ -360,40 +359,6 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
         }
     };
 
-    // Preview voice using Web Speech API (client-side preview)
-    const previewVoice = (voiceId: VoiceOption) => {
-        const voice = VOICE_OPTIONS.find(v => v.id === voiceId);
-        if (!voice) return;
-
-        // Cancel any ongoing speech
-        window.speechSynthesis.cancel();
-        setPreviewingVoice(voiceId);
-
-        const utterance = new SpeechSynthesisUtterance(voice.sampleText);
-
-        // Adjust speech parameters based on voice character
-        if (voiceId === 'onyx') {
-            utterance.pitch = 0.8;
-            utterance.rate = 0.9;
-        } else if (voiceId === 'shimmer') {
-            utterance.pitch = 1.2;
-            utterance.rate = 1.0;
-        } else {
-            utterance.pitch = 1.0;
-            utterance.rate = 1.0;
-        }
-
-        utterance.onend = () => setPreviewingVoice(null);
-        utterance.onerror = () => setPreviewingVoice(null);
-
-        window.speechSynthesis.speak(utterance);
-    };
-
-    const stopPreview = () => {
-        window.speechSynthesis.cancel();
-        setPreviewingVoice(null);
-    };
-
     return (
         <div className="rounded-lg py-2 h-full w-full px-2 md:px-0">
             <div className="flex items-center justify-between mb-4">
@@ -459,18 +424,14 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
 
             {/* No audio overview exists or showing generation form */}
             {((!audioOverview && !jobStatus && isInitialLoadDone) || showGenerationForm) && (
-                <div className="text-center py-4">
-                    <div className="bg-blue-50 dark:bg-blue-950 rounded-xl p-4 md:p-6 max-w-lg mx-auto max-h-[70vh] overflow-y-auto">
-                        <Mic className="w-12 h-12 text-blue-500 mx-auto mb-3" />
-                        <h3 className="text-lg font-semibold text-foreground mb-1">
-                            Audio Overview
-                        </h3>
-                        <p className="text-muted-foreground text-sm mb-6">
+                <div className="py-2">
+                    <div className="bg-blue-50 dark:bg-blue-950 rounded-xl p-4 max-h-[70vh] overflow-y-auto">
+                        <p className="text-muted-foreground text-sm mb-4 text-center">
                             Generate a spoken summary of this paper
                         </p>
 
                         {/* Summary Focus Options */}
-                        <div className="mb-5 text-left">
+                        <div className="mb-4">
                             <Label className="block text-sm font-medium text-foreground mb-2">
                                 Focus
                             </Label>
@@ -492,62 +453,51 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
                             </div>
                         </div>
 
-                        {/* Length Selection */}
-                        <div className="mb-5 text-left">
-                            <Label className="block text-sm font-medium text-foreground mb-2">
-                                Length
-                            </Label>
-                            <div className="grid grid-cols-3 gap-2">
-                                {LENGTH_OPTIONS.map((length) => (
-                                    <Button
-                                        key={length.id}
-                                        variant="outline"
-                                        onClick={() => setSelectedLength(length.id)}
-                                        className={`px-2 py-2 text-sm border rounded-lg font-medium transition-colors flex flex-col items-center ${selectedLength === length.id ? 'border-blue-300 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800' : 'border-border hover:bg-accent'}`}
-                                    >
-                                        <span className="font-medium text-xs">{length.name}</span>
-                                        <span className="text-xs text-muted-foreground">{length.description}</span>
-                                    </Button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Voice Selection with Preview */}
-                        <div className="mb-5 text-left">
-                            <Label className="block text-sm font-medium text-foreground mb-2">
-                                Voice
-                            </Label>
-                            <div className="grid grid-cols-3 gap-2">
-                                {VOICE_OPTIONS.map((voice) => (
-                                    <div key={voice.id} className="relative">
+                        {/* Length and Voice in a row */}
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                            {/* Length Selection */}
+                            <div>
+                                <Label className="block text-sm font-medium text-foreground mb-2">
+                                    Length
+                                </Label>
+                                <div className="flex flex-col gap-1">
+                                    {LENGTH_OPTIONS.map((length) => (
                                         <Button
+                                            key={length.id}
+                                            variant="outline"
+                                            onClick={() => setSelectedLength(length.id)}
+                                            className={`px-2 py-1.5 text-sm border rounded-lg font-medium transition-colors flex justify-between items-center ${selectedLength === length.id ? 'border-blue-300 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800' : 'border-border hover:bg-accent'}`}
+                                        >
+                                            <span className="font-medium text-xs">{length.name}</span>
+                                            <span className="text-xs text-muted-foreground">{length.description}</span>
+                                        </Button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Voice Selection */}
+                            <div>
+                                <Label className="block text-sm font-medium text-foreground mb-2">
+                                    Voice
+                                </Label>
+                                <div className="flex flex-col gap-1">
+                                    {VOICE_OPTIONS.map((voice) => (
+                                        <Button
+                                            key={voice.id}
                                             variant="outline"
                                             onClick={() => setSelectedVoice(voice.id)}
-                                            className={`w-full px-2 py-2 text-sm border rounded-lg font-medium transition-colors flex flex-col items-center h-auto ${selectedVoice === voice.id ? 'border-blue-300 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800' : 'border-border hover:bg-accent'}`}
+                                            className={`px-2 py-1.5 text-sm border rounded-lg font-medium transition-colors flex justify-between items-center ${selectedVoice === voice.id ? 'border-blue-300 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800' : 'border-border hover:bg-accent'}`}
                                         >
                                             <span className="font-medium text-xs">{voice.name}</span>
                                             <span className="text-xs text-muted-foreground">{voice.description}</span>
                                         </Button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                previewingVoice === voice.id ? stopPreview() : previewVoice(voice.id);
-                                            }}
-                                            className="absolute -top-1 -right-1 w-5 h-5 bg-blue-500 hover:bg-blue-600 text-white rounded-full flex items-center justify-center shadow-sm"
-                                            title={previewingVoice === voice.id ? 'Stop preview' : 'Preview voice'}
-                                        >
-                                            <Volume2 className={`w-3 h-3 ${previewingVoice === voice.id ? 'animate-pulse' : ''}`} />
-                                        </button>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-1 text-center">
-                                Click the speaker icon to preview
-                            </p>
                         </div>
 
                         {/* Custom Instructions - Collapsible */}
-                        <details className="mb-5 text-left">
+                        <details className="mb-4">
                             <summary className="cursor-pointer text-sm font-medium text-foreground flex items-center gap-1">
                                 <ChevronDown className="w-4 h-4" />
                                 Custom Instructions
@@ -570,7 +520,6 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
                                         setSelectedVoice('nova');
                                         setSelectedLength('medium');
                                         setSelectedFocus('summary');
-                                        stopPreview();
                                     }}
                                     className="px-5 py-2 text-secondary-foreground border border-border rounded-lg font-medium hover:bg-accent transition-colors text-sm"
                                 >
@@ -579,7 +528,6 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
                             )}
                             <button
                                 onClick={() => {
-                                    stopPreview();
                                     createAudioOverview(additionalInstructions, selectedVoice, selectedLength);
                                     setShowGenerationForm(false);
                                 }}
