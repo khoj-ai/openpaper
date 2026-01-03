@@ -301,8 +301,10 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
             const response: JobStatus = await fetchFromApi(`/api/paper/audio/${paper_id}/status`);
             if (response.job_id && response.status) {
                 setJobStatus(response);
-                // If the job is completed, fetch the audio overview
+                // If the job is completed, stop polling immediately and fetch the audio overview
                 if (response.status === 'completed') {
+                    // Clear job status first to stop the polling interval
+                    setJobStatus(null);
                     await fetchAudioOverview();
                 }
             } else {
@@ -313,14 +315,16 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
             // Only show error if we don't already have an audio overview
             // This prevents showing errors after the overview has been successfully fetched
             if (showErrorOnFail) {
-                // Don't set error if we already have an audio overview
-                // This handles the race condition where polling continues after completion
-                if (!audioOverview) {
-                    setError('Failed to get job status');
-                }
+                // Use a callback to get the current audioOverview value
+                setAudioOverview((current) => {
+                    if (!current) {
+                        setError('Failed to get job status');
+                    }
+                    return current;
+                });
             }
         }
-    }, [paper_id, fetchAudioOverview, audioOverview]);
+    }, [paper_id, fetchAudioOverview]);
 
 
 
