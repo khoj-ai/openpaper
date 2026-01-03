@@ -37,10 +37,35 @@ interface JobStatus {
     paper_id: string;
 }
 
-// TODO: Add buttons to customize voice and additional instructions in the UI
+// Voice options with descriptions for user selection
+const VOICE_OPTIONS = [
+    { id: 'nova', name: 'Nova', description: 'Warm and friendly' },
+    { id: 'alloy', name: 'Alloy', description: 'Neutral and balanced' },
+    { id: 'echo', name: 'Echo', description: 'Soft and smooth' },
+    { id: 'fable', name: 'Fable', description: 'Expressive and dramatic' },
+    { id: 'onyx', name: 'Onyx', description: 'Deep and authoritative' },
+    { id: 'shimmer', name: 'Shimmer', description: 'Clear and bright' },
+    { id: 'coral', name: 'Coral', description: 'Calm and reassuring' },
+    { id: 'sage', name: 'Sage', description: 'Wise and measured' },
+    { id: 'ash', name: 'Ash', description: 'Confident and direct' },
+    { id: 'ballad', name: 'Ballad', description: 'Melodic and soothing' },
+    { id: 'verse', name: 'Verse', description: 'Articulate and clear' },
+] as const;
+
+// Length options for audio overview
+const LENGTH_OPTIONS = [
+    { id: 'short', name: 'Short', description: '~2-3 min' },
+    { id: 'medium', name: 'Medium', description: '~5-7 min' },
+    { id: 'long', name: 'Long', description: '~10-15 min' },
+] as const;
+
+type VoiceOption = typeof VOICE_OPTIONS[number]['id'];
+type LengthOption = typeof LENGTH_OPTIONS[number]['id'];
+
 interface AudioOverviewCreateRequestBody {
     additional_instructions?: string;
-    voice?: string;
+    voice?: VoiceOption;
+    length?: LengthOption;
 }
 
 const audioOverviewLoadingText = [
@@ -71,6 +96,8 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
     const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
     const [selectedFocus, setSelectedFocus] = useState<string | null>(null);
     const [additionalInstructions, setAdditionalInstructions] = useState<string>(DEFAULT_INSTRUCTIONS);
+    const [selectedVoice, setSelectedVoice] = useState<VoiceOption>('nova');
+    const [selectedLength, setSelectedLength] = useState<LengthOption>('medium');
 
 
     // Audio overview credit usage state
@@ -163,7 +190,7 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
         updateAudioCreditUsage();
     }, [updateAudioCreditUsage]);
 
-    const createAudioOverview = async (additionalInstructions: string) => {
+    const createAudioOverview = async (additionalInstructions: string, voice: VoiceOption, length: LengthOption) => {
         // Check if user has remaining audio overview credits
         if (isAudioOverviewAtLimit(subscription)) {
             setError('You have reached your monthly audio overview limit. Please upgrade your plan or wait until next Monday for credits to reset.');
@@ -175,7 +202,8 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
 
         const body: AudioOverviewCreateRequestBody = {
             additional_instructions: additionalInstructions,
-            voice: undefined
+            voice: voice,
+            length: length
         }
 
         try {
@@ -448,12 +476,73 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
                             />
                         </details>
 
+                        {/* Voice Selection */}
+                        <div className="mb-6 text-left">
+                            <Label className="block text-sm font-medium text-foreground mb-3">
+                                Voice
+                            </Label>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                {VOICE_OPTIONS.slice(0, 6).map((voice) => (
+                                    <Button
+                                        key={voice.id}
+                                        variant="outline"
+                                        onClick={() => setSelectedVoice(voice.id)}
+                                        className={`px-3 py-2 text-sm border rounded-lg font-medium transition-colors flex flex-col items-start h-auto ${selectedVoice === voice.id ? 'border-blue-300 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800' : 'border-border hover:bg-accent'}`}
+                                    >
+                                        <span className="font-medium">{voice.name}</span>
+                                        <span className="text-xs text-muted-foreground">{voice.description}</span>
+                                    </Button>
+                                ))}
+                            </div>
+                            <details className="mt-2">
+                                <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+                                    More voices...
+                                </summary>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                                    {VOICE_OPTIONS.slice(6).map((voice) => (
+                                        <Button
+                                            key={voice.id}
+                                            variant="outline"
+                                            onClick={() => setSelectedVoice(voice.id)}
+                                            className={`px-3 py-2 text-sm border rounded-lg font-medium transition-colors flex flex-col items-start h-auto ${selectedVoice === voice.id ? 'border-blue-300 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800' : 'border-border hover:bg-accent'}`}
+                                        >
+                                            <span className="font-medium">{voice.name}</span>
+                                            <span className="text-xs text-muted-foreground">{voice.description}</span>
+                                        </Button>
+                                    ))}
+                                </div>
+                            </details>
+                        </div>
+
+                        {/* Length Selection */}
+                        <div className="mb-6 text-left">
+                            <Label className="block text-sm font-medium text-foreground mb-3">
+                                Length
+                            </Label>
+                            <div className="grid grid-cols-3 gap-2">
+                                {LENGTH_OPTIONS.map((length) => (
+                                    <Button
+                                        key={length.id}
+                                        variant="outline"
+                                        onClick={() => setSelectedLength(length.id)}
+                                        className={`px-3 py-2 text-sm border rounded-lg font-medium transition-colors flex flex-col items-center ${selectedLength === length.id ? 'border-blue-300 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800' : 'border-border hover:bg-accent'}`}
+                                    >
+                                        <span className="font-medium">{length.name}</span>
+                                        <span className="text-xs text-muted-foreground">{length.description}</span>
+                                    </Button>
+                                ))}
+                            </div>
+                        </div>
+
                         <div className="flex gap-3 justify-center">
                             {showGenerationForm && audioOverview && (
                                 <button
                                     onClick={() => {
                                         setShowGenerationForm(false);
                                         setAdditionalInstructions(DEFAULT_INSTRUCTIONS);
+                                        setSelectedVoice('nova');
+                                        setSelectedLength('medium');
+                                        setSelectedFocus(null);
                                     }}
                                     className="px-6 py-3 text-secondary-foreground border border-border rounded-lg font-medium hover:bg-accent transition-colors"
                                 >
@@ -462,7 +551,7 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
                             )}
                             <button
                                 onClick={() => {
-                                    createAudioOverview(additionalInstructions);
+                                    createAudioOverview(additionalInstructions, selectedVoice, selectedLength);
                                     setShowGenerationForm(false);
                                 }}
                                 disabled={isLoading || isAudioOverviewAtLimit(subscription)}
@@ -576,6 +665,9 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
                                 onClick={() => {
                                     setShowGenerationForm(true);
                                     setAdditionalInstructions(DEFAULT_INSTRUCTIONS);
+                                    setSelectedVoice('nova');
+                                    setSelectedLength('medium');
+                                    setSelectedFocus(null);
                                 }}
                                 disabled={isLoading || isAudioOverviewAtLimit(subscription)}
                                 className={`text-sm font-medium flex items-center gap-1 ${isLoading || isAudioOverviewAtLimit(subscription)
