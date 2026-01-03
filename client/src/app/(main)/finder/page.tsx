@@ -539,8 +539,8 @@ function FinderPageContent() {
 
             {/* Split pane layout - results on left, preview on right (desktop) */}
             <div className="flex gap-6 overflow-hidden">
-                {/* Results column */}
-                <div className={`${selectedPaper ? 'hidden lg:block lg:flex-1 lg:h-[calc(100vh-8rem)] lg:overflow-y-auto lg:overflow-x-hidden lg:pr-2 min-w-0' : 'w-full max-w-5xl'} overflow-x-hidden`}>
+                {/* Results column - always use fixed height scroll container to avoid scroll reset when preview opens */}
+                <div className={`${selectedPaper ? 'hidden lg:block lg:flex-1 lg:pr-2 min-w-0' : 'w-full max-w-5xl'} lg:h-[calc(100vh-8rem)] lg:overflow-y-auto overflow-x-hidden`}>
                     {loading && [...Array(6)].map((_, i) => (
                         <div key={`skeleton-${i}`} className="py-4 border-b border-slate-200 dark:border-slate-800">
                             <Skeleton className="h-5 w-3/4 mb-2" />
