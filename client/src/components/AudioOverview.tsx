@@ -1,5 +1,5 @@
 import { fetchFromApi } from '@/lib/api';
-import { Download, Clock, FileAudio, History, ChevronDown, Plus, HelpCircle, Play } from 'lucide-react';
+import { Download, Clock, FileAudio, History, ChevronDown, Plus, HelpCircle, Sparkles } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -100,7 +100,7 @@ const audioOverviewLoadingText = [
     'Converting paper to audio...',
 ]
 
-const DEFAULT_INSTRUCTIONS = FOCUS_OPTIONS[0].instructions;
+const DEFAULT_INSTRUCTIONS = '';
 
 export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTerm }: AudioOverviewProps) {
 
@@ -440,10 +440,7 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
                                     <Button
                                         key={focus.id}
                                         variant="outline"
-                                        onClick={() => {
-                                            setSelectedFocus(focus.id);
-                                            setAdditionalInstructions(focus.instructions);
-                                        }}
+                                        onClick={() => setSelectedFocus(focus.id)}
                                         className={`px-3 py-2 text-sm border rounded-lg font-medium transition-colors flex flex-col items-start h-auto ${selectedFocus === focus.id ? 'border-blue-300 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800' : 'border-border hover:bg-accent'}`}
                                     >
                                         <span className="font-medium text-xs">{focus.name}</span>
@@ -511,7 +508,7 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
                             />
                         </details>
 
-                        <div className="flex gap-3 justify-center">
+                        <div className="flex gap-3 justify-end">
                             {showGenerationForm && audioOverview && (
                                 <button
                                     onClick={() => {
@@ -521,21 +518,25 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
                                         setSelectedLength('medium');
                                         setSelectedFocus('summary');
                                     }}
-                                    className="px-5 py-2 text-secondary-foreground border border-border rounded-lg font-medium hover:bg-accent transition-colors text-sm"
+                                    className="px-4 py-2 text-secondary-foreground border border-border rounded-lg font-medium hover:bg-accent transition-colors text-sm"
                                 >
                                     Cancel
                                 </button>
                             )}
                             <button
                                 onClick={() => {
-                                    createAudioOverview(additionalInstructions, selectedVoice, selectedLength);
+                                    const focusInstructions = FOCUS_OPTIONS.find(f => f.id === selectedFocus)?.instructions || '';
+                                    const fullInstructions = additionalInstructions
+                                        ? `${focusInstructions}\n\nAdditional instructions: ${additionalInstructions}`
+                                        : focusInstructions;
+                                    createAudioOverview(fullInstructions, selectedVoice, selectedLength);
                                     setShowGenerationForm(false);
                                 }}
                                 disabled={isLoading || isAudioOverviewAtLimit(subscription)}
-                                className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-400 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-medium text-sm shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+                                className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-400 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-medium text-sm shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
                             >
-                                <Play className="w-4 h-4" />
-                                {isLoading ? 'Generating...' : isAudioOverviewAtLimit(subscription) ? 'Limit Reached' : 'Generate'}
+                                <Sparkles className="w-4 h-4" />
+                                {isLoading ? 'Creating...' : isAudioOverviewAtLimit(subscription) ? 'Limit Reached' : 'Create'}
                             </button>
                         </div>
 
