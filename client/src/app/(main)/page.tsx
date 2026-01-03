@@ -26,6 +26,7 @@ import { QuickActions } from "@/components/QuickActions";
 import { ProjectsPreview } from "@/components/ProjectsPreview";
 import { RecentPapersGrid } from "@/components/RecentPapersGrid";
 import { HomeEmptyState } from "@/components/HomeEmptyState";
+import { BlogPostToast } from "@/components/BlogPostToast";
 
 const DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE = "We encountered an error processing your request. Please check the file or URL and try again.";
 
@@ -316,6 +317,7 @@ export default function Home() {
 
 	return (
 		<div className="min-h-[calc(100vh-64px)] bg-gradient-to-b from-background to-muted/20 flex flex-col">
+			<BlogPostToast />
 			<div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex-1 w-full">
 				{/* Header with branding and search */}
 				<header className="mb-10">

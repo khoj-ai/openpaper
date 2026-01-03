@@ -29,6 +29,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import {Marquee} from "@/components/magicui/marquee";
+import {BlogPostToast} from "@/components/BlogPostToast";
 
 const logos = [
     { src: "/logos/stanford_logo.svg", alt: "Stanford University", width: 60, height: 40 },
@@ -57,6 +58,7 @@ export default function OpenPaperLanding() {
 
     return (
         <div className="flex flex-col min-h-screen">
+            <BlogPostToast />
             {/* Header */}
             <header className="px-4 lg:px-6 h-16 flex items-center justify-between border-b border-border/40 bg-background/80 backdrop-blur-sm sticky top-0 z-50">
                 <Link href="/" className="flex items-center justify-center">
