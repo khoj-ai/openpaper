@@ -24,7 +24,7 @@ export function BlogPostToast() {
             try {
                 const dismissedSlug = localStorage.getItem(DISMISSED_POST_KEY);
 
-                const response = await fetch("/api/blog/latest");
+                const response = await fetch("/blog-latest.json");
                 if (!response.ok) return;
 
                 const post: BlogPost = await response.json();
