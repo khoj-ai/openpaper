@@ -5,7 +5,7 @@ Your summary should be structured in a way that is easy to understand and provid
 
 If you encounter any difficult or complex concepts, explain them in simple terms to ensure clarity for a broad audience.
 
-Your summary should be no more than {length} characters long, and it should be written in a narrative style that flows logically from one point to the next without abrupt transitions or special headings or formatting. The summary should be written in a way that is engaging and informative, suitable for readers who may not be experts in the field.
+Your summary should be approximately {length} words long (this is important - aim to hit this target). It should be written in a narrative style that flows logically from one point to the next without abrupt transitions or special headings or formatting. The summary should be written in a way that is engaging and informative, suitable for readers who may not be experts in the field.
 
 Write the summary in plain text, with minimal syntax formatting for citations.
 
@@ -38,7 +38,7 @@ Create a narrative summary that:
 3. Highlights agreements and disagreements between papers
 4. Provides a cohesive narrative that addresses the summary request
 5. Includes proper citations and references to the source papers
-6. Is limited to a maximum of {length} characters
+6. Is approximately {length} words long (this is important - aim to hit this target)
 
 The summary should be engaging, informative, and suitable for audio narration.
 

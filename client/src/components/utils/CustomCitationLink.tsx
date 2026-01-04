@@ -68,7 +68,7 @@ function CitationLink({
                     {citationKey}
                 </span>
             </HoverCardTrigger>
-            <HoverCardContent className="w-80 p-2 shadow-md bg-accent">
+            <HoverCardContent className="w-80 p-2 pt-3 shadow-md bg-accent" sideOffset={0}>
                 {paper && <p className="text-sm font-bold text-accent-foreground">{paper.title}</p>}
                 <p className="text-sm text-accent-foreground">{'reference' in matchingCitation ? matchingCitation.reference : matchingCitation.text}</p>
             </HoverCardContent>

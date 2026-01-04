@@ -1,5 +1,5 @@
 import { fetchFromApi } from '@/lib/api';
-import { Download, Clock, FileAudio, History, ChevronDown, Plus, Mic, HelpCircle, Play } from 'lucide-react';
+import { Download, Clock, FileAudio, History, ChevronDown, Plus, HelpCircle } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -37,11 +37,58 @@ interface JobStatus {
     paper_id: string;
 }
 
-// TODO: Add buttons to customize voice and additional instructions in the UI
+// Curated voice options - 3 distinct voices to reduce decision fatigue
+const VOICE_OPTIONS = [
+    { id: 'nova', name: 'Nova', description: 'Warm & friendly' },
+    { id: 'onyx', name: 'Onyx', description: 'Deep & authoritative' },
+    { id: 'shimmer', name: 'Shimmer', description: 'Clear & bright' },
+] as const;
+
+// Length options for audio overview
+const LENGTH_OPTIONS = [
+    { id: 'short', name: 'Short', description: '~2-3 min' },
+    { id: 'medium', name: 'Medium', description: '~5-7 min' },
+    { id: 'long', name: 'Long', description: '~10-15 min' },
+] as const;
+
+type VoiceOption = typeof VOICE_OPTIONS[number]['id'];
+type LengthOption = typeof LENGTH_OPTIONS[number]['id'];
+
 interface AudioOverviewCreateRequestBody {
     additional_instructions?: string;
-    voice?: string;
+    voice?: VoiceOption;
+    length?: LengthOption;
 }
+
+// Focus options for different types of audio summaries
+const FOCUS_OPTIONS = [
+    {
+        id: 'summary',
+        name: 'Concise Summary',
+        description: 'Key points overview',
+        instructions: 'Provide a concise summary of this paper, covering the main objectives, methodology, key findings, and conclusions. Make it easy to understand.'
+    },
+    {
+        id: 'critical',
+        name: 'Critical Analysis',
+        description: 'Limitations & rebuttals',
+        instructions: 'Analyze this paper critically. Identify potential weaknesses, limitations, questionable assumptions, and possible counterarguments. Be thorough but fair.'
+    },
+    {
+        id: 'gaps',
+        name: 'Research Gaps',
+        description: 'Future directions',
+        instructions: 'Identify the research gaps in this paper. What questions remain unanswered? What future work do the authors suggest? What opportunities exist for follow-up research?'
+    },
+    {
+        id: 'novelty',
+        name: "What's Novel",
+        description: 'Key innovations',
+        instructions: 'Focus on what is novel and innovative about this paper. How does it differ from prior work? What new contributions does it make to the field?'
+    },
+] as const;
+
+type FocusOption = typeof FOCUS_OPTIONS[number]['id'];
 
 const audioOverviewLoadingText = [
     'Generating audio overview...',
@@ -53,7 +100,7 @@ const audioOverviewLoadingText = [
     'Converting paper to audio...',
 ]
 
-const DEFAULT_INSTRUCTIONS = 'Please summarize the key points of this paper, focusing on the methodology and results. Make it concise and easy to understand.';
+const DEFAULT_INSTRUCTIONS = '';
 
 export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTerm }: AudioOverviewProps) {
 
@@ -69,8 +116,10 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
     const [error, setError] = useState<string | null>(null);
     const [showGenerationForm, setShowGenerationForm] = useState(false);
     const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
-    const [selectedFocus, setSelectedFocus] = useState<string | null>(null);
+    const [selectedFocus, setSelectedFocus] = useState<FocusOption>('summary');
     const [additionalInstructions, setAdditionalInstructions] = useState<string>(DEFAULT_INSTRUCTIONS);
+    const [selectedVoice, setSelectedVoice] = useState<VoiceOption>('nova');
+    const [selectedLength, setSelectedLength] = useState<LengthOption>('medium');
 
 
     // Audio overview credit usage state
@@ -163,7 +212,7 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
         updateAudioCreditUsage();
     }, [updateAudioCreditUsage]);
 
-    const createAudioOverview = async (additionalInstructions: string) => {
+    const createAudioOverview = async (additionalInstructions: string, voice: VoiceOption, length: LengthOption) => {
         // Check if user has remaining audio overview credits
         if (isAudioOverviewAtLimit(subscription)) {
             setError('You have reached your monthly audio overview limit. Please upgrade your plan or wait until next Monday for credits to reset.');
@@ -175,7 +224,8 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
 
         const body: AudioOverviewCreateRequestBody = {
             additional_instructions: additionalInstructions,
-            voice: undefined
+            voice: voice,
+            length: length
         }
 
         try {
@@ -251,8 +301,10 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
             const response: JobStatus = await fetchFromApi(`/api/paper/audio/${paper_id}/status`);
             if (response.job_id && response.status) {
                 setJobStatus(response);
-                // If the job is completed, fetch the audio overview
+                // If the job is completed, stop polling immediately and fetch the audio overview
                 if (response.status === 'completed') {
+                    // Clear job status first to stop the polling interval
+                    setJobStatus(null);
                     await fetchAudioOverview();
                 }
             } else {
@@ -263,14 +315,16 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
             // Only show error if we don't already have an audio overview
             // This prevents showing errors after the overview has been successfully fetched
             if (showErrorOnFail) {
-                // Don't set error if we already have an audio overview
-                // This handles the race condition where polling continues after completion
-                if (!audioOverview) {
-                    setError('Failed to get job status');
-                }
+                // Use a callback to get the current audioOverview value
+                setAudioOverview((current) => {
+                    if (!current) {
+                        setError('Failed to get job status');
+                    }
+                    return current;
+                });
             }
         }
-    }, [paper_id, fetchAudioOverview, audioOverview]);
+    }, [paper_id, fetchAudioOverview]);
 
 
 
@@ -374,102 +428,118 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
 
             {/* No audio overview exists or showing generation form */}
             {((!audioOverview && !jobStatus && isInitialLoadDone) || showGenerationForm) && (
-                <div className="text-center py-8">
-                    <div className="bg-blue-50 dark:bg-blue-950 rounded-xl p-4 md:p-8 max-w-lg mx-auto">
-                        <Mic className="w-16 h-16 text-blue-500 mx-auto mb-4" />
-                        <h3 className="text-xl font-semibold text-foreground mb-2">
-                            Audio Overview
-                        </h3>
-                        <p className="text-muted-foreground mb-8">
+                <div className="py-2">
+                    <div className="bg-blue-50 dark:bg-blue-950 rounded-xl p-4 max-h-[70vh] overflow-y-auto">
+                        <p className="text-muted-foreground text-sm mb-4 text-center">
                             Generate a spoken summary of this paper
                         </p>
 
                         {/* Summary Focus Options */}
-                        <div className="mb-6 text-left">
-                            <Label className="block text-sm font-medium text-foreground mb-3">
-                                Summary Focus
+                        <div className="mb-4">
+                            <Label className="block text-sm font-medium text-foreground mb-2">
+                                Focus
                             </Label>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                <Button
-                                    variant={'outline'}
-                                    onClick={() => {
-                                        setAdditionalInstructions(`${DEFAULT_INSTRUCTIONS} Focus on the key results and findings of this paper.`);
-                                        setSelectedFocus('key-results');
-                                    }}
-                                    className={`px-4 py-3 text-sm border rounded-lg font-medium transition-colors ${selectedFocus === 'key-results' ? 'border-blue-300 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800' : 'border-border hover:bg-accent'}`}
-                                >
-                                    Key Results
-                                </Button>
-                                <Button
-                                    variant={'outline'}
-                                    onClick={() => {
-                                        setAdditionalInstructions(`${DEFAULT_INSTRUCTIONS} Focus on the methodology and approach used in this paper.`);
-                                        setSelectedFocus('methodology');
-                                    }}
-                                    className={`px-4 py-3 text-sm border rounded-lg font-medium transition-colors ${selectedFocus === 'methodology' ? 'border-blue-300 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800' : 'border-border hover:bg-accent'}`}
-                                >
-                                    Methodology
-                                </Button>
-                                <Button
-                                    variant={'outline'}
-                                    onClick={() => {
-                                        setAdditionalInstructions(`${DEFAULT_INSTRUCTIONS} Provide a comprehensive summary of the entire paper.`);
-                                        setSelectedFocus('full-paper');
-                                    }}
-                                    className={`px-4 py-3 text-sm border rounded-lg font-medium transition-colors ${selectedFocus === 'full-paper' ? 'border-blue-300 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800' : 'border-border hover:bg-accent'}`}
-                                >
-                                    Full Paper
-                                </Button>
-                                <Button
-                                    variant={'outline'}
-                                    onClick={() => {
-                                        setAdditionalInstructions(`${DEFAULT_INSTRUCTIONS} Focus only on the abstract and main conclusions.`);
-                                        setSelectedFocus('abstract-only');
-                                    }}
-                                    className={`px-4 py-3 text-sm border rounded-lg font-medium transition-colors ${selectedFocus === 'abstract-only' ? 'border-blue-300 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800' : 'border-border hover:bg-accent'}`}
-                                >
-                                    Abstract Only
-                                </Button>
+                            <div className="grid grid-cols-2 gap-2">
+                                {FOCUS_OPTIONS.map((focus) => (
+                                    <Button
+                                        key={focus.id}
+                                        variant="outline"
+                                        onClick={() => setSelectedFocus(focus.id)}
+                                        className={`px-3 py-2 text-sm border rounded-lg font-medium transition-colors flex flex-col items-start h-auto ${selectedFocus === focus.id ? 'border-blue-300 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800' : 'border-border hover:bg-accent'}`}
+                                    >
+                                        <span className="font-medium text-xs">{focus.name}</span>
+                                        <span className="text-xs text-muted-foreground">{focus.description}</span>
+                                    </Button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Length and Voice in a row */}
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                            {/* Length Selection */}
+                            <div>
+                                <Label className="block text-sm font-medium text-foreground mb-2">
+                                    Length
+                                </Label>
+                                <div className="flex flex-col gap-1">
+                                    {LENGTH_OPTIONS.map((length) => (
+                                        <Button
+                                            key={length.id}
+                                            variant="outline"
+                                            onClick={() => setSelectedLength(length.id)}
+                                            className={`px-2 py-1.5 text-sm border rounded-lg font-medium transition-colors flex justify-between items-center ${selectedLength === length.id ? 'border-blue-300 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800' : 'border-border hover:bg-accent'}`}
+                                        >
+                                            <span className="font-medium text-xs">{length.name}</span>
+                                            <span className="text-xs text-muted-foreground">{length.description}</span>
+                                        </Button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Voice Selection */}
+                            <div>
+                                <Label className="block text-sm font-medium text-foreground mb-2">
+                                    Voice
+                                </Label>
+                                <div className="flex flex-col gap-1">
+                                    {VOICE_OPTIONS.map((voice) => (
+                                        <Button
+                                            key={voice.id}
+                                            variant="outline"
+                                            onClick={() => setSelectedVoice(voice.id)}
+                                            className={`px-2 py-1.5 text-sm border rounded-lg font-medium transition-colors flex justify-between items-center ${selectedVoice === voice.id ? 'border-blue-300 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800' : 'border-border hover:bg-accent'}`}
+                                        >
+                                            <span className="font-medium text-xs">{voice.name}</span>
+                                            <span className="text-xs text-muted-foreground">{voice.description}</span>
+                                        </Button>
+                                    ))}
+                                </div>
                             </div>
                         </div>
 
                         {/* Custom Instructions - Collapsible */}
-                        <details className="mb-6 text-left">
-                            <summary className="cursor-pointer text-sm font-medium text-foreground mb-3 flex items-center justify-between">
-                                Custom Instructions
+                        <details className="mb-4">
+                            <summary className="cursor-pointer text-sm font-medium text-foreground flex items-center gap-1">
                                 <ChevronDown className="w-4 h-4" />
+                                Custom Instructions
                             </summary>
                             <textarea
                                 value={additionalInstructions}
                                 onChange={(e) => setAdditionalInstructions(e.target.value)}
-                                placeholder="Add specific guidance for your audio overview (optional)"
-                                className="w-full px-3 py-3 text-sm border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none mt-2"
-                                rows={4}
+                                placeholder="Add specific guidance for your audio overview"
+                                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none mt-2"
+                                rows={3}
                             />
                         </details>
 
-                        <div className="flex gap-3 justify-center">
+                        <div className="flex gap-3 justify-end">
                             {showGenerationForm && audioOverview && (
                                 <button
                                     onClick={() => {
                                         setShowGenerationForm(false);
                                         setAdditionalInstructions(DEFAULT_INSTRUCTIONS);
+                                        setSelectedVoice('nova');
+                                        setSelectedLength('medium');
+                                        setSelectedFocus('summary');
                                     }}
-                                    className="px-6 py-3 text-secondary-foreground border border-border rounded-lg font-medium hover:bg-accent transition-colors"
+                                    className="px-4 py-2 text-secondary-foreground border border-border rounded-lg font-medium hover:bg-accent transition-colors text-sm"
                                 >
                                     Cancel
                                 </button>
                             )}
                             <button
                                 onClick={() => {
-                                    createAudioOverview(additionalInstructions);
+                                    const focusInstructions = FOCUS_OPTIONS.find(f => f.id === selectedFocus)?.instructions || '';
+                                    const fullInstructions = additionalInstructions
+                                        ? `${focusInstructions}\n\nAdditional instructions: ${additionalInstructions}`
+                                        : focusInstructions;
+                                    createAudioOverview(fullInstructions, selectedVoice, selectedLength);
                                     setShowGenerationForm(false);
                                 }}
                                 disabled={isLoading || isAudioOverviewAtLimit(subscription)}
-                                className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-400 disabled:cursor-not-allowed text-white px-8 py-3 rounded-lg font-medium text-base shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+                                className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-400 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-medium text-sm shadow-lg hover:shadow-xl transition-all duration-200"
                             >
-                                <Play className="w-4 h-4" />
-                                {isLoading ? 'Generating...' : isAudioOverviewAtLimit(subscription) ? 'Limit Reached' : 'Generate Audio Overview'}
+                                {isLoading ? 'Creating...' : isAudioOverviewAtLimit(subscription) ? 'Limit Reached' : 'Create'}
                             </button>
                         </div>
 
@@ -576,6 +646,9 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
                                 onClick={() => {
                                     setShowGenerationForm(true);
                                     setAdditionalInstructions(DEFAULT_INSTRUCTIONS);
+                                    setSelectedVoice('nova');
+                                    setSelectedLength('medium');
+                                    setSelectedFocus('summary');
                                 }}
                                 disabled={isLoading || isAudioOverviewAtLimit(subscription)}
                                 className={`text-sm font-medium flex items-center gap-1 ${isLoading || isAudioOverviewAtLimit(subscription)

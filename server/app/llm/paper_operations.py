@@ -54,15 +54,17 @@ class PaperOperations(BaseLLMClient):
 
         audio_overview_schema = AudioOverviewForLLM.model_json_schema()
 
+        # Word count targets for audio durations at ~150 words/min
+        # short: ~3 min, medium: ~7 min, long: ~14 min
         word_count_map = {
-            "short": 4000,
-            "medium": 15000,
-            "long": 40000,
+            "short": 450,
+            "medium": 1000,
+            "long": 2000,
         }
 
         formatted_prompt = GENERATE_NARRATIVE_SUMMARY.format(
             additional_instructions=additional_instructions,
-            length=word_count_map.get(str(length), word_count_map["short"]),
+            length=word_count_map.get(str(length), word_count_map["medium"]),
             schema=audio_overview_schema,
         )
 
