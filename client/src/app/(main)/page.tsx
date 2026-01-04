@@ -46,6 +46,47 @@ export default function Home() {
 	const { user, loading: authLoading } = useAuth();
 	const { subscription, loading: subscriptionLoading } = useSubscription();
 	const router = useRouter();
+	const [isDragging, setIsDragging] = useState(false);
+
+	const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setIsDragging(true);
+	};
+
+	const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+		e.preventDefault();
+		e.stopPropagation();
+		if (e.relatedTarget && !(e.currentTarget.contains(e.relatedTarget as Node))) {
+			setIsDragging(false);
+		} else if (!e.relatedTarget) {
+			setIsDragging(false);
+		}
+	};
+
+	const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setIsDragging(true);
+	};
+
+	const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setIsDragging(false);
+
+		const files = Array.from(e.dataTransfer.files).filter(
+			file => file.type === 'application/pdf'
+		);
+
+		if (files.length > 0) {
+			handleUploadStart(files.slice(0, 1));
+		}
+
+		if (e.dataTransfer) {
+			e.dataTransfer.items.clear();
+		}
+	};
 
 	// Toast notifications for subscription limits
 	useEffect(() => {
@@ -318,7 +359,13 @@ export default function Home() {
 	return (
 		<div className="min-h-[calc(100vh-64px)] bg-gradient-to-b from-background to-muted/20 flex flex-col">
 			<BlogPostToast />
-			<div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex-1 w-full">
+			<div
+				className={`max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex-1 w-full rounded-xl transition-colors duration-200 ${isDragging ? 'bg-primary/5 ring-2 ring-primary ring-dashed' : ''}`}
+				onDragEnter={handleDragEnter}
+				onDragLeave={handleDragLeave}
+				onDragOver={handleDragOver}
+				onDrop={handleDrop}
+			>
 				{/* Header with branding and search */}
 				<header className="mb-10">
 					<div className="flex flex-col items-center gap-6">
