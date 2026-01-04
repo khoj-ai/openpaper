@@ -625,14 +625,12 @@ class MultiPaperOperations(BaseLLMClient):
             or f"Provide a comprehensive narrative summary of the key findings, contributions, and insights from the papers in this collection. Synthesize the information to highlight overarching themes and significant advancements."
         )
 
-        # Character limits calibrated for target audio durations
-        # At ~150 words/min speaking rate, ~6 chars/word
-        # Values increased ~50% since LLMs tend to undershoot targets
-        # short: ~2-3 min, medium: ~5-7 min, long: ~10-15 min
-        character_count_map = {
-            "short": 4000,    # ~650 words, ~3 min target
-            "medium": 9000,   # ~1500 words, ~7 min target
-            "long": 18000,    # ~3000 words, ~14 min target
+        # Word count targets for audio durations at ~150 words/min
+        # short: ~3 min, medium: ~7 min, long: ~14 min
+        word_count_map = {
+            "short": 450,
+            "medium": 1000,
+            "long": 2000,
         }
 
         # Use the existing evidence gathering system
@@ -675,7 +673,7 @@ class MultiPaperOperations(BaseLLMClient):
         formatted_prompt = GENERATE_MULTI_PAPER_NARRATIVE_SUMMARY.format(
             summary_request=summary_request,
             evidence_gathered=evidence_collection.get_evidence_dict(),
-            length=character_count_map.get(str(length), character_count_map["medium"]),
+            length=word_count_map.get(str(length), word_count_map["medium"]),
             paper_metadata=paper_metadata,
             additional_instructions=additional_instructions or "",
             schema=audio_overview_schema,

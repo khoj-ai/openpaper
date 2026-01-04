@@ -54,19 +54,17 @@ class PaperOperations(BaseLLMClient):
 
         audio_overview_schema = AudioOverviewForLLM.model_json_schema()
 
-        # Character limits calibrated for target audio durations
-        # At ~150 words/min speaking rate, ~6 chars/word
-        # Values increased ~50% since LLMs tend to undershoot targets
-        # short: ~2-3 min, medium: ~5-7 min, long: ~10-15 min
-        character_count_map = {
-            "short": 4000,    # ~650 words, ~3 min target
-            "medium": 9000,   # ~1500 words, ~7 min target
-            "long": 18000,    # ~3000 words, ~14 min target
+        # Word count targets for audio durations at ~150 words/min
+        # short: ~3 min, medium: ~7 min, long: ~14 min
+        word_count_map = {
+            "short": 450,
+            "medium": 1000,
+            "long": 2000,
         }
 
         formatted_prompt = GENERATE_NARRATIVE_SUMMARY.format(
             additional_instructions=additional_instructions,
-            length=character_count_map.get(str(length), character_count_map["medium"]),
+            length=word_count_map.get(str(length), word_count_map["medium"]),
             schema=audio_overview_schema,
         )
 
