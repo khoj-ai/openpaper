@@ -104,8 +104,8 @@ export function QuickActions({ onUploadComplete, onProjectCreated, onUploadStart
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
                 <QuickActionCard
                     icon={<Upload className="h-5 w-5" />}
-                    title="New Paper"
-                    description="Understand research faster"
+                    title="Upload Paper"
+                    description="Start your next study"
                     onClick={() => setUploadModalOpen(true)}
                     variant="primary"
                 />
