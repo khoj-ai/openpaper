@@ -16,12 +16,15 @@ import {
     GitBranch,
     Highlighter,
     MessageSquareText,
-    Mic2,
     Upload,
     Play,
     HandCoins,
     GithubIcon,
     Menu,
+    Quote,
+    Library,
+    FolderKanban,
+    Table2,
 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useIsDarkMode } from "@/hooks/useDarkMode";
@@ -195,12 +198,12 @@ export default function OpenPaperLanding() {
                                 </div>
                                 <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-muted-foreground">
                                     <div className="flex items-center gap-1">
-                                        <CheckCircle className="w-4 h-4 text-primary" />
-                                        No credit card needed
+                                        <Library className="w-4 h-4 text-primary" />
+                                        Personal library
                                     </div>
                                     <div className="flex items-center gap-1">
-                                        <CheckCircle className="w-4 h-4 text-primary" />
-                                        Full citation tracking
+                                        <Quote className="w-4 h-4 text-primary" />
+                                        Grounded citations
                                     </div>
                                     <div className="flex items-center gap-1">
                                         <GitBranch className="w-4 h-4 text-primary" />
@@ -410,7 +413,7 @@ export default function OpenPaperLanding() {
                                     <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg blur-xl"></div>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
-                                        src="https://assets.khoj.dev/openpaper/read_paper_deeply.png"
+                                        src="https://assets.khoj.dev/op_home/two_pane_view.png"
                                         alt="Deep paper reading with AI assistance"
                                         className="relative rounded-lg shadow-lg border border-border w-full h-auto"
                                     />
@@ -420,7 +423,7 @@ export default function OpenPaperLanding() {
                             {/* Grounded Citations */}
                             <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 items-center">
                                 <div className="space-y-4">
-                                    <Badge variant="outline" className="w-fit border-green-500/30 text-green-500">
+                                    <Badge variant="outline" className="w-fit border-blue-500/30 text-blue-500">
                                         <MessageSquareText className="w-3 h-3 mr-1" />
                                         Grounded Responses
                                     </Badge>
@@ -431,24 +434,24 @@ export default function OpenPaperLanding() {
                                     </p>
                                     <ul className="space-y-2 text-sm">
                                         <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-green-500" />
+                                            <CheckCircle className="w-4 h-4 text-blue-500" />
                                             <span>Clickable citations to source</span>
                                         </li>
                                         <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-green-500" />
+                                            <CheckCircle className="w-4 h-4 text-blue-500" />
                                             <span>Page-specific references</span>
                                         </li>
                                         <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-green-500" />
+                                            <CheckCircle className="w-4 h-4 text-blue-500" />
                                             <span>Academic integrity built-in</span>
                                         </li>
                                     </ul>
                                 </div>
                                 <div className="relative">
-                                    <div className="absolute inset-0 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-lg blur-xl"></div>
+                                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-blue-500/10 rounded-lg blur-xl"></div>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
-                                        src="https://assets.khoj.dev/openpaper/grounded_citations.png"
+                                        src="https://assets.khoj.dev/op_home/context_grounded_responses.png"
                                         alt="AI responses with grounded citations"
                                         className="relative rounded-lg shadow-lg border border-border w-full h-auto"
                                     />
@@ -458,7 +461,7 @@ export default function OpenPaperLanding() {
                             {/* Inline Annotations */}
                             <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 items-center">
                                 <div className="space-y-4">
-                                    <Badge variant="outline" className="w-fit border-purple-500/30 text-purple-500">
+                                    <Badge variant="outline" className="w-fit border-blue-500/30 text-blue-500">
                                         <Highlighter className="w-3 h-3 mr-1" />
                                         Smart Annotations
                                     </Badge>
@@ -469,101 +472,99 @@ export default function OpenPaperLanding() {
                                     </p>
                                     <ul className="space-y-2 text-sm">
                                         <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-purple-500" />
+                                            <CheckCircle className="w-4 h-4 text-blue-500" />
                                             <span>One-click highlighting</span>
                                         </li>
                                         <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-purple-500" />
+                                            <CheckCircle className="w-4 h-4 text-blue-500" />
                                             <span>Rich annotation tools</span>
                                         </li>
                                         <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-purple-500" />
+                                            <CheckCircle className="w-4 h-4 text-blue-500" />
                                             <span>Cross-device synchronization</span>
                                         </li>
                                     </ul>
                                 </div>
                                 <div className="relative">
-                                    <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg blur-xl"></div>
+                                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-blue-500/10 rounded-lg blur-xl"></div>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
-                                        src="https://assets.khoj.dev/openpaper/inline_annotations.png"
+                                        src="https://assets.khoj.dev/op_home/easy_annotations.png"
                                         alt="Inline annotations and highlighting"
                                         className="relative rounded-lg shadow-lg border border-border w-full h-auto"
                                     />
                                 </div>
                             </div>
 
-                            {/* Paper to Podcast */}
+                            {/* Projects */}
                             <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 items-center">
                                 <div className="space-y-4">
-                                    <Badge variant="outline" className="w-fit border-orange-500/30 text-orange-500">
-                                        <Mic2 className="w-3 h-3 mr-1" />
-                                        Audio Summaries
+                                    <Badge variant="outline" className="w-fit border-blue-500/30 text-blue-500">
+                                        <FolderKanban className="w-3 h-3 mr-1" />
+                                        Projects
                                     </Badge>
-                                    <h3 className="text-2xl font-bold">Listen to Research On-the-Go</h3>
+                                    <h3 className="text-2xl font-bold">Research Across Multiple Papers</h3>
                                     <p className="text-muted-foreground">
-                                        Transform dense academic papers into engaging audio summaries. Perfect for commutes,
-                                        workouts, or when you need to absorb information hands-free.
+                                        Group related papers into projects and unlock cross-paper insights. Ask questions that span your entire collection, generate artifacts, and maintain verifiable citations throughout.
                                     </p>
                                     <ul className="space-y-2 text-sm">
                                         <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-orange-500" />
-                                            <span>Natural voice synthesis</span>
+                                            <CheckCircle className="w-4 h-4 text-blue-500" />
+                                            <span>Cross-paper chat</span>
                                         </li>
                                         <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-orange-500" />
-                                            <span>Key insights highlighted</span>
+                                            <CheckCircle className="w-4 h-4 text-blue-500" />
+                                            <span>One-click citation verification</span>
                                         </li>
                                         <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-orange-500" />
-                                            <span>Mobile-friendly playback</span>
+                                            <CheckCircle className="w-4 h-4 text-blue-500" />
+                                            <span>Generate artifacts from sources</span>
                                         </li>
                                     </ul>
                                 </div>
                                 <div className="relative">
-                                    <div className="absolute inset-0 bg-gradient-to-r from-orange-500/10 to-red-500/10 rounded-lg blur-xl"></div>
+                                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-blue-500/10 rounded-lg blur-xl"></div>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
-                                        src="https://assets.khoj.dev/openpaper/paper_to_podcast.png"
-                                        alt="Convert papers to audio podcasts"
+                                        src="https://assets.khoj.dev/op_home/op_projects.png"
+                                        alt="Research projects with multi-paper chat"
                                         className="relative rounded-lg shadow-lg border border-border w-full h-auto"
                                     />
                                 </div>
                             </div>
 
-                            {/* Find Related Papers */}
+                            {/* Data Tables */}
                             <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 items-center">
                                 <div className="space-y-4">
-                                    <Badge variant="outline" className="w-fit border-indigo-500/30 text-indigo-500">
-                                        <Search className="w-3 h-3 mr-1" />
-                                        Discovery
+                                    <Badge variant="outline" className="w-fit border-blue-500/30 text-blue-500">
+                                        <Table2 className="w-3 h-3 mr-1" />
+                                        Data Tables
                                     </Badge>
-                                    <h3 className="text-2xl font-bold">Discover Connected Research</h3>
+                                    <h3 className="text-2xl font-bold">From Papers to Structured Data</h3>
                                     <p className="text-muted-foreground">
-                                        Find papers that build on your current research. Our semantic search understands context
-                                        and relationships between studies, helping you discover relevant work you might have missed.
+                                        Speed up your literature review with structured extraction. Define custom schemas to pull key fields across your entire project, with every cell grounded in your sources. Export to CSV when you&rsquo;re ready to analyze.
                                     </p>
                                     <ul className="space-y-2 text-sm">
                                         <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-indigo-500" />
-                                            <span>Semantic similarity search</span>
+                                            <CheckCircle className="w-4 h-4 text-blue-500" />
+                                            <span>Custom schema extraction</span>
                                         </li>
                                         <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-indigo-500" />
-                                            <span>Open access focus</span>
+                                            <CheckCircle className="w-4 h-4 text-blue-500" />
+                                            <span>Grounded, verifiable cells</span>
                                         </li>
                                         <li className="flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-indigo-500" />
-                                            <span>Expand your literature review</span>
+                                            <CheckCircle className="w-4 h-4 text-blue-500" />
+                                            <span>One-click CSV export</span>
                                         </li>
                                     </ul>
                                 </div>
                                 <div className="relative">
-                                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-blue-500/10 rounded-lg blur-xl"></div>
+                                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-blue-500/10 rounded-lg blur-xl"></div>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
-                                        src="https://assets.khoj.dev/openpaper/find_related_papers.png"
-                                        alt="Find related research papers"
+                                        src="https://assets.khoj.dev/op_home/project_data_tables.png"
+                                        alt="Extract structured data from research papers"
                                         className="relative rounded-lg shadow-lg border border-border w-full h-auto"
                                     />
                                 </div>
@@ -683,15 +684,15 @@ export default function OpenPaperLanding() {
                             </div>
                             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 text-muted-foreground text-sm">
                                 <div className="flex items-center gap-2">
-                                    <CheckCircle className="w-4 h-4 text-primary" />
-                                    No credit card required
+                                    <Library className="w-4 h-4 text-primary" />
+                                    Personal library
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <CheckCircle className="w-4 h-4 text-primary" />
-                                    Full citation tracking
+                                    <Quote className="w-4 h-4 text-primary" />
+                                    Grounded citations
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <CheckCircle className="w-4 h-4 text-primary" />
+                                    <GitBranch className="w-4 h-4 text-primary" />
                                     Open source
                                 </div>
                             </div>
