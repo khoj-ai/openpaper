@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Pause, Play, RotateCcw, Volume2 } from 'lucide-react';
 import { AudioOverview } from '@/lib/schema';
 import CustomCitationLink from '@/components/utils/CustomCitationLink';
@@ -13,6 +13,118 @@ interface EnhancedAudioPlayerProps {
     paper_title?: string;
     setExplicitSearchTerm: (term: string) => void;
 }
+
+// Memoized transcript component to prevent re-renders during audio playback
+interface TranscriptSectionProps {
+    transcript: string;
+    citations: AudioOverview['citations'];
+    handleCitationClick: (citationKey: string, messageIndex: number) => void;
+}
+
+const TranscriptSection = React.memo(function TranscriptSection({
+    transcript,
+    citations,
+    handleCitationClick,
+}: TranscriptSectionProps) {
+    const citationsForMarkdown = useMemo(
+        () => citations.map(c => ({ key: String(c.index), reference: c.text })),
+        [citations]
+    );
+
+    const markdownComponents = useMemo(() => ({
+        p: (props: React.ComponentProps<'p'>) => <CustomCitationLink
+            {...props}
+            handleCitationClick={handleCitationClick}
+            messageIndex={0}
+            citations={citationsForMarkdown}
+        />,
+        li: (props: React.ComponentProps<'li'>) => <CustomCitationLink
+            {...props}
+            handleCitationClick={handleCitationClick}
+            messageIndex={0}
+            citations={citationsForMarkdown}
+        />,
+        div: (props: React.ComponentProps<'div'>) => <CustomCitationLink
+            {...props}
+            handleCitationClick={handleCitationClick}
+            messageIndex={0}
+            citations={citationsForMarkdown}
+        />,
+        td: (props: React.ComponentProps<'td'>) => <CustomCitationLink
+            {...props}
+            handleCitationClick={handleCitationClick}
+            messageIndex={0}
+            citations={citationsForMarkdown}
+        />,
+        table: CopyableTable,
+    }), [citationsForMarkdown, handleCitationClick]);
+
+    return (
+        <Markdown components={markdownComponents}>
+            {transcript}
+        </Markdown>
+    );
+});
+
+// Memoized references section to prevent re-renders during audio playback
+interface ReferencesSectionProps {
+    transcript: string;
+    citations: AudioOverview['citations'];
+    activeCitationKey: string | null;
+    handleCitationClick: (citationKey: string, messageIndex: number) => void;
+}
+
+const ReferencesSection = React.memo(function ReferencesSection({
+    transcript,
+    citations,
+    activeCitationKey,
+    handleCitationClick,
+}: ReferencesSectionProps) {
+    const citationsForActions = useMemo(
+        () => citations.map(c => ({ key: String(c.index), reference: c.text })),
+        [citations]
+    );
+
+    if (!citations || citations.length === 0) {
+        return (
+            <ChatMessageActions
+                message={transcript}
+                references={{ citations: citationsForActions }}
+            />
+        );
+    }
+
+    return (
+        <div className="mt-4 pt-4 border-t border-gray-300 dark:border-gray-700" id="references-section">
+            <div className="flex items-center justify-between">
+                <h4 className="text-sm font-semibold mb-2">References</h4>
+                <ChatMessageActions
+                    message={transcript}
+                    references={{ citations: citationsForActions }}
+                />
+            </div>
+            <ul className="list-none p-0">
+                {citations.map((citation) => (
+                    <div
+                        key={citation.index}
+                        className={`flex flex-row gap-2 animate-fade-in ${activeCitationKey === String(citation.index) ? 'bg-blue-100 dark:bg-blue-900 rounded p-1 transition-colors duration-300' : ''}`}
+                        onClick={() => handleCitationClick(String(citation.index), 0)}
+                    >
+                        <div className="text-xs text-secondary-foreground">
+                            <a href={`#citation-ref-${citation.index}`}>{citation.index}</a>
+                        </div>
+                        <div
+                            id={`citation-ref-${citation.index}`}
+                            className="text-xs text-secondary-foreground"
+                        >
+                            {citation.text}
+                        </div>
+                    </div>
+                ))}
+            </ul>
+        </div>
+    );
+});
 
 export function EnhancedAudioPlayer({ audioOverview, paper_title, setExplicitSearchTerm }: EnhancedAudioPlayerProps) {
     const audioRef = useRef<HTMLAudioElement>(null);
@@ -217,11 +329,7 @@ export function EnhancedAudioPlayer({ audioOverview, paper_title, setExplicitSea
     };
 
 
-    const matchesCurrentCitation = useCallback((key: string) => {
-        return activeCitationKey === key;
-    }, [activeCitationKey]);
-
-    const handleCitationClick = (citationKey: string, messageIndex: number) => {
+    const handleCitationClick = useCallback((citationKey: string, messageIndex: number) => {
         const citationIndex = parseInt(citationKey);
         console.debug(`Index: ${citationIndex}, Message Index: ${messageIndex}`);
         // Look up the citations terms from the citationKey
@@ -229,17 +337,7 @@ export function EnhancedAudioPlayer({ audioOverview, paper_title, setExplicitSea
         setExplicitSearchTerm(citationMatch ? citationMatch.text : citationKey);
         setActiveCitationKey(citationKey);
         setTimeout(() => setActiveCitationKey(null), 3000);
-    };
-
-    const handleCitationClickFromTranscript = (citationKey: string, messageIndex: number) => {
-        const citationIndex = parseInt(citationKey);
-        console.debug(`Index: ${citationIndex}, Message Index: ${messageIndex}`);
-        // Look up the citations terms from the citationKey
-        const citationMatch = audioOverview?.citations.find(c => c.index === citationIndex);
-        setExplicitSearchTerm(citationMatch ? citationMatch.text : citationKey);
-        setActiveCitationKey(citationKey);
-        setTimeout(() => setActiveCitationKey(null), 3000);
-    };
+    }, [audioOverview?.citations, setExplicitSearchTerm]);
 
 
     return (
@@ -337,82 +435,22 @@ export function EnhancedAudioPlayer({ audioOverview, paper_title, setExplicitSea
             </div>
 
 
-            {/* Transcript */}
+            {/* Transcript - memoized to prevent re-renders during playback */}
             {audioOverview.transcript && (
-                <Markdown
-                    components={{
-                        // Apply the custom component to text nodes
-                        p: (props) => <CustomCitationLink
-                            {...props}
-                            handleCitationClick={handleCitationClickFromTranscript}
-                            messageIndex={0}
-                            citations={audioOverview.citations.map(c => ({ key: String(c.index), reference: c.text }))}
-                        />,
-                        li: (props) => <CustomCitationLink
-                            {...props}
-                            handleCitationClick={handleCitationClickFromTranscript}
-                            messageIndex={0}
-                            citations={audioOverview.citations.map(c => ({ key: String(c.index), reference: c.text }))}
-                        />,
-                        div: (props) => <CustomCitationLink
-                            {...props}
-                            handleCitationClick={handleCitationClickFromTranscript}
-                            messageIndex={0}
-                            citations={audioOverview.citations.map(c => ({ key: String(c.index), reference: c.text }))}
-                        />,
-                        td: (props) => <CustomCitationLink
-                            {...props}
-                            handleCitationClick={handleCitationClickFromTranscript}
-                            messageIndex={0}
-                            citations={audioOverview.citations.map(c => ({ key: String(c.index), reference: c.text }))}
-                        />,
-                        table: CopyableTable,
-                    }}
-                >
-                    {audioOverview.transcript}
-                </Markdown>
-            )}
-
-            {/* Citations */}
-            {audioOverview.citations && audioOverview.citations.length > 0 ? (
-                <div className="mt-4 pt-4 border-t border-gray-300 dark:border-gray-700" id="references-section">
-                    <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-semibold mb-2">References</h4>
-                        <ChatMessageActions
-                            message={audioOverview.transcript}
-                            references={{
-                                citations: audioOverview.citations.map(c => ({ key: String(c.index), reference: c.text }))
-                            }}
-                        />
-                    </div>
-                    <ul className="list-none p-0">
-                        {audioOverview.citations.map((citation) => (
-                            <div
-                                key={citation.index}
-                                className={`flex flex-row gap-2 animate-fade-in ${matchesCurrentCitation(String(citation.index)) ? 'bg-blue-100 dark:bg-blue-900 rounded p-1 transition-colors duration-300' : ''}`}
-                                onClick={() => handleCitationClick(String(citation.index), 0)}
-                            >
-                                <div className={`text-xs text-secondary-foreground`}>
-                                    <a href={`#citation-ref-${citation.index}`}>{citation.index}</a>
-                                </div>
-                                <div
-                                    id={`citation-ref-${citation.index}`}
-                                    className={`text-xs text-secondary-foreground`}
-                                >
-                                    {citation.text}
-                                </div>
-                            </div>
-                        ))}
-                    </ul>
-                </div>
-            ) : (
-                <ChatMessageActions
-                    message={audioOverview.transcript}
-                    references={{
-                        citations: audioOverview.citations?.map(c => ({ key: String(c.index), reference: c.text })) || []
-                    }}
+                <TranscriptSection
+                    transcript={audioOverview.transcript}
+                    citations={audioOverview.citations}
+                    handleCitationClick={handleCitationClick}
                 />
             )}
+
+            {/* Citations - memoized to prevent re-renders during playback */}
+            <ReferencesSection
+                transcript={audioOverview.transcript}
+                citations={audioOverview.citations}
+                activeCitationKey={activeCitationKey}
+                handleCitationClick={handleCitationClick}
+            />
         </div>
     );
 }
