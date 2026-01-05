@@ -63,6 +63,9 @@ CONTENT_LIMIT_EVIDENCE_GATHERING = (
 CONTENT_LIMIT_CHAT_EVIDENCE = (
     300000  # Character limit for evidence in chat response prompt
 )
+CONTENT_LIMIT_COMPACTION_BATCH = (
+    80000  # Max chars per batch when compacting (for smaller context models)
+)
 
 
 class MultiPaperOperations(BaseLLMClient):
@@ -443,21 +446,139 @@ class MultiPaperOperations(BaseLLMClient):
         """
         Compact evidence by summarizing it to reduce context size for chat response.
         Modifies the evidence_collection in place.
+
+        If evidence is too large for a single compaction request, it will be
+        batched by paper and compacted in multiple requests.
         """
         start_time = time.time()
         original_size = evidence_collection.get_evidence_size()
         evidence_dict = evidence_collection.get_evidence_dict()
         original_count = sum(len(snippets) for snippets in evidence_dict.values())
 
+        # Split evidence into batches if too large for single request
+        batches = self._split_evidence_into_batches(
+            evidence_dict, CONTENT_LIMIT_COMPACTION_BATCH
+        )
+
+        if len(batches) > 1:
+            logger.info(
+                f"Evidence too large for single compaction. "
+                f"Splitting into {len(batches)} batches."
+            )
+
+        # Compact each batch and merge results
+        all_compacted: Dict[str, List[str]] = {}
+
+        for batch_idx, batch in enumerate(batches):
+            try:
+                compacted_batch = await self._compact_evidence_batch(
+                    batch,
+                    original_question,
+                    llm_provider,
+                )
+                # Merge batch results
+                for paper_id, snippets in compacted_batch.items():
+                    if paper_id in all_compacted:
+                        all_compacted[paper_id].extend(snippets)
+                    else:
+                        all_compacted[paper_id] = snippets
+
+                logger.debug(f"Compacted batch {batch_idx + 1}/{len(batches)}")
+
+            except Exception as e:
+                logger.warning(
+                    f"Batch {batch_idx + 1} compaction failed: {e}. "
+                    f"Keeping original evidence for this batch."
+                )
+                # Keep original evidence for failed batch
+                for paper_id, snippets in batch.items():
+                    if paper_id in all_compacted:
+                        all_compacted[paper_id].extend(snippets)
+                    else:
+                        all_compacted[paper_id] = snippets
+
+        # Apply all compacted evidence
+        evidence_collection.apply_compacted_evidence(all_compacted)
+
+        new_size = evidence_collection.get_evidence_size()
+        new_count = sum(len(snippets) for snippets in all_compacted.values())
+
+        logger.info(
+            f"Evidence compaction complete. "
+            f"Original: {original_count} snippets ({original_size} chars), "
+            f"Compacted: {new_count} snippets ({new_size} chars), "
+            f"Batches: {len(batches)}"
+        )
+
+        track_event(
+            "evidence_compacted",
+            {
+                "duration_ms": (time.time() - start_time) * 1000,
+                "original_count": original_count,
+                "original_size": original_size,
+                "compacted_count": new_count,
+                "compacted_size": new_size,
+                "num_batches": len(batches),
+            },
+            user_id=str(current_user.id),
+        )
+
+    def _split_evidence_into_batches(
+        self,
+        evidence_dict: Dict[str, List[str]],
+        max_batch_size: int,
+    ) -> List[Dict[str, List[str]]]:
+        """Split evidence into batches that fit within the size limit."""
+        batches: List[Dict[str, List[str]]] = []
+        current_batch: Dict[str, List[str]] = {}
+        current_size = 0
+
+        for paper_id, snippets in evidence_dict.items():
+            paper_size = sum(len(s) for s in snippets)
+
+            # If single paper exceeds limit, it goes in its own batch
+            # (the LLM call may still fail, but we'll handle that gracefully)
+            if paper_size > max_batch_size:
+                if current_batch:
+                    batches.append(current_batch)
+                    current_batch = {}
+                    current_size = 0
+                batches.append({paper_id: snippets})
+                continue
+
+            # If adding this paper would exceed limit, start new batch
+            if current_size + paper_size > max_batch_size and current_batch:
+                batches.append(current_batch)
+                current_batch = {}
+                current_size = 0
+
+            current_batch[paper_id] = snippets
+            current_size += paper_size
+
+        # Don't forget the last batch
+        if current_batch:
+            batches.append(current_batch)
+
+        return batches if batches else [{}]
+
+    async def _compact_evidence_batch(
+        self,
+        evidence_batch: Dict[str, List[str]],
+        original_question: str,
+        llm_provider: Optional[LLMProvider] = None,
+    ) -> Dict[str, List[str]]:
+        """Compact a single batch of evidence."""
+        if not evidence_batch:
+            return {}
+
         formatted_prompt = EVIDENCE_COMPACTION_PROMPT.format(
             question=original_question,
-            evidence=json.dumps(evidence_dict, indent=2),
+            evidence=json.dumps(evidence_batch, indent=2),
             schema=EvidenceCompactionResponse.model_json_schema(),
         )
 
         message_content = [TextContent(text=formatted_prompt)]
 
-        # Get LLM to compact the evidence
         llm_response = self.generate_content(
             system_prompt="You are a research assistant that summarizes evidence while preserving key information for answering questions.",
             contents=message_content,
@@ -465,49 +586,17 @@ class MultiPaperOperations(BaseLLMClient):
             provider=llm_provider,
         )
 
-        try:
-            if llm_response and llm_response.text:
-                compaction_response = JSONParser.validate_and_extract_json(
-                    llm_response.text
-                )
-                compaction_response = EvidenceCompactionResponse.model_validate(
-                    compaction_response
-                )
-
-                # Apply the compacted evidence
-                evidence_collection.apply_compacted_evidence(
-                    compaction_response.compacted_evidence
-                )
-
-                new_size = evidence_collection.get_evidence_size()
-                new_count = sum(
-                    len(snippets)
-                    for snippets in compaction_response.compacted_evidence.values()
-                )
-                logger.info(
-                    f"Evidence compaction complete. "
-                    f"Original: {original_count} snippets ({original_size} chars), "
-                    f"Compacted: {new_count} snippets ({new_size} chars)"
-                )
-
-                track_event(
-                    "evidence_compacted",
-                    {
-                        "duration_ms": (time.time() - start_time) * 1000,
-                        "original_count": original_count,
-                        "original_size": original_size,
-                        "compacted_count": new_count,
-                        "compacted_size": new_size,
-                    },
-                    user_id=str(current_user.id),
-                )
-            else:
-                logger.warning("Empty response from LLM during evidence compaction.")
-
-        except Exception as e:
-            logger.warning(
-                f"Evidence compaction failed: {e}. Keeping original evidence."
+        if llm_response and llm_response.text:
+            compaction_response = JSONParser.validate_and_extract_json(
+                llm_response.text
             )
+            compaction_response = EvidenceCompactionResponse.model_validate(
+                compaction_response
+            )
+            return compaction_response.compacted_evidence
+        else:
+            logger.warning("Empty response from LLM during evidence batch compaction.")
+            return evidence_batch  # Return original on failure
 
     async def chat_with_papers(
         self,
