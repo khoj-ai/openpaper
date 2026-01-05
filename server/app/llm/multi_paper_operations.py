@@ -506,7 +506,7 @@ class MultiPaperOperations(BaseLLMClient):
         original_question: str,
         current_user: CurrentUser,
         llm_provider: Optional[LLMProvider] = None,
-    ) -> AsyncGenerator[Dict[str, str], None]:
+    ) -> AsyncGenerator[Dict[str, Union[str, Dict[str, List[str]]]], None]:
         """
         Compact evidence by summarizing it to reduce context size for chat response.
         Modifies the evidence_collection in place.
