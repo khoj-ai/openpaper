@@ -48,6 +48,15 @@ import {
 export type { ExtendedHighlight };
 export { paperHighlightToExtended, extendedToPaperHighlight };
 
+// Position data for highlights rendered via DOM overlays (assistant highlights)
+export interface RenderedHighlightPosition {
+	left: number;
+	top: number;
+	width: number;
+	height: number;
+	page: number;
+}
+
 interface PdfHighlighterViewerProps {
 	pdfUrl: string;
 	explicitSearchTerm?: string;
@@ -76,6 +85,7 @@ interface PdfHighlighterViewerProps {
 	handleStatusChange?: (status: PaperStatus) => void;
 	paperStatus?: PaperStatus;
 	setUserMessageReferences: React.Dispatch<React.SetStateAction<string[]>>;
+	onOverlaysCreated?: (positions: Map<string, RenderedHighlightPosition>) => void;
 }
 
 export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
@@ -98,6 +108,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		paperStatus,
 		handleStatusChange = () => { },
 		setUserMessageReferences,
+		onOverlaysCreated,
 	} = props;
 
 	// Refs
@@ -536,6 +547,20 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 				// Make overlays clickable and navigate to annotation panel
 				overlays.forEach((el) => {
 					el.setAttribute("data-highlight-key", key);
+					el.setAttribute("data-highlight-id", highlight.id || "");
+					el.setAttribute("data-page-number", String(pageNumber));
+					// Encode position from the overlay's computed style
+					const left = el.style.left;
+					const top = el.style.top;
+					const width = el.style.width;
+					const height = el.style.height;
+					el.setAttribute("data-position", JSON.stringify({
+						left: parseFloat(left),
+						top: parseFloat(top),
+						width: parseFloat(width),
+						height: parseFloat(height),
+						page: pageNumber,
+					}));
 					el.style.pointerEvents = "auto";
 					el.style.cursor = "pointer";
 					el.addEventListener("click", (e) => {
@@ -561,6 +586,30 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 					createOverlaysForTextLayer(textLayer, parseInt(pageNum, 10));
 				}
 			});
+		};
+
+		// Collect all rendered highlight positions from the DOM and notify via callback
+		const notifyOverlaysCreated = () => {
+			if (!onOverlaysCreated) return;
+
+			const positions = new Map<string, RenderedHighlightPosition>();
+			const overlays = document.querySelectorAll(".text-match-highlight-overlay[data-highlight-id]");
+
+			overlays.forEach((el) => {
+				const highlightId = el.getAttribute("data-highlight-id");
+				const positionData = el.getAttribute("data-position");
+
+				if (highlightId && positionData && !positions.has(highlightId)) {
+					try {
+						const parsed = JSON.parse(positionData) as RenderedHighlightPosition;
+						positions.set(highlightId, parsed);
+					} catch (e) {
+						console.warn("Failed to parse position data for highlight", highlightId, e);
+					}
+				}
+			});
+
+			onOverlaysCreated(positions);
 		};
 
 		// Populate page cache for highlights (needed for both immediate creation and MutationObserver)
@@ -589,6 +638,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		const timeoutId = setTimeout(() => {
 			ensurePageMappings().then(() => {
 				createOverlaysForAllRenderedPages();
+				notifyOverlaysCreated();
 			});
 		}, creationDelay);
 
@@ -636,6 +686,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 					const timeout = setTimeout(() => {
 						pendingTimeouts.delete(pageNumber);
 						createOverlaysForTextLayer(textLayer, pageNumber);
+						notifyOverlaysCreated();
 					}, 100);
 					pendingTimeouts.set(pageNumber, timeout);
 				}
@@ -658,7 +709,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			pendingTimeouts.forEach((timeout) => clearTimeout(timeout));
 			pendingTimeouts.clear();
 		};
-	}, [pdfReady, highlights, scale]);
+	}, [pdfReady, highlights, scale, onOverlaysCreated]);
 
 	return (
 		<div

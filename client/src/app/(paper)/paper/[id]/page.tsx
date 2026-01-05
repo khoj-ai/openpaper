@@ -1,6 +1,6 @@
 'use client';
 
-import { PdfHighlighterViewer } from '@/components/PdfHighlighterViewer';
+import { PdfHighlighterViewer, RenderedHighlightPosition } from '@/components/PdfHighlighterViewer';
 import { Button } from '@/components/ui/button';
 import { fetchFromApi } from '@/lib/api';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
@@ -113,6 +113,12 @@ export default function PaperView() {
     const [explicitSearchTerm, setExplicitSearchTerm] = useState<string | undefined>(undefined);
     const [isSharing, setIsSharing] = useState(false);
     const [userMessageReferences, setUserMessageReferences] = useState<string[]>([]);
+    const [renderedHighlightPositions, setRenderedHighlightPositions] = useState<Map<string, RenderedHighlightPosition>>(new Map());
+
+    // Callback for when PDF highlight overlays are created (for assistant highlights)
+    const handleOverlaysCreated = useCallback((positions: Map<string, RenderedHighlightPosition>) => {
+        setRenderedHighlightPositions(positions);
+    }, []);
 
     const [jobId, setJobId] = useState<string | null>(null);
     const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
@@ -466,6 +472,7 @@ export default function PaperView() {
         handleCitationClick,
         userMessageReferences,
         setUserMessageReferences,
+        renderedHighlightPositions,
     };
 
     if (isMobile) {
@@ -497,6 +504,7 @@ export default function PaperView() {
                                     setHighlights={setHighlights}
                                     handleStatusChange={handleStatusChange}
                                     paperStatus={paperData.status}
+                                    onOverlaysCreated={handleOverlaysCreated}
                                 />
                             )}
                         </div>
@@ -582,6 +590,7 @@ export default function PaperView() {
                                 setHighlights={setHighlights}
                                 handleStatusChange={handleStatusChange}
                                 paperStatus={paperData.status}
+                                onOverlaysCreated={handleOverlaysCreated}
                             />
                         </div>
                     )}

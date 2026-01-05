@@ -7,6 +7,7 @@ import {
     CreditUsage,
     Reference,
 } from '@/lib/schema';
+import { RenderedHighlightPosition } from './PdfHighlighterViewer';
 import {
     X,
     Loader,
@@ -75,6 +76,7 @@ interface SidePanelContentProps {
     userMessageReferences: string[];
     setUserMessageReferences: React.Dispatch<React.SetStateAction<string[]>>;
     isMobile: boolean;
+    renderedHighlightPositions?: Map<string, RenderedHighlightPosition>;
 }
 
 interface ChatRequestBody {
@@ -108,6 +110,7 @@ export function SidePanelContent({
     userMessageReferences,
     setUserMessageReferences,
     isMobile,
+    renderedHighlightPositions,
 }: SidePanelContentProps) {
     const { user } = useAuth();
     const [conversationId, setConversationId] = useState<string | null>(null);
@@ -779,6 +782,7 @@ export function SidePanelContent({
                                         activeHighlight={activeHighlight}
                                         updateAnnotation={updateAnnotation}
                                         removeAnnotation={removeAnnotation}
+                                        renderedHighlightPositions={renderedHighlightPositions}
                                     />
                                 </div>
                             )

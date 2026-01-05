@@ -5,6 +5,7 @@ import {
 	PaperHighlightAnnotation,
 	HighlightColor,
 } from '@/lib/schema';
+import { RenderedHighlightPosition } from './PdfHighlighterViewer';
 
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -119,6 +120,7 @@ interface HighlightThreadProps {
 	updateAnnotation?: (annotationId: string, content: string) => void;
 	user?: BasicUser
 	readonly?: boolean;
+	renderedPosition?: RenderedHighlightPosition;
 }
 
 
@@ -132,7 +134,8 @@ function HighlightThread({
 	removeAnnotation,
 	updateAnnotation,
 	user,
-	readonly
+	readonly,
+	renderedPosition,
 }: HighlightThreadProps) {
 
 	const highlightBorderColor = highlight.role === 'assistant'
@@ -167,6 +170,22 @@ function HighlightThread({
 						</p>
 					</div>
 				</blockquote>
+
+				{/* Debug Info */}
+				<div className="text-[10px] text-muted-foreground font-mono mb-2 pl-3">
+					<span>page: {highlight.page_number ?? renderedPosition?.page ?? 'n/a'}</span>
+					{highlight.position && (
+						<span className="ml-2">
+							pos: [{Math.round(highlight.position.boundingRect.x1)}, {Math.round(highlight.position.boundingRect.y1)}] - [{Math.round(highlight.position.boundingRect.x2)}, {Math.round(highlight.position.boundingRect.y2)}]
+						</span>
+					)}
+					{!highlight.position && renderedPosition && (
+						<span className="ml-2">
+							pos (rendered): [{Math.round(renderedPosition.left)}, {Math.round(renderedPosition.top)}] w:{Math.round(renderedPosition.width)} h:{Math.round(renderedPosition.height)}
+						</span>
+					)}
+					{!highlight.position && !renderedPosition && <span className="ml-2">pos: n/a</span>}
+				</div>
 
 				{/* The Annotation Thread */}
 				{annotations.length > 0 && (
@@ -208,6 +227,7 @@ interface AnnotationsViewProps {
 	updateAnnotation?: (annotationId: string, content: string) => void;
 	user: BasicUser;
 	readonly?: boolean;
+	renderedHighlightPositions?: Map<string, RenderedHighlightPosition>;
 }
 
 interface AnnotationsToolbarProps {
@@ -271,7 +291,8 @@ export function AnnotationsView(
 		removeAnnotation,
 		updateAnnotation,
 		user,
-		readonly = false
+		readonly = false,
+		renderedHighlightPositions,
 	}: AnnotationsViewProps
 ) {
 	// All your existing useEffect hooks for sorting and mapping data remain the same
@@ -302,10 +323,39 @@ export function AnnotationsView(
 	}, [activeHighlight]);
 
 	useEffect(() => {
-		const sortedHighlights = highlights.sort((a, b) => {
-			const aStart = a.start_offset || 0;
-			const bStart = b.start_offset || 0;
-			return aStart - bStart;
+		// Sort highlights by position
+		// For highlights with position data (user highlights), use boundingRect
+		// For assistant highlights without position, use renderedHighlightPositions from DOM
+		const sortedHighlights = [...highlights].sort((a, b) => {
+			// Get position for highlight a
+			let aPage = a.page_number || 0;
+			let aTop = 0;
+			if (a.position) {
+				aPage = a.position.boundingRect.pageNumber || aPage;
+				aTop = a.position.boundingRect.y1;
+			} else if (a.id && renderedHighlightPositions?.has(a.id)) {
+				const pos = renderedHighlightPositions.get(a.id)!;
+				aPage = pos.page;
+				aTop = pos.top;
+			}
+
+			// Get position for highlight b
+			let bPage = b.page_number || 0;
+			let bTop = 0;
+			if (b.position) {
+				bPage = b.position.boundingRect.pageNumber || bPage;
+				bTop = b.position.boundingRect.y1;
+			} else if (b.id && renderedHighlightPositions?.has(b.id)) {
+				const pos = renderedHighlightPositions.get(b.id)!;
+				bPage = pos.page;
+				bTop = pos.top;
+			}
+
+			// Sort by page first, then by vertical position
+			if (aPage !== bPage) {
+				return aPage - bPage;
+			}
+			return aTop - bTop;
 		});
 
 		setSortedHighlights(sortedHighlights);
@@ -319,7 +369,7 @@ export function AnnotationsView(
 			annotationMap.set(highlightId, existingAnnotations);
 		});
 		setHighlightAnnotationMap(annotationMap);
-	}, [highlights, annotations]);
+	}, [highlights, annotations, renderedHighlightPositions]);
 
 	// Filter highlights based on selected filters
 	useEffect(() => {
@@ -408,6 +458,7 @@ export function AnnotationsView(
 										updateAnnotation={updateAnnotation}
 										user={user ?? undefined}
 										readonly={readonly}
+										renderedPosition={highlight.id ? renderedHighlightPositions?.get(highlight.id) : undefined}
 									/>
 								</div>
 							);
