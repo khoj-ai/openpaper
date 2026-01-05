@@ -10,7 +10,13 @@ from typing import Any, Dict, Iterator, List, Optional, Sequence, Union
 import openai
 from app.database.models import Message
 from app.llm.citation_handler import CitationHandler
-from app.schemas.responses import FileContent, TextContent, ToolCall, ToolCallResult
+from app.schemas.responses import (
+    FileContent,
+    SupplementaryContent,
+    TextContent,
+    ToolCall,
+    ToolCallResult,
+)
 from google import genai
 from google.genai.types import (
     AutomaticFunctionCallingConfig,
@@ -76,7 +82,7 @@ class StreamChunk:
 
 
 # Union type for all content types
-MessageContent = Union[TextContent, FileContent]
+MessageContent = Union[TextContent, FileContent, SupplementaryContent]
 MessageParam = Union[str, Sequence[MessageContent]]
 
 
@@ -389,6 +395,10 @@ class GeminiProvider(BaseLLMProvider):
                     parts.append(
                         Part.from_bytes(data=item.data, mime_type=item.mime_type)
                     )
+                elif isinstance(item, SupplementaryContent):
+                    # Format supplementary content with XML tags to clearly delineate it
+                    formatted = f"<{item.label}>\n{item.content}\n</{item.label}>"
+                    parts.append(Part.from_text(text=formatted))
 
             # If we have multiple parts, we need to return them as proper Parts
             # If only one part, return it directly
@@ -550,6 +560,10 @@ class OpenAIProvider(BaseLLMProvider):
                                 },
                             }
                         )
+                elif isinstance(item, SupplementaryContent):
+                    # Format supplementary content with XML tags to clearly delineate it
+                    formatted = f"<{item.label}>\n{item.content}\n</{item.label}>"
+                    content_parts.append({"type": "text", "text": formatted})
             return content_parts
 
         return content

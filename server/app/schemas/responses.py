@@ -185,3 +185,15 @@ class FileContent(BaseModel):
     mime_type: str
     filename: Optional[str] = None
     type: Literal["file"] = "file"
+
+
+class SupplementaryContent(BaseModel):
+    """Content representing supplementary/collected information for the model to use.
+
+    This is used to separate retrieved context (e.g., evidence from papers) from
+    the user's actual question, making the provenance of information clearer.
+    """
+
+    content: str
+    label: str = "collected_evidence"
+    type: Literal["supplementary"] = "supplementary"

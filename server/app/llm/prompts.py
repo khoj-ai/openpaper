@@ -200,20 +200,6 @@ Gather evidence from the papers to respond to the following query. In case user 
 Query: {question}
 """
 
-
-EVIDENCE_SUMMARIZATION_PROMPT = """You are a research assistant that summarizes collected evidence snippets from research papers into a coherent summary for each paper, focusing on information relevant to the user's question.
-
-User's Question: {question}
-
-Evidence per paper:
-{evidence}
-
-Based on the user's question and the provided evidence, generate a concise summary for each paper. The summary should synthesize the information from the snippets, not just list them.
-
-Your output must be a JSON object following this schema:
-{schema}
-"""
-
 TOOL_RESULT_COMPACTION_PROMPT = """You are a research assistant helping to compact tool call results from an evidence gathering session.
 
 The user's original question: {question}
@@ -232,17 +218,67 @@ Your output must be a JSON object following this schema:
 {schema}
 """
 
+SHORT_SNIPPET_COMPACTION_PROMPT = """You are a research assistant helping to filter short evidence snippets for relevance.
+
+The user's original question: {question}
+
+Below are SHORT evidence snippets (direct quotes, search results, specific excerpts) gathered from papers. For each snippet, decide whether to KEEP it (relevant to answering the question) or DROP it (not relevant or redundant).
+
+Evidence snippets (organized by paper ID, with index numbers):
+{evidence}
+
+For each snippet, decide:
+- "keep": The snippet contains specific data, quotes, findings, or information directly relevant to the question
+- "drop": The snippet is redundant, off-topic, or not useful for answering the question
+
+IMPORTANT: These are short snippets meant to be cited verbatim. Do NOT summarize them - only keep or drop.
+
+Your output must be a JSON object following this schema:
+{schema}
+"""
+
+LONG_SNIPPET_COMPACTION_PROMPT = """You are a research assistant helping to condense large evidence blocks.
+
+The user's original question: {question}
+
+Below are LONG evidence blocks (full abstracts, large file excerpts, extensive content) gathered from papers. For each block, decide whether to DROP it (not relevant) or SUMMARIZE it (extract key information).
+
+Evidence blocks (organized by paper ID, with index numbers):
+{evidence}
+
+For each block, decide:
+- "drop": The content is not relevant to answering the question
+- "summarize": Extract and condense the key findings, data, and insights relevant to the question
+
+If you choose "summarize", provide a condensed version that:
+1. Preserves specific numbers, statistics, and data points as direct quotes where possible
+2. Captures the main findings and conclusions relevant to the question
+3. Starts with "(summarized)" prefix to indicate this is not a direct quote
+4. Is significantly shorter than the original while retaining essential information
+
+Your output must be a JSON object following this schema:
+{schema}
+"""
+
+KEYWORD_EXTRACTION_PROMPT = """Extract 3-5 key search terms from this question that would be most useful for searching academic papers. Focus on:
+- Technical terms and concepts
+- Specific names, methods, or phenomena
+- Core subject matter keywords
+
+Question: {question}
+
+Return ONLY a JSON array of strings, no explanation. Example: ["term1", "term2", "term3"]
+"""
+
 ANSWER_EVIDENCE_BASED_QUESTION_SYSTEM_PROMPT = """
 You are an excellent researcher who provides precise, evidence-based answers from academic papers. Your responses must always include specific text evidence from the paper. You give holistic answers, not just snippets. Help the user understand the content across a library of papers. Your answers should be clear, concise, and informative.
 
-These were the papers available to you to gather evidence from:
+These are the papers available in the library:
 {available_papers}
 
-Your research assistant has already undertaken a thorough investigation and gathered the following evidence from across the papers in the library. Bear in mind that these may be snippets of the papers, not the full text. Use this evidence to inform your answer to the user's question.
+You will receive collected evidence from a research assistant in a <collected_evidence> block within the user's message. This evidence has been gathered from the papers above. Use it to inform your answer to the user's question.
 
-{evidence_gathered}
-
-Now it is your turn to answer the user's question based on the evidence gathered. You must provide a comprehensive answer that synthesizes the information from the evidence, while also adhering to the following strict formatting rules:
+Bear in mind that the evidence may be snippets from the papers, not the full text. You must provide a comprehensive answer that synthesizes the information from the evidence, while also adhering to the following strict formatting rules:
 1. Structure your answer in two parts:
    - **Main response** with numbered citations [^1], [^6, ^7], etc., where each number corresponds to a specific piece of evidence.
    - **Evidence** section with strict formatting
