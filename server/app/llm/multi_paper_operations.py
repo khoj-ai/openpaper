@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import uuid
 from contextlib import suppress
@@ -19,7 +20,7 @@ from app.llm.prompts import (
     ANSWER_EVIDENCE_BASED_QUESTION_SYSTEM_PROMPT,
     GENERATE_MULTI_PAPER_NARRATIVE_SUMMARY,
 )
-from app.llm.provider import LLMProvider, StreamChunk, TextContent
+from app.llm.provider import LLMProvider, StreamChunk, SupplementaryContent, TextContent
 from app.llm.utils import retry_llm_operation
 from app.schemas.message import EvidenceCollection
 from app.schemas.responses import AudioOverviewForLLM
@@ -69,7 +70,6 @@ class MultiPaperOperations(EvidenceOperations):
         logger.debug(f"Evidence gathered: {evidence_gathered.get_evidence_dict()}")
 
         formatted_system_prompt = ANSWER_EVIDENCE_BASED_QUESTION_SYSTEM_PROMPT.format(
-            evidence_gathered=evidence_gathered.get_evidence_dict(),
             available_papers=formatted_paper_options,
         )
 
@@ -84,7 +84,12 @@ class MultiPaperOperations(EvidenceOperations):
         START_DELIMITER = "---EVIDENCE---"
         END_DELIMITER = "---END-EVIDENCE---"
 
+        # Build multipart message: supplementary evidence + user question
         message_content = [
+            SupplementaryContent(
+                content=json.dumps(evidence_gathered.get_evidence_dict(), indent=2),
+                label="collected_evidence",
+            ),
             TextContent(text=formatted_prompt),
         ]
 
