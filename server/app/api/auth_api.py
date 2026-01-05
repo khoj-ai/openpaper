@@ -65,46 +65,6 @@ async def get_me(current_user: Optional[CurrentUser] = Depends(get_current_user)
     return AuthResponse(success=True, message="User found", user=current_user)
 
 
-@auth_router.get("/onboarding")
-async def get_onboarding_status(
-    current_user: CurrentUser = Depends(get_required_user),
-    db: Session = Depends(get_db),
-):
-    # Check if the user has any documents, highlights, annotations, or messages
-    has_highlights = highlight_crud.has_any(db, user=current_user)
-    has_annotations = annotation_crud.has_any(db, user=current_user)
-    has_messages = message_crud.has_any(db, user=current_user)
-    has_papers = paper_crud.has_any(db, user=current_user)
-    has_completed_paper = bool(
-        paper_crud.get_by(db, user=current_user, status=PaperStatus.completed)
-    )
-
-    onboarding_completed = all(
-        [
-            has_highlights,
-            has_annotations,
-            has_messages,
-            has_papers,
-            has_completed_paper,
-        ]
-    )
-
-    onboarding_status = {
-        "onboarding_completed": onboarding_completed,
-        "has_highlights": has_highlights,
-        "has_annotations": has_annotations,
-        "has_messages": has_messages,
-        "has_papers": has_papers,
-        "has_completed_paper": has_completed_paper,
-    }
-
-    return Response(
-        content=json.dumps(onboarding_status),
-        status_code=200,
-        media_type="application/json",
-    )
-
-
 @auth_router.get("/topics")
 async def get_topics(
     current_user: CurrentUser = Depends(get_required_user),
