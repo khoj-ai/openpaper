@@ -254,6 +254,16 @@ Your output must be a JSON object following this schema:
 {schema}
 """
 
+KEYWORD_EXTRACTION_PROMPT = """Extract 3-5 key search terms from this question that would be most useful for searching academic papers. Focus on:
+- Technical terms and concepts
+- Specific names, methods, or phenomena
+- Core subject matter keywords
+
+Question: {question}
+
+Return ONLY a JSON array of strings, no explanation. Example: ["term1", "term2", "term3"]
+"""
+
 ANSWER_EVIDENCE_BASED_QUESTION_SYSTEM_PROMPT = """
 You are an excellent researcher who provides precise, evidence-based answers from academic papers. Your responses must always include specific text evidence from the paper. You give holistic answers, not just snippets. Help the user understand the content across a library of papers. Your answers should be clear, concise, and informative.
 

@@ -21,6 +21,7 @@ from app.llm.prompts import (
     EVIDENCE_GATHERING_MESSAGE,
     EVIDENCE_GATHERING_SYSTEM_PROMPT,
     GENERATE_MULTI_PAPER_NARRATIVE_SUMMARY,
+    KEYWORD_EXTRACTION_PROMPT,
     TOOL_RESULT_COMPACTION_PROMPT,
 )
 from app.llm.provider import LLMProvider, StreamChunk, TextContent
@@ -337,6 +338,68 @@ class MultiPaperOperations(BaseLLMClient):
                     user_id=str(current_user.id),
                 )
 
+        # Fallback: if no evidence was gathered, try keyword-based search
+        if not evidence_collection.has_evidence():
+            logger.info(
+                "No evidence gathered through normal flow. "
+                "Attempting fallback keyword search."
+            )
+            yield {
+                "type": "status",
+                "content": "Searching for relevant information...",
+            }
+
+            try:
+                # Extract keywords from the question
+                keywords = await self._extract_search_keywords(question, llm_provider)
+
+                if keywords:
+                    logger.info(f"Fallback search with keywords: {keywords}")
+
+                    # Search all papers with each keyword
+                    for keyword in keywords:
+                        search_results = search_all_files(
+                            query=keyword,
+                            current_user=current_user,
+                            db=db,
+                            project_id=project_id,
+                        )
+
+                        # Add search results to evidence collection
+                        if search_results:
+                            for paper_id, lines in search_results.items():
+                                evidence_collection.add_evidence(
+                                    paper_id, lines, preserve_line_numbers=True
+                                )
+
+                    if evidence_collection.has_evidence():
+                        logger.info(
+                            f"Fallback search found evidence from "
+                            f"{len(evidence_collection.evidence)} papers"
+                        )
+                        track_event(
+                            "fallback_search_success",
+                            {
+                                "keywords": keywords,
+                                "papers_found": len(evidence_collection.evidence),
+                            },
+                            user_id=str(current_user.id),
+                        )
+                    else:
+                        logger.info("Fallback search found no relevant evidence")
+                        track_event(
+                            "fallback_search_no_results",
+                            {"keywords": keywords},
+                            user_id=str(current_user.id),
+                        )
+            except Exception as e:
+                logger.warning(f"Fallback search failed: {e}")
+                track_event(
+                    "fallback_search_error",
+                    {"error": str(e)},
+                    user_id=str(current_user.id),
+                )
+
         # Compact evidence if it exceeds the limit for chat response
         evidence_size = evidence_collection.get_evidence_size()
         if evidence_size > CONTENT_LIMIT_CHAT_EVIDENCE:
@@ -597,6 +660,41 @@ class MultiPaperOperations(BaseLLMClient):
         else:
             logger.warning("Empty response from LLM during evidence batch compaction.")
             return evidence_batch  # Return original on failure
+
+    async def _extract_search_keywords(
+        self,
+        question: str,
+        llm_provider: Optional[LLMProvider] = None,
+    ) -> List[str]:
+        """Extract search keywords from a question using LLM."""
+        formatted_prompt = KEYWORD_EXTRACTION_PROMPT.format(question=question)
+
+        message_content = [TextContent(text=formatted_prompt)]
+
+        llm_response = self.generate_content(
+            system_prompt="You are a helpful assistant that extracts search keywords.",
+            contents=message_content,
+            model_type=ModelType.FAST,
+            provider=llm_provider,
+        )
+
+        if llm_response and llm_response.text:
+            try:
+                # Parse the JSON array response
+                keywords = json.loads(llm_response.text.strip())
+                if isinstance(keywords, list):
+                    # Filter to only strings and limit to 5
+                    return [str(k) for k in keywords if k][:5]
+            except json.JSONDecodeError:
+                # Try to extract keywords from plain text response
+                logger.warning(f"Failed to parse keywords as JSON: {llm_response.text}")
+                # Fallback: split by common delimiters
+                text = llm_response.text.strip().strip("[]\"'")
+                keywords = [k.strip().strip("\"'") for k in re.split(r"[,\n]", text)]
+                return [k for k in keywords if k][:5]
+
+        logger.warning("Failed to extract keywords from question")
+        return []
 
     async def chat_with_papers(
         self,
