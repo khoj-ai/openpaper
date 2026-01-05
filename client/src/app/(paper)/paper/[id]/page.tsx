@@ -116,8 +116,15 @@ export default function PaperView() {
     const [renderedHighlightPositions, setRenderedHighlightPositions] = useState<Map<string, RenderedHighlightPosition>>(new Map());
 
     // Callback for when PDF highlight overlays are created (for assistant highlights)
+    // Merges new positions with existing ones so positions persist even when pages are unloaded
     const handleOverlaysCreated = useCallback((positions: Map<string, RenderedHighlightPosition>) => {
-        setRenderedHighlightPositions(positions);
+        setRenderedHighlightPositions(prev => {
+            const merged = new Map(prev);
+            positions.forEach((pos, id) => {
+                merged.set(id, pos);
+            });
+            return merged;
+        });
     }, []);
 
     const [jobId, setJobId] = useState<string | null>(null);

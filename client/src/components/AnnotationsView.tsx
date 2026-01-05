@@ -120,7 +120,6 @@ interface HighlightThreadProps {
 	updateAnnotation?: (annotationId: string, content: string) => void;
 	user?: BasicUser
 	readonly?: boolean;
-	renderedPosition?: RenderedHighlightPosition;
 }
 
 
@@ -135,7 +134,6 @@ function HighlightThread({
 	updateAnnotation,
 	user,
 	readonly,
-	renderedPosition,
 }: HighlightThreadProps) {
 
 	const highlightBorderColor = highlight.role === 'assistant'
@@ -171,21 +169,6 @@ function HighlightThread({
 					</div>
 				</blockquote>
 
-				{/* Debug Info */}
-				<div className="text-[10px] text-muted-foreground font-mono mb-2 pl-3">
-					<span>page: {highlight.page_number ?? renderedPosition?.page ?? 'n/a'}</span>
-					{highlight.position && (
-						<span className="ml-2">
-							pos: [{Math.round(highlight.position.boundingRect.x1)}, {Math.round(highlight.position.boundingRect.y1)}] - [{Math.round(highlight.position.boundingRect.x2)}, {Math.round(highlight.position.boundingRect.y2)}]
-						</span>
-					)}
-					{!highlight.position && renderedPosition && (
-						<span className="ml-2">
-							pos (rendered): [{Math.round(renderedPosition.left)}, {Math.round(renderedPosition.top)}] w:{Math.round(renderedPosition.width)} h:{Math.round(renderedPosition.height)}
-						</span>
-					)}
-					{!highlight.position && !renderedPosition && <span className="ml-2">pos: n/a</span>}
-				</div>
 
 				{/* The Annotation Thread */}
 				{annotations.length > 0 && (
@@ -323,10 +306,22 @@ export function AnnotationsView(
 	}, [activeHighlight]);
 
 	useEffect(() => {
+		// Filter out assistant highlights that don't have a rendered position
+		// (they couldn't be found in the PDF text)
+		const visibleHighlights = highlights.filter((h) => {
+			// User highlights are always shown
+			if (h.role === 'user') return true;
+			// Highlights with stored position data are shown
+			if (h.position) return true;
+			// Assistant highlights need a rendered position to be shown
+			if (h.id && renderedHighlightPositions?.has(h.id)) return true;
+			return false;
+		});
+
 		// Sort highlights by position
 		// For highlights with position data (user highlights), use boundingRect
 		// For assistant highlights without position, use renderedHighlightPositions from DOM
-		const sortedHighlights = [...highlights].sort((a, b) => {
+		const sortedHighlights = [...visibleHighlights].sort((a, b) => {
 			// Get position for highlight a
 			let aPage = a.page_number || 0;
 			let aTop = 0;
@@ -458,7 +453,6 @@ export function AnnotationsView(
 										updateAnnotation={updateAnnotation}
 										user={user ?? undefined}
 										readonly={readonly}
-										renderedPosition={highlight.id ? renderedHighlightPositions?.get(highlight.id) : undefined}
 									/>
 								</div>
 							);
