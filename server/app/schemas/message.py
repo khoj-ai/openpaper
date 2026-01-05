@@ -189,6 +189,23 @@ class EvidenceCollection(BaseModel):
             for cr in compacted_results
         ]
 
+    def get_evidence_size(self) -> int:
+        """Calculate the total character size of all evidence"""
+        total_size = 0
+        for evidence in self.evidence.values():
+            for snippet in evidence.content:
+                total_size += len(snippet)
+        return total_size
+
+    def apply_compacted_evidence(
+        self, compacted_evidence: Dict[str, List[str]]
+    ) -> None:
+        """Replace evidence with compacted versions from LLM compaction"""
+        # Clear existing evidence and load compacted version
+        self.evidence.clear()
+        for paper_id, snippets in compacted_evidence.items():
+            self.evidence[paper_id] = Evidence(paper_id=paper_id, content=snippets)
+
 
 class EvidenceSummaryResponse(BaseModel):
     """Response structure for evidence summarization
@@ -219,4 +236,17 @@ class ToolResultCompactionResponse(BaseModel):
     compacted_results: List[CompactedToolResult] = Field(
         default_factory=list,
         description="List of compacted tool results with summaries",
+    )
+
+
+class EvidenceCompactionResponse(BaseModel):
+    """Response structure for evidence compaction before chat response.
+
+    The format matches EvidenceCollection.get_evidence_dict() output:
+    Dict[str, List[str]] mapping paper_id to list of evidence strings.
+    """
+
+    compacted_evidence: Dict[str, List[str]] = Field(
+        default_factory=dict,
+        description="Mapping of paper IDs to their compacted evidence snippets. Each paper should have a reduced list of summarized evidence strings that preserve key findings, quotes, and data points.",
     )

@@ -17,6 +17,7 @@ from app.llm.json_parser import JSONParser
 from app.llm.prompts import (
     ANSWER_EVIDENCE_BASED_QUESTION_MESSAGE,
     ANSWER_EVIDENCE_BASED_QUESTION_SYSTEM_PROMPT,
+    EVIDENCE_COMPACTION_PROMPT,
     EVIDENCE_GATHERING_MESSAGE,
     EVIDENCE_GATHERING_SYSTEM_PROMPT,
     GENERATE_MULTI_PAPER_NARRATIVE_SUMMARY,
@@ -37,7 +38,11 @@ from app.llm.tools.file_tools import (
 )
 from app.llm.tools.meta_tools import stop_function
 from app.llm.utils import retry_llm_operation
-from app.schemas.message import EvidenceCollection, ToolResultCompactionResponse
+from app.schemas.message import (
+    EvidenceCollection,
+    EvidenceCompactionResponse,
+    ToolResultCompactionResponse,
+)
 from app.schemas.responses import AudioOverviewForLLM
 from app.schemas.user import CurrentUser
 from fastapi import Depends
@@ -49,8 +54,15 @@ from app.database.crud.message_crud import message_crud
 from app.database.database import get_db
 from app.database.telemetry import track_event
 
-# TODO Really need to find a better, more robust way to implement the truncation logic based on the tokenization window limits. I know current model has a limit of 250k tokens - we should have a more dynamic way to accommodate additional text for prompts, chat history, and of course evidence. We'll have to estimate the token counts based on character counts for now - then we can even add some basic heuristics for pruning down chat history or evidence if we exceed limits.
-CONTENT_LIMIT_EVIDENCE_GATHERING = 150000  # Character limit for evidence gathering
+# Gemini 3 supports 1M token input (~4M chars). We set conservative limits to leave room for
+# system prompts, history, and responses while keeping costs/latency reasonable.
+# At ~4 chars/token: 150k chars ≈ 37.5k tokens, 400k chars ≈ 100k tokens
+CONTENT_LIMIT_EVIDENCE_GATHERING = (
+    150000  # Character limit for tool results during evidence gathering
+)
+CONTENT_LIMIT_CHAT_EVIDENCE = (
+    300000  # Character limit for evidence in chat response prompt
+)
 
 
 class MultiPaperOperations(BaseLLMClient):
@@ -322,6 +334,24 @@ class MultiPaperOperations(BaseLLMClient):
                     user_id=str(current_user.id),
                 )
 
+        # Compact evidence if it exceeds the limit for chat response
+        evidence_size = evidence_collection.get_evidence_size()
+        if evidence_size > CONTENT_LIMIT_CHAT_EVIDENCE:
+            yield {
+                "type": "status",
+                "content": "Compacting gathered evidence...",
+            }
+            logger.info(
+                f"Evidence size ({evidence_size} chars) exceeds limit "
+                f"({CONTENT_LIMIT_CHAT_EVIDENCE} chars). Compacting."
+            )
+            await self.compact_evidence(
+                evidence_collection,
+                question,
+                current_user,
+                llm_provider,
+            )
+
         yield {
             "type": "evidence_gathered",
             "content": evidence_collection.get_evidence_dict(),
@@ -401,6 +431,82 @@ class MultiPaperOperations(BaseLLMClient):
         except Exception as e:
             logger.warning(
                 f"Tool result compaction failed: {e}. Keeping original results."
+            )
+
+    async def compact_evidence(
+        self,
+        evidence_collection: EvidenceCollection,
+        original_question: str,
+        current_user: CurrentUser,
+        llm_provider: Optional[LLMProvider] = None,
+    ) -> None:
+        """
+        Compact evidence by summarizing it to reduce context size for chat response.
+        Modifies the evidence_collection in place.
+        """
+        start_time = time.time()
+        original_size = evidence_collection.get_evidence_size()
+        evidence_dict = evidence_collection.get_evidence_dict()
+        original_count = sum(len(snippets) for snippets in evidence_dict.values())
+
+        formatted_prompt = EVIDENCE_COMPACTION_PROMPT.format(
+            question=original_question,
+            evidence=json.dumps(evidence_dict, indent=2),
+            schema=EvidenceCompactionResponse.model_json_schema(),
+        )
+
+        message_content = [TextContent(text=formatted_prompt)]
+
+        # Get LLM to compact the evidence
+        llm_response = self.generate_content(
+            system_prompt="You are a research assistant that summarizes evidence while preserving key information for answering questions.",
+            contents=message_content,
+            model_type=ModelType.DEFAULT,
+            provider=llm_provider,
+        )
+
+        try:
+            if llm_response and llm_response.text:
+                compaction_response = JSONParser.validate_and_extract_json(
+                    llm_response.text
+                )
+                compaction_response = EvidenceCompactionResponse.model_validate(
+                    compaction_response
+                )
+
+                # Apply the compacted evidence
+                evidence_collection.apply_compacted_evidence(
+                    compaction_response.compacted_evidence
+                )
+
+                new_size = evidence_collection.get_evidence_size()
+                new_count = sum(
+                    len(snippets)
+                    for snippets in compaction_response.compacted_evidence.values()
+                )
+                logger.info(
+                    f"Evidence compaction complete. "
+                    f"Original: {original_count} snippets ({original_size} chars), "
+                    f"Compacted: {new_count} snippets ({new_size} chars)"
+                )
+
+                track_event(
+                    "evidence_compacted",
+                    {
+                        "duration_ms": (time.time() - start_time) * 1000,
+                        "original_count": original_count,
+                        "original_size": original_size,
+                        "compacted_count": new_count,
+                        "compacted_size": new_size,
+                    },
+                    user_id=str(current_user.id),
+                )
+            else:
+                logger.warning("Empty response from LLM during evidence compaction.")
+
+        except Exception as e:
+            logger.warning(
+                f"Evidence compaction failed: {e}. Keeping original evidence."
             )
 
     async def chat_with_papers(
@@ -570,6 +676,17 @@ class MultiPaperOperations(BaseLLMClient):
                 pinger_task.cancel()
             if not stream_reader_task.done():
                 stream_reader_task.cancel()
+
+        # Check if stream_reader_task raised an exception
+        if stream_reader_task.done():
+            exc = stream_reader_task.exception()
+            if exc is not None:
+                logger.error(f"Stream reader task failed with exception: {exc}")
+                yield {
+                    "type": "error",
+                    "content": f"Sorry, an error occurred while working on this response. Please try again or contact support (saba@openpaper.ai) if the issue persists.",
+                }
+                return
 
         # Handle case where stream ended while still in evidence section
         if in_evidence_section and evidence_buffer:

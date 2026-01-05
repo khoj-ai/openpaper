@@ -232,6 +232,28 @@ Your output must be a JSON object following this schema:
 {schema}
 """
 
+EVIDENCE_COMPACTION_PROMPT = """You are a research assistant helping to compact gathered evidence before generating a final response.
+
+The user's original question: {question}
+
+Below is evidence gathered from multiple papers. The evidence exceeds our size limit and needs to be compacted while preserving the most important information for answering the question.
+
+Current evidence (organized by paper ID):
+{evidence}
+
+Your task is to create a compacted version of this evidence that:
+1. Preserves the most relevant findings, data points, and direct quotes for answering the question
+2. Removes redundant or less relevant information
+3. Maintains the paper_id to evidence mapping structure
+4. Keeps each paper's evidence as a list of concise, information-dense strings
+5. Prioritizes specific data (numbers, statistics, experimental results) over general statements
+
+Target a significant reduction in size while retaining the key information needed to comprehensively answer the user's question.
+
+Your output must be a JSON object following this schema:
+{schema}
+"""
+
 ANSWER_EVIDENCE_BASED_QUESTION_SYSTEM_PROMPT = """
 You are an excellent researcher who provides precise, evidence-based answers from academic papers. Your responses must always include specific text evidence from the paper. You give holistic answers, not just snippets. Help the user understand the content across a library of papers. Your answers should be clear, concise, and informative.
 
