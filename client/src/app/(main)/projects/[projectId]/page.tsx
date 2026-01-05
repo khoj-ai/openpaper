@@ -320,7 +320,7 @@ export default function ProjectPage() {
 							</DialogContent>
 						</Dialog>
 					</div>
-					<AddFromLibrary projectId={projectId} onPapersAdded={refetchPapers} projectPaperIds={papers.map(p => p.id)} />
+					<AddFromLibrary projectId={projectId} onPapersAdded={refetchPapers} projectPaperIds={papers.map(p => p.id)} onUploadClick={() => setIsUploadDialogOpen(true)} />
 				</div>
 				<Dialog open={isUrlDialogOpen} onOpenChange={setIsUrlDialogOpen}>
 					<DialogContent>
@@ -630,7 +630,7 @@ export default function ProjectPage() {
 														Back
 													</Button>
 													<h3 className="text-lg font-semibold mb-2">Add from Library</h3>
-													<AddFromLibrary projectId={projectId} onPapersAdded={refetchPapers} projectPaperIds={papers.map(p => p.id)} />
+													<AddFromLibrary projectId={projectId} onPapersAdded={refetchPapers} projectPaperIds={papers.map(p => p.id)} onUploadClick={() => setIsUploadDialogOpen(true)} />
 												</div>
 											)}
 										</div>

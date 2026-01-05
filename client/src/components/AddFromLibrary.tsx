@@ -10,9 +10,10 @@ interface AddFromLibraryProps {
     projectId: string;
     onPapersAdded: () => void;
     projectPaperIds?: string[];
+    onUploadClick?: () => void;
 }
 
-export default function AddFromLibrary({ projectId, onPapersAdded, projectPaperIds }: AddFromLibraryProps) {
+export default function AddFromLibrary({ projectId, onPapersAdded, projectPaperIds, onUploadClick }: AddFromLibraryProps) {
 
     const handleAddPapers = (papers: PaperItem[], action: string) => {
         if (action !== "Add") return;
@@ -39,6 +40,7 @@ export default function AddFromLibrary({ projectId, onPapersAdded, projectPaperI
             actionOptions={["Add"]}
             onSelectFiles={handleAddPapers}
             projectPaperIds={projectPaperIds}
+            onUploadClick={onUploadClick}
         />
     );
 }

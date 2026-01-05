@@ -629,9 +629,11 @@ export function LibraryTable({
 													<p className="text-lg font-medium mb-2">No papers in your library yet</p>
 													<p className="text-sm">Upload your first research paper to get started. All your papers will appear here for easy access and organization.</p>
 												</div>
-												<Button variant="default" className="bg-blue-500 hover:bg-blue-600 text-white" onClick={onUploadClick}>
-													Upload Your First Paper
-												</Button>
+												{onUploadClick && (
+													<Button variant="default" className="bg-blue-500 hover:bg-blue-600 text-white" onClick={onUploadClick}>
+														Upload Your First Paper
+													</Button>
+												)}
 											</div>
 										)}
 									</TableCell>
