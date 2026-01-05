@@ -64,7 +64,7 @@ CONTENT_LIMIT_CHAT_EVIDENCE = (
     300000  # Character limit for evidence in chat response prompt
 )
 CONTENT_LIMIT_COMPACTION_BATCH = (
-    80000  # Max chars per batch when compacting (for smaller context models)
+    150000  # Max chars per batch when compacting (for smaller context models)
 )
 
 
