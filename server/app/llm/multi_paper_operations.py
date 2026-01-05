@@ -411,12 +411,13 @@ class MultiPaperOperations(BaseLLMClient):
                 f"Evidence size ({evidence_size} chars) exceeds limit "
                 f"({CONTENT_LIMIT_CHAT_EVIDENCE} chars). Compacting."
             )
-            await self.compact_evidence(
+            async for status in self.compact_evidence(
                 evidence_collection,
                 question,
                 current_user,
                 llm_provider,
-            )
+            ):
+                yield status
 
         yield {
             "type": "evidence_gathered",
@@ -505,13 +506,15 @@ class MultiPaperOperations(BaseLLMClient):
         original_question: str,
         current_user: CurrentUser,
         llm_provider: Optional[LLMProvider] = None,
-    ) -> None:
+    ) -> AsyncGenerator[Dict[str, str], None]:
         """
         Compact evidence by summarizing it to reduce context size for chat response.
         Modifies the evidence_collection in place.
 
         If evidence is too large for a single compaction request, it will be
         batched by paper and compacted in multiple requests.
+
+        Yields status updates for client keepalive.
         """
         start_time = time.time()
         original_size = evidence_collection.get_evidence_size()
@@ -523,16 +526,27 @@ class MultiPaperOperations(BaseLLMClient):
             evidence_dict, CONTENT_LIMIT_COMPACTION_BATCH
         )
 
-        if len(batches) > 1:
+        num_batches = len(batches)
+        if num_batches > 1:
             logger.info(
                 f"Evidence too large for single compaction. "
-                f"Splitting into {len(batches)} batches."
+                f"Splitting into {num_batches} batches."
             )
+            yield {
+                "type": "status",
+                "content": f"Compacting evidence in {num_batches} batches...",
+            }
 
         # Compact each batch and merge results
         all_compacted: Dict[str, List[str]] = {}
 
         for batch_idx, batch in enumerate(batches):
+            if num_batches > 1:
+                yield {
+                    "type": "status",
+                    "content": f"Compacting batch {batch_idx + 1}/{num_batches}...",
+                }
+
             try:
                 compacted_batch = await self._compact_evidence_batch(
                     batch,
@@ -546,7 +560,7 @@ class MultiPaperOperations(BaseLLMClient):
                     else:
                         all_compacted[paper_id] = snippets
 
-                logger.debug(f"Compacted batch {batch_idx + 1}/{len(batches)}")
+                logger.debug(f"Compacted batch {batch_idx + 1}/{num_batches}")
 
             except Exception as e:
                 logger.warning(
@@ -570,7 +584,7 @@ class MultiPaperOperations(BaseLLMClient):
             f"Evidence compaction complete. "
             f"Original: {original_count} snippets ({original_size} chars), "
             f"Compacted: {new_count} snippets ({new_size} chars), "
-            f"Batches: {len(batches)}"
+            f"Batches: {num_batches}"
         )
 
         track_event(
@@ -581,7 +595,7 @@ class MultiPaperOperations(BaseLLMClient):
                 "original_size": original_size,
                 "compacted_count": new_count,
                 "compacted_size": new_size,
-                "num_batches": len(batches),
+                "num_batches": num_batches,
             },
             user_id=str(current_user.id),
         )
