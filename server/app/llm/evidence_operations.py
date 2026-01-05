@@ -14,10 +14,11 @@ from app.database.telemetry import track_event
 from app.llm.base import BaseLLMClient, ModelType
 from app.llm.json_parser import JSONParser
 from app.llm.prompts import (
-    EVIDENCE_COMPACTION_PROMPT,
     EVIDENCE_GATHERING_MESSAGE,
     EVIDENCE_GATHERING_SYSTEM_PROMPT,
     KEYWORD_EXTRACTION_PROMPT,
+    LONG_SNIPPET_COMPACTION_PROMPT,
+    SHORT_SNIPPET_COMPACTION_PROMPT,
     TOOL_RESULT_COMPACTION_PROMPT,
 )
 from app.llm.provider import LLMProvider, TextContent
@@ -37,7 +38,8 @@ from app.llm.tools.meta_tools import stop_function
 from app.llm.utils import retry_llm_operation
 from app.schemas.message import (
     EvidenceCollection,
-    EvidenceCompactionResponse,
+    LongSnippetCompactionResponse,
+    ShortSnippetCompactionResponse,
     ToolResultCompactionResponse,
 )
 from app.schemas.user import CurrentUser
@@ -57,6 +59,9 @@ CONTENT_LIMIT_CHAT_EVIDENCE = (
 )
 CONTENT_LIMIT_COMPACTION_BATCH = (
     150000  # Max chars per batch when compacting (for smaller context models)
+)
+SNIPPET_LENGTH_THRESHOLD = (
+    1000  # Snippets shorter than this are keep/drop; longer are drop/summarize
 )
 
 
@@ -484,11 +489,12 @@ class EvidenceOperations(BaseLLMClient):
         llm_provider: Optional[LLMProvider] = None,
     ) -> AsyncGenerator[Dict[str, Union[str, Dict[str, List[str]]]], None]:
         """
-        Compact evidence by summarizing it to reduce context size for chat response.
+        Compact evidence to reduce context size for chat response.
         Modifies the evidence_collection in place.
 
-        If evidence is too large for a single compaction request, it will be
-        batched by paper and compacted in multiple requests.
+        Uses a split approach based on snippet length:
+        - Short snippets (<SNIPPET_LENGTH_THRESHOLD chars): keep/drop only (preserves citations)
+        - Long snippets (>=SNIPPET_LENGTH_THRESHOLD chars): drop/summarize (condenses large blocks)
 
         Yields status updates for client keepalive.
         """
@@ -497,54 +503,96 @@ class EvidenceOperations(BaseLLMClient):
         evidence_dict = evidence_collection.get_evidence_dict()
         original_count = sum(len(snippets) for snippets in evidence_dict.values())
 
-        batches = self._split_evidence_into_batches(
-            evidence_dict, CONTENT_LIMIT_COMPACTION_BATCH
+        # Split evidence into short and long snippets
+        short_snippets, long_snippets = self._split_evidence_by_length(evidence_dict)
+
+        short_count = sum(len(s) for s in short_snippets.values())
+        long_count = sum(len(s) for s in long_snippets.values())
+        logger.info(
+            f"Split evidence: {short_count} short snippets, {long_count} long snippets"
         )
 
-        num_batches = len(batches)
-        if num_batches > 1:
-            logger.info(
-                f"Evidence too large for single compaction. "
-                f"Splitting into {num_batches} batches."
+        yield {
+            "type": "status",
+            "content": "Filtering evidence for relevance...",
+        }
+
+        # Process short snippets (keep/drop)
+        compacted_short: Dict[str, List[str]] = {}
+        if short_snippets:
+            short_batches = self._split_indexed_evidence_into_batches(
+                short_snippets, CONTENT_LIMIT_COMPACTION_BATCH
             )
+            for batch_idx, batch in enumerate(short_batches):
+                if len(short_batches) > 1:
+                    yield {
+                        "type": "status",
+                        "content": f"Filtering short snippets ({batch_idx + 1}/{len(short_batches)})...",
+                    }
+                try:
+                    batch_result = await self._compact_short_snippets(
+                        batch, original_question, llm_provider
+                    )
+                    for paper_id, snippets in batch_result.items():
+                        if paper_id in compacted_short:
+                            compacted_short[paper_id].extend(snippets)
+                        else:
+                            compacted_short[paper_id] = snippets
+                except Exception as e:
+                    logger.warning(
+                        f"Short snippet compaction failed: {e}. Keeping originals."
+                    )
+                    for paper_id, indexed_snippets in batch.items():
+                        originals = [s for _, s in indexed_snippets]
+                        if paper_id in compacted_short:
+                            compacted_short[paper_id].extend(originals)
+                        else:
+                            compacted_short[paper_id] = originals
+
+        # Process long snippets (drop/summarize)
+        compacted_long: Dict[str, List[str]] = {}
+        if long_snippets:
             yield {
                 "type": "status",
-                "content": f"Compacting evidence in {num_batches} batches...",
+                "content": "Summarizing large evidence blocks...",
             }
+            long_batches = self._split_indexed_evidence_into_batches(
+                long_snippets, CONTENT_LIMIT_COMPACTION_BATCH
+            )
+            for batch_idx, batch in enumerate(long_batches):
+                if len(long_batches) > 1:
+                    yield {
+                        "type": "status",
+                        "content": f"Summarizing evidence ({batch_idx + 1}/{len(long_batches)})...",
+                    }
+                try:
+                    batch_result = await self._compact_long_snippets(
+                        batch, original_question, llm_provider
+                    )
+                    for paper_id, snippets in batch_result.items():
+                        if paper_id in compacted_long:
+                            compacted_long[paper_id].extend(snippets)
+                        else:
+                            compacted_long[paper_id] = snippets
+                except Exception as e:
+                    logger.warning(
+                        f"Long snippet compaction failed: {e}. Keeping originals."
+                    )
+                    for paper_id, indexed_snippets in batch.items():
+                        originals = [s for _, s in indexed_snippets]
+                        if paper_id in compacted_long:
+                            compacted_long[paper_id].extend(originals)
+                        else:
+                            compacted_long[paper_id] = originals
 
+        # Merge results
         all_compacted: Dict[str, List[str]] = {}
-
-        for batch_idx, batch in enumerate(batches):
-            if num_batches > 1:
-                yield {
-                    "type": "status",
-                    "content": f"Compacting batch {batch_idx + 1}/{num_batches}...",
-                }
-
-            try:
-                compacted_batch = await self._compact_evidence_batch(
-                    batch,
-                    original_question,
-                    llm_provider,
-                )
-                for paper_id, snippets in compacted_batch.items():
-                    if paper_id in all_compacted:
-                        all_compacted[paper_id].extend(snippets)
-                    else:
-                        all_compacted[paper_id] = snippets
-
-                logger.debug(f"Compacted batch {batch_idx + 1}/{num_batches}")
-
-            except Exception as e:
-                logger.warning(
-                    f"Batch {batch_idx + 1} compaction failed: {e}. "
-                    f"Keeping original evidence for this batch."
-                )
-                for paper_id, snippets in batch.items():
-                    if paper_id in all_compacted:
-                        all_compacted[paper_id].extend(snippets)
-                    else:
-                        all_compacted[paper_id] = snippets
+        for paper_id in set(list(compacted_short.keys()) + list(compacted_long.keys())):
+            all_compacted[paper_id] = []
+            if paper_id in compacted_short:
+                all_compacted[paper_id].extend(compacted_short[paper_id])
+            if paper_id in compacted_long:
+                all_compacted[paper_id].extend(compacted_long[paper_id])
 
         evidence_collection.apply_compacted_evidence(all_compacted)
 
@@ -554,8 +602,7 @@ class EvidenceOperations(BaseLLMClient):
         logger.info(
             f"Evidence compaction complete. "
             f"Original: {original_count} snippets ({original_size} chars), "
-            f"Compacted: {new_count} snippets ({new_size} chars), "
-            f"Batches: {num_batches}"
+            f"Compacted: {new_count} snippets ({new_size} chars)"
         )
 
         track_event(
@@ -566,30 +613,55 @@ class EvidenceOperations(BaseLLMClient):
                 "original_size": original_size,
                 "compacted_count": new_count,
                 "compacted_size": new_size,
-                "num_batches": num_batches,
+                "short_snippets_input": short_count,
+                "long_snippets_input": long_count,
             },
             user_id=str(current_user.id),
         )
 
-    def _split_evidence_into_batches(
-        self,
-        evidence_dict: Dict[str, List[str]],
-        max_batch_size: int,
-    ) -> List[Dict[str, List[str]]]:
-        """Split evidence into batches that fit within the size limit."""
-        batches: List[Dict[str, List[str]]] = []
-        current_batch: Dict[str, List[str]] = {}
-        current_size = 0
+    def _split_evidence_by_length(
+        self, evidence_dict: Dict[str, List[str]]
+    ) -> tuple[Dict[str, List[tuple[int, str]]], Dict[str, List[tuple[int, str]]]]:
+        """
+        Split evidence into short and long snippets based on SNIPPET_LENGTH_THRESHOLD.
+        Returns indexed snippets as (original_index, content) tuples.
+        """
+        short_snippets: Dict[str, List[tuple[int, str]]] = {}
+        long_snippets: Dict[str, List[tuple[int, str]]] = {}
 
         for paper_id, snippets in evidence_dict.items():
-            paper_size = sum(len(s) for s in snippets)
+            for idx, snippet in enumerate(snippets):
+                if len(snippet) < SNIPPET_LENGTH_THRESHOLD:
+                    if paper_id not in short_snippets:
+                        short_snippets[paper_id] = []
+                    short_snippets[paper_id].append((idx, snippet))
+                else:
+                    if paper_id not in long_snippets:
+                        long_snippets[paper_id] = []
+                    long_snippets[paper_id].append((idx, snippet))
+
+        return short_snippets, long_snippets
+
+    def _split_indexed_evidence_into_batches(
+        self,
+        indexed_evidence: Dict[str, List[tuple[int, str]]],
+        max_batch_size: int,
+    ) -> List[Dict[str, List[tuple[int, str]]]]:
+        """Split indexed evidence into batches that fit within the size limit."""
+        batches: List[Dict[str, List[tuple[int, str]]]] = []
+        current_batch: Dict[str, List[tuple[int, str]]] = {}
+        current_size = 0
+
+        for paper_id, indexed_snippets in indexed_evidence.items():
+            paper_size = sum(len(s) for _, s in indexed_snippets)
 
             if paper_size > max_batch_size:
+                # Paper itself exceeds batch size - put in its own batch
                 if current_batch:
                     batches.append(current_batch)
                     current_batch = {}
                     current_size = 0
-                batches.append({paper_id: snippets})
+                batches.append({paper_id: indexed_snippets})
                 continue
 
             if current_size + paper_size > max_batch_size and current_batch:
@@ -597,7 +669,7 @@ class EvidenceOperations(BaseLLMClient):
                 current_batch = {}
                 current_size = 0
 
-            current_batch[paper_id] = snippets
+            current_batch[paper_id] = indexed_snippets
             current_size += paper_size
 
         if current_batch:
@@ -605,42 +677,141 @@ class EvidenceOperations(BaseLLMClient):
 
         return batches if batches else [{}]
 
-    async def _compact_evidence_batch(
+    async def _compact_short_snippets(
         self,
-        evidence_batch: Dict[str, List[str]],
+        indexed_evidence: Dict[str, List[tuple[int, str]]],
         original_question: str,
         llm_provider: Optional[LLMProvider] = None,
     ) -> Dict[str, List[str]]:
-        """Compact a single batch of evidence."""
-        if not evidence_batch:
+        """
+        Compact short snippets using keep/drop decisions.
+        Short snippets are kept verbatim or dropped entirely - no summarization.
+        """
+        if not indexed_evidence:
             return {}
 
-        formatted_prompt = EVIDENCE_COMPACTION_PROMPT.format(
+        # Format evidence with indices for the LLM
+        formatted_evidence: Dict[str, Dict[int, str]] = {}
+        for paper_id, indexed_snippets in indexed_evidence.items():
+            formatted_evidence[paper_id] = {
+                idx: snippet for idx, snippet in indexed_snippets
+            }
+
+        formatted_prompt = SHORT_SNIPPET_COMPACTION_PROMPT.format(
             question=original_question,
-            evidence=json.dumps(evidence_batch, indent=2),
-            schema=EvidenceCompactionResponse.model_json_schema(),
+            evidence=json.dumps(formatted_evidence, indent=2),
+            schema=ShortSnippetCompactionResponse.model_json_schema(),
         )
 
         message_content = [TextContent(text=formatted_prompt)]
 
         llm_response = self.generate_content(
-            system_prompt="You are a research assistant that summarizes evidence while preserving key information for answering questions.",
+            system_prompt="You are a research assistant that filters evidence snippets for relevance.",
+            contents=message_content,
+            model_type=ModelType.FAST,
+            provider=llm_provider,
+        )
+
+        if llm_response and llm_response.text:
+            response_json = JSONParser.validate_and_extract_json(llm_response.text)
+            compaction_response = ShortSnippetCompactionResponse.model_validate(
+                response_json
+            )
+
+            # Apply keep/drop decisions
+            result: Dict[str, List[str]] = {}
+            for paper_id, indexed_snippets in indexed_evidence.items():
+                actions = compaction_response.actions.get(paper_id, [])
+                action_map = {a.index: a.action for a in actions}
+
+                kept_snippets = []
+                for idx, snippet in indexed_snippets:
+                    action = action_map.get(
+                        idx, "delete"
+                    )  # Default to delete if not specified
+                    if action == "keep":
+                        kept_snippets.append(snippet)
+
+                if kept_snippets:
+                    result[paper_id] = kept_snippets
+
+            return result
+        else:
+            logger.warning("Empty response from LLM during short snippet compaction.")
+            # Return all snippets unchanged
+            return {
+                paper_id: [s for _, s in indexed_snippets]
+                for paper_id, indexed_snippets in indexed_evidence.items()
+            }
+
+    async def _compact_long_snippets(
+        self,
+        indexed_evidence: Dict[str, List[tuple[int, str]]],
+        original_question: str,
+        llm_provider: Optional[LLMProvider] = None,
+    ) -> Dict[str, List[str]]:
+        """
+        Compact long snippets using drop/summarize decisions.
+        Long snippets are either dropped or summarized - no keeping verbatim.
+        """
+        if not indexed_evidence:
+            return {}
+
+        # Format evidence with indices for the LLM
+        formatted_evidence: Dict[str, Dict[int, str]] = {}
+        for paper_id, indexed_snippets in indexed_evidence.items():
+            formatted_evidence[paper_id] = {
+                idx: snippet for idx, snippet in indexed_snippets
+            }
+
+        formatted_prompt = LONG_SNIPPET_COMPACTION_PROMPT.format(
+            question=original_question,
+            evidence=json.dumps(formatted_evidence, indent=2),
+            schema=LongSnippetCompactionResponse.model_json_schema(),
+        )
+
+        message_content = [TextContent(text=formatted_prompt)]
+
+        llm_response = self.generate_content(
+            system_prompt="You are a research assistant that condenses large evidence blocks while preserving key information.",
             contents=message_content,
             model_type=ModelType.DEFAULT,
             provider=llm_provider,
         )
 
         if llm_response and llm_response.text:
-            compaction_response = JSONParser.validate_and_extract_json(
-                llm_response.text
+            response_json = JSONParser.validate_and_extract_json(llm_response.text)
+            compaction_response = LongSnippetCompactionResponse.model_validate(
+                response_json
             )
-            compaction_response = EvidenceCompactionResponse.model_validate(
-                compaction_response
-            )
-            return compaction_response.compacted_evidence
+
+            # Apply drop/summarize decisions
+            result: Dict[str, List[str]] = {}
+            for paper_id, indexed_snippets in indexed_evidence.items():
+                actions = compaction_response.actions.get(paper_id, [])
+                action_map = {a.index: a for a in actions}
+
+                processed_snippets = []
+                for idx, snippet in indexed_snippets:
+                    action_obj = action_map.get(idx)
+                    if action_obj is None:
+                        # Default to summarize with truncation if not specified
+                        processed_snippets.append(f"(summarized) {snippet[:500]}...")
+                    elif action_obj.action == "summarize" and action_obj.summary:
+                        processed_snippets.append(action_obj.summary)
+                    # If action is "drop", we skip the snippet
+
+                if processed_snippets:
+                    result[paper_id] = processed_snippets
+
+            return result
         else:
-            logger.warning("Empty response from LLM during evidence batch compaction.")
-            return evidence_batch
+            logger.warning("Empty response from LLM during long snippet compaction.")
+            # Return truncated summaries as fallback
+            return {
+                paper_id: [f"(summarized) {s[:500]}..." for _, s in indexed_snippets]
+                for paper_id, indexed_snippets in indexed_evidence.items()
+            }
 
     async def _extract_search_keywords(
         self,

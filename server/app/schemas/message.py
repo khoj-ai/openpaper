@@ -1,6 +1,6 @@
 import re
 from enum import Enum
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from app.schemas.responses import ToolCall, ToolCallResult
 from pydantic import BaseModel, Field
@@ -236,6 +236,46 @@ class ToolResultCompactionResponse(BaseModel):
     compacted_results: List[CompactedToolResult] = Field(
         default_factory=list,
         description="List of compacted tool results with summaries",
+    )
+
+
+class ShortSnippetAction(BaseModel):
+    """Action for a short snippet - keep or drop only."""
+
+    index: int = Field(description="Index of the snippet in the original list")
+    action: Literal["keep", "drop"] = Field(
+        description="Whether to keep this snippet verbatim or drop it entirely"
+    )
+
+
+class LongSnippetAction(BaseModel):
+    """Action for a long snippet - drop or summarize."""
+
+    index: int = Field(description="Index of the snippet in the original list")
+    action: Literal["drop", "summarize"] = Field(
+        description="Whether to drop this snippet or summarize it"
+    )
+    summary: Optional[str] = Field(
+        default=None,
+        description="The summarized content. Required if action is 'summarize'. Should be prefixed with '(summarized)'.",
+    )
+
+
+class ShortSnippetCompactionResponse(BaseModel):
+    """Response for compacting short snippets (keep/drop decisions)."""
+
+    actions: Dict[str, List[ShortSnippetAction]] = Field(
+        default_factory=dict,
+        description="Mapping of paper IDs to list of actions for each snippet",
+    )
+
+
+class LongSnippetCompactionResponse(BaseModel):
+    """Response for compacting long snippets (drop/summarize decisions)."""
+
+    actions: Dict[str, List[LongSnippetAction]] = Field(
+        default_factory=dict,
+        description="Mapping of paper IDs to list of actions for each snippet",
     )
 
 
