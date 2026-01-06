@@ -7,7 +7,19 @@ import random
 import time
 from typing import Any, Callable, Tuple
 
+import openai
+
 logger = logging.getLogger(__name__)
+
+# Exceptions that should trigger a retry with backoff
+RETRYABLE_EXCEPTIONS = (
+    ValueError,
+    json.JSONDecodeError,
+    openai.InternalServerError,  # 500, 503
+    openai.RateLimitError,  # 429
+    openai.APIConnectionError,  # Network issues
+    openai.APITimeoutError,  # Timeouts
+)
 
 
 def retry_llm_operation(max_retries: int = 3, delay: float = 1.0):
@@ -27,19 +39,19 @@ def retry_llm_operation(max_retries: int = 3, delay: float = 1.0):
             for attempt in range(max_retries + 1):
                 try:
                     return func(*args, **kwargs)
-                except (ValueError, json.JSONDecodeError) as e:
+                except RETRYABLE_EXCEPTIONS as e:
                     last_exception = e
                     if attempt < max_retries:
                         # Calculate exponential backoff with jitter
                         backoff_time = (
                             delay * (2**attempt) * (0.5 + 0.5 * random.random())
                         )
-                        logger.debug(
-                            f"Retry {attempt+1}/{max_retries} for {func.__name__}: {str(e)}. Retrying in {backoff_time:.2f}s"
+                        logger.warning(
+                            f"Retry {attempt+1}/{max_retries} for {func.__name__}: {type(e).__name__}: {str(e)[:100]}. Retrying in {backoff_time:.2f}s"
                         )
                         time.sleep(backoff_time)
                     else:
-                        logger.debug(
+                        logger.warning(
                             f"All {max_retries} retries failed for {func.__name__}"
                         )
 
@@ -58,19 +70,19 @@ def retry_llm_operation(max_retries: int = 3, delay: float = 1.0):
             for attempt in range(max_retries + 1):
                 try:
                     return await func(*args, **kwargs)
-                except (ValueError, json.JSONDecodeError) as e:
+                except RETRYABLE_EXCEPTIONS as e:
                     last_exception = e
                     if attempt < max_retries:
                         # Calculate exponential backoff with jitter
                         backoff_time = (
                             delay * (2**attempt) * (0.5 + 0.5 * random.random())
                         )
-                        logger.debug(
-                            f"Retry {attempt+1}/{max_retries} for {func.__name__}: {str(e)}. Retrying in {backoff_time:.2f}s"
+                        logger.warning(
+                            f"Retry {attempt+1}/{max_retries} for {func.__name__}: {type(e).__name__}: {str(e)[:100]}. Retrying in {backoff_time:.2f}s"
                         )
                         await asyncio.sleep(backoff_time)
                     else:
-                        logger.debug(
+                        logger.warning(
                             f"All {max_retries} retries failed for {func.__name__}"
                         )
 

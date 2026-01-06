@@ -17,6 +17,7 @@ from app.llm.provider import (
     StreamChunk,
     ToolCallResult,
 )
+from app.llm.utils import retry_llm_operation
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +98,7 @@ class BaseLLMClient:
         else:
             raise ValueError(f"Unsupported model type: {model_type}")
 
+    @retry_llm_operation(max_retries=3, delay=1.0)
     def generate_content(
         self,
         contents: Any,
@@ -109,7 +111,7 @@ class BaseLLMClient:
         enable_thinking: bool = True,
         **kwargs,
     ) -> LLMResponse:
-        """Generate content using the specified provider"""
+        """Generate content using the specified provider. Automatically retries on transient errors."""
         start_time = time.time()
         model = self._get_model_for_type(model_type, provider)
         target_provider = provider or self.default_provider
