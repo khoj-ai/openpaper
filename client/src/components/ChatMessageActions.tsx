@@ -9,7 +9,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { Check, Copy, ChevronDown } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 
 import { Reference } from "@/lib/schema";
 
@@ -50,13 +50,12 @@ export function ChatMessageActions({ message, references }: ChatMessageActionsPr
 	};
 
 	return (
-		<div className="">
-			<div className="flex items-center space-x-1 p-1 rounded-lg">
+		<DropdownMenu>
+			<DropdownMenuTrigger asChild>
 				<Button
 					variant="ghost"
 					size="icon"
-					className="h-6 w-6"
-					onClick={copyAsPlainText}
+					className="h-6 w-6 text-muted-foreground hover:text-foreground"
 					title="Copy"
 				>
 					{hasCopied ? (
@@ -65,22 +64,18 @@ export function ChatMessageActions({ message, references }: ChatMessageActionsPr
 						<Copy className="h-3 w-3" />
 					)}
 				</Button>
-				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<Button variant="ghost" size="icon" className="h-6 w-6">
-							<ChevronDown className="h-3 w-3" />
-						</Button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent>
-						<DropdownMenuItem onClick={copyAsMarkdown}>
-							As Markdown
-						</DropdownMenuItem>
-						<DropdownMenuItem onClick={copyWithReferences} disabled={!references || !references.citations || references.citations.length === 0}>
-							With References
-						</DropdownMenuItem>
-					</DropdownMenuContent>
-				</DropdownMenu>
-			</div>
-		</div>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="end">
+				<DropdownMenuItem onClick={copyAsPlainText}>
+					Copy as text
+				</DropdownMenuItem>
+				<DropdownMenuItem onClick={copyAsMarkdown}>
+					Copy as markdown
+				</DropdownMenuItem>
+				<DropdownMenuItem onClick={copyWithReferences} disabled={!references || !references.citations || references.citations.length === 0}>
+					Copy with references
+				</DropdownMenuItem>
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 }

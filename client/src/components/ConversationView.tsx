@@ -242,31 +242,29 @@ export const ConversationView = ({
 					{msg.content}
 				</Markdown>
 				{msg.references && msg.references["citations"]?.length > 0 ? (
-					<div>
+					<div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
 						<div
-							className="mt-0 pt-0 border-t border-gray-300 dark:border-gray-700 flex items-center justify-between"
+							className="flex items-center justify-between"
 							id="references-section"
 						>
 							<button
 								onClick={() => toggleReferences(index)}
-								className="flex items-center gap-1 text-sm font-semibold mb-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+								className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
 							>
 								{expandedReferences.has(index) ? (
-									<ChevronUp className="h-4 w-4" />
+									<ChevronUp className="h-3 w-3" />
 								) : (
-									<ChevronDown className="h-4 w-4" />
+									<ChevronDown className="h-3 w-3" />
 								)}
 								References ({msg.references.citations.length})
+								{msg.references.citations.length > 15 && (
+									<span className="text-amber-600 dark:text-amber-400 ml-1">• summarized</span>
+								)}
 							</button>
 							{msg.role === "assistant" && (
 								<ChatMessageActions message={msg.content} references={msg.references} />
 							)}
 						</div>
-						{msg.references.citations.length > 15 && (
-							<p className="text-xs text-amber-600 dark:text-amber-400 mb-2">
-								With many references, some context may be summarized.
-							</p>
-						)}
 						{expandedReferences.has(index) && (
 							<ReferencePaperCards
 								citations={msg.references.citations}
@@ -482,7 +480,7 @@ export const ConversationView = ({
 							</div>
 						)}
 					</form>
-					<p className="text-xs text-center text-muted-foreground mt-2">
+					<p className="text-[10px] text-center text-muted-foreground/70 mt-1">
 						AI can make mistakes. Verify important information.
 					</p>
 					{isCentered && (
