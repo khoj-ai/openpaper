@@ -11,7 +11,6 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from './ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { BasicUser } from "@/lib/auth";
 import { User as UserIcon } from 'lucide-react';
@@ -214,37 +213,18 @@ interface AnnotationsViewProps {
 }
 
 interface AnnotationsToolbarProps {
-	onHighlightTypeFilter: (type: string) => void;
 	onShowJustMine: (show: boolean) => void;
-	selectedHighlightType: string;
 	showJustMine: boolean;
-	highlightTypes: string[];
 	readonly: boolean;
 }
 
 function AnnotationsToolbar({
-	onHighlightTypeFilter,
 	onShowJustMine,
-	selectedHighlightType,
 	showJustMine,
-	highlightTypes,
 	readonly,
 }: AnnotationsToolbarProps) {
 	return (
-		<div className="flex items-center gap-3 px-3 border-b border-border bg-muted/20">
-			<Select value={selectedHighlightType} onValueChange={onHighlightTypeFilter}>
-				<SelectTrigger className="w-[140px] h-8">
-					<SelectValue placeholder="All types" />
-				</SelectTrigger>
-				<SelectContent>
-					<SelectItem value="all">All types</SelectItem>
-					{highlightTypes.map((type) => (
-						<SelectItem key={type} value={type}>
-							{type.replace('_', ' ').toLowerCase()}
-						</SelectItem>
-					))}
-				</SelectContent>
-			</Select>
+		<div className="flex items-center gap-3 px-3 py-2 border-b border-border bg-muted/20">
 			{
 				!readonly && (
 					<div className="flex items-center gap-2">
@@ -282,19 +262,9 @@ export function AnnotationsView(
 	const [sortedHighlights, setSortedHighlights] = React.useState<PaperHighlight[]>([]);
 	const [filteredHighlights, setFilteredHighlights] = React.useState<PaperHighlight[]>([]);
 	const [highlightAnnotationMap, setHighlightAnnotationMap] = React.useState<Map<string, PaperHighlightAnnotation[]>>(new Map());
-	const [selectedHighlightType, setSelectedHighlightType] = React.useState<string>('all');
 	const [showJustMine, setShowJustMine] = React.useState<boolean>(false);
 	const highlightRefs = useRef<Record<string, HTMLDivElement | null>>({});
 	const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-
-	// Get unique highlight types for filter dropdown
-	const uniqueHighlightTypes = React.useMemo(() => {
-		const types = new Set<string>();
-		highlights.forEach(h => {
-			if (h.type) types.add(h.type);
-		});
-		return Array.from(types).sort();
-	}, [highlights]);
 
 	useEffect(() => {
 		if (activeHighlight?.id) {
@@ -370,11 +340,6 @@ export function AnnotationsView(
 	useEffect(() => {
 		let filtered = sortedHighlights;
 
-		// Filter by highlight type
-		if (selectedHighlightType !== 'all') {
-			filtered = filtered.filter(h => h.type === selectedHighlightType);
-		}
-
 		// Filter to show only user's annotations if enabled
 		if (showJustMine) {
 			filtered = filtered.filter(h => {
@@ -386,11 +351,7 @@ export function AnnotationsView(
 		}
 
 		setFilteredHighlights(filtered);
-	}, [sortedHighlights, selectedHighlightType, showJustMine, highlightAnnotationMap]);
-
-	const handleHighlightTypeFilter = (type: string) => {
-		setSelectedHighlightType(type);
-	};
+	}, [sortedHighlights, showJustMine, highlightAnnotationMap]);
 
 	const handleShowJustMine = (show: boolean) => {
 		setShowJustMine(show);
@@ -410,11 +371,8 @@ export function AnnotationsView(
 	return (
 		<div className="flex flex-col h-full">
 			<AnnotationsToolbar
-				onHighlightTypeFilter={handleHighlightTypeFilter}
 				onShowJustMine={handleShowJustMine}
-				selectedHighlightType={selectedHighlightType}
 				showJustMine={showJustMine}
-				highlightTypes={uniqueHighlightTypes}
 				readonly={readonly}
 			/>
 
