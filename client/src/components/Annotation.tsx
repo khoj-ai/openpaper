@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Check, File, Pencil, Trash2, User as UserIcon, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Avatar } from '@/components/ui/avatar';
 import { PaperHighlightAnnotation } from '@/lib/schema';
 import { BasicUser } from '@/lib/auth';
 import { formatDate } from '@/lib/utils';
@@ -43,57 +42,50 @@ export default function Annotation({
 
     if (isEditing && !readonly) {
         return (
-            <div className="group relative">
-                <div className="flex items-start gap-4 px-4 py-3 bg-background dark:bg-card border border-border rounded-xl shadow-sm">
-                    {/* Avatar */}
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isAI
-                        ? 'bg-blue-200 dark:bg-blue-800'
-                        : 'bg-muted dark:bg-muted/70'
+            <div className="border-l border-muted pl-2 py-1">
+                <div className="flex items-center gap-1.5 mb-1">
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${isAI
+                        ? 'bg-blue-100 dark:bg-blue-900'
+                        : 'bg-muted'
                         }`}>
                         {isAI ? (
-                            <File size={16} className="text-blue-500" />
+                            <File size={10} className="text-blue-500" />
                         ) : (
-                            <UserIcon size={16} className="text-muted-foreground" />
+                            <UserIcon size={10} className="text-muted-foreground" />
                         )}
                     </div>
+                    <span className="text-xs font-medium text-foreground">
+                        {isAI ? 'Open Paper' : user?.name || 'User'}
+                    </span>
+                </div>
 
-                    {/* Content */}
-                    <div className="flex-1 space-y-3">
-                        <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-semibold text-foreground">
-                                {isAI ? 'Open Paper' : user?.name || 'User'}
-                            </h4>
-                        </div>
+                <Textarea
+                    value={editedContent}
+                    onChange={(e) => setEditedContent(e.target.value)}
+                    className="min-h-[60px] text-sm"
+                    onClick={(e) => e.stopPropagation()}
+                    autoFocus
+                    placeholder="Write your annotation..."
+                />
 
-                        <Textarea
-                            value={editedContent}
-                            onChange={(e) => setEditedContent(e.target.value)}
-                            className="min-h-[80px] bg-muted/50 dark:bg-muted/30 border-border focus:bg-background dark:focus:bg-card"
-                            onClick={(e) => e.stopPropagation()}
-                            autoFocus
-                            placeholder="Write your annotation..."
-                        />
-
-                        <div className="flex items-center justify-end gap-2">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleCancel}
-                                className="text-muted-foreground hover:text-foreground"
-                            >
-                                <X size={14} className="mr-1" />
-                                Cancel
-                            </Button>
-                            <Button
-                                size="sm"
-                                onClick={handleSave}
-                                className="bg-primary hover:bg-primary/90"
-                            >
-                                <Check size={14} className="mr-1" />
-                                Save
-                            </Button>
-                        </div>
-                    </div>
+                <div className="flex items-center justify-end gap-1 mt-1">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleCancel}
+                        className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                        <X size={12} className="mr-1" />
+                        Cancel
+                    </Button>
+                    <Button
+                        size="sm"
+                        onClick={handleSave}
+                        className="h-7 text-xs"
+                    >
+                        <Check size={12} className="mr-1" />
+                        Save
+                    </Button>
                 </div>
             </div>
         );
@@ -101,76 +93,57 @@ export default function Annotation({
 
     return (
         <div
-            className="group relative"
+            className="group border-l border-muted pl-2 py-1"
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
-            <div className="relative flex items-start gap-4 px-4 py-3 rounded-xl border bg-background dark:bg-card border-border hover:border-border/80 dark:hover:border-border hover:shadow-sm dark:hover:shadow-lg transition-all duration-300">
-
+            <div className="flex items-center gap-1.5">
                 {/* Avatar */}
-                <div className="relative">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-transform duration-200 ${isAI
-                        ? 'bg-blue-200 dark:bg-blue-800'
-                        : 'bg-muted dark:bg-muted/70'
-                        } ${isHovered ? 'scale-105' : ''}`}>
-                        {isAI ? (
-                            <File size={16} className="text-blue-500" />
-                        ) : user?.picture ? (
-                            <Avatar className="h-8 w-8">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={user.picture} alt={user.name} className="w-full h-full object-cover" />
-                            </Avatar>
-                        ) : (
-                            <UserIcon size={16} className="text-muted-foreground" />
-                        )}
-                    </div>
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden ${isAI
+                    ? 'bg-blue-100 dark:bg-blue-900'
+                    : 'bg-muted'
+                    }`}>
+                    {isAI ? (
+                        <File size={10} className="text-blue-500" />
+                    ) : user?.picture ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={user.picture} alt={user.name} className="w-full h-full object-cover" />
+                    ) : (
+                        <UserIcon size={10} className="text-muted-foreground" />
+                    )}
                 </div>
 
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                            <h4 className="text-sm font-semibold text-foreground">
-                                {isAI ? 'Open Paper' : user?.name || 'User'}
-                            </h4>
-                            <span className="text-xs text-muted-foreground bg-muted dark:bg-muted/50 px-2 py-0.5 rounded-full">
-                                {formatDate(annotation.created_at)}
-                            </span>
-                        </div>
+                <span className="text-xs font-medium text-foreground">
+                    {isAI ? 'Open Paper' : user?.name || 'User'}
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                    {formatDate(annotation.created_at)}
+                </span>
 
-                        {/* Action buttons */}
-                        {!readonly && removeAnnotation && updateAnnotation && (
-                            <div className={`flex items-center gap-1 transition-all duration-200 ${isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-2'
-                                }`}>
-                                {!isAI && (
-                                    <button
-                                        className="p-1.5 hover:bg-muted dark:hover:bg-muted/70 rounded-lg transition-colors duration-200 group/btn"
-                                        onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
-                                        title="Edit annotation"
-                                    >
-                                        <Pencil size={14} className="text-muted-foreground group-hover/btn:text-primary transition-colors" />
-                                    </button>
-                                )}
-                                {!isAI && (
-                                    <button
-                                        className="p-1.5 hover:bg-destructive/10 dark:hover:bg-destructive/20 rounded-lg transition-colors duration-200 group/btn"
-                                        onClick={(e) => { e.stopPropagation(); removeAnnotation(annotation.id); }}
-                                        title="Delete annotation"
-                                    >
-                                        <Trash2 size={14} className="text-muted-foreground group-hover/btn:text-destructive transition-colors" />
-                                    </button>
-                                )}
-                            </div>
-                        )}
+                {/* Action buttons */}
+                {!readonly && removeAnnotation && updateAnnotation && !isAI && (
+                    <div className={`flex items-center gap-0.5 ml-auto transition-opacity ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
+                        <button
+                            className="p-1 hover:bg-muted rounded transition-colors"
+                            onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
+                            title="Edit"
+                        >
+                            <Pencil size={12} className="text-muted-foreground hover:text-primary" />
+                        </button>
+                        <button
+                            className="p-1 hover:bg-destructive/10 rounded transition-colors"
+                            onClick={(e) => { e.stopPropagation(); removeAnnotation(annotation.id); }}
+                            title="Delete"
+                        >
+                            <Trash2 size={12} className="text-muted-foreground hover:text-destructive" />
+                        </button>
                     </div>
-
-                    <div className="prose prose-sm max-w-none dark:prose-invert">
-                        <p className="text-foreground leading-relaxed m-0 whitespace-pre-wrap">
-                            {annotation.content}
-                        </p>
-                    </div>
-                </div>
+                )}
             </div>
+
+            <p className="text-sm text-foreground leading-snug mt-0.5 whitespace-pre-wrap">
+                {annotation.content}
+            </p>
         </div>
     );
 }

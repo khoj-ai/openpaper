@@ -9,8 +9,6 @@ import { RenderedHighlightPosition } from './PdfHighlighterViewer';
 
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent } from './ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { BasicUser } from "@/lib/auth";
 import { User as UserIcon } from 'lucide-react';
@@ -26,27 +24,6 @@ const HIGHLIGHT_BORDER_COLOR_MAP: Record<HighlightColor, string> = {
 	purple: "border-purple-400",
 };
 
-// Function to get badge styling based on highlight type
-function getHighlightTypeStyling(type: string) {
-	switch (type) {
-		case 'topic':
-			return { variant: 'default' as const, className: 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200' };
-		case 'motivation':
-			return { variant: 'default' as const, className: 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200' };
-		case 'method':
-			return { variant: 'default' as const, className: 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200' };
-		case 'evidence':
-			return { variant: 'default' as const, className: 'bg-orange-100 text-orange-800 border-orange-200 hover:bg-orange-200' };
-		case 'result':
-			return { variant: 'default' as const, className: 'bg-red-100 text-red-800 border-red-200 hover:bg-red-200' };
-		case 'impact':
-			return { variant: 'default' as const, className: 'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200' };
-		case 'general':
-			return { variant: 'secondary' as const, className: 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200' };
-		default:
-			return { variant: 'secondary' as const, className: 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200' };
-	}
-}
 
 export interface AnnotationButtonProps {
 	highlightId: string;
@@ -122,7 +99,7 @@ interface HighlightThreadProps {
 }
 
 
-// New HighlightThread Component
+// HighlightThread Component
 function HighlightThread({
 	highlight,
 	annotations,
@@ -136,66 +113,49 @@ function HighlightThread({
 }: HighlightThreadProps) {
 
 	const highlightBorderColor = highlight.role === 'assistant'
-		? 'border-purple-500'
+		? 'border-purple-400'
 		: HIGHLIGHT_BORDER_COLOR_MAP[highlight.color || 'blue'];
-	const activeBgColor = isActive ? 'bg-secondary' : 'hover:bg-secondary/50';
 
 	return (
-		<Card
-			className={`transition-colors cursor-pointer rounded-md border-0 shadow-none py-2 ${activeBgColor}`}
+		<div
+			className={`cursor-pointer rounded px-2 py-1.5 transition-colors ${isActive ? 'bg-secondary' : 'hover:bg-secondary/50'}`}
 			onClick={onClick}
 		>
-			<CardContent className="p-2">
-				{/* The Blockquote */}
-				<blockquote className={`border-l-2 ${highlightBorderColor} pl-3 py-1 mb-2`}>
-					<div className="flex items-start flex-col gap-1">
-						{highlight.type && (
-							(() => {
-								const styling = getHighlightTypeStyling(highlight.type);
-								return (
-									<Badge
-										variant={styling.variant}
-										className={`text-[10px] px-1.5 py-0 shrink-0 ${styling.className}`}
-									>
-										{highlight.type.replace('_', ' ').toLowerCase()}
-									</Badge>
-								);
-							})()
-						)}
-						<p className="text-foreground text-sm flex-1">
-							{highlight.raw_text}
-						</p>
-					</div>
-				</blockquote>
-
-
-				{/* The Annotation Thread */}
-				{annotations.length > 0 && (
-					<div className="space-y-1 ml-3">
-						{annotations.map((annotation) => (
-							<Annotation
-								key={annotation.id}
-								annotation={{ ...annotation }}
-								removeAnnotation={removeAnnotation}
-								updateAnnotation={updateAnnotation}
-								user={user}
-								readonly={readonly}
-							/>
-						))}
-					</div>
+			<blockquote className={`border-l-2 ${highlightBorderColor} pl-2`}>
+				{highlight.type && (
+					<span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
+						{highlight.type.replace('_', ' ').toLowerCase()}
+					</span>
 				)}
+				<p className="text-foreground text-sm leading-snug">
+					{highlight.raw_text}
+				</p>
+			</blockquote>
 
-				{/* Add Annotation Form */}
-				{isActive && !readonly && addAnnotation && highlight.id && (
-					<div className="pt-1 ml-3">
-						<AnnotationButton
-							highlightId={highlight.id}
-							addAnnotation={addAnnotation}
+			{annotations.length > 0 && (
+				<div className="space-y-1 ml-2 mt-1">
+					{annotations.map((annotation) => (
+						<Annotation
+							key={annotation.id}
+							annotation={{ ...annotation }}
+							removeAnnotation={removeAnnotation}
+							updateAnnotation={updateAnnotation}
+							user={user}
+							readonly={readonly}
 						/>
-					</div>
-				)}
-			</CardContent>
-		</Card>
+					))}
+				</div>
+			)}
+
+			{isActive && !readonly && addAnnotation && highlight.id && (
+				<div className="ml-2 mt-1">
+					<AnnotationButton
+						highlightId={highlight.id}
+						addAnnotation={addAnnotation}
+					/>
+				</div>
+			)}
+		</div>
 	);
 }
 
