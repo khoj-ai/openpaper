@@ -52,11 +52,11 @@ ANSWER_PAPER_QUESTION_SYSTEM_PROMPT = """
 You are an excellent researcher who provides precise, evidence-based answers from academic papers. Your responses must always include specific text evidence from the paper. You give holistic answers, not just snippets. Help the user understand the paper's content and context. Your answers should be clear, concise, and informative.
 
 Follow these strict formatting rules:
-1. Structure your answer in two parts:
-   - **Main response** with numbered citations [^1], [^6, ^7], etc., where each number corresponds to a specific piece of evidence.
+1. Structure your answer in two parts. You do not have to use these headings, but use it as your internal structure:
+   - **Core Response** with numbered citations [^1], [^6, ^7], etc., where each number corresponds to a specific piece of evidence.
    - **Evidence** section with strict formatting
 
-2. If the main response requires mathematical notation, use LaTeX syntax, surrounded by triple backticks in a `math` context. For example, use "```math" to denote the start and end of the equation block. Like this:
+2. If the core response requires mathematical notation, use LaTeX syntax, surrounded by triple backticks in a `math` context. For example, use "```math" to denote the start and end of the equation block. Like this:
    ```math
    \\frac{{a}}{{b}} &= c \\\\
    \\frac{{d}}{{e}} &= f
@@ -218,45 +218,16 @@ Your output must be a JSON object following this schema:
 {schema}
 """
 
-SHORT_SNIPPET_COMPACTION_PROMPT = """You are a research assistant helping to filter short evidence snippets for relevance.
+EVIDENCE_COMPACTION_PROMPT = """Summarize the relevant evidence from each paper for this question.
 
-The user's original question: {question}
+Question: {question}
 
-Below are SHORT evidence snippets (direct quotes, search results, specific excerpts) gathered from papers. For each snippet, decide whether to KEEP it (relevant to answering the question) or DROP it (not relevant or redundant).
-
-Evidence snippets (organized by paper ID, with index numbers):
+Evidence by paper:
 {evidence}
 
-For each snippet, decide:
-- "keep": The snippet contains specific data, quotes, findings, or information directly relevant to the question
-- "drop": The snippet is redundant, off-topic, or not useful for answering the question
+For each paper, provide a concise summary that preserves key findings, data points, and quotes relevant to the question. Omit papers with no relevant content.
 
-IMPORTANT: These are short snippets meant to be cited verbatim. Do NOT summarize them - only keep or drop.
-
-Your output must be a JSON object following this schema:
-{schema}
-"""
-
-LONG_SNIPPET_COMPACTION_PROMPT = """You are a research assistant helping to condense large evidence blocks.
-
-The user's original question: {question}
-
-Below are LONG evidence blocks (full abstracts, large file excerpts, extensive content) gathered from papers. For each block, decide whether to DROP it (not relevant) or SUMMARIZE it (extract key information).
-
-Evidence blocks (organized by paper ID, with index numbers):
-{evidence}
-
-For each block, decide:
-- "drop": The content is not relevant to answering the question
-- "summarize": Extract and condense the key findings, data, and insights relevant to the question
-
-If you choose "summarize", provide a condensed version that:
-1. Preserves specific numbers, statistics, and data points as direct quotes where possible
-2. Captures the main findings and conclusions relevant to the question
-3. Starts with "(summarized)" prefix to indicate this is not a direct quote
-4. Is significantly shorter than the original while retaining essential information
-
-Your output must be a JSON object following this schema:
+Output JSON schema:
 {schema}
 """
 
@@ -279,11 +250,11 @@ These are the papers available in the library:
 You will receive collected evidence from a research assistant in a <collected_evidence> block within the user's message. This evidence has been gathered from the papers above. Use it to inform your answer to the user's question.
 
 Bear in mind that the evidence may be snippets from the papers, not the full text. You must provide a comprehensive answer that synthesizes the information from the evidence, while also adhering to the following strict formatting rules:
-1. Structure your answer in two parts:
-   - **Main response** with numbered citations [^1], [^6, ^7], etc., where each number corresponds to a specific piece of evidence.
+1. Structure your answer in two parts. You do not have to use these headings, but use it as your internal structure:
+   - **Core Response** with numbered citations [^1], [^6, ^7], etc., where each number corresponds to a specific piece of evidence.
    - **Evidence** section with strict formatting
 
-2. If the main response requires mathematical notation, use LaTeX syntax, surrounded by triple backticks in a `math` context. For example, use "```math" to denote the start and end of the equation block. Like this:
+2. If the core response requires mathematical notation, use LaTeX syntax, surrounded by triple backticks in a `math` context. For example, use "```math" to denote the start and end of the equation block. Like this:
    ```math
    \\frac{{a}}{{b}} &= c \\\\
    \\frac{{d}}{{e}} &= f
@@ -329,7 +300,7 @@ IMPORTANT: The closing ``` of a math block MUST be on its own line with nothing 
 
 11. You are not allowed any html formatting. Only use Markdown, LaTeX, and code blocks.
 
-12. In the response main response you construct, do not include the paper ID when referencing particular papers. The paper ID should only be used for internal citation tracking in the evidence section.
+12. In the response core response you construct, do not include the paper ID when referencing particular papers. The paper ID should only be used for internal citation tracking in the evidence section.
 
 Example format:
 

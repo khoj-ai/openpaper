@@ -207,19 +207,6 @@ class EvidenceCollection(BaseModel):
             self.evidence[paper_id] = Evidence(paper_id=paper_id, content=snippets)
 
 
-class EvidenceSummaryResponse(BaseModel):
-    """Response structure for evidence summarization
-
-    Maps paper IDs to their respective summaries.
-    Each paper_id should correspond to the summary for that paper's evidence.
-    """
-
-    summaries: Dict[str, str] = Field(
-        default_factory=dict,
-        description="Mapping of paper IDs to their respective summaries",
-    )
-
-
 class CompactedToolResult(BaseModel):
     """A single compacted tool result"""
 
@@ -239,43 +226,21 @@ class ToolResultCompactionResponse(BaseModel):
     )
 
 
-class ShortSnippetAction(BaseModel):
-    """Action for a short snippet - keep or drop only."""
+class PaperEvidenceSummary(BaseModel):
+    """Summary of evidence from a single paper."""
 
-    index: int = Field(description="Index of the snippet in the original list")
-    action: Literal["keep", "drop"] = Field(
-        description="Whether to keep this snippet verbatim or drop it entirely"
+    paper_id: str = Field(description="The paper ID")
+    summary: str = Field(
+        description="Concise summary of relevant evidence from this paper"
     )
 
 
-class LongSnippetAction(BaseModel):
-    """Action for a long snippet - drop or summarize."""
+class EvidenceSummaryResponse(BaseModel):
+    """Response for evidence compaction - one summary per paper."""
 
-    index: int = Field(description="Index of the snippet in the original list")
-    action: Literal["drop", "summarize"] = Field(
-        description="Whether to drop this snippet or summarize it"
-    )
-    summary: Optional[str] = Field(
-        default=None,
-        description="The summarized content. Required if action is 'summarize'. Should be prefixed with '(summarized)'.",
-    )
-
-
-class ShortSnippetCompactionResponse(BaseModel):
-    """Response for compacting short snippets (keep/drop decisions)."""
-
-    actions: Dict[str, List[ShortSnippetAction]] = Field(
-        default_factory=dict,
-        description="Mapping of paper IDs to list of actions for each snippet",
-    )
-
-
-class LongSnippetCompactionResponse(BaseModel):
-    """Response for compacting long snippets (drop/summarize decisions)."""
-
-    actions: Dict[str, List[LongSnippetAction]] = Field(
-        default_factory=dict,
-        description="Mapping of paper IDs to list of actions for each snippet",
+    papers: List[PaperEvidenceSummary] = Field(
+        default_factory=list,
+        description="List of paper summaries",
     )
 
 
