@@ -87,6 +87,7 @@ export const ConversationView = ({
 	const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 	const [searchTerm, setSearchTerm] = useState<string | null>(null);
 	const [isPdfVisible, setIsPdfVisible] = useState(false);
+	const [expandedReferences, setExpandedReferences] = useState<Set<number>>(new Set());
 	const isMobile = useIsMobile();
 
 	const [statusMessageHistory, setStatusMessageHistory] = useState<{ message: string; startTime: number }[]>([]);
@@ -148,6 +149,18 @@ export const ConversationView = ({
 			setIsPdfVisible(true);
 		}
 	};
+
+	const toggleReferences = useCallback((messageIndex: number) => {
+		setExpandedReferences(prev => {
+			const newSet = new Set(prev);
+			if (newSet.has(messageIndex)) {
+				newSet.delete(messageIndex);
+			} else {
+				newSet.add(messageIndex);
+			}
+			return newSet;
+		});
+	}, []);
 
 	const handleTextareaChange = useCallback(
 		(e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -234,23 +247,40 @@ export const ConversationView = ({
 							className="mt-0 pt-0 border-t border-gray-300 dark:border-gray-700 flex items-center justify-between"
 							id="references-section"
 						>
-							<h4 className="text-sm font-semibold mb-2">References</h4>
+							<button
+								onClick={() => toggleReferences(index)}
+								className="flex items-center gap-1 text-sm font-semibold mb-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+							>
+								{expandedReferences.has(index) ? (
+									<ChevronUp className="h-4 w-4" />
+								) : (
+									<ChevronDown className="h-4 w-4" />
+								)}
+								References ({msg.references.citations.length})
+							</button>
 							{msg.role === "assistant" && (
 								<ChatMessageActions message={msg.content} references={msg.references} />
 							)}
 						</div>
-						<ReferencePaperCards
-							citations={msg.references.citations}
-							papers={papers}
-							messageId={msg.id}
-							messageIndex={index}
-							highlightedPaper={
-								highlightedInfo && highlightedInfo.messageIndex === index
-									? highlightedInfo.paperId
-									: null
-							}
-							onHighlightClear={() => setHighlightedInfo(null)}
-						/>
+						{msg.references.citations.length > 15 && (
+							<p className="text-xs text-amber-600 dark:text-amber-400 mb-2">
+								With many references, some context may be summarized.
+							</p>
+						)}
+						{expandedReferences.has(index) && (
+							<ReferencePaperCards
+								citations={msg.references.citations}
+								papers={papers}
+								messageId={msg.id}
+								messageIndex={index}
+								highlightedPaper={
+									highlightedInfo && highlightedInfo.messageIndex === index
+										? highlightedInfo.paperId
+										: null
+								}
+								onHighlightClear={() => setHighlightedInfo(null)}
+							/>
+						)}
 					</div>
 				) : (
 					msg.role === "assistant" && (
@@ -402,7 +432,7 @@ export const ConversationView = ({
 					className={`transition-all duration-300 ${isCentered
 						? "flex-1 flex flex-col justify-center items-center my-au"
 						: ""
-						} ${isPdfVisible ? 'p-2' : 'p-4'} ease-in-out`}
+						} ${isPdfVisible ? 'p-2' : 'py-1'} ease-in-out`}
 				>
 					{isCentered && (
 						<AnimatedGradientText
@@ -452,6 +482,9 @@ export const ConversationView = ({
 							</div>
 						)}
 					</form>
+					<p className="text-xs text-center text-muted-foreground mt-2">
+						AI can make mistakes. Verify important information.
+					</p>
 					{isCentered && (
 						<div className="absolute bottom-0 left-0 w-full">
 							<TopicBubbles isVisible={currentMessage.length === 0} />
