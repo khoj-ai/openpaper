@@ -295,8 +295,8 @@ export default function OpenPaperLanding() {
                             <div className="aspect-video relative rounded-lg overflow-hidden shadow-lg">
                                 <iframe
                                     className="absolute top-0 left-0 w-full h-full"
-                                    src="https://www.youtube.com/embed/ilI1heLZ5R0?si=lwt0PNxCxD8YgAjP"
-                                    title="Accelerate your research with Open Paper"
+                                    src="https://www.youtube.com/embed/xBwzPyMO8ZM?si=wfMyBLyjaUXAXScA"
+                                    title="A personalized research assistant for your literature review"
                                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                                     referrerPolicy="strict-origin-when-cross-origin"
                                     allowFullScreen
