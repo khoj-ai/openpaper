@@ -170,16 +170,11 @@ async def chat_message_multipaper(
                         chunk_content = chunk.get("content", "")
 
                         if chunk_type == "evidence_gathered":
-                            # Initialize evidence collection if not already done
-                            if evidence_collection is None:
-                                evidence_collection = EvidenceCollection()
-
-                            # Add the evidence to the collection
+                            # Use the EvidenceCollection directly (preserves is_compacted and citation_index)
                             assert isinstance(
-                                chunk_content, dict
-                            ), "Chunk content must be a dictionary"
-                            # Cast the chunk_content to EvidenceCollection
-                            evidence_collection.load_from_dict(chunk_content)
+                                chunk_content, EvidenceCollection
+                            ), "Chunk content must be an EvidenceCollection"
+                            evidence_collection = chunk_content
                         elif chunk_type == "status":
                             yield f"{json.dumps({'type': 'status', 'content': chunk_content})}{END_DELIMITER}"
                         else:

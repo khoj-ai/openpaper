@@ -56,6 +56,26 @@ class Evidence(BaseModel):
         return self.metadata.get("line_numbers", [])
 
 
+class OriginalSnippet(BaseModel):
+    """An original evidence snippet with its source metadata."""
+
+    paper_id: str = Field(description="The paper ID this snippet came from")
+    text: str = Field(description="The original snippet text")
+    line_number: Optional[str] = Field(
+        default=None, description="Line number in source paper"
+    )
+
+
+class CitationIndex(BaseModel):
+    """Maps compaction citation markers to original evidence snippets."""
+
+    # Key: "{paper_id}:{snippet_index}" e.g., "abc123:0"
+    index: Dict[str, OriginalSnippet] = Field(
+        default_factory=dict,
+        description="Mapping of paper_id:index keys to original snippets",
+    )
+
+
 class EvidenceCollection(BaseModel):
     """Collection of evidence from multiple papers"""
 
@@ -69,6 +89,14 @@ class EvidenceCollection(BaseModel):
     tool_call_results: List[ToolCallResult] = Field(
         default_factory=list,
         description="List of tool call results for proper multi-turn function calling",
+    )
+    citation_index: CitationIndex = Field(
+        default_factory=CitationIndex,
+        description="Sidecar storage for original snippets during compaction",
+    )
+    is_compacted: bool = Field(
+        default=False,
+        description="Whether evidence has been compacted (citations need resolution)",
     )
 
     def load_from_dict(self, evidence_dict: Dict[str, List[str]]) -> None:
@@ -226,12 +254,25 @@ class ToolResultCompactionResponse(BaseModel):
     )
 
 
+class SummaryCitationMarker(BaseModel):
+    """A citation marker in a summary pointing to an original snippet."""
+
+    marker: int = Field(description="The [@n] marker number used in the summary")
+    original_snippet_index: int = Field(
+        description="Index of the original snippet this marker references"
+    )
+
+
 class PaperEvidenceSummary(BaseModel):
     """Summary of evidence from a single paper."""
 
     paper_id: str = Field(description="The paper ID")
     summary: str = Field(
-        description="Concise summary of relevant evidence from this paper"
+        description="Concise summary with [@n] markers referencing original snippets"
+    )
+    citations: List[SummaryCitationMarker] = Field(
+        default_factory=list,
+        description="Mapping of [@n] markers to original snippet indices",
     )
 
 
@@ -240,7 +281,7 @@ class EvidenceSummaryResponse(BaseModel):
 
     papers: List[PaperEvidenceSummary] = Field(
         default_factory=list,
-        description="List of paper summaries",
+        description="List of paper summaries. You may omit papers with no relevant evidence.",
     )
 
 

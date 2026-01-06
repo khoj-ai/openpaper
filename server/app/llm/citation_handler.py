@@ -1,6 +1,7 @@
 import re
 from typing import List, Optional, Sequence, Union
 
+from app.schemas.message import CitationIndex, OriginalSnippet
 from app.schemas.responses import ResponseCitation
 
 
@@ -151,3 +152,101 @@ class CitationHandler:
             citations.append(current_citation)
 
         return citations
+
+    @staticmethod
+    def resolve_compacted_citations(
+        citations: list[dict],
+        citation_index: CitationIndex,
+    ) -> list[dict]:
+        """
+        Resolve LLM-generated citations from compacted summaries back to
+        original snippets using the citation index.
+
+        Strategy: For each citation, check if its reference text contains
+        [@n] markers. If so, look up the original snippets and combine them.
+        If no markers found, use fuzzy matching or keep the summary text.
+        """
+        resolved = []
+
+        for citation in citations:
+            paper_id = citation.get("paper_id")
+            reference = citation.get("reference", "")
+
+            # Find all [@n] markers in the LLM's citation text
+            marker_matches = re.findall(r"\[@(\d+)\]", reference)
+
+            if marker_matches and paper_id:
+                # Look up all referenced original snippets
+                original_texts = []
+                for snippet_idx in marker_matches:
+                    sidecar_key = f"{paper_id}:{snippet_idx}"
+                    original = citation_index.index.get(sidecar_key)
+                    if original and original.text not in original_texts:
+                        original_texts.append(original.text)
+
+                if original_texts:
+                    # Combine all referenced snippets
+                    resolved.append(
+                        {
+                            "key": citation["key"],
+                            "reference": " [...] ".join(original_texts),
+                            "paper_id": paper_id,
+                        }
+                    )
+                    continue
+
+            # Fallback: try to find best matching original snippet
+            best_match = CitationHandler._find_best_match(
+                reference, paper_id, citation_index
+            )
+
+            if best_match:
+                resolved.append(
+                    {
+                        "key": citation["key"],
+                        "reference": best_match.text,
+                        "paper_id": paper_id,
+                    }
+                )
+            else:
+                # Last resort: keep the summary-derived citation
+                resolved.append(citation)
+
+        return resolved
+
+    @staticmethod
+    def _find_best_match(
+        reference: str,
+        paper_id: Optional[str],
+        citation_index: "CitationIndex",
+    ) -> Optional["OriginalSnippet"]:
+        """
+        Find the original snippet that best matches a summary-derived citation.
+        Uses simple word overlap for speed (no semantic search).
+        """
+        if not paper_id:
+            return None
+
+        candidates = [
+            snippet
+            for key, snippet in citation_index.index.items()
+            if snippet.paper_id == paper_id
+        ]
+
+        if not candidates:
+            return None
+
+        # Simple heuristic: find snippet with most word overlap
+        ref_words = set(reference.lower().split())
+        best_score = 0
+        best_snippet = None
+
+        for snippet in candidates:
+            snippet_words = set(snippet.text.lower().split())
+            overlap = len(ref_words & snippet_words)
+            if overlap > best_score:
+                best_score = overlap
+                best_snippet = snippet
+
+        # Only return if we have a reasonable match (at least 3 words overlap)
+        return best_snippet if best_score >= 3 else None

@@ -219,13 +219,30 @@ Your output must be a JSON object following this schema:
 """
 
 EVIDENCE_COMPACTION_PROMPT = """Summarize the relevant evidence from each paper for this question.
+When making claims in your summary, include [@n] markers that reference the original snippet index (0-based) that supports that claim.
 
 Question: {question}
 
-Evidence by paper:
+Evidence by paper (each snippet has an index):
 {evidence}
 
-For each paper, provide a concise summary that preserves key findings, data points, and quotes relevant to the question. Omit papers with no relevant content.
+For each paper:
+1. Write a concise summary preserving key findings, data points, and direct quotes
+2. Include [@n] markers pointing to the snippet index that supports each claim
+3. List the citation mappings you used
+
+Example:
+If a paper has snippets:
+  [0]: "The model achieved 95% accuracy on the test set"
+  [1]: "Training required 48 hours on 8 GPUs"
+  [2]: "We used the BERT-large architecture as our base"
+
+Your summary might be:
+  "The study achieved high accuracy [@0] using BERT-large [@2], though with substantial compute requirements [@1]."
+
+  And citations would map: marker 0 → snippet 0, marker 2 → snippet 2, marker 1 → snippet 1
+
+IMPORTANT: Each [@n] marker must reference a valid snippet index from that paper's snippets.
 
 Output JSON schema:
 {schema}

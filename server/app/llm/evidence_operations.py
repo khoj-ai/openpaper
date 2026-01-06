@@ -3,7 +3,7 @@ import logging
 import re
 import time
 import uuid
-from typing import AsyncGenerator, Dict, List, Optional, Sequence, Union
+from typing import Any, AsyncGenerator, Dict, List, Mapping, Optional, Sequence, Union
 
 from app.database.crud.message_crud import message_crud
 from app.database.crud.paper_crud import paper_crud
@@ -38,6 +38,7 @@ from app.llm.utils import retry_llm_operation
 from app.schemas.message import (
     EvidenceCollection,
     EvidenceSummaryResponse,
+    OriginalSnippet,
     ToolResultCompactionResponse,
 )
 from app.schemas.user import CurrentUser
@@ -70,7 +71,9 @@ class EvidenceOperations(BaseLLMClient):
         user_references: Optional[Sequence[str]] = None,
         project_id: Optional[str] = None,
         db: Session = Depends(get_db),
-    ) -> AsyncGenerator[Dict[str, Union[str, Dict[str, List[str]]]], None]:
+    ) -> AsyncGenerator[
+        Mapping[str, Union[str, Dict[str, List[str]], EvidenceCollection]], None
+    ]:
         """
         Gather evidence from multiple papers based on the user's question.
         This function will interact with the LLM to gather relevant information
@@ -397,7 +400,7 @@ class EvidenceOperations(BaseLLMClient):
 
         yield {
             "type": "evidence_gathered",
-            "content": evidence_collection.get_evidence_dict(),
+            "content": evidence_collection,  # Full object preserves is_compacted and citation_index
         }
 
     async def compact_tool_call_results(
@@ -499,21 +502,51 @@ class EvidenceOperations(BaseLLMClient):
         # Format evidence for compaction with strict size limits
         # Sort papers by snippet count (most evidence first) and limit total size
 
-        MAX_TOTAL_CHARS = 50000  # Total input limit for fast compaction
-        MAX_PER_PAPER = 3000  # Per-paper limit
+        MAX_TOTAL_CHARS = 80000  # Total input limit for fast compaction
+        MAX_PER_PAPER = 5000  # Per-paper limit
+        MAX_SNIPPET_CHARS = 2000  # Per-snippet limit for indexed format
 
         papers_by_evidence = sorted(
             evidence_dict.items(), key=lambda x: len(x[1]), reverse=True
         )
 
-        evidence_for_compaction: List[Dict[str, str]] = []
+        # Store original snippets in citation_index sidecar BEFORE compaction
+        for paper_id, snippets in papers_by_evidence:
+            evidence_obj = evidence_collection.evidence.get(paper_id)
+            line_numbers = evidence_obj.get_line_numbers() if evidence_obj else []
+
+            for i, snippet in enumerate(snippets):
+                key = f"{paper_id}:{i}"
+                evidence_collection.citation_index.index[key] = OriginalSnippet(
+                    paper_id=paper_id,
+                    text=snippet,  # Full original text preserved
+                    line_number=line_numbers[i] if i < len(line_numbers) else None,
+                )
+
+        # Format evidence with indexed snippets for LLM
+        evidence_for_compaction: List[Dict[str, Any]] = []
         total_chars = 0
         for paper_id, snippets in papers_by_evidence:
-            combined = "\n\n".join(snippets)[:MAX_PER_PAPER]
-            if total_chars + len(combined) > MAX_TOTAL_CHARS:
+            # Build indexed snippets for this paper
+            indexed_snippets = []
+            paper_chars = 0
+            for i, snippet in enumerate(snippets):
+                truncated = snippet[:MAX_SNIPPET_CHARS]
+                if paper_chars + len(truncated) > MAX_PER_PAPER:
+                    break
+                indexed_snippets.append({"index": i, "text": truncated})
+                paper_chars += len(truncated)
+
+            if total_chars + paper_chars > MAX_TOTAL_CHARS:
                 break
-            evidence_for_compaction.append({"paper_id": paper_id, "content": combined})
-            total_chars += len(combined)
+
+            evidence_for_compaction.append(
+                {
+                    "paper_id": paper_id,
+                    "snippets": indexed_snippets,
+                }
+            )
+            total_chars += paper_chars
 
         logger.info(
             f"Compacting {len(evidence_for_compaction)}/{len(evidence_dict)} papers ({total_chars} chars)"
@@ -528,7 +561,7 @@ class EvidenceOperations(BaseLLMClient):
         message_content = [TextContent(text=formatted_prompt)]
 
         llm_response = self.generate_content(
-            system_prompt="Summarize evidence by paper.",
+            system_prompt="You are a research assistant that summarizes evidence snippets from research papers.",
             contents=message_content,
             model_type=ModelType.FAST,
             provider=llm_provider,
@@ -565,6 +598,7 @@ class EvidenceOperations(BaseLLMClient):
                 ]
 
         evidence_collection.apply_compacted_evidence(all_compacted)
+        evidence_collection.is_compacted = True
 
         new_size = evidence_collection.get_evidence_size()
         new_count = sum(len(snippets) for snippets in all_compacted.values())
