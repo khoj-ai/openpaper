@@ -180,6 +180,15 @@ class MultiPaperOperations(EvidenceOperations):
                         CitationHandler.parse_multi_paper_evidence_block(evidence_part)
                     )
 
+                    # Resolve compacted citations to original snippets if evidence was compacted
+                    if evidence_gathered.is_compacted:
+                        structured_evidence = (
+                            CitationHandler.resolve_compacted_citations(
+                                structured_evidence,
+                                evidence_gathered.citation_index,
+                            )
+                        )
+
                     yield {
                         "type": "references",
                         "content": {
@@ -235,6 +244,15 @@ class MultiPaperOperations(EvidenceOperations):
                         )
                     )
 
+                    # Resolve compacted citations to original snippets if evidence was compacted
+                    if evidence_gathered.is_compacted:
+                        structured_evidence = (
+                            CitationHandler.resolve_compacted_citations(
+                                structured_evidence,
+                                evidence_gathered.citation_index,
+                            )
+                        )
+
                     yield {
                         "type": "references",
                         "content": {
@@ -263,7 +281,7 @@ class MultiPaperOperations(EvidenceOperations):
         """
         Create a narrative summary across multiple papers using evidence gathering
         """
-        evidence_collection = EvidenceCollection()
+        evidence_collection: Optional[EvidenceCollection] = None
 
         summary_request = (
             additional_instructions
@@ -287,10 +305,11 @@ class MultiPaperOperations(EvidenceOperations):
             db=db,
         ):
             if result.get("type") == "evidence_gathered":
-                evidence_dict = result.get("content", {})
-                for paper_id, snippets in evidence_dict.items():
-                    evidence_collection.add_evidence(paper_id, snippets)
+                evidence_collection = result.get("content")
                 break
+
+        if evidence_collection is None:
+            evidence_collection = EvidenceCollection()
 
         # Get paper metadata for context
         if project_id:

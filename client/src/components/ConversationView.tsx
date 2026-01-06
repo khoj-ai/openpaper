@@ -85,9 +85,10 @@ export const ConversationView = ({
 	const chatInputFormRef = useRef<HTMLFormElement>(null);
 
 	const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+	const [pdfTitle, setPdfTitle] = useState<string | null>(null);
 	const [searchTerm, setSearchTerm] = useState<string | null>(null);
 	const [isPdfVisible, setIsPdfVisible] = useState(false);
-	const [expandedReferences, setExpandedReferences] = useState<Set<number>>(new Set());
+	const [collapsedReferences, setCollapsedReferences] = useState<Set<number>>(new Set());
 	const isMobile = useIsMobile();
 
 	const [statusMessageHistory, setStatusMessageHistory] = useState<{ message: string; startTime: number }[]>([]);
@@ -138,6 +139,7 @@ export const ConversationView = ({
 
 		if (paper && paper.file_url) {
 			setPdfUrl(paper.file_url);
+			setPdfTitle(paper.title);
 
 			// Strip quotes from the reference if wrapped in them
 			let searchText = citation.reference;
@@ -151,7 +153,7 @@ export const ConversationView = ({
 	};
 
 	const toggleReferences = useCallback((messageIndex: number) => {
-		setExpandedReferences(prev => {
+		setCollapsedReferences((prev: Set<number>) => {
 			const newSet = new Set(prev);
 			if (newSet.has(messageIndex)) {
 				newSet.delete(messageIndex);
@@ -251,10 +253,10 @@ export const ConversationView = ({
 								onClick={() => toggleReferences(index)}
 								className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
 							>
-								{expandedReferences.has(index) ? (
-									<ChevronUp className="h-3 w-3" />
-								) : (
+								{collapsedReferences.has(index) ? (
 									<ChevronDown className="h-3 w-3" />
+								) : (
+									<ChevronUp className="h-3 w-3" />
 								)}
 								References ({msg.references.citations.length})
 								{msg.references.citations.length > 15 && (
@@ -265,7 +267,7 @@ export const ConversationView = ({
 								<ChatMessageActions message={msg.content} references={msg.references} />
 							)}
 						</div>
-						{expandedReferences.has(index) && (
+						{!collapsedReferences.has(index) && (
 							<ReferencePaperCards
 								citations={msg.references.citations}
 								papers={papers}
@@ -491,12 +493,15 @@ export const ConversationView = ({
 				</div>
 			</div>
 			{isPdfVisible && (
-				<div className={`${isMobile ? 'w-full relative' : 'w-2/3 border-l-2'} flex flex-col animate-in slide-in-from-right-5 duration-500 ease-in-out`}>
-					{isMobile && (
-						<Button onClick={() => setIsPdfVisible(false)} variant="ghost" size="icon" className="absolute top-2 right-2 z-20 bg-background rounded-full">
-							<X className="h-6 w-6" />
+				<div className={`${isMobile ? 'w-full' : 'w-2/3 border-l-2'} flex flex-col animate-in slide-in-from-right-5 duration-500 ease-in-out`}>
+					<div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-muted/50">
+						<span className="text-sm font-medium truncate flex-1 mr-2">
+							{pdfTitle || "Document"}
+						</span>
+						<Button onClick={() => setIsPdfVisible(false)} variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+							<X className="h-4 w-4" />
 						</Button>
-					)}
+					</div>
 					<div className="flex-grow transition-all duration-300 ease-in-out overflow-y-auto">
 						{pdfUrl && (
 							<PdfHighlighterViewer
