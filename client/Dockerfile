@@ -45,12 +45,10 @@ RUN yarn build
 # Upload source maps to PostHog, then delete them from the build
 RUN --mount=type=secret,id=POSTHOG_ENV_ID \
     --mount=type=secret,id=POSTHOG_CLI_TOKEN \
-    posthog-cli sourcemap inject --directory .next \
-        --env-id "$(cat /run/secrets/POSTHOG_ENV_ID)" \
-        --cli-token "$(cat /run/secrets/POSTHOG_CLI_TOKEN)" && \
-    posthog-cli sourcemap upload --directory .next \
-        --env-id "$(cat /run/secrets/POSTHOG_ENV_ID)" \
-        --cli-token "$(cat /run/secrets/POSTHOG_CLI_TOKEN)" && \
+    export POSTHOG_CLI_ENV_ID="$(cat /run/secrets/POSTHOG_ENV_ID)" && \
+    export POSTHOG_CLI_TOKEN="$(cat /run/secrets/POSTHOG_CLI_TOKEN)" && \
+    posthog-cli sourcemap inject --directory .next && \
+    posthog-cli sourcemap upload --directory .next && \
     find .next -name '*.map' -delete
 
 
