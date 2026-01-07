@@ -26,7 +26,10 @@ COPY package.json yarn.lock ./
 # Only run this if package.json or yarn.lock changed
 # Using --frozen-lockfile for reproducible and potentially faster installs
 RUN yarn install --frozen-lockfile && \
-    npm install -g posthog-cli
+    yarn global add @posthog/cli
+
+# Add yarn global bin to PATH
+ENV PATH="/root/.yarn/bin:$PATH"
 
 
 # Copy the rest of the application code to the working directory
