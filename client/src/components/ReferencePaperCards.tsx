@@ -10,9 +10,10 @@ interface ReferencePaperCardsProps {
     messageIndex: number;
     highlightedPaper: string | null;
     onHighlightClear: () => void;
+    onPaperClick?: (paper: PaperItem) => void;
 }
 
-export default function ReferencePaperCards({ citations, papers, messageId, messageIndex, highlightedPaper, onHighlightClear }: ReferencePaperCardsProps) {
+export default function ReferencePaperCards({ citations, papers, messageId, messageIndex, highlightedPaper, onHighlightClear, onPaperClick }: ReferencePaperCardsProps) {
     const [expandedPaper, setExpandedPaper] = useState<string | null>(null);
 
     useEffect(() => {
@@ -59,13 +60,25 @@ export default function ReferencePaperCards({ citations, papers, messageId, mess
                     >
                         {/* Paper Info - Clickable */}
                         <div
-                            className={`flex items-start gap-3 pb-3 cursor-pointer hover:opacity-80 transition-opacity ${isExpanded ? 'border-b' : ''}`}
-                            onClick={() => toggleExpanded(paper.id)}
+                            className={`flex items-start gap-3 pb-3 ${isExpanded ? 'border-b' : ''}`}
                         >
-                            <div className="flex-shrink-0 bg-secondary rounded-lg px-2 py-1">
+                            <div
+                                className="flex-shrink-0 bg-secondary rounded-lg px-2 py-1 cursor-pointer hover:bg-secondary/80 transition-colors"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleExpanded(paper.id);
+                                }}
+                            >
                                 <span className="text-xs font-bold text-gray-500">{groupConsecutiveNumbers(citationNumbers)}</span>
                             </div>
-                            <div className="flex-1 min-w-0">
+                            <div
+                                className="flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => {
+                                    if (onPaperClick && paper.file_url) {
+                                        onPaperClick(paper);
+                                    }
+                                }}
+                            >
                                 <p className="font-medium text-sm line-clamp-2 mt-0 mb-0">{paper.title}</p>
                                 {paper.authors && paper.authors.length > 0 && (
                                     <p className="text-xs text-muted-foreground mt-1">

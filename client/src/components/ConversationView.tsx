@@ -279,6 +279,14 @@ export const ConversationView = ({
 										: null
 								}
 								onHighlightClear={() => setHighlightedInfo(null)}
+								onPaperClick={(paper) => {
+									if (paper.file_url) {
+										setPdfUrl(paper.file_url);
+										setPdfTitle(paper.title);
+										setSearchTerm(null);
+										setIsPdfVisible(true);
+									}
+								}}
 							/>
 						)}
 					</div>
