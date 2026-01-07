@@ -41,6 +41,9 @@ jobs:
                 tags: ghcr.io/${{ github.repository_owner }}/ap-client:${{ github.ref_name == 'master' && 'latest' || github.ref_name }}
                 cache-from: type=gha
                 cache-to: type=gha,mode=max
+                secrets: |
+                    POSTHOG_ENV_ID=${{ secrets.POSTHOG_ENV_ID }}
+                    POSTHOG_CLI_TOKEN=${{ secrets.POSTHOG_CLI_TOKEN }}
 
     build_server:
       name: Build and Push server image

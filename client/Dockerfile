@@ -22,10 +22,11 @@ ENV NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
 COPY package.json yarn.lock ./
 
 
-# Install dependencies using yarn
+# Install dependencies using yarn and posthog-cli for source map uploads
 # Only run this if package.json or yarn.lock changed
 # Using --frozen-lockfile for reproducible and potentially faster installs
-RUN yarn install --frozen-lockfile
+RUN yarn install --frozen-lockfile && \
+    npm install -g posthog-cli
 
 
 # Copy the rest of the application code to the working directory
@@ -37,6 +38,17 @@ COPY . .
 # Build the Next.js application
 # This will only run if the code (above) or dependencies (further above) changed.
 RUN yarn build
+
+# Upload source maps to PostHog, then delete them from the build
+RUN --mount=type=secret,id=POSTHOG_ENV_ID \
+    --mount=type=secret,id=POSTHOG_CLI_TOKEN \
+    posthog-cli sourcemap inject --directory .next \
+        --env-id "$(cat /run/secrets/POSTHOG_ENV_ID)" \
+        --cli-token "$(cat /run/secrets/POSTHOG_CLI_TOKEN)" && \
+    posthog-cli sourcemap upload --directory .next \
+        --env-id "$(cat /run/secrets/POSTHOG_ENV_ID)" \
+        --cli-token "$(cat /run/secrets/POSTHOG_CLI_TOKEN)" && \
+    find .next -name '*.map' -delete
 
 
 # Use the official Node.js 23.11.0-slim image for running the app
