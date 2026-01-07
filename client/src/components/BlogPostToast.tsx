@@ -35,7 +35,7 @@ export function BlogPostToast() {
                 toast(post.title, {
                     id: TOAST_ID,
                     description: post.description,
-                    duration: 10000,
+                    duration: 3500,
                     action: {
                         label: "Read",
                         onClick: () => {
@@ -43,6 +43,9 @@ export function BlogPostToast() {
                         },
                     },
                     onDismiss: () => {
+                        localStorage.setItem(DISMISSED_POST_KEY, post.slug);
+                    },
+                    onAutoClose: () => {
                         localStorage.setItem(DISMISSED_POST_KEY, post.slug);
                     },
                 });
