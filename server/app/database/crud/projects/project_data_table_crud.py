@@ -19,6 +19,32 @@ from sqlalchemy.orm import Session, joinedload
 logger = logging.getLogger(__name__)
 
 
+def sanitize_for_postgres(value: Any) -> Any:
+    """
+    Recursively sanitize values to remove characters that PostgreSQL cannot store.
+
+    PostgreSQL text and JSONB columns cannot store null characters (\\u0000).
+    This function removes them from strings while preserving the structure of
+    nested dicts and lists.
+
+    Args:
+        value: Any value that might contain problematic characters
+
+    Returns:
+        The sanitized value with null characters removed from strings
+    """
+    if isinstance(value, str):
+        # Remove null characters that PostgreSQL can't handle
+        # \x00 is the null character, \u0000 in unicode escape
+        return value.replace("\x00", "").replace("\u0000", "")
+    elif isinstance(value, dict):
+        return {k: sanitize_for_postgres(v) for k, v in value.items()}
+    elif isinstance(value, list):
+        return [sanitize_for_postgres(item) for item in value]
+    else:
+        return value
+
+
 # ================================
 # Job Schemas
 # ================================
@@ -439,12 +465,15 @@ class DataTableRowCRUD(CRUDBase[DataTableRow, DataTableRowCreate, DataTableRowUp
         obj_in: DataTableRowCreate,
         user: Optional[CurrentUser] = None,
     ) -> Optional[DataTableRow]:
-        """Create a new data table row"""
+        """Create a new data table row.
+
+        Values are sanitized to remove null characters that PostgreSQL cannot store.
+        """
         try:
             db_obj = DataTableRow(
                 data_table_id=obj_in.data_table_id,
                 paper_id=obj_in.paper_id,
-                values=obj_in.values,
+                values=sanitize_for_postgres(obj_in.values),
             )
             db.add(db_obj)
             db.commit()
@@ -461,13 +490,18 @@ class DataTableRowCRUD(CRUDBase[DataTableRow, DataTableRowCreate, DataTableRowUp
         *,
         rows: List[DataTableRowCreate],
     ) -> List[DataTableRow]:
-        """Create multiple data table rows in a single transaction"""
+        """Create multiple data table rows in a single transaction.
+
+        Values are sanitized to remove null characters (\\u0000) that PostgreSQL
+        cannot store in text/JSONB columns. This is common when processing
+        data extracted from PDFs.
+        """
         try:
             db_objs = [
                 DataTableRow(
                     data_table_id=row.data_table_id,
                     paper_id=row.paper_id,
-                    values=row.values,
+                    values=sanitize_for_postgres(row.values),
                 )
                 for row in rows
             ]
