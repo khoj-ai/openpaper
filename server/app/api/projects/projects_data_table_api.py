@@ -23,6 +23,9 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
+# Maximum time a data table job can run before being marked as failed
+MAX_DATA_TABLES_JOB_RUNTIME = timedelta(minutes=10)
+
 # Create API router
 projects_data_table_router = APIRouter()
 
@@ -143,6 +146,34 @@ async def list_data_table_jobs(
             user=current_user,
         )
 
+        # Check and update status for pending/running jobs
+        for job in jobs:
+            if (
+                job.status not in (JobStatus.COMPLETED, JobStatus.FAILED)
+                and job.task_id
+            ):
+                try:
+                    celery_status = jobs_client.check_celery_task_status(
+                        str(job.task_id)
+                    )
+                    job_age = datetime.now(timezone.utc) - job.created_at
+
+                    # If job has been running longer than max runtime and Celery still shows pending,
+                    # assume it's lost and mark as failed
+                    if (
+                        job_age > MAX_DATA_TABLES_JOB_RUNTIME
+                        and celery_status.get("status", "") == JobStatus.PENDING
+                    ):
+                        data_table_job_crud.update_status(
+                            db=db,
+                            job_id=uuid.UUID(str(job.id)),
+                            status=JobStatus.FAILED,
+                        )
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to check Celery task status for {job.task_id}: {e}"
+                    )
+
         if not all:
             # Filter out failed jobs from more than 1 hour ago
             one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
@@ -200,6 +231,22 @@ async def get_data_table_job_status(
             except Exception as e:
                 logger.warning(
                     f"Failed to get Celery task status for {job.task_id}: {e}"
+                )
+
+        if job.task_id and job.status not in (JobStatus.COMPLETED, JobStatus.FAILED):
+            celery_status = jobs_client.check_celery_task_status(str(job.task_id))
+
+            # If job has been "processing" for longer than the max runtime,
+            # and Celery has no record of it, assume it's lost
+            job_age = datetime.now(timezone.utc) - job.created_at
+
+            if (
+                job_age > MAX_DATA_TABLES_JOB_RUNTIME
+                and celery_status.get("status", "") == JobStatus.PENDING
+            ):
+                # Task is too old to still be pending - it's lost
+                data_table_job_crud.update_status(
+                    db=db, job_id=uuid.UUID(str(job.id)), status=JobStatus.FAILED
                 )
 
         # Build response with both job status and task status
