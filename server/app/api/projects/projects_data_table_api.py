@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 # Maximum time a data table job can run before being marked as failed
-MAX_DATA_TABLES_JOB_RUNTIME = timedelta(minutes=10)
+MAX_DATA_TABLES_JOB_RUNTIME = timedelta(hours=1)
 
 # Create API router
 projects_data_table_router = APIRouter()
@@ -162,7 +162,8 @@ async def list_data_table_jobs(
                     # assume it's lost and mark as failed
                     if (
                         job_age > MAX_DATA_TABLES_JOB_RUNTIME
-                        and celery_status.get("status", "") == JobStatus.PENDING
+                        and celery_status.get("status", "")
+                        == "progress"  # A status specific to our jobs service for mid-run tasks
                     ):
                         data_table_job_crud.update_status(
                             db=db,
