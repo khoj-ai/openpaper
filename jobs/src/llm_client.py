@@ -194,6 +194,7 @@ class AsyncLLMClient:
         file_path: Optional[str] = None,
         max_retries: int = 3,
         base_delay: float = 1.0,
+        client: Optional[genai.Client] = None,
     ) -> str:
         """
         Generate content using the LLM with automatic retry and exponential backoff.
@@ -203,11 +204,14 @@ class AsyncLLMClient:
             model: Optional specific model to use, defaults to self.default_model
             max_retries: Maximum number of retry attempts (default: 3)
             base_delay: Base delay in seconds for exponential backoff (default: 1.0)
+            client: Optional client to use (for concurrent calls)
 
         Returns:
             str: The generated content from the LLM
         """
-        if not self.client:
+        # Use provided client or fall back to self.client
+        active_client = client or self.client
+        if not active_client:
             raise ValueError("Client not initialized. Call extract_paper_metadata first.")
 
         if not model:
@@ -237,7 +241,7 @@ class AsyncLLMClient:
 
         for attempt in range(max_retries + 1):
             try:
-                response = await self.client.aio.models.generate_content(
+                response = await active_client.aio.models.generate_content(
                     model=model,
                     contents=types.Content(
                         role='user',
@@ -522,10 +526,13 @@ class PaperOperations(AsyncLLMClient):
         Returns:
             str: JSON string representing the data table
         """
-        try:
-            if not self.client:
-                self.refresh_client()
+        # Create a fresh client for each call to avoid shared state issues with concurrent tasks
+        client = genai.Client(
+            api_key=self.api_key,
+            http_options=types.HttpOptions(timeout=40_000),
+        )
 
+        try:
             cols_str = "\n".join(f"- {col}" for col in columns)
             prompt = EXTRACT_COLS_INSTRUCTION.format(
                 cols_str=cols_str,
@@ -551,6 +558,7 @@ class PaperOperations(AsyncLLMClient):
                 model=self.default_model,
                 file_path=file_path,
                 schema=ValuesModel,
+                client=client,
             )
 
             # Parse and validate the response
@@ -571,9 +579,6 @@ class PaperOperations(AsyncLLMClient):
         except Exception as e:
             logger.error(f"Error extracting data table: {str(e)}", exc_info=True)
             raise ValueError(f"Failed to extract DT for paper {paper_id}: {str(e)}")
-        finally:
-            # Reset client to avoid issues with closed event loops on subsequent calls
-            self.client = None
 
 
 # Create a single instance to use throughout the application
