@@ -30,6 +30,8 @@ export type Filter = {
     value: string
 }
 
+export const NO_TAGS_FILTER_VALUE = "__NO_TAGS__";
+
 export type Sort = {
     type: "publish_date"
     order: "asc" | "desc"
@@ -166,6 +168,14 @@ export function PaperFiltering({ papers, onFilterChange, onSortChange, filters, 
                                     <CommandList>
                                         <CommandEmpty>No tags found.</CommandEmpty>
                                         <CommandGroup>
+                                            <CommandItem
+                                                value="No tags"
+                                                onSelect={() => handleSelectFilter({ type: "tag", value: NO_TAGS_FILTER_VALUE })}
+                                                className="text-muted-foreground"
+                                            >
+                                                {isFilterActive({ type: "tag", value: NO_TAGS_FILTER_VALUE }) && <Check className="mr-2 h-4 w-4" />}
+                                                No tags
+                                            </CommandItem>
                                             {tags.map(tag => (
                                                 <CommandItem
                                                     key={tag}

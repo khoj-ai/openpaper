@@ -23,7 +23,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { ArrowUpDown, CheckCheck, Trash2, X, ChevronDown, Tag } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { PaperPreview } from "./PaperPreview";
-import { PaperFiltering, Filter, Sort } from "@/components/PaperFiltering";
+import { PaperFiltering, Filter, Sort, NO_TAGS_FILTER_VALUE } from "@/components/PaperFiltering";
 import { Badge } from "@/components/ui/badge";
 import { TagSelector } from "./TagSelector";
 import { toast } from "sonner";
@@ -106,6 +106,9 @@ export function LibraryTable({
 						return paper.keywords?.includes(filter.value);
 					}
 					if (filter.type === 'tag') {
+						if (filter.value === NO_TAGS_FILTER_VALUE) {
+							return !paper.tags?.length;
+						}
 						return paper.tags?.some(t => t.name === filter.value);
 					}
 					if (filter.type === 'status') {
@@ -378,7 +381,7 @@ export function LibraryTable({
 			<div className="flex flex-wrap gap-2 mb-4">
 				{filters.map(filter => (
 					<Badge key={`${filter.type}-${filter.value}`} variant="secondary" className="flex items-center gap-1">
-						{filter.type}: {filter.value}
+						{filter.type}: {filter.value === NO_TAGS_FILTER_VALUE ? 'No tags' : filter.value}
 						<Button
 							variant="ghost"
 							size="sm"
@@ -593,7 +596,18 @@ export function LibraryTable({
 															)}
 														</div>
 													) : (
-														<span className="text-muted-foreground">No tags</span>
+														<span
+														className="text-muted-foreground cursor-pointer hover:underline"
+														onClick={(e) => {
+															e.stopPropagation();
+															const noTagsFilter: Filter = { type: 'tag', value: NO_TAGS_FILTER_VALUE };
+															if (!filters.some(f => f.type === 'tag' && f.value === NO_TAGS_FILTER_VALUE)) {
+																setFilters([...filters, noTagsFilter]);
+															}
+														}}
+													>
+														No tags
+													</span>
 													)}
 												</div>
 											</TableCell>
