@@ -22,6 +22,7 @@ from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
 from app.database.models import ConversableType, Conversation, JobStatus
 from app.database.telemetry import track_event
+from app.helpers.email import send_data_table_complete_email
 from app.helpers.paper_search import get_doi
 from app.helpers.s3 import s3_service
 from app.llm.citation_handler import CitationHandler
@@ -457,6 +458,24 @@ async def handle_data_table_processing_webhook(
                     logger.info(
                         f"Created {len(row_creates)} rows for data table result {table_result.id}"
                     )
+
+                # Send email notification to user
+                job = data_table_job_crud.get_by_task_id(db=db, task_id=task_id)
+                if job and job.user and job.project:
+                    try:
+                        send_data_table_complete_email(
+                            to_email=job.user.email,
+                            table_title=title,
+                            columns=result.columns,
+                            row_count=len(result.rows),
+                            project_name=job.project.name,
+                            project_id=str(job.project.id),
+                        )
+                    except Exception as email_error:
+                        logger.error(
+                            f"Failed to send data table complete email for job {job_id}: {email_error}",
+                            exc_info=True,
+                        )
             else:
                 logger.error(f"Failed to create data table result for job {job_id}")
 
