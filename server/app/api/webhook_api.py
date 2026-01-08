@@ -468,7 +468,7 @@ async def handle_data_table_processing_webhook(
                             table_title=title,
                             columns=result.columns,
                             row_count=len(result.rows),
-                            project_name=job.project.name,
+                            project_name=job.project.title,
                             project_id=str(job.project.id),
                         )
                     except Exception as email_error:
