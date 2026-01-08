@@ -6,7 +6,7 @@ import uuid
 
 from src.schemas import DataTableRow, DataTableSchema, DataTableResult, DataTableCellValue
 from src.s3_service import s3_service
-from src.llm_client import llm_client
+from src.llm_client import fast_llm_client
 
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ async def construct_data_table(
                 temp_file_path = temp_file.name
 
                 # Use LLM to extract data for the specified columns
-                paper_col_values: DataTableRow = await llm_client.extract_data_table(
+                paper_col_values: DataTableRow = await fast_llm_client.extract_data_table(
                     file_path=temp_file_path,
                     columns=data_table_schema.columns,
                     paper_id=paper_id
