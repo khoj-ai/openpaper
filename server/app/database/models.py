@@ -887,6 +887,9 @@ class DataTableExtractionResult(Base):
     )
     success = Column(Boolean, nullable=False, default=True)
     columns = Column(ARRAY(String), nullable=False)  # List of column names
+    row_failures = Column(
+        ARRAY(UUID(as_uuid=True)), nullable=True, default=[]
+    )  # List of paper IDs that failed
 
     job = relationship("DataTableExtractionJob", back_populates="result")
     rows = relationship(

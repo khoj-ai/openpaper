@@ -414,6 +414,9 @@ export interface DataTableJobStatusResponse extends JobStatusResponse {
     columns: string[] | null;
     task_id: string | null;
     error_message: string | null;
+    celery_status: string | null;
+    celery_progress_message: string | null;
+    celery_error: string | null;
 }
 
 export interface DataTableCellValue {
@@ -434,6 +437,7 @@ export interface DataTableResult {
     title: string;
     columns: string[];
     rows: DataTableRow[];
+    row_failures: string[] | null;
     created_at: string | null;
 }
 

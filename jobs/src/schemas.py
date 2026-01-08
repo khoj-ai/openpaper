@@ -3,6 +3,7 @@ Pydantic schemas for PDF processing.
 """
 from enum import Enum
 from typing import List, Optional
+from uuid import UUID
 from pydantic import BaseModel, Field
 
 class ResponseCitation(BaseModel):
@@ -229,3 +230,4 @@ class DataTableResult(BaseModel):
         description="List of column names in the data table."
     )
     rows: List[DataTableRow] = Field(default=[], description="Row data per paper")
+    row_failures: List[str] = Field(default=[], description="List of paper_ids that failed to process")

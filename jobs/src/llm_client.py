@@ -7,8 +7,11 @@ import os
 import re
 import io
 import asyncio
+import random
+import httpx
 from google import genai
 from google.genai import types
+from google.genai.errors import APIError, ClientError, ServerError
 from typing import Any, Dict, List, Optional, Type, TypeVar, Callable
 
 from pydantic import BaseModel, create_model, Field, ConfigDict
@@ -86,28 +89,27 @@ class AsyncLLMClient:
     ):
         self.api_key = api_key
         self.default_model: str = default_model or DEFAULT_CHAT_MODEL
-        self.client: Optional[genai.Client] = None
 
-    def refresh_client(self):
-        """Refresh the LLM client with the current API key."""
+    def _create_client(self) -> genai.Client:
+        """Create a fresh client instance for thread-safe concurrent calls."""
         if not self.api_key:
             raise ValueError("API key is not set")
-        self.client = genai.Client(api_key=self.api_key)
+        return genai.Client(
+            api_key=self.api_key,
+            http_options=types.HttpOptions(timeout=40_000),  # 40s connection timeout
+        )
 
-    async def create_cache(self, cache_content: str) -> str:
+    async def create_cache(self, cache_content: str, client: genai.Client) -> str:
         """Create a cache entry for the given content.
 
         Args:
             cache_content (str): The content to cache.
+            client: The genai client to use.
 
         Returns:
             str: The cache key for the stored content.
         """
-
-        if not self.client:
-            raise ValueError("Client not initialized. Call extract_paper_metadata first.")
-
-        cached_content = await self.client.aio.caches.create(
+        cached_content = await client.aio.caches.create(
             model=self.default_model,
             config=types.CreateCachedContentConfig(
                 contents=types.Content(
@@ -133,33 +135,31 @@ class AsyncLLMClient:
     async def create_file_cache(
         self,
         file_path: str,
+        client: genai.Client,
         system_instructions: Optional[str] = None,
     ):
         """Create a cache entry for the given file.
 
         Args:
             file_path (str): The path to the file to cache.
+            client: The genai client to use.
 
         Returns:
             str: The cache key for the stored file.
         """
-
-        if not self.client:
-            raise ValueError("Client not initialized. Call extract_paper_metadata first.")
-
         # Read the file content
         with open(file_path, 'rb') as f:
             file_content = f.read()
 
         doc_io = io.BytesIO(file_content)
-        document = await self.client.aio.files.upload(
+        document = await client.aio.files.upload(
             file=doc_io,
             config=types.UploadFileConfig(
                 mime_type='application/pdf',
             )
         )
 
-        cached_content = await self.client.aio.caches.create(
+        cached_content = await client.aio.caches.create(
             model=self.default_model,
             config=types.CreateCachedContentConfig(
                 contents=document,
@@ -186,19 +186,25 @@ class AsyncLLMClient:
         model: Optional[str] = None,
         schema: Optional[Type[BaseModel]] = None,
         file_path: Optional[str] = None,
+        max_retries: int = 3,
+        base_delay: float = 1.0,
+        client: Optional[genai.Client] = None,
     ) -> str:
         """
-        Generate content using the LLM.
+        Generate content using the LLM with automatic retry and exponential backoff.
 
         Args:
             prompt: The prompt to send to the LLM
             model: Optional specific model to use, defaults to self.default_model
+            max_retries: Maximum number of retry attempts (default: 3)
+            base_delay: Base delay in seconds for exponential backoff (default: 1.0)
+            client: Optional client to use (for concurrent calls)
 
         Returns:
             str: The generated content from the LLM
         """
-        if not self.client:
-            raise ValueError("Client not initialized. Call extract_paper_metadata first.")
+        if not client:
+            raise ValueError("Client is required for generate_content")
 
         if not model:
             model = self.default_model
@@ -223,19 +229,39 @@ class AsyncLLMClient:
             config.response_mime_type = 'application/json'
             config.response_schema = schema.model_json_schema()
 
-        response = await self.client.aio.models.generate_content(
-            model=model,
-            contents=types.Content(
-                role='user',
-                parts=parts
-            ),
-            config=config
-        )
+        last_exception: Optional[Exception] = None
 
-        if response and response.text:
-            return response.text
+        for attempt in range(max_retries + 1):
+            try:
+                response = await client.aio.models.generate_content(
+                    model=model,
+                    contents=types.Content(
+                        role='user',
+                        parts=parts
+                    ),
+                    config=config
+                )
 
-        raise ValueError("No content generated from LLM response")
+                if response and response.text:
+                    return response.text
+
+                raise ValueError("No content generated from LLM response")
+
+            except (ServerError, ClientError, APIError, httpx.TimeoutException) as e:
+                last_exception = e
+                if attempt < max_retries:
+                    # Exponential backoff with jitter
+                    backoff_time = base_delay * (2 ** attempt) * (0.5 + 0.5 * random.random())
+                    logger.warning(
+                        f"LLM API error (attempt {attempt + 1}/{max_retries + 1}): {e}. "
+                        f"Retrying in {backoff_time:.2f}s"
+                    )
+                    await asyncio.sleep(backoff_time)
+                else:
+                    logger.error(f"All {max_retries + 1} attempts failed for generate_content: {e}")
+
+        # If we reach here, all retries failed
+        raise last_exception or ValueError("Failed to generate content after all retries")
 
 
 class PaperOperations(AsyncLLMClient):
@@ -255,6 +281,7 @@ class PaperOperations(AsyncLLMClient):
         paper_content: str,
         schema: Type[BaseModel],
         status_callback: Callable[[str], None],
+        client: genai.Client,
         cache_key: Optional[str] = None
     ) -> T:
         """
@@ -264,6 +291,7 @@ class PaperOperations(AsyncLLMClient):
             model: The Pydantic model for the data to extract.
             paper_content: The paper content.
             status_callback: Optional function to update task status.
+            client: The genai client to use.
 
         Returns:
             An instance of the provided Pydantic model.
@@ -274,7 +302,7 @@ class PaperOperations(AsyncLLMClient):
         if paper_content and not cache_key:
             prompt = f"Paper Content:\n\n{paper_content}\n\n{prompt}"
 
-        response = await self.generate_content(prompt, cache_key=cache_key, schema=schema)
+        response = await self.generate_content(prompt, cache_key=cache_key, schema=schema, client=client)
         response_json = JSONParser.validate_and_extract_json(response)
         instance = model.model_validate(response_json)
 
@@ -320,6 +348,7 @@ class PaperOperations(AsyncLLMClient):
         self,
         paper_content: str,
         status_callback: Callable[[str], None],
+        client: genai.Client,
         cache_key: Optional[str] = None,
     ) -> TitleAuthorsAbstract:
         result = await self._extract_single_metadata_field(
@@ -328,6 +357,7 @@ class PaperOperations(AsyncLLMClient):
             schema=TitleAuthorsAbstract,
             paper_content=paper_content,
             status_callback=status_callback,
+            client=client,
         )
         return result
 
@@ -336,6 +366,7 @@ class PaperOperations(AsyncLLMClient):
         self,
         paper_content: str,
         status_callback: Callable[[str], None],
+        client: genai.Client,
         cache_key: Optional[str] = None,
     ) -> InstitutionsKeywords:
         return await self._extract_single_metadata_field(
@@ -344,6 +375,7 @@ class PaperOperations(AsyncLLMClient):
             schema=InstitutionsKeywords,
             paper_content=paper_content,
             status_callback=status_callback,
+            client=client,
         )
 
     @retry_llm_operation(max_retries=3, delay=1.0)
@@ -351,6 +383,7 @@ class PaperOperations(AsyncLLMClient):
         self,
         paper_content: str,
         status_callback: Callable[[str], None],
+        client: genai.Client,
         cache_key: Optional[str] = None,
     ) -> SummaryAndCitations:
         result = await self._extract_single_metadata_field(
@@ -359,6 +392,7 @@ class PaperOperations(AsyncLLMClient):
             schema=SummaryAndCitations,
             paper_content=paper_content,
             status_callback=status_callback,
+            client=client,
         )
         return result
 
@@ -367,6 +401,7 @@ class PaperOperations(AsyncLLMClient):
         self,
         paper_content: str,
         status_callback: Callable[[str], None],
+        client: genai.Client,
         cache_key: Optional[str] = None,
     ) -> Highlights:
         return await self._extract_single_metadata_field(
@@ -375,6 +410,7 @@ class PaperOperations(AsyncLLMClient):
             status_callback=status_callback,
             cache_key=cache_key,
             schema=Highlights,
+            client=client,
         )
 
     async def extract_paper_metadata(
@@ -394,13 +430,13 @@ class PaperOperations(AsyncLLMClient):
             PaperMetadataExtraction: Extracted metadata
         """
         async with time_it("Extracting paper metadata from LLM", job_id=job_id):
-            # Create a new client for this operation
-            self.client = genai.Client(api_key=self.api_key)
+            # Create a fresh client for this operation
+            client = self._create_client()
 
             try:
                 try:
                     async with time_it("Creating cache for paper content", job_id=job_id):
-                        cache_key = await self.create_cache(paper_content)
+                        cache_key = await self.create_cache(paper_content, client)
                 except Exception as e:
                     logger.error(f"Failed to create cache: {e}", exc_info=True)
                     cache_key = None
@@ -413,28 +449,32 @@ class PaperOperations(AsyncLLMClient):
                         )(
                             paper_content=paper_content,
                             cache_key=cache_key,
-                            status_callback=status_callback
+                            status_callback=status_callback,
+                            client=client,
                         )),
                         asyncio.create_task(time_it("Extracting institutions and keywords", job_id=job_id)(
                             self.extract_institutions_keywords
                         )(
                             paper_content=paper_content,
                             cache_key=cache_key,
-                            status_callback=status_callback
+                            status_callback=status_callback,
+                            client=client,
                         )),
                         asyncio.create_task(time_it("Extracting summary and citations", job_id=job_id)(
                             self.extract_summary_and_citations
                         )(
                             paper_content=paper_content,
                             cache_key=cache_key,
-                            status_callback=status_callback
+                            status_callback=status_callback,
+                            client=client,
                         )),
                         asyncio.create_task(time_it("Extracting highlights", job_id=job_id)(
                             self.extract_highlights
                         )(
                             paper_content=paper_content,
                             cache_key=cache_key,
-                            status_callback=status_callback
+                            status_callback=status_callback,
+                            client=client,
                         )),
                     ]
 
@@ -470,9 +510,6 @@ class PaperOperations(AsyncLLMClient):
                 if status_callback:
                     status_callback(f"Error during metadata extraction: {e}")
                 raise ValueError(f"Failed to extract metadata: {str(e)}")
-            finally:
-                # Set client to None to allow for proper garbage collection
-                self.client = None
 
     async def extract_data_table(
         self,
@@ -489,10 +526,10 @@ class PaperOperations(AsyncLLMClient):
         Returns:
             str: JSON string representing the data table
         """
-        try:
-            if not self.client:
-                self.refresh_client()
+        # Create a fresh client for each call to avoid shared state issues with concurrent tasks
+        client = self._create_client()
 
+        try:
             cols_str = "\n".join(f"- {col}" for col in columns)
             prompt = EXTRACT_COLS_INSTRUCTION.format(
                 cols_str=cols_str,
@@ -518,6 +555,7 @@ class PaperOperations(AsyncLLMClient):
                 model=self.default_model,
                 file_path=file_path,
                 schema=ValuesModel,
+                client=client,
             )
 
             # Parse and validate the response
@@ -537,10 +575,7 @@ class PaperOperations(AsyncLLMClient):
             )
         except Exception as e:
             logger.error(f"Error extracting data table: {str(e)}", exc_info=True)
-            raise ValueError(f"Failed to extract data table: {str(e)}")
-        finally:
-            # Reset client to avoid issues with closed event loops on subsequent calls
-            self.client = None
+            raise ValueError(f"Failed to extract DT for paper {paper_id}: {str(e)}")
 
 
 # Create a single instance to use throughout the application

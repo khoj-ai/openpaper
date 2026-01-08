@@ -140,6 +140,9 @@ class DataTableResult(BaseModel):
     success: bool = Field(description="Whether the extraction was successful")
     columns: List[str] = Field(description="List of column names in the data table.")
     rows: List[DataTableRow] = Field(default=[], description="Row data per paper")
+    row_failures: List[str] = Field(
+        default=[], description="List of paper IDs that failed extraction"
+    )
 
 
 # -----------------

@@ -31,6 +31,8 @@ celery_app.conf.update(
     },
     worker_prefetch_multiplier=1,  # Process one task at a time
     task_acks_late=True,
+    reject_on_worker_lost=True,
+    task_acks_on_failure_or_timeout=True,
     worker_max_tasks_per_child=1000,
     # Health monitoring settings
     worker_send_task_events=True,

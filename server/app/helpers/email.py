@@ -364,6 +364,61 @@ def send_confirmation_cancellation_email(
         return False
 
 
+def send_data_table_complete_email(
+    to_email: str,
+    table_title: str,
+    columns: list[str],
+    row_count: int,
+    project_name: str,
+    project_id: str,
+) -> bool:
+    """
+    Send an email notification when a data table extraction job completes.
+
+    Args:
+        to_email: Recipient email address
+        table_title: Title of the data table
+        columns: List of column names extracted
+        row_count: Number of rows extracted
+        project_name: Name of the project containing the data table
+        project_id: ID of the project for constructing the view URL
+
+    Returns:
+        bool: True if email was sent successfully, False otherwise
+    """
+    try:
+        view_url = f"{CLIENT_DOMAIN}/projects/{project_id}"
+        subject = f"Data table ready: {table_title}"
+        columns_str = ", ".join(columns)
+
+        html_content = (
+            load_email_template("data_table_complete.html")
+            .replace("{{table_title}}", table_title)
+            .replace("{{columns}}", columns_str)
+            .replace("{{row_count}}", str(row_count))
+            .replace("{{project_name}}", project_name)
+            .replace("{{view_url}}", view_url)
+        )
+
+        payload = resend.Emails.SendParams = {  # type: ignore
+            "from": "Open Paper <noreply@updates.openpaper.ai>",
+            "to": to_email,
+            "subject": subject,
+            "html": html_content,
+        }
+
+        resend.Emails.send(payload)  # type: ignore
+        logger.info(f"Data table complete email sent to {to_email}")
+        return True
+
+    except Exception as e:
+        logger.error(
+            f"Failed to send data table complete email to {to_email}: {e}",
+            exc_info=True,
+        )
+        return False
+
+
 def send_email(
     to_email: str,
     subject: str,
