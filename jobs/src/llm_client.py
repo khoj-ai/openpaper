@@ -8,6 +8,7 @@ import re
 import io
 import asyncio
 import random
+import httpx
 from google import genai
 from google.genai import types
 from google.genai.errors import APIError, ClientError, ServerError
@@ -94,7 +95,10 @@ class AsyncLLMClient:
         """Refresh the LLM client with the current API key."""
         if not self.api_key:
             raise ValueError("API key is not set")
-        self.client = genai.Client(api_key=self.api_key)
+        self.client = genai.Client(
+            api_key=self.api_key,
+            http_options=types.HttpOptions(timeout=40_000),  # 40s connection timeout
+        )
 
     async def create_cache(self, cache_content: str) -> str:
         """Create a cache entry for the given content.
@@ -247,7 +251,7 @@ class AsyncLLMClient:
 
                 raise ValueError("No content generated from LLM response")
 
-            except (ServerError, ClientError, APIError) as e:
+            except (ServerError, ClientError, APIError, httpx.TimeoutException) as e:
                 last_exception = e
                 if attempt < max_retries:
                     # Exponential backoff with jitter
@@ -421,7 +425,10 @@ class PaperOperations(AsyncLLMClient):
         """
         async with time_it("Extracting paper metadata from LLM", job_id=job_id):
             # Create a new client for this operation
-            self.client = genai.Client(api_key=self.api_key)
+            self.client = genai.Client(
+                api_key=self.api_key,
+                http_options=types.HttpOptions(timeout=40_000),  # 40s connection timeout
+            )
 
             try:
                 try:
