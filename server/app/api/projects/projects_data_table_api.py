@@ -117,7 +117,7 @@ async def create_data_table(
             status_code=202,
             content={
                 "message": "Data table processing job submitted",
-                "job_id": job_id,
+                "id": job_id,
                 "task_id": task_id,
             },
         )
