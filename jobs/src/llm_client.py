@@ -7,8 +7,10 @@ import os
 import re
 import io
 import asyncio
+import random
 from google import genai
 from google.genai import types
+from google.genai.errors import APIError, ClientError, ServerError
 from typing import Any, Dict, List, Optional, Type, TypeVar, Callable
 
 from pydantic import BaseModel, create_model, Field, ConfigDict
@@ -186,13 +188,17 @@ class AsyncLLMClient:
         model: Optional[str] = None,
         schema: Optional[Type[BaseModel]] = None,
         file_path: Optional[str] = None,
+        max_retries: int = 3,
+        base_delay: float = 1.0,
     ) -> str:
         """
-        Generate content using the LLM.
+        Generate content using the LLM with automatic retry and exponential backoff.
 
         Args:
             prompt: The prompt to send to the LLM
             model: Optional specific model to use, defaults to self.default_model
+            max_retries: Maximum number of retry attempts (default: 3)
+            base_delay: Base delay in seconds for exponential backoff (default: 1.0)
 
         Returns:
             str: The generated content from the LLM
@@ -223,19 +229,39 @@ class AsyncLLMClient:
             config.response_mime_type = 'application/json'
             config.response_schema = schema.model_json_schema()
 
-        response = await self.client.aio.models.generate_content(
-            model=model,
-            contents=types.Content(
-                role='user',
-                parts=parts
-            ),
-            config=config
-        )
+        last_exception: Optional[Exception] = None
 
-        if response and response.text:
-            return response.text
+        for attempt in range(max_retries + 1):
+            try:
+                response = await self.client.aio.models.generate_content(
+                    model=model,
+                    contents=types.Content(
+                        role='user',
+                        parts=parts
+                    ),
+                    config=config
+                )
 
-        raise ValueError("No content generated from LLM response")
+                if response and response.text:
+                    return response.text
+
+                raise ValueError("No content generated from LLM response")
+
+            except (ServerError, ClientError, APIError) as e:
+                last_exception = e
+                if attempt < max_retries:
+                    # Exponential backoff with jitter
+                    backoff_time = base_delay * (2 ** attempt) * (0.5 + 0.5 * random.random())
+                    logger.warning(
+                        f"LLM API error (attempt {attempt + 1}/{max_retries + 1}): {e}. "
+                        f"Retrying in {backoff_time:.2f}s"
+                    )
+                    await asyncio.sleep(backoff_time)
+                else:
+                    logger.error(f"All {max_retries + 1} attempts failed for generate_content: {e}")
+
+        # If we reach here, all retries failed
+        raise last_exception or ValueError("Failed to generate content after all retries")
 
 
 class PaperOperations(AsyncLLMClient):
@@ -537,7 +563,7 @@ class PaperOperations(AsyncLLMClient):
             )
         except Exception as e:
             logger.error(f"Error extracting data table: {str(e)}", exc_info=True)
-            raise ValueError(f"Failed to extract data table: {str(e)}")
+            raise ValueError(f"Failed to extract DT for paper {paper_id}: {str(e)}")
         finally:
             # Reset client to avoid issues with closed event loops on subsequent calls
             self.client = None
