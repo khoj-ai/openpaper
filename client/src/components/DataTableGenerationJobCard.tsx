@@ -116,9 +116,19 @@ export default function DataTableGenerationJobCard({ job, projectId }: DataTable
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
-                            {job.title || 'Creating Data Table'}
-                        </h3>
+                        {isCompleted && job.result_id ? (
+                            <Link
+                                href={`/projects/${projectId}/tables/${job.result_id}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline mb-1"
+                            >
+                                {job.title || 'Data Table'}
+                            </Link>
+                        ) : (
+                            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                                {job.title || 'Creating Data Table'}
+                            </h3>
+                        )}
                         <div className="flex items-center gap-2">
                             {isExpanded && (
                                 <button
