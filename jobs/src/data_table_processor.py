@@ -1,8 +1,10 @@
 import logging
 import tempfile
 from typing import Callable, List, Tuple
+from uuid import UUID
+import uuid
 
-from src.schemas import DataTableRow, DataTableSchema, DataTableResult
+from src.schemas import DataTableRow, DataTableSchema, DataTableResult, DataTableCellValue
 from src.s3_service import s3_service
 from src.llm_client import llm_client
 
@@ -23,13 +25,14 @@ async def construct_data_table(
         DataTableResult: Resulting data table
         str: Error message if any
     """
-    try:
-        # Construct data rows based on the columns defined in the schema, for each paper, separately.
-        rows: List[DataTableRow] = []
-        for p in data_table_schema.papers:
-            paper_id  = p.id
-            paper_object_key = p.s3_object_key
+    rows: List[DataTableRow] = []
+    row_failures: List[uuid.UUID] = []
 
+    for p in data_table_schema.papers:
+        paper_id = p.id
+        paper_object_key = p.s3_object_key
+
+        try:
             raw_file_bytes = s3_service.download_file_to_bytes(paper_object_key)
 
             with tempfile.NamedTemporaryFile(delete_on_close=True) as temp_file:
@@ -44,20 +47,26 @@ async def construct_data_table(
                 )
 
                 status_callback(f"extract for {p.title} completed")
-
-                # Store in the rows list
                 rows.append(paper_col_values)
 
-        return DataTableResult(
-            success=True,
-            columns=[col for col in data_table_schema.columns],
-            rows=rows
-        ), ''
+        except Exception as e:
+            logger.error(f"Error processing paper {paper_id} ({p.title}): {str(e)}", exc_info=True)
+            row_failures.append(uuid.UUID(str(paper_id)))
+            status_callback(f"extract for {p.title} failed: {str(e)}")
 
-    except Exception as e:
-        logger.error(f"Error constructing data table: {str(e)}", exc_info=True)
-        return DataTableResult(
-            success=False,
-            columns=[col for col in data_table_schema.columns],
-            rows=[],
-        ), str(e)
+            # Add row with empty values to maintain paper ordering
+            rows.append(DataTableRow(
+                paper_id=paper_id,
+                values={col: DataTableCellValue(value="", citations=[]) for col in data_table_schema.columns}
+            ))
+
+    error_msg = ""
+    if row_failures:
+        error_msg = f"Failed to process {len(row_failures)} paper(s)"
+
+    return DataTableResult(
+        success=True,
+        columns=[col for col in data_table_schema.columns],
+        rows=rows,
+        row_failures=row_failures,
+    ), error_msg

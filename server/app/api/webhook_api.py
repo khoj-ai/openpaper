@@ -435,6 +435,7 @@ async def handle_data_table_processing_webhook(
                     title=title,
                     success=result.success,
                     columns=result.columns,
+                    row_failures=[uuid.UUID(pid) for pid in result.row_failures],
                 ),
             )
 

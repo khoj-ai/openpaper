@@ -48,6 +48,7 @@ class DataTableResultCreate(BaseModel):
     title: str
     success: bool
     columns: List[str]
+    row_failures: List[UUID] = []
 
 
 class DataTableResultUpdate(BaseModel):
@@ -337,6 +338,7 @@ class DataTableResultCRUD(
                 job_id=obj_in.job_id,
                 success=obj_in.success,
                 columns=obj_in.columns,
+                row_failures=obj_in.row_failures,
             )
             db.add(db_obj)
             db.commit()
@@ -403,6 +405,9 @@ class DataTableResultCRUD(
             "title": result.title,
             "success": result.success,
             "columns": result.columns,
+            "row_failures": (
+                [str(pid) for pid in result.row_failures] if result.row_failures else []
+            ),
             "created_at": result.created_at.isoformat() if result.created_at else None,
             "updated_at": result.updated_at.isoformat() if result.updated_at else None,
         }

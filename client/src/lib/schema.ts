@@ -434,6 +434,7 @@ export interface DataTableResult {
     title: string;
     columns: string[];
     rows: DataTableRow[];
+    row_failures: string[] | null;
     created_at: string | null;
 }
 
