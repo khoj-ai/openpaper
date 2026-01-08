@@ -371,6 +371,7 @@ def send_data_table_complete_email(
     row_count: int,
     project_name: str,
     project_id: str,
+    result_id: str,
 ) -> bool:
     """
     Send an email notification when a data table extraction job completes.
@@ -382,12 +383,13 @@ def send_data_table_complete_email(
         row_count: Number of rows extracted
         project_name: Name of the project containing the data table
         project_id: ID of the project for constructing the view URL
+        result_id: ID of the data table result for deep linking
 
     Returns:
         bool: True if email was sent successfully, False otherwise
     """
     try:
-        view_url = f"{CLIENT_DOMAIN}/projects/{project_id}"
+        view_url = f"{CLIENT_DOMAIN}/projects/{project_id}/tables/{result_id}"
         subject = f"Data table ready: {table_title}"
         columns_str = ", ".join(columns)
 

@@ -470,6 +470,7 @@ async def handle_data_table_processing_webhook(
                             row_count=len(result.rows),
                             project_name=job.project.title,
                             project_id=str(job.project.id),
+                            result_id=str(table_result.id),
                         )
                     except Exception as email_error:
                         logger.error(
