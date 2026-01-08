@@ -3,7 +3,7 @@
 import { Loader2, Volume2, Table, PlusCircle } from "lucide-react";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { fetchFromApi } from "@/lib/api";
-import { AudioOverview, PaperItem, AudioOverviewJob, ProjectRole, DataTableJobStatusResponse } from "@/lib/schema";
+import { AudioOverview, PaperItem, AudioOverviewJob, ProjectRole, DataTableJob } from "@/lib/schema";
 import AudioOverviewGenerationJobCard from "@/components/AudioOverviewGenerationJobCard";
 import DataTableGenerationJobCard from "@/components/DataTableGenerationJobCard";
 import AudioOverviewCard from "@/components/AudioOverviewCard";
@@ -79,7 +79,7 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
     // Data Table states
     const [isDataTableSchemaModalOpen, setDataTableSchemaModalOpen] = useState(false);
     const [isCreatingDataTable, setIsCreatingDataTable] = useState(false);
-    const [dataTableJobs, setDataTableJobs] = useState<DataTableJobStatusResponse[]>([]);
+    const [dataTableJobs, setDataTableJobs] = useState<DataTableJob[]>([]);
 
     const getProjectAudioOverviews = useCallback(async () => {
         try {
@@ -129,7 +129,7 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
                 fetchDataTableJobs()
             ]);
             const hasPendingAudioJobs = audioJobs.some((job: AudioOverviewJob) => job.status === 'pending' || job.status === 'running');
-            const hasPendingDataTableJobs = dataTableJobs.some((job: DataTableJobStatusResponse) => job.status === 'pending' || job.status === 'running');
+            const hasPendingDataTableJobs = dataTableJobs.some((job: DataTableJob) => job.status === 'pending' || job.status === 'running');
 
             if (!hasPendingAudioJobs && !hasPendingDataTableJobs) {
                 // No more pending jobs, stop polling and refresh overviews
@@ -149,7 +149,7 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
                 fetchDataTableJobs()
             ]).then(([audioJobs, dataTableJobs]) => {
                 const hasPendingAudioJobs = audioJobs.some((job: AudioOverviewJob) => job.status === 'pending' || job.status === 'running');
-                const hasPendingDataTableJobs = dataTableJobs.some((job: DataTableJobStatusResponse) => job.status === 'pending' || job.status === 'running');
+                const hasPendingDataTableJobs = dataTableJobs.some((job: DataTableJob) => job.status === 'pending' || job.status === 'running');
                 if (hasPendingAudioJobs || hasPendingDataTableJobs) {
                     startPolling();
                 }
@@ -249,7 +249,7 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
             toast.info("Creating data table...");
 
             // Create the data table via API
-            const response: DataTableJobStatusResponse = await fetchFromApi(`/api/projects/tables/`, {
+            const response: DataTableJob = await fetchFromApi(`/api/projects/tables/`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -260,7 +260,7 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
                 }),
             });
 
-            if (!response.job_id) {
+            if (!response.id) {
                 throw new Error("No job ID returned from API");
             }
 
@@ -417,7 +417,7 @@ export default function Artifacts({ projectId, papers, currentUserRole }: Artifa
             {dataTableJobs.length > 0 && (
                 <div className="mt-4 space-y-3">
                     {dataTableJobs.map((job) => (
-                        <DataTableGenerationJobCard key={job.job_id} job={job} projectId={projectId} />
+                        <DataTableGenerationJobCard key={job.id} job={job} projectId={projectId} />
                     ))}
                 </div>
             )}

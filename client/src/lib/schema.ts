@@ -394,10 +394,26 @@ export interface ProjectInvitation {
     invited_at: string;
 }
 
-export interface DataTableJobStatusResponse extends JobStatusResponse {
-    celery_progress_message: string | null;
-    job_id: string;
+export interface DataTableJob {
+    id: string;
+    project_id: string | null;
+    columns: string[] | null;
+    task_id: string | null;
+    title: string | null;
+    status: JobStatusType;
+    started_at: string | null;
+    completed_at: string | null;
+    created_at: string | null;
+    updated_at: string | null;
+    error_message: string | null;
     result_id: string | null;
+}
+
+// Response from /api/projects/tables/{job_id} status endpoint
+export interface DataTableJobStatusResponse extends JobStatusResponse {
+    columns: string[] | null;
+    task_id: string | null;
+    error_message: string | null;
 }
 
 export interface DataTableCellValue {
