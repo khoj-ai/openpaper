@@ -230,4 +230,4 @@ class DataTableResult(BaseModel):
         description="List of column names in the data table."
     )
     rows: List[DataTableRow] = Field(default=[], description="Row data per paper")
-    row_failures: List[UUID] = Field(default=[], description="List of paper_ids that failed to process")
+    row_failures: List[str] = Field(default=[], description="List of paper_ids that failed to process")
