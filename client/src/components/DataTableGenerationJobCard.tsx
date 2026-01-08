@@ -176,6 +176,14 @@ export default function DataTableGenerationJobCard({ job, projectId }: DataTable
                                                 {getStatusText(liveData.status)}
                                             </span>
                                         </div>
+                                        {liveData.celery_status && (
+                                            <div>
+                                                <span className="text-gray-500 dark:text-gray-400">Task Status:</span>
+                                                <span className="ml-1 font-medium text-gray-700 dark:text-gray-300">
+                                                    {liveData.celery_status}
+                                                </span>
+                                            </div>
+                                        )}
                                         {liveData.task_id && (
                                             <div>
                                                 <span className="text-gray-500 dark:text-gray-400">Task ID:</span>
@@ -185,7 +193,7 @@ export default function DataTableGenerationJobCard({ job, projectId }: DataTable
                                             </div>
                                         )}
                                         {liveData.completed_at && (
-                                            <div className="col-span-2">
+                                            <div>
                                                 <span className="text-gray-500 dark:text-gray-400">Completed:</span>
                                                 <span className="ml-1 text-gray-700 dark:text-gray-300">
                                                     {formatDateTime(liveData.completed_at)}
@@ -193,6 +201,15 @@ export default function DataTableGenerationJobCard({ job, projectId }: DataTable
                                             </div>
                                         )}
                                     </div>
+
+                                    {liveData.celery_progress_message && (
+                                        <div className="text-xs">
+                                            <span className="text-gray-500 dark:text-gray-400">Progress:</span>
+                                            <p className="mt-1 text-gray-700 dark:text-gray-300 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
+                                                {liveData.celery_progress_message}
+                                            </p>
+                                        </div>
+                                    )}
 
                                     {liveData.columns && liveData.columns.length > 0 && (
                                         <div className="text-xs">
