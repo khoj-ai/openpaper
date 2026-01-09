@@ -215,13 +215,13 @@ export const generateBibTeX = (paper: PaperBase): string => {
 
 // Define citation styles and their generators
 export const citationStyles = [
-    { name: 'MLA', generator: generateMLA },
+    { name: 'MLA 9th Edition', generator: generateMLA },
     { name: 'Harvard', generator: generateHarvard },
     { name: 'AAA', generator: generateAAA },
     { name: 'IEEE', generator: generateIEEE },
-    { name: 'AMA', generator: generateAMA },
-    { name: 'Chicago (Author-Date)', generator: generateChicago },
-    { name: 'APA', generator: generateAPA },
+    { name: 'AMA 11th Edition', generator: generateAMA },
+    { name: 'Chicago 17th (Author-Date)', generator: generateChicago },
+    { name: 'APA 7th Edition', generator: generateAPA },
     { name: 'BibTeX', generator: generateBibTeX },
 ];
 

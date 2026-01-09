@@ -33,7 +33,9 @@ export function CitePaperButton({ paper, paperId: providedPaperId, minimalist = 
     const [selectedStyle, setSelectedStyle] = useState<string>(() => {
         if (typeof window !== 'undefined') {
             const saved = localStorage.getItem('citationStyle');
-            return saved || citationStyles[0].name;
+            // Validate saved preference exists in current options, otherwise use default
+            const isValid = saved && citationStyles.some(style => style.name === saved);
+            return isValid ? saved : citationStyles[0].name;
         }
         return citationStyles[0].name;
     });
