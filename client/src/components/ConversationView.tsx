@@ -490,9 +490,11 @@ export const ConversationView = ({
 							</div>
 						)}
 					</form>
-					<p className="text-[10px] text-center text-muted-foreground/70 mt-1">
-						AI can make mistakes. Verify important information.
-					</p>
+					{!isCentered && (
+						<p className="text-[10px] text-center text-muted-foreground/70 mt-1">
+							AI can make mistakes. Verify important information.
+						</p>
+					)}
 					{isCentered && (
 						<div className="absolute bottom-0 left-0 w-full">
 							<TopicBubbles isVisible={currentMessage.length === 0} />
