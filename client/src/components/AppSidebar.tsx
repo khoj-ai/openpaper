@@ -72,7 +72,6 @@ const items = [
         url: "/projects",
         icon: FolderKanban,
         requiresAuth: true,
-        tag: "New",
     },
     {
         title: "Ask",
@@ -407,7 +406,7 @@ export function AppSidebar() {
                                             getItemUrl={(paper) => `/paper/${paper.id}`}
                                             viewAllUrl="/papers"
                                             viewAllText="View all papers"
-                                            defaultOpen={true}
+                                            defaultOpen={false}
                                         />
                                     )
                                 }
@@ -423,7 +422,6 @@ export function AppSidebar() {
                                             viewAllUrl="/understand/past"
                                             viewAllText="View all chats"
                                             defaultOpen={false}
-                                            tag={item.tag}
                                         />
                                     )
                                 }
@@ -441,7 +439,6 @@ export function AppSidebar() {
                                             viewAllText="View all projects"
                                             defaultOpen={false}
                                             maxItems={3}
-                                            tag={item.tag}
                                         />
                                     )
                                 }
@@ -451,11 +448,6 @@ export function AppSidebar() {
                                             <Link href={item.requiresAuth && !user ? "/login" : item.url}>
                                                 <item.icon />
                                                 <span>{item.title}</span>
-                                                {item.tag && (
-                                                    <span className="ml-1 text-xs text-yellow-500 bg-yellow-100 dark:bg-yellow-800 dark:text-yellow-200 px-1 rounded">
-                                                        {item.tag}
-                                                    </span>
-                                                )}
                                             </Link>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>

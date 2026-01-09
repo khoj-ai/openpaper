@@ -114,7 +114,6 @@ export function QuickActions({ onUploadComplete, onProjectCreated, onUploadStart
                     title="New Project"
                     description="Organize your research"
                     onClick={() => setCreateProjectOpen(true)}
-                    badge="New"
                 />
                 <QuickActionCard
                     icon={<Globe2 className="h-5 w-5" />}
