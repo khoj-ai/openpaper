@@ -11,7 +11,6 @@ import {
     Highlighter,
     MessageCircle,
     Focus,
-    Loader2,
     Lightbulb,
     AudioLines,
 } from 'lucide-react';
@@ -522,14 +521,12 @@ export default function PaperView() {
                             >
                                 {jobId ? (
                                     <div className="flex flex-col h-full w-full">
-                                        <div className="flex items-center justify-center gap-1 font-mono text-lg w-full p-4 border-b dark:border-gray-800 border-gray-200">
-                                            <div className="flex items-center gap-1 w-14">
-                                                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                                                <p className="text-gray-400 w-12">
-                                                    {elapsedTime}s
-                                                </p>
+                                        <div className="flex items-center justify-center w-full px-6 py-4 border-b border-gray-100 dark:border-gray-800/50">
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
+                                                <p className="text-sm text-muted-foreground">{sidePanelDisplayedText}</p>
+                                                <span className="text-xs text-muted-foreground/50 tabular-nums">{elapsedTime}s</span>
                                             </div>
-                                            <p className="text-primary text-right flex-1">{sidePanelDisplayedText}</p>
                                         </div>
                                         <ReportSkeleton />
                                     </div>
@@ -621,14 +618,12 @@ export default function PaperView() {
                 >
                     {jobId ? (
                         <div className="flex flex-col h-full w-full">
-                            <div className="flex items-center justify-center gap-1 font-mono text-lg w-full p-4 border-b dark:border-gray-800 border-gray-200">
-                                <div className="flex items-center gap-1 w-14">
-                                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                                    <p className="text-gray-400 w-12">
-                                        {elapsedTime}s
-                                    </p>
+                            <div className="flex items-center justify-center w-full px-6 py-4 border-b border-gray-100 dark:border-gray-800/50">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
+                                    <p className="text-sm text-muted-foreground">{sidePanelDisplayedText}</p>
+                                    <span className="text-xs text-muted-foreground/50 tabular-nums">{elapsedTime}s</span>
                                 </div>
-                                <p className="text-primary text-right flex-1">{sidePanelDisplayedText}</p>
                             </div>
                             <ReportSkeleton />
                         </div>
