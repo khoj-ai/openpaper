@@ -74,6 +74,7 @@ export function generateStaticParams() {
         { slug: 'library2' },
         { slug: 'whatllm' },
         { slug: 'projects' },
+        { slug: 'project_collaboration' },
         { slug: 'change_december' },
         { slug: 'quiet_week' },
         { slug: 'data_tables' },
