@@ -117,7 +117,7 @@ export default function RootLayout({
 					</AuthProvider>
 				</ThemeProvider>
 				<Toaster
-					position="top-right"
+					position="bottom-right"
 					richColors
 					duration={3000}
 				/>
