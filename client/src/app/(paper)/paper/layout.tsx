@@ -14,6 +14,7 @@ import { CitationGraphButton } from '@/components/CitationGraphButton';
 
 import { SidebarController } from "@/components/utils/SidebarAutoCollapse";
 import Image from "next/image";
+import Link from "next/link";
 import { ManageProjectsButton } from "@/components/ManageProjectsButton";
 import { MobilePaperMenu } from "@/components/MobilePaperMenu";
 
@@ -91,7 +92,7 @@ export default function RootLayout({
 									<header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
 										<SidebarTrigger className="-ml-1" />
 										<Separator orientation="vertical" className="mr-2 h-4" />
-										<header className="flex flex-1 items-center gap-2">
+										<Link href="/" className="flex flex-1 items-center gap-2 hover:opacity-80 transition-opacity">
 											<Image
 												src="/openpaper.svg"
 												width={24}
@@ -99,7 +100,7 @@ export default function RootLayout({
 												alt="Open Paper Logo"
 											/>
 											<span className="text-sm font-semibold">Open Paper</span>
-										</header>
+										</Link>
 									{/* Desktop buttons */}
 									<div className="hidden md:flex items-center gap-2">
 										<ManageProjectsButton />
