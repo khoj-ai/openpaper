@@ -1,3 +1,10 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
 [project]
 name = "open-paper-jobs"
 version = "0.1.0"
@@ -24,3 +31,6 @@ dependencies = [
     "google-genai>=1.23.0",
     "posthog>=6.1.0",
 ]
+
+[project.scripts]
+start = "src:start"

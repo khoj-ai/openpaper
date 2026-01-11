@@ -169,29 +169,16 @@ The following environment variables are required to run the Jobs Service:
 
 ### Running Locally
 
-1.  **Install Dependencies**:
-    ```bash
-    uv install
-    ```
+Run the command below to install dependencies, start job service Docker containers, worker and API:
+```bash
+uv run start
+```
 
-2.  **Start RabbitMQ and Redis**:
-    Make sure you have RabbitMQ and Redis servers running. You can use Docker to easily start them:
-    ```bash
-    docker run -d -p 5672:5672 rabbitmq
-    docker run -d -p 6379:6379 redis
-    ```
-
-3.  **Start the Celery Worker**:
-    ```bash
-    ./scripts/start_worker.sh
-    ```
-
-4.  **Start Flower (Optional)**:
-    Flower is a web-based tool for monitoring Celery jobs.
-    ```bash
-    ./scripts/start_flower.sh
-    ```
-    You can access the Flower dashboard at `http://localhost:5555`.
+Optionally, start Flower to monitor Celery jobs:
+```bash
+./scripts/start_flower.sh
+```
+Access the Flower dashboard at `http://localhost:5555`.
 
 ## Future Development
 

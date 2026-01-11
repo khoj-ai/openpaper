@@ -1,5 +1,12 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
 [project]
-name = "annotated-paper"
+name = "open-paper"
 version = "0.1.0"
 requires-python = ">= 3.12"
 description = "An Application to Read & Understand Papers with AI"
@@ -33,3 +40,14 @@ dependencies = [
     "stripe>=12.3.0",
     "pypdf2>=3.0.1",
 ]
+
+[project.scripts]
+# openpaper = "app.main"
+start = "app:start"
+
+[tool.mypy]
+plugins = [
+    "sqlalchemy.ext.mypy.plugin",
+]
+show_error_codes = true
+strict = true
