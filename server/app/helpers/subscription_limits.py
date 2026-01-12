@@ -81,63 +81,11 @@ def get_plan_limits(plan: SubscriptionPlan) -> Dict:
     return SUBSCRIPTION_LIMITS.get(plan, SUBSCRIPTION_LIMITS[SubscriptionPlan.BASIC])
 
 
-def get_user_paper_count_limit(db: Session, user: CurrentUser) -> int:
-    """
-    Get the paper upload limits for a user based on their subscription plan.
-
-    Returns:
-        int: The paper upload limit.
-    """
-    plan = get_user_subscription_plan(db, user)
-    limits = get_plan_limits(plan)
-
-    return limits[PAPER_UPLOAD_KEY]
-
-
 def get_user_knowledge_base_size(db: Session, user: CurrentUser) -> int:
     """
     Get the total size of the user's knowledge base in MB.
     """
     return paper_crud.get_size_of_knowledge_base(db, user=user)
-
-
-def get_user_knowledge_base_size_limit(db: Session, user: CurrentUser) -> int:
-    """
-    Get the knowledge base limits for a user based on their subscription plan.
-
-    Returns:
-        int: The knowledge base size limit in MB.
-    """
-    plan = get_user_subscription_plan(db, user)
-    limits = get_plan_limits(plan)
-
-    return limits[KB_SIZE_KEY]
-
-
-def get_user_audio_overviews_limit(db: Session, user: CurrentUser) -> int:
-    """
-    Get the audio overview limits for a user based on their subscription plan.
-
-    Returns:
-        int: The audio overview limit per week.
-    """
-    plan = get_user_subscription_plan(db, user)
-    limits = get_plan_limits(plan)
-
-    return limits[AUDIO_OVERVIEWS_KEY]
-
-
-def get_user_data_tables_limit(db: Session, user: CurrentUser) -> int:
-    """
-    Get the data table extraction job limits for a user based on their subscription plan.
-
-    Returns:
-        int: The data table extraction job limit per week.
-    """
-    plan = get_user_subscription_plan(db, user)
-    limits = get_plan_limits(plan)
-
-    return limits[DATA_TABLES_KEY]
 
 
 def can_user_upload_paper(db: Session, user: CurrentUser) -> tuple[bool, Optional[str]]:
