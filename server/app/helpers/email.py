@@ -185,18 +185,14 @@ def notify_billing_issue(email: str, issue: str, name: Union[str, None] = None) 
 def send_subscription_welcome_email(
     email: str,
 ) -> None:
-    """
-    Send a welcome email to a new subscriber.
-
-    Args:
-        email (str): The email address of the user.
-        name (str): The name of the user.
-    """
+    """Send a welcome email to a new subscriber."""
     try:
         payload = resend.Emails.SendParams = {  # type: ignore
+            # Keep the email "from" Saba for a more personal touch.
             "from": f"Saba <{REPLY_TO_DEFAULT_EMAIL}>",
+            "reply_to": REPLY_TO_DEFAULT_EMAIL,
             "to": [email],
-            "subject": "What will you discover today? - Open Paper",
+            "subject": "You're all set - Open Paper",
             "html": load_email_template("subscription_welcome.html"),
         }
 
