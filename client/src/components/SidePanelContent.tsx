@@ -390,9 +390,9 @@ export function SidePanelContent({
         const total = chat_credits_used + chat_credits_remaining;
         const usagePercentage = getChatCreditUsagePercentage(subscription);
 
-        if (isChatCreditAtLimit(subscription)) {
-
-            toast.info('Nice! You have used your chat credits for the week. Upgrade your plan to use more.', {
+        const CHAT_CREDIT_TOAST_KEY = "chat_credit_limit_toast_shown";
+        if (isChatCreditAtLimit(subscription) && !sessionStorage.getItem(CHAT_CREDIT_TOAST_KEY)) {
+            toast.error("Nice! You've used your chat credits for the week. Upgrade your plan to continue chatting.", {
                 duration: 5000,
                 action: {
                     label: 'Upgrade',
@@ -400,8 +400,9 @@ export function SidePanelContent({
                         window.location.href = '/pricing';
                     }
                 }
-            })
-        };
+            });
+            sessionStorage.setItem(CHAT_CREDIT_TOAST_KEY, "true");
+        }
 
         setCreditUsage({
             used: chat_credits_used,

@@ -76,13 +76,15 @@ function UnderstandPageContent() {
     const chatCreditLimitReached = isChatCreditAtLimit(subscription);
 
     useEffect(() => {
-        if (chatCreditLimitReached) {
-            toast.info("Nice! You have used your chat credits for the week. Upgrade your plan to use more.", {
+        const CHAT_CREDIT_TOAST_KEY = "chat_credit_limit_toast_shown";
+        if (chatCreditLimitReached && !sessionStorage.getItem(CHAT_CREDIT_TOAST_KEY)) {
+            toast.error("Nice! You've used your chat credits for the week. Upgrade your plan to continue chatting.", {
                 action: {
-                    label: "See plans",
+                    label: "Upgrade",
                     onClick: () => window.location.href = "/pricing",
                 },
             });
+            sessionStorage.setItem(CHAT_CREDIT_TOAST_KEY, "true");
         }
     }, [chatCreditLimitReached]);
 

@@ -207,14 +207,14 @@ const UsageLimitCard = ({
                 <UsageItem
                     label="Paper Uploads"
                     used={subscription.usage.paper_uploads}
-                    total={subscription.usage.paper_uploads + subscription.usage.paper_uploads_remaining}
+                    total={subscription.limits.paper_uploads}
                     percentage={getPaperUploadPercentage(subscription)}
                 />
 
                 <UsageItem
                     label="Storage"
                     used={subscription.usage.knowledge_base_size}
-                    total={subscription.usage.knowledge_base_size + subscription.usage.knowledge_base_size_remaining}
+                    total={subscription.limits.knowledge_base_size}
                     percentage={getStorageUsagePercentage(subscription)}
                     formatValue={formatFileSize}
                 />
@@ -222,28 +222,28 @@ const UsageLimitCard = ({
                 <UsageItem
                     label="Weekly Chat Credits"
                     used={subscription.usage.chat_credits_used}
-                    total={subscription.usage.chat_credits_used + subscription.usage.chat_credits_remaining}
+                    total={subscription.limits.chat_credits_weekly}
                     percentage={getChatCreditUsagePercentage(subscription)}
                 />
 
                 <UsageItem
                     label="Weekly Audio Overviews"
                     used={subscription.usage.audio_overviews_used}
-                    total={subscription.usage.audio_overviews_used + subscription.usage.audio_overviews_remaining}
+                    total={subscription.limits.audio_overviews_weekly}
                     percentage={getAudioOverviewUsagePercentage(subscription)}
                 />
 
                 <UsageItem
                     label="Weekly Data Tables"
                     used={subscription.usage.data_tables_used}
-                    total={subscription.usage.data_tables_used + subscription.usage.data_tables_remaining}
+                    total={subscription.limits.data_tables_weekly}
                     percentage={getDataTableUsagePercentage(subscription)}
                 />
 
                 <UsageItem
                     label="Projects"
                     used={subscription.usage.projects}
-                    total={subscription.usage.projects + subscription.usage.projects_remaining}
+                    total={subscription.limits.projects}
                     percentage={getProjectUsagePercentage(subscription)}
                 />
             </div>

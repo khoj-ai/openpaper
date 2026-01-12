@@ -444,8 +444,9 @@ export interface DataTableResult {
 export interface SubscriptionLimits {
     paper_uploads: number;
     knowledge_base_size: number;
-    chat_credits_daily: number;
+    chat_credits_weekly: number;
     audio_overviews_weekly: number;
+    data_tables_weekly: number;
     projects: number;
     model: string[];
 }

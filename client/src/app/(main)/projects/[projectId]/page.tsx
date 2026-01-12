@@ -95,13 +95,15 @@ export default function ProjectPage() {
 	const chatDisabled = isChatCreditAtLimit(subscription);
 
 	useEffect(() => {
-		if (chatDisabled) {
-			toast.info("Nice! You have used your chat credits for the week. Upgrade your plan to use more.", {
+		const CHAT_CREDIT_TOAST_KEY = "chat_credit_limit_toast_shown";
+		if (chatDisabled && !sessionStorage.getItem(CHAT_CREDIT_TOAST_KEY)) {
+			toast.error("Nice! You've used your chat credits for the week. Upgrade your plan to continue chatting.", {
 				action: {
 					label: "Upgrade",
 					onClick: () => router.push("/pricing"),
 				},
 			});
+			sessionStorage.setItem(CHAT_CREDIT_TOAST_KEY, "true");
 		}
 	}, [chatDisabled, router]);
 

@@ -125,7 +125,7 @@ export default function Home() {
 
 			if (isStorageAtLimit(subscription)) {
 				toast.error("Storage limit reached", {
-					description: "You've reached your storage limit. Please upgrade your plan or delete some papers to continue.",
+					description: "You've used your available storage. Upgrade for more space, or free up room by removing papers.",
 					action: {
 						label: "Upgrade",
 						onClick: () => window.location.href = "/pricing"
@@ -134,7 +134,7 @@ export default function Home() {
 				toastShown = true;
 			} else if (isPaperUploadAtLimit(subscription)) {
 				toast.error("Upload limit reached", {
-					description: "You've reached your paper upload limit for this plan. Please upgrade your plan to upload more papers.",
+					description: "You've used your available paper uploads. Upgrade for more, or remove existing papers.",
 					action: {
 						label: "Upgrade",
 						onClick: () => window.location.href = "/pricing"
@@ -143,18 +143,18 @@ export default function Home() {
 				toastShown = true;
 			} else if (isStorageNearLimit(subscription)) {
 				toast.warning("Storage nearly full", {
-					description: "You're approaching your storage limit. Consider upgrading your plan or managing your papers.",
+					description: "You're getting close to your storage limit.",
 					action: {
-						label: "Plans",
+						label: "Upgrade",
 						onClick: () => window.location.href = "/pricing"
 					},
 				});
 				toastShown = true;
 			} else if (isPaperUploadNearLimit(subscription)) {
 				toast.warning("Upload limit approaching", {
-					description: "You're approaching your paper upload limit. Consider upgrading your plan.",
+					description: "You're getting close to your paper upload limit.",
 					action: {
-						label: "Plans",
+						label: "Upgrade",
 						onClick: () => window.location.href = "/pricing"
 					},
 				});

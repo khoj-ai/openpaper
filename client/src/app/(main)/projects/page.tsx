@@ -115,10 +115,10 @@ function ProjectsPage() {
 			let toastShown = false;
 
 			if (atProjectLimit) {
-				toast.info("Project limit reached", {
+				toast.error("Project limit reached", {
 					description: "You've used your available project slots. Upgrade for more, or archive existing projects.",
 					action: {
-						label: "View Plans",
+						label: "Upgrade",
 						onClick: () => router.push("/pricing"),
 					},
 				});
@@ -127,7 +127,7 @@ function ProjectsPage() {
 				toast.warning("Approaching project limit", {
 					description: "You're getting close to your project limit.",
 					action: {
-						label: "View Plans",
+						label: "Upgrade",
 						onClick: () => router.push("/pricing"),
 					},
 				});
