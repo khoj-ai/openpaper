@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/lib/auth";
 import { useSubscription, getStorageUsagePercentage, isStorageNearLimit, isStorageAtLimit, formatFileSize, getPaperUploadPercentage, isPaperUploadNearLimit, isPaperUploadAtLimit, isProjectAtLimit } from "@/hooks/useSubscription";
-import { Upload, AlertTriangle, Highlighter, Quote, FolderKanban } from "lucide-react";
+import { Upload, Info, Highlighter, Quote, FolderKanban } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { LibraryTable } from "@/components/LibraryTable";
@@ -212,28 +212,28 @@ function PapersPageContent() {
         }
 
         const atLimit = atStorageLimit || atPaperUploadLimit;
-        const title = atLimit ? "You've reached a limit" : "Approaching a limit";
+        const title = "Usage summary";
         const description = atLimit
-            ? "You have reached one of your usage limits. Please upgrade your plan to continue full access."
-            : "You are approaching one of your usage limits. Consider upgrading soon to avoid any interruptions.";
+            ? "You've used your available quota. Upgrade for more space, or free up room by removing papers."
+            : "You're getting close to your plan limits.";
 
         return (
-            <Alert variant={'default'} className="mb-4">
+            <Alert variant={'default'} className="mb-4 border-muted">
                 <div className="flex justify-between items-start">
                     <div className="flex items-start">
-                        <AlertTriangle className="h-4 w-4 mt-1" />
+                        <Info className="h-4 w-4 mt-1 text-muted-foreground" />
                         <div className="ml-2">
-                            <AlertTitle className={atLimit ? "text-destructive" : "text-blue-500"}>{title}</AlertTitle>
+                            <AlertTitle className="text-foreground">{title}</AlertTitle>
                             <AlertDescription className="text-muted-foreground">
                                 {description}
                             </AlertDescription>
                         </div>
                     </div>
                     <div className="flex items-center gap-x-2">
-                        <Button asChild size="sm">
-                            <Link href="/pricing">Upgrade</Link>
+                        <Button asChild size="sm" variant="outline">
+                            <Link href="/pricing">View plans</Link>
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setShowAlert(false)} className="self-start">
+                        <Button variant="ghost" size="sm" onClick={() => setShowAlert(false)} className="self-start">
                             Dismiss
                         </Button>
                     </div>

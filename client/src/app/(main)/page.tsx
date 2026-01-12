@@ -111,9 +111,18 @@ export default function Home() {
 		}
 	};
 
-	// Toast notifications for subscription limits
+	// Toast notifications for subscription limits (once per session)
 	useEffect(() => {
+		const LIMIT_TOAST_SHOWN_KEY = "subscription_limit_toast_shown";
+
 		if (!subscriptionLoading && subscription && user) {
+			// Only show toast once per session
+			if (sessionStorage.getItem(LIMIT_TOAST_SHOWN_KEY)) {
+				return;
+			}
+
+			let toastShown = false;
+
 			if (isStorageAtLimit(subscription)) {
 				toast.error("Storage limit reached", {
 					description: "You've reached your storage limit. Please upgrade your plan or delete some papers to continue.",
@@ -122,6 +131,7 @@ export default function Home() {
 						onClick: () => window.location.href = "/pricing"
 					},
 				});
+				toastShown = true;
 			} else if (isPaperUploadAtLimit(subscription)) {
 				toast.error("Upload limit reached", {
 					description: "You've reached your paper upload limit for this plan. Please upgrade your plan to upload more papers.",
@@ -130,6 +140,7 @@ export default function Home() {
 						onClick: () => window.location.href = "/pricing"
 					},
 				});
+				toastShown = true;
 			} else if (isStorageNearLimit(subscription)) {
 				toast.warning("Storage nearly full", {
 					description: "You're approaching your storage limit. Consider upgrading your plan or managing your papers.",
@@ -138,6 +149,7 @@ export default function Home() {
 						onClick: () => window.location.href = "/pricing"
 					},
 				});
+				toastShown = true;
 			} else if (isPaperUploadNearLimit(subscription)) {
 				toast.warning("Upload limit approaching", {
 					description: "You're approaching your paper upload limit. Consider upgrading your plan.",
@@ -146,6 +158,11 @@ export default function Home() {
 						onClick: () => window.location.href = "/pricing"
 					},
 				});
+				toastShown = true;
+			}
+
+			if (toastShown) {
+				sessionStorage.setItem(LIMIT_TOAST_SHOWN_KEY, "true");
 			}
 		}
 	}, [subscription, subscriptionLoading, user]);

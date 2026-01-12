@@ -6,7 +6,7 @@ import { ProjectCard } from "@/components/ProjectCard";
 import { Button } from "@/components/ui/button";
 import { Project } from "@/lib/schema";
 import { fetchFromApi } from "@/lib/api";
-import { PlusCircle, Target, BookOpen, FileText, AlertTriangle, Search, Headphones, MessageCircle, Table, Users, X, Plus } from "lucide-react";
+import { PlusCircle, Target, BookOpen, FileText, Info, Search, Headphones, MessageCircle, Table, Users, X, Plus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useSubscription, isProjectNearLimit, isProjectAtLimit, getProjectUsagePercentage } from "@/hooks/useSubscription";
@@ -104,24 +104,38 @@ function ProjectsPage() {
 	}, [userLoading, user, router]);
 
 	useEffect(() => {
+		const PROJECT_LIMIT_TOAST_KEY = "project_limit_toast_shown";
+
 		if (subscription) {
+			// Only show toast once per session
+			if (sessionStorage.getItem(PROJECT_LIMIT_TOAST_KEY)) {
+				return;
+			}
+
+			let toastShown = false;
+
 			if (atProjectLimit) {
-				toast.info("You've built some great projects! Upgrade to create more.", {
-					description: "You have used all of your available projects. Upgrade your plan to create more.",
+				toast.info("Project limit reached", {
+					description: "You've used your available project slots. Upgrade for more, or archive existing projects.",
 					action: {
 						label: "View Plans",
 						onClick: () => router.push("/pricing"),
 					},
 				});
+				toastShown = true;
 			} else if (nearProjectLimit) {
-				toast.warning("Approaching Project Limit", {
-					description: `You have used ${subscription.usage.projects} of ${subscription.usage.projects + subscription.usage.projects_remaining
-						} projects. Consider upgrading soon.`,
+				toast.warning("Approaching project limit", {
+					description: "You're getting close to your project limit.",
 					action: {
 						label: "View Plans",
 						onClick: () => router.push("/pricing"),
 					},
 				});
+				toastShown = true;
+			}
+
+			if (toastShown) {
+				sessionStorage.setItem(PROJECT_LIMIT_TOAST_KEY, "true");
 			}
 		}
 	}, [atProjectLimit, nearProjectLimit, subscription, router]);
@@ -190,24 +204,24 @@ function ProjectsPage() {
 	return (
 		<div className="container mx-auto p-4">
 			{(nearProjectLimit || atProjectLimit) && subscription && showUsageAlert && (
-				<Alert variant={'default'} className="mb-4">
+				<Alert variant={'default'} className="mb-4 border-muted">
 					<div className="flex justify-between items-start">
 						<div className="flex items-start">
-							<AlertTriangle className="h-4 w-4 mt-1" />
+							<Info className="h-4 w-4 mt-1 text-muted-foreground" />
 							<div className="ml-2">
-								<AlertTitle className={atProjectLimit ? "text-destructive" : "text-blue-500"}>{atProjectLimit ? "You've built some great projects!" : "Approaching Project Limit"}</AlertTitle>
+								<AlertTitle className="text-foreground">Usage summary</AlertTitle>
 								<AlertDescription className="text-muted-foreground">
 									{atProjectLimit
-										? `You have used all of your available projects. Upgrade your plan to create more.`
-										: `You have used ${subscription.usage.projects} of ${subscription.limits.projects} projects. Consider upgrading soon.`}
+										? `You've used your available project slots. Upgrade for more, or archive existing projects.`
+										: `You're getting close to your project limit.`}
 								</AlertDescription>
 							</div>
 						</div>
 						<div className="flex items-center gap-x-2">
-							<Button asChild size="sm">
-								<Link href="/pricing">Upgrade</Link>
+							<Button asChild size="sm" variant="outline">
+								<Link href="/pricing">View plans</Link>
 							</Button>
-							<Button variant="outline" size="sm" onClick={() => setShowUsageAlert(false)} className="self-start">
+							<Button variant="ghost" size="sm" onClick={() => setShowUsageAlert(false)} className="self-start">
 								Dismiss
 							</Button>
 						</div>
