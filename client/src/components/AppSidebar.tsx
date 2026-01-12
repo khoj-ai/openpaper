@@ -406,7 +406,7 @@ export function AppSidebar() {
                                             getItemUrl={(paper) => `/paper/${paper.id}`}
                                             viewAllUrl="/papers"
                                             viewAllText="View all papers"
-                                            defaultOpen={false}
+                                            defaultOpen={true}
                                         />
                                     )
                                 }
