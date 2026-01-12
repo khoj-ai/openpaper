@@ -3,6 +3,7 @@ import { MinimalJob, PdfUploadResponse } from "@/lib/schema"
 
 export const uploadFiles = async (files: File[]): Promise<MinimalJob[]> => {
     const newJobs: MinimalJob[] = []
+    const errors: Error[] = []
     for (const file of files) {
         const formData = new FormData()
         formData.append("file", file)
@@ -14,7 +15,12 @@ export const uploadFiles = async (files: File[]): Promise<MinimalJob[]> => {
             newJobs.push({ jobId: res.job_id, fileName: file.name })
         } catch (error) {
             console.error("Failed to start upload for", file.name, error)
+            errors.push(error instanceof Error ? error : new Error(String(error)))
         }
+    }
+    // If all uploads failed, throw the first error so the caller knows what went wrong
+    if (newJobs.length === 0 && errors.length > 0) {
+        throw errors[0]
     }
     return newJobs
 }
