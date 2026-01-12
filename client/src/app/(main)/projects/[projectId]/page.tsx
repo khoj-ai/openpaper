@@ -268,6 +268,11 @@ export default function ProjectPage() {
 		return <div className="container mx-auto p-4">Project not found.</div>;
 	}
 
+	// Show full skeleton if papers or conversations are still loading
+	if (isPapersLoading || isConversationsLoading) {
+		return <ProjectPageSkeleton />;
+	}
+
 	const isEmpty = !papers || (papers.length === 0 && (!conversations || conversations.length === 0));
 
 	if (isEmpty) {
