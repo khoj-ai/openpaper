@@ -36,6 +36,7 @@ export function BlogPostToast() {
                     id: TOAST_ID,
                     description: post.description,
                     duration: 3500,
+                    position: "bottom-right",
                     action: {
                         label: "Read",
                         onClick: () => {
