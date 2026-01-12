@@ -114,6 +114,10 @@ export function UploadModal({ open, onOpenChange, uploadLimit = DEFAULT_UPLOAD_L
         try {
             const newJobs = await uploadFiles(files);
             setJobs(prevJobs => [...prevJobs, ...newJobs]);
+        } catch (error) {
+            console.error("Failed to upload file", error);
+            const errorMessage = error instanceof Error ? error.message : "Failed to upload the file. Please try again.";
+            setImportError(errorMessage);
         } finally {
             setIsSubmitting(false);
         }
@@ -150,9 +154,8 @@ export function UploadModal({ open, onOpenChange, uploadLimit = DEFAULT_UPLOAD_L
             setJobs(prevJobs => [...prevJobs, newJob]);
         } catch (error) {
             console.error("Failed to import from URL", error);
-            setImportError(
-                "Failed to import from URL. Please check the URL and try again."
-            );
+            const errorMessage = error instanceof Error ? error.message : "Failed to import from URL. Please check the URL and try again.";
+            setImportError(errorMessage);
         } finally {
             setIsSubmitting(false);
         }

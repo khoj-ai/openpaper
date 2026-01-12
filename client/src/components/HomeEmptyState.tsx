@@ -10,9 +10,11 @@ interface HomeEmptyStateProps {
     onUploadComplete?: () => void;
     onUploadStart?: (files: File[]) => void;
     onUrlImportStart?: (url: string) => void;
+    isUploadBlocked?: boolean;
+    onUploadBlocked?: () => void;
 }
 
-export function HomeEmptyState({ onUploadComplete, onUploadStart, onUrlImportStart }: HomeEmptyStateProps) {
+export function HomeEmptyState({ onUploadComplete, onUploadStart, onUrlImportStart, isUploadBlocked, onUploadBlocked }: HomeEmptyStateProps) {
     const router = useRouter();
     const [isUploadModalOpen, setUploadModalOpen] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
@@ -23,7 +25,11 @@ export function HomeEmptyState({ onUploadComplete, onUploadStart, onUrlImportSta
     };
 
     const handleUploadClick = () => {
-        setUploadModalOpen(true);
+        if (isUploadBlocked && onUploadBlocked) {
+            onUploadBlocked();
+        } else {
+            setUploadModalOpen(true);
+        }
     };
 
     const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
@@ -53,6 +59,15 @@ export function HomeEmptyState({ onUploadComplete, onUploadStart, onUrlImportSta
         e.stopPropagation();
         setIsDragging(false);
 
+        // Check if upload is blocked before processing files
+        if (isUploadBlocked && onUploadBlocked) {
+            onUploadBlocked();
+            if (e.dataTransfer) {
+                e.dataTransfer.items.clear();
+            }
+            return;
+        }
+
         const files = Array.from(e.dataTransfer.files).filter(
             file => file.type === 'application/pdf'
         );
@@ -64,7 +79,7 @@ export function HomeEmptyState({ onUploadComplete, onUploadStart, onUrlImportSta
         if (e.dataTransfer) {
             e.dataTransfer.items.clear();
         }
-    }, [onUploadStart]);
+    }, [onUploadStart, isUploadBlocked, onUploadBlocked]);
 
     return (
         <div

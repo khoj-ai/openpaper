@@ -11,7 +11,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, MessageCircleWarning, File } from "lucide-react";
+import { MessageCircleWarning, File } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
 import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience";
@@ -48,6 +48,20 @@ export default function Home() {
 	const router = useRouter();
 	const [isDragging, setIsDragging] = useState(false);
 
+	// Compute if upload is blocked due to subscription limits
+	const isUploadBlocked = !subscriptionLoading && (isPaperUploadAtLimit(subscription) || isStorageAtLimit(subscription));
+
+	// Handler to show error when upload is blocked
+	const handleUploadBlocked = () => {
+		if (isPaperUploadAtLimit(subscription)) {
+			setErrorAlertMessage("You've reached your paper upload limit. Please upgrade your plan to upload more papers.");
+		} else if (isStorageAtLimit(subscription)) {
+			setErrorAlertMessage("You've reached your storage limit. Please upgrade your plan or delete some papers to continue.");
+		}
+		setShowPricingOnError(true);
+		setShowErrorAlert(true);
+	};
+
 	const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
 		e.preventDefault();
 		e.stopPropagation();
@@ -74,6 +88,15 @@ export default function Home() {
 		e.preventDefault();
 		e.stopPropagation();
 		setIsDragging(false);
+
+		// Check if upload is blocked before processing files
+		if (isUploadBlocked) {
+			handleUploadBlocked();
+			if (e.dataTransfer) {
+				e.dataTransfer.items.clear();
+			}
+			return;
+		}
 
 		const files = Array.from(e.dataTransfer.files).filter(
 			file => file.type === 'application/pdf'
@@ -279,6 +302,20 @@ export default function Home() {
 	const handleUploadStart = async (files: File[]) => {
 		if (files.length === 0) return;
 
+		// Check subscription limits before attempting upload
+		if (isPaperUploadAtLimit(subscription)) {
+			setShowErrorAlert(true);
+			setErrorAlertMessage("You've reached your paper upload limit. Please upgrade your plan to upload more papers.");
+			setShowPricingOnError(true);
+			return;
+		}
+		if (isStorageAtLimit(subscription)) {
+			setShowErrorAlert(true);
+			setErrorAlertMessage("You've reached your storage limit. Please upgrade your plan or delete some papers to continue.");
+			setShowPricingOnError(true);
+			return;
+		}
+
 		const file = files[0];
 		setIsUploading(true);
 		setFileSize(file.size);
@@ -289,19 +326,14 @@ export default function Home() {
 			const jobs = await uploadFiles(files);
 			if (jobs.length > 0) {
 				pollJobStatus(jobs[0].jobId);
-			} else {
-				// All uploads failed - uploadFiles catches errors internally
-				setShowErrorAlert(true);
-				setErrorAlertMessage("Failed to upload the PDF. The file may be corrupted, encrypted, or in an unsupported format.");
-				setShowPricingOnError(false);
-				setIsUploading(false);
 			}
 		} catch (error) {
 			console.error('Error uploading file:', error);
 			setShowErrorAlert(true);
 			if (error instanceof Error) {
 				setErrorAlertMessage(error.message);
-				if (error.message.includes('upgrade') && error.message.includes('upload limit')) {
+				// Show upgrade option for limit-related errors
+				if (error.message.toLowerCase().includes('limit') || error.message.toLowerCase().includes('upgrade')) {
 					setShowPricingOnError(true);
 				} else {
 					setShowPricingOnError(false);
@@ -319,6 +351,20 @@ export default function Home() {
 
 	// Handle URL import with custom loading experience
 	const handleUrlImportStart = async (url: string) => {
+		// Check subscription limits before attempting upload
+		if (isPaperUploadAtLimit(subscription)) {
+			setShowErrorAlert(true);
+			setErrorAlertMessage("You've reached your paper upload limit. Please upgrade your plan to upload more papers.");
+			setShowPricingOnError(true);
+			return;
+		}
+		if (isStorageAtLimit(subscription)) {
+			setShowErrorAlert(true);
+			setErrorAlertMessage("You've reached your storage limit. Please upgrade your plan or delete some papers to continue.");
+			setShowPricingOnError(true);
+			return;
+		}
+
 		setIsUploading(true);
 		setFileSize(null);
 		setCeleryMessage(null);
@@ -331,12 +377,19 @@ export default function Home() {
 			setShowErrorAlert(true);
 			if (error instanceof Error) {
 				setErrorAlertMessage(error.message);
+				// Show upgrade option for limit-related errors
+				if (error.message.toLowerCase().includes('limit') || error.message.toLowerCase().includes('upgrade')) {
+					setShowPricingOnError(true);
+				} else {
+					setShowPricingOnError(false);
+				}
 			} else if (typeof error === 'object' && error !== null) {
 				setErrorAlertMessage(JSON.stringify(error));
+				setShowPricingOnError(false);
 			} else {
 				setErrorAlertMessage(String(error));
+				setShowPricingOnError(false);
 			}
-			setShowPricingOnError(false);
 			setIsUploading(false);
 		}
 	};
@@ -380,6 +433,8 @@ export default function Home() {
 						onUploadComplete={refreshData}
 						onUploadStart={handleUploadStart}
 						onUrlImportStart={handleUrlImportStart}
+						isUploadBlocked={isUploadBlocked}
+						onUploadBlocked={handleUploadBlocked}
 					/>
 				) : (
 					<div className="space-y-12">
@@ -390,6 +445,8 @@ export default function Home() {
 								onProjectCreated={refreshData}
 								onUploadStart={handleUploadStart}
 								onUrlImportStart={handleUrlImportStart}
+								isUploadBlocked={isUploadBlocked}
+								onUploadBlocked={handleUploadBlocked}
 							/>
 						</section>
 
@@ -444,7 +501,7 @@ export default function Home() {
 			{showErrorAlert && (
 				<Dialog open={showErrorAlert} onOpenChange={setShowErrorAlert}>
 					<DialogContent>
-						<DialogTitle>Upload Failed</DialogTitle>
+						<DialogTitle>{showPricingOnError ? "Upload Limit Reached" : "Upload Failed"}</DialogTitle>
 						<DialogDescription className="space-y-4 inline-flex items-center">
 							<MessageCircleWarning className="h-6 w-6 text-slate-500 mr-2 flex-shrink-0" />
 							{errorAlertMessage ?? DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE}
@@ -476,14 +533,10 @@ export default function Home() {
 					</DialogHeader>
 					<div className="flex flex-col items-center justify-center py-8 space-y-6 w-full">
 						<EnigmaticLoadingExperience />
-						<div className="flex items-center justify-center gap-1 font-mono text-lg w-full">
-							<div className="flex items-center gap-1 w-14">
-								<Loader2 className="h-6 w-6 animate-spin text-primary" />
-								<p className="text-gray-400 w-12">
-									{elapsedTime}s
-								</p>
-							</div>
-							<p className="text-primary text-right flex-1">{displayedMessage}</p>
+						<div className="flex items-center gap-3">
+							<div className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
+							<p className="text-sm text-muted-foreground">{displayedMessage}</p>
+							<span className="text-xs text-muted-foreground/50 tabular-nums">{elapsedTime}s</span>
 						</div>
 					</div>
 				</DialogContent>

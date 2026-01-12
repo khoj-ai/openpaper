@@ -56,12 +56,22 @@ interface QuickActionsProps {
     onProjectCreated?: () => void;
     onUploadStart?: (files: File[]) => void;
     onUrlImportStart?: (url: string) => void;
+    isUploadBlocked?: boolean;
+    onUploadBlocked?: () => void;
 }
 
-export function QuickActions({ onUploadComplete, onProjectCreated, onUploadStart, onUrlImportStart }: QuickActionsProps) {
+export function QuickActions({ onUploadComplete, onProjectCreated, onUploadStart, onUrlImportStart, isUploadBlocked, onUploadBlocked }: QuickActionsProps) {
     const router = useRouter();
     const [isUploadModalOpen, setUploadModalOpen] = useState(false);
     const [isCreateProjectOpen, setCreateProjectOpen] = useState(false);
+
+    const handleUploadClick = () => {
+        if (isUploadBlocked && onUploadBlocked) {
+            onUploadBlocked();
+        } else {
+            setUploadModalOpen(true);
+        }
+    };
 
     const handleUploadComplete = (paperId: string) => {
         router.push(`/paper/${paperId}`);
@@ -106,7 +116,7 @@ export function QuickActions({ onUploadComplete, onProjectCreated, onUploadStart
                     icon={<Upload className="h-5 w-5" />}
                     title="Upload Paper"
                     description="Start your next study"
-                    onClick={() => setUploadModalOpen(true)}
+                    onClick={handleUploadClick}
                     variant="primary"
                 />
                 <QuickActionCard

@@ -97,6 +97,24 @@ function PapersPageContent() {
     const [isProjectLimitDialogOpen, setProjectLimitDialogOpen] = useState(false);
     const [papersForNewProject, setPapersForNewProject] = useState<PaperItem[]>([]);
     const [isUploadModalOpen, setUploadModalOpen] = useState(false);
+    const [isUploadLimitDialogOpen, setUploadLimitDialogOpen] = useState(false);
+    const [uploadLimitMessage, setUploadLimitMessage] = useState("");
+
+    // Check if upload is blocked due to subscription limits
+    const isUploadBlocked = !subscriptionLoading && (isPaperUploadAtLimit(subscription) || isStorageAtLimit(subscription));
+
+    const handleUploadClick = () => {
+        if (isUploadBlocked) {
+            if (isPaperUploadAtLimit(subscription)) {
+                setUploadLimitMessage("You've reached your paper upload limit. Please upgrade your plan to upload more papers.");
+            } else if (isStorageAtLimit(subscription)) {
+                setUploadLimitMessage("You've reached your storage limit. Please upgrade your plan or delete some papers to continue.");
+            }
+            setUploadLimitDialogOpen(true);
+        } else {
+            setUploadModalOpen(true);
+        }
+    };
 
     useEffect(() => {
         if (papers) {
@@ -279,8 +297,8 @@ function PapersPageContent() {
             );
 
             if (files.length > 0) {
-                // Open upload modal - the modal will handle the files
-                setUploadModalOpen(true);
+                // Check if upload is blocked before opening modal
+                handleUploadClick();
             }
 
             if (e.dataTransfer) {
@@ -308,7 +326,7 @@ function PapersPageContent() {
                     <Button
                         size="lg"
                         className="bg-primary hover:bg-primary/90"
-                        onClick={() => setUploadModalOpen(true)}
+                        onClick={handleUploadClick}
                     >
                         <Upload className="h-4 w-4 mr-2" />
                         Upload your first paper
@@ -367,11 +385,27 @@ function PapersPageContent() {
                 onSubmit={handleCreateProjectSubmit}
             />
             <UploadModal open={isUploadModalOpen} onOpenChange={setUploadModalOpen} onUploadComplete={() => { mutate(); }} />
+            <AlertDialog open={isUploadLimitDialogOpen} onOpenChange={setUploadLimitDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Upload Limit Reached</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {uploadLimitMessage}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <Link href="/pricing">
+                            <AlertDialogAction>Upgrade</AlertDialogAction>
+                        </Link>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
             <UsageDisplay />
             <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 flex-shrink-0">
                 <h1 className="text-3xl font-bold tracking-tight">Library</h1>
                 <div className="flex items-center gap-x-4 mt-2 md:mt-0">
-                    <Button onClick={() => setUploadModalOpen(true)}>
+                    <Button onClick={handleUploadClick}>
                         <Upload className="h-4 w-4 mr-2" />
                         Upload
                     </Button>
@@ -386,7 +420,7 @@ function PapersPageContent() {
                         selectable={true}
                         actionOptions={["Make Project"]}
                         onSelectFiles={handleTableAction}
-                        onUploadClick={() => setUploadModalOpen(true)}
+                        onUploadClick={handleUploadClick}
                     />
                 )}
             </div>
