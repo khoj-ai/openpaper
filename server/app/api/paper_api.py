@@ -20,6 +20,7 @@ from app.database.telemetry import track_event
 from app.helpers.paper_search import get_doi, get_enriched_data
 from app.helpers.parser import parse_publication_date
 from app.helpers.s3 import s3_service
+from app.helpers.subscription_limits import can_user_upload_paper
 from app.schemas.responses import ResponseCitation
 from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
@@ -601,7 +602,7 @@ async def get_shared_pdf(
     response["paper"] = paper_data
     response["highlights"] = [highlight.to_dict() for highlight in highlights]
     response["annotations"] = [annotation.to_dict() for annotation in annotations]
-    response["owner"] = {"name": paper.user.name, "picture": paper.user.picture}
+    response["owner"] = {"name": paper.user.name, "picture": paper.user.picture, "id": str(paper.user.id)}  # type: ignore
 
     track_event(
         "paper_shared_view",
@@ -665,4 +666,119 @@ async def delete_pdf(
         return JSONResponse(
             status_code=500,
             content={"message": f"Error deleting document: {str(e)}"},
+        )
+
+
+class ForkSharedPaperRequest(BaseModel):
+    share_id: str
+
+
+@paper_router.post("/fork")
+async def fork_shared_paper(
+    request: ForkSharedPaperRequest,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+) -> JSONResponse:
+    """
+    Fork a shared paper into the current user's library.
+    The paper must be publicly shared (via share_id).
+    """
+    try:
+        # Check subscription limits before forking
+        can_upload, error_message = can_user_upload_paper(db, current_user)
+        if not can_upload:
+            return JSONResponse(
+                status_code=403,
+                content={"message": error_message},
+            )
+
+        # Find the shared paper by share_id
+        shared_paper = paper_crud.get_public_paper(db, share_id=request.share_id)
+
+        if not shared_paper:
+            raise HTTPException(
+                status_code=404,
+                detail="Shared paper not found or is no longer public.",
+            )
+
+        # Skip fork if user is the original owner
+        if shared_paper.user_id == current_user.id:
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "message": "You already own this paper",
+                    "new_paper_id": str(shared_paper.id),
+                    "already_exists": True,
+                },
+            )
+
+        # Check if user already has a fork of this paper
+        existing_fork = paper_crud.get_forked_paper_by_parent_id(
+            db, parent_paper_id=uuid.UUID(str(shared_paper.id)), user=current_user
+        )
+        if existing_fork:
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "message": "You already have this paper in your library",
+                    "new_paper_id": str(existing_fork.id),
+                    "already_exists": True,
+                },
+            )
+
+        # Duplicate the file in S3
+        duplicate_paper_key, duplicate_file_url = s3_service.duplicate_file(
+            source_object_key=str(shared_paper.s3_object_key),
+            new_filename=f"forked_{uuid.uuid4()}.pdf",
+        )
+
+        # Duplicate the preview image if it exists
+        duplicate_preview_url = None
+        if shared_paper.preview_url:
+            _, duplicate_preview_url = s3_service.duplicate_file_from_url(
+                s3_url=str(shared_paper.preview_url),
+                new_filename=f"forked_preview_{uuid.uuid4()}.png",
+            )
+
+        # Fork the paper using paper_crud
+        new_paper = paper_crud.fork_paper(
+            db,
+            original_paper=shared_paper,
+            new_file_object_key=duplicate_paper_key,
+            new_file_url=duplicate_file_url,
+            new_preview_url=duplicate_preview_url,
+            current_user=current_user,
+        )
+
+        if not new_paper:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to fork paper.",
+            )
+
+        track_event(
+            "paper_forked_from_share",
+            user_id=str(current_user.id),
+            properties={
+                "share_id": request.share_id,
+                "original_paper_id": str(shared_paper.id),
+                "new_paper_id": str(new_paper.id),
+            },
+        )
+
+        return JSONResponse(
+            status_code=201,
+            content={
+                "message": "Paper forked successfully",
+                "new_paper_id": str(new_paper.id),
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error forking shared paper: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=400,
+            content={"message": "Failed to fork shared paper"},
         )
