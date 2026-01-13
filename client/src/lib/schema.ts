@@ -1,4 +1,5 @@
 import { PaperStatus } from "@/components/utils/PdfStatus";
+import { BasicUser } from "./auth";
 
 export type HighlightType = 'topic' | 'motivation' | 'method' | 'evidence' | 'result' | 'impact' | 'general';
 
@@ -26,6 +27,13 @@ export interface PaperData {
     journal?: string;
     doi?: string;
     publisher?: string;
+}
+
+export interface SharedPaper {
+    paper: PaperData;
+    highlights: PaperHighlight[];
+    annotations: PaperHighlightAnnotation[];
+    owner: BasicUser;
 }
 
 export interface ChatMessage {

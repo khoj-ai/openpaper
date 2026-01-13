@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, usePathname } from 'next/navigation';
 import { FolderKanban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -11,11 +11,15 @@ import { useIsMobile } from '@/hooks/use-mobile';
 
 export function ManageProjectsButton() {
     const params = useParams();
+    const pathname = usePathname();
     const paperId = (params.id && (Array.isArray(params.id) ? params.id[0] : params.id)) as string | null;
     const [isOpen, setIsOpen] = useState(false);
     const isMobile = useIsMobile();
 
-    if (!paperId) {
+    // Hide on shared paper pages
+    const isSharePage = pathname?.includes('/paper/share/');
+
+    if (!paperId || isSharePage) {
         return null;
     }
 

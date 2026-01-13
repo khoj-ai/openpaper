@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { PdfHighlighterViewer } from '@/components/PdfHighlighterViewer';
 import { AnnotationsView } from '@/components/AnnotationsView';
 import { fetchFromApi } from '@/lib/api';
-import { PaperData, PaperHighlight, PaperHighlightAnnotation, ChatMessage } from '@/lib/schema';
+import { PaperData, PaperHighlight, PaperHighlightAnnotation, ChatMessage, SharedPaper } from '@/lib/schema';
 import PaperMetadata from '@/components/PaperMetadata';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Book, Box, User } from 'lucide-react';
@@ -24,15 +24,6 @@ import { ChatMessageActions } from '@/components/ChatMessageActions';
 import { BasicUser } from '@/lib/auth';
 import { Avatar } from '@/components/ui/avatar';
 import EmptyConversationState from './EmptyConversationState';
-
-// Define the expected structure of the response from the share endpoint
-interface SharedPaperResponse {
-    paper: PaperData;
-    highlights: PaperHighlight[];
-    annotations: PaperHighlightAnnotation[];
-    owner: BasicUser;
-}
-
 
 
 export default function SharedPaperView() {
@@ -287,7 +278,7 @@ export default function SharedPaperView() {
             setLoading(true);
             setError(null);
             try {
-                const response: SharedPaperResponse = await fetchFromApi(`/api/paper/share?id=${shareId}`);
+                const response: SharedPaper = await fetchFromApi(`/api/paper/share?id=${shareId}`);
                 setPaperData(response.paper);
                 setHighlights(response.highlights || []);
                 setAnnotations(response.annotations || []);
@@ -321,7 +312,6 @@ export default function SharedPaperView() {
         fetchSharedData();
         fetchConversation();
     }, [shareId]);
-
 
     if (loading) {
         return <div className="flex justify-center items-center h-screen">Loading shared paper...</div>;

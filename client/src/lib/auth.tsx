@@ -6,6 +6,7 @@ import { fetchFromApi } from './api';
 export interface BasicUser {
 	name: string;
 	picture: string;
+	id?: string;
 }
 
 export interface User extends BasicUser {

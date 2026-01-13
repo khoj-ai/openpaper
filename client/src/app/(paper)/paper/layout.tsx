@@ -11,6 +11,7 @@ import { PostHogProvider, ThemeProvider } from "@/lib/providers";
 import { SharePaperButton } from '@/components/SharePaperButton';
 import { CitePaperButton } from '@/components/CitePaperButton';
 import { CitationGraphButton } from '@/components/CitationGraphButton';
+import { ImportPaperButton } from '@/components/ImportPaperButton';
 
 import { SidebarController } from "@/components/utils/SidebarAutoCollapse";
 import Image from "next/image";
@@ -103,6 +104,7 @@ export default function RootLayout({
 										</Link>
 									{/* Desktop buttons */}
 									<div className="hidden md:flex items-center gap-2">
+										<ImportPaperButton />
 										<ManageProjectsButton />
 										<CitationGraphButton />
 										<CitePaperButton />
