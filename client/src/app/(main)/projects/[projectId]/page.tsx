@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, ArrowLeft, ArrowRight, BookOpen, Library, Loader2, MessageCircle, Pencil, PlusCircle, Send, Sparkles, UploadCloud } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, BookOpen, Info, Library, Loader2, MessageCircle, Pencil, PlusCircle, Send, Sparkles, UploadCloud } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { fetchFromApi } from "@/lib/api";
@@ -41,6 +41,7 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Link from "next/link";
 import { Label } from "@/components/ui/label";
 import {
@@ -65,6 +66,10 @@ interface PdfUploadResponse {
 	message: string;
 	job_id: string;
 }
+
+// Client-side paper limits per project
+const PROJECT_PAPER_WARNING_LIMIT = 75;
+const PROJECT_PAPER_HARD_LIMIT = 100;
 
 export default function ProjectPage() {
 	const params = useParams();
@@ -94,6 +99,12 @@ export default function ProjectPage() {
 
 	const chatDisabled = isChatCreditAtLimit(subscription);
 
+	// Paper limit checks
+	const currentPaperCount = papers?.length || 0;
+	const isAtPaperWarningLimit = currentPaperCount >= PROJECT_PAPER_WARNING_LIMIT;
+	const isAtPaperHardLimit = currentPaperCount >= PROJECT_PAPER_HARD_LIMIT;
+	const remainingPaperSlots = Math.max(0, PROJECT_PAPER_HARD_LIMIT - currentPaperCount);
+
 	useEffect(() => {
 		const CHAT_CREDIT_TOAST_KEY = "chat_credit_limit_toast_shown";
 		if (chatDisabled && !sessionStorage.getItem(CHAT_CREDIT_TOAST_KEY)) {
@@ -121,8 +132,16 @@ export default function ProjectPage() {
 	};
 
 	const handleFileSelect = async (files: File[]) => {
+		if (isAtPaperHardLimit) {
+			toast.error(`This project has reached the maximum of ${PROJECT_PAPER_HARD_LIMIT} papers. Remove some papers before adding more.`);
+			return;
+		}
 		if (isPaperUploadAtLimit(subscription)) {
 			setUploadError("You have reached your paper upload limit. Please upgrade your plan to upload more papers.");
+			return;
+		}
+		if (files.length > remainingPaperSlots) {
+			toast.error(`You can only add ${remainingPaperSlots} more paper${remainingPaperSlots === 1 ? '' : 's'} to this project (limit: ${PROJECT_PAPER_HARD_LIMIT}).`);
 			return;
 		}
 		setUploadError(null);
@@ -158,6 +177,11 @@ export default function ProjectPage() {
 	}, [projectId, refetchPapers]);
 
 	const handlePdfUrl = async (url: string) => {
+		if (isAtPaperHardLimit) {
+			toast.error(`This project has reached the maximum of ${PROJECT_PAPER_HARD_LIMIT} papers. Remove some papers before adding more.`);
+			setIsUrlDialogOpen(false);
+			return;
+		}
 		if (isPaperUploadAtLimit(subscription)) {
 			setUploadError("You have reached your paper upload limit. Please upgrade your plan to upload more papers.");
 			setIsUrlDialogOpen(false);
@@ -309,7 +333,7 @@ export default function ProjectPage() {
 									<DialogTitle>Upload New Papers</DialogTitle>
 									<DialogDescription>You can upload any additional papers to your library here. They will automatically be added to the project.</DialogDescription>
 								</DialogHeader>
-								<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} disabled={isPaperUploadAtLimit(subscription)} />
+								<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} disabled={isPaperUploadAtLimit(subscription) || isAtPaperHardLimit} />
 								{isPaperUploadAtLimit(subscription) && (
 									<Alert variant="destructive" className="mt-4">
 										<AlertCircle className="h-4 w-4" />
@@ -327,7 +351,7 @@ export default function ProjectPage() {
 							</DialogContent>
 						</Dialog>
 					</div>
-					<AddFromLibrary projectId={projectId} onPapersAdded={refetchPapers} projectPaperIds={papers.map(p => p.id)} onUploadClick={() => setIsUploadDialogOpen(true)} />
+					<AddFromLibrary projectId={projectId} onPapersAdded={refetchPapers} projectPaperIds={papers.map(p => p.id)} onUploadClick={() => setIsUploadDialogOpen(true)} remainingPaperSlots={remainingPaperSlots} paperHardLimit={PROJECT_PAPER_HARD_LIMIT} />
 				</div>
 				<Dialog open={isUrlDialogOpen} onOpenChange={setIsUrlDialogOpen}>
 					<DialogContent>
@@ -547,22 +571,65 @@ export default function ProjectPage() {
 							)}
 							{project?.role !== 'viewer' && (
 								<Sheet open={isAddPapersSheetOpen} onOpenChange={(isOpen) => {
+									if (isOpen && isAtPaperHardLimit) {
+										toast.error(`This project has reached the maximum of ${PROJECT_PAPER_HARD_LIMIT} papers. Remove some papers before adding more.`);
+										return;
+									}
 									setIsAddPapersSheetOpen(isOpen);
 									if (!isOpen) {
 										setAddPapersView('initial');
 									}
 								}}>
-									<SheetTrigger asChild>
-										<Button variant="outline">
-											<PlusCircle className="mr-2 h-4 w-4" />
-											Add
-										</Button>
-									</SheetTrigger>
+									{isAtPaperHardLimit ? (
+										<Tooltip>
+											<TooltipTrigger asChild>
+												<span tabIndex={0}>
+													<Button variant="outline" disabled className="pointer-events-none">
+														<PlusCircle className="mr-2 h-4 w-4" />
+														Add
+													</Button>
+												</span>
+											</TooltipTrigger>
+											<TooltipContent className="max-w-xs">
+												<p>Paper limit reached ({PROJECT_PAPER_HARD_LIMIT} max). Remove papers to add more, or contact <a href="mailto:saba@openpaper.ai" className="underline">saba@openpaper.ai</a> for higher limits.</p>
+											</TooltipContent>
+										</Tooltip>
+									) : (
+										<SheetTrigger asChild>
+											<Button variant="outline">
+												<PlusCircle className="mr-2 h-4 w-4" />
+												Add
+											</Button>
+										</SheetTrigger>
+									)}
 									<SheetContent className="sm:max-w-[90vw]! w-[90vw] overflow-y-auto">
 										<SheetHeader className="px-6">
 											<SheetTitle>Add Papers to Project</SheetTitle>
 										</SheetHeader>
 										<div className="mt-0 px-6">
+											{/* Paper limit info */}
+											<div className={`flex items-start gap-2 p-3 rounded-lg mt-4 ${isAtPaperHardLimit ? 'bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800' : isAtPaperWarningLimit ? 'bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800' : 'bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800'}`}>
+												<Info className={`h-4 w-4 mt-0.5 flex-shrink-0 ${isAtPaperHardLimit ? 'text-red-500' : isAtPaperWarningLimit ? 'text-amber-500' : 'text-blue-500'}`} />
+												<div className="text-sm">
+													<p className={`font-medium ${isAtPaperHardLimit ? 'text-red-700 dark:text-red-300' : isAtPaperWarningLimit ? 'text-amber-700 dark:text-amber-300' : 'text-blue-700 dark:text-blue-300'}`}>
+														{currentPaperCount} / {PROJECT_PAPER_HARD_LIMIT} papers in this project
+													</p>
+													{isAtPaperHardLimit ? (
+														<p className="text-red-600 dark:text-red-400 mt-1">
+															You&apos;ve reached the maximum. Remove papers to add more.
+														</p>
+													) : isAtPaperWarningLimit ? (
+														<p className="text-amber-600 dark:text-amber-400 mt-1">
+															Large paper counts may impact response quality. For higher limits, contact <a href="mailto:saba@openpaper.ai" className="underline font-medium">saba@openpaper.ai</a>
+														</p>
+													) : (
+														<p className="text-blue-600 dark:text-blue-400 mt-1">
+															You can add {remainingPaperSlots} more paper{remainingPaperSlots === 1 ? '' : 's'}.
+														</p>
+													)}
+												</div>
+											</div>
+
 											{addPapersView === 'initial' && (
 												<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
 													<button
@@ -612,7 +679,7 @@ export default function ProjectPage() {
 													</Button>
 													<h3 className="text-lg font-semibold mb-2">Upload New Papers</h3>
 													<p className="text-sm text-gray-500 mb-4">Upload papers to your library. They will be automatically added to this project.</p>
-													<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} disabled={isPaperUploadAtLimit(subscription)} />
+													<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} disabled={isPaperUploadAtLimit(subscription) || isAtPaperHardLimit} />
 													{isPaperUploadAtLimit(subscription) && (
 														<Alert variant="destructive" className="mt-4">
 															<AlertCircle className="h-4 w-4" />
@@ -637,7 +704,7 @@ export default function ProjectPage() {
 														Back
 													</Button>
 													<h3 className="text-lg font-semibold mb-2">Add from Library</h3>
-													<AddFromLibrary projectId={projectId} onPapersAdded={refetchPapers} projectPaperIds={papers.map(p => p.id)} onUploadClick={() => setIsUploadDialogOpen(true)} />
+													<AddFromLibrary projectId={projectId} onPapersAdded={refetchPapers} projectPaperIds={papers.map(p => p.id)} onUploadClick={() => setIsUploadDialogOpen(true)} remainingPaperSlots={remainingPaperSlots} paperHardLimit={PROJECT_PAPER_HARD_LIMIT} />
 												</div>
 											)}
 										</div>
@@ -723,7 +790,7 @@ export default function ProjectPage() {
 										<DialogTitle>Upload New Papers</DialogTitle>
 										<DialogDescription>You can upload any additional papers to your library here. They will automatically be added to the project.</DialogDescription>
 									</DialogHeader>
-									<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} disabled={isPaperUploadAtLimit(subscription)} />
+									<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} disabled={isPaperUploadAtLimit(subscription) || isAtPaperHardLimit} />
 									{isPaperUploadAtLimit(subscription) && (
 										<Alert variant="destructive" className="mt-4">
 											<AlertCircle className="h-4 w-4" />
