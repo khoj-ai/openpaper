@@ -125,6 +125,21 @@ export function ProjectCard({ project, onProjectUpdate, onUnlink, compact = fals
 			: null;
 
 		return (
+			<>
+			<AlertDialog open={showUnlinkAlert} onOpenChange={setShowUnlinkAlert}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Are you sure you want to unlink this paper?</AlertDialogTitle>
+						<AlertDialogDescription>
+							This action will remove this paper from the project. You can add it back later.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction onClick={onUnlink}>Unlink</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 			<Link
 				href={`/projects/${project.id}`}
 				className="group flex items-center gap-4 p-4 rounded-xl border border-border/50 bg-card hover:border-border hover:shadow-sm transition-all"
@@ -188,6 +203,7 @@ export function ProjectCard({ project, onProjectUpdate, onUnlink, compact = fals
 					</Button>
 				)}
 			</Link>
+			</>
 		);
 	}
 
