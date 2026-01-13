@@ -12,6 +12,7 @@ from app.database.database import get_db
 from app.database.models import Paper, ProjectPaper
 from app.database.telemetry import track_event
 from app.helpers.s3 import s3_service
+from app.helpers.subscription_limits import can_user_upload_paper
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
@@ -39,6 +40,14 @@ async def fork_paper_from_project(
     As we can have multiple users working on the same project, sometimes there may be papers in a project a different user wants to fork into their own library. This endpoint allows a user to fork a paper from a specified project into their own library.
     """
     try:
+        # Check subscription limits before forking
+        can_upload, error_message = can_user_upload_paper(db, current_user)
+        if not can_upload:
+            return JSONResponse(
+                status_code=403,
+                content={"message": error_message},
+            )
+
         project_paper: Paper | None = project_paper_crud.get_paper_by_project(
             db,
             paper_id=uuid.UUID(request.paper_id),
