@@ -583,6 +583,70 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
 
         return list(topics)
 
+    def get_forked_paper_by_parent_id(
+        self, db: Session, *, parent_paper_id: uuid.UUID, user: CurrentUser
+    ) -> Paper | None:
+        """
+        Find a forked paper by its parent_paper_id for the current user.
+        A user can only have one fork of a given paper.
+        """
+        return (
+            db.query(Paper)
+            .filter(Paper.parent_paper_id == parent_paper_id, Paper.user_id == user.id)
+            .one_or_none()
+        )
+
+    def fork_paper(
+        self,
+        db: Session,
+        *,
+        original_paper: Paper,
+        new_file_object_key: str,
+        new_file_url: str,
+        new_preview_url: Optional[str],
+        current_user: CurrentUser,
+    ) -> Optional[Paper]:
+        """
+        Fork a paper to create a duplicate for the current user.
+
+        Args:
+            original_paper: The paper to fork
+            new_file_object_key: S3 object key for the forked paper's file
+            new_file_url: URL for the forked paper's file
+            new_preview_url: Optional preview URL for the forked paper
+            current_user: The user creating the fork
+
+        Returns:
+            The newly created forked paper, or None if creation failed
+        """
+        # Create a new PaperCreate object with the same data as the original
+        # TODO: Include AI highlights/annotations as well? See function used during intake `create_ai_annotations` for reference.
+        new_paper_data = PaperCreate(
+            file_url=new_file_url,
+            s3_object_key=new_file_object_key,
+            authors=original_paper.authors,  # type: ignore
+            title=str(original_paper.title),
+            abstract=str(original_paper.abstract),
+            institutions=original_paper.institutions,  # type: ignore
+            keywords=original_paper.keywords,  # type: ignore
+            summary=str(original_paper.summary),
+            summary_citations=None,  # type: ignore
+            starter_questions=original_paper.starter_questions,  # type: ignore
+            publish_date=str(original_paper.publish_date) if original_paper.publish_date else None,  # type: ignore
+            raw_content=original_paper.raw_content,  # type: ignore
+            upload_job_id=None,  # New upload job ID
+            preview_url=new_preview_url,
+            size_in_kb=(
+                int(original_paper.size_in_kb)  # type: ignore
+                if original_paper.size_in_kb is not None
+                else None
+            ),
+            parent_paper_id=uuid.UUID(str(original_paper.id)),  # Set parent paper ID
+        )
+
+        # Create the new paper in the database
+        return self.create(db, obj_in=new_paper_data, user=current_user)
+
 
 # Create a single instance to use throughout the application
 paper_crud = PaperCRUD(Paper)

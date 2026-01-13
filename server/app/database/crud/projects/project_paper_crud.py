@@ -3,7 +3,7 @@ import uuid
 from ctypes import cast
 from typing import List, Optional
 
-from app.database.crud.paper_crud import PaperCreate, paper_crud
+from app.database.crud.paper_crud import paper_crud
 from app.database.crud.projects.project_base_crud import ProjectBaseCRUD
 from app.database.models import Paper, Project, ProjectPaper, ProjectRole, ProjectRoles
 from app.schemas.user import CurrentUser
@@ -239,14 +239,13 @@ class ProjectPaperCRUD(
     def get_forked_papers_by_parent_id(
         self, db: Session, *, parent_paper_id: uuid.UUID, user: CurrentUser
     ) -> Paper | None:
-        # First, find the paper that has the given parent_paper_id. This can only be one at max.
-        forked_paper: Paper | None = (
-            db.query(Paper)
-            .filter(Paper.parent_paper_id == parent_paper_id, Paper.user_id == user.id)
-            .one_or_none()
+        """
+        Find a forked paper by its parent_paper_id for the current user.
+        Delegates to paper_crud.get_forked_paper_by_parent_id.
+        """
+        return paper_crud.get_forked_paper_by_parent_id(
+            db, parent_paper_id=parent_paper_id, user=user
         )
-
-        return forked_paper
 
     def fork_paper(
         self,
@@ -259,7 +258,11 @@ class ProjectPaperCRUD(
         project_id: str,
         current_user: CurrentUser,
     ) -> Optional[Paper]:
-        """Fork a paper to create a duplicate for the current user."""
+        """
+        Fork a paper to create a duplicate for the current user.
+        Validates that the user has access to the paper via the project,
+        then delegates to paper_crud.fork_paper.
+        """
         # Retrieve the original paper. Validate that the current_user has access to it via a project.
         original_paper = self.get_paper_by_project(
             db,
@@ -274,34 +277,15 @@ class ProjectPaperCRUD(
             )
             return None
 
-        # Create a new PaperCreate object with the same data as the original
-        # TODO: Include AI highlights/annotations as well? See function used during intake `create_ai_annotations` in paper_crud.py for reference.
-        new_paper_data = PaperCreate(
-            file_url=new_file_url,
-            s3_object_key=new_file_object_key,
-            authors=original_paper.authors,  # type: ignore
-            title=str(original_paper.title),
-            abstract=str(original_paper.abstract),
-            institutions=original_paper.institutions,  # type: ignore
-            keywords=original_paper.keywords,  # type: ignore
-            summary=str(original_paper.summary),
-            summary_citations=None,  # type: ignore
-            starter_questions=original_paper.starter_questions,  # type: ignore
-            publish_date=str(original_paper.publish_date) if original_paper.publish_date else None,  # type: ignore
-            raw_content=original_paper.raw_content,  # type: ignore
-            upload_job_id=None,  # New upload job ID
-            preview_url=new_preview_url,
-            size_in_kb=(
-                int(original_paper.size_in_kb)  # type: ignore
-                if original_paper.size_in_kb is not None
-                else None
-            ),
-            parent_paper_id=uuid.UUID(str(original_paper.id)),  # Set parent paper ID
+        # Delegate to paper_crud.fork_paper for the actual forking logic
+        return paper_crud.fork_paper(
+            db,
+            original_paper=original_paper,
+            new_file_object_key=new_file_object_key,
+            new_file_url=new_file_url,
+            new_preview_url=new_preview_url,
+            current_user=current_user,
         )
-
-        # Create the new paper in the database
-        new_paper = paper_crud.create(db, obj_in=new_paper_data, user=current_user)
-        return new_paper
 
 
 project_paper_crud = ProjectPaperCRUD(ProjectPaper)
