@@ -15,7 +15,7 @@ interface ShareOwnerInfo {
 export function ImportPaperButton() {
     const pathname = usePathname();
     const router = useRouter();
-    const { user, login } = useAuth();
+    const { user } = useAuth();
     const [shareId, setShareId] = useState<string | null>(null);
     const [ownerInfo, setOwnerInfo] = useState<ShareOwnerInfo | null>(null);
     const [isImporting, setIsImporting] = useState(false);
@@ -59,7 +59,9 @@ export function ImportPaperButton() {
 
     const handleImport = async () => {
         if (!user) {
-            login();
+            // Store return URL and redirect to login page
+            localStorage.setItem('returnTo', pathname || '/');
+            router.push('/login');
             return;
         }
 
