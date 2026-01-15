@@ -13,7 +13,7 @@ import {
     HoverCardContent,
     HoverCardTrigger,
 } from "@/components/ui/hover-card";
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import EnigmaticLoadingExperience from './EnigmaticLoadingExperience';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -120,6 +120,9 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
     const [additionalInstructions, setAdditionalInstructions] = useState<string>(DEFAULT_INSTRUCTIONS);
     const [selectedVoice, setSelectedVoice] = useState<VoiceOption>('nova');
     const [selectedLength, setSelectedLength] = useState<LengthOption>('medium');
+
+    // Ref to track if we've started fetching the completed audio (prevents race condition errors)
+    const isFetchingCompletedAudioRef = useRef(false);
 
 
     // Audio overview credit usage state
@@ -238,6 +241,8 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
             });
 
             if (response.job_id && response.status) {
+                // Reset the ref for the new job
+                isFetchingCompletedAudioRef.current = false;
                 setJobStatus(response);
                 setAudioOverviewJobId(response.job_id);
                 setAudioOverview(null);
@@ -297,15 +302,23 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
     }, [paper_id]);
 
     const pollJobStatus = useCallback(async (showErrorOnFail: boolean = true) => {
+        // Skip polling if we're already fetching the completed audio
+        if (isFetchingCompletedAudioRef.current) {
+            return;
+        }
+
         try {
             const response: JobStatus = await fetchFromApi(`/api/paper/audio/${paper_id}/status`);
             if (response.job_id && response.status) {
                 setJobStatus(response);
                 // If the job is completed, stop polling immediately and fetch the audio overview
                 if (response.status === 'completed') {
+                    // Mark that we're fetching completed audio to prevent race condition errors
+                    isFetchingCompletedAudioRef.current = true;
                     // Clear job status first to stop the polling interval
                     setJobStatus(null);
                     await fetchAudioOverview();
+                    isFetchingCompletedAudioRef.current = false;
                 }
             } else {
                 throw new Error('Failed to get job status');
@@ -313,8 +326,9 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
         } catch (err) {
             console.error('Error polling job status:', err);
             // Only show error if we don't already have an audio overview
+            // and we're not in the process of fetching the completed audio
             // This prevents showing errors after the overview has been successfully fetched
-            if (showErrorOnFail) {
+            if (showErrorOnFail && !isFetchingCompletedAudioRef.current) {
                 // Use a callback to get the current audioOverview value
                 setAudioOverview((current) => {
                     if (!current) {
