@@ -39,7 +39,7 @@ const features: PricingFeature[] = [
     {
         name: "Chat credits (weekly)",
         basic: "5000",
-        researcher: "100,000",
+        researcher: "150,000",
         teams: "unlimited"
     },
     {
