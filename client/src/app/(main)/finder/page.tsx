@@ -480,6 +480,11 @@ function FinderPageContent() {
                             <Button variant="outline" className="flex items-center gap-2">
                                 <ArrowDownNarrowWide className="h-4 w-4" />
                                 Sort
+                                {sort && (
+                                    <Badge variant="secondary" className="ml-1 px-1 py-0 text-xs flex items-center gap-1">
+                                        1
+                                    </Badge>
+                                )}
                                 <ChevronDown className="h-3 w-3" />
                             </Button>
                         </PopoverTrigger>
