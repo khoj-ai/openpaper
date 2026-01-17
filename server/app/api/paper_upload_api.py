@@ -212,9 +212,6 @@ async def upload_pdf(
             },
         )
 
-    if not file.filename or not file.filename.lower().endswith(".pdf"):
-        return JSONResponse(status_code=400, content={"message": "File must be a PDF"})
-
     # Read the file contents BEFORE adding to background task. We need this because the UploadFile object becomes inaccessible after the request is processed.
     try:
         file_contents = await file.read()
@@ -299,14 +296,6 @@ async def upload_raw_file_microservice(
     """
     Helper function to upload a raw file using the microservice.
     """
-
-    if not filename or not filename.lower().endswith(".pdf"):
-        paper_upload_job_crud.mark_as_failed(
-            db=db,
-            job_id=str(paper_upload_job.id),
-            user=current_user,
-        )
-        return
 
     paper_upload_job_crud.mark_as_running(
         db=db,
