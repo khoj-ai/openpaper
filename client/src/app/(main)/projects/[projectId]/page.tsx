@@ -10,6 +10,7 @@ import PaperCard from "@/components/PaperCard";
 import PdfUploadTracker from "@/components/PdfUploadTracker";
 import { CitePaperButton } from "@/components/CitePaperButton";
 import { MinimalJob } from "@/lib/schema";
+import { uploadFromUrlWithFallbackForProject } from "@/lib/uploadUtils";
 import {
 	Sheet,
 	SheetContent,
@@ -61,11 +62,6 @@ import { ProjectCollaborators } from "@/components/ProjectCollaborators";
 import ProjectPageSkeleton from "@/components/ProjectPageSkeleton";
 import { ConversationListSkeleton } from "@/components/ConversationListSkeleton";
 import { PaperListSkeleton } from "@/components/PaperListSkeleton";
-
-interface PdfUploadResponse {
-	message: string;
-	job_id: string;
-}
 
 // Client-side paper limits per project
 const PROJECT_PAPER_WARNING_LIMIT = 75;
@@ -165,7 +161,7 @@ export default function ProjectPage() {
 				console.error(err);
 			}
 		}
-		setInitialJobs(newJobs);
+		setInitialJobs((prevJobs) => [...prevJobs, ...newJobs]);
 	};
 
 	const handleUploadComplete = useCallback(async (paperId: string) => {
@@ -189,15 +185,11 @@ export default function ProjectPage() {
 		}
 		setIsUploading(true);
 		try {
-			// Fallback to server-side fetch
-			const response: PdfUploadResponse = await fetchFromApi('/api/paper/upload/from-url', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({ url, project_id: projectId }),
-			});
-			setInitialJobs([{ jobId: response.job_id, fileName: url }]);
+			const job = await uploadFromUrlWithFallbackForProject(url, projectId);
+			setInitialJobs((prevJobs) => [...prevJobs, { jobId: job.jobId, fileName: job.fileName }]);
+			// Close sheet and dialogs on success
+			setIsAddPapersSheetOpen(false);
+			setIsUploadDialogOpen(false);
 		} catch (serverError) {
 			console.error('Both client and server-side fetches failed:', serverError);
 			setUploadError(`Failed to upload file from url: ${url}. Please try again.`);
