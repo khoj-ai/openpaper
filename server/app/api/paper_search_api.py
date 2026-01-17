@@ -12,6 +12,7 @@ from app.helpers.paper_search import (
     get_doi,
     get_work_by_doi,
     search_open_alex,
+    PaperSort,
 )
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -22,11 +23,6 @@ logger = logging.getLogger(__name__)
 # API routes for effectively searching and retrieving papers from external sources
 
 paper_search_router = APIRouter()
-
-class PaperSort(str, Enum):
-    top_cited = "cited_by_count:desc"
-    newest = "publication_date:desc"
-    newest_then_cited = "publication_date:desc,cited_by_count:desc"
 
 @paper_search_router.post("/search")
 async def search_papers(

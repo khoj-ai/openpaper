@@ -81,6 +81,10 @@ class OAStatus(str, Enum):
     BRONZE = "bronze"
     CLOSED = "closed"
 
+class PaperSort(str, Enum):
+    top_cited = "cited_by_count:desc"
+    newest = "publication_date:desc"
+
 
 class BaseOpenAlexModel(BaseModel):
     model_config = ConfigDict(extra="ignore")
