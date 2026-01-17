@@ -68,7 +68,7 @@ function FinderPageContent() {
             ? "Most cited"
             : sort === "publication_date:desc"
                 ? "Newest"
-                : "Relevance";
+                : "Sort";
 
 
     // Check for mobile viewport
