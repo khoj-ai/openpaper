@@ -24,7 +24,6 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 STRIPE_API_KEY = os.getenv("STRIPE_API_KEY")
-
 if not STRIPE_API_KEY:
     raise ValueError("STRIPE_API_KEY environment variable is not set")
 
