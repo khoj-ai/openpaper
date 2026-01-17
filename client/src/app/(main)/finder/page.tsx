@@ -353,7 +353,7 @@ function FinderPageContent() {
         <div className="w-full px-4 py-6 space-y-6 overflow-x-hidden">
             <div className="space-y-4">
                 {/* Main search bar */}
-                <div className="flex gap-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
                     <div className="relative flex-1 max-w-2xl">
                         <Input
                             ref={inputRef}
@@ -373,7 +373,7 @@ function FinderPageContent() {
                             </Button>
                         </PopoverTrigger>
 
-                        <PopoverContent className="w-56 p-2" align="start">
+                        <PopoverContent className="w-56 p-2" align={isMobile ? "center" : "start"} sideOffset={isMobile ? 8 : 4}>
                             <div className="flex flex-col">
                                 <button
                                     className="w-full rounded-sm px-2 py-2 text-left text-sm hover:bg-accent transition-colors"
@@ -411,7 +411,7 @@ function FinderPageContent() {
                                 <ChevronDown className="h-3 w-3" />
                             </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-96 p-4" align="end">
+                        <PopoverContent className="w-96 max-w-[calc(100vw-2rem)] p-4" align={isMobile ? "center" : "end"} sideOffset={isMobile ? 8 : 4}>
                             <div className="space-y-4">
                                 <h3 className="font-medium text-sm">Search Filters</h3>
 
