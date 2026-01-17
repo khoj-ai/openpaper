@@ -342,8 +342,10 @@ function FinderPageContent() {
         setInstitutionSuggestions([]);
     };
 
-    const hasActiveConstraints = authors.length > 0 || institutions.length > 0 || onlyOpenAccess || !!sort;
-    const activeConstraintCount = authors.length + institutions.length + (onlyOpenAccess ? 1 : 0) + (sort ? 1 : 0);
+    const hasActiveFilters = authors.length > 0 || institutions.length > 0 || onlyOpenAccess;
+    const filterCount = authors.length + institutions.length + (onlyOpenAccess ? 1 : 0);
+    const hasActiveConstraints = hasActiveFilters || !!sort;
+    const activeConstraintCount = filterCount + (sort ? 1 : 0);
 
     return (
         <div className="w-full px-4 py-6 space-y-6 overflow-x-hidden">
@@ -366,9 +368,9 @@ function FinderPageContent() {
                             <Button variant="outline" className="flex items-center gap-2" ref={filterButtonRef} >
                                 <Filter className="h-4 w-4" />
                                 Filters
-                                {hasActiveConstraints && (
+                                {hasActiveFilters && (
                                     <Badge variant="secondary" className="ml-1 px-1 py-0 text-xs flex items-center gap-1">
-                                        {activeConstraintCount}
+                                        {filterCount}
                                     </Badge>
                                 )}
                                 <ChevronDown className="h-3 w-3" />
