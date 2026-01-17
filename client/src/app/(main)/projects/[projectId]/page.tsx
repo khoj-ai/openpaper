@@ -292,8 +292,9 @@ export default function ProjectPage() {
 		return <div className="container mx-auto p-4">Project not found.</div>;
 	}
 
-	// Show full skeleton if papers or conversations are still loading
-	if (isPapersLoading || isConversationsLoading) {
+	// Show full skeleton only on initial load when we have no data yet
+	// If we already have papers/conversations, keep showing them during refetch
+	if ((isPapersLoading || isConversationsLoading) && !papers?.length && !conversations?.length) {
 		return <ProjectPageSkeleton />;
 	}
 
