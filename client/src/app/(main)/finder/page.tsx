@@ -625,44 +625,46 @@ function FinderPageContent() {
             )}
 
             {/* Split pane layout - results on left, preview on right (desktop) */}
-            <div className="flex gap-6 overflow-hidden">
-                {/* Results column - always use fixed height scroll container to avoid scroll reset when preview opens */}
-                <div className={`${selectedPaper ? 'hidden lg:block lg:flex-1 lg:pr-2 min-w-0' : 'w-full max-w-5xl'} lg:h-[calc(100vh-8rem)] lg:overflow-y-auto overflow-x-hidden`}>
-                    {loading && [...Array(6)].map((_, i) => (
-                        <div key={`skeleton-${i}`} className="py-4 border-b border-slate-200 dark:border-slate-800">
-                            <Skeleton className="h-5 w-3/4 mb-2" />
-                            <Skeleton className="h-4 w-1/2 mb-2" />
-                            <Skeleton className="h-4 w-full mb-1" />
-                            <Skeleton className="h-4 w-2/3" />
-                        </div>
-                    ))}
+            {(loading || results) && (
+                <div className="flex gap-6 overflow-hidden">
+                    {/* Results column - always use fixed height scroll container to avoid scroll reset when preview opens */}
+                    <div className={`${selectedPaper ? 'hidden lg:block lg:flex-1 lg:pr-2 min-w-0' : 'w-full max-w-5xl'} lg:h-[calc(100vh-8rem)] lg:overflow-y-auto overflow-x-hidden`}>
+                        {loading && [...Array(6)].map((_, i) => (
+                            <div key={`skeleton-${i}`} className="py-4 border-b border-slate-200 dark:border-slate-800">
+                                <Skeleton className="h-5 w-3/4 mb-2" />
+                                <Skeleton className="h-4 w-1/2 mb-2" />
+                                <Skeleton className="h-4 w-full mb-1" />
+                                <Skeleton className="h-4 w-2/3" />
+                            </div>
+                        ))}
 
-                    {results?.results.map((paper) => (
-                        <PaperResultCard
-                            key={paper.id}
-                            paper={paper}
-                            isSelected={selectedPaper?.id === paper.id}
-                            onSelect={setSelectedPaper}
-                        />
-                    ))}
+                        {results?.results.map((paper) => (
+                            <PaperResultCard
+                                key={paper.id}
+                                paper={paper}
+                                isSelected={selectedPaper?.id === paper.id}
+                                onSelect={setSelectedPaper}
+                            />
+                        ))}
 
-                    {results?.results.length === 0 && (
-                        <div className="text-center text-muted-foreground py-8">
-                            No results found
+                        {results?.results.length === 0 && (
+                            <div className="text-center text-muted-foreground py-8">
+                                No results found
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Preview panel - desktop only */}
+                    {selectedPaper && (
+                        <div className="hidden lg:block lg:w-80 xl:w-96 flex-shrink-0 sticky top-6 h-[calc(100vh-8rem)] border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
+                            <PaperPreviewPanel
+                                paper={selectedPaper}
+                                onClose={() => setSelectedPaper(null)}
+                            />
                         </div>
                     )}
                 </div>
-
-                {/* Preview panel - desktop only */}
-                {selectedPaper && (
-                    <div className="hidden lg:block lg:w-80 xl:w-96 flex-shrink-0 sticky top-6 h-[calc(100vh-8rem)] border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
-                        <PaperPreviewPanel
-                            paper={selectedPaper}
-                            onClose={() => setSelectedPaper(null)}
-                        />
-                    </div>
-                )}
-            </div>
+            )}
 
             {/* Mobile sheet for paper preview */}
             <Sheet open={selectedPaper !== null && isMobile} onOpenChange={(open) => !open && setSelectedPaper(null)}>
