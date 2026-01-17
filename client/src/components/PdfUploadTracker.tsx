@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { fetchFromApi } from "@/lib/api";
 import { PaperUploadJobStatusResponse, JobStatusType, MinimalJob } from "@/lib/schema";
 import { CheckCircle2 } from 'lucide-react';
@@ -15,22 +15,50 @@ interface PdfUploadTrackerProps {
 	onComplete: (paperId: string) => void;
 }
 
+// Track jobs that have already triggered onComplete - persists across component remounts
+// This prevents the infinite loop: complete -> refetch -> unmount -> remount -> complete again
+// Also stores paperId so we can restore full job state on remount
+const completedJobs = new Map<string, string>(); // jobId -> paperId
+
 const PdfUploadTracker: React.FC<PdfUploadTrackerProps> = ({ initialJobs, onComplete }) => {
 	const [jobs, setJobs] = useState<Job[]>([]);
+	const jobsRef = useRef<Job[]>(jobs);
+	const onCompleteRef = useRef(onComplete);
+
+	// Keep refs in sync with current values
+	useEffect(() => {
+		jobsRef.current = jobs;
+	}, [jobs]);
+
+	useEffect(() => {
+		onCompleteRef.current = onComplete;
+	}, [onComplete]);
 
 	useEffect(() => {
 		setJobs(prevJobs => {
 			const newJobs = initialJobs.filter(ij => !prevJobs.some(pj => pj.jobId === ij.jobId));
-			return [...prevJobs, ...newJobs.map(j => ({ ...j, status: 'pending' as JobStatusType }))];
+			return [...prevJobs, ...newJobs.map(j => {
+				// If this job already completed, restore its completed status and paperId
+				const completedPaperId = completedJobs.get(j.jobId);
+				return {
+					...j,
+					status: completedPaperId ? 'completed' as JobStatusType : 'pending' as JobStatusType,
+					paperId: completedPaperId
+				};
+			})];
 		});
 	}, [initialJobs]);
 
 	useEffect(() => {
-		if (jobs.length === 0) return;
-
 		const interval = setInterval(async () => {
+			const currentJobs = jobsRef.current;
+			if (currentJobs.length === 0) return;
+
 			let hasPendingJobs = false;
-			for (const job of jobs) {
+			for (const job of currentJobs) {
+				// Skip jobs that have already completed (including across remounts)
+				if (completedJobs.has(job.jobId)) continue;
+
 				if (job.status === 'pending' || job.status === 'running') {
 					hasPendingJobs = true;
 					try {
@@ -43,7 +71,9 @@ const PdfUploadTracker: React.FC<PdfUploadTrackerProps> = ({ initialJobs, onComp
 						} : j));
 
 						if (statusResponse.status === "completed" && statusResponse.paper_id) {
-							onComplete(statusResponse.paper_id);
+							// Mark as completed before calling onComplete to prevent duplicate calls
+							completedJobs.set(job.jobId, statusResponse.paper_id);
+							onCompleteRef.current(statusResponse.paper_id);
 						}
 					} catch (err) {
 						console.error(`Failed to get upload status for ${job.fileName}.`, err);
@@ -57,7 +87,7 @@ const PdfUploadTracker: React.FC<PdfUploadTrackerProps> = ({ initialJobs, onComp
 		}, 2000);
 
 		return () => clearInterval(interval);
-	}, [jobs, onComplete]);
+	}, []);
 
 	return (
 		<div className="w-full overflow-hidden">
