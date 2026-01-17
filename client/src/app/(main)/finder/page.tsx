@@ -347,8 +347,8 @@ function FinderPageContent() {
         setInstitutionSuggestions([]);
     };
 
-    const activeFilterCount = authors.length + institutions.length + (onlyOpenAccess ? 1 : 0);
-
+    const hasActiveConstraints = authors.length > 0 || institutions.length > 0 || onlyOpenAccess || !!sort;
+    const activeConstraintCount = authors.length + institutions.length + (onlyOpenAccess ? 1 : 0) + (sort ? 1 : 0);
 
     return (
         <div className="w-full px-4 py-6 space-y-6 overflow-x-hidden">
@@ -369,7 +369,7 @@ function FinderPageContent() {
                     <Popover>
                         <PopoverTrigger asChild>
                             <Button variant="outline" className="flex items-center gap-2">
-                                {sortLabel /* e.g. "Most cited" */}
+                                {sortLabel}
                                 <ChevronDown className="h-3 w-3" />
                             </Button>
                         </PopoverTrigger>
@@ -408,9 +408,9 @@ function FinderPageContent() {
                             <Button variant="outline" className="flex items-center gap-2" ref={filterButtonRef} >
                                 <Filter className="h-4 w-4" />
                                 Filters
-                                {activeFilterCount > 0 && (
+                                {hasActiveConstraints && (
                                     <Badge variant="secondary" className="ml-1 px-1 py-0 text-xs">
-                                        {activeFilterCount}
+                                        {hasActiveConstraints}
                                     </Badge>
                                 )}
                                 <ChevronDown className="h-3 w-3" />
@@ -519,13 +519,13 @@ function FinderPageContent() {
                 </div>
 
                 {/* Active filters display */}
-                {activeFilterCount > 0 && (
+                {hasActiveConstraints && (
                     <div className="space-y-2">
                         {/* Header row with label and clear button */}
                         <div className="flex items-center flex-row gap-2">
                             <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
                                 <Search className="h-3 w-3" />
-                                Active filters ({activeFilterCount}):
+                                Active filters ({activeConstraintCount}):
                             </span>
                             <Button
                                 variant="outline"
@@ -535,6 +535,7 @@ function FinderPageContent() {
                                     setInstitutions([]);
                                     setOnlyOpenAccess(false);
                                     setFilterQuery("");
+                                    setSort("");
                                 }}
                                 className="h-6 px-3 text-xs"
                             >
@@ -549,6 +550,18 @@ function FinderPageContent() {
                                     Open Access
                                     <button
                                         onClick={() => setOnlyOpenAccess(false)}
+                                        className="hover:bg-destructive/20 rounded-full p-0.5 transition-colors"
+                                    >
+                                        <X className="h-2.5 w-2.5" />
+                                    </button>
+                                </Badge>
+                            )}
+
+                            {sort && (
+                                <Badge variant="secondary" className="gap-1 text-xs">
+                                    {sortLabel}
+                                    <button
+                                        onClick={() => setSort("")}
                                         className="hover:bg-destructive/20 rounded-full p-0.5 transition-colors"
                                     >
                                         <X className="h-2.5 w-2.5" />
