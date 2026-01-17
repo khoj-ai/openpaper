@@ -327,7 +327,7 @@ class OpenAISpeaker:
                 pass
 
 
-speaker = OpenAISpeaker()
+speaker = OpenAISpeaker() if os.getenv("AZURE_OPENAI_API_KEY") else None
 
 
 """"

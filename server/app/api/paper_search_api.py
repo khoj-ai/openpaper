@@ -1,5 +1,6 @@
 import logging
 from typing import Optional, cast
+from enum import Enum
 
 from app.auth.dependencies import get_current_user, get_required_user
 from app.database.crud.paper_crud import PaperUpdate, paper_crud
@@ -22,6 +23,10 @@ logger = logging.getLogger(__name__)
 
 paper_search_router = APIRouter()
 
+class PaperSort(str, Enum):
+    top_cited = "cited_by_count:desc"
+    newest = "publication_date:desc"
+    newest_then_cited = "publication_date:desc,cited_by_count:desc"
 
 @paper_search_router.post("/search")
 async def search_papers(
@@ -29,6 +34,7 @@ async def search_papers(
     page: int = 1,
     # Accept filter in the body for more complex queries
     filter: Optional[OpenAlexFilter] = None,
+    sort: Optional[PaperSort] = None,
     db: Session = Depends(get_db),
     current_user: Optional[CurrentUser] = Depends(get_current_user),
 ):
@@ -37,13 +43,14 @@ async def search_papers(
     """
     try:
         # Perform the search operation
-        results = search_open_alex(query, filter=filter, page=page)
+        results = search_open_alex(query, filter=filter, page=page, sort=sort.value if sort else None)
         track_event(
             "paper_search",
             user_id=current_user.id if current_user else None,
             properties={
                 "query": query,
                 "page": page,
+                "sort": sort.value if sort else None,
                 "results_count": len(results.results),
             },
         )

@@ -1,14 +1,10 @@
 "use client"
 
-import { Suspense, useEffect, useRef, useState, useCallback } from "react"
-import { useSearchParams } from "next/navigation";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Search, X, User, Building2 } from "lucide-react";
-import { fetchFromApi } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
     Pagination,
     PaginationContent,
@@ -19,23 +15,26 @@ import {
     PaginationPrevious,
 } from "@/components/ui/pagination";
 import {
-    Sheet,
-    SheetContent,
-} from "@/components/ui/sheet";
-import Link from "next/link";
-import { getOpenAlexTypeAheadAuthors, getOpenAlexTypeAheadInstitutions, OpenAlexTypeAheadAuthor, OpenAlexTypeAheadInstitution } from "./utils";
-import { OpenAlexPaper, OpenAlexResponse } from "@/lib/schema";
-import PaperResultCard from "./PaperResultCard";
-import PaperPreviewPanel from "./PaperPreviewPanel";
-import { FinderIntro } from "./FinderIntro";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Filter, ChevronDown } from "lucide-react";
-import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+    Sheet,
+    SheetContent,
+} from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { fetchFromApi } from "@/lib/api";
+import { OpenAlexPaper, OpenAlexResponse } from "@/lib/schema";
+import { Building2, ChevronDown, Filter, Search, User, X } from "lucide-react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { FinderIntro } from "./FinderIntro";
+import PaperPreviewPanel from "./PaperPreviewPanel";
+import PaperResultCard from "./PaperResultCard";
+import { getOpenAlexTypeAheadAuthors, getOpenAlexTypeAheadInstitutions, OpenAlexTypeAheadAuthor, OpenAlexTypeAheadInstitution } from "./utils";
 
 interface SearchPaperRequest {
     authors?: string[];
@@ -60,6 +59,18 @@ function FinderPageContent() {
     const [isMobile, setIsMobile] = useState(false);
     const [initializedFromUrl, setInitializedFromUrl] = useState(false);
 
+    // Add sort state in case we want to add sorting later
+    const [sort, setSort] = useState<string>("");
+
+    // Add some options for sorting
+    const sortLabel =
+        sort === "cited_by_count:desc"
+            ? "Most cited"
+            : sort === "publication_date:desc"
+                ? "Newest"
+                : "Relevance";
+
+
     // Check for mobile viewport
     useEffect(() => {
         const checkMobile = () => setIsMobile(window.innerWidth < 1024);
@@ -69,11 +80,21 @@ function FinderPageContent() {
     }, []);
 
     // Update URL with current search state
-    const updateUrl = useCallback((searchQuery: string, pageNum: number, authorList: OpenAlexTypeAheadAuthor[], institutionList: OpenAlexTypeAheadInstitution[], openAccess: boolean) => {
+    const updateUrl = useCallback((
+        searchQuery: string,
+        pageNum: number,
+        authorList: OpenAlexTypeAheadAuthor[],
+        institutionList: OpenAlexTypeAheadInstitution[],
+        openAccess: boolean,
+
+        // added sort value here
+        sortValue: string,
+    ) => {
         const params = new URLSearchParams();
         if (searchQuery) params.set('q', searchQuery);
         if (pageNum > 1) params.set('page', pageNum.toString());
         if (openAccess) params.set('oa', '1');
+        if (sortValue) params.set("sort", sortValue);
 
         // Store authors as JSON with id and display_name
         if (authorList.length > 0) {
@@ -99,6 +120,7 @@ function FinderPageContent() {
         const urlOa = searchParams.get('oa');
         const urlAuthors = searchParams.get('authors');
         const urlInstitutions = searchParams.get('institutions');
+        const urlSort = searchParams.get("sort");
 
         let parsedAuthors: OpenAlexTypeAheadAuthor[] = [];
         let parsedInstitutions: OpenAlexTypeAheadInstitution[] = [];
@@ -135,11 +157,13 @@ function FinderPageContent() {
             }
         }
 
+        if (urlSort) setSort(urlSort);
+
         setInitializedFromUrl(true);
 
         // If there's a URL query, trigger search directly with parsed values
         if (urlQuery) {
-            performSearch(urlQuery, parsedPage, parsedAuthors, parsedInstitutions, parsedOa, false);
+            performSearch(urlQuery, parsedPage, parsedAuthors, parsedInstitutions, parsedOa, urlSort ?? "", false);
         }
     }, [searchParams, initializedFromUrl]);
 
@@ -168,6 +192,7 @@ function FinderPageContent() {
         authorList: OpenAlexTypeAheadAuthor[],
         institutionList: OpenAlexTypeAheadInstitution[],
         openAccess: boolean,
+        sortValue: string, // Added sort value here
         shouldUpdateUrl: boolean = true
     ) => {
         if (!searchQuery.trim()) return;
@@ -186,8 +211,9 @@ function FinderPageContent() {
 
             const hasFilters = (filter.authors?.length ?? 0 > 0) || (filter.institutions?.length ?? 0 > 0) || filter.only_oa;
 
+            const sortParam = sortValue ? `&sort=${encodeURIComponent(sortValue)}` : "";
             const response: OpenAlexResponse = await fetchFromApi(
-                `/api/search/global/search?query=${encodeURIComponent(searchQuery)}&page=${pageNumber}&per_page=${perPage}`,
+                `/api/search/global/search?query=${encodeURIComponent(searchQuery)}&page=${pageNumber}&per_page=${perPage}${sortParam}`,
                 {
                     method: "POST",
                     ...(hasFilters && { body: JSON.stringify(filter) }),
@@ -201,7 +227,7 @@ function FinderPageContent() {
 
             // Update URL after successful search
             if (shouldUpdateUrl) {
-                updateUrl(searchQuery, pageNumber, authorList, institutionList, openAccess);
+                updateUrl(searchQuery, pageNumber, authorList, institutionList, openAccess, sortValue);
             }
         } catch (error) {
             console.error("Search failed:", error);
@@ -212,8 +238,9 @@ function FinderPageContent() {
     };
 
     // Search triggered by user action (updates URL)
-    const handleSearch = async (pageNumber = page) => {
-        await performSearch(query, pageNumber, authors, institutions, onlyOpenAccess, true);
+    const handleSearch = async (pageNumber = page, sortOverride?: string) => {
+        const effectiveSort = sortOverride ?? sort;
+        await performSearch(query, pageNumber, authors, institutions, onlyOpenAccess, effectiveSort, true);
     };
 
     const totalPages = Math.ceil(totalResults / perPage);
@@ -337,6 +364,43 @@ function FinderPageContent() {
                             onKeyDown={(e) => e.key === "Enter" && handleSearch(1)}
                         />
                     </div>
+
+                    {/* Sort dropdown (match Filters style) */}
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" className="flex items-center gap-2">
+                                {sortLabel /* e.g. "Most cited" */}
+                                <ChevronDown className="h-3 w-3" />
+                            </Button>
+                        </PopoverTrigger>
+
+                        <PopoverContent className="w-56 p-2" align="start">
+                            <div className="flex flex-col">
+                                <button
+                                    className="w-full rounded-sm px-2 py-2 text-left text-sm hover:bg-accent transition-colors"
+                                    onClick={() => {
+                                        const next = "cited_by_count:desc";
+                                        setSort(next);
+                                        handleSearch(1, next); // uses the new value immediately
+                                    }}
+                                >
+                                    Most cited
+                                </button>
+
+                                <button
+                                    className="w-full rounded-sm px-2 py-2 text-left text-sm hover:bg-accent transition-colors"
+                                    onClick={() => {
+                                        const next = "publication_date:desc";
+                                        setSort(next)
+                                        handleSearch(1, next);
+                                    }}
+                                >
+                                    Newest
+                                </button>
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+
 
                     {/* Filter button */}
                     <Popover>
@@ -534,7 +598,7 @@ function FinderPageContent() {
                         setTimeout(() => filterInputRef.current?.focus(), 100);
                         setFilterQuery(filter);
                     }}
-                    />
+                />
             )}
 
             {/* Split pane layout - results on left, preview on right (desktop) */}

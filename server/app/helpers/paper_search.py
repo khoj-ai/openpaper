@@ -247,7 +247,10 @@ def construct_open_alex_filter_url(filter: OpenAlexFilter) -> str:
 # Utility functions for searching the OpenAlex API
 # For documentation, see https://docs.openalex.org/api-entities/works/search-works
 def search_open_alex(
-    search_term: Optional[str], filter: Optional[OpenAlexFilter] = None, page: int = 1
+    search_term: Optional[str], 
+    filter: Optional[OpenAlexFilter] = None, 
+    page: int = 1,
+    sort: Optional[str] = None, # e.g. "cited_by_count:desc" or "publication_year:desc"
 ) -> OpenAlexResponse:
     """
     Search the OpenAlex API for papers based on a search term and optional filter.
@@ -265,12 +268,14 @@ def search_open_alex(
     params = {"search": quote(search_term) if search_term else "", "page": page}
     if filter:
         params["filter"] = quote(construct_open_alex_filter_url(filter))
+    if sort:
+        params["sort"] = quote(sort)
 
     constructed_url = f"{base_url}?"
     for key, value in params.items():
         constructed_url += f"{key}={value}&"
 
-    constructed_url = constructed_url.rstrip("&")  # Remove trailing '&'
+    constructed_url = base_url + "?" + "&".join(f"{k}={v}" for k, v in params.items())
 
     logger.debug(f"Constructed URL: {constructed_url}")
 
