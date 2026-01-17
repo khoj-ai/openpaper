@@ -59,10 +59,8 @@ function FinderPageContent() {
     const [isMobile, setIsMobile] = useState(false);
     const [initializedFromUrl, setInitializedFromUrl] = useState(false);
 
-    // Add sort state in case we want to add sorting later
     const [sort, setSort] = useState<string>("");
 
-    // Add some options for sorting
     const sortLabel =
         sort === "cited_by_count:desc"
             ? "Most cited"
@@ -86,8 +84,6 @@ function FinderPageContent() {
         authorList: OpenAlexTypeAheadAuthor[],
         institutionList: OpenAlexTypeAheadInstitution[],
         openAccess: boolean,
-
-        // added sort value here
         sortValue: string,
     ) => {
         const params = new URLSearchParams();
@@ -192,7 +188,7 @@ function FinderPageContent() {
         authorList: OpenAlexTypeAheadAuthor[],
         institutionList: OpenAlexTypeAheadInstitution[],
         openAccess: boolean,
-        sortValue: string, // Added sort value here
+        sortValue: string,
         shouldUpdateUrl: boolean = true
     ) => {
         if (!searchQuery.trim()) return;
