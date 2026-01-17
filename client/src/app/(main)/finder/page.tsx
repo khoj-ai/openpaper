@@ -238,9 +238,8 @@ function FinderPageContent() {
     };
 
     // Search triggered by user action (updates URL)
-    const handleSearch = async (pageNumber = page, sortOverride?: string) => {
-        const effectiveSort = sortOverride ?? sort;
-        await performSearch(query, pageNumber, authors, institutions, onlyOpenAccess, effectiveSort, true);
+    const handleSearch = async (pageNumber = page) => {
+        await performSearch(query, pageNumber, authors, institutions, onlyOpenAccess, sort, true);
     };
 
     const totalPages = Math.ceil(totalResults / perPage);
@@ -379,9 +378,7 @@ function FinderPageContent() {
                                 <button
                                     className="w-full rounded-sm px-2 py-2 text-left text-sm hover:bg-accent transition-colors"
                                     onClick={() => {
-                                        const next = "cited_by_count:desc";
-                                        setSort(next);
-                                        handleSearch(1, next); // uses the new value immediately
+                                        setSort("cited_by_count:desc");
                                     }}
                                 >
                                     Most cited
@@ -390,9 +387,7 @@ function FinderPageContent() {
                                 <button
                                     className="w-full rounded-sm px-2 py-2 text-left text-sm hover:bg-accent transition-colors"
                                     onClick={() => {
-                                        const next = "publication_date:desc";
-                                        setSort(next)
-                                        handleSearch(1, next);
+                                        setSort("publication_date:desc");
                                     }}
                                 >
                                     Newest
