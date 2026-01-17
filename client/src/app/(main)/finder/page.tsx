@@ -27,7 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { fetchFromApi } from "@/lib/api";
 import { OpenAlexPaper, OpenAlexResponse } from "@/lib/schema";
-import { Building2, ChevronDown, Filter, Search, User, X } from "lucide-react";
+import { ArrowDownNarrowWide, Building2, CheckIcon, ChevronDown, Filter, Search, User, X } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
@@ -364,39 +364,6 @@ function FinderPageContent() {
                         />
                     </div>
 
-                    {/* Sort dropdown (match Filters style) */}
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" className="flex items-center gap-2">
-                                {sortLabel}
-                                <ChevronDown className="h-3 w-3" />
-                            </Button>
-                        </PopoverTrigger>
-
-                        <PopoverContent className="w-56 p-2" align={isMobile ? "center" : "start"} sideOffset={isMobile ? 8 : 4}>
-                            <div className="flex flex-col">
-                                <button
-                                    className="w-full rounded-sm px-2 py-2 text-left text-sm hover:bg-accent transition-colors"
-                                    onClick={() => {
-                                        setSort("cited_by_count:desc");
-                                    }}
-                                >
-                                    Most cited
-                                </button>
-
-                                <button
-                                    className="w-full rounded-sm px-2 py-2 text-left text-sm hover:bg-accent transition-colors"
-                                    onClick={() => {
-                                        setSort("publication_date:desc");
-                                    }}
-                                >
-                                    Newest
-                                </button>
-                            </div>
-                        </PopoverContent>
-                    </Popover>
-
-
                     {/* Filter button */}
                     <Popover>
                         <PopoverTrigger asChild>
@@ -404,8 +371,8 @@ function FinderPageContent() {
                                 <Filter className="h-4 w-4" />
                                 Filters
                                 {hasActiveConstraints && (
-                                    <Badge variant="secondary" className="ml-1 px-1 py-0 text-xs">
-                                        {hasActiveConstraints}
+                                    <Badge variant="secondary" className="ml-1 px-1 py-0 text-xs flex items-center gap-1">
+                                        {activeConstraintCount}
                                     </Badge>
                                 )}
                                 <ChevronDown className="h-3 w-3" />
@@ -504,6 +471,51 @@ function FinderPageContent() {
                                         )}
                                     </div>
                                 </div>
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+
+
+                    {/* Sort dropdown (match Filters style) */}
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" className="flex items-center gap-2">
+                                <ArrowDownNarrowWide className="h-4 w-4" />
+                                Sort
+                                <ChevronDown className="h-3 w-3" />
+                            </Button>
+                        </PopoverTrigger>
+
+                        <PopoverContent className="w-56 p-2" align={isMobile ? "center" : "start"} sideOffset={isMobile ? 8 : 4}>
+                            <div className="flex flex-col">
+
+                                <button
+                                    className="w-full rounded-sm px-2 py-2 text-left text-sm hover:bg-accent transition-colors flex items-center gap-2"
+                                    onClick={() => {
+                                        setSort("cited_by_count:desc");
+                                    }}
+                                >
+                                    {
+                                        sortLabel == 'Most cited' ? (
+                                            <CheckIcon className="h-4 w-4 mb-1 text-primary" />
+                                        ) : null
+                                    }
+                                    Most cited
+                                </button>
+
+                                <button
+                                    className="w-full rounded-sm px-2 py-2 text-left text-sm hover:bg-accent transition-colors flex items-center gap-2"
+                                    onClick={() => {
+                                        setSort("publication_date:desc");
+                                    }}
+                                >
+                                    {
+                                        sortLabel == 'Newest' ? (
+                                            <CheckIcon className="h-4 w-4 mb-1 text-primary" />
+                                        ) : null
+                                    }
+                                    Newest
+                                </button>
                             </div>
                         </PopoverContent>
                     </Popover>
