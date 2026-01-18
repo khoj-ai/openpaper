@@ -186,7 +186,7 @@ export default function DataTableGenerationJobCard({ job, projectId }: DataTable
                                                 {getStatusText(liveData.status)}
                                             </span>
                                         </div>
-                                        {liveData.celery_status && (
+                                        {liveData.celery_status && currentStatus !== JobStatus.COMPLETED && currentStatus !== JobStatus.FAILED && (
                                             <div>
                                                 <span className="text-gray-500 dark:text-gray-400">Task Status:</span>
                                                 <span className="ml-1 font-medium text-gray-700 dark:text-gray-300">
