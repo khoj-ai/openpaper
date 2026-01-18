@@ -222,9 +222,10 @@ async def get_data_table_job_status(
                 content={"message": "Data table job not found"},
             )
 
-        # Get real-time Celery task status if we have a task_id
+        # Get real-time Celery task status if we have a task_id and job is still in progress
+        # (completed/failed jobs no longer have active Celery tasks)
         celery_task_status = None
-        if job.task_id:
+        if job.task_id and job.status not in (JobStatus.COMPLETED, JobStatus.FAILED):
             try:
                 celery_task_status = jobs_client.check_celery_task_status(
                     str(job.task_id)
@@ -234,16 +235,14 @@ async def get_data_table_job_status(
                     f"Failed to get Celery task status for {job.task_id}: {e}"
                 )
 
-        if job.task_id and job.status not in (JobStatus.COMPLETED, JobStatus.FAILED):
-            celery_status = jobs_client.check_celery_task_status(str(job.task_id))
-
+        if celery_task_status:
             # If job has been "processing" for longer than the max runtime,
             # and Celery has no record of it, assume it's lost
             job_age = datetime.now(timezone.utc) - job.created_at
 
             if (
                 job_age > MAX_DATA_TABLES_JOB_RUNTIME
-                and celery_status.get("status", "") == JobStatus.PENDING
+                and celery_task_status.get("status", "") == JobStatus.PENDING
             ):
                 # Task is too old to still be pending - it's lost
                 data_table_job_crud.update_status(

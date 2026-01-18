@@ -77,9 +77,13 @@ async def get_upload_status(
         if not paper:
             return JSONResponse(status_code=404, content={"message": "Paper not found"})
 
-    # Get real-time Celery task status if we have a task_id
+    # Get real-time Celery task status if we have a task_id and job is still in progress
+    # (completed/failed jobs no longer have active Celery tasks)
     celery_task_status = None
-    if paper_upload_job.task_id:
+    if paper_upload_job.task_id and paper_upload_job.status not in (
+        JobStatus.COMPLETED,
+        JobStatus.FAILED,
+    ):
         try:
             celery_task_status = jobs_client.check_celery_task_status(
                 str(paper_upload_job.task_id)
