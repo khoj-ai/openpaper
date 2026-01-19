@@ -142,7 +142,11 @@ export function SidePanelContent({
 
     const END_DELIMITER = "END_OF_STREAM";
 
+    const COMPREHENSIVE_OVERVIEW_DISPLAY = "Create a comprehensive overview";
+    const COMPREHENSIVE_OVERVIEW_PROMPT = "Create a comprehensive, thoughtful brief for this paper. Separate each section with clear headings covering: (1) Key Takeaways - the main points in 2-3 bullets, (2) Background - the problem and context, (3) Key Contributions - what's novel about this work, (4) Methods - the approach taken, (5) Results - main findings, (6) Limitations - weaknesses of the study, (7) Open Questions - gaps for future research, and (8) Important Figures/Tables - which visuals to pay attention to. This should serve as a helpful guided reading before I dive into the paper myself.";
+
     const defaultStarterQuestions = [
+        COMPREHENSIVE_OVERVIEW_DISPLAY,
         "What is the main research question or hypothesis of this paper?",
         "What methodology did the authors use?",
         "What are the key findings and conclusions?",
@@ -1023,25 +1027,30 @@ export function SidePanelContent({
                                     {(messages.length === 0 || messages.length === 1) && !hasMoreMessages && (
                                         <div className="text-center text-gray-500 my-4">
                                             <div className='flex overflow-x-auto gap-2 mt-2 pb-2 scrollbar-hide'>
-                                                {starterQuestions.slice(0, 5).map((question, i) => (
-                                                    <Button
-                                                        key={i}
-                                                        variant="outline"
-                                                        className="text-sm font-normal p-2 bg-background text-secondary-foreground hover:bg-secondary/50 border rounded-full whitespace-nowrap"
-                                                        onClick={() => {
-                                                            setCurrentMessage(question);
-                                                            inputMessageRef.current?.focus();
-                                                            chatInputFormRef.current?.scrollIntoView({
-                                                                behavior: 'smooth',
-                                                                block: 'nearest',
-                                                                inline: 'nearest',
-                                                            });
-                                                            setPendingStarterQuestion(question);
-                                                        }}
-                                                    >
-                                                        {question}
-                                                    </Button>
-                                                ))}
+                                                {starterQuestions.slice(0, 5).map((question, i) => {
+                                                    const messageToSend = question === COMPREHENSIVE_OVERVIEW_DISPLAY
+                                                        ? COMPREHENSIVE_OVERVIEW_PROMPT
+                                                        : question;
+                                                    return (
+                                                        <Button
+                                                            key={i}
+                                                            variant="outline"
+                                                            className="text-sm font-normal p-2 bg-background text-secondary-foreground hover:bg-secondary/50 border rounded-full whitespace-nowrap"
+                                                            onClick={() => {
+                                                                setCurrentMessage(messageToSend);
+                                                                inputMessageRef.current?.focus();
+                                                                chatInputFormRef.current?.scrollIntoView({
+                                                                    behavior: 'smooth',
+                                                                    block: 'nearest',
+                                                                    inline: 'nearest',
+                                                                });
+                                                                setPendingStarterQuestion(messageToSend);
+                                                            }}
+                                                        >
+                                                            {question}
+                                                        </Button>
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     )}
