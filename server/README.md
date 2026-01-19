@@ -28,23 +28,6 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/annotated-paper
 GEMINI_API_KEY="your_gemini_api_key" # Replace with your actual API key from step 3
 ```
 
-(Optional) Add the following environment variables. These variables can take dummy values.
-```bash
-# Required for server/app/database/telemetry.py
-POSTHOG_API_KEY=your-posthog-api-key-here
-POSTHOG_HOST=your-posthog-host-here
-
-# Required for server/app/api/subscription_api.py
-STRIPE_API_KEY=your-stripe-api-key-here
-STRIPE_MONTHLY_PRICE_ID=your-stripe-monthly-price-id-here
-STRIPE_YEARLY_PRICE_ID=your-stripe-yearly-price-id-here
-CLIENT_DOMAIN=your-client-domain-here
-
-# Required for server/app/llm/speech.py
-AZURE_OPENAI_API_KEY=your-azure-openai-api-key-here
-AZURE_OPENAI_ENDPOINT=your-azure-openai-endpoint-here
-```
-
 ## Start the Application
 
 Run the command below to install dependencies, run db migrations and start the app:
