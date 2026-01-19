@@ -5,7 +5,7 @@ This server manages the backend for the Open Paper project, which allows users t
 ## Prerequisites
 - Python 3.12 or higher
 - [Uv](https://docs.astral.sh/uv/getting-started/installation/)
-- PostgreSQL database
+- [PostgreSQL database](http://postgresql.org/download/) (Make sure it's running with a user postgres)
 
 ## Setup
 
@@ -17,7 +17,7 @@ source .venv/bin/activate
 
 2. Get an API key from [Google AI Studio](https://aistudio.google.com/apikey)
 
-3. Set up environment variables:
+3. Set up environment variables. Check `.env.example` for required and optional variables
 ```bash
 touch .env
 ```
@@ -26,6 +26,23 @@ Add the following environment variables to your `.env` file:
 ```bash
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/annotated-paper
 GEMINI_API_KEY="your_gemini_api_key" # Replace with your actual API key from step 3
+```
+
+(Optional) Add the following environment variables. These variables can take dummy values.
+```bash
+# Required for server/app/database/telemetry.py
+POSTHOG_API_KEY=your-posthog-api-key-here
+POSTHOG_HOST=your-posthog-host-here
+
+# Required for server/app/api/subscription_api.py
+STRIPE_API_KEY=your-stripe-api-key-here
+STRIPE_MONTHLY_PRICE_ID=your-stripe-monthly-price-id-here
+STRIPE_YEARLY_PRICE_ID=your-stripe-yearly-price-id-here
+CLIENT_DOMAIN=your-client-domain-here
+
+# Required for server/app/llm/speech.py
+AZURE_OPENAI_API_KEY=your-azure-openai-api-key-here
+AZURE_OPENAI_ENDPOINT=your-azure-openai-endpoint-here
 ```
 
 ## Start the Application
