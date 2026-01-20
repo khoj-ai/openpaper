@@ -5,7 +5,7 @@ This server manages the backend for the Open Paper project, which allows users t
 ## Prerequisites
 - Python 3.12 or higher
 - [Uv](https://docs.astral.sh/uv/getting-started/installation/)
-- PostgreSQL database
+- [PostgreSQL database](http://postgresql.org/download/) (Make sure it's running with a user postgres)
 
 ## Setup
 
@@ -17,7 +17,7 @@ source .venv/bin/activate
 
 2. Get an API key from [Google AI Studio](https://aistudio.google.com/apikey)
 
-3. Set up environment variables:
+3. Set up environment variables. Check `.env.example` for required and optional variables
 ```bash
 touch .env
 ```
