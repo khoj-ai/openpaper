@@ -143,7 +143,7 @@ export function SidePanelContent({
     const END_DELIMITER = "END_OF_STREAM";
 
     const COMPREHENSIVE_OVERVIEW_DISPLAY = "Create a comprehensive overview";
-    const COMPREHENSIVE_OVERVIEW_PROMPT = "Create a comprehensive, thoughtful brief for this paper. Separate each section with clear headings covering: (1) Key Takeaways - the main points in 2-3 bullets, (2) Background - the problem and context, (3) Key Contributions - what's novel about this work, (4) Methods - the approach taken, (5) Results - main findings, (6) Limitations - weaknesses of the study, (7) Open Questions - gaps for future research, and (8) Important Figures/Tables - which visuals to pay attention to. This should serve as a helpful guided reading before I dive into the paper myself.";
+    const COMPREHENSIVE_OVERVIEW_PROMPT = "Create a comprehensive, thoughtful brief for this paper. Separate each section with clear headings covering: Key Takeaways (the main points in 2-3 bullets), Background (the problem and context), Key Contributions (what's novel about this work), Methods (the approach taken), Results (main findings), Limitations (weaknesses of the study), Open Questions (gaps for future research), and Important Figures/Tables (which visuals to pay attention to). This should serve as a helpful guided reading before I dive into the paper myself.";
 
     const defaultStarterQuestions = [
         COMPREHENSIVE_OVERVIEW_DISPLAY,
