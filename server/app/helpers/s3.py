@@ -154,14 +154,14 @@ class S3Service:
             return False
 
     def generate_presigned_url(
-        self, object_key: str, expiration: int = 28800
+        self, object_key: str, expiration: int = 86400
     ) -> Optional[str]:
         """
         Generate a presigned URL for a file
 
         Args:
             object_key: The S3 object key
-            expiration: URL expiration time in seconds (default: 8 hours)
+            expiration: URL expiration time in seconds (default: 24 hours)
 
         Returns:
             str: Presigned URL or None if error
@@ -227,7 +227,7 @@ class S3Service:
         db: Session,
         paper_id: str,
         object_key: str,
-        expiration: int = 28800,
+        expiration: int = 86400,
         current_user: Optional[CurrentUser] = None,
     ) -> Optional[str]:
         """
@@ -237,7 +237,7 @@ class S3Service:
             db: Database session
             paper_id: The paper ID to cache the URL for
             object_key: The S3 object key
-            expiration: URL expiration time in seconds (default: 8 hours)
+            expiration: URL expiration time in seconds (default: 24 hours)
             current_user: Current user for ownership verification
 
         Returns:
@@ -339,7 +339,7 @@ class S3Service:
         paper_id: str,
         object_key: str,
         owner_id: str,
-        expiration: int = 28800,
+        expiration: int = 86400,
     ) -> Optional[str]:
         """
         Get a cached presigned URL for a paper owned by a specific user (used for shared papers)
@@ -377,7 +377,7 @@ class S3Service:
         self,
         db: Session,
         papers: List[Paper],
-        expiration: int = 28800,
+        expiration: int = 86400,
     ) -> Dict[str, Optional[str]]:
         """
         Bulk retrieve presigned URLs for multiple papers, parallelizing S3 calls for expired URLs.
@@ -390,7 +390,7 @@ class S3Service:
         Args:
             db: Database session
             papers: List of Paper objects to get URLs for
-            expiration: URL expiration time in seconds (default: 8 hours)
+            expiration: URL expiration time in seconds (default: 24 hours)
 
         Returns:
             Dict mapping paper_id (str) to presigned URL (or None if error)
