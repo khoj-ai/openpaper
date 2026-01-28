@@ -9,6 +9,9 @@ from PyPDF2 import PdfReader
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+MAX_UPLOAD_SIZE_MB = 30
+DOCUMENT_PAGE_LIMIT = 800
+
 
 def get_start_page_from_offset(offsets: dict[int, Tuple[int, int]], offset: int) -> int:
     """
@@ -61,9 +64,9 @@ async def validate_pdf_content(
     Returns (is_valid, error_message).
     """
     try:
-        # Check file size (e.g., max 50MB)
-        if len(pdf_bytes) > 50 * 1024 * 1024:
-            return False, "File too large (max 50MB)"
+        # Check file size
+        if len(pdf_bytes) > MAX_UPLOAD_SIZE_MB * 1024 * 1024:
+            return False, f"File too large (max {MAX_UPLOAD_SIZE_MB}MB)"
 
         # Check minimum file size (at least 1KB)
         if len(pdf_bytes) < 1024:
@@ -81,6 +84,10 @@ async def validate_pdf_content(
             # Check if PDF has pages
             if len(reader.pages) == 0:
                 return False, "PDF contains no pages"
+
+            # Guard against extremely long PDFs that may exceed LLM context limits
+            if len(reader.pages) > DOCUMENT_PAGE_LIMIT:
+                return False, f"PDF exceeds the {DOCUMENT_PAGE_LIMIT}-page limit"
 
             # Check if PDF is encrypted and can't be processed
             if reader.is_encrypted:
@@ -131,8 +138,8 @@ async def validate_url_and_fetch_pdf(url: str) -> tuple[bool, bytes, str]:
         content_length = head_response.headers.get("content-length")
         if content_length:
             size_mb = int(content_length) / (1024 * 1024)
-            if size_mb > 50:
-                return False, b"", "File too large (max 50MB)"
+            if size_mb > MAX_UPLOAD_SIZE_MB:
+                return False, b"", f"File too large (max {MAX_UPLOAD_SIZE_MB}MB)"
             if size_mb < 0.001:  # Less than 1KB
                 return False, b"", "File too small to be a valid PDF"
 

@@ -14,7 +14,7 @@ interface PdfDropzoneProps {
     maxPapers?: number;
 }
 
-export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 15, disabled = false, maxPapers = MAX_PAPERS_TO_UPLOAD }: PdfDropzoneProps) {
+export function PdfDropzone({ onFileSelect, onUrlClick, maxSizeMb = 30, disabled = false, maxPapers = MAX_PAPERS_TO_UPLOAD }: PdfDropzoneProps) {
     const [isDragging, setIsDragging] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
