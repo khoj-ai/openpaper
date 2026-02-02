@@ -104,6 +104,8 @@ class BaseLLMProvider(ABC):
         history: Optional[List[Message]] = None,
         function_declarations: Optional[List[Dict]] = None,
         tool_call_results: Optional[List[ToolCallResult]] = None,
+        enable_thinking: bool = False,
+        schema: Optional[Dict] = None,
         **kwargs,
     ) -> LLMResponse:
         """Generate content using the provider's API
@@ -115,6 +117,9 @@ class BaseLLMProvider(ABC):
             history: Optional conversation history
             function_declarations: Optional list of tool/function declarations
             tool_call_results: Optional list of tool call results from previous calls
+            enable_thinking: Whether to enable thinking/reasoning mode
+            schema: Optional JSON schema dict for structured output. When provided,
+                the response will be constrained to match this schema.
             **kwargs: Additional provider-specific arguments
         """
         pass
@@ -173,6 +178,7 @@ class GeminiProvider(BaseLLMProvider):
         function_declarations: Optional[List[Dict]] = None,
         tool_call_results: Optional[List[ToolCallResult]] = None,
         enable_thinking: bool = False,
+        schema: Optional[Dict] = None,
         **kwargs,
     ) -> LLMResponse:
         tool_options: List[FunctionDeclaration] = []
@@ -194,6 +200,12 @@ class GeminiProvider(BaseLLMProvider):
         tools = Tool(function_declarations=tool_options) if tool_options else None
 
         config = GenerateContentConfig()
+
+        # Apply structured output schema if provided
+        if schema:
+            config.response_mime_type = "application/json"
+            config.response_schema = schema
+
         if tools:
             config.tools = [tools]
             config.tool_config = ToolConfig(
@@ -446,6 +458,7 @@ class OpenAIProvider(BaseLLMProvider):
         function_declarations: Optional[List[Dict]] = None,
         tool_call_results: Optional[List[ToolCallResult]] = None,
         enable_thinking: bool = True,
+        schema: Optional[Dict] = None,
         **kwargs,
     ) -> LLMResponse:
         # Convert to OpenAI format
@@ -467,6 +480,17 @@ class OpenAIProvider(BaseLLMProvider):
 
         if tools:
             kwargs["tools"] = tools
+
+        # Apply structured output schema if provided
+        if schema:
+            kwargs["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "structured_response",
+                    "strict": True,
+                    "schema": schema,
+                },
+            }
 
         if enable_thinking:
             logger.debug(
