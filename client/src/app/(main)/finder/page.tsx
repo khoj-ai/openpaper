@@ -31,6 +31,7 @@ import { ArrowDownNarrowWide, Building2, CheckIcon, ChevronDown, Filter, Search,
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { FinderIntro } from "./FinderIntro";
 import PaperPreviewPanel from "./PaperPreviewPanel";
 import PaperResultCard from "./PaperResultCard";
@@ -349,6 +350,20 @@ function FinderPageContent() {
 
     return (
         <div className="w-full px-4 py-6 space-y-6 overflow-x-hidden">
+            <Alert className="max-w-2xl">
+                <AlertTitle>This feature will be deprecated</AlertTitle>
+                <AlertDescription>
+                    For a free alternative, visit{" "}
+                    <a href="https://openalex.org" target="_blank" rel="noopener noreferrer" className="underline font-medium">
+                        OpenAlex.org
+                    </a>
+                    , or try the new{" "}
+                    <Link href="/discover" className="underline font-medium">
+                        Discover
+                    </Link>
+                    {" "}feature.
+                </AlertDescription>
+            </Alert>
             <div className="space-y-4">
                 {/* Main search bar */}
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">

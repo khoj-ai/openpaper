@@ -455,6 +455,7 @@ export interface SubscriptionLimits {
     chat_credits_weekly: number;
     audio_overviews_weekly: number;
     data_tables_weekly: number;
+    discover_searches_weekly: number;
     projects: number;
     model: string[];
 }
@@ -472,6 +473,8 @@ export interface SubscriptionUsage {
     projects_remaining: number;
     data_tables_used: number;
     data_tables_remaining: number;
+    discover_searches_used: number;
+    discover_searches_remaining: number;
 }
 
 export interface SubscriptionData {

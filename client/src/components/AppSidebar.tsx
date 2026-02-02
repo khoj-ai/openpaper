@@ -5,6 +5,7 @@ import {
     ChevronsUpDown,
     FileText,
     FolderKanban,
+    Compass,
     Globe2,
     Home,
     LogOut,
@@ -47,7 +48,7 @@ import {
 } from "@/components/ui/sheet";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useIsDarkMode } from "@/hooks/useDarkMode";
-import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isStorageNearLimit, isPaperUploadNearLimit, isChatCreditAtLimit, isChatCreditNearLimit, formatFileSize, getStorageUsagePercentage, getPaperUploadPercentage, getChatCreditUsagePercentage, getAudioOverviewUsagePercentage, getProjectUsagePercentage, getDataTableUsagePercentage } from "@/hooks/useSubscription";
+import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isStorageNearLimit, isPaperUploadNearLimit, isChatCreditAtLimit, isChatCreditNearLimit, formatFileSize, getStorageUsagePercentage, getPaperUploadPercentage, getChatCreditUsagePercentage, getAudioOverviewUsagePercentage, getProjectUsagePercentage, getDataTableUsagePercentage, getDiscoverSearchUsagePercentage } from "@/hooks/useSubscription";
 import Link from "next/link";
 import { Conversation, PaperItem, Project, SubscriptionData } from "@/lib/schema";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -77,6 +78,12 @@ const items = [
         title: "Ask",
         url: "/understand",
         icon: TelescopeIcon,
+        requiresAuth: true,
+    },
+    {
+        title: "Discover",
+        url: "/discover",
+        icon: Compass,
         requiresAuth: true,
     },
     {
@@ -238,6 +245,13 @@ const UsageLimitCard = ({
                     used={subscription.usage.data_tables_used}
                     total={subscription.limits.data_tables_weekly}
                     percentage={getDataTableUsagePercentage(subscription)}
+                />
+
+                <UsageItem
+                    label="Weekly Discover Searches"
+                    used={subscription.usage.discover_searches_used}
+                    total={subscription.limits.discover_searches_weekly}
+                    percentage={getDiscoverSearchUsagePercentage(subscription)}
                 />
 
                 <UsageItem
