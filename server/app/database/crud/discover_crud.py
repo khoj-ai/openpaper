@@ -64,6 +64,28 @@ class DiscoverSearchCRUD:
             logger.error(f"Error fetching discover history: {e}", exc_info=True)
             return []
 
+    def get_by_id(
+        self,
+        db: Session,
+        *,
+        search_id: str,
+        user: CurrentUser,
+    ) -> Optional[DiscoverSearch]:
+        try:
+            return (
+                db.query(DiscoverSearch)
+                .filter(
+                    DiscoverSearch.id == UUID(search_id),
+                    DiscoverSearch.user_id == user.id,
+                )
+                .first()
+            )
+        except Exception as e:
+            logger.error(
+                f"Error fetching discover search {search_id}: {e}", exc_info=True
+            )
+            return None
+
     def get_searches_this_week(self, db: Session, *, user: CurrentUser) -> int:
         """Count discover searches by this user in the current week (Monday-based)."""
         try:

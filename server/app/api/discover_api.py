@@ -50,7 +50,7 @@ async def discover_search(
                     collected_results[subquery] = chunk.get("content", [])
                 elif chunk_type == "done":
                     # Persist the search
-                    discover_search_crud.create(
+                    saved = discover_search_crud.create(
                         db,
                         question=request.question,
                         subqueries=collected_subqueries,
@@ -69,6 +69,9 @@ async def discover_search(
                         },
                         user_id=str(current_user.id),
                     )
+
+                    # Include the search ID in the done chunk
+                    chunk["search_id"] = str(saved.id) if saved else None
 
                 yield f"{json.dumps(chunk)}{END_DELIMITER}"
 
@@ -96,3 +99,22 @@ async def discover_history(
         }
         for s in searches
     ]
+
+
+@discover_router.get("/{search_id}")
+async def discover_get(
+    search_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """Get a single discover search by ID."""
+    search = discover_search_crud.get_by_id(db, search_id=search_id, user=current_user)
+    if not search:
+        raise HTTPException(status_code=404, detail="Search not found")
+    return {
+        "id": str(search.id),
+        "question": search.question,
+        "subqueries": search.subqueries,
+        "results": search.results,
+        "created_at": search.created_at.isoformat() if search.created_at else None,
+    }
