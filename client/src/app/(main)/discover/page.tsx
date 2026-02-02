@@ -3,6 +3,7 @@
 import { fetchFromApi, fetchStreamFromApi } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Suspense, useCallback, useEffect, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { RotateCcw } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import DiscoverHistory, { DiscoverSearchHistory } from "./DiscoverHistory"
@@ -18,6 +19,9 @@ interface SubqueryResults {
 }
 
 function DiscoverPageContent() {
+    const router = useRouter()
+    const searchParams = useSearchParams()
+
     const [question, setQuestion] = useState("")
     const [submittedQuestion, setSubmittedQuestion] = useState<string | null>(null)
     const [loading, setLoading] = useState(false)
@@ -26,6 +30,29 @@ function DiscoverPageContent() {
     const [resultGroups, setResultGroups] = useState<SubqueryResults[]>([])
     const [history, setHistory] = useState<DiscoverSearchHistory[]>([])
     const [error, setError] = useState<string | null>(null)
+
+    const loadSearchById = useCallback(async (id: string) => {
+        try {
+            const data = await fetchFromApi(`/api/discover/${id}`)
+            setQuestion(data.question)
+            setSubmittedQuestion(data.question)
+            setSubqueries(data.subqueries || [])
+            setError(null)
+
+            const groups: SubqueryResults[] = []
+            if (data.results) {
+                for (const [subquery, results] of Object.entries(data.results)) {
+                    groups.push({
+                        subquery,
+                        results: results as DiscoverResult[],
+                    })
+                }
+            }
+            setResultGroups(groups)
+        } catch {
+            setError("Search not found")
+        }
+    }, [])
 
     const fetchHistory = useCallback(async () => {
         try {
@@ -40,6 +67,14 @@ function DiscoverPageContent() {
         fetchHistory()
     }, [fetchHistory])
 
+    // Load search from URL ?id= param on mount
+    useEffect(() => {
+        const id = searchParams.get("id")
+        if (id) {
+            loadSearchById(id)
+        }
+    }, [searchParams, loadSearchById])
+
     const handleReset = () => {
         setQuestion("")
         setSubmittedQuestion(null)
@@ -47,6 +82,7 @@ function DiscoverPageContent() {
         setResultGroups([])
         setActiveSubquery("")
         setError(null)
+        router.push("/discover")
     }
 
     const handleSearch = async () => {
@@ -99,6 +135,10 @@ function DiscoverPageContent() {
                                     results: parsed.content || [],
                                 },
                             ])
+                        } else if (parsed.type === "done") {
+                            if (parsed.search_id) {
+                                router.replace(`/discover?id=${parsed.search_id}`)
+                            }
                         } else if (parsed.type === "error") {
                             setError(parsed.content)
                         }
@@ -119,25 +159,10 @@ function DiscoverPageContent() {
     }
 
     const handleHistorySelect = (search: DiscoverSearchHistory) => {
-        setQuestion(search.question)
-        setSubmittedQuestion(search.question)
-        setSubqueries(search.subqueries || [])
-        setError(null)
-
-        // Reconstruct result groups from persisted results
-        const groups: SubqueryResults[] = []
-        if (search.results) {
-            for (const [subquery, results] of Object.entries(search.results)) {
-                groups.push({
-                    subquery,
-                    results: results as DiscoverResult[],
-                })
-            }
-        }
-        setResultGroups(groups)
+        router.push(`/discover?id=${search.id}`)
     }
 
-    // Deduplicate within each group so a URL only appears under the first subquery that found it
+    // Deduplicate within each group so a result only appears under the first subquery that found it
     const globalSeen = new Set<string>()
     const dedupedGroups = resultGroups.map((group) => {
         const dedupedResults = group.results.filter((r) => {
@@ -214,7 +239,7 @@ function DiscoverPageContent() {
                             if (group.results.length === 0) return null
                             return (
                                 <div key={group.subquery}>
-                                    <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                                    <h3 className="text-md font-medium border-b border-slate-200 dark:border-slate-700 pb-2 mb-0">
                                         {group.subquery}
                                     </h3>
                                     <div>
