@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Dict, Optional
 
 from app.database.crud.audio_overview_crud import audio_overview_crud
+from app.database.crud.discover_crud import discover_search_crud
 from app.database.crud.message_crud import message_crud
 from app.database.crud.paper_crud import paper_crud
 from app.database.crud.projects.project_crud import project_crud
@@ -29,6 +30,7 @@ CHAT_CREDITS_KEY = "chat_credits_weekly"
 DATA_TABLES_KEY = "data_tables_weekly"
 AUDIO_OVERVIEWS_KEY = "audio_overviews_weekly"
 PROJECTS_KEY = "projects"
+DISCOVER_SEARCHES_KEY = "discover_searches_weekly"
 
 # Define subscription plan limits
 SUBSCRIPTION_LIMITS = {
@@ -39,6 +41,7 @@ SUBSCRIPTION_LIMITS = {
         AUDIO_OVERVIEWS_KEY: 5,
         PROJECTS_KEY: 2,
         DATA_TABLES_KEY: 2,
+        DISCOVER_SEARCHES_KEY: 10,
     },
     SubscriptionPlan.RESEARCHER: {
         PAPER_UPLOAD_KEY: 500,
@@ -47,6 +50,7 @@ SUBSCRIPTION_LIMITS = {
         AUDIO_OVERVIEWS_KEY: 100,
         PROJECTS_KEY: 100,
         DATA_TABLES_KEY: 50,
+        DISCOVER_SEARCHES_KEY: 100,
     },
 }
 
@@ -305,6 +309,47 @@ def can_user_create_data_table_job(
     return True, None
 
 
+def can_user_run_discover_search(
+    db: Session, user: CurrentUser
+) -> tuple[bool, Optional[str]]:
+    """
+    Check if a user can run a discover search based on their subscription limits.
+
+    Returns:
+        tuple: (can_search: bool, error_message: Optional[str])
+    """
+    plan = get_user_subscription_plan(db, user)
+    limits = get_plan_limits(plan)
+
+    current_searches = discover_search_crud.get_searches_this_week(db, user=user)
+    search_limit = limits[DISCOVER_SEARCHES_KEY]
+
+    if search_limit == float("inf"):
+        return True, None
+
+    if current_searches >= search_limit:
+        track_event(
+            "action_blocked_limit_reached",
+            user_id=str(user.id),
+            properties={
+                "current_discover_searches": current_searches,
+                "discover_search_limit": search_limit,
+                "type": "discover_searches",
+                "plan": plan.value,
+            },
+        )
+        plan_name = {
+            SubscriptionPlan.BASIC: "Basic",
+            SubscriptionPlan.RESEARCHER: "Researcher",
+        }.get(plan, "Basic")
+        return (
+            False,
+            f"You have reached your discover search limit ({int(search_limit)} searches per week) for the {plan_name} plan. Please upgrade your subscription to run more discover searches.",
+        )
+
+    return True, None
+
+
 def get_user_chat_credits_used_this_week(db: Session, user: CurrentUser) -> int:
     """
     Get the number of chat credits used by the user today.
@@ -345,6 +390,9 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
         db, user=user
     )
 
+    discover_searches_allowed = limits[DISCOVER_SEARCHES_KEY]
+    discover_searches_used = discover_search_crud.get_searches_this_week(db, user=user)
+
     current_project_count = len(
         project_crud.get_all_projects_by_user_with_metadata(db=db, user=user)
     )
@@ -377,6 +425,11 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
     data_table_usage_percentage = (
         (data_tables_used_this_week / data_tables_allowed) * 100
         if data_tables_allowed != float("inf")
+        else 0
+    )
+    discover_usage_percentage = (
+        (discover_searches_used / discover_searches_allowed) * 100
+        if discover_searches_allowed != float("inf")
         else 0
     )
 
@@ -439,6 +492,18 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
             },
         )
 
+    if discover_usage_percentage > HIGH_USAGE_THRESHOLD:
+        track_event(
+            "high_usage_limit",
+            user_id=str(user.id),
+            properties={
+                "metric": "discover_searches",
+                "usage": discover_searches_used,
+                "limit": discover_searches_allowed,
+                "plan": plan.value,
+            },
+        )
+
     if data_table_usage_percentage > HIGH_USAGE_THRESHOLD:
         track_event(
             "high_usage_limit",
@@ -488,6 +553,12 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
         else max(0, int(data_tables_allowed) - data_tables_used_this_week)
     )
 
+    discover_searches_remaining = (
+        None
+        if discover_searches_allowed == float("inf")
+        else max(0, int(discover_searches_allowed) - discover_searches_used)
+    )
+
     return {
         "plan": plan.value,
         "limits": {
@@ -506,5 +577,7 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
             "projects_remaining": projects_remaining,
             "data_tables_used": data_tables_used_this_week,
             "data_tables_remaining": data_tables_remaining,
+            "discover_searches_used": discover_searches_used,
+            "discover_searches_remaining": discover_searches_remaining,
         },
     }

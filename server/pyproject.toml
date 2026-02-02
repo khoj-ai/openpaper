@@ -39,6 +39,7 @@ dependencies = [
     "celery>=5.5.3",
     "stripe>=12.3.0",
     "pypdf2>=3.0.1",
+    "exa-py>=1.0.0",
 ]
 
 [project.scripts]
