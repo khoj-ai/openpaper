@@ -20,7 +20,8 @@ class ExaResult:
     published_date: Optional[str] = None
     text: Optional[str] = None
     highlights: list[str] = field(default_factory=list)
-    score: Optional[float] = None
+    highlight_scores: list[float] = field(default_factory=list)
+    favicon: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {
@@ -30,7 +31,8 @@ class ExaResult:
             "published_date": self.published_date,
             "text": self.text,
             "highlights": self.highlights,
-            "score": self.score,
+            "highlight_scores": self.highlight_scores,
+            "favicon": self.favicon,
         }
 
 
@@ -60,7 +62,13 @@ def search_exa(query: str, num_results: int = 10) -> list[ExaResult]:
                     published_date=result.published_date,
                     text=result.text,
                     highlights=result.highlights if result.highlights else [],
-                    score=result.score,
+                    highlight_scores=(
+                        result.highlight_scores
+                        if hasattr(result, "highlight_scores")
+                        and result.highlight_scores
+                        else []
+                    ),
+                    favicon=getattr(result, "favicon", None),
                 )
             )
 
