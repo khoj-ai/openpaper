@@ -36,6 +36,76 @@ class ExaResult:
         }
 
 
+# Academic domains to prioritize for research paper searches
+ACADEMIC_DOMAINS = [
+    # Preprint servers & repositories
+    "arxiv.org",
+    "biorxiv.org",
+    "medrxiv.org",
+    "ssrn.com",
+    "osf.io",  # Open Science Framework
+    "zenodo.org",
+    "researchgate.net",
+    # Academic databases & indexes
+    "pubmed.ncbi.nlm.nih.gov",
+    "ncbi.nlm.nih.gov",
+    "semanticscholar.org",
+    "eric.ed.gov",  # Education research
+    "jstor.org",
+    "scholar.google.com",
+    # Major publishers (multi-disciplinary)
+    "nature.com",
+    "sciencedirect.com",
+    "springer.com",
+    "link.springer.com",
+    "wiley.com",
+    "onlinelibrary.wiley.com",
+    "sagepub.com",  # Social sciences, education, policy
+    "tandfonline.com",  # Taylor & Francis - broad coverage
+    "oup.com",  # Oxford University Press
+    "academic.oup.com",
+    "cambridge.org",
+    # Open access publishers
+    "plos.org",
+    "frontiersin.org",
+    "mdpi.com",
+    "biomedcentral.com",
+    "peerj.com",
+    "elifesciences.org",
+    "hindawi.com",
+    # High-impact journals
+    "science.org",
+    "cell.com",
+    "pnas.org",
+    "thelancet.com",
+    "bmj.com",
+    "nejm.org",
+    "jamanetwork.com",
+    # Economics & policy
+    "nber.org",  # National Bureau of Economic Research
+    "aeaweb.org",  # American Economic Association
+    "worldbank.org",
+    "imf.org",
+    "brookings.edu",
+    "rand.org",
+    # Education
+    "educationnext.org",
+    "edweek.org",
+    "tcrecord.org",  # Teachers College Record
+    # Social sciences & humanities
+    "journals.uchicago.edu",
+    "annualreviews.org",
+    "mitpress.mit.edu",
+    "press.princeton.edu",
+    # CS/ML (limited selection)
+    "ieee.org",
+    "acm.org",
+    "openreview.net",
+    "jmlr.org",
+    "aclweb.org",
+]
+
+
 def search_exa(query: str, num_results: int = 10) -> list[ExaResult]:
     """Search Exa for research papers matching the query."""
     if not EXA_API_KEY:
@@ -47,16 +117,22 @@ def search_exa(query: str, num_results: int = 10) -> list[ExaResult]:
         response = exa.search_and_contents(
             query=query,
             num_results=num_results,
+            type="neural",
             category="research paper",
+            include_domains=ACADEMIC_DOMAINS,
             text={"max_characters": 500},
             highlights={"num_sentences": 3},
         )
 
         results = []
         for result in response.results:
+            # Skip results without a proper title
+            if not result.title or not result.title.strip():
+                continue
+
             results.append(
                 ExaResult(
-                    title=result.title or "Untitled",
+                    title=result.title.strip(),
                     url=result.url,
                     author=result.author,
                     published_date=result.published_date,
