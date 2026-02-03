@@ -11,6 +11,7 @@ export interface DiscoverResult {
     highlights?: string[]
     highlight_scores?: number[]
     favicon?: string | null
+    cited_by_count?: number | null
 }
 
 interface DiscoverResultCardProps {
@@ -71,6 +72,10 @@ export default function DiscoverResultCard({ result }: DiscoverResultCardProps) 
                     {result.author && <span>{result.author}</span>}
                     {result.author && publishedYear && <span>&middot;</span>}
                     {publishedYear && <span>{publishedYear}</span>}
+                    {(result.author || publishedYear) && result.cited_by_count != null && result.cited_by_count > 0 && <span>&middot;</span>}
+                    {result.cited_by_count != null && result.cited_by_count > 0 && (
+                        <span>{result.cited_by_count.toLocaleString()} citations</span>
+                    )}
                 </div>
 
                 {snippet && (

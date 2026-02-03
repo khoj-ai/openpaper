@@ -4,7 +4,7 @@ import json
 import logging
 from typing import AsyncGenerator, List
 
-from app.helpers.exa_search import ExaResult, search_exa
+from app.helpers.openalex_search import OpenAlexResult, search_openalex
 from app.llm.base import BaseLLMClient, ModelType
 from app.llm.provider import LLMProvider
 from pydantic import BaseModel, Field
@@ -60,7 +60,7 @@ async def run_discover_pipeline(question: str) -> AsyncGenerator[dict, None]:
     # Step 2: Search each subquery via Exa
     for subquery in subqueries:
         try:
-            results = search_exa(subquery, num_results=5)
+            results = search_openalex(subquery, num_results=10)
 
             yield {
                 "type": "results",
