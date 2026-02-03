@@ -1,12 +1,12 @@
 "use client"
 
-import { Button } from "@/components/ui/button"
+import Link from "next/link"
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover"
-import { History } from "lucide-react"
+import { ChevronRight } from "lucide-react"
 
 export interface DiscoverSearchHistory {
     id: string
@@ -19,25 +19,25 @@ export interface DiscoverSearchHistory {
 interface DiscoverHistoryProps {
     searches: DiscoverSearchHistory[]
     onSelect: (search: DiscoverSearchHistory) => void
+    maxVisible?: number
 }
 
-export default function DiscoverHistory({ searches, onSelect }: DiscoverHistoryProps) {
+export default function DiscoverHistory({ searches, onSelect, maxVisible = 5 }: DiscoverHistoryProps) {
     if (searches.length === 0) return null
+
+    const visibleSearches = searches.slice(0, maxVisible)
+    const hasMore = searches.length > maxVisible
 
     return (
         <Popover>
             <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-1.5">
-                    <History className="h-3.5 w-3.5" />
-                    History
-                </Button>
+                <button className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                    Previous searches
+                </button>
             </PopoverTrigger>
-            <PopoverContent className="w-80 p-2 max-h-80 overflow-y-auto" align="end">
+            <PopoverContent className="w-80 p-2" align="end">
                 <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground px-2 py-1">
-                        Past Searches
-                    </p>
-                    {searches.map((search) => (
+                    {visibleSearches.map((search) => (
                         <button
                             key={search.id}
                             onClick={() => onSelect(search)}
@@ -48,13 +48,18 @@ export default function DiscoverHistory({ searches, onSelect }: DiscoverHistoryP
                                 {search.created_at
                                     ? new Date(search.created_at).toLocaleDateString()
                                     : ""}
-                                {" · "}
-                                {search.subqueries?.length || 0} subqueries
-                                {" · "}
-                                {Object.values(search.results || {}).flat().length} results
                             </div>
                         </button>
                     ))}
+                    {hasMore && (
+                        <Link
+                            href="/discover/history"
+                            className="flex items-center justify-between w-full px-2 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-accent rounded-sm transition-colors"
+                        >
+                            <span>View all searches</span>
+                            <ChevronRight className="h-3.5 w-3.5" />
+                        </Link>
+                    )}
                 </div>
             </PopoverContent>
         </Popover>
