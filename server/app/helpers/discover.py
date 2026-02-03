@@ -13,7 +13,15 @@ logger = logging.getLogger(__name__)
 
 llm_client = BaseLLMClient(default_provider=LLMProvider.GEMINI)
 
-DECOMPOSE_PROMPT = """You are a research assistant. Given a research question, decompose it into 2-5 targeted search subqueries that would help find relevant research papers. Each subquery should focus on a different aspect of the question. Each subquery should be a concise search phrase suitable for finding academic papers."""
+DECOMPOSE_PROMPT = """You are a research assistant helping find academic papers. Given a research question, generate 2-5 search subqueries.
+
+Guidelines:
+- The FIRST subquery should be a direct, general search closely matching the original question's core intent
+- Additional subqueries can explore specific aspects, related concepts, or alternative phrasings
+- Vary specificity: include both broad and narrow queries
+- If the original question is already specific and well-formed, fewer subqueries (2-3) may be better
+- Each subquery should be a concise search phrase suitable for academic paper search
+- Avoid over-decomposing simple questions into overly narrow fragments"""
 
 
 class DecomposeResponse(BaseModel):
