@@ -162,12 +162,20 @@ function DiscoverPageContent() {
         router.push(`/discover?id=${search.id}`)
     }
 
-    // Deduplicate within each group so a result only appears under the first subquery that found it
-    const globalSeen = new Set<string>()
+    // Normalize title for comparison (lowercase, remove punctuation, collapse whitespace)
+    const normalizeTitle = (title: string) =>
+        title.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim()
+
+    // Deduplicate by URL and similar titles
+    const globalSeenUrls = new Set<string>()
+    const globalSeenTitles = new Set<string>()
     const dedupedGroups = resultGroups.map((group) => {
         const dedupedResults = group.results.filter((r) => {
-            if (globalSeen.has(r.url)) return false
-            globalSeen.add(r.url)
+            if (globalSeenUrls.has(r.url)) return false
+            const normalizedTitle = normalizeTitle(r.title)
+            if (globalSeenTitles.has(normalizedTitle)) return false
+            globalSeenUrls.add(r.url)
+            globalSeenTitles.add(normalizedTitle)
             return true
         })
         return { ...group, results: dedupedResults }
@@ -184,23 +192,27 @@ function DiscoverPageContent() {
         <div className="w-full px-4 py-6 space-y-6 overflow-x-hidden">
             {!hasResults ? (
                 <>
-                    <div className="flex justify-end">
-                        <DiscoverHistory searches={history} onSelect={handleHistorySelect} />
-                    </div>
-
                     <DiscoverInput
                         value={question}
                         onChange={setQuestion}
                         onSubmit={handleSearch}
                         loading={loading}
                     />
+
+                    {history.length > 0 && (
+                        <div className="max-w-2xl mx-auto flex justify-center">
+                            <DiscoverHistory searches={history} onSelect={handleHistorySelect} />
+                        </div>
+                    )}
                 </>
             ) : (
                 <>
                     {/* Results header */}
                     <div className="max-w-2xl mx-auto flex items-start justify-between gap-4">
                         <h1 className="text-xl font-semibold">{submittedQuestion}</h1>
-                        <DiscoverHistory searches={history} onSelect={handleHistorySelect} />
+                        {history.length > 0 && (
+                            <DiscoverHistory searches={history} onSelect={handleHistorySelect} />
+                        )}
                     </div>
 
                     {(subqueries.length > 0 || loading) && (
@@ -221,7 +233,7 @@ function DiscoverPageContent() {
                     )}
 
                     {/* Results grouped by subquery */}
-                    <div className="max-w-2xl mx-auto space-y-8">
+                    <div className="max-w-2xl mx-auto space-y-10">
                         {loading && resultGroups.length === 0 && subqueries.length > 0 && (
                             <div className="space-y-4">
                                 {[...Array(4)].map((_, i) => (
@@ -239,9 +251,11 @@ function DiscoverPageContent() {
                             if (group.results.length === 0) return null
                             return (
                                 <div key={group.subquery}>
-                                    <h3 className="text-md font-medium border-b border-slate-200 dark:border-slate-700 pb-2 mb-0">
-                                        {group.subquery}
-                                    </h3>
+                                    <div className="bg-slate-100 dark:bg-slate-800/50 rounded-md px-3 py-2 mb-2">
+                                        <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                            {group.subquery}
+                                        </h3>
+                                    </div>
                                     <div>
                                         {group.results.map((result, idx) => (
                                             <DiscoverResultCard

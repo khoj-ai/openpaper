@@ -30,21 +30,21 @@ export default function DiscoverInput({ value, onChange, onSubmit, loading }: Di
             <p className="text-sm text-muted-foreground text-center">
                 Enter a research question and we&apos;ll find relevant papers across the web.
             </p>
-            <div className="flex gap-2">
+            <div className="relative">
                 <Textarea
                     ref={textareaRef}
                     placeholder="What research questions are you exploring?"
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    className="min-h-[60px] max-h-[120px] resize-none"
+                    className="min-h-[60px] max-h-[120px] resize-none pr-12"
                     rows={2}
                 />
                 <Button
                     onClick={onSubmit}
                     disabled={!value.trim() || loading}
-                    className="self-end"
                     size="icon"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
                 >
                     <Search className="h-4 w-4" />
                 </Button>
