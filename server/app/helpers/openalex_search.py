@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Optional
 
-from app.helpers.paper_search import search_open_alex
+from app.helpers.paper_search import OpenAlexFilter, search_open_alex
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class OpenAlexResult:
     title: str
     url: str
-    author: Optional[str] = None
+    authors: list[str] = field(default_factory=list)
     published_date: Optional[str] = None
     text: Optional[str] = None  # Abstract
     highlights: list[str] = field(default_factory=list)
@@ -25,7 +25,7 @@ class OpenAlexResult:
         return {
             "title": self.title,
             "url": self.url,
-            "author": self.author,
+            "authors": self.authors,
             "published_date": self.published_date,
             "text": self.text,
             "highlights": self.highlights,
@@ -35,10 +35,25 @@ class OpenAlexResult:
         }
 
 
-def search_openalex(query: str, num_results: int = 10) -> list[OpenAlexResult]:
-    """Search OpenAlex for research papers matching the query."""
+def search_openalex(
+    query: str,
+    num_results: int = 10,
+    sort: Optional[str] = None,
+    only_open_access: bool = False,
+) -> list[OpenAlexResult]:
+    """Search OpenAlex for research papers matching the query.
+
+    Args:
+        query: Search query string
+        num_results: Maximum number of results to return
+        sort: Optional sort parameter (e.g., "cited_by_count:desc" or "publication_date:desc")
+        only_open_access: If True, only return open access papers
+    """
     try:
-        response = search_open_alex(query)
+        filter_obj = (
+            OpenAlexFilter(only_oa=only_open_access) if only_open_access else None
+        )
+        response = search_open_alex(query, filter=filter_obj, sort=sort)
 
         results = []
         for work in response.results[:num_results]:
@@ -46,14 +61,12 @@ def search_openalex(query: str, num_results: int = 10) -> list[OpenAlexResult]:
             if not work.title or not work.title.strip():
                 continue
 
-            # Extract first author name
-            author = None
-            if work.authorships and len(work.authorships) > 0:
-                first_author = work.authorships[0]
-                if first_author.author and first_author.author.display_name:
-                    author = first_author.author.display_name
-                    if len(work.authorships) > 1:
-                        author += " et al."
+            # Extract all author names
+            authors: list[str] = []
+            if work.authorships:
+                for authorship in work.authorships:
+                    if authorship.author and authorship.author.display_name:
+                        authors.append(authorship.author.display_name)
 
             # Get the best URL (prefer landing page, fall back to DOI)
             url = None
@@ -76,7 +89,7 @@ def search_openalex(query: str, num_results: int = 10) -> list[OpenAlexResult]:
                 OpenAlexResult(
                     title=work.title.strip(),
                     url=url,
-                    author=author,
+                    authors=authors,
                     published_date=work.publication_date,
                     text=work.abstract,
                     highlights=[],

@@ -9,7 +9,7 @@ from app.database.database import get_db
 from app.database.telemetry import track_event
 from app.helpers.discover import run_discover_pipeline
 from app.helpers.subscription_limits import can_user_run_discover_search
-from app.schemas.discover import DiscoverSearchRequest
+from app.schemas.discover import DISCOVER_SOURCES, DiscoverSearchRequest
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -40,7 +40,12 @@ async def discover_search(
         collected_results: dict[str, list] = {}
 
         try:
-            async for chunk in run_discover_pipeline(request.question):
+            async for chunk in run_discover_pipeline(
+                request.question,
+                request.sources,
+                request.sort,
+                request.only_open_access,
+            ):
                 chunk_type = chunk.get("type")
 
                 if chunk_type == "subqueries":
@@ -98,6 +103,15 @@ async def discover_history(
             "created_at": s.created_at.isoformat() if s.created_at else None,
         }
         for s in searches
+    ]
+
+
+@discover_router.get("/sources")
+async def discover_sources():
+    """Get the list of available source filters for discover search."""
+    return [
+        {"key": key, "label": info["label"], "description": info["description"]}
+        for key, info in DISCOVER_SOURCES.items()
     ]
 
 

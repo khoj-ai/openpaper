@@ -16,7 +16,7 @@ EXA_API_KEY = os.getenv("EXA_API_KEY")
 class ExaResult:
     title: str
     url: str
-    author: Optional[str] = None
+    authors: list[str] = field(default_factory=list)
     published_date: Optional[str] = None
     text: Optional[str] = None
     highlights: list[str] = field(default_factory=list)
@@ -27,7 +27,7 @@ class ExaResult:
         return {
             "title": self.title,
             "url": self.url,
-            "author": self.author,
+            "authors": self.authors,
             "published_date": self.published_date,
             "text": self.text,
             "highlights": self.highlights,
@@ -106,23 +106,35 @@ ACADEMIC_DOMAINS = [
 ]
 
 
-def search_exa(query: str, num_results: int = 10) -> list[ExaResult]:
-    """Search Exa for research papers matching the query."""
+def search_exa(
+    query: str, num_results: int = 10, domains: Optional[list[str]] = None
+) -> list[ExaResult]:
+    """Search Exa for research papers matching the query.
+
+    Args:
+        query: Search query string
+        num_results: Maximum number of results to return
+        domains: Optional list of domains to filter by. If None, no domain filtering
+                 is applied (relies on category="research paper" for relevance).
+    """
     if not EXA_API_KEY:
         raise ValueError("EXA_API_KEY environment variable is not set")
 
     exa = Exa(api_key=EXA_API_KEY)
 
     try:
-        response = exa.search_and_contents(
-            query=query,
-            num_results=num_results,
-            type="neural",
-            category="research paper",
-            include_domains=ACADEMIC_DOMAINS,
-            text={"max_characters": 500},
-            highlights={"num_sentences": 3},
-        )
+        search_params = {
+            "query": query,
+            "num_results": num_results,
+            "type": "auto",
+            "category": "research paper",
+            "text": {"max_characters": 500},
+            "highlights": {"num_sentences": 3},
+        }
+
+        search_params["include_domains"] = domains or ACADEMIC_DOMAINS
+
+        response = exa.search_and_contents(**search_params)
 
         results = []
         for result in response.results:
@@ -134,7 +146,7 @@ def search_exa(query: str, num_results: int = 10) -> list[ExaResult]:
                 ExaResult(
                     title=result.title.strip(),
                     url=result.url,
-                    author=result.author,
+                    authors=[result.author] if result.author else [],
                     published_date=result.published_date,
                     text=result.text,
                     highlights=result.highlights if result.highlights else [],
