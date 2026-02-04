@@ -5,7 +5,7 @@ import { ExternalLink } from "lucide-react"
 export interface DiscoverResult {
     title: string
     url: string
-    author?: string | null
+    authors?: string[]
     published_date?: string | null
     text?: string | null
     highlights?: string[]
@@ -37,16 +37,23 @@ function sanitizeSnippet(text: string): string {
     return cleaned
 }
 
+function formatAuthors(authors?: string[]): string | null {
+    if (!authors || authors.length === 0) return null
+    if (authors.length === 1) return authors[0]
+    if (authors.length === 2) return `${authors[0]} and ${authors[1]}`
+    return `${authors[0]} et al.`
+}
+
 export default function DiscoverResultCard({ result }: DiscoverResultCardProps) {
     const publishedYear = result.published_date
         ? new Date(result.published_date).getFullYear()
         : null
 
-    const snippet = result.highlights?.[0]
-        ? sanitizeSnippet(result.highlights[0])
-        : result.text
-          ? sanitizeSnippet(result.text)
-          : null
+    const authorsDisplay = formatAuthors(result.authors)
+
+    const snippet = sanitizeSnippet(
+        result.text || result.highlights?.[0] || ""
+    );
 
     return (
         <div className="py-4 border-b border-slate-200 dark:border-slate-800 last:border-b-0 group">
@@ -69,10 +76,10 @@ export default function DiscoverResultCard({ result }: DiscoverResultCardProps) 
                 </a>
 
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    {result.author && <span>{result.author}</span>}
-                    {result.author && publishedYear && <span>&middot;</span>}
+                    {authorsDisplay && <span>{authorsDisplay}</span>}
+                    {authorsDisplay && publishedYear && <span>&middot;</span>}
                     {publishedYear && <span>{publishedYear}</span>}
-                    {(result.author || publishedYear) && result.cited_by_count != null && result.cited_by_count > 0 && <span>&middot;</span>}
+                    {(authorsDisplay || publishedYear) && result.cited_by_count != null && result.cited_by_count > 0 && <span>&middot;</span>}
                     {result.cited_by_count != null && result.cited_by_count > 0 && (
                         <span>{result.cited_by_count.toLocaleString()} citations</span>
                     )}

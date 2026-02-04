@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { RotateCcw } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import DiscoverHistory, { DiscoverSearchHistory } from "./DiscoverHistory"
-import DiscoverInput from "./DiscoverInput"
+import DiscoverInput, { DiscoverSource, DiscoverSort, SearchMode } from "./DiscoverInput"
 import DiscoverResultCard, { DiscoverResult } from "./DiscoverResultCard"
 import SubqueryList from "./SubqueryList"
 
@@ -30,6 +30,11 @@ function DiscoverPageContent() {
     const [resultGroups, setResultGroups] = useState<SubqueryResults[]>([])
     const [history, setHistory] = useState<DiscoverSearchHistory[]>([])
     const [error, setError] = useState<string | null>(null)
+    const [sources, setSources] = useState<DiscoverSource[]>([])
+    const [selectedSources, setSelectedSources] = useState<string[]>([])
+    const [sort, setSort] = useState<DiscoverSort>(null)
+    const [mode, setMode] = useState<SearchMode>("scholarly")
+    const [onlyOpenAccess, setOnlyOpenAccess] = useState(false)
 
     const loadSearchById = useCallback(async (id: string) => {
         try {
@@ -63,9 +68,27 @@ function DiscoverPageContent() {
         }
     }, [])
 
+    const fetchSources = useCallback(async () => {
+        try {
+            const data = await fetchFromApi("/api/discover/sources")
+            setSources(data)
+        } catch {
+            // Silently fail for sources
+        }
+    }, [])
+
     useEffect(() => {
         fetchHistory()
-    }, [fetchHistory])
+        fetchSources()
+    }, [fetchHistory, fetchSources])
+
+    const handleSourceToggle = (sourceKey: string) => {
+        setSelectedSources((prev) =>
+            prev.includes(sourceKey)
+                ? prev.filter((s) => s !== sourceKey)
+                : [...prev, sourceKey]
+        )
+    }
 
     // Load search from URL ?id= param on mount
     useEffect(() => {
@@ -82,6 +105,10 @@ function DiscoverPageContent() {
         setResultGroups([])
         setActiveSubquery("")
         setError(null)
+        setSelectedSources([])
+        setSort(null)
+        setMode("scholarly")
+        setOnlyOpenAccess(false)
         router.push("/discover")
     }
 
@@ -97,10 +124,29 @@ function DiscoverPageContent() {
         setError(null)
 
         try {
+            const requestBody: { question: string; sources?: string[]; sort?: string; only_open_access?: boolean } = {
+                question: question.trim(),
+            }
+
+            // Set sources based on mode
+            if (mode === "scholarly") {
+                requestBody.sources = ["openalex"]
+                if (sort) {
+                    requestBody.sort = sort
+                }
+                if (onlyOpenAccess) {
+                    requestBody.only_open_access = true
+                }
+            } else if (selectedSources.length > 0) {
+                // Discover mode with specific domain filters
+                requestBody.sources = selectedSources.filter(s => s !== "openalex")
+            }
+            // Discover mode with no filters = use Exa with default domains
+
             const stream = await fetchStreamFromApi("/api/discover/search", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ question: question.trim() }),
+                body: JSON.stringify(requestBody),
             })
 
             const reader = stream.getReader()
@@ -189,14 +235,23 @@ function DiscoverPageContent() {
     const hasResults = submittedQuestion !== null
 
     return (
-        <div className="w-full px-4 py-6 space-y-6 overflow-x-hidden">
+        <div className={`w-full px-4 overflow-x-hidden ${!hasResults ? "min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center" : "py-6 space-y-6"}`}>
             {!hasResults ? (
-                <>
+                <div className="w-full space-y-6">
                     <DiscoverInput
                         value={question}
                         onChange={setQuestion}
                         onSubmit={handleSearch}
                         loading={loading}
+                        sources={sources}
+                        selectedSources={selectedSources}
+                        onSourceToggle={handleSourceToggle}
+                        sort={sort}
+                        onSortChange={setSort}
+                        mode={mode}
+                        onModeChange={setMode}
+                        onlyOpenAccess={onlyOpenAccess}
+                        onOpenAccessChange={setOnlyOpenAccess}
                     />
 
                     {history.length > 0 && (
@@ -204,7 +259,7 @@ function DiscoverPageContent() {
                             <DiscoverHistory searches={history} onSelect={handleHistorySelect} />
                         </div>
                     )}
-                </>
+                </div>
             ) : (
                 <>
                     {/* Results header */}
