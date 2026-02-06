@@ -263,11 +263,8 @@ function DiscoverPageContent() {
             ) : (
                 <>
                     {/* Results header */}
-                    <div className="max-w-2xl mx-auto flex items-start justify-between gap-4">
+                    <div className="max-w-2xl mx-auto">
                         <h1 className="text-xl font-semibold">{submittedQuestion}</h1>
-                        {history.length > 0 && (
-                            <DiscoverHistory searches={history} onSelect={handleHistorySelect} />
-                        )}
                     </div>
 
                     {(subqueries.length > 0 || loading) && (
@@ -335,7 +332,7 @@ function DiscoverPageContent() {
                         <div className="fixed bottom-6 right-6">
                             <Button onClick={handleReset} className="gap-2 shadow-lg">
                                 <RotateCcw className="h-4 w-4" />
-                                Ask another question
+                                Find more literature
                             </Button>
                         </div>
                     )}
