@@ -20,6 +20,8 @@ class OpenAlexResult:
     highlight_scores: list[float] = field(default_factory=list)
     favicon: Optional[str] = None
     cited_by_count: Optional[int] = None
+    source: Optional[str] = None  # Publication venue/journal
+    institutions: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -32,6 +34,8 @@ class OpenAlexResult:
             "highlight_scores": self.highlight_scores,
             "favicon": self.favicon,
             "cited_by_count": self.cited_by_count,
+            "source": self.source,
+            "institutions": self.institutions,
         }
 
 
@@ -61,12 +65,22 @@ def search_openalex(
             if not work.title or not work.title.strip():
                 continue
 
-            # Extract all author names
+            # Extract all author names and institutions
             authors: list[str] = []
+            institutions_set: set[str] = set()
             if work.authorships:
                 for authorship in work.authorships:
                     if authorship.author and authorship.author.display_name:
                         authors.append(authorship.author.display_name)
+                    if authorship.institutions:
+                        for inst in authorship.institutions:
+                            if inst.display_name:
+                                institutions_set.add(inst.display_name)
+
+            # Extract publication source (journal/venue)
+            source = None
+            if work.primary_location and work.primary_location.source:
+                source = work.primary_location.source.display_name
 
             # Get the best URL (prefer landing page, fall back to DOI)
             url = None
@@ -96,6 +110,8 @@ def search_openalex(
                     highlight_scores=[],
                     favicon=None,
                     cited_by_count=work.cited_by_count,
+                    source=source,
+                    institutions=list(institutions_set),
                 )
             )
 
