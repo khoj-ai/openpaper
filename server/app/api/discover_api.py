@@ -33,6 +33,11 @@ async def discover_search(
     # Check quota
     can_search, error_msg = can_user_run_discover_search(db, current_user)
     if not can_search:
+        track_event(
+            "discover_search_quota_exceeded",
+            properties={"error": error_msg},
+            user_id=str(current_user.id),
+        )
         raise HTTPException(status_code=429, detail=error_msg)
 
     async def response_generator():
@@ -64,6 +69,10 @@ async def discover_search(
                         user=current_user,
                     )
 
+                    # Determine search mode based on sources
+                    use_openalex = request.sources and "openalex" in request.sources
+                    search_mode = "scholarly" if use_openalex else "discover"
+
                     track_event(
                         "did_discover_search",
                         properties={
@@ -72,6 +81,11 @@ async def discover_search(
                             "num_results": sum(
                                 len(v) for v in collected_results.values()
                             ),
+                            "mode": search_mode,
+                            "sources": request.sources,
+                            "sort": request.sort,
+                            "only_open_access": request.only_open_access,
+                            "year_filter": request.year_filter,
                         },
                         user_id=str(current_user.id),
                     )
@@ -83,6 +97,14 @@ async def discover_search(
 
         except Exception as e:
             logger.error(f"Error in discover pipeline: {e}", exc_info=True)
+            track_event(
+                "discover_search_error",
+                properties={
+                    "question": request.question,
+                    "error": str(e),
+                },
+                user_id=str(current_user.id),
+            )
             yield f"{json.dumps({'type': 'error', 'content': str(e)})}{END_DELIMITER}"
 
     return StreamingResponse(response_generator(), media_type="text/event-stream")
@@ -126,6 +148,13 @@ async def discover_get(
     search = discover_search_crud.get_by_id(db, search_id=search_id, user=current_user)
     if not search:
         raise HTTPException(status_code=404, detail="Search not found")
+
+    track_event(
+        "did_view_discover_search",
+        properties={"search_id": search_id},
+        user_id=str(current_user.id),
+    )
+
     return {
         "id": str(search.id),
         "question": search.question,
