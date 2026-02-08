@@ -154,6 +154,15 @@ export const getDiscoverSearchUsagePercentage = (subscription: SubscriptionData 
     return (discover_searches_used / total) * 100;
 };
 
+export const isDiscoverSearchNearLimit = (subscription: SubscriptionData | null, threshold: number = 75): boolean => {
+    return getDiscoverSearchUsagePercentage(subscription) >= threshold;
+};
+
+export const isDiscoverSearchAtLimit = (subscription: SubscriptionData | null): boolean => {
+    if (!subscription) return false;
+    return subscription.usage.discover_searches_remaining <= 0;
+};
+
 // Calculate next Monday at 12 AM UTC for credit reset
 export const nextMonday = (() => {
     const now = new Date();

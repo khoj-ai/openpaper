@@ -50,6 +50,9 @@ interface DiscoverInputProps {
     onOpenAccessChange: (value: boolean) => void
     yearFilter: YearFilter
     onYearFilterChange: (filter: YearFilter) => void
+    atSearchLimit?: boolean
+    nearSearchLimit?: boolean
+    searchesRemaining?: number
 }
 
 export default function DiscoverInput({
@@ -68,6 +71,9 @@ export default function DiscoverInput({
     onOpenAccessChange,
     yearFilter,
     onYearFilterChange,
+    atSearchLimit = false,
+    nearSearchLimit = false,
+    searchesRemaining,
 }: DiscoverInputProps) {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -284,7 +290,7 @@ export default function DiscoverInput({
                     {/* Search button */}
                     <Button
                         onClick={onSubmit}
-                        disabled={!value.trim() || loading}
+                        disabled={!value.trim() || loading || atSearchLimit}
                         size="sm"
                         className="gap-2"
                     >
@@ -293,6 +299,16 @@ export default function DiscoverInput({
                     </Button>
                 </div>
             </div>
+
+            {atSearchLimit ? (
+                <p className="text-sm text-muted-foreground text-center">
+                    You&apos;ve reached your weekly search limit. Limits reset every Monday.
+                </p>
+            ) : nearSearchLimit && searchesRemaining !== undefined ? (
+                <p className="text-sm text-muted-foreground text-center">
+                    {searchesRemaining} search{searchesRemaining === 1 ? "" : "es"} remaining this week.
+                </p>
+            ) : null}
         </div>
     )
 }

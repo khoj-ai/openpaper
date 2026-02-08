@@ -6,6 +6,7 @@ import { Suspense, useCallback, useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Search } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useSubscription, isDiscoverSearchAtLimit, isDiscoverSearchNearLimit } from "@/hooks/useSubscription"
 import DiscoverHistory, { DiscoverSearchHistory } from "./DiscoverHistory"
 import DiscoverInput, { DiscoverSource, DiscoverSort, SearchMode, YearFilter } from "./DiscoverInput"
 import DiscoverResultCard, { DiscoverResult } from "./DiscoverResultCard"
@@ -43,6 +44,10 @@ function DiscoverPageContent() {
     const [mode, setMode] = useState<SearchMode>("scholarly")
     const [onlyOpenAccess, setOnlyOpenAccess] = useState(false)
     const [yearFilter, setYearFilter] = useState<YearFilter>(null)
+
+    const { subscription, refetch: refetchSubscription } = useSubscription()
+    const atSearchLimit = isDiscoverSearchAtLimit(subscription)
+    const nearSearchLimit = isDiscoverSearchNearLimit(subscription)
 
     const loadSearchById = useCallback(async (id: string) => {
         try {
@@ -213,6 +218,7 @@ function DiscoverPageContent() {
         } finally {
             setLoading(false)
             setActiveSubquery("")
+            refetchSubscription()
         }
     }
 
@@ -276,6 +282,9 @@ function DiscoverPageContent() {
                         onOpenAccessChange={setOnlyOpenAccess}
                         yearFilter={yearFilter}
                         onYearFilterChange={setYearFilter}
+                        atSearchLimit={atSearchLimit}
+                        nearSearchLimit={nearSearchLimit}
+                        searchesRemaining={subscription?.usage.discover_searches_remaining}
                     />
 
                     {history.length > 0 && (
