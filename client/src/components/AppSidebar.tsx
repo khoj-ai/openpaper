@@ -5,6 +5,7 @@ import {
     ChevronsUpDown,
     FileText,
     FolderKanban,
+    Compass,
     Globe2,
     Home,
     LogOut,
@@ -47,7 +48,7 @@ import {
 } from "@/components/ui/sheet";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useIsDarkMode } from "@/hooks/useDarkMode";
-import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isStorageNearLimit, isPaperUploadNearLimit, isChatCreditAtLimit, isChatCreditNearLimit, formatFileSize, getStorageUsagePercentage, getPaperUploadPercentage, getChatCreditUsagePercentage, getAudioOverviewUsagePercentage, getProjectUsagePercentage, getDataTableUsagePercentage } from "@/hooks/useSubscription";
+import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isStorageNearLimit, isPaperUploadNearLimit, isChatCreditAtLimit, isChatCreditNearLimit, formatFileSize, getStorageUsagePercentage, getPaperUploadPercentage, getChatCreditUsagePercentage, getAudioOverviewUsagePercentage, getProjectUsagePercentage, getDataTableUsagePercentage, getDiscoverSearchUsagePercentage } from "@/hooks/useSubscription";
 import Link from "next/link";
 import { Conversation, PaperItem, Project, SubscriptionData } from "@/lib/schema";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -78,6 +79,13 @@ const items = [
         url: "/understand",
         icon: TelescopeIcon,
         requiresAuth: true,
+    },
+    {
+        title: "Discover",
+        url: "/discover",
+        icon: Compass,
+        requiresAuth: true,
+        isNew: true,
     },
     {
         title: "Find Papers",
@@ -238,6 +246,13 @@ const UsageLimitCard = ({
                     used={subscription.usage.data_tables_used}
                     total={subscription.limits.data_tables_weekly}
                     percentage={getDataTableUsagePercentage(subscription)}
+                />
+
+                <UsageItem
+                    label="Weekly Discover Searches"
+                    used={subscription.usage.discover_searches_used}
+                    total={subscription.limits.discover_searches_weekly}
+                    percentage={getDiscoverSearchUsagePercentage(subscription)}
                 />
 
                 <UsageItem
@@ -448,6 +463,11 @@ export function AppSidebar() {
                                             <Link href={item.requiresAuth && !user ? "/login" : item.url}>
                                                 <item.icon />
                                                 <span>{item.title}</span>
+                                                {item.isNew && (
+                                                    <Badge className="ml-auto text-[10px] px-1.5 py-0 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900">
+                                                        New
+                                                    </Badge>
+                                                )}
                                             </Link>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>

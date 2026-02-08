@@ -27,10 +27,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { fetchFromApi } from "@/lib/api";
 import { OpenAlexPaper, OpenAlexResponse } from "@/lib/schema";
-import { ArrowDownNarrowWide, Building2, CheckIcon, ChevronDown, Filter, Search, User, X } from "lucide-react";
+import { ArrowDownNarrowWide, Building2, CheckIcon, ChevronDown, Filter, Mail, Search, User, X } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { FinderIntro } from "./FinderIntro";
 import PaperPreviewPanel from "./PaperPreviewPanel";
 import PaperResultCard from "./PaperResultCard";
@@ -349,6 +350,25 @@ function FinderPageContent() {
 
     return (
         <div className="w-full px-4 py-6 space-y-6 overflow-x-hidden">
+            <Alert className="max-w-2xl">
+                <AlertTitle>This feature will be deprecated</AlertTitle>
+                <AlertDescription className="space-y-2">
+                    <p>
+                        Please try the new{" "}
+                        <Link href="/discover" className="underline font-medium">
+                            Discover
+                        </Link>
+                        {" "}feature for finding research papers.
+                    </p>
+                    <a
+                        href="mailto:saba@openpaper.ai"
+                        className="inline-flex items-center gap-1.5 text-sm font-medium hover:underline"
+                    >
+                        <Mail className="h-3.5 w-3.5" />
+                        Share feedback
+                    </a>
+                </AlertDescription>
+            </Alert>
             <div className="space-y-4">
                 {/* Main search bar */}
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">

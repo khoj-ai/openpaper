@@ -81,6 +81,7 @@ class OAStatus(str, Enum):
     BRONZE = "bronze"
     CLOSED = "closed"
 
+
 class PaperSort(str, Enum):
     top_cited = "cited_by_count:desc"
     newest = "publication_date:desc"
@@ -225,6 +226,7 @@ class OpenAlexFilter(BaseModel):
     authors: Optional[List[str]] = None
     institutions: Optional[List[str]] = None
     only_oa: bool = False
+    from_publication_date: Optional[str] = None  # ISO date format: YYYY-MM-DD
 
 
 def construct_open_alex_filter_url(filter: OpenAlexFilter) -> str:
@@ -244,6 +246,8 @@ def construct_open_alex_filter_url(filter: OpenAlexFilter) -> str:
         filters.append(f"institutions.id:{'|'.join(filter.institutions)}")
     if filter.only_oa:
         filters.append("open_access.is_oa:true")
+    if filter.from_publication_date:
+        filters.append(f"from_publication_date:{filter.from_publication_date}")
 
     return ",".join(filters) if filters else ""
 
@@ -251,10 +255,10 @@ def construct_open_alex_filter_url(filter: OpenAlexFilter) -> str:
 # Utility functions for searching the OpenAlex API
 # For documentation, see https://docs.openalex.org/api-entities/works/search-works
 def search_open_alex(
-    search_term: Optional[str], 
-    filter: Optional[OpenAlexFilter] = None, 
+    search_term: Optional[str],
+    filter: Optional[OpenAlexFilter] = None,
     page: int = 1,
-    sort: Optional[str] = None, # e.g. "cited_by_count:desc" or "publication_year:desc"
+    sort: Optional[str] = None,  # e.g. "cited_by_count:desc" or "publication_year:desc"
 ) -> OpenAlexResponse:
     """
     Search the OpenAlex API for papers based on a search term and optional filter.

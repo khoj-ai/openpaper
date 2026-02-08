@@ -109,9 +109,16 @@ class BaseLLMClient:
         model_type: ModelType = ModelType.DEFAULT,
         provider: Optional[LLMProvider] = None,
         enable_thinking: bool = True,
+        schema: Optional[Dict] = None,
         **kwargs,
     ) -> LLMResponse:
-        """Generate content using the specified provider. Automatically retries on transient errors."""
+        """Generate content using the specified provider. Automatically retries on transient errors.
+
+        Args:
+            schema: Optional JSON schema dict for structured output. When provided,
+                the LLM response will be constrained to match this schema via
+                the provider's native structured output support.
+        """
         start_time = time.time()
         model = self._get_model_for_type(model_type, provider)
         target_provider = provider or self.default_provider
@@ -125,6 +132,7 @@ class BaseLLMClient:
                 tool_call_results=tool_call_results,
                 history=history,
                 enable_thinking=enable_thinking,
+                schema=schema,
                 **kwargs,
             )
 

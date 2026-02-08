@@ -145,6 +145,24 @@ export const isDataTableAtLimit = (subscription: SubscriptionData | null): boole
     return getDataTableUsagePercentage(subscription) >= 100;
 };
 
+// Discover search usage helper functions
+export const getDiscoverSearchUsagePercentage = (subscription: SubscriptionData | null): number => {
+    if (!subscription) return 0;
+    const { discover_searches_used, discover_searches_remaining } = subscription.usage;
+    const total = discover_searches_used + discover_searches_remaining;
+    if (total === 0) return 0;
+    return (discover_searches_used / total) * 100;
+};
+
+export const isDiscoverSearchNearLimit = (subscription: SubscriptionData | null, threshold: number = 75): boolean => {
+    return getDiscoverSearchUsagePercentage(subscription) >= threshold;
+};
+
+export const isDiscoverSearchAtLimit = (subscription: SubscriptionData | null): boolean => {
+    if (!subscription) return false;
+    return subscription.usage.discover_searches_remaining <= 0;
+};
+
 // Calculate next Monday at 12 AM UTC for credit reset
 export const nextMonday = (() => {
     const now = new Date();

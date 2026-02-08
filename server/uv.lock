@@ -400,6 +400,24 @@ wheels = [
 ]
 
 [[package]]
+name = "exa-py"
+version = "2.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpcore" },
+    { name = "httpx" },
+    { name = "openai" },
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "requests" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5c/3b/36b15e7fd1e3bd85237378a5ef22f0d84eeb74ae50b72f4aeea5a6e8a84b/exa_py-2.3.0.tar.gz", hash = "sha256:9511848795e2bc6e37c00868a2a85ba4ce6784254d4b5f514c8b29eca6ad362a", size = 47929, upload-time = "2026-02-01T23:51:18.851Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7c/9b/e44cac030097e63e8d41d3d1746d18b279b91fc7e68df5e4601f278d3bc2/exa_py-2.3.0-py3-none-any.whl", hash = "sha256:d42506bbcd8826cb933b1588815a6c12c4060c01e52101338ad8fa186cce55aa", size = 62983, upload-time = "2026-02-01T23:51:17.857Z" },
+]
+
+[[package]]
 name = "fastapi"
 version = "0.128.0"
 source = { registry = "https://pypi.org/simple" }
@@ -834,6 +852,7 @@ dependencies = [
     { name = "alembic" },
     { name = "boto3" },
     { name = "celery" },
+    { name = "exa-py" },
     { name = "fastapi" },
     { name = "firecrawl-py" },
     { name = "google-genai" },
@@ -865,6 +884,7 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.15.1" },
     { name = "boto3", specifier = ">=1.37.33" },
     { name = "celery", specifier = ">=5.5.3" },
+    { name = "exa-py", specifier = ">=1.0.0" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "firecrawl-py", specifier = ">=2.7.0" },
     { name = "google-genai", specifier = ">=1.7.0" },

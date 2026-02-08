@@ -835,6 +835,20 @@ class Onboarding(Base):
     user = relationship("User", back_populates="onboarding")
 
 
+class DiscoverSearch(Base):
+    __tablename__ = "discover_searches"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    question = Column(Text, nullable=False)
+    subqueries = Column(JSONB, nullable=True)
+    results = Column(JSONB, nullable=True)
+
+    user = relationship("User")
+
+
 class DataTableExtractionJob(Base):
     __tablename__ = "data_table_extraction_jobs"
 
