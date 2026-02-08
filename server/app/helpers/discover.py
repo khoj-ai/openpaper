@@ -64,6 +64,7 @@ async def run_discover_pipeline(
     sources: Optional[list[str]] = None,
     sort: Optional[str] = None,
     only_open_access: bool = False,
+    year_filter: Optional[str] = None,
 ) -> AsyncGenerator[dict, None]:
     """
     Run the full discover pipeline, yielding streaming chunks:
@@ -77,6 +78,7 @@ async def run_discover_pipeline(
                  uses OpenAlex backend. Otherwise uses Exa with domain filtering.
         sort: Optional sort parameter for OpenAlex (e.g., "cited_by_count:desc")
         only_open_access: If True, only return open access papers (OpenAlex only)
+        year_filter: Optional time filter ("last_year", "last_5_years", or None for all time)
     """
     # Step 1: Decompose question into subqueries
     subqueries = decompose_query(question)
@@ -97,6 +99,7 @@ async def run_discover_pipeline(
                     num_results=10,
                     sort=sort,
                     only_open_access=only_open_access,
+                    year_filter=year_filter,
                 )
             else:
                 results = search_exa(subquery, num_results=10, domains=exa_domains)

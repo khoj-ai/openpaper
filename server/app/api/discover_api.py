@@ -45,6 +45,7 @@ async def discover_search(
                 request.sources,
                 request.sort,
                 request.only_open_access,
+                request.year_filter,
             ):
                 chunk_type = chunk.get("type")
 

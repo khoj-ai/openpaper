@@ -67,3 +67,6 @@ class DiscoverSearchRequest(BaseModel):
         None  # Sort option: "cited_by_count:desc" or "publication_date:desc"
     )
     only_open_access: bool = False  # Filter for open access papers (OpenAlex only)
+    year_filter: Optional[str] = (
+        None  # Time filter: "last_year", "last_5_years", or None for all time
+    )

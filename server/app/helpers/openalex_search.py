@@ -2,6 +2,7 @@
 
 import logging
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from typing import Optional
 
 from app.helpers.paper_search import OpenAlexFilter, search_open_alex
@@ -44,6 +45,7 @@ def search_openalex(
     num_results: int = 10,
     sort: Optional[str] = None,
     only_open_access: bool = False,
+    year_filter: Optional[str] = None,
 ) -> list[OpenAlexResult]:
     """Search OpenAlex for research papers matching the query.
 
@@ -52,11 +54,23 @@ def search_openalex(
         num_results: Maximum number of results to return
         sort: Optional sort parameter (e.g., "cited_by_count:desc" or "publication_date:desc")
         only_open_access: If True, only return open access papers
+        year_filter: Optional time filter ("last_year", "last_5_years", or None for all time)
     """
     try:
-        filter_obj = (
-            OpenAlexFilter(only_oa=only_open_access) if only_open_access else None
-        )
+        # Calculate from_publication_date based on year_filter
+        from_date = None
+        if year_filter == "last_year":
+            from_date = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
+        elif year_filter == "last_5_years":
+            from_date = (datetime.now() - timedelta(days=5 * 365)).strftime("%Y-%m-%d")
+
+        # Build filter object if we have any filters
+        filter_obj = None
+        if only_open_access or from_date:
+            filter_obj = OpenAlexFilter(
+                only_oa=only_open_access,
+                from_publication_date=from_date,
+            )
         response = search_open_alex(query, filter=filter_obj, sort=sort)
 
         results = []
