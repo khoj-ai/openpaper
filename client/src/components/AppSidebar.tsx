@@ -85,6 +85,7 @@ const items = [
         url: "/discover",
         icon: Compass,
         requiresAuth: true,
+        isNew: true,
     },
     {
         title: "Find Papers",
@@ -462,6 +463,11 @@ export function AppSidebar() {
                                             <Link href={item.requiresAuth && !user ? "/login" : item.url}>
                                                 <item.icon />
                                                 <span>{item.title}</span>
+                                                {item.isNew && (
+                                                    <Badge className="ml-auto text-[10px] px-1.5 py-0 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900">
+                                                        New
+                                                    </Badge>
+                                                )}
                                             </Link>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
