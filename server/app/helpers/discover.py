@@ -2,6 +2,7 @@
 
 import json
 import logging
+from datetime import datetime, timedelta
 from typing import AsyncGenerator, List, Optional
 
 from app.helpers.exa_search import search_exa
@@ -90,6 +91,13 @@ async def run_discover_pipeline(
     if sources and not use_openalex:
         exa_domains = _get_domains_for_sources(sources)
 
+    # Calculate start date for date filtering
+    start_date = None
+    if year_filter == "last_year":
+        start_date = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
+    elif year_filter == "last_5_years":
+        start_date = (datetime.now() - timedelta(days=5 * 365)).strftime("%Y-%m-%d")
+
     # Step 2: Search each subquery
     for subquery in subqueries:
         try:
@@ -102,7 +110,12 @@ async def run_discover_pipeline(
                     year_filter=year_filter,
                 )
             else:
-                results = search_exa(subquery, num_results=10, domains=exa_domains)
+                results = search_exa(
+                    subquery,
+                    num_results=10,
+                    domains=exa_domains,
+                    start_published_date=start_date,
+                )
 
             yield {
                 "type": "results",

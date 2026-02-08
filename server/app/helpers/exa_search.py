@@ -107,7 +107,10 @@ ACADEMIC_DOMAINS = [
 
 
 def search_exa(
-    query: str, num_results: int = 10, domains: Optional[list[str]] = None
+    query: str,
+    num_results: int = 10,
+    domains: Optional[list[str]] = None,
+    start_published_date: Optional[str] = None,
 ) -> list[ExaResult]:
     """Search Exa for research papers matching the query.
 
@@ -116,6 +119,7 @@ def search_exa(
         num_results: Maximum number of results to return
         domains: Optional list of domains to filter by. If None, no domain filtering
                  is applied (relies on category="research paper" for relevance).
+        start_published_date: Optional ISO date string (YYYY-MM-DD) for earliest publication date
     """
     if not EXA_API_KEY:
         raise ValueError("EXA_API_KEY environment variable is not set")
@@ -133,6 +137,9 @@ def search_exa(
         }
 
         search_params["include_domains"] = domains or ACADEMIC_DOMAINS
+
+        if start_published_date:
+            search_params["start_published_date"] = start_published_date
 
         response = exa.search_and_contents(**search_params)
 

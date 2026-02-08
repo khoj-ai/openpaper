@@ -146,14 +146,16 @@ function DiscoverPageContent() {
                 if (onlyOpenAccess) {
                     requestBody.only_open_access = true
                 }
-                if (yearFilter) {
-                    requestBody.year_filter = yearFilter
-                }
             } else if (selectedSources.length > 0) {
                 // Discover mode with specific domain filters
                 requestBody.sources = selectedSources.filter(s => s !== "openalex")
             }
             // Discover mode with no filters = use Exa with default domains
+
+            // Year filter applies to both modes
+            if (yearFilter) {
+                requestBody.year_filter = yearFilter
+            }
 
             const stream = await fetchStreamFromApi("/api/discover/search", {
                 method: "POST",

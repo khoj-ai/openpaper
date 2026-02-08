@@ -195,48 +195,10 @@ export default function DiscoverInput({
                                     </span>
                                 </label>
 
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <button
-                                            type="button"
-                                            className={cn(
-                                                "flex items-center gap-1.5 text-sm rounded-md px-2 py-1 transition-colors",
-                                                "hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                                yearFilter ? "text-foreground" : "text-muted-foreground"
-                                            )}
-                                        >
-                                            <Calendar className="h-3.5 w-3.5" />
-                                            {currentYearFilterLabel}
-                                            <ChevronDown className="h-3.5 w-3.5" />
-                                        </button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-40 p-1" align="start">
-                                        <div className="space-y-0.5">
-                                            {YEAR_FILTER_OPTIONS.map((option) => (
-                                                <button
-                                                    key={option.label}
-                                                    type="button"
-                                                    onClick={() => onYearFilterChange(option.value)}
-                                                    className={cn(
-                                                        "w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
-                                                        "hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                                        yearFilter === option.value && "bg-accent"
-                                                    )}
-                                                >
-                                                    <Check className={cn(
-                                                        "h-3.5 w-3.5",
-                                                        yearFilter === option.value ? "opacity-100" : "opacity-0"
-                                                    )} />
-                                                    {option.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </PopoverContent>
-                                </Popover>
                             </>
                         )}
 
-                        {/* Web mode: domain filter dropdown */}
+                        {/* Discover mode: domain filter dropdown */}
                         {mode === "discover" && webSources.length > 0 && (
                             <Popover>
                                 <PopoverTrigger asChild>
@@ -277,6 +239,46 @@ export default function DiscoverInput({
                                 </PopoverContent>
                             </Popover>
                         )}
+
+                        {/* Time filter (shown for both modes) */}
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <button
+                                    type="button"
+                                    className={cn(
+                                        "flex items-center gap-1.5 text-sm rounded-md px-2 py-1 transition-colors",
+                                        "hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                        yearFilter ? "text-foreground" : "text-muted-foreground"
+                                    )}
+                                >
+                                    <Calendar className="h-3.5 w-3.5" />
+                                    {currentYearFilterLabel}
+                                    <ChevronDown className="h-3.5 w-3.5" />
+                                </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-40 p-1" align="start">
+                                <div className="space-y-0.5">
+                                    {YEAR_FILTER_OPTIONS.map((option) => (
+                                        <button
+                                            key={option.label}
+                                            type="button"
+                                            onClick={() => onYearFilterChange(option.value)}
+                                            className={cn(
+                                                "w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+                                                "hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                                yearFilter === option.value && "bg-accent"
+                                            )}
+                                        >
+                                            <Check className={cn(
+                                                "h-3.5 w-3.5",
+                                                yearFilter === option.value ? "opacity-100" : "opacity-0"
+                                            )} />
+                                            {option.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </PopoverContent>
+                        </Popover>
                     </div>
 
                     {/* Search button */}
