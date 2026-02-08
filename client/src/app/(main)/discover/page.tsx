@@ -4,14 +4,21 @@ import { fetchFromApi, fetchStreamFromApi } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Suspense, useCallback, useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { RotateCcw } from "lucide-react"
+import { Search } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import DiscoverHistory, { DiscoverSearchHistory } from "./DiscoverHistory"
-import DiscoverInput, { DiscoverSource, DiscoverSort, SearchMode } from "./DiscoverInput"
+import DiscoverInput, { DiscoverSource, DiscoverSort, SearchMode, YearFilter } from "./DiscoverInput"
 import DiscoverResultCard, { DiscoverResult } from "./DiscoverResultCard"
 import SubqueryList from "./SubqueryList"
 
 const END_DELIMITER = "END_OF_STREAM"
+
+const EXAMPLE_QUERIES = [
+    "How do large language models handle long context windows?",
+    "What are the environmental impacts of lithium mining?",
+    "Recent advances in CRISPR gene editing therapies",
+    "Neural mechanisms of decision making under uncertainty",
+]
 
 interface SubqueryResults {
     subquery: string
@@ -35,6 +42,7 @@ function DiscoverPageContent() {
     const [sort, setSort] = useState<DiscoverSort>(null)
     const [mode, setMode] = useState<SearchMode>("scholarly")
     const [onlyOpenAccess, setOnlyOpenAccess] = useState(false)
+    const [yearFilter, setYearFilter] = useState<YearFilter>(null)
 
     const loadSearchById = useCallback(async (id: string) => {
         try {
@@ -109,6 +117,7 @@ function DiscoverPageContent() {
         setSort(null)
         setMode("scholarly")
         setOnlyOpenAccess(false)
+        setYearFilter(null)
         router.push("/discover")
     }
 
@@ -124,7 +133,7 @@ function DiscoverPageContent() {
         setError(null)
 
         try {
-            const requestBody: { question: string; sources?: string[]; sort?: string; only_open_access?: boolean } = {
+            const requestBody: { question: string; sources?: string[]; sort?: string; only_open_access?: boolean; year_filter?: string } = {
                 question: question.trim(),
             }
 
@@ -136,6 +145,9 @@ function DiscoverPageContent() {
                 }
                 if (onlyOpenAccess) {
                     requestBody.only_open_access = true
+                }
+                if (yearFilter) {
+                    requestBody.year_filter = yearFilter
                 }
             } else if (selectedSources.length > 0) {
                 // Discover mode with specific domain filters
@@ -194,8 +206,6 @@ function DiscoverPageContent() {
                 }
             }
 
-            // Refresh history after successful search
-            fetchHistory()
         } catch (err) {
             setError(err instanceof Error ? err.message : "Search failed")
         } finally {
@@ -206,6 +216,16 @@ function DiscoverPageContent() {
 
     const handleHistorySelect = (search: DiscoverSearchHistory) => {
         router.push(`/discover?id=${search.id}`)
+    }
+
+    const handleExampleClick = (example: string) => {
+        setQuestion(example)
+        setSubmittedQuestion(null)
+        setSubqueries([])
+        setResultGroups([])
+        setActiveSubquery("")
+        setError(null)
+        router.push("/discover")
     }
 
     // Normalize title for comparison (lowercase, remove punctuation, collapse whitespace)
@@ -252,6 +272,8 @@ function DiscoverPageContent() {
                         onModeChange={setMode}
                         onlyOpenAccess={onlyOpenAccess}
                         onOpenAccessChange={setOnlyOpenAccess}
+                        yearFilter={yearFilter}
+                        onYearFilterChange={setYearFilter}
                     />
 
                     {history.length > 0 && (
@@ -321,8 +343,21 @@ function DiscoverPageContent() {
                         })}
 
                         {!loading && totalResults === 0 && subqueries.length > 0 && (
-                            <div className="text-center text-muted-foreground py-8">
-                                No results found. Try a different question.
+                            <div className="text-center py-8 space-y-4">
+                                <p className="text-muted-foreground">
+                                    No results found{mode === "scholarly" ? " in academic databases" : ""}. Try a different query or explore these examples:
+                                </p>
+                                <div className="flex flex-wrap justify-center gap-2">
+                                    {EXAMPLE_QUERIES.map((example) => (
+                                        <button
+                                            key={example}
+                                            onClick={() => handleExampleClick(example)}
+                                            className="text-sm px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-left"
+                                        >
+                                            {example}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -331,7 +366,7 @@ function DiscoverPageContent() {
                     {!loading && (
                         <div className="fixed bottom-6 right-6">
                             <Button onClick={handleReset} className="gap-2 shadow-lg">
-                                <RotateCcw className="h-4 w-4" />
+                                <Search className="h-4 w-4" />
                                 Find more literature
                             </Button>
                         </div>

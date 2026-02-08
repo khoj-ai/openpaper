@@ -27,7 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { fetchFromApi } from "@/lib/api";
 import { OpenAlexPaper, OpenAlexResponse } from "@/lib/schema";
-import { ArrowDownNarrowWide, Building2, CheckIcon, ChevronDown, Filter, Search, User, X } from "lucide-react";
+import { ArrowDownNarrowWide, Building2, CheckIcon, ChevronDown, Filter, Mail, Search, User, X } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
@@ -352,16 +352,21 @@ function FinderPageContent() {
         <div className="w-full px-4 py-6 space-y-6 overflow-x-hidden">
             <Alert className="max-w-2xl">
                 <AlertTitle>This feature will be deprecated</AlertTitle>
-                <AlertDescription>
-                    For a free alternative, visit{" "}
-                    <a href="https://openalex.org" target="_blank" rel="noopener noreferrer" className="underline font-medium">
-                        OpenAlex.org
+                <AlertDescription className="space-y-2">
+                    <p>
+                        Please try the new{" "}
+                        <Link href="/discover" className="underline font-medium">
+                            Discover
+                        </Link>
+                        {" "}feature for finding research papers.
+                    </p>
+                    <a
+                        href="mailto:saba@openpaper.ai"
+                        className="inline-flex items-center gap-1.5 text-sm font-medium hover:underline"
+                    >
+                        <Mail className="h-3.5 w-3.5" />
+                        Share feedback
                     </a>
-                    , or try the new{" "}
-                    <Link href="/discover" className="underline font-medium">
-                        Discover
-                    </Link>
-                    {" "}feature.
                 </AlertDescription>
             </Alert>
             <div className="space-y-4">

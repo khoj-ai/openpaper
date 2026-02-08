@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/popover"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
-import { ArrowDownNarrowWide, Check, ChevronDown, Search } from "lucide-react"
+import { ArrowDownNarrowWide, Calendar, Check, ChevronDown, Search } from "lucide-react"
 import { useRef } from "react"
 
 export interface DiscoverSource {
@@ -20,11 +20,18 @@ export interface DiscoverSource {
 
 export type SearchMode = "scholarly" | "discover"
 export type DiscoverSort = "cited_by_count:desc" | "publication_date:desc" | null
+export type YearFilter = "last_year" | "last_5_years" | null
 
 const SORT_OPTIONS: { value: DiscoverSort; label: string }[] = [
     { value: null, label: "Relevance" },
     { value: "cited_by_count:desc", label: "Most cited" },
     { value: "publication_date:desc", label: "Newest" },
+]
+
+const YEAR_FILTER_OPTIONS: { value: YearFilter; label: string }[] = [
+    { value: null, label: "All time" },
+    { value: "last_year", label: "Last year" },
+    { value: "last_5_years", label: "Last 5 years" },
 ]
 
 interface DiscoverInputProps {
@@ -41,6 +48,8 @@ interface DiscoverInputProps {
     onModeChange: (mode: SearchMode) => void
     onlyOpenAccess: boolean
     onOpenAccessChange: (value: boolean) => void
+    yearFilter: YearFilter
+    onYearFilterChange: (filter: YearFilter) => void
 }
 
 export default function DiscoverInput({
@@ -57,6 +66,8 @@ export default function DiscoverInput({
     onModeChange,
     onlyOpenAccess,
     onOpenAccessChange,
+    yearFilter,
+    onYearFilterChange,
 }: DiscoverInputProps) {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -81,6 +92,7 @@ export default function DiscoverInput({
             : `${selectedCount} sources`
 
     const currentSortLabel = SORT_OPTIONS.find(o => o.value === sort)?.label || "Relevance"
+    const currentYearFilterLabel = YEAR_FILTER_OPTIONS.find(o => o.value === yearFilter)?.label || "All time"
 
     return (
         <div className="w-full max-w-2xl mx-auto space-y-4">
@@ -182,6 +194,45 @@ export default function DiscoverInput({
                                         Open Access
                                     </span>
                                 </label>
+
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <button
+                                            type="button"
+                                            className={cn(
+                                                "flex items-center gap-1.5 text-sm rounded-md px-2 py-1 transition-colors",
+                                                "hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                                yearFilter ? "text-foreground" : "text-muted-foreground"
+                                            )}
+                                        >
+                                            <Calendar className="h-3.5 w-3.5" />
+                                            {currentYearFilterLabel}
+                                            <ChevronDown className="h-3.5 w-3.5" />
+                                        </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-40 p-1" align="start">
+                                        <div className="space-y-0.5">
+                                            {YEAR_FILTER_OPTIONS.map((option) => (
+                                                <button
+                                                    key={option.label}
+                                                    type="button"
+                                                    onClick={() => onYearFilterChange(option.value)}
+                                                    className={cn(
+                                                        "w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+                                                        "hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                                        yearFilter === option.value && "bg-accent"
+                                                    )}
+                                                >
+                                                    <Check className={cn(
+                                                        "h-3.5 w-3.5",
+                                                        yearFilter === option.value ? "opacity-100" : "opacity-0"
+                                                    )} />
+                                                    {option.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </PopoverContent>
+                                </Popover>
                             </>
                         )}
 
