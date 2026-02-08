@@ -18,7 +18,7 @@ export interface DiscoverSource {
     description: string
 }
 
-export type SearchMode = "scholarly" | "discover"
+export type SearchMode = "scholarly" | "explore"
 export type DiscoverSort = "cited_by_count:desc" | "publication_date:desc" | null
 export type YearFilter = "last_year" | "last_5_years" | null
 
@@ -27,6 +27,11 @@ const SORT_OPTIONS: { value: DiscoverSort; label: string }[] = [
     { value: "cited_by_count:desc", label: "Most cited" },
     { value: "publication_date:desc", label: "Newest" },
 ]
+
+const PLACEHOLDERS: Record<SearchMode, string> = {
+    scholarly: "Search structured indexed academic databases...",
+    explore: "Search across preprints, journals, and research sites...",
+}
 
 const YEAR_FILTER_OPTIONS: { value: YearFilter; label: string }[] = [
     { value: null, label: "All time" },
@@ -105,7 +110,7 @@ export default function DiscoverInput({
             <div className="relative">
                 <Textarea
                     ref={textareaRef}
-                    placeholder="What research questions are you exploring?"
+                    placeholder={PLACEHOLDERS[mode]}
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
                     onKeyDown={handleKeyDown}
@@ -132,15 +137,15 @@ export default function DiscoverInput({
                             </button>
                             <button
                                 type="button"
-                                onClick={() => onModeChange("discover")}
+                                onClick={() => onModeChange("explore")}
                                 className={cn(
                                     "px-2.5 py-1 text-sm rounded transition-colors",
-                                    mode === "discover"
+                                    mode === "explore"
                                         ? "bg-background text-foreground shadow-sm"
                                         : "text-muted-foreground hover:text-foreground"
                                 )}
                             >
-                                Discover
+                                Explore
                             </button>
                         </div>
 
@@ -200,8 +205,8 @@ export default function DiscoverInput({
                             </>
                         )}
 
-                        {/* Discover mode: domain filter dropdown */}
-                        {mode === "discover" && webSources.length > 0 && (
+                        {/* Explore mode: domain filter dropdown */}
+                        {mode === "explore" && webSources.length > 0 && (
                             <Popover>
                                 <PopoverTrigger asChild>
                                     <button

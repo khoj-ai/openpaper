@@ -71,7 +71,7 @@ async def discover_search(
 
                     # Determine search mode based on sources
                     use_openalex = request.sources and "openalex" in request.sources
-                    search_mode = "scholarly" if use_openalex else "discover"
+                    search_mode = "scholarly" if use_openalex else "explore"
 
                     track_event(
                         "did_discover_search",
