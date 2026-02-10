@@ -164,13 +164,9 @@ export default function ProjectPage() {
 		setInitialJobs((prevJobs) => [...prevJobs, ...newJobs]);
 	};
 
-	const handleUploadComplete = useCallback(async (paperId: string) => {
-		await fetchFromApi(`/api/projects/papers/${projectId}`, {
-			method: "POST",
-			body: JSON.stringify({ paper_ids: [paperId] }),
-		});
-		refetchPapers(); // Refresh project data
-	}, [projectId, refetchPapers]);
+	const handleUploadComplete = useCallback(async (_paperId: string) => {
+		refetchPapers();
+	}, [refetchPapers]);
 
 	const handlePdfUrl = async (url: string) => {
 		if (isAtPaperHardLimit) {

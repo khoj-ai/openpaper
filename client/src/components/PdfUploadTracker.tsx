@@ -24,6 +24,7 @@ const completedJobs = new Map<string, string>(); // jobId -> paperId
 const PdfUploadTracker: React.FC<PdfUploadTrackerProps> = ({ initialJobs, onComplete }) => {
 	const [jobs, setJobs] = useState<Job[]>([]);
 	const [isOpen, setIsOpen] = useState(false);
+	const [pollingTrigger, setPollingTrigger] = useState(0);
 	const jobsRef = useRef<Job[]>(jobs);
 	const onCompleteRef = useRef(onComplete);
 
@@ -37,8 +38,12 @@ const PdfUploadTracker: React.FC<PdfUploadTrackerProps> = ({ initialJobs, onComp
 	}, [onComplete]);
 
 	useEffect(() => {
+		let addedNewPending = false;
 		setJobs(prevJobs => {
 			const newJobs = initialJobs.filter(ij => !prevJobs.some(pj => pj.jobId === ij.jobId));
+			if (newJobs.some(j => !completedJobs.has(j.jobId))) {
+				addedNewPending = true;
+			}
 			return [...prevJobs, ...newJobs.map(j => {
 				// If this job already completed, restore its completed status and paperId
 				const completedPaperId = completedJobs.get(j.jobId);
@@ -49,6 +54,10 @@ const PdfUploadTracker: React.FC<PdfUploadTrackerProps> = ({ initialJobs, onComp
 				};
 			})];
 		});
+		// Restart polling when new pending jobs arrive
+		if (addedNewPending) {
+			setPollingTrigger(prev => prev + 1);
+		}
 	}, [initialJobs]);
 
 	useEffect(() => {
@@ -89,7 +98,7 @@ const PdfUploadTracker: React.FC<PdfUploadTrackerProps> = ({ initialJobs, onComp
 		}, 2000);
 
 		return () => clearInterval(interval);
-	}, []);
+	}, [pollingTrigger]);
 
 	// Calculate counts for summary
 	const completedCount = jobs.filter(j => j.status === 'completed').length;
