@@ -35,6 +35,7 @@ class ProjectPaperCRUD(
         obj_in: ProjectPaperCreate,
         user: Optional[CurrentUser] = None,
         project_id: Optional[uuid.UUID] = None,
+        auto_commit: bool = True,
     ) -> Optional[ProjectPaper]:
         # Validate required parameters for this implementation
         if user is None:
@@ -90,7 +91,10 @@ class ProjectPaperCRUD(
 
             db_obj = ProjectPaper(project_id=project_id, paper_id=obj_in.paper_id)
             db.add(db_obj)
-            db.commit()
+            if auto_commit:
+                db.commit()
+            else:
+                db.flush()
             db.refresh(db_obj)
             return db_obj
         except Exception as e:

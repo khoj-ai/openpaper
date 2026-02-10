@@ -320,6 +320,7 @@ class JobsClient:
         s3_object_key: Optional[str] = None
         created_paper = None
         created_project_paper = None
+        db_committed = False
 
         try:
             # Upload PDF to S3
@@ -343,6 +344,7 @@ class JobsClient:
                 sync=True,
             )
 
+            # Create paper and project association in a single transaction
             new_paper = PaperCreate(
                 file_url=file_url,
                 s3_object_key=s3_object_key,
@@ -353,6 +355,7 @@ class JobsClient:
                 db=db,
                 obj_in=new_paper,
                 user=user,
+                auto_commit=False,
             )
 
             if not created_paper:
@@ -363,18 +366,21 @@ class JobsClient:
             if project_id and created_paper.id:
                 casted_uuid = UUID(str(created_paper.id))
 
-                # Create project paper association if project_id is provided
                 created_project_paper = project_paper_crud.create(
                     db=db,
                     obj_in=ProjectPaperCreate(paper_id=casted_uuid),
                     user=user,
                     project_id=project_id,
+                    auto_commit=False,
                 )
 
                 if not created_project_paper:
                     raise Exception(
                         "Failed to associate paper with project. Check permissions or if the paper already exists in the project."
                     )
+
+            db.commit()
+            db_committed = True
 
             # Submit processing job with S3 object key
             task_id = self.submit_pdf_processing_job(s3_object_key, job_id)
@@ -390,30 +396,37 @@ class JobsClient:
             # Rollback: Clean up created resources
             logger.info("Rolling back created resources due to task submission failure")
 
-            # Remove project paper association if it was created
-            if created_project_paper and project_id and created_paper:
-                try:
-                    project_paper_crud.remove_by_paper_and_project(
-                        db=db,
-                        paper_id=UUID(str(created_paper.id)),
-                        project_id=project_id,
-                        user=user,
-                    )
-                    logger.info(
-                        f"Rolled back project paper association for paper {created_paper.id}"
-                    )
-                except Exception as rollback_error:
-                    logger.error(
-                        f"Failed to rollback project paper association: {rollback_error}"
-                    )
+            if not db_committed:
+                # Transaction wasn't committed, so rollback undoes paper + project paper atomically
+                db.rollback()
+            else:
+                # Records were committed, need to manually remove them
+                if created_project_paper and project_id and created_paper:
+                    try:
+                        project_paper_crud.remove_by_paper_and_project(
+                            db=db,
+                            paper_id=UUID(str(created_paper.id)),
+                            project_id=project_id,
+                            user=user,
+                        )
+                        logger.info(
+                            f"Rolled back project paper association for paper {created_paper.id}"
+                        )
+                    except Exception as rollback_error:
+                        logger.error(
+                            f"Failed to rollback project paper association: {rollback_error}"
+                        )
 
-            # Remove paper record if it was created
-            if created_paper and created_paper.id:
-                try:
-                    paper_crud.remove(db=db, id=created_paper.id, user=user)
-                    logger.info(f"Rolled back paper record with ID {created_paper.id}")
-                except Exception as rollback_error:
-                    logger.error(f"Failed to rollback paper record: {rollback_error}")
+                if created_paper and created_paper.id:
+                    try:
+                        paper_crud.remove(db=db, id=created_paper.id, user=user)
+                        logger.info(
+                            f"Rolled back paper record with ID {created_paper.id}"
+                        )
+                    except Exception as rollback_error:
+                        logger.error(
+                            f"Failed to rollback paper record: {rollback_error}"
+                        )
 
             # Delete S3 file if it was uploaded
             if s3_object_key:

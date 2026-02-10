@@ -254,7 +254,7 @@ async def upload_pdf(
     background_tasks.add_task(
         upload_raw_file_microservice,
         file_contents=file_contents,
-        filename=filename,
+        filename=str(filename),
         paper_upload_job=paper_upload_job,
         current_user=current_user,
         db=db,

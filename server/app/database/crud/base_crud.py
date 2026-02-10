@@ -144,15 +144,22 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         *,
         obj_in: CreateSchemaType,
         user: Optional[CurrentUser] = None,
+        auto_commit: bool = True,
     ) -> Optional[ModelType]:
-        """Create a new record, optionally associating with a user"""
+        """Create a new record, optionally associating with a user.
+        Set auto_commit=False to flush without committing, allowing the caller to
+        batch multiple operations into a single transaction.
+        """
         try:
             obj_in_data = obj_in.model_dump()
             if user and hasattr(self.model, "user_id"):
                 obj_in_data["user_id"] = user.id
             db_obj = self.model(**obj_in_data)
             db.add(db_obj)
-            db.commit()
+            if auto_commit:
+                db.commit()
+            else:
+                db.flush()
             db.refresh(db_obj)
             return db_obj
         except Exception as e:
