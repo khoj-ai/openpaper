@@ -164,7 +164,7 @@ export default function ProjectPage() {
 		setInitialJobs((prevJobs) => [...prevJobs, ...newJobs]);
 	};
 
-	const handleUploadComplete = useCallback(async (_paperId: string) => {
+	const handleUploadComplete = useCallback(async () => {
 		refetchPapers();
 	}, [refetchPapers]);
 
