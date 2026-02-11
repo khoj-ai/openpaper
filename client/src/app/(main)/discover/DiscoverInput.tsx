@@ -221,8 +221,8 @@ export default function DiscoverInput({
                                         <ChevronDown className="h-3.5 w-3.5" />
                                     </button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-64 p-2" align="start">
-                                    <div className="space-y-1">
+                                <PopoverContent className="w-64 p-2" align="start" side="bottom" avoidCollisions={false}>
+                                    <div className="space-y-1 max-h-64 overflow-y-auto">
                                         {webSources.map((source) => {
                                             const isSelected = selectedSources.includes(source.key)
                                             return (
