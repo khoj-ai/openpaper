@@ -2,7 +2,7 @@
 
 import { PaperData, PaperItem } from "@/lib/schema";
 import { Button } from "./ui/button";
-import { X, ExternalLink, Highlighter, Plus } from "lucide-react";
+import { X, ExternalLink, Highlighter, Plus, FileText, Download } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { handleStatusChange, truncateText } from "@/components/utils/paperUtils";
@@ -14,6 +14,7 @@ import { fetchFromApi } from "@/lib/api";
 import { useHighlighterHighlights } from "./hooks/PdfHighlighterHighlights";
 import { useEffect, useState } from "react";
 import { CitePaperButton } from "./CitePaperButton";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface PaperPreviewProps {
     paper: PaperItem;
@@ -25,10 +26,12 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
     const { highlights } = useHighlighterHighlights(paper.id);
     const [showAllHighlights, setShowAllHighlights] = useState(false);
     const [loadedPaper, setLoadedPaper] = useState<PaperData | null>(null);
+    const [previewLoaded, setPreviewLoaded] = useState(false);
 
     useEffect(() => {
         // Fetch the full paper data to get tags and other details
         setLoadedPaper(null);
+        setPreviewLoaded(false);
         fetchFromApi(`/api/paper?id=${paper.id}`)
             .then(data => setLoadedPaper(data))
             .catch(error => console.error("Failed to load paper data", error));
@@ -70,54 +73,80 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
                 >
                     <X className="h-4 w-4" />
                 </Button>
-                <Link href={`/paper/${paper.id}`} passHref>
-                    <h3 className="font-bold text-lg mb-2 pr-8 hover:underline cursor-pointer flex items-center gap-2">
-                        {paper.title}
-                        <ExternalLink className="h-4 w-4 flex-shrink-0" />
-                    </h3>
-                </Link>
-                {paper.preview_url && (
-                    <>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={paper.preview_url}
-                            alt="Paper preview"
-                            className="w-full h-auto my-4 rounded-md"
-                        />
-                    </>
-                )}
-                <div className="flex items-center gap-2 flex-wrap">
-                    {paper.status && (
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button size="sm" variant="outline" className="h-8 px-3 text-xs capitalize">
-                                    <span className="flex items-center gap-2">
-                                        {getStatusIcon(paper.status)}
-                                        {paper.status}
-                                    </span>
+
+                {/* Title + Actions */}
+                <div>
+                    <Link href={`/paper/${paper.id}`} passHref>
+                        <h3 className="font-bold text-lg mb-2 pr-8 hover:underline cursor-pointer flex items-center gap-2">
+                            {paper.title}
+                            <ExternalLink className="h-4 w-4 flex-shrink-0" />
+                        </h3>
+                    </Link>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <Link href={`/paper/${paper.id}`} passHref>
+                            <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
+                                <FileText className="h-3.5 w-3.5 mr-1.5" />
+                                Open
+                            </Button>
+                        </Link>
+                        {loadedPaper?.file_url && (
+                            <a href={loadedPaper.file_url} target="_blank" rel="noopener noreferrer">
+                                <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
+                                    <Download className="h-3.5 w-3.5 mr-1.5" />
+                                    Download
                                 </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleStatusChange(paper, PaperStatusEnum.TODO, setPaper)}>
-                                    {getStatusIcon(PaperStatusEnum.TODO)}
-                                    Todo
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleStatusChange(paper, PaperStatusEnum.READING, setPaper)}>
-                                    {getStatusIcon(PaperStatusEnum.READING)}
-                                    Reading
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleStatusChange(paper, PaperStatusEnum.COMPLETED, setPaper)}>
-                                    {getStatusIcon(PaperStatusEnum.COMPLETED)}
-                                    Completed
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    )}
-                    <CitePaperButton paper={[loadedPaper ?? paper]} minimalist={true} />
+                            </a>
+                        )}
+                        <CitePaperButton paper={[loadedPaper ?? paper]} minimalist={true} variant="outline" />
+                        {paper.status && (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button size="sm" variant="outline" className="h-8 px-3 text-xs capitalize">
+                                        <span className="flex items-center gap-2">
+                                            {getStatusIcon(paper.status)}
+                                            {paper.status}
+                                        </span>
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleStatusChange(paper, PaperStatusEnum.TODO, setPaper)}>
+                                        {getStatusIcon(PaperStatusEnum.TODO)}
+                                        Todo
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleStatusChange(paper, PaperStatusEnum.READING, setPaper)}>
+                                        {getStatusIcon(PaperStatusEnum.READING)}
+                                        Reading
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleStatusChange(paper, PaperStatusEnum.COMPLETED, setPaper)}>
+                                        {getStatusIcon(PaperStatusEnum.COMPLETED)}
+                                        Completed
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )}
+                    </div>
                 </div>
 
+                {/* Preview Image */}
+                {paper.preview_url && (
+                    <div className="border-t border-border pt-4 mt-4">
+                        {!previewLoaded && (
+                            <Skeleton className="w-full aspect-[3/4] rounded-md" />
+                        )}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            key={paper.id}
+                            src={paper.preview_url}
+                            alt="Paper preview"
+                            className={`w-full h-auto rounded-md ${!previewLoaded ? "hidden" : ""}`}
+                            onLoad={() => setPreviewLoaded(true)}
+                        />
+                    </div>
+                )}
+
                 {/* Paper Info Section - Tabular Layout */}
-                {(paper?.authors?.length || loadedPaper?.journal || loadedPaper?.publisher || loadedPaper?.publish_date) && (
-                    <div className="mt-4 mb-2 text-sm border rounded-md overflow-hidden">
+                <div className="border-t border-border pt-4 mt-4">
+                    <div className="text-sm border rounded-md overflow-hidden">
                         <table className="w-full">
                             <tbody className="divide-y divide-border">
                                 {paper?.authors && paper.authors.length > 0 && (
@@ -132,23 +161,33 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
                                         <td className="px-3 py-2">{new Date(paper.publish_date).toLocaleDateString()}</td>
                                     </tr>
                                 )}
-                                {
-                                    loadedPaper?.doi && (
+                                {!loadedPaper && (
+                                    <>
                                         <tr>
-                                            <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">DOI</td>
-                                            <td className="px-3 py-2">
-                                                <a
-                                                    href={`https://doi.org/${loadedPaper.doi}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-blue-600 hover:underline"
-                                                >
-                                                    {loadedPaper.doi}
-                                                </a>
-                                            </td>
+                                            <td className="px-3 py-2 text-right w-24"><Skeleton className="h-4 w-12 ml-auto" /></td>
+                                            <td className="px-3 py-2"><Skeleton className="h-4 w-48" /></td>
                                         </tr>
-                                    )
-                                }
+                                        <tr>
+                                            <td className="px-3 py-2 text-right w-24"><Skeleton className="h-4 w-16 ml-auto" /></td>
+                                            <td className="px-3 py-2"><Skeleton className="h-4 w-32" /></td>
+                                        </tr>
+                                    </>
+                                )}
+                                {loadedPaper?.doi && (
+                                    <tr>
+                                        <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">DOI</td>
+                                        <td className="px-3 py-2">
+                                            <a
+                                                href={`https://doi.org/${loadedPaper.doi}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-blue-600 hover:underline"
+                                            >
+                                                {loadedPaper.doi}
+                                            </a>
+                                        </td>
+                                    </tr>
+                                )}
                                 {loadedPaper?.journal && (
                                     <tr>
                                         <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">Publication</td>
@@ -164,12 +203,12 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
                             </tbody>
                         </table>
                     </div>
-                )}
+                </div>
 
                 {/* Highlights Section */}
                 {highlightCount > 0 && (
-                    <div className="space-y-2 mb-4">
-                        <h4 className="font-semibold text-sm flex items-center gap-2 mt-2">
+                    <div className="border-t border-border pt-4 mt-4 space-y-2">
+                        <h4 className="font-semibold text-sm flex items-center gap-2">
                             <Highlighter className="h-4 w-4 text-yellow-600" />
                             Highlights ({highlightCount})
                         </h4>
@@ -203,7 +242,8 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
                     </div>
                 )}
 
-                <div className="space-y-2 my-4">
+                {/* Tags Section */}
+                <div className="border-t border-border pt-4 mt-4 space-y-2">
                     <div className="flex items-center justify-between mb-1">
                         <h4 className="font-semibold text-sm">Tags</h4>
                         <DropdownMenu>
@@ -230,10 +270,13 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
                                 </button>
                             </span>
                         ))}
-
                     </div>
                 </div>
-                <PaperProjects id={paper.id} view='compact' />
+
+                {/* Projects Section */}
+                <div className="border-t border-border pt-4 mt-4">
+                    <PaperProjects id={paper.id} view='compact' />
+                </div>
             </div>
         </div>
     );
