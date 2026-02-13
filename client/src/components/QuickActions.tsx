@@ -106,7 +106,7 @@ export function QuickActions({ onUploadComplete, onProjectCreated, onUploadStart
     };
 
     const handleFindPapers = () => {
-        router.push("/finder");
+        router.push("/discover");
     };
 
     return (
@@ -127,8 +127,8 @@ export function QuickActions({ onUploadComplete, onProjectCreated, onUploadStart
                 />
                 <QuickActionCard
                     icon={<Globe2 className="h-5 w-5" />}
-                    title="Find Papers"
-                    description="Search academic databases"
+                    title="Discover Research"
+                    description="Find relevant research from academic sources"
                     onClick={handleFindPapers}
                 />
             </div>
