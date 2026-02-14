@@ -1,7 +1,7 @@
 "use client";
 
-import { AlertCircle, ArrowLeft, ArrowRight, BookOpen, Info, Library, Loader2, MessageCircle, Pencil, PlusCircle, Send, Sparkles, UploadCloud } from "lucide-react";
-import { useEffect, useState, useCallback } from "react";
+import { AlertCircle, ArrowLeft, ArrowRight, BookOpen, Info, Library, Loader2, MessageCircle, Pencil, PlusCircle, Search, Send, Sparkles, UploadCloud } from "lucide-react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { fetchFromApi } from "@/lib/api";
 import { ProjectRole } from "@/lib/schema";
@@ -45,6 +45,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Link from "next/link";
 import { Label } from "@/components/ui/label";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import {
 	Breadcrumb,
 	BreadcrumbItem,
@@ -91,6 +98,9 @@ export default function ProjectPage() {
 	const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
 	const [showAllOwnedPapers, setShowAllOwnedPapers] = useState(false);
 	const [showAllOtherPapers, setShowAllOtherPapers] = useState(false);
+	const [paperSearchQuery, setPaperSearchQuery] = useState("");
+	const [paperSortBy, setPaperSortBy] = useState<"date_added" | "publish_date" | "title">("date_added");
+	const [conversationSearchQuery, setConversationSearchQuery] = useState("");
 	const { subscription } = useSubscription();
 
 	const chatDisabled = isChatCreditAtLimit(subscription);
@@ -100,6 +110,36 @@ export default function ProjectPage() {
 	const isAtPaperWarningLimit = currentPaperCount >= PROJECT_PAPER_WARNING_LIMIT;
 	const isAtPaperHardLimit = currentPaperCount >= PROJECT_PAPER_HARD_LIMIT;
 	const remainingPaperSlots = Math.max(0, PROJECT_PAPER_HARD_LIMIT - currentPaperCount);
+
+	const filteredAndSortedPapers = useMemo(() => {
+		if (!papers) return [];
+		let result = [...papers];
+		if (paperSearchQuery.trim()) {
+			const q = paperSearchQuery.toLowerCase();
+			result = result.filter(p =>
+				(p.title?.toLowerCase().includes(q)) ||
+				(p.authors?.some(a => a.toLowerCase().includes(q))) ||
+				(p.keywords?.some(k => k.toLowerCase().includes(q)))
+			);
+		}
+		result.sort((a, b) => {
+			if (paperSortBy === "title") {
+				return (a.title || "").localeCompare(b.title || "");
+			} else if (paperSortBy === "publish_date") {
+				return (b.publish_date || "").localeCompare(a.publish_date || "");
+			} else {
+				return (b.created_at || "").localeCompare(a.created_at || "");
+			}
+		});
+		return result;
+	}, [papers, paperSearchQuery, paperSortBy]);
+
+	const filteredConversations = useMemo(() => {
+		if (!conversations) return [];
+		if (!conversationSearchQuery.trim()) return conversations;
+		const q = conversationSearchQuery.toLowerCase();
+		return conversations.filter(c => c.title?.toLowerCase().includes(q));
+	}, [conversations, conversationSearchQuery]);
 
 	useEffect(() => {
 		const CHAT_CREDIT_TOAST_KEY = "chat_credit_limit_toast_shown";
@@ -306,42 +346,91 @@ export default function ProjectPage() {
 							</Button>
 						)}
 					</div>
-					<p className="text-lg text-secondary-foreground mb-8">{project.description}</p>
+					{project.description ? (
+						<p className="text-lg text-secondary-foreground mb-8">{project.description}</p>
+					) : project.role !== ProjectRole.Viewer ? (
+						<button
+							className="text-lg text-muted-foreground/60 mb-8 cursor-pointer hover:text-muted-foreground transition-colors bg-transparent border-none p-0 text-left"
+							onClick={handleEditClick}
+						>
+							Add a description...
+						</button>
+					) : null}
+				</div>
+
+				<PdfUploadTracker initialJobs={initialJobs} onComplete={handleUploadComplete} />
+
+				<div className="flex flex-col items-center justify-center py-12 max-w-lg mx-auto text-center">
+					<div className="p-4 bg-blue-100 dark:bg-blue-900/30 rounded-full w-16 h-16 mb-4 flex items-center justify-center">
+						<BookOpen className="w-8 h-8 text-blue-500" />
+					</div>
+					<h2 className="text-2xl font-bold mb-2">Get Started with Your Project</h2>
+					<p className="text-muted-foreground mb-8">Add research papers to your project, then ask questions and generate insights.</p>
+
+					<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full mb-8">
+						<button
+							onClick={() => setIsUploadDialogOpen(true)}
+							className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg hover:bg-accent transition-colors group"
+						>
+							<UploadCloud className="w-10 h-10 text-muted-foreground group-hover:text-blue-500 mb-3 transition-colors" />
+							<h3 className="font-semibold group-hover:text-blue-600 transition-colors">Upload Papers</h3>
+							<p className="text-sm text-muted-foreground mt-1">Upload PDFs from your computer</p>
+						</button>
+						<button
+							onClick={() => setIsAddPapersSheetOpen(true)}
+							className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg hover:bg-accent transition-colors group"
+						>
+							<Library className="w-10 h-10 text-muted-foreground group-hover:text-blue-500 mb-3 transition-colors" />
+							<h3 className="font-semibold group-hover:text-blue-600 transition-colors">Add from Library</h3>
+							<p className="text-sm text-muted-foreground mt-1">Choose from your existing papers</p>
+						</button>
+					</div>
+
+					<div className="flex items-center gap-3 text-sm text-muted-foreground">
+						<div className="flex items-center gap-1.5">
+							<span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 text-xs font-medium">1</span>
+							Add papers
+						</div>
+						<ArrowRight className="h-3 w-3" />
+						<div className="flex items-center gap-1.5">
+							<span className="flex items-center justify-center w-5 h-5 rounded-full bg-muted text-muted-foreground text-xs font-medium">2</span>
+							Ask questions
+						</div>
+						<ArrowRight className="h-3 w-3" />
+						<div className="flex items-center gap-1.5">
+							<span className="flex items-center justify-center w-5 h-5 rounded-full bg-muted text-muted-foreground text-xs font-medium">3</span>
+							Generate insights
+						</div>
+					</div>
 				</div>
 
 				<div className="mt-4">
-					<PdfUploadTracker initialJobs={initialJobs} onComplete={handleUploadComplete} />
-					<div className="flex justify-between items-center mb-4">
-						<h2 className="text-2xl font-bold">Add Papers to Your Project</h2>
-						<Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
-							<DialogTrigger asChild>
-								<Button variant="outline">Upload New Papers</Button>
-							</DialogTrigger>
-							<DialogContent>
-								<DialogHeader>
-									<DialogTitle>Upload New Papers</DialogTitle>
-									<DialogDescription>You can upload any additional papers to your library here. They will automatically be added to the project.</DialogDescription>
-								</DialogHeader>
-								<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} disabled={isPaperUploadAtLimit(subscription) || isAtPaperHardLimit} />
-								{isPaperUploadAtLimit(subscription) && (
-									<Alert variant="destructive" className="mt-4">
-										<AlertCircle className="h-4 w-4" />
-										<AlertTitle>Upload Limit Reached</AlertTitle>
-										<AlertDescription>
-											You have reached your paper upload limit. Please{" "}
-											<Link href="/pricing" className="font-bold underline">
-												upgrade your plan
-											</Link>{" "}
-											to upload more papers.
-										</AlertDescription>
-									</Alert>
-								)}
-								{uploadError && <p className="text-red-500 mt-4">{uploadError}</p>}
-							</DialogContent>
-						</Dialog>
-					</div>
 					<AddFromLibrary projectId={projectId} onPapersAdded={refetchPapers} projectPaperIds={papers.map(p => p.id)} onUploadClick={() => setIsUploadDialogOpen(true)} remainingPaperSlots={remainingPaperSlots} paperHardLimit={PROJECT_PAPER_HARD_LIMIT} />
 				</div>
+
+				<Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+					<DialogContent>
+						<DialogHeader>
+							<DialogTitle>Upload New Papers</DialogTitle>
+							<DialogDescription>You can upload any additional papers to your library here. They will automatically be added to the project.</DialogDescription>
+						</DialogHeader>
+						<PdfDropzone onFileSelect={handleFileSelect} onUrlClick={handleLinkClick} disabled={isPaperUploadAtLimit(subscription) || isAtPaperHardLimit} />
+						{isPaperUploadAtLimit(subscription) && (
+							<Alert variant="destructive" className="mt-4">
+								<AlertCircle className="h-4 w-4" />
+								<AlertTitle>Upload Limit Reached</AlertTitle>
+								<AlertDescription>
+									You have reached your paper upload limit. Please{" "}
+									<Link href="/pricing" className="font-bold underline">
+										upgrade your plan
+									</Link>{" "}
+									to upload more papers.
+								</AlertDescription>
+							</Alert>
+						)}
+						{uploadError && <p className="text-red-500 mt-4">{uploadError}</p>}
+					</DialogContent>
+				</Dialog>
 				<Dialog open={isUrlDialogOpen} onOpenChange={setIsUrlDialogOpen}>
 					<DialogContent>
 						<DialogHeader>
@@ -392,7 +481,7 @@ export default function ProjectPage() {
 								<Label htmlFor="description" className="text-right">
 									Description
 								</Label>
-								<Input
+								<Textarea
 									id="description"
 									value={currentDescription}
 									onChange={(e) => setCurrentDescription(e.target.value)}
@@ -442,7 +531,16 @@ export default function ProjectPage() {
 								</Button>
 							)}
 						</div>
-						<p className="text-lg text-secondary-foreground mb-6">{project.description}</p>
+						{project.description ? (
+							<p className="text-lg text-secondary-foreground mb-6">{project.description}</p>
+						) : project.role !== ProjectRole.Viewer ? (
+							<button
+								className="text-lg text-muted-foreground/60 mb-6 cursor-pointer hover:text-muted-foreground transition-colors bg-transparent border-none p-0 text-left"
+								onClick={handleEditClick}
+							>
+								Add a description...
+							</button>
+						) : null}
 					</div>
 					<ProjectCollaborators
 						projectId={projectId}
@@ -508,22 +606,53 @@ export default function ProjectPage() {
 							<>
 								<div className="flex justify-between items-center mb-4">
 									<h2 className="text-2xl font-bold">Chats</h2>
+									{conversations.length > 3 && (
+										<div className="relative">
+											<Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+											<Input
+												placeholder="Search chats..."
+												value={conversationSearchQuery}
+												onChange={(e) => setConversationSearchQuery(e.target.value)}
+												className="pl-9 h-9 w-48"
+											/>
+										</div>
+									)}
 								</div>
-								{conversations.slice(0, 3).map((convo, index) => (
-									<ConversationCard
-										key={index}
-										convo={convo}
-										showAvatar={hasCollaborators}
-										href={`/projects/${projectId}/conversations/${convo.id}`}
-										onDelete={handleDeleteConversation} />
-								))}
-								{conversations.length > 3 && (
-									<div className="mt-4 text-left">
-										<Link href={`/project/${projectId}/past`}>
-											View {conversations.length - 3} more
-											<ArrowRight className="inline-block ml-1 h-4 w-4" />
-										</Link>
-									</div>
+								{conversationSearchQuery.trim() ? (
+									filteredConversations.length > 0 ? (
+										filteredConversations.map((convo, index) => (
+											<ConversationCard
+												key={index}
+												convo={convo}
+												showAvatar={hasCollaborators}
+												href={`/projects/${projectId}/conversations/${convo.id}`}
+												onDelete={handleDeleteConversation} />
+										))
+									) : (
+										<div className="text-center py-8 text-muted-foreground">
+											<Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
+											<p className="text-sm">No chats matching &ldquo;{conversationSearchQuery}&rdquo;</p>
+										</div>
+									)
+								) : (
+									<>
+										{conversations.slice(0, 3).map((convo, index) => (
+											<ConversationCard
+												key={index}
+												convo={convo}
+												showAvatar={hasCollaborators}
+												href={`/projects/${projectId}/conversations/${convo.id}`}
+												onDelete={handleDeleteConversation} />
+										))}
+										{conversations.length > 3 && (
+											<div className="mt-4 text-left">
+												<Link href={`/projects/${projectId}/past`}>
+													View {conversations.length - 3} more
+													<ArrowRight className="inline-block ml-1 h-4 w-4" />
+												</Link>
+											</div>
+										)}
+									</>
 								)}
 							</>
 						) : (
@@ -703,12 +832,36 @@ export default function ProjectPage() {
 						</div>
 					</div>
 
+					{papers && papers.length > 3 && (
+						<div className="flex gap-2 mb-4">
+							<div className="relative flex-1">
+								<Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+								<Input
+									placeholder="Search papers..."
+									value={paperSearchQuery}
+									onChange={(e) => setPaperSearchQuery(e.target.value)}
+									className="pl-9 h-9"
+								/>
+							</div>
+							<Select value={paperSortBy} onValueChange={(v) => setPaperSortBy(v as "date_added" | "publish_date" | "title")}>
+								<SelectTrigger size="sm">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="date_added">Date Added</SelectItem>
+									<SelectItem value="publish_date">Publish Date</SelectItem>
+									<SelectItem value="title">Title</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+					)}
+
 					{isPapersLoading ? (
 						<PaperListSkeleton count={3} />
 					) : papers && papers.length > 0 ? (
 						(() => {
-							const ownedPapers = papers.filter(p => p.is_owner);
-							const otherPapers = papers.filter(p => !p.is_owner);
+							const ownedPapers = filteredAndSortedPapers.filter(p => p.is_owner);
+							const otherPapers = filteredAndSortedPapers.filter(p => !p.is_owner);
 							const papersToShow = 3;
 
 							return (
@@ -758,6 +911,12 @@ export default function ProjectPage() {
 													</Button>
 												</div>
 											)}
+										</div>
+									)}
+									{filteredAndSortedPapers.length === 0 && paperSearchQuery.trim() && (
+										<div className="text-center py-8 text-muted-foreground">
+											<Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
+											<p className="text-sm">No papers matching &ldquo;{paperSearchQuery}&rdquo;</p>
 										</div>
 									)}
 								</div>
