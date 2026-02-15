@@ -1,0 +1,116 @@
+export const metadata = {
+    title: "How to Conduct a Systematic Literature Review with AI",
+    description: "A practical guide to using AI tools to streamline every phase of a systematic review — from discovering papers to extracting structured evidence and writing with confidence.",
+    date: "02-14-2026",
+    image: "https://assets.khoj.dev/orbs_blue_abstract.png"
+}
+
+A systematic literature review is one of the most important — and most grueling — undertakings in research. Done well, it forms the backbone of a thesis, a meta-analysis, or a grant proposal. Done poorly, it becomes weeks of unfocused reading that produces a shaky bibliography and a lot of self-doubt.
+
+The process hasn't changed much in decades: define a question, search databases, screen hundreds of results, extract data, synthesize findings, write it up. Each step is necessary. Each step is also where momentum goes to die.
+
+AI doesn't replace any of these steps. But it can dramatically reduce the friction between them.
+
+## The Real Bottleneck
+
+The hardest part of a systematic review isn't any single step — it's the transitions. Moving from search to screening. From screening to extraction. From extraction to synthesis. Every handoff leaks information. You forget which paper had that key statistic. You lose track of why you included a borderline study. You spend an afternoon reconstructing context you had two weeks ago.
+
+Open Paper is built around eliminating these transitions. Your papers, your notes, your AI conversations, your structured data — they all live in one place, linked together. Here's how that plays out across a full systematic review.
+
+## Phase 1: Define Your Research Question
+
+Before you touch a search bar, get specific. A well-scoped question is the difference between a focused review and an unfocused reading marathon.
+
+Use the [PICO framework](https://en.wikipedia.org/wiki/PICO_process) or a variant that fits your field:
+- **Population**: Who or what are you studying?
+- **Intervention**: What treatment, exposure, or variable?
+- **Comparison**: Against what?
+- **Outcome**: What are you measuring?
+
+A vague question like "How does exercise affect mental health?" will bury you. A focused question like "What is the effect of aerobic exercise on depression symptoms in adults over 60?" gives you search terms, inclusion criteria, and a reason to say no to irrelevant papers.
+
+## Phase 2: Discover Relevant Research
+
+This is where most reviews hit their first wall. Traditional database searches require you to guess the right keywords, chain Boolean operators, and repeat the process across multiple databases. It works, but it's slow and brittle.
+
+[Discover](/discover) takes a different approach. Instead of keywords, you ask a natural language question — the same research question you just defined. The system uses AI to decompose your question into multiple targeted subqueries, then searches across academic sources in parallel.
+
+For example, asking "What is the effect of aerobic exercise on depression symptoms in older adults?" might generate subqueries like:
+- "aerobic exercise intervention depression elderly clinical trials"
+- "physical activity mood outcomes aging population"
+- "exercise prescription mental health older adults systematic review"
+
+Each subquery returns results grouped separately, so you can see different angles of your topic at once rather than a single ranked list.
+
+**Two modes, depending on your needs:**
+- **Scholarly** searches structured academic databases, with options to filter by open access and sort by citation count or recency
+- **Explore** searches across a broader set of sources — arXiv, PubMed, Nature, Science, PLOS, bioRxiv, IEEE, and more
+
+You can also filter by publication year, which is useful when you want to focus on the last five years of literature or cast a wider net.
+
+The key advantage isn't just speed — it's coverage. The AI-generated subqueries surface papers you wouldn't have found with your initial keyword choices. That's often where the most interesting work lives.
+
+## Phase 3: Screen and Organize with Projects
+
+Once you've identified promising papers, upload them into a [Project](/blog/projects). A project is a research workspace that groups papers together and lets you interact with all of them as a collection.
+
+This is your screening phase. For each paper, Open Paper automatically generates:
+- A brief summary
+- Starter questions to ground your understanding
+- Extracted metadata (title, authors, abstract, DOI)
+
+Instead of opening each PDF and reading the abstract manually, you can quickly triage papers using the AI-generated briefs. Read the summary, skim the starter questions, decide if it's in or out.
+
+For borderline cases, use the single-paper chat. Ask pointed questions like "What was the sample size?" or "Did this study control for medication use?" — and get answers grounded in the actual text, with citations you can click to verify.
+
+## Phase 4: Extract Structured Data
+
+This is the phase that separates a good review from a great one — and it's also where most researchers lose the most time.
+
+[Data Tables](/blog/data_tables) let you define exactly what you want to extract from each paper. Create a schema with fields like:
+
+| Field | Example |
+|-------|---------|
+| Study Design | Randomized controlled trial |
+| Sample Size | n = 142 |
+| Intervention | 30 min moderate aerobic exercise, 3x/week |
+| Duration | 12 weeks |
+| Primary Outcome | Hamilton Depression Rating Scale |
+| Effect Size | Cohen's d = 0.68 |
+| Key Limitations | No blinding, high dropout rate |
+
+The AI reads through each paper in your project and populates the table. Every cell links back to the source text, so you can verify any data point with a single click.
+
+This structured extraction turns days of manual work into minutes. More importantly, it produces a clean, exportable dataset — ready for meta-analysis, ready for your methods section, ready for the supplementary materials that reviewers inevitably ask for.
+
+## Phase 5: Synthesize Across Papers
+
+With your evidence organized, the real intellectual work begins: finding patterns, identifying gaps, and building an argument.
+
+Project chat lets you ask questions across your entire collection. These aren't generic chatbot responses — they're grounded in the papers you've curated, with citations for every claim.
+
+Questions that work well at this stage:
+- "What are the most common methodological limitations across these studies?"
+- "How do the effect sizes compare between studies using moderate vs. vigorous exercise?"
+- "Which studies found no significant effect, and what do they have in common?"
+- "Summarize the evolution of measurement approaches across these papers"
+
+The AI synthesizes across all your papers, but it shows its work. Every response points back to specific passages, so you can follow the thread from claim to source to original context.
+
+## Phase 6: Write with Confidence
+
+By this point, you have something most researchers don't at the writing stage: structured evidence that's still connected to its source.
+
+Your data table gives you the quantitative backbone of your review. Your project chat history preserves the qualitative synthesis. Your annotations and highlights are still attached to the papers they came from. And the [citation manager](/blog/citation_manager) can generate formatted citations for any paper in your library.
+
+You're not reconstructing context from memory. You're writing from evidence that's alive and clickable.
+
+## The Compound Effect
+
+No single feature here is revolutionary on its own. The power is in the compound effect of keeping everything connected. When your discovery results flow into a project, your project feeds data tables, your data tables inform synthesis, and your synthesis is grounded in citable evidence — the friction between steps approaches zero.
+
+That's when systematic reviews stop feeling like endurance tests and start feeling like research.
+
+---
+
+Ready to try it? [Upload your first batch of papers](/papers) and start a project. Or try [Discover](/discover) with your research question and see what surfaces.

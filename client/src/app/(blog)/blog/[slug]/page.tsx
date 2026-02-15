@@ -80,6 +80,7 @@ export function generateStaticParams() {
         { slug: 'data_tables' },
         { slug: 'citation_manager' },
         { slug: 'why_open_source' },
+        { slug: 'systematic_review' },
     ];
 }
 
