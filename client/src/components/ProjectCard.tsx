@@ -213,11 +213,11 @@ export function ProjectCard({ project, onProjectUpdate, onUnlink, compact = fals
 				<Card className="h-64 transition-all duration-300 border-border/50 hover:border-border bg-secondary backdrop-blur-sm hover:shadow-xl hover:ring-1 hover:ring-border">
 					<CardHeader className="pb-3">
 						<CardTitle className="text-lg font-semibold text-foreground line-clamp-2 flex items-center">
-							{currentTitle}
+							{project.title}
 						</CardTitle>
-						{currentDescription && (
+						{project.description && (
 							<CardDescription className="text-muted-foreground line-clamp-2 text-sm leading-relaxed">
-								{currentDescription}
+								{project.description}
 							</CardDescription>
 						)}
 					</CardHeader>
