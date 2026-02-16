@@ -65,7 +65,7 @@ export function ProjectCard({ project, onProjectUpdate, onUnlink, compact = fals
 					description: currentDescription,
 				}),
 			});
-			if (response.ok) {
+			if (response) {
 				setShowEditAlert(false);
 				onProjectUpdate?.();
 			} else {
