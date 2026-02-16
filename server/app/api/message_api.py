@@ -159,7 +159,7 @@ async def chat_message_multipaper(
                     conversation_id=request.conversation_id,
                     question=request.user_query,
                     current_user=current_user,
-                    llm_provider=LLMProvider.GROQ,
+                    llm_provider=LLMProvider.CEREBRAS,
                     user_references=request.user_references,
                     db=db,
                     project_id=request.project_id,
