@@ -49,6 +49,7 @@ class LLMProvider(Enum):
     GEMINI = "gemini"
     OPENAI = "openai"
     GROQ = "groq"
+    CEREBRAS = "cerebras"
 
 
 class LLMResponse:

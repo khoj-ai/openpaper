@@ -73,6 +73,13 @@ class BaseLLMClient:
                     default_model="openai/gpt-oss-120b",
                     fast_model="moonshotai/kimi-k2-instruct-0905",
                 )
+            elif provider == LLMProvider.CEREBRAS:
+                self._providers[provider] = OpenAIProvider(
+                    api_key=os.getenv("CEREBRAS_API_KEY"),
+                    base_url=os.getenv("CEREBRAS_BASE_URL"),
+                    default_model="gpt-oss-120b",
+                    fast_model="zai-glm-4.7",
+                )
             else:
                 raise ValueError(f"Unsupported LLM provider: {provider}")
 
