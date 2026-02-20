@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from typing import Optional, Union
 from uuid import UUID
 
+from app.api.webhook_api import handle_failed_upload
 from app.auth.dependencies import get_required_user
 from app.database.crud.paper_crud import paper_crud
 from app.database.crud.paper_upload_crud import (
@@ -92,6 +93,15 @@ async def get_upload_status(
             logger.warning(
                 f"Failed to get Celery task status for {paper_upload_job.task_id}: {e}"
             )
+
+    # If Celery reports failure, clean up and update the job status to match
+    if celery_task_status and celery_task_status.get("status", "").lower() == "failure":
+        handle_failed_upload(
+            db=db,
+            job_id=str(paper_upload_job.id),
+            job_user=current_user,
+            reason=celery_task_status.get("error", "Celery task failed"),
+        )
 
     # Build response with both job status and task status
     response_content = {
