@@ -67,7 +67,7 @@ async def get_task_status(task_id: str):
             progress_info = task_result.info or {}
             status_response = TaskStatus(
                 task_id=task_id,
-                status="progress",
+                status="running",
                 meta=progress_info,
                 progress_message=progress_info.get("status", "Processing...")
             )
@@ -75,7 +75,7 @@ async def get_task_status(task_id: str):
             # Task completed successfully
             status_response = TaskStatus(
                 task_id=task_id,
-                status="success",
+                status="completed",
                 result=task_result.result,
                 meta={"completed_at": str(task_result.date_done)}
             )
@@ -83,7 +83,7 @@ async def get_task_status(task_id: str):
             # Task failed
             status_response = TaskStatus(
                 task_id=task_id,
-                status="failure",
+                status="failed",
                 error=str(task_result.info),
                 meta={"failed_at": str(task_result.date_done)}
             )
