@@ -156,20 +156,29 @@ async def list_data_table_jobs(
                     celery_status = jobs_client.check_celery_task_status(
                         str(job.task_id)
                     )
-                    job_age = datetime.now(timezone.utc) - job.created_at
+                    celery_status_str = celery_status.get("status", "").lower()
 
-                    # If job has been running longer than max runtime and Celery still shows pending,
-                    # assume it's lost and mark as failed
-                    if (
-                        job_age > MAX_DATA_TABLES_JOB_RUNTIME
-                        and celery_status.get("status", "")
-                        == "progress"  # A status specific to our jobs service for mid-run tasks
-                    ):
+                    if celery_status_str == "failure":
+                        # Celery task failed - update job status to match
                         data_table_job_crud.update_status(
                             db=db,
                             job_id=uuid.UUID(str(job.id)),
                             status=JobStatus.FAILED,
                         )
+                    else:
+                        job_age = datetime.now(timezone.utc) - job.created_at
+
+                        # If job has been running longer than max runtime and Celery still shows pending,
+                        # assume it's lost and mark as failed
+                        if (
+                            job_age > MAX_DATA_TABLES_JOB_RUNTIME
+                            and celery_status_str == "progress"
+                        ):
+                            data_table_job_crud.update_status(
+                                db=db,
+                                job_id=uuid.UUID(str(job.id)),
+                                status=JobStatus.FAILED,
+                            )
                 except Exception as e:
                     logger.warning(
                         f"Failed to check Celery task status for {job.task_id}: {e}"
@@ -236,18 +245,26 @@ async def get_data_table_job_status(
                 )
 
         if celery_task_status:
-            # If job has been "processing" for longer than the max runtime,
-            # and Celery has no record of it, assume it's lost
-            job_age = datetime.now(timezone.utc) - job.created_at
+            celery_status_str = celery_task_status.get("status", "").lower()
 
-            if (
-                job_age > MAX_DATA_TABLES_JOB_RUNTIME
-                and celery_task_status.get("status", "") == JobStatus.PENDING
-            ):
-                # Task is too old to still be pending - it's lost
+            if celery_status_str == "failure":
+                # Celery task failed - update job status to match
                 data_table_job_crud.update_status(
                     db=db, job_id=uuid.UUID(str(job.id)), status=JobStatus.FAILED
                 )
+            else:
+                # If job has been "processing" for longer than the max runtime,
+                # and Celery has no record of it, assume it's lost
+                job_age = datetime.now(timezone.utc) - job.created_at
+
+                if (
+                    job_age > MAX_DATA_TABLES_JOB_RUNTIME
+                    and celery_status_str == JobStatus.PENDING
+                ):
+                    # Task is too old to still be pending - it's lost
+                    data_table_job_crud.update_status(
+                        db=db, job_id=uuid.UUID(str(job.id)), status=JobStatus.FAILED
+                    )
 
         # Build response with both job status and task status
         response_content = {
