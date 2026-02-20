@@ -95,7 +95,10 @@ async def get_upload_status(
             )
 
     # If Celery reports failure, clean up and update the job status to match
-    if celery_task_status and celery_task_status.get("status", "").lower() == "failure":
+    if (
+        celery_task_status
+        and celery_task_status.get("status", "").lower() == JobStatus.FAILED
+    ):
         handle_failed_upload(
             db=db,
             job_id=str(paper_upload_job.id),

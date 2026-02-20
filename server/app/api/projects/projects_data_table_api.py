@@ -158,7 +158,7 @@ async def list_data_table_jobs(
                     )
                     celery_status_str = celery_status.get("status", "").lower()
 
-                    if celery_status_str == "failure":
+                    if celery_status_str == JobStatus.FAILED:
                         # Celery task failed - update job status to match
                         data_table_job_crud.update_status(
                             db=db,
@@ -168,11 +168,11 @@ async def list_data_table_jobs(
                     else:
                         job_age = datetime.now(timezone.utc) - job.created_at
 
-                        # If job has been running longer than max runtime and Celery still shows pending,
+                        # If job has been running longer than max runtime and Celery still shows running,
                         # assume it's lost and mark as failed
                         if (
                             job_age > MAX_DATA_TABLES_JOB_RUNTIME
-                            and celery_status_str == "progress"
+                            and celery_status_str == JobStatus.RUNNING
                         ):
                             data_table_job_crud.update_status(
                                 db=db,
@@ -247,13 +247,13 @@ async def get_data_table_job_status(
         if celery_task_status:
             celery_status_str = celery_task_status.get("status", "").lower()
 
-            if celery_status_str == "failure":
+            if celery_status_str == JobStatus.FAILED:
                 # Celery task failed - update job status to match
                 data_table_job_crud.update_status(
                     db=db, job_id=uuid.UUID(str(job.id)), status=JobStatus.FAILED
                 )
             else:
-                # If job has been "processing" for longer than the max runtime,
+                # If job has been running for longer than the max runtime,
                 # and Celery has no record of it, assume it's lost
                 job_age = datetime.now(timezone.utc) - job.created_at
 
