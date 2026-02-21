@@ -171,7 +171,7 @@ def upload_and_process_file(
         # Re-raise the exception to mark task as failed in Celery
         raise exc
 
-@celery_app.task(bind=True, name="process_data_table")
+@celery_app.task(bind=True, name="process_data_table", soft_time_limit=900, time_limit=960)
 def construct_data_table_task(
     self,
     data_table: DataTableSchema,
