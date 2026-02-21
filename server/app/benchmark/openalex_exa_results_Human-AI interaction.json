@@ -1,0 +1,254 @@
+[
+  {
+    "title": "Human-AI interaction research agenda: A user-centered perspective",
+    "url": "https://doi.org/10.1016/j.dim.2024.100078",
+    "authors": [
+      "Jiang Tingting",
+      "Zhumo Sun",
+      "Shiting Fu",
+      "Yan Lv"
+    ],
+    "published_date": "2024-07-15",
+    "text": "The rapid growth of artificial intelligence (AI) has given rise to the field of Human-AI Interaction (HAII). This study meticulously reviewed the research themes, theoretical foundations, and methodological frameworks of the HAII field, aiming to construct a comprehensive overview of this field and provide robust support for future investigations. HAII research themes include human-AI collaboration, competition, conflict, and symbiosis. Theories drawn from communication, psychology, and sociology support these studies, while the employed methods include both self-reporting and observational approaches commonly utilized in user studies. It is suggested that future research should broaden its focus to encompass diverse user groups, AI roles, and tasks. Moreover, it is necessary to develop multi-disciplinary theories and integrate multi-level research methods to support the sustained development of the field. This study not only furnishes indispensable theoretical and practical insights for forthcoming research endeavors but also catalyzes the realization of a future distinguished by seamless interaction between humans and AI.",
+    "highlights": [],
+    "highlight_scores": [],
+    "favicon": null,
+    "cited_by_count": 58,
+    "source": "Data and Information Management",
+    "institutions": [
+      "Wuhan University"
+    ]
+  },
+  {
+    "title": "The brain side of human-AI interactions in the long-term: the \u201c3R principle\u201d",
+    "url": "https://doi.org/10.1038/s44387-025-00063-1",
+    "authors": [
+      "Simone Rossi",
+      "Valter Fraccaro",
+      "Riccardo Manzotti"
+    ],
+    "published_date": "2026-01-27",
+    "text": "Neuroplasticity is shaped by how humans interact with AI. We argue that passive, uncritical, reliance on AI may weaken activity-dependent brain plasticity and erode cognition, whereas active co-creation can sustain or enhance it. Drawing on plasticity rules and ethical considerations, we propose the 3R principle\u2014Results, Responses, Responsibility\u2014as a preventive framework for cognitive hygiene, urging education towards AI use to preserve agency, meaning-making, and long-term brain health.",
+    "highlights": [],
+    "highlight_scores": [],
+    "favicon": null,
+    "cited_by_count": 0,
+    "source": "npj Artificial Intelligence",
+    "institutions": [
+      "IULM University",
+      "University of Siena"
+    ]
+  },
+  {
+    "title": "Human\u2013Artificial Intelligence (AI) Interaction: Latest Advances and Prospects",
+    "url": "https://doi.org/10.3390/app152212218",
+    "authors": [
+      "Ant\u00f3nio Correia",
+      "Daniel Schneider",
+      "Benjamim Fonseca",
+      "Tommi K\u00e4rkk\u00e4inen"
+    ],
+    "published_date": "2025-11-18",
+    "text": "In recent years, artificial intelligence (AI) has been embedded in everyday life contexts and has empowered systems with the capacity to learn, adapt, and make decisions autonomously [...]",
+    "highlights": [],
+    "highlight_scores": [],
+    "favicon": null,
+    "cited_by_count": 0,
+    "source": "Applied Sciences",
+    "institutions": [
+      "Universidade Federal do Rio de Janeiro",
+      "University of Tr\u00e1s-os-Montes and Alto Douro",
+      "University of Jyv\u00e4skyl\u00e4",
+      "INESC TEC"
+    ]
+  },
+  {
+    "title": "Human-AI interaction",
+    "url": "https://doi.org/10.1016/j.dim.2023.100048",
+    "authors": [
+      "Yongqiang Sun",
+      "Xiao\u2010Liang Shen",
+      "Kem Z.K. Zhang"
+    ],
+    "published_date": "2023-09-01",
+    "text": null,
+    "highlights": [],
+    "highlight_scores": [],
+    "favicon": null,
+    "cited_by_count": 7,
+    "source": "Data and Information Management",
+    "institutions": [
+      "Wuhan University",
+      "Lakehead University"
+    ]
+  },
+  {
+    "title": "Guidelines for Human-AI Interaction",
+    "url": "https://doi.org/10.1145/3290605.3300233",
+    "authors": [
+      "Saleema Amershi",
+      "Dan Weld",
+      "Mihaela Vorvoreanu",
+      "Adam Fourney",
+      "Besmira Nushi",
+      "Penny Collisson",
+      "Jina Suh",
+      "Shamsi T. Iqbal",
+      "Paul N. Bennett",
+      "Kori Inkpen",
+      "Jaime Teevan",
+      "Ruth Kikin-Gil",
+      "Eric Horvitz"
+    ],
+    "published_date": "2019-04-29",
+    "text": "Advances in artificial intelligence (AI) frame opportunities and challenges for user interface design. Principles for human-AI interaction have been discussed in the human-computer interaction community for over two decades, but more study and innovation are needed in light of advances in AI and the growing uses of AI technologies in human-facing applications. We propose 18 generally applicable design guidelines for human-AI interaction. These guidelines are validated through multiple rounds of evaluation including a user study with 49 design practitioners who tested the guidelines against 20 popular AI-infused products. The results verify the relevance of the guidelines over a spectrum of interaction scenarios and reveal gaps in our knowledge, highlighting opportunities for further research. Based on the evaluations, we believe the set of design guidelines can serve as a resource to practitioners working on the design of applications and features that harness AI technologies, and to researchers interested in the further development of human-AI interaction design principles.",
+    "highlights": [],
+    "highlight_scores": [],
+    "favicon": null,
+    "cited_by_count": 1535,
+    "source": null,
+    "institutions": [
+      "Microsoft (United States)",
+      "University of Washington"
+    ]
+  },
+  {
+    "title": "Human-AI interaction in safety-critical network infrastructures",
+    "url": "https://doi.org/10.1016/j.isci.2025.113400",
+    "authors": [
+      "Marco Mussi",
+      "Alberto Maria Metelli",
+      "Marcello Restelli",
+      "Gianvito Losapio",
+      "Ricardo J. Bessa",
+      "Daniel Boos",
+      "Christopher L. Borst",
+      "G. Leto",
+      "Alberto Castagna",
+      "Ricardo Chavarriaga",
+      "Dylmar Penteado Dias",
+      "Adrian Egli",
+      "Andrina Eisenegger",
+      "Yassine El Manyari",
+      "Anton R. Fuxj\u00e4ger",
+      "Joaquim Geraldes",
+      "Samira Hamouche",
+      "Mohamed Salah El-Din Hassouna",
+      "Bruno Lemetayer",
+      "Milad Leyli-Abadi",
+      "Roman Liessner",
+      "Jonas Lundberg",
+      "Antoine Marot",
+      "Maroua Meddeb",
+      "Viola Schiaffonati",
+      "Matthias Schneider",
+      "Thilo Stadelmann",
+      "Julia Usher",
+      "Herke van Hoof",
+      "Jan Viebahn",
+      "Toni Waefler",
+      "Giacomo Zanotti"
+    ],
+    "published_date": "2025-08-21",
+    "text": null,
+    "highlights": [],
+    "highlight_scores": [],
+    "favicon": null,
+    "cited_by_count": 1,
+    "source": "iScience",
+    "institutions": [
+      "ZHAW Zurich University of Applied Sciences",
+      "Fraunhofer Institute for Energy Economics and Energy System Technology",
+      "Link\u00f6ping University",
+      "\u00c9lectricit\u00e9 de France (France)",
+      "University of Amsterdam",
+      "FHNW University of Applied Sciences and Arts",
+      "Institut de Recherche Technologique SystemX",
+      "University of Kassel",
+      "Swiss Federal Railways",
+      "Deutsche Bahn (Germany)",
+      "Tennet (Netherlands)",
+      "Politecnico di Milano",
+      "Delft University of Technology",
+      "INESC TEC"
+    ]
+  },
+  {
+    "title": "From Explainable to Interactive AI: A Literature Review on Current Trends in Human-AI Interaction",
+    "url": "http://arxiv.org/abs/2405.15051",
+    "authors": [
+      "Muhammad Raees",
+      "Inge Meijerink",
+      "Ioanna Lykourentzou",
+      "Vassilis-Javed Khan",
+      "Konstantinos Papagelis"
+    ],
+    "published_date": "2024-05-23",
+    "text": "AI systems are increasingly being adopted across various domains and application areas. With this surge, there is a growing research focus and societal concern for actively involving humans in developing, operating, and adopting these systems. Despite this concern, most existing literature on AI and Human-Computer Interaction (HCI) primarily focuses on explaining how AI systems operate and, at times, allowing users to contest AI decisions. Existing studies often overlook more impactful forms of user interaction with AI systems, such as giving users agency beyond contestability and enabling them to adapt and even co-design the AI's internal mechanics. In this survey, we aim to bridge this gap by reviewing the state-of-the-art in Human-Centered AI literature, the domain where AI and HCI studies converge, extending past Explainable and Contestable AI, delving into the Interactive AI and beyond. Our analysis contributes to shaping the trajectory of future Interactive AI design and advocates for a more user-centric approach that provides users with greater agency, fostering not only their understanding of AI's workings but also their active engagement in its development and evolution.",
+    "highlights": [],
+    "highlight_scores": [],
+    "favicon": null,
+    "cited_by_count": 3,
+    "source": "arXiv (Cornell University)",
+    "institutions": []
+  },
+  {
+    "title": "Human-AI Interaction and Collaboration - Cambridge University Press",
+    "url": "https://www.cambridge.org/core/books/humanai-interaction-and-collaboration/CC47EFB06171F714256FD11EFE38DC16",
+    "authors": [
+      "Dan Wu"
+    ],
+    "published_date": "2025-09-19T00:00:00.000Z",
+    "text": "\n \n The integration of AI into information systems will affect the way users interface with these systems. This exploration of the interaction and collaboration between humans and AI reveals its potential and challenges, covering issues such as data privacy, credibility of results, misinformation, and search interactions. Later chapters delve into application domains such as healthcare and scientific discovery. In addition to providing new perspectives on and methods for developing",
+    "highlights": [
+      "The integration of AI into information systems will affect the way users interface with these systems. This exploration of the interaction and collaboration between humans and AI reveals its potential and challenges, covering issues such as data privacy, credibility of results, misinformation, and search interactions. Later chapters delve into application domains such as healthcare and scientific discovery. In addition to providing new perspectives on and methods for developing"
+    ],
+    "highlight_scores": [
+      -0.1728515625
+    ],
+    "favicon": "https://www.cambridge.org/core/cambridge-core/public/images/favicon.ico",
+    "cited_by_count": null,
+    "source": null,
+    "institutions": []
+  },
+  {
+    "title": "Examining human-AI interaction in real-world healthcare beyond the laboratory",
+    "url": "https://doi.org/10.1038/s41746-025-01559-5",
+    "authors": [
+      "Magdalena Wekenborg",
+      "Stephen Gilbert",
+      "Jakob Nikolas Kather"
+    ],
+    "published_date": "2025-03-19",
+    "text": "Abstract Artificial Intelligence (AI) is revolutionizing healthcare, but its true impact depends on seamless human interaction. While most research focuses on technical metrics, we lack frameworks to measure the compatibility or synergy of real-world human-AI interactions in healthcare settings. We propose a multimodal toolkit combining ecological momentary assessment, quantitative observations, and baseline measurements to optimize AI implementation.",
+    "highlights": [],
+    "highlight_scores": [],
+    "favicon": null,
+    "cited_by_count": 23,
+    "source": "npj Digital Medicine",
+    "institutions": [
+      "National Center for Tumor Diseases",
+      "University Hospital Heidelberg",
+      "University Hospital Carl Gustav Carus",
+      "Heidelberg University"
+    ]
+  },
+  {
+    "title": "Human-AI Interactions: Cognitive, Behavioral, and Emotional Impacts",
+    "url": "http://arxiv.org/abs/2510.17753",
+    "authors": [
+      "Celeste Riley",
+      "Omar Alrefai",
+      "Yadira Colunga Reyes",
+      "Eman Hammad"
+    ],
+    "published_date": "2025-10-20",
+    "text": "As stories of human-AI interactions continue to be highlighted in the news and research platforms, the challenges are becoming more pronounced, including potential risks of overreliance, cognitive offloading, social and emotional manipulation, and the nuanced degradation of human agency and judgment. This paper surveys recent research on these issues through the lens of the psychological triad: cognition, behavior, and emotion. Observations seem to suggest that while AI can substantially enhance memory, creativity, and engagement, it also introduces risks such as diminished critical thinking, skill erosion, and increased anxiety. Emotional outcomes are similarly mixed, with AI systems showing promise for support and stress reduction, but raising concerns about dependency, inappropriate attachments, and ethical oversight. This paper aims to underscore the need for responsible and context-aware AI design, highlighting gaps for longitudinal research and grounded evaluation frameworks to balance benefits with emerging human-centric risks.",
+    "highlights": [],
+    "highlight_scores": [],
+    "favicon": null,
+    "cited_by_count": 0,
+    "source": "arXiv (Cornell University)",
+    "institutions": []
+  }
+]
