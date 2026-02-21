@@ -82,6 +82,9 @@ class AsyncLLMClient:
     with actual LLM API calls (OpenAI, Anthropic, Google, etc.)
     """
 
+    DEFAULT_TIMEOUT = 40_000  # 40s for text/cached operations
+    PDF_TIMEOUT = 120_000    # 120s for PDF file operations
+
     def __init__(
         self,
         api_key: str,
@@ -90,13 +93,13 @@ class AsyncLLMClient:
         self.api_key = api_key
         self.default_model: str = default_model or DEFAULT_CHAT_MODEL
 
-    def _create_client(self) -> genai.Client:
+    def _create_client(self, timeout: int = DEFAULT_TIMEOUT) -> genai.Client:
         """Create a fresh client instance for thread-safe concurrent calls."""
         if not self.api_key:
             raise ValueError("API key is not set")
         return genai.Client(
             api_key=self.api_key,
-            http_options=types.HttpOptions(timeout=40_000),  # 40s connection timeout
+            http_options=types.HttpOptions(timeout=timeout),
         )
 
     async def create_cache(self, cache_content: str, client: genai.Client) -> str:
@@ -526,8 +529,8 @@ class PaperOperations(AsyncLLMClient):
         Returns:
             str: JSON string representing the data table
         """
-        # Create a fresh client for each call to avoid shared state issues with concurrent tasks
-        client = self._create_client()
+        # Create a fresh client with longer timeout since we're sending full PDFs
+        client = self._create_client(timeout=self.PDF_TIMEOUT)
 
         try:
             cols_str = "\n".join(f"- {col}" for col in columns)
