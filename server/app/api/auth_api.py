@@ -3,6 +3,7 @@ import logging
 import os
 import random
 import secrets
+import uuid
 from datetime import datetime
 from typing import Optional
 
@@ -21,6 +22,7 @@ from app.database.crud.paper_crud import paper_crud
 from app.database.crud.projects.project_role_invitation_crud import (
     project_role_invitation_crud,
 )
+from app.database.crud.subscription_crud import subscription_crud
 from app.database.crud.user_crud import user as user_crud
 from app.database.database import get_db
 from app.database.models import PaperStatus, Project, User
@@ -52,6 +54,13 @@ class AuthResponse(BaseModel):
     message: str
     user: Optional[CurrentUser] = None
     newly_created: bool = False
+    needs_name: bool = False
+
+
+class ProfileUpdateRequest(BaseModel):
+    """Request model for profile update."""
+
+    name: str
 
 
 @auth_router.get("/me", response_model=AuthResponse)
@@ -63,6 +72,48 @@ async def get_me(current_user: Optional[CurrentUser] = Depends(get_current_user)
     # Track the event of fetching user details
     track_event("user_details_fetched", user_id=str(current_user.id))
     return AuthResponse(success=True, message="User found", user=current_user)
+
+
+@auth_router.patch("/profile", response_model=AuthResponse)
+async def update_profile(
+    request: ProfileUpdateRequest,
+    current_user: CurrentUser = Depends(get_required_user),
+    db: Session = Depends(get_db),
+):
+    """Update the current user's profile."""
+    name = request.name.strip()
+    if not name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Name cannot be empty",
+        )
+
+    db_user = user_crud.get(db=db, id=current_user.id)
+    if not db_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    user_crud.update(db=db, db_obj=db_user, obj_in=UserUpdate(name=name))
+    db.refresh(db_user)
+
+    is_user_active = subscription_crud.is_user_active(db, db_user)
+    updated_current_user = CurrentUser(
+        id=uuid.UUID(str(db_user.id)),
+        email=str(db_user.email),
+        name=str(db_user.name) if db_user.name else None,
+        is_admin=bool(db_user.is_admin),
+        picture=str(db_user.picture) if db_user.picture else None,
+        is_email_verified=bool(db_user.is_email_verified),
+        is_active=is_user_active,
+    )
+
+    return AuthResponse(
+        success=True,
+        message="Profile updated successfully",
+        user=updated_current_user,
+    )
 
 
 @auth_router.get("/topics")
@@ -295,10 +346,12 @@ async def email_signin(
 
         if success:
             track_event("email_signin_initiated", user_id=str(db_user.id))
+            needs_name = not newly_created and not db_user.name
             return AuthResponse(
                 success=True,
                 message="Verification code sent to your email",
                 newly_created=newly_created,
+                needs_name=bool(needs_name),
             )
         else:
             return AuthResponse(
