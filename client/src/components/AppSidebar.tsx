@@ -12,6 +12,7 @@ import {
     MessageCircleQuestion,
     Moon,
     Route,
+    Settings,
     Sun,
     TelescopeIcon,
     User as UserIcon,
@@ -110,13 +111,19 @@ const UserMenuContent = ({
         <div className="flex items-center gap-3 p-3">
             <Avatar className="h-10 w-10">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                {user.picture ? (<img src={user.picture} alt={user.name} />) : (<UserIcon size={24} />)}
+                {user.picture ? (<img src={user.picture} alt={user.name || user.email} />) : (<UserIcon size={24} />)}
             </Avatar>
             <div>
-                <h3 className="font-medium">{user.name}</h3>
+                <h3 className="font-medium">{user.name || user.email}</h3>
                 <p className="text-sm text-muted-foreground">{user.email}</p>
             </div>
         </div>
+        <Link href="/settings" className="w-full">
+            <Button variant="ghost" className="w-full justify-start">
+                <Settings size={16} className="mr-2" />
+                Settings
+            </Button>
+        </Link>
         {/* Feedback section */}
         <Link href="https://github.com/khoj-ai/openpaper/issues" target="_blank" className="w-full">
             <Button variant="ghost" className="w-full justify-start">
@@ -541,9 +548,9 @@ export function AppSidebar() {
                                         <span className="flex items-center gap-2 truncate">
                                             <Avatar className="h-6 w-6">
                                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                {user.picture ? <img src={user.picture} alt={user.name} /> : <UserIcon size={16} />}
+                                                {user.picture ? <img src={user.picture} alt={user.name || user.email} /> : <UserIcon size={16} />}
                                             </Avatar>
-                                            <span className="truncate">{user.name}</span>
+                                            <span className="truncate">{user.name || user.email}</span>
                                         </span>
                                         <ChevronsUpDown className="h-4 w-4 ml-auto" />
                                     </SidebarMenuButton>
@@ -559,9 +566,9 @@ export function AppSidebar() {
                                         <span className="flex items-center gap-2 truncate">
                                             <Avatar className="h-6 w-6">
                                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                {user.picture ? (<img src={user.picture} alt={user.name} />) : (<UserIcon size={16} />)}
+                                                {user.picture ? (<img src={user.picture} alt={user.name || user.email} />) : (<UserIcon size={16} />)}
                                             </Avatar>
-                                            <span className="truncate">{user.name}</span>
+                                            <span className="truncate">{user.name || user.email}</span>
                                         </span>
                                         <ChevronsUpDown className="h-4 w-4 ml-auto" />
                                     </SidebarMenuButton>
