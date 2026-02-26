@@ -64,9 +64,9 @@ def get_current_user(
     return CurrentUser(
         id=id_as_uuid,
         email=str(db_user.email),
-        name=str(db_user.name),
+        name=db_user.name,  # type: ignore
         is_admin=bool(db_user.is_admin),
-        picture=str(db_user.picture),
+        picture=db_user.picture,  # type: ignore
         is_email_verified=bool(db_user.is_email_verified),
         is_active=is_user_active,
     )
