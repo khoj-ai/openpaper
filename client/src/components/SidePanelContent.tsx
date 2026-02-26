@@ -673,9 +673,9 @@ export function SidePanelContent({
                 {
                     msg.role === 'user' && user && (
                         <Avatar className="h-6 w-6">
-                            <AvatarImage src={user.picture} alt={user.name} />
-                            <AvatarFallback className={getAlphaHashToBackgroundColor(user.name)}>
-                                {getInitials(user.name)}
+                            <AvatarImage src={user.picture} alt={user.name || user.email} />
+                            <AvatarFallback className={getAlphaHashToBackgroundColor(user.name || user.email)}>
+                                {getInitials(user.name || user.email)}
                             </AvatarFallback>
                         </Avatar>
                     )

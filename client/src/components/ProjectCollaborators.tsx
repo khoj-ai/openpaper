@@ -294,21 +294,24 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin, setHasColl
 						</>
 					) : (
 						<>
-							{visibleCollaborators.map((collaborator: Collaborator) => (
+							{visibleCollaborators.map((collaborator: Collaborator) => {
+								const displayName = collaborator.name || collaborator.email;
+								return (
 								<Tooltip key={collaborator.id}>
 									<TooltipTrigger asChild>
 										<Avatar className="h-8 w-8 border-2 border-background ring-0">
-											<AvatarImage src={collaborator.picture} alt={collaborator.name} />
-											<AvatarFallback className={`text-xs ${getAlphaHashToBackgroundColor(collaborator.name)}`}>
-												{getInitials(collaborator.name)}
+											<AvatarImage src={collaborator.picture} alt={displayName} />
+											<AvatarFallback className={`text-xs ${getAlphaHashToBackgroundColor(displayName)}`}>
+												{getInitials(displayName)}
 											</AvatarFallback>
 										</Avatar>
 									</TooltipTrigger>
 									<TooltipContent>
-										<p>{collaborator.name}</p>
+										<p>{displayName}</p>
 									</TooltipContent>
 								</Tooltip>
-							))}
+								);
+							})}
 							{remainingCount > 0 && (
 								<Tooltip>
 									<TooltipTrigger asChild>
@@ -368,17 +371,19 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin, setHasColl
 					</DialogHeader>
 					<div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto">
 						{/* Active Collaborators */}
-						{collaborators.map((collaborator: Collaborator) => (
+						{collaborators.map((collaborator: Collaborator) => {
+							const displayName = collaborator.name || collaborator.email;
+							return (
 							<div key={collaborator.id} className="flex items-center justify-between">
 								<div className="flex items-center space-x-3">
 									<Avatar className="h-9 w-9">
-										<AvatarImage src={collaborator.picture} alt={collaborator.name} />
-										<AvatarFallback className={getAlphaHashToBackgroundColor(collaborator.name)}>
-											{getInitials(collaborator.name)}
+										<AvatarImage src={collaborator.picture} alt={displayName} />
+										<AvatarFallback className={getAlphaHashToBackgroundColor(displayName)}>
+											{getInitials(displayName)}
 										</AvatarFallback>
 									</Avatar>
 									<div className="min-w-0">
-										<p className="font-medium text-sm truncate">{collaborator.name}</p>
+										<p className="font-medium text-sm truncate">{displayName}</p>
 										<p className="text-xs text-muted-foreground truncate">{collaborator.email}</p>
 									</div>
 								</div>
@@ -395,7 +400,7 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin, setHasColl
 												<AlertDialogHeader>
 													<AlertDialogTitle>Remove Collaborator</AlertDialogTitle>
 													<AlertDialogDescription>
-														Are you sure you want to remove <b>{collaborator.name}</b> from the project? You will have to invite them again to add them back.
+														Are you sure you want to remove <b>{displayName}</b> from the project? You will have to invite them again to add them back.
 													</AlertDialogDescription>
 												</AlertDialogHeader>
 												<AlertDialogFooter>
@@ -409,7 +414,8 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin, setHasColl
 									)}
 								</div>
 							</div>
-						))}
+							);
+						})}
 
 						{/* Pending Invites Section */}
 						{pendingInvites.length > 0 && (

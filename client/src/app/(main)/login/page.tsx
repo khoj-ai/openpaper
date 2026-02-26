@@ -92,7 +92,7 @@ function LoginContent() {
 			});
 			if (data.success) {
 				setError(null);
-				if (data.newly_created) {
+				if (data.newly_created || data.needs_name) {
 					setShowNameInput(true);
 				} else {
 					setShowOtp(true);

@@ -48,6 +48,7 @@ export const formatDate = (dateString: string) => {
 };
 
 export function getAlphaHashToBackgroundColor(input: string): string {
+	if (!input) input = "User";
 	// Given a string, return a color from a predefined set based on a hash of the string, using tailwind bg-color-500 variants.
 	const colors = [
 		"bg-red-500",
@@ -72,6 +73,7 @@ export function getAlphaHashToBackgroundColor(input: string): string {
 }
 
 export function getInitials(name: string): string {
+	if (!name) return "?";
 	const names = name.split(" ");
 	let initials = names[0].charAt(0).toUpperCase();
 
