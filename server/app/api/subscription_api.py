@@ -223,14 +223,19 @@ async def get_user_subscription(
                     period_start = None
                     period_end = None
 
-                    if hasattr(stripe_sub, "current_period_start"):
+                    # Period dates are on the subscription item, not the subscription
+                    sub_item = (
+                        stripe_sub["items"]["data"][0]
+                        if stripe_sub.get("items", {}).get("data")
+                        else None
+                    )
+                    if sub_item and sub_item.get("current_period_start"):
                         period_start = datetime.fromtimestamp(
-                            stripe_sub["current_period_start"]
+                            sub_item["current_period_start"]
                         )
-
-                    if hasattr(stripe_sub, "current_period_end"):
+                    if sub_item and sub_item.get("current_period_end"):
                         period_end = datetime.fromtimestamp(
-                            stripe_sub["current_period_end"]
+                            sub_item["current_period_end"]
                         )
 
                     # Extract the product_id from the price object
@@ -287,6 +292,20 @@ async def get_user_subscription(
         # Check if the subscription needs payment attention (past_due or payment failed)
         requires_payment_update = status in ["past_due", "unpaid"]
 
+        # Build scheduled_change info if a schedule exists
+        scheduled_change = None
+        if subscription.stripe_schedule_id and plan_interval:
+            # Derive new_interval: if current is month, scheduled is year (and vice versa)
+            scheduled_new_interval = (
+                "year" if plan_interval == SubscriptionInterval.MONTHLY else "month"
+            )
+            scheduled_change = {
+                "new_interval": scheduled_new_interval,
+                "effective_date": (
+                    current_period_end.isoformat() if current_period_end else None
+                ),
+            }
+
         return {
             "has_subscription": is_valid_subscription,
             "had_subscription": had_subscription,
@@ -298,6 +317,7 @@ async def get_user_subscription(
                 "current_period_end": current_period_end,
                 "cancel_at_period_end": cancel_at_period_end,
             },
+            "scheduled_change": scheduled_change,
         }
 
     except Exception as e:
@@ -352,6 +372,8 @@ async def handle_stripe_webhook(
             "invoice.payment_action_required",
             "customer.subscription.past_due",
             "invoice.payment_succeeded",
+            "subscription_schedule.completed",
+            "subscription_schedule.released",
         ]:
             logger.info(f"Skipping unsupported event type: {event_type}")
             return {"success": False}
@@ -449,17 +471,27 @@ async def handle_stripe_webhook(
 
                 if user_id:
                     # Create or update subscription in database with new subscription data
+                    # Period dates are on the subscription item
+                    webhook_sub_item = stripe_sub.get("items", {}).get("data", [{}])[0]
                     subscription_data = {
                         "stripe_customer_id": customer_id,
                         "stripe_subscription_id": subscription_id,
                         "stripe_price_id": stripe_received_price_id,
                         "plan": SubscriptionPlan.RESEARCHER,
                         "status": stripe_sub.status,
-                        "current_period_start": datetime.fromtimestamp(
-                            stripe_sub["current_period_start"]
+                        "current_period_start": (
+                            datetime.fromtimestamp(
+                                webhook_sub_item["current_period_start"]
+                            )
+                            if webhook_sub_item.get("current_period_start")
+                            else None
                         ),
-                        "current_period_end": datetime.fromtimestamp(
-                            stripe_sub["current_period_end"]
+                        "current_period_end": (
+                            datetime.fromtimestamp(
+                                webhook_sub_item["current_period_end"]
+                            )
+                            if webhook_sub_item.get("current_period_end")
+                            else None
                         ),
                         "cancel_at_period_end": stripe_sub["cancel_at_period_end"],
                     }
@@ -536,6 +568,9 @@ async def handle_stripe_webhook(
                     )
                     was_scheduled_for_cancellation = previous_cancel_at_period_end
 
+                    # Period dates are on the subscription item
+                    updated_sub_item = stripe_sub.get("items", {}).get("data", [{}])[0]
+
                     # Update with new data
                     subscription_crud.update_subscription_status(
                         db,
@@ -543,13 +578,17 @@ async def handle_stripe_webhook(
                         stripe_sub.status,
                         stripe_price_id=stripe_received_price_id,
                         period_start=(
-                            datetime.fromtimestamp(stripe_sub["current_period_start"])
-                            if stripe_sub.get("current_period_start")
+                            datetime.fromtimestamp(
+                                updated_sub_item["current_period_start"]
+                            )
+                            if updated_sub_item.get("current_period_start")
                             else None
                         ),
                         period_end=(
-                            datetime.fromtimestamp(stripe_sub["current_period_end"])
-                            if stripe_sub.get("current_period_end")
+                            datetime.fromtimestamp(
+                                updated_sub_item["current_period_end"]
+                            )
+                            if updated_sub_item.get("current_period_end")
                             else None
                         ),
                         cancel_at_period_end=is_scheduled_for_cancellation,
@@ -835,6 +874,39 @@ async def handle_stripe_webhook(
             except Exception as e:
                 logger.error(
                     f"Error processing past due subscription: {e}", exc_info=True
+                )
+
+        elif event_type in [
+            "subscription_schedule.completed",
+            "subscription_schedule.released",
+        ]:
+            schedule = event["data"]["object"]
+            schedule_id = schedule.get("id")
+            subscription_id = schedule.get("subscription")
+
+            try:
+                if subscription_id:
+                    subscription = subscription_crud.get_by_stripe_subscription_id(
+                        db, subscription_id
+                    )
+
+                    if (
+                        subscription
+                        and str(subscription.stripe_schedule_id) == schedule_id
+                    ):
+                        subscription_crud.create_or_update(
+                            db,
+                            uuid.UUID(str(subscription.user_id)),
+                            {"stripe_schedule_id": None},
+                        )
+                        logger.info(
+                            f"Cleared schedule_id {schedule_id} from subscription {subscription_id} "
+                            f"(event: {event_type})"
+                        )
+            except Exception as e:
+                logger.error(
+                    f"Error processing {event_type} for schedule {schedule_id}: {e}",
+                    exc_info=True,
                 )
 
         # Return a 200 response to acknowledge receipt of the event. We should only arrive here if the event was processed successfully.
@@ -1135,7 +1207,8 @@ def change_subscription_interval(
     current_user: CurrentUser = Depends(get_required_user),
 ):
     """
-    Change the billing interval of the current user's subscription.
+    Schedule a billing interval change at the end of the current billing period
+    using Stripe Subscription Schedules. No immediate charge or proration.
     """
     try:
         # Get the user's current subscription
@@ -1180,36 +1253,67 @@ def change_subscription_interval(
                 "message": f"Subscription is already on {new_interval.value}ly billing",
             }
 
-        # Update the subscription directly
+        # current_period_end lives on the subscription item, not the subscription itself
+        current_period_end_ts = stripe_sub["items"]["data"][0].get("current_period_end")
+
+        # If there's already a schedule, release it first
+        if subscription.stripe_schedule_id:
+            try:
+                stripe.SubscriptionSchedule.release(
+                    str(subscription.stripe_schedule_id)
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to release existing schedule {subscription.stripe_schedule_id}: {e}"
+                )
+
+        # Create a schedule from the existing subscription
         try:
-            updated_subscription = stripe.Subscription.modify(
-                subscription_id,
-                items=[
-                    {
-                        "id": stripe_sub["items"]["data"][0]["id"],
-                        "price": new_price_id,
-                    }
-                ],
-                proration_behavior="create_prorations",
-                billing_cycle_anchor="now",
+            schedule = stripe.SubscriptionSchedule.create(
+                from_subscription=subscription_id
             )
 
-            effective_date = datetime.fromtimestamp(
-                updated_subscription["items"]["data"][0]["current_period_end"]
+            # Add a second phase with the new price at period end
+            current_phase = schedule.phases[0]
+            stripe.SubscriptionSchedule.modify(
+                schedule.id,
+                end_behavior="release",
+                phases=[
+                    {
+                        "items": [{"price": current_price_id, "quantity": 1}],
+                        "start_date": current_phase.start_date,
+                        "end_date": current_phase.end_date,
+                    },
+                    {
+                        "items": [{"price": new_price_id, "quantity": 1}],
+                    },
+                ],
+            )
+
+            # Store schedule ID in database
+            subscription_crud.create_or_update(
+                db,
+                current_user.id,
+                {"stripe_schedule_id": schedule.id},
             )
 
         except Exception as e:
-            logger.error(f"Error updating subscription: {e}")
+            logger.error(f"Error creating subscription schedule: {e}")
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to update subscription: {str(e)}",
+                detail=f"Failed to schedule interval change: {str(e)}",
             )
+
+        # Use the pre-captured period end, or fall back to the schedule's phase end_date
+        effective_ts = current_period_end_ts or current_phase.end_date
+        effective_date = datetime.fromtimestamp(effective_ts, tz=timezone.utc)
 
         # Track the interval change event
         track_event(
-            event_name="subscription_interval_changed",
+            event_name="subscription_interval_scheduled",
             properties={
                 "subscription_id": subscription_id,
+                "schedule_id": schedule.id,
                 "old_interval": (
                     "yearly" if current_price_id == YEARLY_PRICE_ID else "monthly"
                 ),
@@ -1220,9 +1324,9 @@ def change_subscription_interval(
         )
 
         logger.info(
-            f"Subscription {subscription_id} for user {current_user.id} changed from "
+            f"Subscription {subscription_id} for user {current_user.id} scheduled to change from "
             f"{'yearly' if current_price_id == YEARLY_PRICE_ID else 'monthly'} to "
-            f"{new_interval.value}ly, effective at: {effective_date}"
+            f"{new_interval.value}ly on {effective_date}"
         )
 
         # Notify user about the billing interval change
@@ -1234,22 +1338,77 @@ def change_subscription_interval(
 
         return {
             "success": True,
-            "message": f"Subscription interval will change to {new_interval.value}ly at the end of the current billing cycle",
-            "current_period_end": effective_date,
-            "new_interval": new_interval.value + "ly",
+            "message": f"Subscription interval will change to {new_interval.value}ly on {effective_date.strftime('%B %d, %Y')}",
+            "scheduled_date": effective_date.isoformat(),
+            "new_interval": new_interval.value,
         }
 
+    except HTTPException:
+        raise
     except Exception as stripe_error:
         logger.error(
-            f"Error when changing subscription interval: {stripe_error}", exc_info=True
+            f"Error when scheduling subscription interval change: {stripe_error}",
+            exc_info=True,
         )
-        if "stripe" in str(stripe_error).lower():
+        raise HTTPException(status_code=500, detail=str(stripe_error))
+
+
+@subscription_router.post("/cancel-scheduled-change")
+def cancel_scheduled_change(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """
+    Cancel a previously scheduled billing interval change.
+    Releases the Stripe Subscription Schedule so the subscription continues as-is.
+    """
+    try:
+        subscription = subscription_crud.get_by_user_id(db, current_user.id)
+
+        if not subscription:
+            return {"success": False, "error": "No existing subscription found"}
+
+        if not subscription.stripe_schedule_id:
+            return {"success": False, "error": "No scheduled change found"}
+
+        schedule_id = str(subscription.stripe_schedule_id)
+
+        # Release the schedule (subscription continues unchanged)
+        try:
+            stripe.SubscriptionSchedule.release(schedule_id)
+        except Exception as e:
+            logger.error(f"Error releasing subscription schedule {schedule_id}: {e}")
             raise HTTPException(
-                status_code=400, detail=f"Stripe error: {str(stripe_error)}"
+                status_code=500,
+                detail=f"Failed to cancel scheduled change: {str(e)}",
             )
-        else:
-            logger.error(
-                f"Error changing subscription interval: {str(stripe_error)}",
-                exc_info=True,
-            )
-            raise HTTPException(status_code=500, detail=str(stripe_error))
+
+        # Clear the schedule ID in our database
+        subscription_crud.create_or_update(
+            db, current_user.id, {"stripe_schedule_id": None}
+        )
+
+        # Track the cancellation event
+        track_event(
+            event_name="subscription_interval_schedule_canceled",
+            properties={
+                "subscription_id": str(subscription.stripe_subscription_id),
+                "schedule_id": schedule_id,
+            },
+            user_id=str(current_user.id),
+        )
+
+        logger.info(
+            f"Canceled scheduled interval change (schedule {schedule_id}) for user {current_user.id}"
+        )
+
+        return {
+            "success": True,
+            "message": "Scheduled billing change has been canceled",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error canceling scheduled change: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))

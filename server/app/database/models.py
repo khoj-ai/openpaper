@@ -798,6 +798,9 @@ class Subscription(Base):
     # Cancel at period end flag
     cancel_at_period_end = Column(Boolean, default=False)
 
+    # Stripe Subscription Schedule ID (for deferred interval changes)
+    stripe_schedule_id = Column(String, nullable=True)
+
     # When the subscription was canceled, if it was
     canceled_at = Column(DateTime(timezone=True), nullable=True)
 

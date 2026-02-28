@@ -16,6 +16,7 @@ class SubscriptionCreate(BaseModel):
     stripe_customer_id: Optional[str] = None
     stripe_subscription_id: Optional[str] = None
     stripe_price_id: Optional[str] = None
+    stripe_schedule_id: Optional[str] = None
     status: str = SubscriptionStatus.INCOMPLETE.value
     current_period_start: Optional[datetime] = None
     current_period_end: Optional[datetime] = None
@@ -28,6 +29,7 @@ class SubscriptionUpdate(BaseModel):
     stripe_customer_id: Optional[str] = None
     stripe_subscription_id: Optional[str] = None
     stripe_price_id: Optional[str] = None
+    stripe_schedule_id: Optional[str] = None
     status: Optional[str] = None
     current_period_start: Optional[datetime] = None
     current_period_end: Optional[datetime] = None
