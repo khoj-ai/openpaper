@@ -218,6 +218,10 @@ export interface UserSubscription {
         current_period_start: string;
         cancel_at_period_end: boolean;
     };
+    scheduled_change?: {
+        new_interval: "month" | "year";
+        effective_date: string;
+    } | null;
 }
 
 export interface HighlightResult {

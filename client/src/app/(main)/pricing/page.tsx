@@ -43,9 +43,13 @@ export default function PricingPage() {
 
                 setUserSubscription(response);
 
-                // Set billing toggle based on user's current subscription
+                // Set billing toggle: show future state if a change is scheduled
                 if (response.has_subscription) {
-                    setIsAnnual(response.subscription.interval === "year");
+                    if (response.scheduled_change) {
+                        setIsAnnual(response.scheduled_change.new_interval === "year");
+                    } else {
+                        setIsAnnual(response.subscription.interval === "year");
+                    }
                 }
             } catch (error) {
                 console.error('Failed to fetch subscription:', error);
@@ -91,28 +95,53 @@ export default function PricingPage() {
             });
 
             if (response.success) {
-                // Update the local state to reflect the change
+                toast.success(response.message || `Billing change to ${newInterval === "year" ? "annual" : "monthly"} scheduled.`);
                 setIsAnnual(newInterval === "year");
 
-                toast.success(`Billing interval changed to ${newInterval === "year" ? "annual" : "monthly"} successfully.`);
-
-                // Add delay to ensure backend state is updated before refreshing
-                await new Promise(resolve => setTimeout(resolve, 800));
-
-                // Optionally refresh the subscription data
+                // Refresh the subscription data
                 const updatedSubscription = await fetchFromApi("/api/subscription/user-subscription", {
                     method: "GET",
                 });
                 setUserSubscription(updatedSubscription);
             } else {
-                console.error('Failed to change interval:', response.message);
-                // You might want to show an error toast here
-                toast.error(`Failed to change billing interval: ${response.message}`);
+                console.error('Failed to schedule interval change:', response.message);
+                toast.error(`Failed to schedule billing change: ${response.message}`);
             }
         } catch (error) {
-            console.error('Failed to change interval:', error);
-            // You might want to show an error toast here
-            toast.error('Failed to change billing interval. Please try again later.');
+            console.error('Failed to schedule interval change:', error);
+            toast.error('Failed to schedule billing change. Please try again later.');
+        } finally {
+            setIsIntervalChangeLoading(false);
+        }
+    };
+
+    const handleCancelScheduledChange = async () => {
+        setIsIntervalChangeLoading(true);
+        try {
+            const response = await fetchFromApi("/api/subscription/cancel-scheduled-change", {
+                method: "POST",
+            });
+
+            if (response.success) {
+                toast.success("Scheduled billing change canceled.");
+
+                // Flip toggle back to current interval
+                if (userSubscription?.subscription?.interval) {
+                    setIsAnnual(userSubscription.subscription.interval === "year");
+                }
+
+                // Refresh the subscription data
+                const updatedSubscription = await fetchFromApi("/api/subscription/user-subscription", {
+                    method: "GET",
+                });
+                setUserSubscription(updatedSubscription);
+            } else {
+                console.error('Failed to cancel scheduled change:', response.error);
+                toast.error(`Failed to cancel scheduled change: ${response.error}`);
+            }
+        } catch (error) {
+            console.error('Failed to cancel scheduled change:', error);
+            toast.error('Failed to cancel scheduled change. Please try again later.');
         } finally {
             setIsIntervalChangeLoading(false);
         }
@@ -220,34 +249,63 @@ export default function PricingPage() {
                                     </Button>
                                 </DialogTrigger>
                                 <DialogContent className="border-slate-200 dark:border-slate-700 mx-4">
-                                    <DialogHeader>
-                                        <DialogTitle className="text-slate-900 dark:text-slate-100">
-                                            Change Billing Cycle
-                                        </DialogTitle>
-                                        <DialogDescription className="text-slate-600 dark:text-slate-400">
-                                            Switch from {isAnnual ? "annual" : "monthly"} to {isAnnual ? "monthly" : "annual"} billing.
-                                            The change will take effect at the end of your current billing cycle.
-                                        </DialogDescription>
-                                        {!isAnnual && (
-                                            <DialogDescription className="text-slate-600 dark:text-slate-400">
-                                                You will be charged the prorated amount for the remainder of the new billing cycle, effective immediately.
-                                            </DialogDescription>
-                                        )}
-                                    </DialogHeader>
-                                    <div className="flex gap-3 mt-4">
-                                        <DialogTrigger asChild>
-                                            <Button variant="outline" className="flex-1">
-                                                Cancel
-                                            </Button>
-                                        </DialogTrigger>
-                                        <Button
-                                            className="flex-1 bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900"
-                                            onClick={() => handleIntervalChange(isAnnual ? "month" : "year")}
-                                            disabled={isIntervalChangeLoading}
-                                        >
-                                            {isIntervalChangeLoading ? "Changing..." : `Switch to ${isAnnual ? "Monthly" : "Annual"}`}
-                                        </Button>
-                                    </div>
+                                    {userSubscription?.scheduled_change ? (
+                                        <>
+                                            <DialogHeader>
+                                                <DialogTitle className="text-slate-900 dark:text-slate-100">
+                                                    Billing Change Scheduled
+                                                </DialogTitle>
+                                                <DialogDescription className="text-slate-600 dark:text-slate-400">
+                                                    Your plan will switch to {userSubscription.scheduled_change.new_interval === "year" ? "annual" : "monthly"} billing
+                                                    on {formatDate(userSubscription.scheduled_change.effective_date)}. No changes until then.
+                                                </DialogDescription>
+                                            </DialogHeader>
+                                            <div className="flex gap-3 mt-4">
+                                                <Button
+                                                    variant="outline"
+                                                    className="flex-1"
+                                                    onClick={handleCancelScheduledChange}
+                                                    disabled={isIntervalChangeLoading}
+                                                >
+                                                    {isIntervalChangeLoading ? "Canceling..." : `Keep ${userSubscription.scheduled_change.new_interval === "year" ? "monthly" : "annual"} billing`}
+                                                </Button>
+                                                <DialogTrigger asChild>
+                                                    <Button className="flex-1 bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900">
+                                                        Got it
+                                                    </Button>
+                                                </DialogTrigger>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <DialogHeader>
+                                                <DialogTitle className="text-slate-900 dark:text-slate-100">
+                                                    Change Billing Cycle
+                                                </DialogTitle>
+                                                <DialogDescription className="text-slate-600 dark:text-slate-400">
+                                                    Your plan will switch to {isAnnual ? "monthly" : "annual"} billing
+                                                    on {userSubscription?.subscription.current_period_end
+                                                        ? formatDate(userSubscription.subscription.current_period_end)
+                                                        : "the end of your current period"
+                                                    } when your current billing period ends. No immediate charges.
+                                                </DialogDescription>
+                                            </DialogHeader>
+                                            <div className="flex gap-3 mt-4">
+                                                <DialogTrigger asChild>
+                                                    <Button variant="outline" className="flex-1">
+                                                        Cancel
+                                                    </Button>
+                                                </DialogTrigger>
+                                                <Button
+                                                    className="flex-1 bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900"
+                                                    onClick={() => handleIntervalChange(isAnnual ? "month" : "year")}
+                                                    disabled={isIntervalChangeLoading}
+                                                >
+                                                    {isIntervalChangeLoading ? "Scheduling..." : `Switch to ${isAnnual ? "Monthly" : "Annual"}`}
+                                                </Button>
+                                            </div>
+                                        </>
+                                    )}
                                 </DialogContent>
                             </Dialog>
                         ) : (
@@ -371,6 +429,11 @@ export default function PricingPage() {
                                 {isIntervalChangeLoading && (
                                     <Badge variant="secondary" className="text-xs">
                                         Updating...
+                                    </Badge>
+                                )}
+                                {userSubscription?.scheduled_change && (
+                                    <Badge variant="secondary" className="text-xs bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 whitespace-normal text-left">
+                                        Switching to {userSubscription.scheduled_change.new_interval === "year" ? "annual" : "monthly"} on {formatDate(userSubscription.scheduled_change.effective_date)}
                                     </Badge>
                                 )}
                             </div>

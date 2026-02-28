@@ -88,12 +88,6 @@ const items = [
         requiresAuth: true,
         isNew: true,
     },
-    {
-        title: "Find Papers",
-        url: "/finder",
-        icon: Globe2,
-        requiresAuth: false,
-    },
 ]
 
 const UserMenuContent = ({
