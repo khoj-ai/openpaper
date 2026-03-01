@@ -11,6 +11,7 @@ export interface DiscoverResult {
     highlights?: string[]
     highlight_scores?: number[]
     favicon?: string | null
+    summary?: string | null
     cited_by_count?: number | null
     source?: string | null
     institutions?: string[]
@@ -62,7 +63,7 @@ export default function DiscoverResultCard({ result }: DiscoverResultCardProps) 
     const institutionsDisplay = formatInstitutions(result.institutions)
 
     const snippet = sanitizeSnippet(
-        result.text || result.highlights?.[0] || ""
+        result.summary || result.text || result.highlights?.[0] || ""
     );
 
     // Build metadata items for the first line

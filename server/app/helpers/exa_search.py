@@ -22,6 +22,7 @@ class ExaResult:
     highlights: list[str] = field(default_factory=list)
     highlight_scores: list[float] = field(default_factory=list)
     favicon: Optional[str] = None
+    summary: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {
@@ -33,6 +34,7 @@ class ExaResult:
             "highlights": self.highlights,
             "highlight_scores": self.highlight_scores,
             "favicon": self.favicon,
+            "summary": self.summary,
         }
 
 
@@ -134,6 +136,9 @@ def search_exa(
             "category": "research paper",
             "text": {"max_characters": 500},
             "highlights": {"num_sentences": 3},
+            "summary": {
+                "query": "You're reviewing academic literature. Describe the background and results in 2-3 sentences. The reader already knows this is a research paper, so skip meta-commentary and focus on the actual content and findings. Do not start with 'This paper' or similar phrases. Just summarize the key points."
+            },
         }
 
         search_params["include_domains"] = domains or ACADEMIC_DOMAINS
@@ -164,6 +169,7 @@ def search_exa(
                         else []
                     ),
                     favicon=getattr(result, "favicon", None),
+                    summary=getattr(result, "summary", None),
                 )
             )
 
