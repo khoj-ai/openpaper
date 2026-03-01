@@ -6,7 +6,6 @@ import {
     FileText,
     FolderKanban,
     Compass,
-    Globe2,
     Home,
     LogOut,
     MessageCircleQuestion,
