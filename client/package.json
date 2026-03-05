@@ -73,7 +73,8 @@
     "@radix-ui/react-slot": "^1.2.3",
     "preact": "^10.28.2",
     "minimatch": "^9.0.7",
-    "hono": "^4.12.4"
+    "hono": "^4.12.4",
+    "@hono/node-server": "^1.19.10"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
