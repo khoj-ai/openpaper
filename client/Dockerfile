@@ -1,5 +1,5 @@
-# Use the official Node.js 23.11.0-slim image as the base image
-FROM node:23.11.0-slim as base
+# Use the official Node.js 24 slim image as the base image
+FROM node:24-slim as base
 
 
 # Set the working directory inside the container
@@ -52,8 +52,8 @@ RUN --mount=type=secret,id=POSTHOG_ENV_ID \
     find .next -name '*.map' -delete
 
 
-# Use the official Node.js 23.11.0-slim image for running the app
-FROM node:23.11.0-slim as production
+# Use the official Node.js 24 slim image for running the app
+FROM node:24-slim as production
 
 
 # Set the working directory
