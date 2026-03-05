@@ -31,7 +31,7 @@ from src.utils import retry_llm_operation, time_it
 logger = logging.getLogger(__name__)
 
 # Constants
-DEFAULT_CHAT_MODEL = "gemini-3-flash-preview"
+DEFAULT_CHAT_MODEL = "gemini-3.1-pro-preview"
 FAST_CHAT_MODEL = "gemini-3-flash-preview"
 CACHE_TTL_SECONDS = 3600
 
