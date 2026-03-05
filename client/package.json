@@ -71,7 +71,8 @@
   "resolutions": {
     "pdfjs-dist": "4.10.38",
     "@radix-ui/react-slot": "^1.2.3",
-    "preact": "^10.28.2"
+    "preact": "^10.28.2",
+    "minimatch": "^9.0.7"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
