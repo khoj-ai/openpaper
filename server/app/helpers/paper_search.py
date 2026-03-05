@@ -227,6 +227,7 @@ class OpenAlexFilter(BaseModel):
     institutions: Optional[List[str]] = None
     only_oa: bool = False
     from_publication_date: Optional[str] = None  # ISO date format: YYYY-MM-DD
+    min_cited_by_count: Optional[int] = None
 
 
 def construct_open_alex_filter_url(filter: OpenAlexFilter) -> str:
@@ -248,6 +249,8 @@ def construct_open_alex_filter_url(filter: OpenAlexFilter) -> str:
         filters.append("open_access.is_oa:true")
     if filter.from_publication_date:
         filters.append(f"from_publication_date:{filter.from_publication_date}")
+    if filter.min_cited_by_count is not None:
+        filters.append(f"cited_by_count:>{filter.min_cited_by_count - 1}")
 
     return ",".join(filters) if filters else ""
 
