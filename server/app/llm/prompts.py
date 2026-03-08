@@ -341,7 +341,7 @@ You are an expert at summarizing conversations. Your task is to generate a conci
 """
 
 NAME_DATA_TABLE_SYSTEM_PROMPT = """
-You are an expert at creating concise, descriptive titles. Your task is to generate a title for a data table that summarizes information extracted from research papers. The title should be no more than 10 words and should reflect both the papers' subject matter and the type of data being extracted.
+You are an expert at creating concise, descriptive titles. Your task is to generate a title for a data table that summarizes information extracted from research papers. The title should be no more than 10 words and should reflect both the papers' subject matter and the type of data being extracted. The title must be plaintext only — do not use any markdown formatting, asterisks, or special characters.
 """
 
 NAME_DATA_TABLE_USER_MESSAGE = """
