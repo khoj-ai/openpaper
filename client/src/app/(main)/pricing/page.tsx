@@ -196,8 +196,9 @@ export default function PricingPage() {
     const isCanceled = subscriptionStatus === SubscriptionStatus.CANCELED || userSubscription?.subscription?.cancel_at_period_end;
     const canResubscribe = userSubscription?.has_subscription && isCanceled;
 
-    // User had a subscription but needs to manage it (payment failed, past_due, etc.)
-    const needsSubscriptionManagement = userSubscription?.had_subscription && userSubscription?.requires_payment_update;
+    // User had a subscription but needs to manage it (payment failed, past_due, incomplete, etc.)
+    const needsSubscriptionManagement = userSubscription?.had_subscription && userSubscription?.requires_payment_update
+        || subscriptionStatus === SubscriptionStatus.INCOMPLETE;
 
     return (
         <div className="max-w-6xl mx-auto p-2 sm:p-8 space-y-16">
