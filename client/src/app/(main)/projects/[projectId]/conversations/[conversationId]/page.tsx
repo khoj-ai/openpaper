@@ -172,6 +172,22 @@ function ProjectConversationPageContent() {
         }
     }, [conversationIdFromUrl, user, fetchMessages, router, projectId, authLoading, isSessionLoading]);
 
+    const refreshPaperUrl = useCallback(async (paperId: string): Promise<string | null> => {
+        try {
+            const response = await fetchFromApi(`/api/projects/papers/${projectId}`);
+            const match = response.papers?.find((p: PaperItem) => p.id === paperId);
+            if (match?.file_url) {
+                // Update the papers state so future clicks use the fresh URL
+                setPapers(prev => prev.map(p => p.id === paperId ? { ...p, file_url: match.file_url } : p));
+                return match.file_url;
+            }
+            return null;
+        } catch (error) {
+            console.error("Error refreshing paper URL:", error);
+            return null;
+        }
+    }, [projectId]);
+
     useEffect(() => {
         const fetchPapers = async () => {
             try {
@@ -496,6 +512,7 @@ function ProjectConversationPageContent() {
                     highlightedInfo={highlightedInfo}
                     setHighlightedInfo={setHighlightedInfo}
                     authLoading={authLoading}
+                    onRefreshPaperUrl={refreshPaperUrl}
                 />
             </div>
         </div>

@@ -116,6 +116,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 	// Track the effective PDF URL, which may be refreshed on 403 errors
 	const [effectivePdfUrl, setEffectivePdfUrl] = useState(pdfUrl);
 	const [isRefreshingUrl, setIsRefreshingUrl] = useState(false);
+	const [pdfLoaderKey, setPdfLoaderKey] = useState(0);
 	const refreshAttemptRef = useRef(0);
 	const MAX_REFRESH_ATTEMPTS = 2;
 
@@ -141,6 +142,8 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 					const freshUrl = await onRefreshUrl();
 					if (freshUrl) {
 						setEffectivePdfUrl(freshUrl);
+						// Force PdfLoader remount to clear its internal error state
+						setPdfLoaderKey(prev => prev + 1);
 					}
 				} catch (e) {
 					console.error("Failed to refresh PDF URL:", e);
@@ -789,6 +792,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			{/* PDF Viewer */}
 			<div className="flex-1 overflow-hidden relative">
 				<PdfLoader
+					key={pdfLoaderKey}
 					document={effectivePdfUrl}
 					workerSrc="/pdf.worker.mjs"
 					beforeLoad={() => <EnigmaticLoadingExperience />}
