@@ -86,6 +86,7 @@ interface PdfHighlighterViewerProps {
 	paperStatus?: PaperStatus;
 	setUserMessageReferences: React.Dispatch<React.SetStateAction<string[]>>;
 	onOverlaysCreated?: (positions: Map<string, RenderedHighlightPosition>) => void;
+	onRefreshUrl?: () => Promise<string | null>;
 }
 
 export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
@@ -109,7 +110,47 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		handleStatusChange = () => { },
 		setUserMessageReferences,
 		onOverlaysCreated,
+		onRefreshUrl,
 	} = props;
+
+	// Track the effective PDF URL, which may be refreshed on 403 errors
+	const [effectivePdfUrl, setEffectivePdfUrl] = useState(pdfUrl);
+	const [isRefreshingUrl, setIsRefreshingUrl] = useState(false);
+	const refreshAttemptRef = useRef(0);
+	const MAX_REFRESH_ATTEMPTS = 2;
+
+	// Sync effective URL when parent provides a new pdfUrl
+	useEffect(() => {
+		setEffectivePdfUrl(pdfUrl);
+		refreshAttemptRef.current = 0;
+	}, [pdfUrl]);
+
+	// Handle PDF load errors — refresh presigned URL on 403
+	const handlePdfError = useCallback(
+		async (error: Error) => {
+			const is403 = error.message?.includes("403");
+			if (
+				is403 &&
+				onRefreshUrl &&
+				refreshAttemptRef.current < MAX_REFRESH_ATTEMPTS &&
+				!isRefreshingUrl
+			) {
+				refreshAttemptRef.current += 1;
+				setIsRefreshingUrl(true);
+				try {
+					const freshUrl = await onRefreshUrl();
+					if (freshUrl) {
+						setEffectivePdfUrl(freshUrl);
+					}
+				} catch (e) {
+					console.error("Failed to refresh PDF URL:", e);
+				} finally {
+					setIsRefreshingUrl(false);
+				}
+			}
+		},
+		[onRefreshUrl, isRefreshingUrl]
+	);
 
 	// Refs
 	const highlighterUtilsRef = useRef<PdfHighlighterUtils | null>(null);
@@ -748,14 +789,19 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			{/* PDF Viewer */}
 			<div className="flex-1 overflow-hidden relative">
 				<PdfLoader
-					document={pdfUrl}
+					document={effectivePdfUrl}
 					workerSrc="/pdf.worker.mjs"
 					beforeLoad={() => <EnigmaticLoadingExperience />}
-					errorMessage={(error) => (
-						<div className="p-4 text-red-500">
-							Error loading PDF: {error.message}
-						</div>
-					)}
+					onError={handlePdfError}
+					errorMessage={(error) =>
+						isRefreshingUrl ? (
+							<EnigmaticLoadingExperience />
+						) : (
+							<div className="p-4 text-red-500">
+								Error loading PDF: {error.message}
+							</div>
+						)
+					}
 				>
 					{(pdfDocument) => {
 						// Store PDF document ref for text extraction
