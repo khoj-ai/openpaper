@@ -289,8 +289,8 @@ async def get_user_subscription(
         # for users with expired/past_due subscriptions
         had_subscription = subscription.stripe_subscription_id is not None
 
-        # Check if the subscription needs payment attention (past_due or payment failed)
-        requires_payment_update = status in ["past_due", "unpaid"]
+        # Check if the subscription needs payment attention (past_due, unpaid, or incomplete)
+        requires_payment_update = status in ["past_due", "unpaid", "incomplete"]
 
         # Build scheduled_change info if a schedule exists
         scheduled_change = None
