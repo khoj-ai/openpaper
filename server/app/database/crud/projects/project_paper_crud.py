@@ -5,6 +5,7 @@ from typing import List, Optional
 
 from app.database.crud.paper_crud import paper_crud
 from app.database.crud.projects.project_base_crud import ProjectBaseCRUD
+from app.database.crud.projects.project_crud import project_crud
 from app.database.models import Paper, Project, ProjectPaper, ProjectRole, ProjectRoles
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
@@ -96,6 +97,10 @@ class ProjectPaperCRUD(
             else:
                 db.flush()
             db.refresh(db_obj)
+
+            # Touch project updated_at so it sorts to top of recent projects
+            project_crud.touch(db, project_id)
+
             return db_obj
         except Exception as e:
             db.rollback()
