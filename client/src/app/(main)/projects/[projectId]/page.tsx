@@ -326,7 +326,7 @@ export default function ProjectPage() {
 		return <ProjectPageSkeleton />;
 	}
 
-	const isEmpty = !papers || (papers.length === 0 && (!conversations || conversations.length === 0));
+	const isEmpty = !isPapersLoading && !isConversationsLoading && (!papers || (papers.length === 0 && (!conversations || conversations.length === 0)));
 
 	if (isEmpty) {
 		return (
