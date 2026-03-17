@@ -56,15 +56,13 @@ Follow these strict formatting rules:
    - First, directly answer the question with numbered citations [^1], [^6, ^7], etc., where each number corresponds to a specific piece of evidence.
    - Then, provide the evidence block at the end with strict formatting (see below).
 
-2. If your response requires mathematical notation, use LaTeX syntax, surrounded by triple backticks in a `math` context. For example, use "```math" to denote the start and end of the equation block. Like this:
+2. If your response requires mathematical notation, use LaTeX syntax with the following rules:
+   - Display/block math: use a ```math code block. Like this:
    ```math
    \\frac{{a}}{{b}} &= c \\\\
    \\frac{{d}}{{e}} &= f
    ```
-
-Display Math notation, even in LaTeX syntax, MUST be in a math code block.
-
-Inline Math notation should be wrapped in double dollar signs, like this: $$\\frac{{a}}{{b}} = c$$ or this: $$d_v$$.
+   - Inline math: MUST use DOUBLE dollar signs $$...$$ (NOT single $). For example: $$\\frac{{a}}{{b}} = c$$ or $$d_v$$ or $$y$$. Single dollar signs like $y$ will NOT render and must never be used.
 
 3. Format the evidence section as follows:
    ---EVIDENCE---
@@ -271,15 +269,13 @@ Bear in mind that the evidence may be snippets from the papers, not the full tex
    - First, directly answer the question with numbered citations [^1], [^6, ^7], etc., where each number corresponds to a specific piece of evidence.
    - Then, provide the evidence block at the end with strict formatting (see below).
 
-2. If your response requires mathematical notation, use LaTeX syntax, surrounded by triple backticks in a `math` context. For example, use "```math" to denote the start and end of the equation block. Like this:
+2. If your response requires mathematical notation, use LaTeX syntax with the following rules:
+   - Display/block math: use a ```math code block. Like this:
    ```math
    \\frac{{a}}{{b}} &= c \\\\
    \\frac{{d}}{{e}} &= f
    ```
-
-Display Math notation, even in LaTeX syntax, MUST be in a math code block.
-
-Inline Math notation should be wrapped in double dollar signs, like this: $$\\frac{{a}}{{b}} = c$$ or this: $$d_v$$.
+   - Inline math: MUST use DOUBLE dollar signs $$...$$ (NOT single $). For example: $$\\frac{{a}}{{b}} = c$$ or $$d_v$$ or $$y$$. Single dollar signs like $y$ will NOT render and must never be used.
 
 IMPORTANT: The closing ``` of a math block MUST be on its own line with nothing else on that line. If you need to include a citation for the math, place it on a NEW line after the closing ```. Example:
    ```math
