@@ -9,6 +9,7 @@ import argparse
 import logging
 import os
 import sys
+import time
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
@@ -39,6 +40,8 @@ def backfill(batch_size: int = 100, dry_run: bool = False) -> None:
 
         indexed = 0
         skipped = 0
+        errors = 0
+        start_time = time.time()
 
         if not total:
             logger.info("No papers to backfill.")
@@ -66,6 +69,7 @@ def backfill(batch_size: int = 100, dry_run: bool = False) -> None:
             if not rows:
                 break
 
+            batch_start = time.time()
             for paper_id, raw_content in rows:
                 if dry_run:
                     passages = paper_crud.build_passages(raw_content)
@@ -74,18 +78,35 @@ def backfill(batch_size: int = 100, dry_run: bool = False) -> None:
                     )
                     skipped += 1
                 else:
-                    paper_crud.index_paper_passages(
-                        db, paper_id=paper_id, raw_content=raw_content
-                    )
-                    indexed += 1
+                    try:
+                        paper_crud.index_paper_passages(
+                            db, paper_id=paper_id, raw_content=raw_content
+                        )
+                        indexed += 1
+                    except Exception as e:
+                        errors += 1
+                        logger.error(f"Failed to index paper {paper_id}: {e}")
+                        db.rollback()
 
             if not dry_run:
                 db.commit()
 
-            logger.info(f"Progress: {indexed}/{total}")
+            elapsed = time.time() - start_time
+            batch_elapsed = time.time() - batch_start
+            rate = indexed / elapsed if elapsed > 0 else 0
+            remaining = (total - indexed) / rate if rate > 0 else 0
+            logger.info(
+                f"Progress: {indexed}/{total} ({indexed * 100 // total}%) | "
+                f"batch: {batch_elapsed:.1f}s | "
+                f"rate: {rate:.0f} papers/s | "
+                f"errors: {errors} | "
+                f"ETA: {remaining / 60:.0f}m"
+            )
 
+        elapsed = time.time() - start_time
         logger.info(
-            f"Backfill complete. Indexed: {indexed}, Skipped (dry-run): {skipped}"
+            f"Backfill complete in {elapsed / 60:.1f}m. "
+            f"Indexed: {indexed}, Errors: {errors}, Skipped (dry-run): {skipped}"
         )
     finally:
         db.close()
