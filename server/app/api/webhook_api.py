@@ -244,7 +244,9 @@ async def handle_paper_processing_webhook(
             if result.raw_content and paper:
                 try:
                     paper_crud.index_paper_passages(
-                        db, paper_id=paper.id, raw_content=result.raw_content
+                        db,
+                        paper_id=uuid.UUID(str(paper.id)),
+                        raw_content=result.raw_content,
                     )
                 except Exception as e:
                     logger.error(
