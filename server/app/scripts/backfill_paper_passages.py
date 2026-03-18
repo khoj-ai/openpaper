@@ -23,13 +23,20 @@ logger = logging.getLogger(__name__)
 def backfill(batch_size: int = 100, dry_run: bool = False) -> None:
     db = SessionLocal()
     try:
-        # Get total count of papers with raw_content
+        # Count papers that still need indexing (skip already-indexed ones)
         total = db.execute(
-            text("SELECT COUNT(*) FROM papers WHERE raw_content IS NOT NULL")
+            text(
+                """
+                SELECT COUNT(*) FROM papers p
+                WHERE p.raw_content IS NOT NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM paper_passages pp WHERE pp.paper_id = p.id
+                  )
+            """
+            )
         ).scalar()
-        logger.info(f"Found {total} papers with raw_content")
+        logger.info(f"Found {total} papers to backfill (skipping already-indexed)")
 
-        offset = 0
         indexed = 0
         skipped = 0
 
@@ -37,18 +44,23 @@ def backfill(batch_size: int = 100, dry_run: bool = False) -> None:
             logger.info("No papers to backfill.")
             return
 
-        while offset < total:
+        while True:
+            # Always OFFSET 0 because each committed batch removes papers
+            # from the NOT EXISTS filter.
             rows = db.execute(
                 text(
                     """
-                    SELECT id, raw_content
-                    FROM papers
-                    WHERE raw_content IS NOT NULL
-                    ORDER BY id
-                    LIMIT :limit OFFSET :offset
+                    SELECT p.id, p.raw_content
+                    FROM papers p
+                    WHERE p.raw_content IS NOT NULL
+                      AND NOT EXISTS (
+                        SELECT 1 FROM paper_passages pp WHERE pp.paper_id = p.id
+                      )
+                    ORDER BY p.id
+                    LIMIT :limit
                 """
                 ),
-                {"limit": batch_size, "offset": offset},
+                {"limit": batch_size},
             ).fetchall()
 
             if not rows:
@@ -70,8 +82,7 @@ def backfill(batch_size: int = 100, dry_run: bool = False) -> None:
             if not dry_run:
                 db.commit()
 
-            offset += batch_size
-            logger.info(f"Progress: {offset}/{total}")
+            logger.info(f"Progress: {indexed}/{total}")
 
         logger.info(
             f"Backfill complete. Indexed: {indexed}, Skipped (dry-run): {skipped}"
