@@ -33,6 +33,10 @@ def backfill(batch_size: int = 100, dry_run: bool = False) -> None:
         indexed = 0
         skipped = 0
 
+        if not total:
+            logger.info("No papers to backfill.")
+            return
+
         while offset < total:
             rows = db.execute(
                 text(
