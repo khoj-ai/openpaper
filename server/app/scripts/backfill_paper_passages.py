@@ -129,19 +129,46 @@ def backfill(batch_size: int = 100, dry_run: bool = False) -> None:
                 f"ETA: {remaining / 60:.0f}m"
             )
 
-        # Backfill ts_vector for all rows that are missing it
-        logger.info("Backfilling ts_vector column (this may take a few minutes)...")
-        ts_start = time.time()
-        db.execute(
-            text(
-                """
-                UPDATE paper_passages
-                SET ts_vector = to_tsvector('pg_catalog.english', coalesce(content, ''))
-                WHERE ts_vector IS NULL
-            """
-            )
+        # Backfill ts_vector in batches
+        ts_batch_size = 100_000
+        null_count = db.execute(
+            text("SELECT COUNT(*) FROM paper_passages WHERE ts_vector IS NULL")
+        ).scalar()
+        logger.info(
+            f"Backfilling ts_vector for {null_count} rows in batches of {ts_batch_size}..."
         )
-        db.commit()
+        ts_start = time.time()
+        ts_updated = 0
+
+        while True:
+            result = db.execute(
+                text(
+                    """
+                    UPDATE paper_passages
+                    SET ts_vector = to_tsvector('pg_catalog.english', coalesce(content, ''))
+                    WHERE id IN (
+                        SELECT id FROM paper_passages
+                        WHERE ts_vector IS NULL
+                        LIMIT :batch_size
+                    )
+                """
+                ),
+                {"batch_size": ts_batch_size},
+            )
+            db.commit()
+            updated = result.rowcount
+            if updated == 0:
+                break
+            ts_updated += updated
+            elapsed = time.time() - ts_start
+            rate = ts_updated / elapsed if elapsed > 0 else 0
+            remaining = (null_count - ts_updated) / rate if rate > 0 else 0
+            logger.info(
+                f"ts_vector progress: {ts_updated}/{null_count} ({ts_updated * 100 // null_count}%) | "
+                f"rate: {rate:.0f} rows/s | "
+                f"ETA: {remaining / 60:.0f}m"
+            )
+
         logger.info(f"ts_vector backfill done in {time.time() - ts_start:.0f}s")
 
         # Re-enable the trigger for future inserts
