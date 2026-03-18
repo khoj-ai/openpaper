@@ -128,14 +128,9 @@ def backfill(batch_size: int = 100, dry_run: bool = False) -> None:
                 f"ETA: {remaining / 60:.0f}m"
             )
 
-        # Backfill ts_vector in batches
+        # Backfill ts_vector in batches (no upfront COUNT to avoid full table scan)
         ts_batch_size = 100_000
-        null_count = db.execute(
-            text("SELECT COUNT(*) FROM paper_passages WHERE ts_vector IS NULL")
-        ).scalar()
-        logger.info(
-            f"Backfilling ts_vector for {null_count} rows in batches of {ts_batch_size}..."
-        )
+        logger.info(f"Backfilling ts_vector in batches of {ts_batch_size}...")
         ts_start = time.time()
         ts_updated = 0
 
@@ -161,14 +156,15 @@ def backfill(batch_size: int = 100, dry_run: bool = False) -> None:
             ts_updated += updated
             elapsed = time.time() - ts_start
             rate = ts_updated / elapsed if elapsed > 0 else 0
-            remaining = (null_count - ts_updated) / rate if rate > 0 else 0
             logger.info(
-                f"ts_vector progress: {ts_updated}/{null_count} ({ts_updated * 100 // null_count}%) | "
+                f"ts_vector progress: {ts_updated} rows | "
                 f"rate: {rate:.0f} rows/s | "
-                f"ETA: {remaining / 60:.0f}m"
+                f"elapsed: {elapsed / 60:.1f}m"
             )
 
-        logger.info(f"ts_vector backfill done in {time.time() - ts_start:.0f}s")
+        logger.info(
+            f"ts_vector backfill done: {ts_updated} rows in {(time.time() - ts_start) / 60:.1f}m"
+        )
 
         # Re-enable the trigger for future inserts
         logger.info("Re-enabling tsvector trigger...")
