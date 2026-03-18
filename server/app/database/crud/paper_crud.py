@@ -691,7 +691,7 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
             try:
                 self.index_paper_passages(
                     db,
-                    paper_id=forked_paper.id,
+                    paper_id=uuid.UUID(str(forked_paper.id)),  # type: ignore
                     raw_content=str(original_paper.raw_content),
                 )
             except Exception as e:
