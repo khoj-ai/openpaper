@@ -43,10 +43,6 @@ def backfill(batch_size: int = 100, dry_run: bool = False) -> None:
         errors = 0
         start_time = time.time()
 
-        if not total:
-            logger.info("No papers to backfill.")
-            return
-
         # Disable the tsvector trigger during bulk insert — computing
         # to_tsvector per row is the main bottleneck. We'll backfill
         # ts_vector in one UPDATE pass at the end.
@@ -58,7 +54,10 @@ def backfill(batch_size: int = 100, dry_run: bool = False) -> None:
         )
         db.commit()
 
-        while True:
+        if not total:
+            logger.info("No papers to insert. Skipping to ts_vector backfill...")
+
+        while total > 0:
             # Always OFFSET 0 because each committed batch removes papers
             # from the NOT EXISTS filter.
             rows = db.execute(
