@@ -70,26 +70,40 @@ def backfill(batch_size: int = 100, dry_run: bool = False) -> None:
                 break
 
             batch_start = time.time()
-            for paper_id, raw_content in rows:
-                if dry_run:
+
+            if dry_run:
+                for paper_id, raw_content in rows:
                     passages = paper_crud.build_passages(raw_content)
                     logger.info(
                         f"[DRY RUN] Paper {paper_id}: would index {len(passages)} passages"
                     )
                     skipped += 1
-                else:
+            else:
+                # Build all passages for the batch in memory, then bulk insert.
+                # No DELETE needed — the NOT EXISTS filter guarantees these
+                # papers have no existing passages.
+                all_passages = []
+                for paper_id, raw_content in rows:
                     try:
-                        paper_crud.index_paper_passages(
-                            db, paper_id=paper_id, raw_content=raw_content
-                        )
-                        indexed += 1
+                        for p in paper_crud.build_passages(raw_content):
+                            all_passages.append({"paper_id": paper_id, **p})
                     except Exception as e:
                         errors += 1
-                        logger.error(f"Failed to index paper {paper_id}: {e}")
-                        db.rollback()
+                        logger.error(f"Failed to build passages for {paper_id}: {e}")
 
-            if not dry_run:
-                db.commit()
+                if all_passages:
+                    db.execute(
+                        text(
+                            """
+                            INSERT INTO paper_passages (paper_id, start_line, end_line, content)
+                            VALUES (:paper_id, :start_line, :end_line, :content)
+                        """
+                        ),
+                        all_passages,
+                    )
+                    db.commit()
+
+                indexed += len(rows) - errors
 
             elapsed = time.time() - start_time
             batch_elapsed = time.time() - batch_start
