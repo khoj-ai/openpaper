@@ -684,7 +684,23 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
         )
 
         # Create the new paper in the database
-        return self.create(db, obj_in=new_paper_data, user=current_user)
+        forked_paper = self.create(db, obj_in=new_paper_data, user=current_user)
+
+        # Index passages for the forked paper
+        if forked_paper and original_paper.raw_content:
+            try:
+                self.index_paper_passages(
+                    db,
+                    paper_id=forked_paper.id,
+                    raw_content=str(original_paper.raw_content),
+                )
+            except Exception as e:
+                logger.error(
+                    f"Error indexing passages for forked paper {forked_paper.id}: {e}",
+                    exc_info=True,
+                )
+
+        return forked_paper
 
 
 # Create a single instance to use throughout the application
