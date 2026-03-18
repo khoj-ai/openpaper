@@ -27,6 +27,10 @@ from sqlalchemy.orm import Session, selectinload
 
 logger = logging.getLogger(__name__)
 
+# Max papers to decompress from TOAST during full-text search.
+# Caps disk I/O by only processing the top-N most relevant FTS matches.
+FTS_MAX_PAPERS = 15
+
 
 # Define Pydantic models for type safety
 class PaperBase(BaseModel):
@@ -525,7 +529,8 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
             phrase_parts.append(f"phraseto_tsquery('english', :term_{i})")
         fts_query_clause = " || ".join(phrase_parts)
 
-        # Base query
+        # Base query — rank by FTS relevance and cap the number of papers whose
+        # raw_content we decompress from TOAST to bound disk I/O.
         sql_base = f"""
             WITH matching_papers AS (
                 SELECT id
@@ -534,7 +539,9 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
                   AND user_id = :user_id
         """
 
-        sql_end = """
+        sql_end = f"""
+                ORDER BY ts_rank(ts_vector, {fts_query_clause}) DESC
+                LIMIT :fts_max_papers
             )
             SELECT p.id, lines.line_number, lines.line_content
             FROM papers p,
@@ -547,6 +554,7 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
         params = {
             "user_id": user.id,
             "regex_query": regex_query,
+            "fts_max_papers": FTS_MAX_PAPERS,
         }
 
         # Add each term as a separate parameter
