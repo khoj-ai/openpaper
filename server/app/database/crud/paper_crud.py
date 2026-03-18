@@ -27,10 +27,6 @@ from sqlalchemy.orm import Session, selectinload
 
 logger = logging.getLogger(__name__)
 
-# Max papers to decompress from TOAST during full-text search.
-# Caps disk I/O by only processing the top-N most relevant FTS matches.
-FTS_MAX_PAPERS = 15
-
 
 # Define Pydantic models for type safety
 class PaperBase(BaseModel):
@@ -494,6 +490,52 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
 
         return db_query.order_by(Paper.updated_at.desc()).all()
 
+    @staticmethod
+    def build_passages(
+        raw_content: str, window: int = 5, stride: int = 3
+    ) -> list[dict]:
+        """Split raw_content into overlapping passage windows."""
+        lines = raw_content.split("\n")
+        passages = []
+        for i in range(0, len(lines), stride):
+            chunk = lines[i : i + window]
+            passages.append(
+                {
+                    "start_line": i + 1,  # 1-indexed
+                    "end_line": i + len(chunk),  # 1-indexed
+                    "content": "\n".join(chunk),
+                }
+            )
+        return passages
+
+    def index_paper_passages(
+        self,
+        db: Session,
+        *,
+        paper_id: uuid.UUID,
+        raw_content: str,
+        window: int = 5,
+        stride: int = 3,
+    ) -> None:
+        """Index a paper's content as overlapping passages for FTS."""
+        db.execute(
+            text("DELETE FROM paper_passages WHERE paper_id = :paper_id"),
+            {"paper_id": paper_id},
+        )
+
+        passages = self.build_passages(raw_content, window=window, stride=stride)
+        if passages:
+            db.execute(
+                text(
+                    """
+                    INSERT INTO paper_passages (paper_id, start_line, end_line, content)
+                    VALUES (:paper_id, :start_line, :end_line, :content)
+                """
+                ),
+                [{"paper_id": paper_id, **p} for p in passages],
+            )
+        db.flush()
+
     def search_papers_and_get_matching_lines(
         self,
         db: Session,
@@ -503,10 +545,13 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
         paper_ids: Optional[List[uuid.UUID]] = None,
     ) -> List[Tuple[str, int, str]]:
         """
-        Search for papers using full-text search and return the matching lines.
+        Search for papers using passage-level FTS and return exact matching lines.
+
+        Queries the paper_passages table (GIN-indexed tsvector per passage),
+        then refines to exact lines with a cheap in-memory regex on the small
+        passage content. Deduplicates lines that appear in overlapping windows.
         """
         sanitized_query = query.replace("-", " ")
-        # Split on | to preserve phrases like "machine learning"
         raw_terms = [
             term.strip() for term in sanitized_query.split("|") if term.strip()
         ]
@@ -514,62 +559,48 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
             return []
 
         search_terms = list({t.lower() for t in raw_terms})
-        # For regex, escape special chars and join individual words
-        regex_terms = []
-        for term in search_terms:
-            # Escape special regex characters
-            escaped_term = re.escape(term)
-            regex_terms.append(escaped_term)
+
+        # Build regex for in-memory line refinement
+        regex_terms = [re.escape(term) for term in search_terms]
         regex_query = "|".join(regex_terms)
 
-        # Use phraseto_tsquery for each term to preserve multi-word phrases
-        # Build the OR combination of phrase queries
+        # Build FTS query clause
         phrase_parts = []
         for i, term in enumerate(search_terms):
             phrase_parts.append(f"phraseto_tsquery('english', :term_{i})")
         fts_query_clause = " || ".join(phrase_parts)
 
-        # Base query — rank by FTS relevance and cap the number of papers whose
-        # raw_content we decompress from TOAST to bound disk I/O.
-        sql_base = f"""
-            WITH matching_papers AS (
-                SELECT id
-                FROM papers
-                WHERE ts_vector @@ ({fts_query_clause})
-                  AND user_id = :user_id
+        sql = f"""
+            SELECT pp.paper_id::text, pp.start_line, pp.content
+            FROM paper_passages pp
+            JOIN papers p ON p.id = pp.paper_id
+            WHERE pp.ts_vector @@ ({fts_query_clause})
+              AND p.user_id = :user_id
         """
 
-        sql_end = f"""
-                ORDER BY ts_rank(ts_vector, {fts_query_clause}) DESC
-                LIMIT :fts_max_papers
-            )
-            SELECT p.id, lines.line_number, lines.line_content
-            FROM papers p,
-                 unnest(string_to_array(p.raw_content, '\n')) WITH ORDINALITY AS lines(line_content, line_number)
-            WHERE p.id IN (SELECT id FROM matching_papers)
-              AND lines.line_content ~* :regex_query
-            ORDER BY p.id, lines.line_number;
-        """
-
-        params = {
-            "user_id": user.id,
-            "regex_query": regex_query,
-            "fts_max_papers": FTS_MAX_PAPERS,
-        }
-
-        # Add each term as a separate parameter
+        params: dict = {"user_id": user.id}
         for i, term in enumerate(search_terms):
             params[f"term_{i}"] = term
 
         if paper_ids:
-            sql_base += " AND id = ANY(:paper_ids)"
+            sql += " AND pp.paper_id = ANY(:paper_ids)"
             params["paper_ids"] = paper_ids
 
-        final_sql = sql_base + sql_end
+        sql += " ORDER BY pp.paper_id, pp.start_line"
 
-        result = db.execute(text(final_sql), params).fetchall()
+        raw_results = db.execute(text(sql), params).fetchall()
 
-        return [(str(row[0]), row[1], row[2]) for row in result]
+        # Refine: extract exact matching lines and deduplicate across
+        # overlapping passage windows.
+        seen: dict[tuple, tuple] = {}
+        for paper_id, start_line, content in raw_results:
+            for offset, line in enumerate(content.split("\n")):
+                if re.search(regex_query, line, re.IGNORECASE):
+                    key = (paper_id, start_line + offset)
+                    if key not in seen:
+                        seen[key] = (paper_id, start_line + offset, line)
+
+        return sorted(seen.values(), key=lambda r: (r[0], r[1]))
 
     def get_topics(
         self,
@@ -653,7 +684,23 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
         )
 
         # Create the new paper in the database
-        return self.create(db, obj_in=new_paper_data, user=current_user)
+        forked_paper = self.create(db, obj_in=new_paper_data, user=current_user)
+
+        # Index passages for the forked paper
+        if forked_paper and original_paper.raw_content:
+            try:
+                self.index_paper_passages(
+                    db,
+                    paper_id=uuid.UUID(str(forked_paper.id)),  # type: ignore
+                    raw_content=str(original_paper.raw_content),
+                )
+            except Exception as e:
+                logger.error(
+                    f"Error indexing passages for forked paper {forked_paper.id}: {e}",
+                    exc_info=True,
+                )
+
+        return forked_paper
 
 
 # Create a single instance to use throughout the application

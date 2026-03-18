@@ -240,6 +240,20 @@ async def handle_paper_processing_webhook(
                 user=job_user,
             )
 
+            # Index passages for full-text search
+            if result.raw_content and paper:
+                try:
+                    paper_crud.index_paper_passages(
+                        db,
+                        paper_id=uuid.UUID(str(paper.id)),
+                        raw_content=result.raw_content,
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Error indexing passages for job {job_id}: {str(e)}",
+                        exc_info=True,
+                    )
+
             # Create highlights/annotations if any
             if metadata.highlights and paper:
                 try:
