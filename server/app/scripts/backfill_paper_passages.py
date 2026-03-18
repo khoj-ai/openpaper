@@ -47,6 +47,17 @@ def backfill(batch_size: int = 100, dry_run: bool = False) -> None:
             logger.info("No papers to backfill.")
             return
 
+        # Disable the tsvector trigger during bulk insert — computing
+        # to_tsvector per row is the main bottleneck. We'll backfill
+        # ts_vector in one UPDATE pass at the end.
+        logger.info("Disabling tsvector trigger for bulk insert...")
+        db.execute(
+            text(
+                "ALTER TABLE paper_passages DISABLE TRIGGER paper_passages_tsvectorupdate"
+            )
+        )
+        db.commit()
+
         while True:
             # Always OFFSET 0 because each committed batch removes papers
             # from the NOT EXISTS filter.
@@ -117,6 +128,30 @@ def backfill(batch_size: int = 100, dry_run: bool = False) -> None:
                 f"errors: {errors} | "
                 f"ETA: {remaining / 60:.0f}m"
             )
+
+        # Backfill ts_vector for all rows that are missing it
+        logger.info("Backfilling ts_vector column (this may take a few minutes)...")
+        ts_start = time.time()
+        db.execute(
+            text(
+                """
+                UPDATE paper_passages
+                SET ts_vector = to_tsvector('pg_catalog.english', coalesce(content, ''))
+                WHERE ts_vector IS NULL
+            """
+            )
+        )
+        db.commit()
+        logger.info(f"ts_vector backfill done in {time.time() - ts_start:.0f}s")
+
+        # Re-enable the trigger for future inserts
+        logger.info("Re-enabling tsvector trigger...")
+        db.execute(
+            text(
+                "ALTER TABLE paper_passages ENABLE TRIGGER paper_passages_tsvectorupdate"
+            )
+        )
+        db.commit()
 
         elapsed = time.time() - start_time
         logger.info(
