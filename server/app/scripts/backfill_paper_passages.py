@@ -97,6 +97,7 @@ def backfill(batch_size: int = 100, dry_run: bool = False) -> None:
                             """
                             INSERT INTO paper_passages (paper_id, start_line, end_line, content)
                             VALUES (:paper_id, :start_line, :end_line, :content)
+                            ON CONFLICT (paper_id, start_line) DO NOTHING
                         """
                         ),
                         all_passages,
