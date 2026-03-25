@@ -71,6 +71,23 @@ def create_checkout_session(
                 detail="You already have an active subscription. Please use the customer portal to manage your subscription or update your payment method.",
             )
 
+        # Cancel any incomplete Stripe subscription before creating a new checkout session
+        # This handles the case where a user's first payment attempt failed
+        if (
+            subscription
+            and subscription.status == SubscriptionStatus.INCOMPLETE
+            and subscription.stripe_subscription_id
+        ):
+            try:
+                stripe.Subscription.cancel(str(subscription.stripe_subscription_id))
+                logger.info(
+                    f"Canceled incomplete subscription {subscription.stripe_subscription_id} for user {current_user.id}"
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to cancel incomplete subscription {subscription.stripe_subscription_id}: {e}"
+                )
+
         # Create a Stripe Checkout session
         price_id = (
             MONTHLY_PRICE_ID
