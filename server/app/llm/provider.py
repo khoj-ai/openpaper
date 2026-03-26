@@ -45,6 +45,39 @@ from openai.types.chat import (
 logger = logging.getLogger(__name__)
 
 
+def _normalize_openai_json_schema(
+    schema: dict[str, Any], provider_type: str
+) -> dict[str, Any]:
+    """Normalize schemas for providers with stricter JSON schema validation."""
+    if provider_type != "openai_compatible":
+        return schema
+
+    def normalize(node: Any) -> Any:
+        if isinstance(node, dict):
+            normalized = {key: normalize(value) for key, value in node.items()}
+
+            if "$ref" in normalized:
+                return {"$ref": normalized["$ref"]}
+
+            if normalized.get("type") == "object":
+                properties = normalized.get("properties")
+                if isinstance(properties, dict):
+                    normalized["properties"] = {
+                        key: normalize(value) for key, value in properties.items()
+                    }
+                    normalized["required"] = list(normalized["properties"].keys())
+                normalized["additionalProperties"] = False
+
+            return normalized
+
+        if isinstance(node, list):
+            return [normalize(value) for value in node]
+
+        return node
+
+    return normalize(schema)
+
+
 class LLMProvider(Enum):
     GEMINI = "gemini"
     OPENAI = "openai"
@@ -432,10 +465,13 @@ class OpenAIProvider(BaseLLMProvider):
         base_url: Optional[str] = None,
         default_model: Optional[str] = None,
         fast_model: Optional[str] = None,
+        provider_type: str = "builtin",
     ):
 
         # Allow explicit api_key/base_url overrides while keeping env-based defaults.
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        self.base_url = base_url
+        self.provider_type = provider_type
 
         if not self.api_key:
             raise ValueError("OPENAI_API_KEY environment variable is required")
@@ -484,12 +520,16 @@ class OpenAIProvider(BaseLLMProvider):
 
         # Apply structured output schema if provided
         if schema:
+            normalized_schema = _normalize_openai_json_schema(
+                schema,
+                self.provider_type,
+            )
             kwargs["response_format"] = {
                 "type": "json_schema",
                 "json_schema": {
                     "name": "structured_response",
                     "strict": True,
-                    "schema": schema,
+                    "schema": normalized_schema,
                 },
             }
 

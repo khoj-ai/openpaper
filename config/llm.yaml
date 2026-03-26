@@ -1,0 +1,58 @@
+version: 1
+allow_manual_override: true
+default_provider: gemini
+
+providers:
+  gemini:
+    enabled: true
+    default_model: gemini-3.1-pro-preview
+    fast_model: gemini-3-flash-preview
+  openai:
+    enabled: false
+    default_model: gpt-4.1
+    fast_model: gpt-4.1-mini
+  groq:
+    enabled: false
+    default_model: openai/gpt-oss-120b
+    fast_model: moonshotai/kimi-k2-instruct-0905
+  cerebras:
+    enabled: false
+    default_model: gpt-oss-120b
+    fast_model: zai-glm-4.7
+
+custom_providers:
+  custom-openai:
+    enabled: false
+    provider_type: openai_compatible
+    api_key_env: FUSE_API_KEY
+    base_url: https://your-openai-compatible-endpoint/v1
+    default_model: gpt-5.1
+    fast_model: gpt-5.1
+
+routing:
+  chat_stream:
+    primary: gemini
+    failover: [openai, groq]
+  evidence_gathering:
+    primary: groq
+    failover: [gemini, openai]
+  multi_paper_response:
+    primary: gemini
+    failover: [openai, groq]
+  conversation_title:
+    primary: gemini
+    failover: [openai]
+  data_table_naming:
+    primary: gemini
+    failover: [openai]
+  metadata_extraction:
+    primary: gemini
+    failover: [openai]
+  data_table_extraction:
+    primary: gemini
+    failover: [openai]
+
+retry:
+  max_attempts_per_provider: 2
+  failover_on: [timeout, rate_limit, upstream_5xx, connection_error]
+  no_failover_on: [bad_request, auth_error, schema_validation, unsupported_feature]

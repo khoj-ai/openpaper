@@ -1,61 +1,138 @@
 """
-Simplified LLM client for metadata extraction.
+Provider-aware LLM client for jobs metadata extraction.
 """
+import asyncio
+import base64
+import io
 import json
 import logging
 import os
-import re
-import io
-import asyncio
 import random
+import re
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional, Type, TypeVar
+
 import httpx
 from google import genai
 from google.genai import types
 from google.genai.errors import APIError, ClientError, ServerError
-from typing import Any, Dict, List, Optional, Type, TypeVar, Callable
+from openai import APIConnectionError, APIError as OpenAIAPIError
+from openai import APITimeoutError, AsyncOpenAI, RateLimitError
+from pydantic import BaseModel, ConfigDict, Field, create_model
 
-from pydantic import BaseModel, create_model, Field, ConfigDict
-
-from src.prompts import EXTRACT_COLS_INSTRUCTION, SYSTEM_INSTRUCTIONS_CACHE, EXTRACT_METADATA_PROMPT_TEMPLATE
+from src.llm_config import LLMProvider, RoutingTask, get_llm_routing_config
+from src.prompts import (
+    EXTRACT_COLS_INSTRUCTION,
+    EXTRACT_METADATA_PROMPT_TEMPLATE,
+    SYSTEM_INSTRUCTIONS_CACHE,
+)
 from src.schemas import (
-    DataTableRow,
-    PaperMetadataExtraction,
-    TitleAuthorsAbstract,
-    InstitutionsKeywords,
-    SummaryAndCitations,
-    Highlights,
     DataTableCellValue,
+    DataTableRow,
+    Highlights,
+    InstitutionsKeywords,
+    PaperMetadataExtraction,
+    SummaryAndCitations,
+    TitleAuthorsAbstract,
 )
 from src.utils import retry_llm_operation, time_it
 
 logger = logging.getLogger(__name__)
 
-# Constants
-DEFAULT_CHAT_MODEL = "gemini-3.1-pro-preview"
-FAST_CHAT_MODEL = "gemini-3-flash-preview"
 CACHE_TTL_SECONDS = 3600
 
-# Pydantic model type variable
 T = TypeVar("T", bound=BaseModel)
 
 
-class JSONParser:
+def _normalize_openai_json_schema(
+    schema: dict[str, Any], provider_type: str
+) -> dict[str, Any]:
+    """Normalize schemas for providers with stricter JSON schema validation."""
+    if provider_type != "openai_compatible":
+        return schema
 
+    def normalize(node: Any) -> Any:
+        if isinstance(node, dict):
+            normalized = {key: normalize(value) for key, value in node.items()}
+
+            if "$ref" in normalized:
+                return {"$ref": normalized["$ref"]}
+
+            if normalized.get("type") == "object":
+                properties = normalized.get("properties")
+                if isinstance(properties, dict):
+                    normalized["properties"] = {
+                        key: normalize(value) for key, value in properties.items()
+                    }
+                    normalized["required"] = list(normalized["properties"].keys())
+                normalized["additionalProperties"] = False
+
+            return normalized
+
+        if isinstance(node, list):
+            return [normalize(value) for value in node]
+
+        return node
+
+    return normalize(schema)
+
+@dataclass(frozen=True)
+class ProviderConfig:
+    provider_key: str
+    provider: Optional[LLMProvider]
+    provider_type: str
+    api_key: str
+    default_model: str
+    fast_model: str
+    base_url: Optional[str] = None
+
+def _parse_builtin_provider(provider_key: str) -> Optional[LLMProvider]:
+    for provider in LLMProvider:
+        if provider.value == provider_key:
+            return provider
+    return None
+
+
+def _get_provider_config(provider_key: str) -> ProviderConfig:
+    routing_config = get_llm_routing_config()
+    provider_config = routing_config.providers.get(provider_key)
+    if provider_config is None:
+        raise ValueError(f"Unsupported LLM provider: {provider_key}")
+
+    api_key = os.getenv(provider_config.api_key_env or "")
+    if provider_key == LLMProvider.GEMINI.value and not api_key:
+        api_key = os.getenv("GOOGLE_API_KEY", "")
+
+    if not api_key:
+        raise ValueError(
+            f"Provider '{provider_key}' is not configured. Missing env var '{provider_config.api_key_env}'."
+        )
+
+    return ProviderConfig(
+        provider_key=provider_key,
+        provider=_parse_builtin_provider(provider_key),
+        provider_type=provider_config.provider_type,
+        api_key=api_key,
+        default_model=provider_config.default_model,
+        fast_model=provider_config.fast_model,
+        base_url=provider_config.base_url,
+    )
+
+
+class JSONParser:
     @staticmethod
     def validate_and_extract_json(json_data: str) -> dict:
-        """Extract and validate JSON data from various formats"""
+        """Extract and validate JSON data from various formats."""
         if not json_data or not isinstance(json_data, str):
             raise ValueError("Invalid input: empty or non-string data")
 
         json_data = json_data.strip()
 
-        # Case 1: Try parsing directly first
         try:
             return json.loads(json_data)
         except json.JSONDecodeError:
             pass
 
-        # Case 2: Check for code block format
         if "```" in json_data:
             code_blocks = re.findall(r"```(?:json)?\s*([\s\S]*?)```", json_data)
 
@@ -76,90 +153,83 @@ class JSONParser:
 
 
 class AsyncLLMClient:
-    """
-    A simple LLM client for metadata extraction.
-    This is a placeholder implementation that would need to be replaced
-    with actual LLM API calls (OpenAI, Anthropic, Google, etc.)
-    """
-
-    DEFAULT_TIMEOUT = 40_000  # 40s for text/cached operations
-    PDF_TIMEOUT = 120_000    # 120s for PDF file operations
+    DEFAULT_TIMEOUT = 40.0
+    PDF_TIMEOUT = 120.0
 
     def __init__(
         self,
-        api_key: str,
+        provider_config: ProviderConfig,
         default_model: Optional[str] = None,
     ):
-        self.api_key = api_key
-        self.default_model: str = default_model or DEFAULT_CHAT_MODEL
+        self.provider_config = provider_config
+        self.provider_key = provider_config.provider_key
+        self.provider = provider_config.provider
+        self.provider_type = provider_config.provider_type
+        self.api_key = provider_config.api_key
+        self.base_url = provider_config.base_url
+        self.default_model = default_model or provider_config.default_model
 
-    def _create_client(self, timeout: int = DEFAULT_TIMEOUT) -> genai.Client:
-        """Create a fresh client instance for thread-safe concurrent calls."""
-        if not self.api_key:
-            raise ValueError("API key is not set")
-        return genai.Client(
+    def _create_client(
+        self, timeout: float = DEFAULT_TIMEOUT
+    ) -> genai.Client | AsyncOpenAI:
+        if self.provider_key == LLMProvider.GEMINI.value:
+            return genai.Client(
+                api_key=self.api_key,
+                http_options=types.HttpOptions(timeout=int(timeout * 1000)),
+            )
+
+        return AsyncOpenAI(
             api_key=self.api_key,
-            http_options=types.HttpOptions(timeout=timeout),
+            base_url=self.base_url,
+            timeout=timeout,
         )
 
-    async def create_cache(self, cache_content: str, client: genai.Client) -> str:
-        """Create a cache entry for the given content.
+    async def create_cache(
+        self, cache_content: str, client: genai.Client | AsyncOpenAI
+    ) -> Optional[str]:
+        """Create a cache entry when the active provider supports it."""
+        if self.provider_key != LLMProvider.GEMINI.value:
+            return None
 
-        Args:
-            cache_content (str): The content to cache.
-            client: The genai client to use.
-
-        Returns:
-            str: The cache key for the stored content.
-        """
+        assert isinstance(client, genai.Client)
         cached_content = await client.aio.caches.create(
             model=self.default_model,
             config=types.CreateCachedContentConfig(
                 contents=types.Content(
-                    role='user',
+                    role="user",
                     parts=[
                         types.Part.from_text(text=cache_content),
-                        types.Part.from_text(text=SYSTEM_INSTRUCTIONS_CACHE)
-                    ]
+                        types.Part.from_text(text=SYSTEM_INSTRUCTIONS_CACHE),
+                    ],
                 ),
                 display_name="Paper Metadata Cache",
-                ttl='3600s'
-            )
+                ttl=f"{CACHE_TTL_SECONDS}s",
+            ),
         )
 
         if cached_content and cached_content.name:
-            logger.info(f"Cache created successfully: {cached_content.name}")
-        else:
-            logger.error("Failed to create cache entry")
-            raise ValueError("Cache creation failed")
+            logger.info("Cache created successfully: %s", cached_content.name)
+            return cached_content.name
 
-        return cached_content.name
+        raise ValueError("Cache creation failed")
 
     async def create_file_cache(
         self,
         file_path: str,
-        client: genai.Client,
+        client: genai.Client | AsyncOpenAI,
         system_instructions: Optional[str] = None,
-    ):
-        """Create a cache entry for the given file.
+    ) -> Optional[str]:
+        """Create a file-backed cache when the active provider supports it."""
+        if self.provider_key != LLMProvider.GEMINI.value:
+            return None
 
-        Args:
-            file_path (str): The path to the file to cache.
-            client: The genai client to use.
-
-        Returns:
-            str: The cache key for the stored file.
-        """
-        # Read the file content
-        with open(file_path, 'rb') as f:
+        assert isinstance(client, genai.Client)
+        with open(file_path, "rb") as f:
             file_content = f.read()
 
-        doc_io = io.BytesIO(file_content)
         document = await client.aio.files.upload(
-            file=doc_io,
-            config=types.UploadFileConfig(
-                mime_type='application/pdf',
-            )
+            file=io.BytesIO(file_content),
+            config=types.UploadFileConfig(mime_type="application/pdf"),
         )
 
         cached_content = await client.aio.caches.create(
@@ -167,18 +237,215 @@ class AsyncLLMClient:
             config=types.CreateCachedContentConfig(
                 contents=document,
                 display_name="Paper Metadata Cache",
-                ttl='3600s',
-                system_instruction=system_instructions or SYSTEM_INSTRUCTIONS_CACHE
+                ttl=f"{CACHE_TTL_SECONDS}s",
+                system_instruction=system_instructions or SYSTEM_INSTRUCTIONS_CACHE,
             ),
         )
 
         if cached_content and cached_content.name:
-            logger.info(f"File cache created successfully: {cached_content.name}")
-        else:
-            logger.error("Failed to create cache entry")
-            raise ValueError("Cache creation failed")
+            logger.info("File cache created successfully: %s", cached_content.name)
+            return cached_content.name
 
-        return cached_content.name
+        raise ValueError("Cache creation failed")
+
+    def _build_openai_content_parts(
+        self,
+        prompt: str,
+        image_bytes: Optional[bytes] = None,
+        image_mime_type: Optional[str] = None,
+        file_path: Optional[str] = None,
+    ) -> list[dict[str, Any]]:
+        parts: list[dict[str, Any]] = []
+
+        if image_bytes:
+            base64_image = base64.b64encode(image_bytes).decode("utf-8")
+            mime_type = image_mime_type or "image/png"
+            parts.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{mime_type};base64,{base64_image}"},
+                }
+            )
+
+        if file_path:
+            with open(file_path, "rb") as f:
+                file_data = base64.b64encode(f.read()).decode("utf-8")
+            parts.append(
+                {
+                    "type": "file",
+                    "file": {
+                        "filename": os.path.basename(file_path),
+                        "file_data": f"data:application/pdf;base64,{file_data}",
+                    },
+                }
+            )
+
+        parts.append({"type": "text", "text": prompt})
+        return parts
+
+    async def _generate_with_gemini(
+        self,
+        prompt: str,
+        client: genai.Client,
+        image_bytes: Optional[bytes] = None,
+        image_mime_type: Optional[str] = None,
+        cache_key: Optional[str] = None,
+        model: Optional[str] = None,
+        schema: Optional[Type[BaseModel]] = None,
+        file_path: Optional[str] = None,
+        max_retries: int = 3,
+        base_delay: float = 1.0,
+    ) -> str:
+        target_model = model or self.default_model
+        parts: list[types.Part] = []
+
+        if image_bytes:
+            parts.append(
+                types.Part.from_bytes(
+                    data=image_bytes,
+                    mime_type=image_mime_type or "image/png",
+                )
+            )
+
+        if file_path:
+            with open(file_path, "rb") as f:
+                parts.append(
+                    types.Part.from_bytes(
+                        data=f.read(),
+                        mime_type="application/pdf",
+                    )
+                )
+
+        parts.append(types.Part.from_text(text=prompt))
+
+        config = types.GenerateContentConfig(cached_content=cache_key)
+        if schema:
+            config.response_mime_type = "application/json"
+            config.response_schema = schema.model_json_schema()
+
+        last_exception: Optional[Exception] = None
+        for attempt in range(max_retries + 1):
+            try:
+                response = await client.aio.models.generate_content(
+                    model=target_model,
+                    contents=types.Content(role="user", parts=parts),
+                    config=config,
+                )
+
+                if response and response.text:
+                    return response.text
+
+                raise ValueError("No content generated from LLM response")
+            except (
+                ServerError,
+                ClientError,
+                APIError,
+                httpx.TimeoutException,
+            ) as e:
+                last_exception = e
+                if attempt < max_retries:
+                    backoff_time = base_delay * (2**attempt) * (
+                        0.5 + 0.5 * random.random()
+                    )
+                    logger.warning(
+                        "Gemini API error (attempt %s/%s): %s. Retrying in %.2fs",
+                        attempt + 1,
+                        max_retries + 1,
+                        e,
+                        backoff_time,
+                    )
+                    await asyncio.sleep(backoff_time)
+                else:
+                    logger.error(
+                        "All %s Gemini attempts failed for generate_content: %s",
+                        max_retries + 1,
+                        e,
+                    )
+
+        raise last_exception or ValueError(
+            "Failed to generate content after all retries"
+        )
+
+    async def _generate_with_openai_compatible(
+        self,
+        prompt: str,
+        client: AsyncOpenAI,
+        image_bytes: Optional[bytes] = None,
+        image_mime_type: Optional[str] = None,
+        model: Optional[str] = None,
+        schema: Optional[Type[BaseModel]] = None,
+        file_path: Optional[str] = None,
+        max_retries: int = 3,
+        base_delay: float = 1.0,
+    ) -> str:
+        target_model = model or self.default_model
+        content_parts = self._build_openai_content_parts(
+            prompt=prompt,
+            image_bytes=image_bytes,
+            image_mime_type=image_mime_type,
+            file_path=file_path,
+        )
+
+        request_kwargs: dict[str, Any] = {}
+        if schema:
+            normalized_schema = _normalize_openai_json_schema(
+                schema.model_json_schema(),
+                self.provider_type,
+            )
+            request_kwargs["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "structured_response",
+                    "strict": True,
+                    "schema": normalized_schema,
+                },
+            }
+
+        last_exception: Optional[Exception] = None
+        for attempt in range(max_retries + 1):
+            try:
+                response = await client.chat.completions.create(
+                    model=target_model,
+                    messages=[{"role": "user", "content": content_parts}],
+                    **request_kwargs,
+                )
+
+                if response.choices and response.choices[0].message.content:
+                    return response.choices[0].message.content
+
+                raise ValueError("No content generated from LLM response")
+            except (
+                OpenAIAPIError,
+                APIConnectionError,
+                APITimeoutError,
+                RateLimitError,
+                httpx.TimeoutException,
+            ) as e:
+                last_exception = e
+                if attempt < max_retries:
+                    backoff_time = base_delay * (2**attempt) * (
+                        0.5 + 0.5 * random.random()
+                    )
+                    logger.warning(
+                        "%s API error (attempt %s/%s): %s. Retrying in %.2fs",
+                        self.provider_key,
+                        attempt + 1,
+                        max_retries + 1,
+                        e,
+                        backoff_time,
+                    )
+                    await asyncio.sleep(backoff_time)
+                else:
+                    logger.error(
+                        "All %s attempts failed for %s generate_content: %s",
+                        max_retries + 1,
+                        self.provider_key,
+                        e,
+                    )
+
+        raise last_exception or ValueError(
+            "Failed to generate content after all retries"
+        )
 
     async def generate_content(
         self,
@@ -191,92 +458,42 @@ class AsyncLLMClient:
         file_path: Optional[str] = None,
         max_retries: int = 3,
         base_delay: float = 1.0,
-        client: Optional[genai.Client] = None,
+        client: Optional[genai.Client | AsyncOpenAI] = None,
     ) -> str:
-        """
-        Generate content using the LLM with automatic retry and exponential backoff.
-
-        Args:
-            prompt: The prompt to send to the LLM
-            model: Optional specific model to use, defaults to self.default_model
-            max_retries: Maximum number of retry attempts (default: 3)
-            base_delay: Base delay in seconds for exponential backoff (default: 1.0)
-            client: Optional client to use (for concurrent calls)
-
-        Returns:
-            str: The generated content from the LLM
-        """
-        if not client:
+        if client is None:
             raise ValueError("Client is required for generate_content")
 
-        if not model:
-            model = self.default_model
+        if self.provider_key == LLMProvider.GEMINI.value:
+            assert isinstance(client, genai.Client)
+            return await self._generate_with_gemini(
+                prompt=prompt,
+                client=client,
+                image_bytes=image_bytes,
+                image_mime_type=image_mime_type,
+                cache_key=cache_key,
+                model=model,
+                schema=schema,
+                file_path=file_path,
+                max_retries=max_retries,
+                base_delay=base_delay,
+            )
 
-        parts = []
-        if image_bytes:
-            parts.append(types.Part.from_bytes(data=image_bytes, mime_type=image_mime_type or 'image/png'))
-
-        if file_path:
-            with open(file_path, "rb") as f:
-                file_data = f.read()
-            parts.append(types.Part.from_bytes(data=file_data, mime_type='application/pdf'))
-
-
-        parts.append(types.Part.from_text(text=prompt))
-
-        config = types.GenerateContentConfig(
-            cached_content=cache_key
+        assert isinstance(client, AsyncOpenAI)
+        return await self._generate_with_openai_compatible(
+            prompt=prompt,
+            client=client,
+            image_bytes=image_bytes,
+            image_mime_type=image_mime_type,
+            model=model,
+            schema=schema,
+            file_path=file_path,
+            max_retries=max_retries,
+            base_delay=base_delay,
         )
-
-        if schema:
-            config.response_mime_type = 'application/json'
-            config.response_schema = schema.model_json_schema()
-
-        last_exception: Optional[Exception] = None
-
-        for attempt in range(max_retries + 1):
-            try:
-                response = await client.aio.models.generate_content(
-                    model=model,
-                    contents=types.Content(
-                        role='user',
-                        parts=parts
-                    ),
-                    config=config
-                )
-
-                if response and response.text:
-                    return response.text
-
-                raise ValueError("No content generated from LLM response")
-
-            except (ServerError, ClientError, APIError, httpx.TimeoutException) as e:
-                last_exception = e
-                if attempt < max_retries:
-                    # Exponential backoff with jitter
-                    backoff_time = base_delay * (2 ** attempt) * (0.5 + 0.5 * random.random())
-                    logger.warning(
-                        f"LLM API error (attempt {attempt + 1}/{max_retries + 1}): {e}. "
-                        f"Retrying in {backoff_time:.2f}s"
-                    )
-                    await asyncio.sleep(backoff_time)
-                else:
-                    logger.error(f"All {max_retries + 1} attempts failed for generate_content: {e}")
-
-        # If we reach here, all retries failed
-        raise last_exception or ValueError("Failed to generate content after all retries")
 
 
 class PaperOperations(AsyncLLMClient):
-    """
-    Simplified LLM client for metadata extraction.
-    This is a placeholder implementation that would need to be replaced
-    with actual LLM API calls (OpenAI, Anthropic, Google, etc.)
-    """
-
-    def __init__(self, api_key: str, default_model: Optional[str] = None):
-        """Initialize the LLM client for paper operations."""
-        super().__init__(api_key, default_model=default_model)
+    """LLM operations used by the jobs service."""
 
     async def _extract_single_metadata_field(
         self,
@@ -284,28 +501,20 @@ class PaperOperations(AsyncLLMClient):
         paper_content: str,
         schema: Type[BaseModel],
         status_callback: Callable[[str], None],
-        client: genai.Client,
-        cache_key: Optional[str] = None
+        client: genai.Client | AsyncOpenAI,
+        cache_key: Optional[str] = None,
     ) -> T:
-        """
-        Helper function to extract a single metadata field.
-
-        Args:
-            model: The Pydantic model for the data to extract.
-            paper_content: The paper content.
-            status_callback: Optional function to update task status.
-            client: The genai client to use.
-
-        Returns:
-            An instance of the provided Pydantic model.
-        """
-        prompt = EXTRACT_METADATA_PROMPT_TEMPLATE.format(
-        )
+        prompt = EXTRACT_METADATA_PROMPT_TEMPLATE.format()
 
         if paper_content and not cache_key:
             prompt = f"Paper Content:\n\n{paper_content}\n\n{prompt}"
 
-        response = await self.generate_content(prompt, cache_key=cache_key, schema=schema, client=client)
+        response = await self.generate_content(
+            prompt,
+            cache_key=cache_key,
+            schema=schema,
+            client=client,
+        )
         response_json = JSONParser.validate_and_extract_json(response)
         instance = model.model_validate(response_json)
 
@@ -317,30 +526,21 @@ class PaperOperations(AsyncLLMClient):
             institutions = getattr(instance, "institutions", [])
             first_keyword = keywords[0] if keywords else ""
             if first_keyword:
-                status_callback(
-                    f"Building on {first_keyword} context"
-                )
+                status_callback(f"Building on {first_keyword} context")
             elif institutions:
-                institutions = getattr(instance, "institutions", [])
                 first_institution = institutions[0] if institutions else ""
-                status_callback(
-                    f"Adding context from institution: {first_institution}"
-                )
+                status_callback(f"Adding context from institution: {first_institution}")
             else:
                 status_callback("Processing without keyword data")
         elif model == Highlights:
             highlights = getattr(instance, "highlights", [])
             if highlights:
-                status_callback(
-                    f"Formulated {len(highlights)} annotations"
-                )
+                status_callback(f"Formulated {len(highlights)} annotations")
             else:
                 status_callback("No annotations extracted")
         elif model == TitleAuthorsAbstract:
             title = getattr(instance, "title", "")
-            status_callback(
-                f"Reading {title if title else 'untitled paper'}"
-            )
+            status_callback(f"Reading {title if title else 'untitled paper'}")
         else:
             status_callback(f"Successfully extracted {model.__name__}")
 
@@ -351,10 +551,10 @@ class PaperOperations(AsyncLLMClient):
         self,
         paper_content: str,
         status_callback: Callable[[str], None],
-        client: genai.Client,
+        client: genai.Client | AsyncOpenAI,
         cache_key: Optional[str] = None,
     ) -> TitleAuthorsAbstract:
-        result = await self._extract_single_metadata_field(
+        return await self._extract_single_metadata_field(
             model=TitleAuthorsAbstract,
             cache_key=cache_key,
             schema=TitleAuthorsAbstract,
@@ -362,14 +562,13 @@ class PaperOperations(AsyncLLMClient):
             status_callback=status_callback,
             client=client,
         )
-        return result
 
     @retry_llm_operation(max_retries=3, delay=1.0)
     async def extract_institutions_keywords(
         self,
         paper_content: str,
         status_callback: Callable[[str], None],
-        client: genai.Client,
+        client: genai.Client | AsyncOpenAI,
         cache_key: Optional[str] = None,
     ) -> InstitutionsKeywords:
         return await self._extract_single_metadata_field(
@@ -386,10 +585,10 @@ class PaperOperations(AsyncLLMClient):
         self,
         paper_content: str,
         status_callback: Callable[[str], None],
-        client: genai.Client,
+        client: genai.Client | AsyncOpenAI,
         cache_key: Optional[str] = None,
     ) -> SummaryAndCitations:
-        result = await self._extract_single_metadata_field(
+        return await self._extract_single_metadata_field(
             model=SummaryAndCitations,
             cache_key=cache_key,
             schema=SummaryAndCitations,
@@ -397,14 +596,13 @@ class PaperOperations(AsyncLLMClient):
             status_callback=status_callback,
             client=client,
         )
-        return result
 
     @retry_llm_operation(max_retries=3, delay=1.0)
     async def extract_highlights(
         self,
         paper_content: str,
         status_callback: Callable[[str], None],
-        client: genai.Client,
+        client: genai.Client | AsyncOpenAI,
         cache_key: Optional[str] = None,
     ) -> Highlights:
         return await self._extract_single_metadata_field(
@@ -419,73 +617,74 @@ class PaperOperations(AsyncLLMClient):
     async def extract_paper_metadata(
         self,
         paper_content: str,
-        job_id: str,  # Add job_id here
+        job_id: str,
         status_callback: Optional[Callable[[str], None]] = None,
     ) -> PaperMetadataExtraction:
-        """
-        Extract metadata from paper content using LLM.
-
-        Args:
-            paper_content: The extracted text content from the PDF
-            status_callback: Optional function to update task status
-
-        Returns:
-            PaperMetadataExtraction: Extracted metadata
-        """
         async with time_it("Extracting paper metadata from LLM", job_id=job_id):
-            # Create a fresh client for this operation
             client = self._create_client()
 
             try:
-                try:
-                    async with time_it("Creating cache for paper content", job_id=job_id):
-                        cache_key = await self.create_cache(paper_content, client)
-                except Exception as e:
-                    logger.error(f"Failed to create cache: {e}", exc_info=True)
-                    cache_key = None
+                cache_key: Optional[str] = None
+                if self.provider_key == LLMProvider.GEMINI.value:
+                    try:
+                        async with time_it(
+                            "Creating cache for paper content", job_id=job_id
+                        ):
+                            cache_key = await self.create_cache(paper_content, client)
+                    except Exception as e:
+                        logger.error("Failed to create cache: %s", e, exc_info=True)
 
-                # Run all extraction tasks concurrently
-                async with time_it("Running all metadata extraction tasks concurrently", job_id=job_id):
+                async with time_it(
+                    "Running all metadata extraction tasks concurrently", job_id=job_id
+                ):
                     tasks = [
-                        asyncio.create_task(time_it("Extracting title, authors, and abstract", job_id=job_id)(
-                            self.extract_title_authors_abstract
-                        )(
-                            paper_content=paper_content,
-                            cache_key=cache_key,
-                            status_callback=status_callback,
-                            client=client,
-                        )),
-                        asyncio.create_task(time_it("Extracting institutions and keywords", job_id=job_id)(
-                            self.extract_institutions_keywords
-                        )(
-                            paper_content=paper_content,
-                            cache_key=cache_key,
-                            status_callback=status_callback,
-                            client=client,
-                        )),
-                        asyncio.create_task(time_it("Extracting summary and citations", job_id=job_id)(
-                            self.extract_summary_and_citations
-                        )(
-                            paper_content=paper_content,
-                            cache_key=cache_key,
-                            status_callback=status_callback,
-                            client=client,
-                        )),
-                        asyncio.create_task(time_it("Extracting highlights", job_id=job_id)(
-                            self.extract_highlights
-                        )(
-                            paper_content=paper_content,
-                            cache_key=cache_key,
-                            status_callback=status_callback,
-                            client=client,
-                        )),
+                        asyncio.create_task(
+                            time_it(
+                                "Extracting title, authors, and abstract", job_id=job_id
+                            )(self.extract_title_authors_abstract)(
+                                paper_content=paper_content,
+                                cache_key=cache_key,
+                                status_callback=status_callback,
+                                client=client,
+                            )
+                        ),
+                        asyncio.create_task(
+                            time_it(
+                                "Extracting institutions and keywords", job_id=job_id
+                            )(self.extract_institutions_keywords)(
+                                paper_content=paper_content,
+                                cache_key=cache_key,
+                                status_callback=status_callback,
+                                client=client,
+                            )
+                        ),
+                        asyncio.create_task(
+                            time_it(
+                                "Extracting summary and citations", job_id=job_id
+                            )(self.extract_summary_and_citations)(
+                                paper_content=paper_content,
+                                cache_key=cache_key,
+                                status_callback=status_callback,
+                                client=client,
+                            )
+                        ),
+                        asyncio.create_task(
+                            time_it("Extracting highlights", job_id=job_id)(
+                                self.extract_highlights
+                            )(
+                                paper_content=paper_content,
+                                cache_key=cache_key,
+                                status_callback=status_callback,
+                                client=client,
+                            )
+                        ),
                     ]
 
-                    # Use shield to prevent task cancellation during cleanup
-                    shielded_tasks = [asyncio.shield(task) for task in tasks]
-                    results = await asyncio.gather(*shielded_tasks, return_exceptions=True)
+                    results = await asyncio.gather(
+                        *[asyncio.shield(task) for task in tasks],
+                        return_exceptions=True,
+                    )
 
-                # Process results and handle potential errors
                 (
                     title_authors_abstract,
                     institutions_keywords,
@@ -493,7 +692,6 @@ class PaperOperations(AsyncLLMClient):
                     highlights,
                 ) = results
 
-                # Combine the results into the final metadata object
                 return PaperMetadataExtraction(
                     title=getattr(title_authors_abstract, "title", ""),
                     authors=getattr(title_authors_abstract, "authors", []),
@@ -507,9 +705,8 @@ class PaperOperations(AsyncLLMClient):
                     highlights=getattr(highlights, "highlights", []),
                     publish_date=getattr(title_authors_abstract, "publish_date", None),
                 )
-
             except Exception as e:
-                logger.error(f"Error extracting metadata: {e}", exc_info=True)
+                logger.error("Error extracting metadata: %s", e, exc_info=True)
                 if status_callback:
                     status_callback(f"Error during metadata extraction: {e}")
                 raise ValueError(f"Failed to extract metadata: {str(e)}")
@@ -520,37 +717,27 @@ class PaperOperations(AsyncLLMClient):
         file_path: str,
         paper_id: str,
     ) -> DataTableRow:
-        """
-        Extract structured data table from paper content.
-
-        Args:
-            columns: List of column names for the data table
-            file_path: The file path to the PDF
-        Returns:
-            str: JSON string representing the data table
-        """
-        # Create a fresh client with longer timeout since we're sending full PDFs
         client = self._create_client(timeout=self.PDF_TIMEOUT)
 
         try:
             cols_str = "\n".join(f"- {col}" for col in columns)
             prompt = EXTRACT_COLS_INSTRUCTION.format(
                 cols_str=cols_str,
-                n_cols=len(columns)
+                n_cols=len(columns),
             )
 
-            # Create the dynamic schema that matches DataTableRow structure
-            # Each column maps to a DataTableCellValue (value + citations)
             field_definitions: Dict[str, Any] = {
-                col: (DataTableCellValue, Field(description=f"Value and citations for column '{col}'"))
+                col: (
+                    DataTableCellValue,
+                    Field(description=f"Value and citations for column '{col}'"),
+                )
                 for col in columns
             }
 
-            # Create the values model that enforces all column names as required fields
             ValuesModel = create_model(
-                'ValuesModel',
-                __config__=ConfigDict(),  # Prevent extra fields
-                **field_definitions
+                "ValuesModel",
+                __config__=ConfigDict(),
+                **field_definitions,
             )
 
             response = await self.generate_content(
@@ -561,31 +748,35 @@ class PaperOperations(AsyncLLMClient):
                 client=client,
             )
 
-            # Parse and validate the response
             response_json = JSONParser.validate_and_extract_json(response)
             values_instance = ValuesModel.model_validate(response_json)
-
-            # Convert the Pydantic model to a dict for DataTableRow
             values_dict: Dict[str, DataTableCellValue] = {
-                col: getattr(values_instance, col)
-                for col in columns
+                col: getattr(values_instance, col) for col in columns
             }
 
-            # Create and return the DataTableRow
-            return DataTableRow(
-                paper_id=paper_id,
-                values=values_dict
-            )
+            return DataTableRow(paper_id=paper_id, values=values_dict)
         except Exception as e:
-            logger.error(f"Error extracting data table: {str(e)}", exc_info=True)
+            logger.error("Error extracting data table: %s", str(e), exc_info=True)
             raise ValueError(f"Failed to extract DT for paper {paper_id}: {str(e)}")
 
 
-# Create a single instance to use throughout the application
-api_key = os.getenv("GOOGLE_API_KEY")
+routing_config = get_llm_routing_config()
+provider_config = _get_provider_config(
+    routing_config.routing[RoutingTask.METADATA_EXTRACTION].primary
+    if RoutingTask.METADATA_EXTRACTION in routing_config.routing
+    else routing_config.default_provider
+)
+fast_provider_config = _get_provider_config(
+    routing_config.routing[RoutingTask.DATA_TABLE_EXTRACTION].primary
+    if RoutingTask.DATA_TABLE_EXTRACTION in routing_config.routing
+    else routing_config.default_provider
+)
 
-if not api_key:
-    raise ValueError("GOOGLE_API_KEY environment variable is not set")
-
-llm_client = PaperOperations(api_key=api_key, default_model=DEFAULT_CHAT_MODEL)
-fast_llm_client = PaperOperations(api_key=api_key, default_model=FAST_CHAT_MODEL)
+llm_client = PaperOperations(
+    provider_config=provider_config,
+    default_model=provider_config.default_model,
+)
+fast_llm_client = PaperOperations(
+    provider_config=fast_provider_config,
+    default_model=fast_provider_config.fast_model,
+)

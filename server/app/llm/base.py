@@ -17,6 +17,7 @@ from app.llm.provider import (
     StreamChunk,
     ToolCallResult,
 )
+from app.llm.routing_config import RoutingTask, get_llm_routing_config
 from app.llm.utils import retry_llm_operation
 
 logger = logging.getLogger(__name__)
@@ -30,15 +31,54 @@ class ModelType(Enum):
 class BaseLLMClient:
     """Unified LLM client that supports multiple providers"""
 
-    def __init__(self, default_provider: LLMProvider = LLMProvider.GEMINI):
-        self.default_provider = default_provider
-        self._providers: Dict[LLMProvider, BaseLLMProvider] = {}
+    def __init__(self, default_provider: Optional[LLMProvider] = None):
+        self._providers: Dict[str, BaseLLMProvider] = {}
+        self._routing_config = get_llm_routing_config()
+        self._configured_provider_keys = self._discover_configured_provider_keys()
+        explicit_provider_key = default_provider.value if default_provider else None
+        self.default_provider_key = self._resolve_default_provider_key(explicit_provider_key)
+        self.default_provider = self._parse_builtin_provider_name(self.default_provider_key)
 
-        # Initialize all providers to ensure they are ready for use
+    def _discover_configured_provider_keys(self) -> list[str]:
+        configured: list[str] = []
+        for provider_key, provider_config in self._routing_config.providers.items():
+            if not provider_config.enabled:
+                continue
+            if provider_config.provider_type == "builtin":
+                if provider_config.api_key_env and os.getenv(provider_config.api_key_env):
+                    configured.append(provider_key)
+            elif provider_config.provider_type == "openai_compatible":
+                if provider_config.api_key_env and os.getenv(provider_config.api_key_env):
+                    configured.append(provider_key)
+        return configured
+
+    def _parse_builtin_provider_name(
+        self, provider_name: Optional[str]
+    ) -> Optional[LLMProvider]:
+        if not provider_name:
+            return None
+
+        normalized_name = provider_name.strip().lower()
         for provider in LLMProvider:
-            self._initialize_provider(provider)
+            if provider.value == normalized_name:
+                return provider
 
-    def get_chat_model_options(self) -> Dict[LLMProvider, str]:
+        return None
+
+    def _resolve_default_provider_key(self, explicit_provider_key: Optional[str]) -> str:
+        if explicit_provider_key is not None:
+            return explicit_provider_key
+
+        env_provider = os.getenv("LLM_DEFAULT_PROVIDER")
+        if env_provider:
+            return env_provider.strip().lower()
+
+        if self._configured_provider_keys:
+            return self._configured_provider_keys[0]
+
+        return self._routing_config.default_provider
+
+    def get_chat_model_options(self) -> Dict[str, str]:
         def _get_display_name(model_name: str) -> str:
             """Format model name for display"""
             split_by_dash = model_name.split("-")
@@ -46,57 +86,92 @@ class BaseLLMClient:
                 return "-".join([part.lower() for part in split_by_dash[:2]])
             return model_name.lower()
 
-        """Get available models for each provider"""
-        return {
-            provider: _get_display_name(
-                self._get_model_for_type(ModelType.DEFAULT, provider)
-            )
-            for provider in self._providers.keys()
-        }
+        available_models: Dict[str, str] = {}
+        for provider_key in self.get_available_provider_keys():
+            if self._parse_builtin_provider_name(provider_key) is None:
+                continue
+            try:
+                available_models[provider_key] = _get_display_name(
+                    self._get_model_for_type(ModelType.DEFAULT, provider_key=provider_key)
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Skipping unavailable LLM provider %s while building model options: %s",
+                    provider_key,
+                    exc,
+                )
 
-    def _initialize_provider(self, provider: LLMProvider) -> None:
+        return available_models
+
+    def get_available_provider_keys(self) -> list[str]:
+        if self._configured_provider_keys:
+            return list(self._configured_provider_keys)
+        return [self.default_provider_key]
+
+    def _initialize_provider(self, provider_key: str) -> None:
         """Initialize a provider if not already done"""
-        if provider not in self._providers:
-            if provider == LLMProvider.GEMINI:
-                self._providers[provider] = GeminiProvider()
-            elif provider == LLMProvider.OPENAI:
-                self._providers[provider] = OpenAIProvider()
-            elif provider == LLMProvider.GROQ:
-                # Custom OpenAI-compatible provider using a separate base URL and API key.
-                # These can be configured via environment variables or another config layer.
-                custom_api_key = os.getenv("GROQ_API_KEY")
-                custom_base_url = os.getenv("GROQ_BASE_URL")
+        if provider_key in self._providers:
+            return
 
-                self._providers[provider] = OpenAIProvider(
-                    api_key=custom_api_key,
-                    base_url=custom_base_url,
-                    default_model="openai/gpt-oss-120b",
-                    fast_model="moonshotai/kimi-k2-instruct-0905",
-                )
-            elif provider == LLMProvider.CEREBRAS:
-                self._providers[provider] = OpenAIProvider(
-                    api_key=os.getenv("CEREBRAS_API_KEY"),
-                    base_url=os.getenv("CEREBRAS_BASE_URL"),
-                    default_model="gpt-oss-120b",
-                    fast_model="zai-glm-4.7",
-                )
-            else:
-                raise ValueError(f"Unsupported LLM provider: {provider}")
+        provider_config = self._routing_config.providers.get(provider_key)
+        if provider_config is None:
+            raise ValueError(f"Unsupported LLM provider: {provider_key}")
 
-    def _get_provider(self, provider: Optional[LLMProvider] = None) -> BaseLLMProvider:
-        """Get the appropriate provider, initializing if necessary"""
-        target_provider = provider or self.default_provider
+        builtin_provider = self._parse_builtin_provider_name(provider_key)
+        if builtin_provider == LLMProvider.GEMINI:
+            self._providers[provider_key] = GeminiProvider()
+            return
 
-        if target_provider not in self._providers:
-            self._initialize_provider(target_provider)
+        if provider_config.provider_type not in {"builtin", "openai_compatible"}:
+            raise ValueError(
+                f"Unsupported provider type '{provider_config.provider_type}' for provider '{provider_key}'"
+            )
 
-        return self._providers[target_provider]
+        api_key = os.getenv(provider_config.api_key_env or "")
+        if not api_key:
+            raise ValueError(
+                f"Provider '{provider_key}' is not configured. Missing env var '{provider_config.api_key_env}'."
+            )
+
+        self._providers[provider_key] = OpenAIProvider(
+            api_key=api_key,
+            base_url=provider_config.base_url,
+            default_model=provider_config.default_model,
+            fast_model=provider_config.fast_model,
+            provider_type=provider_config.provider_type,
+        )
+
+    def _get_provider(
+        self,
+        provider: Optional[LLMProvider] = None,
+        provider_key: Optional[str] = None,
+    ) -> BaseLLMProvider:
+        target_provider_key = provider_key or (
+            provider.value if provider else self.default_provider_key
+        )
+
+        if (
+            self._configured_provider_keys
+            and target_provider_key not in self._configured_provider_keys
+        ):
+            configured = ", ".join(self._configured_provider_keys)
+            raise ValueError(
+                f"LLM provider '{target_provider_key}' is not configured. "
+                f"Configured providers: {configured}"
+            )
+
+        if target_provider_key not in self._providers:
+            self._initialize_provider(target_provider_key)
+
+        return self._providers[target_provider_key]
 
     def _get_model_for_type(
-        self, model_type: ModelType, provider: Optional[LLMProvider] = None
+        self,
+        model_type: ModelType,
+        provider: Optional[LLMProvider] = None,
+        provider_key: Optional[str] = None,
     ) -> str:
-        """Get the appropriate model string for the given type and provider"""
-        provider_instance = self._get_provider(provider)
+        provider_instance = self._get_provider(provider, provider_key)
 
         if model_type == ModelType.DEFAULT:
             return provider_instance.get_default_model()
@@ -115,6 +190,7 @@ class BaseLLMClient:
         tool_call_results: Optional[List[ToolCallResult]] = None,
         model_type: ModelType = ModelType.DEFAULT,
         provider: Optional[LLMProvider] = None,
+        provider_key: Optional[str] = None,
         enable_thinking: bool = True,
         schema: Optional[Dict] = None,
         **kwargs,
@@ -127,11 +203,19 @@ class BaseLLMClient:
                 the provider's native structured output support.
         """
         start_time = time.time()
-        model = self._get_model_for_type(model_type, provider)
-        target_provider = provider or self.default_provider
+        resolved_provider_key = provider_key or (
+            provider.value if provider else self.default_provider_key
+        )
+        model = self._get_model_for_type(
+            model_type,
+            provider=provider,
+            provider_key=provider_key,
+        )
 
         try:
-            response = self._get_provider(provider).generate_content(
+            response = self._get_provider(
+                provider=provider, provider_key=provider_key
+            ).generate_content(
                 model,
                 contents,
                 system_prompt=system_prompt,
@@ -151,7 +235,7 @@ class BaseLLMClient:
                 "llm_generate_content",
                 {
                     "model": model,
-                    "provider": target_provider.value,
+                    "provider": resolved_provider_key,
                     "model_type": model_type.value,
                     "duration_ms": duration_ms,
                     "has_function_declarations": function_declarations is not None,
@@ -160,7 +244,7 @@ class BaseLLMClient:
             )
 
             logger.info(
-                f"Generated content using {target_provider.value}/{model} in {duration_ms:.2f}ms"
+                f"Generated content using {resolved_provider_key}/{model} in {duration_ms:.2f}ms"
             )
 
             return response
@@ -173,7 +257,7 @@ class BaseLLMClient:
                 "llm_generate_content_error",
                 {
                     "model": model,
-                    "provider": target_provider.value,
+                    "provider": resolved_provider_key,
                     "model_type": model_type.value,
                     "duration_ms": duration_ms,
                     "error": str(e),
@@ -181,7 +265,7 @@ class BaseLLMClient:
             )
 
             logger.error(
-                f"Error generating content with {target_provider.value}/{model}: {e}"
+                f"Error generating content with {resolved_provider_key}/{model}: {e}"
             )
             raise
 
@@ -193,19 +277,48 @@ class BaseLLMClient:
         file: FileContent | None = None,
         model_type: ModelType = ModelType.DEFAULT,
         provider: Optional[LLMProvider] = None,
+        provider_key: Optional[str] = None,
         **kwargs,
     ) -> Iterator[StreamChunk]:
         """Send a message and stream the response"""
-        model = self._get_model_for_type(model_type, provider)
-        return self._get_provider(provider).send_message_stream(
+        model = self._get_model_for_type(
+            model_type, provider=provider, provider_key=provider_key
+        )
+        return self._get_provider(
+            provider=provider, provider_key=provider_key
+        ).send_message_stream(
             model, message, history, system_prompt, file, **kwargs
         )
 
     # Convenience properties for backward compatibility
     @property
     def default_model(self) -> str:
-        return self._get_model_for_type(ModelType.DEFAULT)
+        return self._get_model_for_type(ModelType.DEFAULT, provider_key=self.default_provider_key)
 
     @property
     def fast_model(self) -> str:
-        return self._get_model_for_type(ModelType.FAST)
+        return self._get_model_for_type(ModelType.FAST, provider_key=self.default_provider_key)
+
+    def get_route_provider_key(
+        self,
+        task: RoutingTask,
+        manual_provider: Optional[LLMProvider] = None,
+    ) -> str:
+        if (
+            manual_provider is not None
+            and self._routing_config.allow_manual_override
+        ):
+            return manual_provider.value
+
+        route = self._routing_config.routing.get(task)
+        if route and route.primary in self.get_available_provider_keys():
+            return route.primary
+
+        if self.default_provider_key in self.get_available_provider_keys():
+            return self.default_provider_key
+
+        available = self.get_available_provider_keys()
+        if available:
+            return available[0]
+
+        return self.default_provider_key

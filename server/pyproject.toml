@@ -36,10 +36,11 @@ dependencies = [
     "posthog>=4.2.0",
     "pillow>=12.1.1",
     "resend>=2.10.0",
-    "celery>=5.5.3",
+    "celery[redis]>=5.5.3",
     "stripe>=12.3.0",
     "pypdf2>=3.0.1",
     "exa-py>=1.0.0",
+    "pyyaml>=6.0.2",
 ]
 
 [project.scripts]
