@@ -27,6 +27,8 @@ client/public/blog-latest.json
 # production
 client/build
 docker-compose.yml
+docker-compose.local.yml
+config/llm.local.yaml
 ecs-task-definitions/
 
 # misc

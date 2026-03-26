@@ -1,0 +1,78 @@
+services:
+  minio:
+    image: minio/minio:RELEASE.2025-02-03T21-03-04Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "${MINIO_PORT:-19000}:9000"
+      - "${MINIO_CONSOLE_PORT:-19001}:9001"
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-05-21T01-59-54Z
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin}; do sleep 2; done &&
+      mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin} &&
+      mc mb --ignore-existing local/${S3_BUCKET_NAME:-openpaper-local} &&
+      mc anonymous set download local/${S3_BUCKET_NAME:-openpaper-local}
+      "
+
+  server:
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      CLIENT_DOMAIN: http://localhost:${CLIENT_PORT:-13000}
+      API_DOMAIN: http://localhost:${SERVER_PORT:-18000}
+      LLM_DEFAULT_PROVIDER: ${LLM_DEFAULT_PROVIDER:-custom-openai}
+      LLM_CONFIG_PATH: ${LLM_CONFIG_PATH:-/workspace/config/llm.local.yaml}
+      LOCAL_AUTH_BYPASS: ${LOCAL_AUTH_BYPASS:-true}
+      POSTHOG_ENABLED: ${POSTHOG_ENABLED:-false}
+      STRIPE_API_KEY: ${STRIPE_API_KEY:-sk_test_local}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-minioadmin}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-openpaper-local}
+      CLOUDFLARE_BUCKET_NAME: ${CLOUDFLARE_BUCKET_NAME:-localhost:${MINIO_PORT:-19000}/${S3_BUCKET_NAME:-openpaper-local}}
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-http://minio:9000}
+      S3_PUBLIC_BASE_URL: ${S3_PUBLIC_BASE_URL:-http://localhost:${MINIO_PORT:-19000}/${S3_BUCKET_NAME:-openpaper-local}}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+
+  jobs-api:
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      LLM_DEFAULT_PROVIDER: ${LLM_DEFAULT_PROVIDER:-custom-openai}
+      LLM_CONFIG_PATH: ${LLM_CONFIG_PATH:-/workspace/config/llm.local.yaml}
+      POSTHOG_ENABLED: ${POSTHOG_ENABLED:-false}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-minioadmin}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-openpaper-local}
+      CLOUDFLARE_BUCKET_NAME: ${CLOUDFLARE_BUCKET_NAME:-localhost:${MINIO_PORT:-19000}/${S3_BUCKET_NAME:-openpaper-local}}
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-http://minio:9000}
+      S3_PUBLIC_BASE_URL: ${S3_PUBLIC_BASE_URL:-http://localhost:${MINIO_PORT:-19000}/${S3_BUCKET_NAME:-openpaper-local}}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+
+  jobs-worker:
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      LLM_DEFAULT_PROVIDER: ${LLM_DEFAULT_PROVIDER:-custom-openai}
+      LLM_CONFIG_PATH: ${LLM_CONFIG_PATH:-/workspace/config/llm.local.yaml}
+      POSTHOG_ENABLED: ${POSTHOG_ENABLED:-false}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-minioadmin}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-openpaper-local}
+      CLOUDFLARE_BUCKET_NAME: ${CLOUDFLARE_BUCKET_NAME:-localhost:${MINIO_PORT:-19000}/${S3_BUCKET_NAME:-openpaper-local}}
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-http://minio:9000}
+      S3_PUBLIC_BASE_URL: ${S3_PUBLIC_BASE_URL:-http://localhost:${MINIO_PORT:-19000}/${S3_BUCKET_NAME:-openpaper-local}}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}

@@ -23,6 +23,13 @@ AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME")
 CLOUDFLARE_BUCKET_NAME = os.environ.get("CLOUDFLARE_BUCKET_NAME")
+S3_ENDPOINT_URL = os.environ.get("S3_ENDPOINT_URL")
+S3_PUBLIC_BASE_URL = os.environ.get("S3_PUBLIC_BASE_URL")
+S3_FORCE_PATH_STYLE = os.environ.get("S3_FORCE_PATH_STYLE", "false").lower() in (
+    "true",
+    "1",
+    "t",
+)
 
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
 
@@ -37,9 +44,23 @@ class S3Service:
             aws_access_key_id=AWS_ACCESS_KEY_ID,
             aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
             region_name=AWS_REGION,
+            endpoint_url=S3_ENDPOINT_URL,
+            config=boto3.session.Config(s3={"addressing_style": "path"})
+            if S3_FORCE_PATH_STYLE
+            else None,
         )
         self.bucket_name = S3_BUCKET_NAME
         self.cloudflare_bucket_name = CLOUDFLARE_BUCKET_NAME
+        self.public_base_url = (
+            S3_PUBLIC_BASE_URL.rstrip("/") if S3_PUBLIC_BASE_URL else None
+        )
+
+    def _build_public_url(self, object_key: str) -> str:
+        if self.public_base_url:
+            return f"{self.public_base_url}/{object_key}"
+        if self.cloudflare_bucket_name:
+            return f"https://{self.cloudflare_bucket_name}/{object_key}"
+        return object_key
 
     def _validate_pdf_url(self, url: str) -> bool:
         """
@@ -89,7 +110,7 @@ class S3Service:
                 )
 
             # Generate the URL for the uploaded file
-            file_url = f"https://{self.cloudflare_bucket_name}/{object_key}"
+            file_url = self._build_public_url(object_key)
 
             return object_key, file_url
 
@@ -128,7 +149,7 @@ class S3Service:
             )
 
             # Generate the URL for the uploaded file
-            file_url = f"https://{self.cloudflare_bucket_name}/{object_key}"
+            file_url = self._build_public_url(object_key)
 
             return object_key, file_url
 
@@ -167,6 +188,9 @@ class S3Service:
             str: Presigned URL or None if error
         """
         try:
+            if self.public_base_url:
+                return self._build_public_url(object_key)
+
             url = self.s3_client.generate_presigned_url(
                 "get_object",
                 Params={"Bucket": self.bucket_name, "Key": object_key},
@@ -221,6 +245,18 @@ class S3Service:
         except ClientError as e:
             logger.error(f"Error getting file size for {object_key}: {e}")
             return None
+
+    def download_file_bytes(self, object_key: str) -> bytes:
+        """Download an object directly from S3-compatible storage."""
+        try:
+            response = self.s3_client.get_object(
+                Bucket=self.bucket_name,
+                Key=object_key,
+            )
+            return response["Body"].read()
+        except ClientError as e:
+            logger.error(f"Error downloading file for {object_key}: {e}")
+            raise ValueError(f"Failed to download file: {object_key}") from e
 
     def get_cached_presigned_url(
         self,
@@ -518,7 +554,7 @@ class S3Service:
             )
 
             # Generate the URL for the duplicated file
-            file_url = f"https://{self.cloudflare_bucket_name}/{new_object_key}"
+            file_url = self._build_public_url(new_object_key)
 
             return new_object_key, file_url
 

@@ -17,6 +17,13 @@ AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME")
 CLOUDFLARE_BUCKET_NAME = os.environ.get("CLOUDFLARE_BUCKET_NAME")
+S3_ENDPOINT_URL = os.environ.get("S3_ENDPOINT_URL")
+S3_PUBLIC_BASE_URL = os.environ.get("S3_PUBLIC_BASE_URL")
+S3_FORCE_PATH_STYLE = os.environ.get("S3_FORCE_PATH_STYLE", "false").lower() in (
+    "true",
+    "1",
+    "t",
+)
 UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "uploads")
 
 
@@ -30,9 +37,23 @@ class S3Service:
             aws_access_key_id=AWS_ACCESS_KEY_ID,
             aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
             region_name=AWS_REGION,
+            endpoint_url=S3_ENDPOINT_URL,
+            config=boto3.session.Config(s3={"addressing_style": "path"})
+            if S3_FORCE_PATH_STYLE
+            else None,
         )
         self.bucket_name = S3_BUCKET_NAME
         self.cloudflare_bucket_name = CLOUDFLARE_BUCKET_NAME
+        self.public_base_url = (
+            S3_PUBLIC_BASE_URL.rstrip("/") if S3_PUBLIC_BASE_URL else None
+        )
+
+    def _build_public_url(self, object_key: str) -> str:
+        if self.public_base_url:
+            return f"{self.public_base_url}/{object_key}"
+        if self.cloudflare_bucket_name:
+            return f"https://{self.cloudflare_bucket_name}/{object_key}"
+        return object_key
 
     def download_file_to_bytes(self, object_key: str) -> bytes:
         """Download a file from S3 and return its content as bytes
@@ -77,7 +98,7 @@ class S3Service:
             Body=file_bytes,
             ContentType=content_type,
         )
-        file_url = f"https://{self.cloudflare_bucket_name}/{object_key}"
+        file_url = self._build_public_url(object_key)
         return object_key, file_url
 
     def upload_any_file(
@@ -111,7 +132,7 @@ class S3Service:
                 )
 
             # Generate the URL for the uploaded file
-            file_url = f"https://{self.cloudflare_bucket_name}/{object_key}"
+            file_url = self._build_public_url(object_key)
 
             return object_key, file_url
         except ClientError as e:

@@ -5,23 +5,28 @@ from app.database.database import get_db
 from posthog import Posthog
 
 POSTHOG_API_KEY = os.getenv("POSTHOG_API_KEY", None)
+POSTHOG_ENABLED = os.getenv("POSTHOG_ENABLED", "true").lower() in ("true", "1", "t")
 DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "t")
 
-posthog = Posthog(
-    POSTHOG_API_KEY,
-    host="https://us.i.posthog.com",
-    enable_exception_autocapture=True,
-)
+posthog = None
+posthog_sync = None
 
-posthog_sync = Posthog(
-    POSTHOG_API_KEY,
-    host="https://us.i.posthog.com",
-    sync_mode=True,
-    enable_exception_autocapture=True,
-)
+if POSTHOG_ENABLED and POSTHOG_API_KEY:
+    posthog = Posthog(
+        POSTHOG_API_KEY,
+        host="https://us.i.posthog.com",
+        enable_exception_autocapture=True,
+    )
 
-if DEBUG:
-    posthog.debug = True
+    posthog_sync = Posthog(
+        POSTHOG_API_KEY,
+        host="https://us.i.posthog.com",
+        sync_mode=True,
+        enable_exception_autocapture=True,
+    )
+
+    if DEBUG:
+        posthog.debug = True
 
 
 def track_event(event_name, properties={}, user_id=None, sync=False):
@@ -31,7 +36,7 @@ def track_event(event_name, properties={}, user_id=None, sync=False):
     :param event_name: Name of the event to track.
     :param properties: Optional dictionary of properties to associate with the event.
     """
-    if POSTHOG_API_KEY and not DEBUG:
+    if POSTHOG_ENABLED and POSTHOG_API_KEY and not DEBUG:
         subscription = None
         if user_id is None:
             user_id = "anonymous"

@@ -10,6 +10,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+LOCAL_AUTH_BYPASS = os.getenv("LOCAL_AUTH_BYPASS", "false").lower() in (
+    "true",
+    "1",
+    "t",
+)
 
 
 class EmailAuthClient:
@@ -27,6 +32,14 @@ class EmailAuthClient:
             bool: True if email was sent successfully, False otherwise
         """
         try:
+            if LOCAL_AUTH_BYPASS:
+                logger.warning(
+                    "LOCAL_AUTH_BYPASS enabled. Verification code for %s: %s",
+                    email,
+                    verification_code,
+                )
+                return True
+
             subject = "Your Open Paper verification code"
 
             html_template = load_email_template("verification_code.html")

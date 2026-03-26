@@ -2,6 +2,24 @@
 
 This project consists of three main components: a `server`, a `client`, and a `jobs` service. Each has its own setup instructions.
 
+## Docker Compose
+
+For local development, you can now run the full stack with Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+This starts:
+
+- `client` on `http://localhost:3000`
+- `server` on `http://localhost:8000`
+- `jobs-api` on `http://localhost:8001`
+- `postgres`, `redis`, and `rabbitmq`
+
+Set provider credentials in your shell or a local `.env` before starting Compose. Use `LLM_DEFAULT_PROVIDER` to choose the active provider for the jobs service and the server default fallback.
+Built-in providers remain manually selectable in chat. Custom OpenAI-compatible providers defined in `config/llm.yaml` are available for backend routing and defaults, but are not exposed in the current chat model picker.
+
 ## 1. Clone the Repository
 
 First, clone the project repository:
