@@ -15,6 +15,7 @@ from app.llm.base import ModelType
 from app.llm.citation_handler import CitationHandler
 from app.llm.evidence_operations import EvidenceOperations
 from app.llm.json_parser import JSONParser
+from app.llm.routing_config import RoutingTask
 from app.llm.prompts import (
     ANSWER_EVIDENCE_BASED_QUESTION_MESSAGE,
     ANSWER_EVIDENCE_BASED_QUESTION_SYSTEM_PROMPT,
@@ -119,7 +120,10 @@ class MultiPaperOperations(EvidenceOperations):
                     message=message_content,
                     system_prompt=formatted_system_prompt,
                     history=conversation_history,
-                    provider=llm_provider,
+                    provider_key=self.get_route_provider_key(
+                        RoutingTask.MULTI_PAPER_RESPONSE,
+                        manual_provider=llm_provider,
+                    ),
                 )
                 while True:
                     chunk = await asyncio.to_thread(get_next_chunk, blocking_iterator)
@@ -300,7 +304,7 @@ class MultiPaperOperations(EvidenceOperations):
         async for result in self.gather_evidence(
             question=f"{summary_request}",
             current_user=current_user,
-            llm_provider=LLMProvider.GROQ,
+            llm_provider=None,
             project_id=project_id,
             db=db,
         ):
@@ -348,7 +352,9 @@ class MultiPaperOperations(EvidenceOperations):
         response = self.generate_content(
             contents=message_content,
             model_type=ModelType.DEFAULT,
-            provider=LLMProvider.GEMINI,
+            provider_key=self.get_route_provider_key(
+                RoutingTask.MULTI_PAPER_RESPONSE
+            ),
         )
 
         try:

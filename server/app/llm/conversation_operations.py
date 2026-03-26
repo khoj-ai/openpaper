@@ -7,6 +7,7 @@ from app.database.crud.message_crud import message_crud
 from app.database.database import get_db
 from app.database.models import Conversation
 from app.llm.base import BaseLLMClient, ModelType
+from app.llm.routing_config import RoutingTask
 from app.llm.prompts import (
     NAME_DATA_TABLE_SYSTEM_PROMPT,
     NAME_DATA_TABLE_USER_MESSAGE,
@@ -69,6 +70,7 @@ class ConversationOperations(BaseLLMClient):
             contents=message_content,
             system_prompt=RENAME_CONVERSATION_SYSTEM_PROMPT,
             model_type=ModelType.FAST,
+            provider_key=self.get_route_provider_key(RoutingTask.CONVERSATION_TITLE),
         )
 
         if response and response.text:
@@ -124,6 +126,7 @@ class DataTableOperations(BaseLLMClient):
             contents=message_content,
             system_prompt=NAME_DATA_TABLE_SYSTEM_PROMPT,
             model_type=ModelType.FAST,
+            provider_key=self.get_route_provider_key(RoutingTask.DATA_TABLE_NAMING),
         )
 
         if response and response.text:

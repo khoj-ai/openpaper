@@ -15,6 +15,7 @@ from app.database.database import get_db
 from app.database.telemetry import track_event
 from app.llm.base import BaseLLMClient, ModelType
 from app.llm.json_parser import JSONParser
+from app.llm.routing_config import RoutingTask
 from app.llm.prompts import (
     EVIDENCE_COMPACTION_PROMPT,
     EVIDENCE_GATHERING_MESSAGE,
@@ -157,6 +158,10 @@ class EvidenceOperations(BaseLLMClient):
 
         while n_iterations < max_iterations and not should_stop:
             n_iterations += 1
+            route_provider_key = self.get_route_provider_key(
+                RoutingTask.EVIDENCE_GATHERING,
+                manual_provider=llm_provider,
+            )
 
             # If tool call results are very large, compact them to avoid context overflow
             tool_results_size = evidence_collection.get_tool_results_size()
@@ -207,7 +212,7 @@ class EvidenceOperations(BaseLLMClient):
                 model_type=ModelType.FAST,
                 function_declarations=function_declarations,
                 tool_call_results=tool_call_results,
-                provider=llm_provider,
+                provider_key=route_provider_key,
                 enable_thinking=True,
             )
 
@@ -460,7 +465,10 @@ class EvidenceOperations(BaseLLMClient):
             system_prompt="You are a research assistant that summarizes tool call results while preserving key information.",
             contents=message_content,
             model_type=ModelType.DEFAULT,
-            provider=llm_provider,
+            provider_key=self.get_route_provider_key(
+                RoutingTask.EVIDENCE_GATHERING,
+                manual_provider=llm_provider,
+            ),
         )
 
         try:
@@ -590,7 +598,10 @@ class EvidenceOperations(BaseLLMClient):
             system_prompt="You are a research assistant that summarizes evidence snippets from research papers.",
             contents=message_content,
             model_type=ModelType.FAST,
-            provider=llm_provider,
+            provider_key=self.get_route_provider_key(
+                RoutingTask.EVIDENCE_GATHERING,
+                manual_provider=llm_provider,
+            ),
         )
 
         all_compacted: Dict[str, List[str]] = {}
@@ -661,7 +672,10 @@ class EvidenceOperations(BaseLLMClient):
             system_prompt="You are a helpful assistant that extracts search keywords.",
             contents=message_content,
             model_type=ModelType.FAST,
-            provider=llm_provider,
+            provider_key=self.get_route_provider_key(
+                RoutingTask.EVIDENCE_GATHERING,
+                manual_provider=llm_provider,
+            ),
         )
 
         if llm_response and llm_response.text:

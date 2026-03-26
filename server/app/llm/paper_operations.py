@@ -3,12 +3,12 @@ import re
 import uuid
 from typing import AsyncGenerator, Literal, Optional, Sequence, Union
 
-import httpx
 from app.database.crud.paper_crud import paper_crud
 from app.database.models import Paper
 from app.llm.base import BaseLLMClient
 from app.llm.citation_handler import CitationHandler
 from app.llm.json_parser import JSONParser
+from app.llm.routing_config import RoutingTask
 from app.llm.prompts import (
     ANSWER_PAPER_QUESTION_SYSTEM_PROMPT,
     ANSWER_PAPER_QUESTION_USER_MESSAGE,
@@ -68,20 +68,7 @@ class PaperOperations(BaseLLMClient):
             schema=audio_overview_schema,
         )
 
-        signed_url = s3_service.get_cached_presigned_url(
-            db,
-            paper_id=str(paper.id),
-            object_key=str(paper.s3_object_key),
-            current_user=user,
-        )
-
-        if not signed_url:
-            raise ValueError(
-                f"Could not generate presigned URL for paper with ID {paper_id}."
-            )
-
-        # Retrieve and encode the PDF byte
-        pdf_bytes = httpx.get(signed_url).content
+        pdf_bytes = s3_service.download_file_bytes(str(paper.s3_object_key))
 
         message_content = [
             FileContent(
@@ -95,6 +82,7 @@ class PaperOperations(BaseLLMClient):
         # Generate narrative summary using the LLM
         response = self.generate_content(
             contents=message_content,
+            provider_key=self.get_route_provider_key(RoutingTask.METADATA_EXTRACTION),
         )
 
         try:
@@ -166,20 +154,7 @@ class PaperOperations(BaseLLMClient):
         START_DELIMITER = "---EVIDENCE---"
         END_DELIMITER = "---END-EVIDENCE---"
 
-        signed_url = s3_service.get_cached_presigned_url(
-            db,
-            paper_id=str(paper.id),
-            object_key=str(paper.s3_object_key),
-            current_user=current_user,
-        )
-
-        if not signed_url:
-            raise ValueError(
-                f"Could not generate presigned URL for paper with ID {paper_id}."
-            )
-
-        # Retrieve and encode the PDF byte
-        pdf_bytes = httpx.get(signed_url).content
+        pdf_bytes = s3_service.download_file_bytes(str(paper.s3_object_key))
 
         message_content = [
             TextContent(text=formatted_prompt),
@@ -195,7 +170,10 @@ class PaperOperations(BaseLLMClient):
             ),
             system_prompt=formatted_system_prompt,
             history=conversation_history,
-            provider=llm_provider,
+            provider_key=self.get_route_provider_key(
+                RoutingTask.CHAT_STREAM,
+                manual_provider=llm_provider,
+            ),
         ):
             text = chunk.text
 
