@@ -727,6 +727,7 @@ class AudioOverviewJob(Base):
     conversable = generic_relationship("conversable_type", "conversable_id")
 
     status = Column(String, nullable=False, default=JobStatus.PENDING)
+    status_message = Column(String, nullable=True)
     started_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
 

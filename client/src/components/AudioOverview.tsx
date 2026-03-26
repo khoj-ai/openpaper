@@ -34,6 +34,7 @@ interface AudioOverviewProps {
 interface JobStatus {
     job_id: string;
     status: JobStatusType;
+    status_message: string | null;
     paper_id: string;
 }
 
@@ -596,7 +597,7 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
                         </div>
                         <p className="text-primary text-lg">
                             {jobStatus.status === 'pending' && 'Preparing your audio overview'}
-                            {jobStatus.status === 'running' && loadingText}
+                            {jobStatus.status === 'running' && (jobStatus.status_message || loadingText)}
                             {jobStatus.status === 'failed' && 'Audio overview generation failed. Please try again.'}
                         </p>
                         {jobStatus.status === 'failed' && (

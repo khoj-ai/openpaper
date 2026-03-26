@@ -108,7 +108,6 @@ async def create_project_audio_overview(
         additional_instructions=audio_request.additional_instructions,
         voice=audio_request.voice or "nova",
         length=audio_request.length,
-        db=db,
     )
 
     track_event(

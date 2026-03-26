@@ -1,5 +1,6 @@
 import os
 import re
+import struct
 import tempfile
 import wave
 from typing import List, Literal, Tuple
@@ -138,6 +139,10 @@ def concatenate_wav_files(wav_files: List[str], output_path: str) -> None:
     """
     Concatenate multiple WAV files into a single WAV file.
 
+    Bypasses Python's wave module for writing because it uses 32-bit size
+    fields which overflow at ~4GB. Instead, we read raw PCM frames from each
+    chunk and write a correct RIFF/WAV header manually.
+
     Args:
         wav_files: List of paths to WAV files to concatenate.
         output_path: Path for the output concatenated WAV file.
@@ -153,24 +158,52 @@ def concatenate_wav_files(wav_files: List[str], output_path: str) -> None:
 
     # Read parameters from the first file
     with wave.open(wav_files[0], "rb") as first_wav:
-        params = first_wav.getparams()
+        nchannels = first_wav.getnchannels()
+        sampwidth = first_wav.getsampwidth()
+        framerate = first_wav.getframerate()
 
-    # Write concatenated audio
-    with wave.open(output_path, "wb") as output_wav:
-        output_wav.setparams(params)
+    # Collect raw PCM data from all chunks, validating format consistency
+    all_frames: List[bytes] = []
+    for wav_file in wav_files:
+        with wave.open(wav_file, "rb") as input_wav:
+            if input_wav.getnchannels() != nchannels:
+                raise ValueError(f"Channel mismatch in {wav_file}")
+            if input_wav.getsampwidth() != sampwidth:
+                raise ValueError(f"Sample width mismatch in {wav_file}")
+            if input_wav.getframerate() != framerate:
+                raise ValueError(f"Frame rate mismatch in {wav_file}")
+            all_frames.append(input_wav.readframes(input_wav.getnframes()))
 
-        for wav_file in wav_files:
-            with wave.open(wav_file, "rb") as input_wav:
-                # Verify compatible parameters
-                if input_wav.getnchannels() != params.nchannels:
-                    raise ValueError(f"Channel mismatch in {wav_file}")
-                if input_wav.getsampwidth() != params.sampwidth:
-                    raise ValueError(f"Sample width mismatch in {wav_file}")
-                if input_wav.getframerate() != params.framerate:
-                    raise ValueError(f"Frame rate mismatch in {wav_file}")
+    total_data_size = sum(len(f) for f in all_frames)
+    byte_rate = nchannels * sampwidth * framerate
+    block_align = nchannels * sampwidth
 
-                # Write frames
-                output_wav.writeframes(input_wav.readframes(input_wav.getnframes()))
+    # Write WAV file manually to avoid the 4GB overflow in Python's wave module.
+    # For files under 4GB we write a standard RIFF header; for larger files
+    # the struct pack would fail the same way, so we cap the header sizes at
+    # 0xFFFFFFFF. Most players handle this gracefully and read until EOF.
+    riff_size = min(total_data_size + 36, 0xFFFFFFFF)
+    data_field_size = min(total_data_size, 0xFFFFFFFF)
+
+    with open(output_path, "wb") as f:
+        # RIFF header
+        f.write(b"RIFF")
+        f.write(struct.pack("<I", riff_size))
+        f.write(b"WAVE")
+        # fmt subchunk (16 bytes for PCM)
+        f.write(b"fmt ")
+        f.write(struct.pack("<I", 16))  # subchunk size
+        f.write(struct.pack("<H", 1))  # audio format (PCM)
+        f.write(struct.pack("<H", nchannels))
+        f.write(struct.pack("<I", framerate))
+        f.write(struct.pack("<I", byte_rate))
+        f.write(struct.pack("<H", block_align))
+        f.write(struct.pack("<H", sampwidth * 8))  # bits per sample
+        # data subchunk
+        f.write(b"data")
+        f.write(struct.pack("<I", data_field_size))
+        for frame_data in all_frames:
+            f.write(frame_data)
 
 
 class OpenAISpeaker:

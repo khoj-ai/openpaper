@@ -72,7 +72,7 @@ export default function AudioOverviewGenerationJobCard({ job }: AudioOverviewGen
                         Creating Audio Overview
                     </h3>
                     <p className={`text-xs font-medium mb-1 ${getStatusColor(job.status)}`}>
-                        {getStatusText(job.status)}
+                        {job.status_message || getStatusText(job.status)}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                         {job.completed_at ? (
