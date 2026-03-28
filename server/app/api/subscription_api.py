@@ -117,7 +117,7 @@ def create_checkout_session(
 
         # Create session parameters
         session_params = {
-            "ui_mode": "embedded",
+            "ui_mode": "embedded_page",
             "client_reference_id": str(current_user.id),
             "line_items": [{"quantity": 1, "price": price_id}],
             "mode": "subscription",
