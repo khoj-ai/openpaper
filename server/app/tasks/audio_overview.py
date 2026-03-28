@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 from datetime import datetime, timezone
@@ -11,16 +12,13 @@ from app.database.crud.audio_overview_crud import (
 )
 from app.database.crud.paper_crud import paper_crud
 from app.database.crud.projects.project_crud import project_crud
-from app.database.database import get_db
+from app.database.database import SessionLocal
 from app.database.models import ConversableType, JobStatus
 from app.database.telemetry import track_event
 from app.llm.operations import operations
-from app.llm.provider import LLMProvider
 from app.llm.speech import speaker
 from app.schemas.responses import AudioOverviewForLLM
 from app.schemas.user import CurrentUser
-from fastapi import Depends
-from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -45,23 +43,20 @@ async def generate_audio_overview(
         "shimmer",
         "verse",
     ] = "nova",
-    db: Session = Depends(get_db),
 ) -> None:
     """
     Generate an audio overview for a paper by creating a narrative summary
     and converting it to speech.
 
-    Args:
-        paper_id: UUID of the paper to process
-        user: Current user requesting the overview
-        audio_overview_job_id: UUID of the job tracking this operation
-        additional_instructions: Optional instructions for the narrative summary
-        voice: Voice to use for speech synthesis
-        db: Database session
+    Creates its own DB session to avoid stale session issues in background tasks.
     """
 
     start_time = datetime.now(timezone.utc)
     assert paper_id or project_id, "Either paper_id or project_id must be provided"
+
+    # Create a fresh DB session for the background task instead of reusing the
+    # request-scoped session, which may be closed by the time this runs.
+    db = SessionLocal()
 
     try:
 
@@ -71,6 +66,7 @@ async def generate_audio_overview(
             job_id=audio_overview_job_id,
             status=JobStatus.RUNNING,
             current_user=user,
+            status_message="Starting audio generation",
         )
 
         logger.info(
@@ -80,9 +76,6 @@ async def generate_audio_overview(
         conversable_title: str = ""
 
         # Step 1: Generate narrative summary
-        logger.info(
-            f"Generating narrative summary for paper/project {paper_id or project_id}"
-        )
         narrative_summary: Optional[AudioOverviewForLLM] = None
 
         if paper_id:
@@ -91,6 +84,15 @@ async def generate_audio_overview(
             if not paper:
                 raise ValueError(f"Paper with ID {paper_id} not found")
             conversable_title = str(paper.title) or "Untitled Paper"
+
+            audio_overview_job_crud.update_status_message(
+                db,
+                job_id=audio_overview_job_id,
+                status_message="Analyzing paper",
+                current_user=user,
+            )
+
+            logger.info(f"Generating narrative summary for paper {paper_id}")
 
             narrative_summary = operations.create_narrative_summary(
                 paper_id=str(paper_id),
@@ -108,6 +110,15 @@ async def generate_audio_overview(
                 f"{project.title} - {project.description}" or "Untitled Project"
             )
 
+            audio_overview_job_crud.update_status_message(
+                db,
+                job_id=audio_overview_job_id,
+                status_message="Searching and analyzing papers",
+                current_user=user,
+            )
+
+            logger.info(f"Generating narrative summary for project {project_id}")
+
             narrative_summary = await operations.create_multi_paper_narrative_summary(
                 project_id=str(project_id),
                 length=length,
@@ -121,6 +132,13 @@ async def generate_audio_overview(
 
         logger.info(
             f"Generated narrative summary ({len(narrative_summary.summary)} characters)"
+        )
+
+        audio_overview_job_crud.update_status_message(
+            db,
+            job_id=audio_overview_job_id,
+            status_message="Transcript generated",
+            current_user=user,
         )
 
         # Track event creation of narrative summary
@@ -142,8 +160,18 @@ async def generate_audio_overview(
         ).strip()
 
         # Step 2: Convert summary to speech
+        audio_overview_job_crud.update_status_message(
+            db,
+            job_id=audio_overview_job_id,
+            status_message="Converting to audio",
+            current_user=user,
+        )
+
         logger.info(f"Converting summary to speech with voice: {voice}")
-        object_key, file_url = speaker.generate_speech_from_text(
+
+        # Run synchronous TTS in a thread pool to avoid blocking the event loop
+        object_key, file_url = await asyncio.to_thread(
+            speaker.generate_speech_from_text,
             title=conversable_title,
             text=cleaned_narration,
             voice=voice,
@@ -153,6 +181,13 @@ async def generate_audio_overview(
             raise ValueError("Failed to generate speech audio")
 
         logger.info(f"Generated speech audio: {object_key}")
+
+        audio_overview_job_crud.update_status_message(
+            db,
+            job_id=audio_overview_job_id,
+            status_message="Saving audio overview",
+            current_user=user,
+        )
 
         # Step 3: Create AudioOverview record
         audio_overview_data = AudioOverviewCreate(
@@ -180,6 +215,7 @@ async def generate_audio_overview(
             job_id=audio_overview_job_id,
             status=JobStatus.COMPLETED,
             current_user=user,
+            status_message="Completed",
         )
 
         logger.info(
@@ -209,6 +245,7 @@ async def generate_audio_overview(
                 job_id=audio_overview_job_id,
                 status=JobStatus.FAILED,
                 current_user=user,
+                status_message=f"Failed: {str(e)[:200]}",
             )
             track_event(
                 "audio_overview_failed",
@@ -227,6 +264,9 @@ async def generate_audio_overview(
 
         # Re-raise the original exception
         raise e
+
+    finally:
+        db.close()
 
 
 async def generate_audio_overview_async(
@@ -249,11 +289,14 @@ async def generate_audio_overview_async(
         "verse",
     ] = "nova",
     length: Optional[Literal["short", "medium", "long"]] = "medium",
-    db: Session = Depends(get_db),
+    **kwargs,
 ) -> None:
     """
     Async wrapper for generate_audio_overview function.
     Useful for background task processing.
+
+    Accepts and ignores extra kwargs (e.g. db) for backward compatibility
+    with callers that still pass a db session.
     """
     return await generate_audio_overview(
         paper_id=paper_id,
@@ -263,5 +306,4 @@ async def generate_audio_overview_async(
         additional_instructions=additional_instructions,
         voice=voice,
         length=length,
-        db=db,
     )

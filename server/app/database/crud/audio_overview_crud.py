@@ -75,7 +75,7 @@ class AudioOverviewJobCRUD(
         *,
         conversable_id: UUID,
         conversable_type: ConversableType,
-        current_user: CurrentUser
+        current_user: CurrentUser,
     ) -> Optional[List[AudioOverviewJob]]:
         """Get audio overviews by conversable ID, type and user"""
         if conversable_type == ConversableType.PAPER:
@@ -147,7 +147,7 @@ class AudioOverviewJobCRUD(
         *,
         current_user: CurrentUser,
         status: Optional[str] = None,
-        conversable_type: Optional[ConversableType] = None
+        conversable_type: Optional[ConversableType] = None,
     ) -> List[AudioOverviewJob]:
         """Get all audio overview jobs for a user, optionally filtered by status and type"""
         query = db.query(AudioOverviewJob).filter(
@@ -163,7 +163,13 @@ class AudioOverviewJobCRUD(
         return query.order_by(AudioOverviewJob.created_at.desc()).all()
 
     def update_status(
-        self, db: Session, *, job_id: UUID, status: str, current_user: CurrentUser
+        self,
+        db: Session,
+        *,
+        job_id: UUID,
+        status: str,
+        current_user: CurrentUser,
+        status_message: Optional[str] = None,
     ) -> Optional[AudioOverviewJob]:
         """Update job status with timestamp tracking"""
         job = (
@@ -180,6 +186,9 @@ class AudioOverviewJobCRUD(
 
         job.status = status
 
+        if status_message is not None:
+            job.status_message = status_message
+
         # Set timestamps based on status
         if status == JobStatus.RUNNING and not job.started_at:
             job.started_at = datetime.now(timezone.utc)
@@ -187,6 +196,32 @@ class AudioOverviewJobCRUD(
             if not job.completed_at:
                 job.completed_at = datetime.now(timezone.utc)
 
+        db.commit()
+        db.refresh(job)
+        return job
+
+    def update_status_message(
+        self,
+        db: Session,
+        *,
+        job_id: UUID,
+        status_message: str,
+        current_user: CurrentUser,
+    ) -> Optional[AudioOverviewJob]:
+        """Update only the status message without changing status"""
+        job = (
+            db.query(AudioOverviewJob)
+            .filter(
+                AudioOverviewJob.id == job_id,
+                AudioOverviewJob.user_id == current_user.id,
+            )
+            .first()
+        )
+
+        if not job:
+            return None
+
+        job.status_message = status_message
         db.commit()
         db.refresh(job)
         return job
@@ -204,6 +239,7 @@ class AudioOverviewJobCRUD(
                 else None
             ),
             "status": job.status,
+            "status_message": job.status_message,
             "started_at": job.started_at.isoformat() if job.started_at else None,
             "completed_at": job.completed_at.isoformat() if job.completed_at else None,
             "created_at": job.created_at.isoformat() if job.created_at else None,
@@ -234,7 +270,7 @@ class AudioOverviewCRUD(
         *,
         conversable_id: UUID,
         conversable_type: ConversableType,
-        current_user: CurrentUser
+        current_user: CurrentUser,
     ) -> Optional[List[AudioOverview]]:
         """Get audio overviews by conversable ID, type and user"""
         if conversable_type == ConversableType.PAPER:
@@ -282,7 +318,7 @@ class AudioOverviewCRUD(
         *,
         conversable_id: UUID,
         conversable_type: ConversableType,
-        current_user: CurrentUser
+        current_user: CurrentUser,
     ) -> Optional[AudioOverview]:
         """Get the most recent audio overview by conversable ID, type and user"""
         return (
@@ -352,7 +388,7 @@ class AudioOverviewCRUD(
         db: Session,
         *,
         current_user: CurrentUser,
-        conversable_type: Optional[ConversableType] = None
+        conversable_type: Optional[ConversableType] = None,
     ) -> List[AudioOverview]:
         """Get all audio overviews for a user, optionally filtered by type"""
         query = db.query(AudioOverview).filter(AudioOverview.user_id == current_user.id)
@@ -368,7 +404,7 @@ class AudioOverviewCRUD(
         *,
         overview_id: UUID,
         transcript: str,
-        current_user: CurrentUser
+        current_user: CurrentUser,
     ) -> Optional[AudioOverview]:
         """Update the transcript for an audio overview"""
         overview = (
@@ -420,7 +456,7 @@ class AudioOverviewCRUD(
         db: Session,
         *,
         current_user: CurrentUser,
-        conversable_type: Optional[ConversableType] = None
+        conversable_type: Optional[ConversableType] = None,
     ) -> int:
         """
         Get the number of audio overviews used by the user this week.

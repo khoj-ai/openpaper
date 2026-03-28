@@ -81,6 +81,7 @@ export function generateStaticParams() {
         { slug: 'citation_manager' },
         { slug: 'why_open_source' },
         { slug: 'systematic_review' },
+        { slug: 'howtorag' },
     ];
 }
 

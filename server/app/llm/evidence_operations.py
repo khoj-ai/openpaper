@@ -1,8 +1,10 @@
+import asyncio
 import json
 import logging
 import re
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, AsyncGenerator, Dict, List, Mapping, Optional, Sequence, Union
 
 from app.database.crud.message_crud import message_crud
@@ -56,6 +58,11 @@ CONTENT_LIMIT_EVIDENCE_GATHERING = (
 CONTENT_LIMIT_CHAT_EVIDENCE = (
     300000  # Character limit for evidence in chat response prompt
 )
+HEARTBEAT_INTERVAL_SECONDS = (
+    15  # Keep streaming connections alive during long operations
+)
+
+_tool_executor = ThreadPoolExecutor(max_workers=4)
 
 
 class EvidenceOperations(BaseLLMClient):
@@ -266,12 +273,31 @@ class EvidenceOperations(BaseLLMClient):
 
                         logger.debug(f"Thinking process - {llm_response.thinking}")
 
-                        result = function_maps[fn_name](
-                            **fn_args,
-                            current_user=current_user,
-                            project_id=project_id,
-                            db=db,
-                        )
+                        # Run the tool call in a thread so we can yield
+                        # heartbeats and keep the streaming connection alive.
+                        def _run_tool(_fn=function_maps[fn_name], _args=fn_args):
+                            return _fn(
+                                **_args,
+                                current_user=current_user,
+                                project_id=project_id,
+                                db=db,
+                            )
+
+                        loop = asyncio.get_event_loop()
+                        future = loop.run_in_executor(_tool_executor, _run_tool)
+
+                        while True:
+                            try:
+                                result = await asyncio.wait_for(
+                                    asyncio.shield(future),
+                                    timeout=HEARTBEAT_INTERVAL_SECONDS,
+                                )
+                                break
+                            except asyncio.TimeoutError:
+                                yield {
+                                    "type": "status",
+                                    "content": f"{pretty_fn_name} - {paper_name}{display_query}",
+                                }
 
                         evidence_collection.add_tool_call_result(fn_selected, result)
 

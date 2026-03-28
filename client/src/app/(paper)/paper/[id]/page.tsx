@@ -394,6 +394,20 @@ export default function PaperView() {
     }, [activeCitationKey, activeCitationMessageIndex]);
 
 
+    const refreshPdfUrl = useCallback(async (): Promise<string | null> => {
+        try {
+            const response: PaperData = await fetchFromApi(`/api/paper?id=${id}`);
+            if (response.file_url) {
+                setPaperData(response);
+                return response.file_url;
+            }
+            return null;
+        } catch (error) {
+            console.error('Error refreshing PDF URL:', error);
+            return null;
+        }
+    }, [id]);
+
     const handleShare = useCallback(async () => {
         if (!id || !paperData || isSharing) return;
         setIsSharing(true);
@@ -511,6 +525,7 @@ export default function PaperView() {
                                     handleStatusChange={handleStatusChange}
                                     paperStatus={paperData.status}
                                     onOverlaysCreated={handleOverlaysCreated}
+                                    onRefreshUrl={refreshPdfUrl}
                                 />
                             )}
                         </div>
@@ -595,6 +610,7 @@ export default function PaperView() {
                                 handleStatusChange={handleStatusChange}
                                 paperStatus={paperData.status}
                                 onOverlaysCreated={handleOverlaysCreated}
+                                onRefreshUrl={refreshPdfUrl}
                             />
                         </div>
                     )}

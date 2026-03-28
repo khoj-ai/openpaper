@@ -71,6 +71,23 @@ def create_checkout_session(
                 detail="You already have an active subscription. Please use the customer portal to manage your subscription or update your payment method.",
             )
 
+        # Cancel any incomplete Stripe subscription before creating a new checkout session
+        # This handles the case where a user's first payment attempt failed
+        if (
+            subscription
+            and subscription.status == SubscriptionStatus.INCOMPLETE
+            and subscription.stripe_subscription_id
+        ):
+            try:
+                stripe.Subscription.cancel(str(subscription.stripe_subscription_id))
+                logger.info(
+                    f"Canceled incomplete subscription {subscription.stripe_subscription_id} for user {current_user.id}"
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to cancel incomplete subscription {subscription.stripe_subscription_id}: {e}"
+                )
+
         # Create a Stripe Checkout session
         price_id = (
             MONTHLY_PRICE_ID
@@ -100,7 +117,7 @@ def create_checkout_session(
 
         # Create session parameters
         session_params = {
-            "ui_mode": "embedded",
+            "ui_mode": "embedded_page",
             "client_reference_id": str(current_user.id),
             "line_items": [{"quantity": 1, "price": price_id}],
             "mode": "subscription",
@@ -289,8 +306,8 @@ async def get_user_subscription(
         # for users with expired/past_due subscriptions
         had_subscription = subscription.stripe_subscription_id is not None
 
-        # Check if the subscription needs payment attention (past_due or payment failed)
-        requires_payment_update = status in ["past_due", "unpaid"]
+        # Check if the subscription needs payment attention (past_due, unpaid, or incomplete)
+        requires_payment_update = status in ["past_due", "unpaid", "incomplete"]
 
         # Build scheduled_change info if a schedule exists
         scheduled_change = None

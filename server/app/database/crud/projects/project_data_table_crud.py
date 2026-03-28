@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional, cast
 from uuid import UUID
 
 from app.database.crud.base_crud import CRUDBase
+from app.database.crud.projects.project_crud import project_crud
 from app.database.models import (
     DataTableExtractionJob,
     DataTableExtractionResult,
@@ -137,6 +138,10 @@ class DataTableJobCRUD(
             db.add(db_obj)
             db.commit()
             db.refresh(db_obj)
+
+            # Touch project updated_at so it sorts to top of recent projects
+            project_crud.touch(db, obj_in.project_id)
+
             return db_obj
         except Exception as e:
             db.rollback()

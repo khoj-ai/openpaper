@@ -326,6 +326,20 @@ export default function SharedPaperView() {
     }
 
 
+    const refreshPdfUrl = useCallback(async (): Promise<string | null> => {
+        try {
+            const response: SharedPaper = await fetchFromApi(`/api/paper/share?id=${shareId}`);
+            if (response.paper?.file_url) {
+                setPaperData(response.paper);
+                return response.paper.file_url;
+            }
+            return null;
+        } catch (error) {
+            console.error('Error refreshing PDF URL:', error);
+            return null;
+        }
+    }, [shareId]);
+
     const heightClass = isMobile ? "h-[calc(100vh-128px)]" : "h-[calc(100vh-64px)]";
 
 
@@ -356,6 +370,7 @@ export default function SharedPaperView() {
                                     removeHighlight={() => { }}
                                     renderAnnotations={() => { }}
                                     annotations={[]}
+                                    onRefreshUrl={refreshPdfUrl}
                                 />
                             ) : (
                                 <div className="flex justify-center items-center h-full">PDF could not be loaded.</div>
@@ -472,6 +487,7 @@ export default function SharedPaperView() {
                             removeHighlight={() => { }}
                             renderAnnotations={() => { }}
                             annotations={[]}
+                            onRefreshUrl={refreshPdfUrl}
                         />
                     ) : (
                         <div className="flex justify-center items-center h-full">PDF could not be loaded.</div>

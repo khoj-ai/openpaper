@@ -98,7 +98,6 @@ async def create_audio_overview(
         audio_overview_job_id=job_id_as_uuid,
         additional_instructions=audio_request.additional_instructions,
         voice=audio_request.voice or "nova",
-        db=db,
     )
 
     track_event(
@@ -139,16 +138,19 @@ async def get_audio_overview_job_status(
     if not audio_overview_job:
         return JSONResponse(status_code=404, content={"message": "Job not found"})
 
-    # If the audio overview has been running for more than 10 minutes, mark it as failed
+    # If the audio overview has been running for more than 20 minutes, mark it as failed.
+    # Long/medium multi-paper generations can legitimately take 10-15 minutes
+    # (evidence gathering + LLM summary + multi-chunk TTS).
     if audio_overview_job.status == JobStatus.RUNNING and audio_overview_job.created_at:
         if (datetime.now(timezone.utc) - audio_overview_job.created_at) > timedelta(
-            minutes=10
+            minutes=20
         ):
             audio_overview_job_crud.update_status(
                 db,
                 job_id=uuid.UUID(str(audio_overview_job.id)),
                 status=JobStatus.FAILED,
                 current_user=current_user,
+                status_message="Job timed out",
             )
             logger.warning(
                 f"Audio overview job {audio_overview_job.id} marked as failed due to timeout."
@@ -160,6 +162,7 @@ async def get_audio_overview_job_status(
         content={
             "job_id": str(audio_overview_job.id),
             "status": audio_overview_job.status,
+            "status_message": audio_overview_job.status_message,
             "conversable_id": str(audio_overview_job.conversable_id),
             "conversable_type": audio_overview_job.conversable_type,
         },

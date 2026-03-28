@@ -11,6 +11,7 @@ import { toast } from "sonner";
 
 import {
     ChatMessage,
+    PaperData,
     Reference,
 } from '@/lib/schema';
 import { useAuth } from '@/lib/auth';
@@ -369,6 +370,16 @@ function UnderstandPageContent() {
 
     const [isCentered, setIsCentered] = useState(true);
 
+    const refreshPaperUrl = useCallback(async (paperId: string): Promise<string | null> => {
+        try {
+            const response: PaperData = await fetchFromApi(`/api/paper?id=${paperId}`);
+            return response.file_url ?? null;
+        } catch (error) {
+            console.error('Error refreshing paper URL:', error);
+            return null;
+        }
+    }, []);
+
     return (
         <div className="h-[calc(100vh-64px)] mx-2">
             <ConversationView
@@ -395,6 +406,7 @@ function UnderstandPageContent() {
                 highlightedInfo={highlightedInfo}
                 setHighlightedInfo={setHighlightedInfo}
                 authLoading={authLoading}
+                onRefreshPaperUrl={refreshPaperUrl}
             />
         </div>
     );

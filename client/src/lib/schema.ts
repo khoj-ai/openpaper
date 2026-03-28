@@ -347,6 +347,7 @@ export interface AudioOverviewJob extends JobStatusResponse {
     id: string;
     conversable_id: string;
     conversable_type: string;
+    status_message: string | null;
 }
 
 export interface Project {

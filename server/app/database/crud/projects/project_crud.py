@@ -1,5 +1,7 @@
 import logging
+from datetime import datetime, timezone
 from typing import List, Optional
+from uuid import UUID
 
 from app.database.crud.projects.project_base_crud import ProjectBaseCRUD
 from app.database.crud.user_crud import user as user_crud
@@ -179,6 +181,17 @@ class ProjectCRUD(ProjectBaseCRUD[Project, ProjectCreate, ProjectUpdate]):
                 exc_info=True,
             )
             return []
+
+    def touch(self, db: Session, project_id: UUID) -> None:
+        """Update the project's updated_at timestamp to now."""
+        try:
+            project = db.query(Project).filter(Project.id == project_id).first()
+            if project:
+                project.updated_at = datetime.now(timezone.utc)
+                db.commit()
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error touching project {project_id}: {str(e)}")
 
     def has_role(
         self, db: Session, *, project_id: str, user_id: str, role: ProjectRoles

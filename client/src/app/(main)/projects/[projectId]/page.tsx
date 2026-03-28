@@ -326,7 +326,7 @@ export default function ProjectPage() {
 		return <ProjectPageSkeleton />;
 	}
 
-	const isEmpty = !papers || (papers.length === 0 && (!conversations || conversations.length === 0));
+	const isEmpty = !isPapersLoading && !isConversationsLoading && (!papers || (papers.length === 0 && (!conversations || conversations.length === 0)));
 
 	if (isEmpty) {
 		return (
@@ -580,12 +580,12 @@ export default function ProjectPage() {
 									</form>
 								</div>
 							) : (
-								<div className="mb-6 text-center p-8 border-dashed border-2 border-gray-300 rounded-xl bg-gray-50">
-									<div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-										<MessageCircle className="w-8 h-8 text-gray-400" />
+								<div className="mb-6 text-center p-8 border-dashed border-2 border-gray-300 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+									<div className="p-4 bg-gray-100 dark:bg-gray-700/50 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+										<MessageCircle className="w-8 h-8 text-gray-400 dark:text-gray-500" />
 									</div>
-									<h3 className="text-lg font-semibold text-gray-600 mb-2">Ready to Start Conversations</h3>
-									<p className="text-gray-500">Add papers to your project to begin discussing and analyzing them.</p>
+									<h3 className="text-lg font-semibold text-gray-600 dark:text-gray-300 mb-2">Ready to Start Conversations</h3>
+									<p className="text-gray-500 dark:text-gray-400">Add papers to your project to begin discussing and analyzing them.</p>
 								</div>
 							)}
 						</>
@@ -923,12 +923,12 @@ export default function ProjectPage() {
 							)
 						})()
 					) : (
-						<div className="text-center p-8 border-dashed border-2 border-gray-300 rounded-xl bg-gray-50">
-							<div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-								<Sparkles className="w-8 h-8 text-gray-400" />
+						<div className="text-center p-8 border-dashed border-2 border-gray-300 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+							<div className="p-4 bg-gray-100 dark:bg-gray-700/50 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+								<Sparkles className="w-8 h-8 text-gray-400 dark:text-gray-500" />
 							</div>
-							<h3 className="text-lg font-semibold text-gray-600 mb-2">No Papers Yet</h3>
-							<p className="text-gray-500 mb-4">Add papers to start analyzing and discussing them.</p>
+							<h3 className="text-lg font-semibold text-gray-600 dark:text-gray-300 mb-2">No Papers Yet</h3>
+							<p className="text-gray-500 dark:text-gray-400 mb-4">Add papers to start analyzing and discussing them.</p>
 							<Dialog>
 								<DialogTrigger asChild>
 									<Button variant="outline">Upload Papers</Button>

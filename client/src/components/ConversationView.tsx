@@ -52,6 +52,7 @@ interface ConversationViewProps {
 	highlightedInfo: { paperId: string; messageIndex: number } | null;
 	setHighlightedInfo: (info: { paperId: string; messageIndex: number } | null) => void;
 	authLoading: boolean;
+	onRefreshPaperUrl?: (paperId: string) => Promise<string | null>;
 }
 
 export const ConversationView = ({
@@ -78,6 +79,7 @@ export const ConversationView = ({
 	highlightedInfo,
 	setHighlightedInfo,
 	authLoading,
+	onRefreshPaperUrl,
 }: ConversationViewProps) => {
 	const messagesContainerRef = useRef<HTMLDivElement>(null);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -86,6 +88,7 @@ export const ConversationView = ({
 
 	const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 	const [pdfTitle, setPdfTitle] = useState<string | null>(null);
+	const [activePaperId, setActivePaperId] = useState<string | null>(null);
 	const [searchTerm, setSearchTerm] = useState<string | null>(null);
 	const [isPdfVisible, setIsPdfVisible] = useState(false);
 	const [collapsedReferences, setCollapsedReferences] = useState<Set<number>>(new Set());
@@ -140,6 +143,7 @@ export const ConversationView = ({
 		if (paper && paper.file_url) {
 			setPdfUrl(paper.file_url);
 			setPdfTitle(paper.title);
+			setActivePaperId(paper.id);
 
 			// Strip quotes from the reference if wrapped in them
 			let searchText = citation.reference;
@@ -151,6 +155,15 @@ export const ConversationView = ({
 			setIsPdfVisible(true);
 		}
 	};
+
+	const refreshPdfUrl = useCallback(async (): Promise<string | null> => {
+		if (!activePaperId || !onRefreshPaperUrl) return null;
+		const freshUrl = await onRefreshPaperUrl(activePaperId);
+		if (freshUrl) {
+			setPdfUrl(freshUrl);
+		}
+		return freshUrl;
+	}, [activePaperId, onRefreshPaperUrl]);
 
 	const toggleReferences = useCallback((messageIndex: number) => {
 		setCollapsedReferences((prev: Set<number>) => {
@@ -283,6 +296,7 @@ export const ConversationView = ({
 									if (paper.file_url) {
 										setPdfUrl(paper.file_url);
 										setPdfTitle(paper.title);
+										setActivePaperId(paper.id);
 										setSearchTerm(null);
 										setIsPdfVisible(true);
 									}
@@ -534,6 +548,7 @@ export const ConversationView = ({
 								removeHighlight={() => { }}
 								renderAnnotations={() => { }}
 								annotations={[]}
+								onRefreshUrl={refreshPdfUrl}
 							/>
 						)}
 					</div>

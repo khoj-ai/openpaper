@@ -196,8 +196,13 @@ export default function PricingPage() {
     const isCanceled = subscriptionStatus === SubscriptionStatus.CANCELED || userSubscription?.subscription?.cancel_at_period_end;
     const canResubscribe = userSubscription?.has_subscription && isCanceled;
 
-    // User had a subscription but needs to manage it (payment failed, past_due, etc.)
-    const needsSubscriptionManagement = userSubscription?.had_subscription && userSubscription?.requires_payment_update;
+    // User had a subscription but needs to manage it (payment failed, past_due, incomplete, etc.)
+    // For incomplete subscriptions where the user never had an active subscription (first-time payment failure),
+    // show the checkout cart again instead of the portal so they can retry payment.
+    const isFirstTimeIncomplete = subscriptionStatus === SubscriptionStatus.INCOMPLETE && !userSubscription?.has_subscription;
+    const needsSubscriptionManagement = !isFirstTimeIncomplete
+        && (userSubscription?.had_subscription && userSubscription?.requires_payment_update
+            || subscriptionStatus === SubscriptionStatus.INCOMPLETE);
 
     return (
         <div className="max-w-6xl mx-auto p-2 sm:p-8 space-y-16">
@@ -514,7 +519,7 @@ export default function PricingPage() {
                                 onClick={handleManageSubscription}
                                 disabled={isPortalLoading}
                             >
-                                {isPortalLoading ? "Loading..." : "Update Payment Method"}
+                                {isPortalLoading ? "Loading..." : "Manage Subscription"}
                             </Button>
                         ) : canResubscribe ? (
                             <Button

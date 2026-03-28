@@ -5,16 +5,19 @@ from types import NoneType
 from sqlalchemy import (  # type: ignore
     ARRAY,
     UUID,
+    BigInteger,
     Boolean,
     CheckConstraint,
     Column,
     DateTime,
     Float,
     ForeignKey,
+    Identity,
     Index,
     Integer,
     String,
     Text,
+    UniqueConstraint,
     and_,
 )
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
@@ -472,6 +475,29 @@ class Paper(Base):
     )
 
 
+class PaperPassage(Base):
+    __tablename__ = "paper_passages"
+
+    __table_args__ = (
+        UniqueConstraint("paper_id", "start_line"),
+        Index("ix_paper_passages_ts_vector", "ts_vector", postgresql_using="gin"),
+    )
+
+    id = Column(BigInteger, Identity(always=True), primary_key=True)
+    paper_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("papers.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    start_line = Column(Integer, nullable=False)
+    end_line = Column(Integer, nullable=False)
+    content = Column(Text, nullable=False)
+    ts_vector = Column(TSVECTOR, nullable=True)
+
+    paper = relationship("Paper")
+
+
 class Project(Base):
     __tablename__ = "project"
 
@@ -701,6 +727,7 @@ class AudioOverviewJob(Base):
     conversable = generic_relationship("conversable_type", "conversable_id")
 
     status = Column(String, nullable=False, default=JobStatus.PENDING)
+    status_message = Column(String, nullable=True)
     started_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
 

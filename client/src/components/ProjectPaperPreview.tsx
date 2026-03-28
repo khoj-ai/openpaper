@@ -5,7 +5,7 @@ import { FilePlus2 } from "lucide-react";
 import { PdfHighlighterViewer } from "./PdfHighlighterViewer";
 import { useRouter } from "next/navigation";
 import { fetchFromApi } from "@/lib/api";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { CitePaperButton } from "./CitePaperButton";
 
 interface ProjectPaperPreviewProps {
@@ -36,6 +36,17 @@ export function ProjectPaperPreview({ paper, projectId }: ProjectPaperPreviewPro
 
         checkForkStatus();
     }, [paper.id]);
+
+    const refreshPdfUrl = useCallback(async (): Promise<string | null> => {
+        try {
+            const response = await fetchFromApi(`/api/projects/papers/${projectId}`);
+            const match = response.papers?.find((p: PaperItem) => p.id === paper.id);
+            return match?.file_url ?? null;
+        } catch (error) {
+            console.error("Error refreshing PDF URL:", error);
+            return null;
+        }
+    }, [projectId, paper.id]);
 
     const handleDuplicate = async () => {
         if (!projectId) {
@@ -127,6 +138,7 @@ export function ProjectPaperPreview({ paper, projectId }: ProjectPaperPreviewPro
                             loadHighlights={async () => { }}
                             renderAnnotations={() => { }}
                             annotations={[]}
+                            onRefreshUrl={refreshPdfUrl}
                         />
                     )}
                 </div>
