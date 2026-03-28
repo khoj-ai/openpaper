@@ -519,7 +519,7 @@ export default function PricingPage() {
                                 onClick={handleManageSubscription}
                                 disabled={isPortalLoading}
                             >
-                                {isPortalLoading ? "Loading..." : "Update Payment Method"}
+                                {isPortalLoading ? "Loading..." : "Manage Subscription"}
                             </Button>
                         ) : canResubscribe ? (
                             <Button
