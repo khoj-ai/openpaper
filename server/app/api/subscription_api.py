@@ -167,8 +167,8 @@ async def session_status(
         # If the session is complete, also check our backend subscription status
         if session.status == "complete":
             # Get the client_reference_id which contains our user ID
-            client_reference_id = session.get("client_reference_id")
-            subscription_id = session.get("subscription")
+            client_reference_id = session.client_reference_id
+            subscription_id = session.subscription
 
             if client_reference_id:
                 try:
@@ -243,20 +243,22 @@ async def get_user_subscription(
                     # Period dates are on the subscription item, not the subscription
                     sub_item = (
                         stripe_sub["items"]["data"][0]
-                        if stripe_sub.get("items", {}).get("data")
+                        if stripe_sub["items"] and stripe_sub["items"]["data"]
                         else None
                     )
-                    if sub_item and sub_item.get("current_period_start"):
+                    if sub_item and getattr(sub_item, "current_period_start", None):
                         period_start = datetime.fromtimestamp(
-                            sub_item["current_period_start"]
+                            sub_item.current_period_start
                         )
-                    if sub_item and sub_item.get("current_period_end"):
-                        period_end = datetime.fromtimestamp(
-                            sub_item["current_period_end"]
-                        )
+                    if sub_item and getattr(sub_item, "current_period_end", None):
+                        period_end = datetime.fromtimestamp(sub_item.current_period_end)
 
                     # Extract the product_id from the price object
-                    stripe_price_id = stripe_sub.get("plan", {}).get("id")
+                    stripe_price_id = (
+                        sub_item.price.id
+                        if sub_item and getattr(sub_item, "price", None)
+                        else None
+                    )
                     if stripe_price_id not in [MONTHLY_PRICE_ID, YEARLY_PRICE_ID]:
                         logger.info(
                             f"Skipping subscription update for unsupported price ID: {stripe_price_id}"
@@ -398,10 +400,10 @@ async def handle_stripe_webhook(
         if event_type == "checkout.session.completed":
             # Payment is successful - log the event but let subscription.created handle the actual subscription
             session = event["data"]["object"]
-            customer_id = session.get("customer")
-            subscription_id = session.get("subscription")
-            client_reference_id = session.get(
-                "client_reference_id"
+            customer_id = session.customer
+            subscription_id = session.subscription
+            client_reference_id = (
+                session.client_reference_id
             )  # This contains our user ID
 
             if client_reference_id and customer_id:
@@ -428,14 +430,15 @@ async def handle_stripe_webhook(
         elif event_type == "customer.subscription.created":
             # Subscription created - this handles all subscription creation (checkout and direct)
             stripe_sub = event["data"]["object"]
-            subscription_id = stripe_sub.get("id")
-            customer_id = stripe_sub.get("customer")
+            subscription_id = stripe_sub.id
+            customer_id = stripe_sub.customer
 
             try:
                 # Get price ID from subscription items to validate it's one of ours
                 stripe_received_price_id = None
-                if stripe_sub.get("plan"):
-                    stripe_received_price_id = stripe_sub.plan.stripe_id
+                sub_items = stripe_sub["items"]["data"]
+                if sub_items:
+                    stripe_received_price_id = sub_items[0].price.id
 
                 if stripe_received_price_id and not is_valid_price_id(
                     stripe_received_price_id
@@ -458,7 +461,7 @@ async def handle_stripe_webhook(
                     # No existing subscription found, try to find user by email from Stripe customer
                     try:
                         stripe_customer = stripe.Customer.retrieve(customer_id)
-                        customer_email = stripe_customer.get("email")
+                        customer_email = stripe_customer.email
 
                         if customer_email:
                             # Find user by email in our database
@@ -489,7 +492,7 @@ async def handle_stripe_webhook(
                 if user_id:
                     # Create or update subscription in database with new subscription data
                     # Period dates are on the subscription item
-                    webhook_sub_item = stripe_sub.get("items", {}).get("data", [{}])[0]
+                    webhook_sub_item = stripe_sub["items"]["data"][0]
                     subscription_data = {
                         "stripe_customer_id": customer_id,
                         "stripe_subscription_id": subscription_id,
@@ -498,19 +501,17 @@ async def handle_stripe_webhook(
                         "status": stripe_sub.status,
                         "current_period_start": (
                             datetime.fromtimestamp(
-                                webhook_sub_item["current_period_start"]
+                                webhook_sub_item.current_period_start
                             )
-                            if webhook_sub_item.get("current_period_start")
+                            if getattr(webhook_sub_item, "current_period_start", None)
                             else None
                         ),
                         "current_period_end": (
-                            datetime.fromtimestamp(
-                                webhook_sub_item["current_period_end"]
-                            )
-                            if webhook_sub_item.get("current_period_end")
+                            datetime.fromtimestamp(webhook_sub_item.current_period_end)
+                            if getattr(webhook_sub_item, "current_period_end", None)
                             else None
                         ),
-                        "cancel_at_period_end": stripe_sub["cancel_at_period_end"],
+                        "cancel_at_period_end": stripe_sub.cancel_at_period_end,
                     }
 
                     # Save to database using create_or_update
@@ -549,7 +550,7 @@ async def handle_stripe_webhook(
 
         elif event_type == "customer.subscription.updated":
             stripe_sub = event["data"]["object"]
-            subscription_id = stripe_sub.get("id")
+            subscription_id = stripe_sub.id
 
             try:
                 # Find subscription in our database
@@ -560,8 +561,9 @@ async def handle_stripe_webhook(
                 if subscription:
                     # Get price ID from subscription items to validate it's one of ours
                     stripe_received_price_id = None
-                    if stripe_sub.get("plan"):
-                        stripe_received_price_id = stripe_sub.plan.stripe_id
+                    sub_items = stripe_sub["items"]["data"]
+                    if sub_items:
+                        stripe_received_price_id = sub_items[0].price.id
 
                     if stripe_received_price_id and not is_valid_price_id(
                         stripe_received_price_id
@@ -575,8 +577,10 @@ async def handle_stripe_webhook(
                     # Stripe supports two cancellation methods:
                     # 1. cancel_at_period_end: true - cancels at end of current period
                     # 2. cancel_at: timestamp - cancels at a specific future date
-                    cancel_at_period_end = stripe_sub.get("cancel_at_period_end", False)
-                    cancel_at = stripe_sub.get("cancel_at")
+                    cancel_at_period_end = getattr(
+                        stripe_sub, "cancel_at_period_end", False
+                    )
+                    cancel_at = getattr(stripe_sub, "cancel_at", None)
                     previous_cancel_at_period_end = subscription.cancel_at_period_end
 
                     # Treat either cancellation method as a pending cancellation
@@ -586,7 +590,7 @@ async def handle_stripe_webhook(
                     was_scheduled_for_cancellation = previous_cancel_at_period_end
 
                     # Period dates are on the subscription item
-                    updated_sub_item = stripe_sub.get("items", {}).get("data", [{}])[0]
+                    updated_sub_item = stripe_sub["items"]["data"][0]
 
                     # Update with new data
                     subscription_crud.update_subscription_status(
@@ -596,16 +600,14 @@ async def handle_stripe_webhook(
                         stripe_price_id=stripe_received_price_id,
                         period_start=(
                             datetime.fromtimestamp(
-                                updated_sub_item["current_period_start"]
+                                updated_sub_item.current_period_start
                             )
-                            if updated_sub_item.get("current_period_start")
+                            if getattr(updated_sub_item, "current_period_start", None)
                             else None
                         ),
                         period_end=(
-                            datetime.fromtimestamp(
-                                updated_sub_item["current_period_end"]
-                            )
-                            if updated_sub_item.get("current_period_end")
+                            datetime.fromtimestamp(updated_sub_item.current_period_end)
+                            if getattr(updated_sub_item, "current_period_end", None)
                             else None
                         ),
                         cancel_at_period_end=is_scheduled_for_cancellation,
@@ -631,7 +633,7 @@ async def handle_stripe_webhook(
                                 event_name="subscription_canceled",
                                 properties={
                                     "subscription_id": subscription_id,
-                                    "customer_id": stripe_sub.get("customer"),
+                                    "customer_id": stripe_sub.customer,
                                     "interval": (
                                         "yearly"
                                         if stripe_received_price_id == YEARLY_PRICE_ID
@@ -639,9 +641,9 @@ async def handle_stripe_webhook(
                                     ),
                                     "canceled_at": (
                                         datetime.fromtimestamp(
-                                            stripe_sub.get("canceled_at", 0)
+                                            stripe_sub.canceled_at
                                         ).isoformat()
-                                        if stripe_sub.get("canceled_at")
+                                        if getattr(stripe_sub, "canceled_at", None)
                                         else None
                                     ),
                                     "cancel_at_period_end": True,
@@ -661,7 +663,7 @@ async def handle_stripe_webhook(
 
         elif event_type == "customer.subscription.deleted":
             stripe_sub = event["data"]["object"]
-            subscription_id = stripe_sub.get("id")
+            subscription_id = stripe_sub.id
 
             try:
                 # Find subscription in our database
@@ -672,8 +674,9 @@ async def handle_stripe_webhook(
                 if subscription:
                     # Get price ID from subscription items to validate it's one of ours
                     stripe_received_price_id = None
-                    if stripe_sub.get("plan"):
-                        stripe_received_price_id = stripe_sub.plan.stripe_id
+                    sub_items = stripe_sub["items"]["data"]
+                    if sub_items:
+                        stripe_received_price_id = sub_items[0].price.id
 
                     if stripe_received_price_id and not is_valid_price_id(
                         stripe_received_price_id
@@ -700,7 +703,7 @@ async def handle_stripe_webhook(
                         event_name="subscription_canceled",
                         properties={
                             "subscription_id": subscription_id,
-                            "customer_id": stripe_sub.get("customer"),
+                            "customer_id": stripe_sub.customer,
                             "interval": (
                                 "yearly"
                                 if stripe_received_price_id == YEARLY_PRICE_ID
@@ -708,9 +711,9 @@ async def handle_stripe_webhook(
                             ),
                             "canceled_at": (
                                 datetime.fromtimestamp(
-                                    stripe_sub.get("canceled_at", 0)
+                                    stripe_sub.canceled_at
                                 ).isoformat()
-                                if stripe_sub.get("canceled_at")
+                                if getattr(stripe_sub, "canceled_at", None)
                                 else None
                             ),
                         },
@@ -722,8 +725,8 @@ async def handle_stripe_webhook(
 
         elif event_type == "invoice.payment_failed":
             invoice = event["data"]["object"]
-            subscription_id = invoice.get("subscription")
-            customer_id = invoice.get("customer")
+            subscription_id = invoice.subscription
+            customer_id = invoice.customer
 
             try:
                 if subscription_id:
@@ -744,7 +747,7 @@ async def handle_stripe_webhook(
                             properties={
                                 "subscription_id": subscription_id,
                                 "customer_id": customer_id,
-                                "invoice_id": invoice.get("id"),
+                                "invoice_id": invoice.id,
                             },
                             user_id=str(subscription.user_id),
                         )
@@ -773,7 +776,7 @@ async def handle_stripe_webhook(
 
         elif event_type == "invoice.payment_succeeded":
             invoice = event["data"]["object"]
-            subscription_id = invoice.get("subscription")
+            subscription_id = invoice.subscription
 
             try:
                 if subscription_id:
@@ -793,7 +796,7 @@ async def handle_stripe_webhook(
                             event_name="payment_succeeded",
                             properties={
                                 "subscription_id": subscription_id,
-                                "invoice_id": invoice.get("id"),
+                                "invoice_id": invoice.id,
                             },
                             user_id=str(subscription.user_id),
                         )
@@ -807,7 +810,7 @@ async def handle_stripe_webhook(
 
         elif event_type == "invoice.payment_action_required":
             invoice = event["data"]["object"]
-            subscription_id = invoice.get("subscription")
+            subscription_id = invoice.subscription
 
             try:
                 if subscription_id:
@@ -821,7 +824,7 @@ async def handle_stripe_webhook(
                             event_name="payment_action_required",
                             properties={
                                 "subscription_id": subscription_id,
-                                "invoice_id": invoice.get("id"),
+                                "invoice_id": invoice.id,
                             },
                             user_id=str(subscription.user_id),
                         )
@@ -851,7 +854,7 @@ async def handle_stripe_webhook(
 
         elif event_type == "customer.subscription.past_due":
             stripe_sub = event["data"]["object"]
-            subscription_id = stripe_sub.get("id")
+            subscription_id = stripe_sub.id
 
             try:
                 subscription = subscription_crud.get_by_stripe_subscription_id(
@@ -898,8 +901,8 @@ async def handle_stripe_webhook(
             "subscription_schedule.released",
         ]:
             schedule = event["data"]["object"]
-            schedule_id = schedule.get("id")
-            subscription_id = schedule.get("subscription")
+            schedule_id = schedule.id
+            subscription_id = schedule.subscription
 
             try:
                 if subscription_id:
@@ -1040,18 +1043,18 @@ def resubscribe(
                     customer = stripe.Customer.retrieve(
                         str(subscription.stripe_customer_id)
                     )
-                    if customer.get("invoice_settings", {}).get(
-                        "default_payment_method"
+                    invoice_settings = getattr(customer, "invoice_settings", None)
+                    if (
+                        invoice_settings is not None
+                        and invoice_settings.default_payment_method
                     ):
-                        payment_method_id = customer["invoice_settings"][
-                            "default_payment_method"
-                        ]
+                        payment_method_id = invoice_settings.default_payment_method
 
                     # If no default payment method, try to get from the canceled subscription
-                    if not payment_method_id and stripe_sub.get(
-                        "default_payment_method"
+                    if not payment_method_id and getattr(
+                        stripe_sub, "default_payment_method", None
                     ):
-                        payment_method_id = stripe_sub["default_payment_method"]
+                        payment_method_id = stripe_sub.default_payment_method
 
                     # If still no payment method, get the customer's payment methods
                     if not payment_method_id:
@@ -1271,7 +1274,9 @@ def change_subscription_interval(
             }
 
         # current_period_end lives on the subscription item, not the subscription itself
-        current_period_end_ts = stripe_sub["items"]["data"][0].get("current_period_end")
+        current_period_end_ts = getattr(
+            stripe_sub["items"]["data"][0], "current_period_end", None
+        )
 
         # If there's already a schedule, release it first
         if subscription.stripe_schedule_id:
