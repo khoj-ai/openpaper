@@ -25,7 +25,7 @@ from app.api.projects.projects_invitation_api import (
     router as projects_invitation_router,
 )
 from app.api.search_api import search_router
-from app.api.subscription_api import subscription_router
+from app.api.subscription import subscription_router
 from app.api.webhook_api import webhook_router
 from app.database.admin import setup_admin
 from dotenv import load_dotenv
