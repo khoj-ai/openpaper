@@ -488,6 +488,7 @@ async def run_eval_questions(
                     {
                         "row_id": row_id,
                         "paper_id": row["paper_id"],
+                        "domain": row.get("domain", "unknown"),
                         "question_type": row["question_type"],
                         "question": row["question"],
                         "expected_answer": row["expected_answer"],
@@ -522,6 +523,7 @@ async def run_eval_questions(
                 {
                     "row_id": row_id,
                     "paper_id": row["paper_id"],
+                    "domain": row.get("domain", "unknown"),
                     "question_type": row["question_type"],
                     "question": row["question"],
                     "expected_answer": row["expected_answer"],
@@ -751,11 +753,14 @@ def compute_summary(graded_results: list[dict]) -> dict:
     if not graded_results:
         return {}
 
-    # Separate by question type
+    # Separate by question type and domain
     by_type: dict[str, list[dict]] = {}
+    by_domain: dict[str, list[dict]] = {}
     for r in graded_results:
         qt = r.get("question_type", "unknown")
         by_type.setdefault(qt, []).append(r)
+        domain = r.get("domain", "unknown")
+        by_domain.setdefault(domain, []).append(r)
 
     def avg(items: list[dict], key: str) -> float:
         vals = [r[key] for r in items if key in r and r[key] is not None and r[key] > 0]
@@ -780,7 +785,16 @@ def compute_summary(graded_results: list[dict]) -> dict:
         per_type[qt] = {key: avg(items, key) for key in metric_keys}
         per_type[qt]["count"] = len(items)
 
-    return {"overall": overall, "by_question_type": per_type}
+    per_domain = {}
+    for domain, items in by_domain.items():
+        per_domain[domain] = {key: avg(items, key) for key in metric_keys}
+        per_domain[domain]["count"] = len(items)
+
+    return {
+        "overall": overall,
+        "by_question_type": per_type,
+        "by_domain": per_domain,
+    }
 
 
 def print_summary(summary: dict):
@@ -888,12 +902,17 @@ def print_comparison(harness_path: str, baseline_path: str):
         ("Avg latency (s)", "avg_latency_seconds"),
     ]
 
-    for label, key in metrics:
-        h_val = h_summary.get(key, 0)
-        b_val = b_summary.get(key, 0)
-        delta = h_val - b_val
-        sign = "+" if delta > 0 else ""
-        logger.info(f"{label:<25} {h_val:>10.3f} {b_val:>10.3f} {sign}{delta:>9.3f}")
+    def _print_metric_rows(h_data: dict, b_data: dict, metrics_list: list):
+        for label, key in metrics_list:
+            h_val = h_data.get(key, 0)
+            b_val = b_data.get(key, 0)
+            delta = h_val - b_val
+            sign = "+" if delta > 0 else ""
+            logger.info(
+                f"{label:<25} {h_val:>10.3f} {b_val:>10.3f} {sign}{delta:>9.3f}"
+            )
+
+    _print_metric_rows(h_summary, b_summary, metrics)
 
     # Citation metrics only apply to harness
     citation_metrics = [
@@ -907,6 +926,27 @@ def print_comparison(harness_path: str, baseline_path: str):
     for label, key in citation_metrics:
         h_val = h_summary.get(key, 0)
         logger.info(f"  {label:<23} {h_val:>10.3f}")
+
+    # Per-domain breakdown
+    h_by_domain = harness.get("summary", {}).get("by_domain", {})
+    b_by_domain = baseline.get("summary", {}).get("by_domain", {})
+    all_domains = sorted(set(list(h_by_domain.keys()) + list(b_by_domain.keys())))
+
+    if all_domains:
+        logger.info("")
+        logger.info("-" * 55)
+        logger.info("BY DOMAIN")
+        logger.info("-" * 55)
+
+        for domain in all_domains:
+            h_domain = h_by_domain.get(domain, {})
+            b_domain = b_by_domain.get(domain, {})
+            h_count = h_domain.get("count", 0)
+            b_count = b_domain.get("count", 0)
+            logger.info(f"\n  {domain} (harness: {h_count}, baseline: {b_count})")
+            header = f"{'Metric':<25} {'Harness':>10} {'Baseline':>10} {'Delta':>10}"
+            logger.info(header)
+            _print_metric_rows(h_domain, b_domain, metrics)
 
     logger.info("=" * 70)
 
