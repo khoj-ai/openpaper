@@ -443,8 +443,8 @@ class OpenAIProvider(BaseLLMProvider):
         # For standard OpenAI, base_url should be None. For OpenAI-compatible
         # providers, pass a custom base_url when constructing this provider.
         self._client = openai.OpenAI(api_key=self.api_key, base_url=base_url)
-        self._default_model = default_model or "gpt-4.1"
-        self._fast_model = fast_model or "gpt-4.1-2025-04-14"
+        self._default_model = default_model or "gpt-5.4"
+        self._fast_model = fast_model or "gpt-4.1"
 
     @property
     def client(self) -> openai.OpenAI:
