@@ -40,6 +40,7 @@ from app.database.database import SessionLocal
 from app.database.models import ConversableType, SubscriptionStatus
 from app.llm.operations import operations
 from app.llm.provider import LLMProvider, TextContent
+from app.schemas.responses import FileContent
 from app.schemas.user import CurrentUser
 
 logging.basicConfig(
@@ -372,6 +373,54 @@ async def run_single_question(
     }
 
 
+BASELINE_SYSTEM_PROMPT = """\
+You are a helpful research assistant. You will be given a research paper as a PDF \
+and a question about it. Answer the question accurately and completely based only \
+on the content of the paper. Be specific and cite relevant details from the paper \
+in your answer."""
+
+
+def run_single_question_baseline(
+    db,
+    paper_id: str,
+    question: str,
+    provider: Optional[LLMProvider] = None,
+) -> dict:
+    """Run a single question directly against the LLM with the PDF, no harness."""
+    import httpx
+
+    paper = paper_crud.get(db, id=paper_id)
+    if not paper:
+        raise ValueError(f"Paper with ID {paper_id} not found.")
+
+    # Download the PDF
+    url = paper.cached_presigned_url
+    if not url:
+        raise ValueError(f"No cached presigned URL for paper {paper_id}")
+    pdf_bytes = httpx.get(str(url)).content
+
+    message_content = [
+        FileContent(
+            data=pdf_bytes,
+            mime_type="application/pdf",
+            filename=f"{paper.title or 'paper'}.pdf",
+        ),
+        TextContent(text=question),
+    ]
+
+    response = operations.generate_content(
+        contents=message_content,
+        system_prompt=BASELINE_SYSTEM_PROMPT,
+        provider=provider,
+    )
+
+    answer_text = response.text.strip() if response and response.text else ""
+    return {
+        "answer_text": answer_text,
+        "citations": [],
+    }
+
+
 async def run_eval_questions(
     db,
     current_user: CurrentUser,
@@ -382,10 +431,13 @@ async def run_eval_questions(
     provider: Optional[LLMProvider] = None,
     limit: Optional[int] = None,
     max_retries: int = 3,
+    baseline: bool = False,
 ):
     """Run eval questions, writing each result to disk incrementally.
 
     Skips rows that already succeeded. Retries errors up to max_retries times.
+    When baseline=True, sends the question directly to the LLM with the PDF
+    instead of going through the chat_with_paper pipeline.
     """
     rows = dataset["rows"]
     if limit is not None:
@@ -422,9 +474,14 @@ async def run_eval_questions(
         for attempt in range(1, max_retries + 1):
             start = time.time()
             try:
-                result = await run_single_question(
-                    db, current_user, paper_id, row["question"], provider
-                )
+                if baseline:
+                    result = run_single_question_baseline(
+                        db, paper_id, row["question"], provider
+                    )
+                else:
+                    result = await run_single_question(
+                        db, current_user, paper_id, row["question"], provider
+                    )
                 elapsed = time.time() - start
 
                 results["rows"].append(
@@ -647,10 +704,12 @@ def grade_results(
     results_path: str,
     provider: Optional[LLMProvider] = None,
     skip_judge: bool = False,
+    baseline: bool = False,
 ):
     """Grade results in-place with citation metrics and optionally LLM judge.
 
     Skips rows that are already graded (for resumability).
+    Skips citation metrics for baseline runs (no citation protocol).
     Writes to disk after each row.
     """
     already_graded = get_graded_row_ids(results)
@@ -664,13 +723,14 @@ def grade_results(
 
         logger.info(f"Grading [{i + 1}/{len(rows)}] {row_id}")
 
-        # Citation metrics (always computed)
-        citation_scores = compute_citation_metrics(result)
-        result.update(citation_scores)
+        # Citation metrics (skip for baseline — no citation protocol)
+        if not baseline:
+            citation_scores = compute_citation_metrics(result)
+            result.update(citation_scores)
 
         # LLM judge (optional)
         if not skip_judge and not result.get("error"):
-            judge_scores = judge_single_result(result, provider)
+            judge_scores = judge_single_result(result, LLMProvider.GEMINI)
             result.update(judge_scores)
             logger.info(
                 f"  Scores: accuracy={judge_scores.get('factual_accuracy')}, "
@@ -762,19 +822,93 @@ def print_summary(summary: dict):
     logger.info("=" * 60)
 
 
-def get_results_path(output_dir: str, provider_name: str) -> str:
+def get_results_path(
+    output_dir: str, provider_name: str, baseline: bool = False
+) -> str:
     """Return a stable results file path for this provider.
 
     Re-running with the same provider resumes into the same file.
     Use --output to start a fresh run in a different directory.
     """
     os.makedirs(output_dir, exist_ok=True)
-    return os.path.join(output_dir, f"eval_{provider_name}.json")
+    suffix = "_baseline" if baseline else ""
+    return os.path.join(output_dir, f"eval_{provider_name}{suffix}.json")
 
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
+
+def print_comparison(harness_path: str, baseline_path: str):
+    """Load harness and baseline results and print a side-by-side comparison."""
+    if not os.path.exists(harness_path):
+        logger.error(f"Harness results not found: {harness_path}")
+        return
+    if not os.path.exists(baseline_path):
+        logger.error(f"Baseline results not found: {baseline_path}")
+        return
+
+    with open(harness_path) as f:
+        harness = json.load(f)
+    with open(baseline_path) as f:
+        baseline = json.load(f)
+
+    h_summary = harness.get("summary", {}).get("overall", {})
+    b_summary = baseline.get("summary", {}).get("overall", {})
+
+    if not h_summary or not b_summary:
+        logger.error("One or both results are missing summary data. Run grading first.")
+        return
+
+    logger.info("\n" + "=" * 70)
+    logger.info("COMPARISON: Harness vs Baseline")
+    logger.info("=" * 70)
+
+    logger.info(
+        f"  Harness: {harness.get('llm_provider', '?')} — "
+        f"{h_summary.get('total_rows', 0)} rows, "
+        f"{h_summary.get('errors', 0)} errors"
+    )
+    logger.info(
+        f"  Baseline: {baseline.get('llm_provider', '?')} — "
+        f"{b_summary.get('total_rows', 0)} rows, "
+        f"{b_summary.get('errors', 0)} errors"
+    )
+    logger.info("")
+
+    header = f"{'Metric':<25} {'Harness':>10} {'Baseline':>10} {'Delta':>10}"
+    logger.info(header)
+    logger.info("-" * 55)
+
+    metrics = [
+        ("Factual accuracy", "factual_accuracy"),
+        ("Completeness", "completeness"),
+        ("Groundedness", "groundedness"),
+        ("Avg latency (s)", "avg_latency_seconds"),
+    ]
+
+    for label, key in metrics:
+        h_val = h_summary.get(key, 0)
+        b_val = b_summary.get(key, 0)
+        delta = h_val - b_val
+        sign = "+" if delta > 0 else ""
+        logger.info(f"{label:<25} {h_val:>10.3f} {b_val:>10.3f} {sign}{delta:>9.3f}")
+
+    # Citation metrics only apply to harness
+    citation_metrics = [
+        ("Citation precision", "citation_precision"),
+        ("Citation recall", "citation_recall"),
+        ("Citation accuracy", "citation_accuracy"),
+    ]
+
+    logger.info("")
+    logger.info("Citation metrics (harness only):")
+    for label, key in citation_metrics:
+        h_val = h_summary.get(key, 0)
+        logger.info(f"  {label:<23} {h_val:>10.3f}")
+
+    logger.info("=" * 70)
 
 
 def parse_provider(name: str) -> Optional[LLMProvider]:
@@ -833,6 +967,17 @@ def main():
         help="Max retries per question on error (default: 3)",
     )
     parser.add_argument(
+        "--baseline",
+        action="store_true",
+        help="Run in baseline mode: send question + PDF directly to the LLM, "
+        "bypassing the server's citation protocol and harness",
+    )
+    parser.add_argument(
+        "--compare",
+        action="store_true",
+        help="Compare harness vs baseline results for the selected provider and exit",
+    )
+    parser.add_argument(
         "--output",
         default="evals/results",
         help="Output directory for results (default: evals/results)",
@@ -842,6 +987,15 @@ def main():
     provider = parse_provider(args.provider) if args.provider else None
     provider_name = provider.value if provider else "gemini"
 
+    # Handle --compare: print comparison and exit
+    if args.compare:
+        harness_path = get_results_path(args.output, provider_name, baseline=False)
+        baseline_path = get_results_path(args.output, provider_name, baseline=True)
+        print_comparison(harness_path, baseline_path)
+        return
+
+    mode_label = "BASELINE" if args.baseline else "HARNESS"
+
     # Load dataset and manifest
     with open(args.dataset) as f:
         dataset = json.load(f)
@@ -849,14 +1003,15 @@ def main():
         manifest = json.load(f)
 
     logger.info(
-        f"Loaded dataset: {dataset['total_rows']} rows, "
+        f"[{mode_label}] Loaded dataset: {dataset['total_rows']} rows, "
         f"{dataset.get('total_papers_processed', '?')} papers"
     )
 
     # Load or create results file (stable path per provider for resumability)
-    results_path = get_results_path(args.output, provider_name)
+    results_path = get_results_path(args.output, provider_name, baseline=args.baseline)
     results = load_results(results_path)
     results["llm_provider"] = provider_name
+    results["mode"] = "baseline" if args.baseline else "harness"
     logger.info(
         f"Results file: {results_path} "
         f"({len(results['rows'])} rows from previous run)"
@@ -896,7 +1051,7 @@ def main():
             return
 
         # Phase 2: Run eval questions (incremental, writes to disk per row)
-        logger.info("Phase 2: Running eval questions...")
+        logger.info(f"Phase 2: Running eval questions ({mode_label})...")
         asyncio.run(
             run_eval_questions(
                 db,
@@ -908,6 +1063,7 @@ def main():
                 provider,
                 args.limit,
                 max_retries=args.retries,
+                baseline=args.baseline,
             )
         )
 
@@ -922,6 +1078,7 @@ def main():
             results_path,
             provider=provider,
             skip_judge=args.skip_grading,
+            baseline=args.baseline,
         )
 
         # Final summary
