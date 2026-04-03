@@ -53,6 +53,18 @@ class UpdatePaperNoteSchema(BaseModel):
     content: str
 
 
+class UpdatePaperFieldsSchema(BaseModel):
+    title: Optional[str] = None
+    authors: Optional[List[str]] = None
+    abstract: Optional[str] = None
+    institutions: Optional[List[str]] = None
+    keywords: Optional[List[str]] = None
+    publish_date: Optional[str] = None
+    doi: Optional[str] = None
+    journal: Optional[str] = None
+    publisher: Optional[str] = None
+
+
 @paper_router.get("/all")
 async def get_paper_ids(
     db: Session = Depends(get_db),
@@ -238,6 +250,47 @@ async def set_paper_status(
         properties={
             "paper_id": str(updated_paper.id),
             "status": updated_paper.status,
+        },
+        user_id=str(current_user.id),
+    )
+
+    return JSONResponse(content=updated_paper.to_dict(), status_code=200)
+
+
+@paper_router.patch("")
+async def update_paper_fields(
+    paper_id: str,
+    request: UpdatePaperFieldsSchema,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """
+    Update editable fields of a paper (title, authors, abstract, etc.)
+    """
+    target_paper = paper_crud.get(db, id=paper_id, user=current_user)
+
+    if not target_paper:
+        raise HTTPException(status_code=404, detail=f"No document with id {paper_id}")
+
+    update_data = request.model_dump(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    updated_paper = paper_crud.update(
+        db=db, db_obj=target_paper, obj_in=update_data, user=current_user
+    )
+
+    if not updated_paper:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update paper fields for document ID {paper_id}",
+        )
+
+    track_event(
+        "paper_fields_updated",
+        properties={
+            "paper_id": str(updated_paper.id),
+            "updated_fields": list(update_data.keys()),
         },
         user_id=str(current_user.id),
     )
