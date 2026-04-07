@@ -421,6 +421,91 @@ def run_single_question_baseline(
     }
 
 
+async def _run_single_row(
+    row: dict,
+    row_index: int,
+    total_rows: int,
+    current_user: CurrentUser,
+    paper_id: str,
+    provider: Optional[LLMProvider],
+    max_retries: int,
+    baseline: bool,
+) -> dict:
+    """Run a single eval row with retries, using its own DB session.
+
+    Returns a result dict ready to be appended to results["rows"].
+    """
+    row_id = row["row_id"]
+    logger.info(f"[{row_index}/{total_rows}] {row_id} ({row['question_type']})")
+
+    last_error = None
+    elapsed = 0.0
+
+    for attempt in range(1, max_retries + 1):
+        db = SessionLocal()
+        try:
+            start = time.time()
+            if baseline:
+                result = await asyncio.to_thread(
+                    run_single_question_baseline,
+                    db,
+                    paper_id,
+                    row["question"],
+                    provider,
+                )
+            else:
+                result = await run_single_question(
+                    db, current_user, paper_id, row["question"], provider
+                )
+            elapsed = time.time() - start
+
+            logger.info(
+                f"  [{row_id}] Answer: {result['answer_text'][:100]}... "
+                f"({len(result['citations'])} citations, {elapsed:.1f}s)"
+            )
+            return {
+                "row_id": row_id,
+                "paper_id": row["paper_id"],
+                "domain": row.get("domain", "unknown"),
+                "question_type": row["question_type"],
+                "question": row["question"],
+                "expected_answer": row["expected_answer"],
+                "expected_references": row["expected_references"],
+                "judge_rubric": row.get("judge_rubric"),
+                "actual_answer": result["answer_text"],
+                "actual_citations": result["citations"],
+                "latency_seconds": round(elapsed, 2),
+            }
+        except Exception as e:
+            elapsed = time.time() - start
+            last_error = e
+            if attempt < max_retries:
+                logger.warning(
+                    f"  [{row_id}] Attempt {attempt}/{max_retries} failed: {e} ({elapsed:.1f}s), retrying..."
+                )
+            else:
+                logger.error(
+                    f"  [{row_id}] All {max_retries} attempts failed: {e} ({elapsed:.1f}s)"
+                )
+        finally:
+            db.close()
+
+    return {
+        "row_id": row_id,
+        "paper_id": row["paper_id"],
+        "domain": row.get("domain", "unknown"),
+        "question_type": row["question_type"],
+        "question": row["question"],
+        "expected_answer": row["expected_answer"],
+        "expected_references": row["expected_references"],
+        "judge_rubric": row.get("judge_rubric"),
+        "actual_answer": "",
+        "actual_citations": [],
+        "latency_seconds": round(elapsed, 2),
+        "error": str(last_error),
+    }
+
+
 async def run_eval_questions(
     db,
     current_user: CurrentUser,
@@ -432,8 +517,9 @@ async def run_eval_questions(
     limit: Optional[int] = None,
     max_retries: int = 3,
     baseline: bool = False,
+    batch_size: int = 5,
 ):
-    """Run eval questions, writing each result to disk incrementally.
+    """Run eval questions in parallel batches, writing results to disk after each batch.
 
     Skips rows that already succeeded. Retries errors up to max_retries times.
     When baseline=True, sends the question directly to the LLM with the PDF
@@ -453,9 +539,10 @@ async def run_eval_questions(
 
     logger.info(f"{len(completed)} rows already completed, skipping those")
 
+    # Build list of pending rows
+    pending = []
     for i, row in enumerate(rows):
         row_id = row["row_id"]
-
         if row_id in completed:
             continue
 
@@ -467,76 +554,38 @@ async def run_eval_questions(
             )
             continue
 
-        logger.info(f"[{i + 1}/{len(rows)}] {row_id} ({row['question_type']})")
+        pending.append((i + 1, row, paper_id))
 
-        last_error = None
-        elapsed = 0.0
-        for attempt in range(1, max_retries + 1):
-            start = time.time()
-            try:
-                if baseline:
-                    result = run_single_question_baseline(
-                        db, paper_id, row["question"], provider
-                    )
-                else:
-                    result = await run_single_question(
-                        db, current_user, paper_id, row["question"], provider
-                    )
-                elapsed = time.time() - start
+    logger.info(f"{len(pending)} rows to run (batch_size={batch_size})")
 
-                results["rows"].append(
-                    {
-                        "row_id": row_id,
-                        "paper_id": row["paper_id"],
-                        "domain": row.get("domain", "unknown"),
-                        "question_type": row["question_type"],
-                        "question": row["question"],
-                        "expected_answer": row["expected_answer"],
-                        "expected_references": row["expected_references"],
-                        "judge_rubric": row.get("judge_rubric"),
-                        "actual_answer": result["answer_text"],
-                        "actual_citations": result["citations"],
-                        "latency_seconds": round(elapsed, 2),
-                    }
-                )
+    # Process in batches
+    for batch_start in range(0, len(pending), batch_size):
+        batch = pending[batch_start : batch_start + batch_size]
+        batch_num = batch_start // batch_size + 1
+        total_batches = (len(pending) + batch_size - 1) // batch_size
+        logger.info(
+            f"Batch {batch_num}/{total_batches} — "
+            f"{len(batch)} questions in parallel"
+        )
 
-                logger.info(
-                    f"  Answer: {result['answer_text'][:100]}... "
-                    f"({len(result['citations'])} citations, {elapsed:.1f}s)"
-                )
-                last_error = None
-                break
-            except Exception as e:
-                elapsed = time.time() - start
-                last_error = e
-                if attempt < max_retries:
-                    logger.warning(
-                        f"  Attempt {attempt}/{max_retries} failed: {e} ({elapsed:.1f}s), retrying..."
-                    )
-                else:
-                    logger.error(
-                        f"  All {max_retries} attempts failed: {e} ({elapsed:.1f}s)"
-                    )
-
-        if last_error is not None:
-            results["rows"].append(
-                {
-                    "row_id": row_id,
-                    "paper_id": row["paper_id"],
-                    "domain": row.get("domain", "unknown"),
-                    "question_type": row["question_type"],
-                    "question": row["question"],
-                    "expected_answer": row["expected_answer"],
-                    "expected_references": row["expected_references"],
-                    "judge_rubric": row.get("judge_rubric"),
-                    "actual_answer": "",
-                    "actual_citations": [],
-                    "latency_seconds": round(elapsed, 2),
-                    "error": str(last_error),
-                }
+        tasks = [
+            _run_single_row(
+                row=row,
+                row_index=row_index,
+                total_rows=len(rows),
+                current_user=current_user,
+                paper_id=paper_id,
+                provider=provider,
+                max_retries=max_retries,
+                baseline=baseline,
             )
+            for row_index, row, paper_id in batch
+        ]
 
-        # Save after each row for resumability
+        batch_results = await asyncio.gather(*tasks)
+        results["rows"].extend(batch_results)
+
+        # Save after each batch for resumability
         save_results_file(results, results_path)
 
 
@@ -1007,6 +1056,12 @@ def main():
         help="Max retries per question on error (default: 3)",
     )
     parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=5,
+        help="Number of questions to run in parallel per batch (default: 5)",
+    )
+    parser.add_argument(
         "--baseline",
         action="store_true",
         help="Run in baseline mode: send question + PDF directly to the LLM, "
@@ -1104,6 +1159,7 @@ def main():
                 args.limit,
                 max_retries=args.retries,
                 baseline=args.baseline,
+                batch_size=args.batch_size,
             )
         )
 
