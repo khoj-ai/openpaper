@@ -8,6 +8,7 @@ from app.database.crud.annotation_crud import AnnotationCreate, annotation_crud
 from app.database.crud.base_crud import CRUDBase
 from app.database.crud.highlight_crud import HighlightCreate, highlight_crud
 from app.database.crud.paper_image_crud import paper_image_crud
+from app.database.crud.sanitization import sanitize_for_postgres
 from app.database.models import (
     JobStatus,
     Paper,
@@ -518,12 +519,23 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
         stride: int = 3,
     ) -> None:
         """Index a paper's content as overlapping passages for FTS."""
+        sanitized_raw_content = sanitize_for_postgres(raw_content)
+        if sanitized_raw_content != raw_content:
+            logger.warning(
+                "Sanitized null characters before indexing passages for paper %s",
+                paper_id,
+            )
+
         db.execute(
             text("DELETE FROM paper_passages WHERE paper_id = :paper_id"),
             {"paper_id": paper_id},
         )
 
-        passages = self.build_passages(raw_content, window=window, stride=stride)
+        passages = self.build_passages(
+            sanitized_raw_content,
+            window=window,
+            stride=stride,
+        )
         if passages:
             db.execute(
                 text(

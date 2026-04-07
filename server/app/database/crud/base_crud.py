@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
 
+from app.database.crud.sanitization import sanitize_for_postgres
 from app.database.database import Base
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
@@ -13,6 +14,14 @@ CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
 UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
 
 logger = logging.getLogger(__name__)
+
+
+def _get_sanitized_field_names(data: Dict[str, Any]) -> List[str]:
+    sanitized_fields: List[str] = []
+    for field, value in data.items():
+        if sanitize_for_postgres(value) != value:
+            sanitized_fields.append(field)
+    return sanitized_fields
 
 
 # Generic CRUD base class with type safety
@@ -154,6 +163,14 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             obj_in_data = obj_in.model_dump()
             if user and hasattr(self.model, "user_id"):
                 obj_in_data["user_id"] = user.id
+            sanitized_fields = _get_sanitized_field_names(obj_in_data)
+            obj_in_data = sanitize_for_postgres(obj_in_data)
+            if sanitized_fields:
+                logger.warning(
+                    "Sanitized null characters before creating %s in fields: %s",
+                    self.model.__name__,
+                    ", ".join(sanitized_fields),
+                )
             db_obj = self.model(**obj_in_data)
             db.add(db_obj)
             if auto_commit:
@@ -189,6 +206,16 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                 update_data = obj_in
             else:
                 update_data = obj_in.model_dump(exclude_unset=True)
+
+            sanitized_fields = _get_sanitized_field_names(update_data)
+            update_data = sanitize_for_postgres(update_data)
+            if sanitized_fields:
+                logger.warning(
+                    "Sanitized null characters before updating %s %s in fields: %s",
+                    self.model.__name__,
+                    db_obj.id,
+                    ", ".join(sanitized_fields),
+                )
 
             for field in update_data:
                 if hasattr(db_obj, field):
