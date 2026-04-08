@@ -29,7 +29,7 @@ function NavButton({ item, rightSideFunction, setRightSideFunction }: {
             <TooltipTrigger asChild>
                 <Button
                     variant="ghost"
-                    className={`h-10 w-10 p-0 rounded-lg ${
+                    className={`h-10 w-10 p-0 rounded-md ${
                         item.name === rightSideFunction
                             ? 'bg-blue-500 dark:bg-blue-500 text-blue-100 dark:text-blue-100 hover:bg-blue-600 dark:hover:bg-blue-600'
                             : 'text-secondary-foreground hover:bg-blue-100 dark:hover:bg-blue-800'
@@ -52,7 +52,7 @@ export function PaperSidebar({ rightSideFunction, setRightSideFunction, PaperToo
 
     return (
         <TooltipProvider>
-            <div className="absolute right-2 top-14 z-20 flex flex-col gap-1 p-1.5 bg-background/95 backdrop-blur-sm border border-border rounded-xl shadow-md">
+            <div className="absolute right-2 top-14 z-20 flex flex-col gap-1 p-1.5 bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-md">
                 {beforeFocus.map((item) => (
                     <NavButton key={item.name} item={item} rightSideFunction={rightSideFunction} setRightSideFunction={setRightSideFunction} />
                 ))}

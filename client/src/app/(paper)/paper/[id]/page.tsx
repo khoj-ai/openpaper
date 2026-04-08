@@ -200,11 +200,6 @@ export default function PaperView() {
         }
     }, [jobId]);
 
-    useEffect(() => {
-        if (isAnnotating) {
-            setRightSideFunction('Annotations');
-        }
-    }, [isAnnotating]);
 
     useEffect(() => {
         if (!jobId) {
@@ -508,6 +503,7 @@ export default function PaperView() {
                                     setUserMessageReferences={setUserMessageReferences}
                                     setSelectedText={setSelectedText}
                                     setTooltipPosition={setTooltipPosition}
+                                    isAnnotating={isAnnotating}
                                     setIsAnnotating={setIsAnnotating}
                                     setIsHighlightInteraction={setIsHighlightInteraction}
                                     isHighlightInteraction={isHighlightInteraction}
@@ -526,6 +522,8 @@ export default function PaperView() {
                                     paperStatus={paperData.status}
                                     onOverlaysCreated={handleOverlaysCreated}
                                     onRefreshUrl={refreshPdfUrl}
+                                    addAnnotation={addAnnotation}
+                                    currentUser={user}
                                 />
                             )}
                         </div>
@@ -593,6 +591,7 @@ export default function PaperView() {
                                 setUserMessageReferences={setUserMessageReferences}
                                 setSelectedText={setSelectedText}
                                 setTooltipPosition={setTooltipPosition}
+                                isAnnotating={isAnnotating}
                                 setIsAnnotating={setIsAnnotating}
                                 setIsHighlightInteraction={setIsHighlightInteraction}
                                 isHighlightInteraction={isHighlightInteraction}
@@ -611,6 +610,8 @@ export default function PaperView() {
                                 paperStatus={paperData.status}
                                 onOverlaysCreated={handleOverlaysCreated}
                                 onRefreshUrl={refreshPdfUrl}
+                                addAnnotation={addAnnotation}
+                                currentUser={user}
                             />
                         </div>
                     )}

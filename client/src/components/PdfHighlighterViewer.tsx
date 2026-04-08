@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import {
 	PdfLoader,
 	PdfHighlighter,
@@ -32,12 +33,15 @@ const HIGHLIGHT_COLOR_MAP: Record<HighlightColor, string> = {
 import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience";
 import { PaperStatus } from "./utils/PdfStatus";
 import InlineAnnotationMenu from "./InlineAnnotationMenu";
+import { InlineAnnotationCard } from "./InlineAnnotationCard";
+import { BasicUser } from "@/lib/auth";
 
 import {
 	ExtendedHighlight,
 	paperHighlightToExtended,
 	extendedToPaperHighlight,
 	HighlightContainer,
+	activeHighlightStore,
 	usePdfSearch,
 	PdfToolbar,
 	findTextPages,
@@ -66,6 +70,7 @@ interface PdfHighlighterViewerProps {
 	setSelectedText: (text: string) => void;
 	tooltipPosition: { x: number; y: number } | null;
 	setTooltipPosition: (position: { x: number; y: number } | null) => void;
+	isAnnotating: boolean;
 	setIsAnnotating: (isAnnotating: boolean) => void;
 	isHighlightInteraction: boolean;
 	setIsHighlightInteraction: (isHighlightInteraction: boolean) => void;
@@ -87,6 +92,8 @@ interface PdfHighlighterViewerProps {
 	setUserMessageReferences: React.Dispatch<React.SetStateAction<string[]>>;
 	onOverlaysCreated?: (positions: Map<string, RenderedHighlightPosition>) => void;
 	onRefreshUrl?: () => Promise<string | null>;
+	addAnnotation?: (highlightId: string, content: string) => Promise<PaperHighlightAnnotation>;
+	currentUser?: BasicUser | null;
 }
 
 export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
@@ -99,6 +106,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		setSelectedText,
 		tooltipPosition,
 		setTooltipPosition,
+		isAnnotating,
 		setIsAnnotating,
 		isHighlightInteraction,
 		setIsHighlightInteraction,
@@ -111,7 +119,25 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		setUserMessageReferences,
 		onOverlaysCreated,
 		onRefreshUrl,
+		addAnnotation,
+		currentUser,
+		annotations,
 	} = props;
+
+	// Position anchors for inline annotation cards
+	interface AnnotationCardEntry {
+		highlightId: string;
+		top: number;
+		left: number;
+		scrollContainer: Element;
+		initialContent?: string;
+	}
+	const [annotationCards, setAnnotationCards] = useState<AnnotationCardEntry[]>([]);
+	const [selectionRectTop, setSelectionRectTop] = useState<number | null>(null);
+	// Holds position computed during onAnnotate when activeHighlight isn't set yet (new text selection)
+	const [pendingAnnotationPos, setPendingAnnotationPos] = useState<{ top: number; left: number; scrollContainer: Element } | null>(null);
+	// Guard: restore annotation cards from server data only once per mount
+	const hasRestoredRef = useRef(false);
 
 	// Track the effective PDF URL, which may be refreshed on 403 errors
 	const [effectivePdfUrl, setEffectivePdfUrl] = useState(pdfUrl);
@@ -276,6 +302,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 					x: rect.right,
 					y: rect.top + rect.height / 2,
 				});
+				setSelectionRectTop(rect.top);
 			}
 		},
 		[setSelectedText, setTooltipPosition, setIsHighlightInteraction]
@@ -324,7 +351,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		(viewportHighlight: ViewportHighlight<ExtendedHighlight>, event: MouseEvent) => {
 			setIsHighlightInteraction(true);
 			setSelectedText(viewportHighlight.content?.text || viewportHighlight.raw_text || "");
-			setTooltipPosition({ x: event.clientX, y: event.clientY });
+			setSelectionRectTop(event.clientY);
 
 			const originalHighlight = extendedHighlights.find(h => h.id === viewportHighlight.id);
 			if (originalHighlight) {
@@ -333,6 +360,17 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 				blockScrollOnNextHighlight.current = true;
 				setActiveHighlight(paperHighlight);
 			}
+
+			// If this highlight already has an open annotation card, skip the context menu
+			// and scroll to center the card (at its natural stored position) in the viewport
+			const card = annotationCards.find(c => c.highlightId === viewportHighlight.id);
+			if (!card) {
+				setTooltipPosition({ x: event.clientX, y: event.clientY });
+			} else {
+				const container = card.scrollContainer as HTMLElement;
+				const targetScrollTop = card.top - container.clientHeight / 2;
+				container.scrollTo({ top: Math.max(0, targetScrollTop), behavior: "smooth" });
+			}
 		},
 		[
 			setIsHighlightInteraction,
@@ -340,6 +378,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			setTooltipPosition,
 			setActiveHighlight,
 			extendedHighlights,
+			annotationCards,
 		]
 	);
 
@@ -377,6 +416,73 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		setTooltipPosition,
 		setIsAnnotating,
 	]);
+
+	// When a new highlight is saved after a text selection annotate, create the pending card
+	useEffect(() => {
+		if (isAnnotating && activeHighlight && pendingAnnotationPos) {
+			setAnnotationCards(prev => {
+				const exists = prev.find(c => c.highlightId === activeHighlight.id);
+				return exists ? prev : [...prev, { highlightId: activeHighlight.id, ...pendingAnnotationPos }];
+			});
+			setPendingAnnotationPos(null);
+		}
+	}, [isAnnotating, activeHighlight, pendingAnnotationPos]);
+
+	// Restore annotation cards from server-persisted annotations on page load
+	useEffect(() => {
+		if (!pdfReady || hasRestoredRef.current) return;
+
+		const viewer = highlighterUtilsRef.current?.getViewer();
+		const scrollContainer = viewer?.container;
+		if (!viewer || !scrollContainer) return;
+
+		// Mark as restored immediately so subsequent annotation saves don't re-trigger this
+		hasRestoredRef.current = true;
+
+		if (!annotations.length || !highlights.length) return;
+
+		// Group annotations by highlight_id, keep the first (earliest) per highlight
+		const byHighlight = new Map<string, string>();
+		for (const ann of annotations) {
+			if (!byHighlight.has(ann.highlight_id)) {
+				byHighlight.set(ann.highlight_id, ann.content);
+			}
+		}
+
+		const restored: AnnotationCardEntry[] = [];
+		byHighlight.forEach((content, highlightId) => {
+			const highlight = highlights.find(h => h.id === highlightId);
+			if (!highlight?.position || !highlight.page_number) return;
+
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const pageView = (viewer as any).getPageView(highlight.page_number - 1);
+			if (!pageView?.div || !pageView?.viewport) return;
+
+			const { div: pageDiv, viewport } = pageView;
+			const { boundingRect } = highlight.position;
+			const scaleY = viewport.height / boundingRect.height;
+
+			restored.push({
+				highlightId,
+				top: pageDiv.offsetTop + boundingRect.y1 * scaleY,
+				left: pageDiv.offsetLeft + pageDiv.offsetWidth + 8,
+				scrollContainer,
+				initialContent: content,
+			});
+		});
+
+		if (restored.length > 0) {
+			setAnnotationCards(prev => {
+				const existing = new Set(prev.map(c => c.highlightId));
+				return [...prev, ...restored.filter(c => !existing.has(c.highlightId))];
+			});
+		}
+	}, [pdfReady, annotations, highlights]);
+
+	// Keep the module-level store in sync so HighlightContainer (in a separate React root) can react
+	useEffect(() => {
+		activeHighlightStore.set(activeHighlight?.id);
+	}, [activeHighlight]);
 
 	// Scroll to active highlight when it changes (unless blocked, e.g., when clicking directly on a highlight)
 	useEffect(() => {
@@ -859,8 +965,94 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 					addHighlight={handleAddHighlightFromMenu}
 					removeHighlight={removeHighlight}
 					setUserMessageReferences={setUserMessageReferences}
-				/>
-			)}
+			onAnnotate={(y) => {
+					const scrollContainer = highlighterUtilsRef.current?.getViewer()?.container;
+					if (!scrollContainer) return;
+					const containerRect = scrollContainer.getBoundingClientRect();
+					const scrollTop = scrollContainer.scrollTop;
+
+					const pdfPage = document.querySelector('#pdf-container .page')
+						?? document.querySelector('#pdf-container [data-page-number]');
+					const pdfRight = pdfPage
+						? pdfPage.getBoundingClientRect().right + 8
+						: window.innerWidth * 0.6;
+
+					const pos = {
+						top: (selectionRectTop ?? y) - containerRect.top + scrollTop,
+						left: pdfRight - containerRect.left,
+						scrollContainer,
+					};
+
+					if (isHighlightInteraction && activeHighlight) {
+						// User clicked an existing highlight — ID is already known, create card immediately
+						setAnnotationCards(prev => {
+							const exists = prev.find(c => c.highlightId === activeHighlight.id);
+							return exists ? prev : [...prev, { highlightId: activeHighlight.id, ...pos }];
+						});
+					} else {
+						// New text selection — highlight not yet saved; wait for async server response
+						setPendingAnnotationPos(pos);
+					}
+				}}
+			/>
+		)}
+
+	{/* Inline Annotation Cards — one per annotated highlight, persists until closed */}
+	{addAnnotation && (() => {
+		const CARD_HEIGHT = 120;
+		const GAP = 8;
+		const activeId = activeHighlight?.id;
+		const sorted = [...annotationCards].sort((a, b) => a.top - b.top);
+		const activeIdx = sorted.findIndex(c => c.highlightId === activeId);
+
+		let adjusted: typeof sorted;
+		if (activeIdx === -1) {
+			// No active card — standard downward pass
+			let prevBottom = -Infinity;
+			adjusted = sorted.map(card => {
+				const top = Math.max(card.top, prevBottom + GAP);
+				prevBottom = top + CARD_HEIGHT;
+				return { ...card, top };
+			});
+		} else {
+			adjusted = [...sorted];
+			// Active card sits at its exact top
+			// Push cards ABOVE upward so they don't overlap the active card
+			let nextCardTop = sorted[activeIdx].top;
+			for (let i = activeIdx - 1; i >= 0; i--) {
+				const top = Math.min(sorted[i].top, Math.max(0, nextCardTop - GAP - CARD_HEIGHT));
+				adjusted[i] = { ...sorted[i], top };
+				nextCardTop = adjusted[i].top;
+			}
+			// Push cards BELOW downward
+			let prevBottom = sorted[activeIdx].top + CARD_HEIGHT;
+			for (let i = activeIdx + 1; i < sorted.length; i++) {
+				const top = Math.max(sorted[i].top, prevBottom + GAP);
+				adjusted[i] = { ...sorted[i], top };
+				prevBottom = adjusted[i].top + CARD_HEIGHT;
+			}
+		}
+		return adjusted.map(card =>
+			createPortal(
+				<InlineAnnotationCard
+					key={card.highlightId}
+					highlightId={card.highlightId}
+					topPosition={card.top}
+					leftPosition={card.left}
+					initialContent={card.initialContent}
+					isActive={card.highlightId === activeId}
+					user={currentUser ?? null}
+					addAnnotation={addAnnotation}
+					onClose={() => {
+						setIsAnnotating(false);
+						setSelectionRectTop(null);
+						setAnnotationCards(prev => prev.filter(c => c.highlightId !== card.highlightId));
+					}}
+				/>,
+				card.scrollContainer
+			)
+		);
+	})()}
 
 			{/* Scroll to top button */}
 			{showScrollToTop && (

@@ -20,6 +20,7 @@ interface InlineAnnotationMenuProps {
     addHighlight: (selectedText: string, doAnnotate?: boolean) => void;
     removeHighlight: (highlight: PaperHighlight) => void;
     setUserMessageReferences: React.Dispatch<React.SetStateAction<string[]>>;
+    onAnnotate: (y: number) => void;
 }
 
 // Estimated height of the menu (5-6 buttons at ~36px each + padding)
@@ -39,6 +40,7 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
         addHighlight,
         removeHighlight,
         setUserMessageReferences,
+        onAnnotate,
     } = props;
 
     const menuRef = useRef<HTMLDivElement>(null);
@@ -99,6 +101,7 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                 setTooltipPosition(null);
                 setIsAnnotating(false);
             } else if (e.key === "e" && (e.ctrlKey || e.metaKey)) {
+                if (tooltipPosition) onAnnotate(tooltipPosition.y);
                 setIsAnnotating(true);
                 setTooltipPosition(null);
                 setSelectedText("");
@@ -179,6 +182,7 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={(e) => {
                             e.stopPropagation();
+                            if (tooltipPosition) onAnnotate(tooltipPosition.y);
                             setIsAnnotating(true);
                             setTooltipPosition(null);
                             setSelectedText("");
