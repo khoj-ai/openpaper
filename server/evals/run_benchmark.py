@@ -911,6 +911,29 @@ def get_results_path(
 # ---------------------------------------------------------------------------
 
 
+def backfill_domains(rows: list[dict], dataset_path: str) -> list[dict]:
+    """Backfill missing 'domain' field on result rows from the eval dataset."""
+    missing = [r for r in rows if not r.get("domain") or r["domain"] == "unknown"]
+    if not missing:
+        return rows
+
+    if not os.path.exists(dataset_path):
+        return rows
+
+    with open(dataset_path) as f:
+        dataset = json.load(f)
+
+    domain_by_row_id = {
+        r["row_id"]: r.get("domain", "unknown") for r in dataset["rows"]
+    }
+
+    for r in rows:
+        if not r.get("domain") or r["domain"] == "unknown":
+            r["domain"] = domain_by_row_id.get(r.get("row_id", ""), "unknown")
+
+    return rows
+
+
 def discover_providers(output_dir: str) -> list[str]:
     """Scan the results directory and return provider names that have result files."""
     import re
@@ -1022,7 +1045,9 @@ def print_comparison(harness_path: str, baseline_path: str):
     logger.info("=" * 70)
 
 
-def print_all_providers_comparison(output_dir: str):
+def print_all_providers_comparison(
+    output_dir: str, dataset_path: str = "evals/eval_dataset.json"
+):
     """Discover all providers in the results directory and print a cross-provider comparison."""
     providers = discover_providers(output_dir)
     if not providers:
@@ -1043,6 +1068,7 @@ def print_all_providers_comparison(output_dir: str):
                     data = json.load(f)
                 rows = data.get("rows", [])
                 if rows:
+                    backfill_domains(rows, dataset_path)
                     summary = compute_summary(rows)
                     entry[mode] = summary.get("overall", {})
                     entry[f"{mode}_rows"] = summary.get("overall", {}).get(
@@ -1256,7 +1282,7 @@ def main():
             print_comparison(harness_path, baseline_path)
         else:
             # No provider specified: compare all available providers
-            print_all_providers_comparison(args.output)
+            print_all_providers_comparison(args.output, dataset_path=args.dataset)
         return
 
     # Resolve sample size: --full means no limit, --limit N overrides, default is 100
