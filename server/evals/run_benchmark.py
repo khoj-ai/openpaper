@@ -443,8 +443,8 @@ async def _run_single_row(
 
     for attempt in range(1, max_retries + 1):
         db = SessionLocal()
+        start = time.time()
         try:
-            start = time.time()
             if baseline:
                 result = await asyncio.to_thread(
                     run_single_question_baseline,
@@ -905,8 +905,22 @@ def get_results_path(
 # ---------------------------------------------------------------------------
 
 
+def discover_providers(output_dir: str) -> list[str]:
+    """Scan the results directory and return provider names that have result files."""
+    import re
+
+    providers = set()
+    if not os.path.isdir(output_dir):
+        return []
+    for fname in os.listdir(output_dir):
+        m = re.match(r"eval_(.+?)(?:_baseline)?\.json$", fname)
+        if m:
+            providers.add(m.group(1))
+    return sorted(providers)
+
+
 def print_comparison(harness_path: str, baseline_path: str):
-    """Load harness and baseline results and print a side-by-side comparison."""
+    """Load harness and baseline results and print a side-by-side comparison for one provider."""
     if not os.path.exists(harness_path):
         logger.error(f"Harness results not found: {harness_path}")
         return
@@ -1002,6 +1016,140 @@ def print_comparison(harness_path: str, baseline_path: str):
     logger.info("=" * 70)
 
 
+def print_all_providers_comparison(output_dir: str):
+    """Discover all providers in the results directory and print a cross-provider comparison."""
+    providers = discover_providers(output_dir)
+    if not providers:
+        logger.error(f"No result files found in {output_dir}")
+        return
+
+    # Load all available results
+    all_results = {}  # provider -> {"harness": summary, "baseline": summary}
+    for provider_name in providers:
+        entry = {}
+        for mode in ("harness", "baseline"):
+            path = get_results_path(
+                output_dir, provider_name, baseline=(mode == "baseline")
+            )
+            if os.path.exists(path):
+                with open(path) as f:
+                    data = json.load(f)
+                summary = data.get("summary", {}).get("overall", {})
+                if summary:
+                    entry[mode] = summary
+                    entry[f"{mode}_rows"] = summary.get("total_rows", 0)
+                    entry[f"{mode}_errors"] = summary.get("errors", 0)
+                    entry[f"{mode}_by_domain"] = data.get("summary", {}).get(
+                        "by_domain", {}
+                    )
+        if entry:
+            all_results[provider_name] = entry
+
+    if not all_results:
+        logger.error("No results with summary data found. Run grading first.")
+        return
+
+    # Build column list: each provider can have harness and/or baseline
+    columns = []  # list of (label, provider_name, mode)
+    for provider_name in sorted(all_results.keys()):
+        entry = all_results[provider_name]
+        if "harness" in entry:
+            columns.append((f"{provider_name}", provider_name, "harness"))
+        if "baseline" in entry:
+            columns.append((f"{provider_name}_base", provider_name, "baseline"))
+
+    col_width = max(len(c[0]) for c in columns) + 2
+    col_width = max(col_width, 12)
+
+    metrics = [
+        ("Factual accuracy", "factual_accuracy"),
+        ("Completeness", "completeness"),
+        ("Groundedness", "groundedness"),
+        ("Avg latency (s)", "avg_latency_seconds"),
+    ]
+
+    citation_metrics = [
+        ("Citation precision", "citation_precision"),
+        ("Citation recall", "citation_recall"),
+        ("Citation accuracy", "citation_accuracy"),
+    ]
+
+    # Header
+    logger.info("\n" + "=" * (25 + col_width * len(columns)))
+    logger.info("CROSS-PROVIDER COMPARISON")
+    logger.info("=" * (25 + col_width * len(columns)))
+
+    # Row counts
+    for col_label, provider_name, mode in columns:
+        entry = all_results[provider_name]
+        rows = entry.get(f"{mode}_rows", 0)
+        errors = entry.get(f"{mode}_errors", 0)
+        logger.info(f"  {col_label}: {rows} rows, {errors} errors")
+    logger.info("")
+
+    header = f"{'Metric':<25}" + "".join(f"{c[0]:>{col_width}}" for c in columns)
+    logger.info(header)
+    logger.info("-" * (25 + col_width * len(columns)))
+
+    for label, key in metrics:
+        line = f"{label:<25}"
+        for _, provider_name, mode in columns:
+            val = all_results[provider_name].get(mode, {}).get(key, 0)
+            line += f"{val:>{col_width}.3f}"
+        logger.info(line)
+
+    logger.info("")
+    logger.info("Citation metrics (harness only):")
+    header = f"{'Metric':<25}" + "".join(
+        f"{c[0]:>{col_width}}" for c in columns if c[2] == "harness"
+    )
+    logger.info(header)
+    logger.info("-" * (25 + col_width * len([c for c in columns if c[2] == "harness"])))
+
+    for label, key in citation_metrics:
+        line = f"{label:<25}"
+        for col_label, provider_name, mode in columns:
+            if mode != "harness":
+                continue
+            val = all_results[provider_name].get("harness", {}).get(key, 0)
+            line += f"{val:>{col_width}.3f}"
+        logger.info(line)
+
+    # Per-domain breakdown
+    all_domains = set()
+    for entry in all_results.values():
+        for mode in ("harness", "baseline"):
+            all_domains.update(entry.get(f"{mode}_by_domain", {}).keys())
+    all_domains = sorted(all_domains)
+
+    if all_domains:
+        logger.info("")
+        logger.info("-" * (25 + col_width * len(columns)))
+        logger.info("BY DOMAIN")
+        logger.info("-" * (25 + col_width * len(columns)))
+
+        for domain in all_domains:
+            logger.info(f"\n  {domain}")
+            header = f"{'Metric':<25}" + "".join(
+                f"{c[0]:>{col_width}}" for c in columns
+            )
+            logger.info(header)
+
+            for label, key in metrics:
+                line = f"{label:<25}"
+                for _, provider_name, mode in columns:
+                    domain_data = (
+                        all_results[provider_name]
+                        .get(f"{mode}_by_domain", {})
+                        .get(domain, {})
+                    )
+                    val = domain_data.get(key, 0)
+                    line += f"{val:>{col_width}.3f}"
+                logger.info(line)
+
+    logger.info("=" * (25 + col_width * len(columns)))
+
+
 def parse_provider(name: str) -> Optional[LLMProvider]:
     """Convert a provider string to LLMProvider enum."""
     if not name:
@@ -1086,9 +1234,14 @@ def main():
 
     # Handle --compare: print comparison and exit
     if args.compare:
-        harness_path = get_results_path(args.output, provider_name, baseline=False)
-        baseline_path = get_results_path(args.output, provider_name, baseline=True)
-        print_comparison(harness_path, baseline_path)
+        if args.provider:
+            # Single provider: harness vs baseline
+            harness_path = get_results_path(args.output, provider_name, baseline=False)
+            baseline_path = get_results_path(args.output, provider_name, baseline=True)
+            print_comparison(harness_path, baseline_path)
+        else:
+            # No provider specified: compare all available providers
+            print_all_providers_comparison(args.output)
         return
 
     mode_label = "BASELINE" if args.baseline else "HARNESS"
