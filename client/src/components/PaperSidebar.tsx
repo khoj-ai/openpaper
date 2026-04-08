@@ -1,15 +1,10 @@
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
-    Sidebar,
-    SidebarContent,
-    SidebarGroup,
-    SidebarGroupContent,
-    SidebarGroupLabel,
-    SidebarMenu,
-    SidebarMenuItem,
-    SidebarProvider
-} from "@/components/ui/sidebar";
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { LucideIcon } from 'lucide-react';
 
 interface PaperSidebarProps {
@@ -24,41 +19,30 @@ interface PaperSidebarProps {
 }
 
 export function PaperSidebar({ rightSideFunction, setRightSideFunction, PaperToolset }: PaperSidebarProps) {
-    const [isSidebarHovered, setIsSidebarHovered] = useState(false);
-
     return (
-        <div
-            className={`flex flex-col h-[calc(100vh-128px)] md:h-[calc(100vh-64px)] absolute right-0 top-0 bg-background z-20 transition-all duration-300 ease-in-out`}
-            onMouseEnter={() => setIsSidebarHovered(true)}
-            onMouseLeave={() => setIsSidebarHovered(false)}
-        >
-            <SidebarProvider className="items-start h-[calc(100vh-128px)] md:h-[calc(100vh-64px)] min-h-fit">
-                <Sidebar collapsible="none" className="flex transition-all duration-300 ease-in-out" style={{ width: isSidebarHovered ? '180px' : '60px' }}>
-                    <SidebarContent>
-                        <SidebarGroup>
-                            <SidebarGroupLabel className={`transition-opacity duration-300 ${isSidebarHovered ? 'opacity-100' : 'opacity-50'}`}>Tools</SidebarGroupLabel>
-                            <SidebarGroupContent>
-                                <SidebarMenu>
-                                    {PaperToolset.nav.map((item) => (
-                                        <SidebarMenuItem key={item.name}>
-                                            <Button
-                                                variant="ghost"
-                                                className={`h-10 p-2 rounded-lg flex items-center overflow-hidden transition-colors duration-200 ${isSidebarHovered ? 'w-full justify-start' : 'w-fit justify-center'} ${item.name === rightSideFunction ? 'bg-blue-500 dark:bg-blue-500 text-blue-100 dark:text-blue-100' : 'text-secondary-foreground hover:bg-blue-200 dark:hover:bg-blue-800'}`}
-                                                onClick={() => {
-                                                    setRightSideFunction(item.name);
-                                                }}
-                                            >
-                                                <item.icon className={`h-5 w-5 flex-shrink-0 ${isSidebarHovered ? "mr-2" : ""}`} />
-                                                {isSidebarHovered && <span className="ml-2 whitespace-nowrap transition-opacity duration-300 opacity-100">{item.name}</span>}
-                                            </Button>
-                                        </SidebarMenuItem>
-                                    ))}
-                                </SidebarMenu>
-                            </SidebarGroupContent>
-                        </SidebarGroup>
-                    </SidebarContent>
-                </Sidebar>
-            </SidebarProvider>
-        </div>
+        <TooltipProvider>
+            <div className="absolute right-2 top-14 z-20 flex flex-col gap-1 p-1.5 bg-background/95 backdrop-blur-sm border border-border rounded-xl shadow-md">
+                {PaperToolset.nav.map((item) => (
+                    <Tooltip key={item.name}>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                className={`h-10 w-10 p-0 rounded-lg ${
+                                    item.name === rightSideFunction
+                                        ? 'bg-blue-500 dark:bg-blue-500 text-blue-100 dark:text-blue-100 hover:bg-blue-600 dark:hover:bg-blue-600'
+                                        : 'text-secondary-foreground hover:bg-blue-100 dark:hover:bg-blue-800'
+                                }`}
+                                onClick={() => setRightSideFunction(item.name)}
+                            >
+                                <item.icon className="h-5 w-5" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="left" sideOffset={8}>
+                            {item.name}
+                        </TooltipContent>
+                    </Tooltip>
+                ))}
+            </div>
+        </TooltipProvider>
     );
 }
