@@ -7,6 +7,7 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { CitePaperButton } from '@/components/CitePaperButton';
+import { Eye, EyeOff } from 'lucide-react';
 
 interface PaperSidebarProps {
     rightSideFunction: string;
@@ -17,6 +18,8 @@ interface PaperSidebarProps {
             icon: React.ComponentType<{ className?: string }>;
         }[];
     };
+    showAnnotationCards: boolean;
+    onToggleAnnotationCards: () => void;
 }
 
 function NavButton({ item, rightSideFunction, setRightSideFunction }: {
@@ -46,7 +49,7 @@ function NavButton({ item, rightSideFunction, setRightSideFunction }: {
     );
 }
 
-export function PaperSidebar({ rightSideFunction, setRightSideFunction, PaperToolset }: PaperSidebarProps) {
+export function PaperSidebar({ rightSideFunction, setRightSideFunction, PaperToolset, showAnnotationCards, onToggleAnnotationCards }: PaperSidebarProps) {
     const beforeFocus = PaperToolset.nav.filter(item => item.name !== 'Focus');
     const focusTool = PaperToolset.nav.find(item => item.name === 'Focus');
 
@@ -64,6 +67,28 @@ export function PaperSidebar({ rightSideFunction, setRightSideFunction, PaperToo
                     </TooltipTrigger>
                     <TooltipContent side="left" sideOffset={8}>
                         Cite
+                    </TooltipContent>
+                </Tooltip>
+                {/* Annotation cards visibility toggle */}
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            className={`h-10 w-10 p-0 rounded-md ${
+                                showAnnotationCards
+                                    ? 'text-secondary-foreground hover:bg-blue-100 dark:hover:bg-blue-800'
+                                    : 'text-muted-foreground hover:bg-muted'
+                            }`}
+                            onClick={onToggleAnnotationCards}
+                        >
+                            {showAnnotationCards
+                                ? <Eye className="h-5 w-5" />
+                                : <EyeOff className="h-5 w-5" />
+                            }
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" sideOffset={8}>
+                        {showAnnotationCards ? 'Hide annotations' : 'Show annotations'}
                     </TooltipContent>
                 </Tooltip>
                 {focusTool && (

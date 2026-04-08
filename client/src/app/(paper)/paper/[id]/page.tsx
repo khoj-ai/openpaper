@@ -107,6 +107,7 @@ export default function PaperView() {
         refreshAnnotations,
     } = useAnnotations(id);
 
+    const [showAnnotationCards, setShowAnnotationCards] = useState(true);
     const [activeCitationKey, setActiveCitationKey] = useState<string | null>(null);
     const [activeCitationMessageIndex, setActiveCitationMessageIndex] = useState<number | null>(null);
     const [explicitSearchTerm, setExplicitSearchTerm] = useState<string | undefined>(undefined);
@@ -524,6 +525,7 @@ export default function PaperView() {
                                     onRefreshUrl={refreshPdfUrl}
                                     addAnnotation={addAnnotation}
                                     currentUser={user}
+                                    showAnnotationCards={showAnnotationCards}
                                 />
                             )}
                         </div>
@@ -550,6 +552,8 @@ export default function PaperView() {
                                             rightSideFunction={rightSideFunction}
                                             setRightSideFunction={setRightSideFunction}
                                             PaperToolset={toolset}
+                                            showAnnotationCards={showAnnotationCards}
+                                            onToggleAnnotationCards={() => setShowAnnotationCards(v => !v)}
                                         />
                                     </>
                                 )}
@@ -612,6 +616,7 @@ export default function PaperView() {
                                 onRefreshUrl={refreshPdfUrl}
                                 addAnnotation={addAnnotation}
                                 currentUser={user}
+                                showAnnotationCards={showAnnotationCards}
                             />
                         </div>
                     )}
@@ -651,7 +656,10 @@ export default function PaperView() {
                                 rightSideFunction={rightSideFunction}
                                 setRightSideFunction={setRightSideFunction}
                                 PaperToolset={toolset}
-                            />                        </>
+                                showAnnotationCards={showAnnotationCards}
+                                onToggleAnnotationCards={() => setShowAnnotationCards(v => !v)}
+                            />
+                        </>
                     )}
                 </div>
             </div>

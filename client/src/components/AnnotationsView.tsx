@@ -24,6 +24,24 @@ const HIGHLIGHT_BORDER_COLOR_MAP: Record<HighlightColor, string> = {
 	purple: "border-purple-400",
 };
 
+// Map highlight color names to bg color classes for the left bar
+const HIGHLIGHT_BAR_COLOR_MAP: Record<HighlightColor, string> = {
+	yellow: "bg-yellow-400",
+	green: "bg-green-500",
+	blue: "bg-blue-400",
+	pink: "bg-pink-400",
+	purple: "bg-purple-400",
+};
+
+// Map highlight color names to bubble background + border classes for annotation notes
+const BUBBLE_BG_MAP: Record<HighlightColor, string> = {
+	yellow: "bg-yellow-50 border-yellow-200 dark:bg-yellow-950/30 dark:border-yellow-800",
+	green:  "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800",
+	blue:   "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800",
+	pink:   "bg-pink-50 border-pink-200 dark:bg-pink-950/30 dark:border-pink-800",
+	purple: "bg-purple-50 border-purple-200 dark:bg-purple-950/30 dark:border-purple-800",
+};
+
 
 export interface AnnotationButtonProps {
 	highlightId: string;
@@ -112,32 +130,38 @@ function HighlightThread({
 	readonly,
 }: HighlightThreadProps) {
 
-	const highlightBorderColor = highlight.role === 'assistant'
-		? 'border-purple-400'
-		: HIGHLIGHT_BORDER_COLOR_MAP[highlight.color || 'blue'];
+	const barColor = highlight.role === 'assistant'
+		? 'bg-purple-400'
+		: HIGHLIGHT_BAR_COLOR_MAP[highlight.color || 'blue'];
 
 	return (
 		<div
-			className={`cursor-pointer rounded px-2 py-1.5 transition-colors ${isActive ? 'bg-secondary' : 'hover:bg-secondary/50'}`}
+			className={`cursor-pointer rounded-lg px-3 py-3 transition-colors ${isActive ? 'bg-secondary' : 'hover:bg-secondary/50'}`}
 			onClick={onClick}
 		>
-			<blockquote className={`border-l-2 ${highlightBorderColor} pl-2`}>
-				{highlight.type && (
-					<span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
-						{highlight.type.replace('_', ' ').toLowerCase()}
-					</span>
-				)}
-				<p className="text-foreground text-sm leading-snug">
-					{highlight.raw_text}
-				</p>
-			</blockquote>
+			{/* Quoted highlight text with colored left bar */}
+			<div className="flex gap-2.5">
+				<div className={`w-0.5 rounded-full shrink-0 self-stretch ${barColor}`} />
+				<div className="min-w-0">
+					{highlight.type && (
+						<span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium block mb-0.5">
+							{highlight.type.replace('_', ' ').toLowerCase()}
+						</span>
+					)}
+					<p className="text-foreground text-sm leading-snug">
+						{highlight.raw_text}
+					</p>
+				</div>
+			</div>
 
+			{/* Annotation notes */}
 			{annotations.length > 0 && (
-				<div className="space-y-1 ml-2 mt-1">
+				<div className="space-y-3 mt-3">
 					{annotations.map((annotation) => (
 						<Annotation
 							key={annotation.id}
 							annotation={{ ...annotation }}
+							highlightColor={highlight.role === 'assistant' ? 'purple' : (highlight.color || 'blue')}
 							removeAnnotation={removeAnnotation}
 							updateAnnotation={updateAnnotation}
 							user={user}
@@ -148,7 +172,7 @@ function HighlightThread({
 			)}
 
 			{isActive && !readonly && addAnnotation && highlight.id && (
-				<div className="ml-2 mt-1">
+				<div className="mt-3">
 					<AnnotationButton
 						highlightId={highlight.id}
 						addAnnotation={addAnnotation}
@@ -337,7 +361,7 @@ export function AnnotationsView(
 			/>
 
 			<div className="flex-1 overflow-auto" ref={scrollContainerRef}>
-				<div className="space-y-2 p-2">
+				<div className="space-y-1 p-2">
 					{filteredHighlights.length === 0 ? (
 						<div className="text-center text-muted-foreground text-sm py-8">
 							No highlights match the current filters.

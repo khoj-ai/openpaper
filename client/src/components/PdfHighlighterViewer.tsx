@@ -94,6 +94,7 @@ interface PdfHighlighterViewerProps {
 	onRefreshUrl?: () => Promise<string | null>;
 	addAnnotation?: (highlightId: string, content: string) => Promise<PaperHighlightAnnotation>;
 	currentUser?: BasicUser | null;
+	showAnnotationCards?: boolean;
 }
 
 export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
@@ -122,6 +123,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		addAnnotation,
 		currentUser,
 		annotations,
+		showAnnotationCards = true,
 	} = props;
 
 	// Position anchors for inline annotation cards
@@ -998,7 +1000,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		)}
 
 	{/* Inline Annotation Cards — one per annotated highlight, persists until closed */}
-	{addAnnotation && (() => {
+	{showAnnotationCards && addAnnotation && (() => {
 		const CARD_HEIGHT = 120;
 		const GAP = 8;
 		const activeId = activeHighlight?.id;
