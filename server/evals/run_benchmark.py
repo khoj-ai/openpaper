@@ -1029,7 +1029,8 @@ def print_all_providers_comparison(output_dir: str):
         logger.error(f"No result files found in {output_dir}")
         return
 
-    # Load all available results
+    # Load all available results, recomputing summaries from row data
+    # to ensure consistent metrics even for older result files
     all_results = {}  # provider -> {"harness": summary, "baseline": summary}
     for provider_name in providers:
         entry = {}
@@ -1040,14 +1041,17 @@ def print_all_providers_comparison(output_dir: str):
             if os.path.exists(path):
                 with open(path) as f:
                     data = json.load(f)
-                summary = data.get("summary", {}).get("overall", {})
-                if summary:
-                    entry[mode] = summary
-                    entry[f"{mode}_rows"] = summary.get("total_rows", 0)
-                    entry[f"{mode}_errors"] = summary.get("errors", 0)
-                    entry[f"{mode}_by_domain"] = data.get("summary", {}).get(
-                        "by_domain", {}
+                rows = data.get("rows", [])
+                if rows:
+                    summary = compute_summary(rows)
+                    entry[mode] = summary.get("overall", {})
+                    entry[f"{mode}_rows"] = summary.get("overall", {}).get(
+                        "total_rows", 0
                     )
+                    entry[f"{mode}_errors"] = summary.get("overall", {}).get(
+                        "errors", 0
+                    )
+                    entry[f"{mode}_by_domain"] = summary.get("by_domain", {})
         if entry:
             all_results[provider_name] = entry
 
