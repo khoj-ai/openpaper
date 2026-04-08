@@ -524,10 +524,16 @@ async def run_eval_questions(
     Skips rows that already succeeded. Retries errors up to max_retries times.
     When baseline=True, sends the question directly to the LLM with the PDF
     instead of going through the chat_with_paper pipeline.
+
+    When limit is set, samples that many rows evenly spaced across the dataset
+    (every len(rows)/limit items) rather than taking the first N.
     """
-    rows = dataset["rows"]
-    if limit is not None:
-        rows = rows[:limit]
+    all_rows = dataset["rows"]
+    if limit is not None and limit < len(all_rows):
+        step = len(all_rows) / limit
+        rows = [all_rows[int(i * step)] for i in range(limit)]
+    else:
+        rows = all_rows
 
     completed = get_completed_row_ids(results)
 
@@ -1194,10 +1200,15 @@ def main():
         help="Skip LLM-as-judge grading, only compute citation metrics",
     )
     parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Run the entire dataset (default: sample 100 evenly-spaced rows)",
+    )
+    parser.add_argument(
         "--limit",
         type=int,
         default=None,
-        help="Only run first N eval rows (for quick iteration)",
+        help="Sample N evenly-spaced eval rows (default: 100, use --full for all)",
     )
     parser.add_argument(
         "--retries",
@@ -1243,6 +1254,14 @@ def main():
             # No provider specified: compare all available providers
             print_all_providers_comparison(args.output)
         return
+
+    # Resolve sample size: --full means no limit, --limit N overrides, default is 100
+    if args.full:
+        effective_limit = None
+    elif args.limit is not None:
+        effective_limit = args.limit
+    else:
+        effective_limit = 100
 
     mode_label = "BASELINE" if args.baseline else "HARNESS"
 
@@ -1296,12 +1315,17 @@ def main():
         url_to_paper_id = resolve_paper_ids(db, current_user, dataset)
         logger.info(f"Resolved {len(url_to_paper_id)} papers in DB")
 
-        if args.limit == 0:
+        if effective_limit == 0:
             logger.info("--limit 0: setup only, no questions to run.")
             return
 
         # Phase 2: Run eval questions (incremental, writes to disk per row)
-        logger.info(f"Phase 2: Running eval questions ({mode_label})...")
+        sample_label = (
+            "all" if effective_limit is None else f"{effective_limit} sampled"
+        )
+        logger.info(
+            f"Phase 2: Running eval questions ({mode_label}, {sample_label})..."
+        )
         asyncio.run(
             run_eval_questions(
                 db,
@@ -1311,7 +1335,7 @@ def main():
                 results,
                 results_path,
                 provider,
-                args.limit,
+                effective_limit,
                 max_retries=args.retries,
                 baseline=args.baseline,
                 batch_size=args.batch_size,
