@@ -833,11 +833,13 @@ def compute_summary(graded_results: list[dict]) -> dict:
     for qt, items in by_type.items():
         per_type[qt] = {key: avg(items, key) for key in metric_keys}
         per_type[qt]["count"] = len(items)
+        per_type[qt]["avg_latency_seconds"] = avg(items, "latency_seconds")
 
     per_domain = {}
     for domain, items in by_domain.items():
         per_domain[domain] = {key: avg(items, key) for key in metric_keys}
         per_domain[domain]["count"] = len(items)
+        per_domain[domain]["avg_latency_seconds"] = avg(items, "latency_seconds")
 
     return {
         "overall": overall,
