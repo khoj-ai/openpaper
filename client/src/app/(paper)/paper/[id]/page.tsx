@@ -64,9 +64,9 @@ const AudioTool = {
 const PaperToolset = {
     nav: [
         OverviewTool,
+        AnnotationsTool,
         ChatTool,
         AudioTool,
-        AnnotationsTool,
         FocusTool,
     ],
 }
@@ -532,7 +532,7 @@ export default function PaperView() {
                     ) : (
                         <div className="w-full h-full">
                             <div
-                                className={`flex flex-row h-full relative ${!jobId ? "pr-[60px]" : ""}`}
+                                className="flex flex-row h-full relative"
                             >
                                 {jobId ? (
                                     <div className="flex flex-col h-full w-full">
@@ -629,7 +629,7 @@ export default function PaperView() {
 
                 {/* Right Side Panel */}
                 <div
-                    className={`flex flex-row h-full relative ${!jobId ? "pr-[60px]" : ""}`}
+                    className="flex flex-row h-full relative"
                     style={rightSideFunction !== 'Focus' ? { width: `${100 - leftPanelWidth}%` } : { width: 'auto' }}
                 >
                     {jobId ? (

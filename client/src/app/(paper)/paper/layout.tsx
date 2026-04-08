@@ -9,7 +9,6 @@ import { AuthProvider } from "@/lib/auth";
 import { Toaster } from "@/components/ui/sonner";
 import { PostHogProvider, ThemeProvider } from "@/lib/providers";
 import { SharePaperButton } from '@/components/SharePaperButton';
-import { CitePaperButton } from '@/components/CitePaperButton';
 import { CitationGraphButton } from '@/components/CitationGraphButton';
 import { ImportPaperButton } from '@/components/ImportPaperButton';
 
@@ -103,13 +102,12 @@ export default function RootLayout({
 											<span className="text-sm font-semibold">Open Paper</span>
 										</Link>
 									{/* Desktop buttons */}
-									<div className="hidden md:flex items-center gap-2">
-										<ImportPaperButton />
-										<ManageProjectsButton />
-										<CitationGraphButton />
-										<CitePaperButton />
-										<SharePaperButton />
-									</div>
+								<div className="hidden md:flex items-center gap-2">
+									<ImportPaperButton />
+									<ManageProjectsButton />
+									<CitationGraphButton />
+									<SharePaperButton />
+								</div>
 									{/* Mobile menu */}
 									<MobilePaperMenu />
 									</header>
