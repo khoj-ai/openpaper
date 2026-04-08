@@ -5,6 +5,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { CitePaperButton } from '@/components/CitePaperButton';
 import { LucideIcon } from 'lucide-react';
 
 interface PaperSidebarProps {
@@ -42,6 +43,16 @@ export function PaperSidebar({ rightSideFunction, setRightSideFunction, PaperToo
                         </TooltipContent>
                     </Tooltip>
                 ))}
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <div>
+                            <CitePaperButton iconOnly />
+                        </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" sideOffset={8}>
+                        Cite
+                    </TooltipContent>
+                </Tooltip>
             </div>
         </TooltipProvider>
     );

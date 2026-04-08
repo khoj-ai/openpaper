@@ -24,9 +24,10 @@ interface CitePaperButtonProps {
     paperId?: string;
     minimalist?: boolean;
     variant?: "ghost" | "outline";
+    iconOnly?: boolean;
 }
 
-export function CitePaperButton({ paper, paperId: providedPaperId, minimalist = false, variant = "ghost" }: CitePaperButtonProps) {
+export function CitePaperButton({ paper, paperId: providedPaperId, minimalist = false, variant = "ghost", iconOnly = false }: CitePaperButtonProps) {
     const pathname = usePathname();
     const [derivedPaperId, setDerivedPaperId] = useState<string | null>(null);
     const [paperData, setPaperData] = useState<(PaperData | PaperItem)[] | null>(paper || null);
@@ -97,7 +98,11 @@ export function CitePaperButton({ paper, paperId: providedPaperId, minimalist = 
         return null;
     }
 
-    const triggerButton = (
+    const triggerButton = iconOnly ? (
+        <Button variant="ghost" className="h-10 w-10 p-0">
+            <Quote className="h-5 w-5" />
+        </Button>
+    ) : (
         <Button variant={variant} size="sm" className={variant === "outline" ? "h-8 px-3 text-xs" : ""}>
             {(!minimalist || variant === "outline") && <Quote className="h-3.5 w-3.5 mr-1.5" />}
             <span className={minimalist && variant !== "outline" ? "text-sm" : ""}>{isBibliography ? 'Bibliography' : 'Cite'}</span>
