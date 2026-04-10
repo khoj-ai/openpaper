@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
-import { Check, File, Pencil, Trash2, User as UserIcon, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { PaperHighlightAnnotation } from '@/lib/schema';
-import { HighlightColor } from '@/lib/schema';
 import { BasicUser } from '@/lib/auth';
+import { HighlightColor, PaperHighlightAnnotation } from '@/lib/schema';
 import { formatDate } from '@/lib/utils';
+import { Check, File, Pencil, Trash2, User as UserIcon, X } from 'lucide-react';
+import React, { useState } from 'react';
 
+// Map highlight color names to bubble background + border classes for annotation notes in the side panel
 const BUBBLE_BG_MAP: Record<HighlightColor, string> = {
     yellow: "bg-yellow-50 border-yellow-200 dark:bg-yellow-950/30 dark:border-yellow-800",
     green:  "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800",
