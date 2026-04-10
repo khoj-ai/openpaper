@@ -524,6 +524,8 @@ export default function PaperView() {
                                     onOverlaysCreated={handleOverlaysCreated}
                                     onRefreshUrl={refreshPdfUrl}
                                     addAnnotation={addAnnotation}
+                                    updateAnnotation={updateAnnotation}
+                                    removeAnnotation={removeAnnotation}
                                     currentUser={user}
                                     showAnnotationCards={showAnnotationCards}
                                 />
@@ -615,6 +617,8 @@ export default function PaperView() {
                                 onOverlaysCreated={handleOverlaysCreated}
                                 onRefreshUrl={refreshPdfUrl}
                                 addAnnotation={addAnnotation}
+                                updateAnnotation={updateAnnotation}
+                                removeAnnotation={removeAnnotation}
                                 currentUser={user}
                                 showAnnotationCards={showAnnotationCards}
                             />

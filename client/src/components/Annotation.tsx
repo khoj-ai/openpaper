@@ -83,7 +83,7 @@ export default function Annotation({
                 <Textarea
                     value={editedContent}
                     onChange={(e) => setEditedContent(e.target.value)}
-                    className="min-h-[60px] text-sm mt-2"
+                    className="ml-10 min-h-[60px] text-sm mt-2 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-foreground focus-visible:border-foreground"
                     onClick={(e) => e.stopPropagation()}
                     autoFocus
                     placeholder="Write your annotation..."

@@ -45,14 +45,17 @@ const BUBBLE_BG_MAP: Record<HighlightColor, string> = {
 
 export interface AnnotationButtonProps {
 	highlightId: string;
-	// Make addAnnotation optional as it might not be needed in readonly
 	addAnnotation?: (highlightId: string, content: string) => Promise<PaperHighlightAnnotation>;
+	user?: BasicUser;
 }
 
-export function AnnotationButton({ highlightId, addAnnotation }: AnnotationButtonProps) {
+export function AnnotationButton({ highlightId, addAnnotation, user }: AnnotationButtonProps) {
 	const [content, setContent] = useState("");
 	const [isTyping, setIsTyping] = useState(false);
 	const [isAdding, setIsAdding] = useState(false);
+
+	const now = new Date();
+	const timeStr = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
 	const handleSave = async () => {
 		if (content.trim() && addAnnotation) {
@@ -73,6 +76,20 @@ export function AnnotationButton({ highlightId, addAnnotation }: AnnotationButto
 
 	return (
 		<div className="mt-1">
+			{/* Avatar row */}
+			<div className="flex items-center gap-2 mb-2">
+				<div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden bg-muted">
+					{user?.picture ? (
+						// eslint-disable-next-line @next/next/no-img-element
+						<img src={user.picture} alt={user.name} className="w-full h-full object-cover" />
+					) : (
+						<UserIcon size={14} className="text-muted-foreground" />
+					)}
+				</div>
+				<span className="text-sm font-medium text-foreground">{user?.name || 'User'}</span>
+				<span className="text-xs text-muted-foreground">{timeStr}</span>
+			</div>
+
 			<Textarea
 				value={content}
 				onChange={(e) => {
@@ -86,7 +103,7 @@ export function AnnotationButton({ highlightId, addAnnotation }: AnnotationButto
 					}
 				})}
 				placeholder="Store your thoughts here."
-				className="text-sm"
+				className="ml-10 w-[calc(100%-2.5rem)] text-sm focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-foreground focus-visible:border-foreground"
 				rows={3}
 				autoFocus
 			/>
@@ -176,6 +193,7 @@ function HighlightThread({
 					<AnnotationButton
 						highlightId={highlight.id}
 						addAnnotation={addAnnotation}
+						user={user}
 					/>
 				</div>
 			)}
