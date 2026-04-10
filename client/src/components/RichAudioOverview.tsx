@@ -221,6 +221,7 @@ export const RichAudioOverview = ({
                                 setUserMessageReferences={() => { }}
                                 setSelectedText={() => { }}
                                 setTooltipPosition={() => { }}
+                                isAnnotating={false}
                                 setIsAnnotating={() => { }}
                                 setIsHighlightInteraction={() => { }}
                                 isHighlightInteraction={false}
