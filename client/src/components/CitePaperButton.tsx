@@ -1,16 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
-import { Quote, Loader, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { toast } from 'sonner';
-import { fetchFromApi } from '@/lib/api';
-import { PaperData, PaperItem } from '@/lib/schema';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { citationStyles, copyToClipboard, PaperBase } from '@/components/utils/paperUtils';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import {
     Select,
     SelectContent,
@@ -18,6 +10,14 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { citationStyles, copyToClipboard, PaperBase } from '@/components/utils/paperUtils';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { fetchFromApi } from '@/lib/api';
+import { PaperData, PaperItem } from '@/lib/schema';
+import { Check, Copy, Loader, Quote } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 interface CitePaperButtonProps {
     paper?: (PaperData | PaperItem)[];
@@ -99,8 +99,8 @@ export function CitePaperButton({ paper, paperId: providedPaperId, minimalist = 
     }
 
     const triggerButton = iconOnly ? (
-        <Button variant="ghost" className="h-10 w-10 p-0 rounded-md text-secondary-foreground hover:bg-blue-100 dark:hover:bg-blue-800">
-            <Quote className="h-5 w-5" />
+        <Button variant="ghost" className="h-7 w-7 p-0 rounded-md text-secondary-foreground hover:bg-blue-100 dark:hover:bg-blue-800">
+            <Quote className="h-4 w-4" />
         </Button>
     ) : (
         <Button variant={variant} size="sm" className={variant === "outline" ? "h-8 px-3 text-xs" : ""}>
