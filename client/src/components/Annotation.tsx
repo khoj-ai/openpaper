@@ -68,7 +68,7 @@ export default function Annotation({
 
     if (isEditing && !readonly) {
         return (
-            <div>
+            <div className="w-full min-w-0">
                 {/* Avatar row */}
                 <div className="flex items-center gap-2">
                     {avatarEl}
@@ -80,33 +80,36 @@ export default function Annotation({
                     </span>
                 </div>
 
-                <Textarea
-                    value={editedContent}
-                    onChange={(e) => setEditedContent(e.target.value)}
-                    className="ml-10 min-h-[60px] text-sm mt-2 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-foreground focus-visible:border-foreground"
-                    onClick={(e) => e.stopPropagation()}
-                    autoFocus
-                    placeholder="Write your annotation..."
-                />
+                {/* Indent to align with name, but use padding so width stays within container */}
+                <div className="pl-10 mt-2">
+                    <Textarea
+                        value={editedContent}
+                        onChange={(e) => setEditedContent(e.target.value)}
+                        className="w-full min-h-[60px] text-sm focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-foreground focus-visible:border-foreground"
+                        onClick={(e) => e.stopPropagation()}
+                        autoFocus
+                        placeholder="Write your annotation..."
+                    />
 
-                <div className="flex items-center justify-end gap-1 mt-1">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleCancel}
-                        className="h-7 text-xs text-muted-foreground hover:text-foreground"
-                    >
-                        <X size={12} className="mr-1" />
-                        Cancel
-                    </Button>
-                    <Button
-                        size="sm"
-                        onClick={handleSave}
-                        className="h-7 text-xs"
-                    >
-                        <Check size={12} className="mr-1" />
-                        Save
-                    </Button>
+                    <div className="flex items-center justify-end gap-1 mt-1">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleCancel}
+                            className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                        >
+                            <X size={12} className="mr-1" />
+                            Cancel
+                        </Button>
+                        <Button
+                            size="sm"
+                            onClick={handleSave}
+                            className="h-7 text-xs"
+                        >
+                            <Check size={12} className="mr-1" />
+                            Save
+                        </Button>
+                    </div>
                 </div>
             </div>
         );
