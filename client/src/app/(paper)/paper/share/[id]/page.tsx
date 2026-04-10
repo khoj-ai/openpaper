@@ -44,6 +44,7 @@ export default function SharedPaperView() {
     const [activeCitationKey, setActiveCitationKey] = useState<string | null>(null);
     const [activeCitationMessageIndex, setActiveCitationMessageIndex] = useState<number | null>(null);
     const [explicitSearchTerm, setExplicitSearchTerm] = useState<string>();
+    const [showAnnotationCards, setShowAnnotationCards] = useState(true);
 
     const dynamicPaperToolset = useMemo(() => {
         const navItems = [
@@ -357,6 +358,7 @@ export default function SharedPaperView() {
                                     setUserMessageReferences={() => { }}
                                     setSelectedText={() => { }}
                                     setTooltipPosition={() => { }}
+                                    isAnnotating={false}
                                     setIsAnnotating={() => { }}
                                     setIsHighlightInteraction={() => { }}
                                     isHighlightInteraction={false}
@@ -369,8 +371,10 @@ export default function SharedPaperView() {
                                     loadHighlights={async () => { }}
                                     removeHighlight={() => { }}
                                     renderAnnotations={() => { }}
-                                    annotations={[]}
+                                    annotations={annotations}
                                     onRefreshUrl={refreshPdfUrl}
+                                    currentUser={owner ?? null}
+                                    showAnnotationCards={showAnnotationCards}
                                 />
                             ) : (
                                 <div className="flex justify-center items-center h-full">PDF could not be loaded.</div>
@@ -441,6 +445,8 @@ export default function SharedPaperView() {
                                 rightSideFunction={rightSideFunction}
                                 setRightSideFunction={setRightSideFunction}
                                 PaperToolset={dynamicPaperToolset}
+                                showAnnotationCards={showAnnotationCards}
+                                onToggleAnnotationCards={() => setShowAnnotationCards((v) => !v)}
                             />
                         </div>
                     )}
@@ -475,6 +481,7 @@ export default function SharedPaperView() {
                             setSelectedText={() => { }}
                             setTooltipPosition={() => { }}
                             explicitSearchTerm={explicitSearchTerm}
+                            isAnnotating={false}
                             setIsAnnotating={() => { }}
                             setIsHighlightInteraction={() => { }}
                             isHighlightInteraction={false}
@@ -486,8 +493,10 @@ export default function SharedPaperView() {
                             loadHighlights={async () => { }}
                             removeHighlight={() => { }}
                             renderAnnotations={() => { }}
-                            annotations={[]}
+                            annotations={annotations}
                             onRefreshUrl={refreshPdfUrl}
+                            currentUser={owner ?? null}
+                            showAnnotationCards={showAnnotationCards}
                         />
                     ) : (
                         <div className="flex justify-center items-center h-full">PDF could not be loaded.</div>
@@ -562,6 +571,8 @@ export default function SharedPaperView() {
                         rightSideFunction={rightSideFunction}
                         setRightSideFunction={setRightSideFunction}
                         PaperToolset={dynamicPaperToolset}
+                        showAnnotationCards={showAnnotationCards}
+                        onToggleAnnotationCards={() => setShowAnnotationCards((v) => !v)}
                     />
                 </div>
             </div>

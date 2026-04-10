@@ -207,6 +207,16 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 	const [numPages, setNumPages] = useState<number | null>(null);
 	const [showScrollToTop] = useState(false);
 	const [pdfReady, setPdfReady] = useState(false);
+	/** Bumped on PDF.js `pagerendered` so annotation-card restore can retry when page views exist */
+	const [pdfLayoutTick, setPdfLayoutTick] = useState(0);
+	/**
+	 * Bumped once the PDF.js PDFViewer instance is actually ready.
+	 * The library initialises the viewer with a 100ms debounce inside a useLayoutEffect,
+	 * so getViewer() returns null for a short window after pdfReady becomes true.
+	 * Polling after pdfReady ensures both the pagerendered subscriber and the restore
+	 * effect re-run once the viewer is genuinely available.
+	 */
+	const [viewerReadyTick, setViewerReadyTick] = useState(0);
 	const [highlightColor, setHighlightColor] = useState<HighlightColor>("blue");
 
 	// Search hook
@@ -445,26 +455,60 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 
 	// When a new highlight is saved after a text selection annotate, create the pending card
 	useEffect(() => {
-		if (isAnnotating && activeHighlight && pendingAnnotationPos) {
+		if (!addAnnotation) return;
+		const hid = activeHighlight?.id;
+		if (isAnnotating && hid && pendingAnnotationPos) {
 			setAnnotationCards(prev => {
-				const exists = prev.find(c => c.highlightId === activeHighlight.id);
-				return exists ? prev : [...prev, { highlightId: activeHighlight.id, ...pendingAnnotationPos }];
+				const exists = prev.find(c => c.highlightId === hid);
+				return exists ? prev : [...prev, { highlightId: hid, ...pendingAnnotationPos }];
 			});
 			setPendingAnnotationPos(null);
 		}
-	}, [isAnnotating, activeHighlight, pendingAnnotationPos]);
+	}, [addAnnotation, isAnnotating, activeHighlight, pendingAnnotationPos]);
+
+	// Poll for the PDF.js viewer instance becoming available.
+	// The library initialises it with a 100ms debounce, so getViewer() returns null
+	// immediately after pdfReady. We bump viewerReadyTick when it's actually set,
+	// which re-triggers the pagerendered subscriber and the restore effect below.
+	useEffect(() => {
+		if (!pdfReady) return;
+		let timerId: ReturnType<typeof setTimeout>;
+		const check = () => {
+			const viewer = highlighterUtilsRef.current?.getViewer();
+			if (viewer) {
+				setViewerReadyTick(t => t + 1);
+			} else {
+				timerId = setTimeout(check, 50);
+			}
+		};
+		// Start polling slightly after the library's 100ms debounce
+		timerId = setTimeout(check, 120);
+		return () => clearTimeout(timerId);
+	}, [pdfReady]);
+
+	// Re-run restore attempts as each PDF page finishes rendering (page views may be missing before then)
+	useEffect(() => {
+		if (!pdfReady || numPages == null) return;
+		const viewer = highlighterUtilsRef.current?.getViewer();
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const bus = (viewer as any)?.eventBus;
+		if (!bus?.on) return;
+		const onPageRendered = () => setPdfLayoutTick((t) => t + 1);
+		bus.on("pagerendered", onPageRendered);
+		return () => bus.off("pagerendered", onPageRendered);
+	}, [pdfReady, numPages, viewerReadyTick]);
 
 	// Restore annotation cards from server-persisted annotations on page load
 	useEffect(() => {
 		if (!pdfReady || hasRestoredRef.current) return;
 
 		const viewer = highlighterUtilsRef.current?.getViewer();
-		const scrollContainer = viewer?.container;
+		const scrollContainer = viewer?.container as HTMLElement | undefined;
 		if (!viewer || !scrollContainer) return;
 
-		// Mark as restored immediately so subsequent annotation saves don't re-trigger this
-		hasRestoredRef.current = true;
-
+		// Wait until both data sources are ready before marking as restored.
+		// Without this guard, if the PDF loads before server data arrives, hasRestoredRef
+		// would be locked to true with empty arrays and the restore would never run.
 		if (!annotations.length || !highlights.length) return;
 
 		// Group annotations by highlight_id, keep the first (earliest) per highlight
@@ -475,23 +519,39 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			}
 		}
 
+		const containerRect = scrollContainer.getBoundingClientRect();
 		const restored: AnnotationCardEntry[] = [];
+		let missingPageView = 0;
+		let attempted = 0;
+
 		byHighlight.forEach(({ content, annotationId }, highlightId) => {
 			const highlight = highlights.find(h => h.id === highlightId);
 			if (!highlight?.position || !highlight.page_number) return;
 
+			attempted++;
+
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const pageView = (viewer as any).getPageView(highlight.page_number - 1);
-			if (!pageView?.div || !pageView?.viewport) return;
+			if (!pageView?.div || !pageView?.viewport) {
+				missingPageView += 1;
+				return;
+			}
 
 			const { div: pageDiv, viewport } = pageView;
 			const { boundingRect } = highlight.position;
+			// scaleY converts from stored page-height units to current CSS pixels
 			const scaleY = viewport.height / boundingRect.height;
+
+			// Use getBoundingClientRect so the position is correct regardless of
+			// intermediate offset parents (.pdfViewer vs .PdfHighlighter scroll container).
+			const pageRect = (pageDiv as HTMLElement).getBoundingClientRect();
+			const top = pageRect.top - containerRect.top + scrollContainer.scrollTop + boundingRect.y1 * scaleY;
+			const left = pageRect.right - containerRect.left + 8;
 
 			restored.push({
 				highlightId,
-				top: pageDiv.offsetTop + boundingRect.y1 * scaleY,
-				left: pageDiv.offsetLeft + pageDiv.offsetWidth + 8,
+				top,
+				left,
 				scrollContainer,
 				initialContent: content,
 				annotationId,
@@ -504,7 +564,17 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 				return [...prev, ...restored.filter(c => !existing.has(c.highlightId))];
 			});
 		}
-	}, [pdfReady, annotations, highlights]);
+
+		// Lock the ref only when we actually attempted restorations and all page views
+		// were available. If attempted === 0 (no highlights had position data) or
+		// missingPageView > 0, keep retrying on the next pdfLayoutTick.
+		if (attempted > 0 && missingPageView === 0) {
+			hasRestoredRef.current = true;
+		} else if (attempted === 0 && byHighlight.size === 0) {
+			// No annotations to restore at all — nothing to do, lock to stop retrying.
+			hasRestoredRef.current = true;
+		}
+	}, [pdfReady, annotations, highlights, pdfLayoutTick, scale, numPages, viewerReadyTick]);
 
 	// Keep the module-level store in sync so HighlightContainer (in a separate React root) can react
 	useEffect(() => {
@@ -892,7 +962,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 	return (
 		<div
 			ref={containerRef}
-			className="flex flex-col w-full h-full overflow-hidden"
+			className="flex flex-col w-full h-full min-h-0 overflow-x-visible overflow-y-hidden"
 			id="pdf-container"
 		>
 			{/* Toolbar */}
@@ -923,8 +993,8 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 				setHighlightColor={setHighlightColor}
 			/>
 
-			{/* PDF Viewer */}
-			<div className="flex-1 overflow-hidden relative">
+			{/* PDF Viewer — overflow-x-visible so margin annotation cards beside the page are not clipped */}
+			<div className="flex-1 min-h-0 overflow-x-visible overflow-y-hidden relative">
 				<PdfLoader
 					key={pdfLoaderKey}
 					document={effectivePdfUrl}
@@ -994,6 +1064,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 					removeHighlight={removeHighlight}
 					setUserMessageReferences={setUserMessageReferences}
 			onAnnotate={(y) => {
+					if (!addAnnotation) return;
 					const scrollContainer = highlighterUtilsRef.current?.getViewer()?.container;
 					if (!scrollContainer) return;
 					const containerRect = scrollContainer.getBoundingClientRect();
@@ -1011,11 +1082,12 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 					scrollContainer,
 				};
 
-					if (isHighlightInteraction && activeHighlight) {
+					if (isHighlightInteraction && activeHighlight?.id) {
+						const hid = activeHighlight.id;
 						// User clicked an existing highlight — ID is already known, create card immediately
 						setAnnotationCards(prev => {
-							const exists = prev.find(c => c.highlightId === activeHighlight.id);
-							return exists ? prev : [...prev, { highlightId: activeHighlight.id, ...pos }];
+							const exists = prev.find(c => c.highlightId === hid);
+							return exists ? prev : [...prev, { highlightId: hid, ...pos }];
 						});
 					} else {
 						// New text selection — highlight not yet saved; wait for async server response
@@ -1026,7 +1098,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		)}
 
 	{/* Inline Annotation Cards — one per annotated highlight, persists until closed */}
-	{showAnnotationCards && addAnnotation && (() => {
+	{showAnnotationCards && (() => {
 		const FALLBACK_HEIGHT = 120;
 		const GAP = 8;
 		const activeId = activeHighlight?.id;
@@ -1089,19 +1161,22 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 							c.highlightId === card.highlightId ? { ...c, annotationId: savedId } : c
 						))
 					}
-					onDelete={() => {
-						if (card.annotationId && removeAnnotation) removeAnnotation(card.annotationId);
+				onDelete={() => {
+					if (card.annotationId && removeAnnotation) removeAnnotation(card.annotationId);
+					setAnnotationCards(prev => prev.filter(c => c.highlightId !== card.highlightId));
+					setCardHeights(prev => { const next = new Map(prev); next.delete(card.highlightId); return next; });
+					setIsAnnotating(false);
+					setSelectionRectTop(null);
+				}}
+				onClose={() => {
+					setIsAnnotating(false);
+					setSelectionRectTop(null);
+					// Only remove unsaved cards — saved annotations persist until explicitly deleted
+					if (!card.annotationId) {
 						setAnnotationCards(prev => prev.filter(c => c.highlightId !== card.highlightId));
 						setCardHeights(prev => { const next = new Map(prev); next.delete(card.highlightId); return next; });
-						setIsAnnotating(false);
-						setSelectionRectTop(null);
-					}}
-					onClose={() => {
-						setIsAnnotating(false);
-						setSelectionRectTop(null);
-						setAnnotationCards(prev => prev.filter(c => c.highlightId !== card.highlightId));
-						setCardHeights(prev => { const next = new Map(prev); next.delete(card.highlightId); return next; });
-					}}
+					}
+				}}
 				/>,
 				card.scrollContainer
 			)

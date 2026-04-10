@@ -16,7 +16,8 @@ interface InlineAnnotationCardProps {
     annotationId?: string;
     isActive?: boolean;
     user: BasicUser | null;
-    addAnnotation: (highlightId: string, content: string) => Promise<PaperHighlightAnnotation>;
+    /** When omitted, card is display-only (e.g. share / preview); no create or save. */
+    addAnnotation?: (highlightId: string, content: string) => Promise<PaperHighlightAnnotation>;
     updateAnnotation?: (annotationId: string, content: string) => Promise<unknown> | void;
     onAnnotationSaved?: (annotationId: string) => void;
     onDelete?: () => void;
@@ -41,7 +42,10 @@ export function InlineAnnotationCard({
 }: InlineAnnotationCardProps) {
     const [content, setContent] = useState(initialContent ?? "");
     const [isSaving, setIsSaving] = useState(false);
-    const [isEditing, setIsEditing] = useState(!initialContent);
+    const canCreateOrEdit = annotationId
+        ? Boolean(updateAnnotation)
+        : Boolean(addAnnotation);
+    const [isEditing, setIsEditing] = useState(!initialContent && canCreateOrEdit);
     const cardRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -51,11 +55,16 @@ export function InlineAnnotationCard({
 
     const handleSave = async () => {
         if (!content.trim() || isSaving) return;
+        if (annotationId) {
+            if (!updateAnnotation) return;
+        } else if (!addAnnotation) {
+            return;
+        }
         setIsSaving(true);
         try {
             if (annotationId && updateAnnotation) {
                 await updateAnnotation(annotationId, content.trim());
-            } else {
+            } else if (addAnnotation) {
                 const result = await addAnnotation(highlightId, content.trim());
                 onAnnotationSaved?.(result.id);
             }
@@ -97,11 +106,15 @@ export function InlineAnnotationCard({
         return () => ro.disconnect();
     }, [onHeightChange]);
 
-    // Outside click: close only if nothing has been typed; otherwise collapse to read mode
+        // Outside click: for persistent (saved) cards, only collapse to read mode.
+        // For new unsaved cards, close if nothing has been typed; otherwise collapse.
     useEffect(() => {
         const handleOutsideClick = (e: MouseEvent) => {
             if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
-                if (!content.trim()) {
+                if (annotationId) {
+                    // Saved annotation — never close via outside click; only collapse if editing
+                    if (isEditing) setIsEditing(false);
+                } else if (!content.trim()) {
                     onClose();
                 } else if (isEditing) {
                     setIsEditing(false);
@@ -115,7 +128,7 @@ export function InlineAnnotationCard({
             clearTimeout(timerId);
             document.removeEventListener("mousedown", handleOutsideClick);
         };
-    }, [onClose, content, isEditing]);
+    }, [onClose, content, isEditing, annotationId]);
 
     const displayName = user?.name || "Anonymous";
     const avatarBg = user?.name ? getAlphaHashToBackgroundColor(user.name) : "bg-muted";
@@ -146,7 +159,7 @@ export function InlineAnnotationCard({
 
                 {/* Action icons */}
                 <div className="flex items-center gap-0.5 flex-shrink-0">
-                    {!isEditing && (
+                    {!isEditing && canCreateOrEdit && (
                         <>
                             <Button
                                 variant="ghost"
@@ -158,12 +171,12 @@ export function InlineAnnotationCard({
                             >
                                 <Pencil size={13} />
                             </Button>
-                            {annotationId && (
+                            {annotationId && onDelete && (
                                 <Button
                                     variant="ghost"
                                     size="icon"
                                     className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                                    onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
+                                    onClick={(e) => { e.stopPropagation(); onDelete(); }}
                                     onMouseDown={(e) => e.stopPropagation()}
                                     title="Delete"
                                 >
@@ -172,16 +185,19 @@ export function InlineAnnotationCard({
                             )}
                         </>
                     )}
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                        onClick={(e) => { e.stopPropagation(); onClose(); }}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        title="Close"
-                    >
-                        <X size={14} />
-                    </Button>
+                    {/* X button only for unsaved (new) annotation cards — saved cards use Delete */}
+                    {!annotationId && addAnnotation && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                            onClick={(e) => { e.stopPropagation(); onClose(); }}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            title="Close"
+                        >
+                            <X size={14} />
+                        </Button>
+                    )}
                 </div>
             </div>
 

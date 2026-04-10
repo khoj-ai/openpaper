@@ -536,6 +536,7 @@ export const ConversationView = ({
 								setUserMessageReferences={() => { }}
 								setSelectedText={() => { }}
 								setTooltipPosition={() => { }}
+								isAnnotating={false}
 								setIsAnnotating={() => { }}
 								setIsHighlightInteraction={() => { }}
 								isHighlightInteraction={false}
