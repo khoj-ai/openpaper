@@ -1,28 +1,19 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import {
+	HighlightColor,
 	PaperHighlight,
 	PaperHighlightAnnotation,
-	HighlightColor,
 } from '@/lib/schema';
 import { RenderedHighlightPosition } from './PdfHighlighterViewer';
 
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import { smoothScrollTo } from '@/lib/animation';
 import { BasicUser } from "@/lib/auth";
 import { User as UserIcon } from 'lucide-react';
-import { smoothScrollTo } from '@/lib/animation';
 import Annotation from './Annotation';
-
-// Map highlight color names to Tailwind border classes
-const HIGHLIGHT_BORDER_COLOR_MAP: Record<HighlightColor, string> = {
-	yellow: "border-yellow-400",
-	green: "border-green-500",
-	blue: "border-blue-400",
-	pink: "border-pink-400",
-	purple: "border-purple-400",
-};
 
 // Map highlight color names to bg color classes for the left bar
 const HIGHLIGHT_BAR_COLOR_MAP: Record<HighlightColor, string> = {
@@ -32,16 +23,6 @@ const HIGHLIGHT_BAR_COLOR_MAP: Record<HighlightColor, string> = {
 	pink: "bg-pink-400",
 	purple: "bg-purple-400",
 };
-
-// Map highlight color names to bubble background + border classes for annotation notes
-const BUBBLE_BG_MAP: Record<HighlightColor, string> = {
-	yellow: "bg-yellow-50 border-yellow-200 dark:bg-yellow-950/30 dark:border-yellow-800",
-	green:  "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800",
-	blue:   "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800",
-	pink:   "bg-pink-50 border-pink-200 dark:bg-pink-950/30 dark:border-pink-800",
-	purple: "bg-purple-50 border-purple-200 dark:bg-purple-950/30 dark:border-purple-800",
-};
-
 
 export interface AnnotationButtonProps {
 	highlightId: string;
