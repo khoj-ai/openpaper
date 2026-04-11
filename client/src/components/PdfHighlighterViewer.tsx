@@ -61,6 +61,56 @@ export interface RenderedHighlightPosition {
 	page: number;
 }
 
+/** Matches `w-[280px]` on margin annotation cards */
+const ANNOTATION_CARD_WIDTH_PX = 280;
+const ANNOTATION_CARD_MARGIN_GAP_PX = 8;
+
+/**
+ * Anchor for margin annotation cards: right gutter by default, left gutter if the
+ * card would not fit to the right of the page in the scroll container.
+ */
+function getAnnotationCardAnchorForHighlight(
+	highlight: PaperHighlight,
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	viewer: any,
+	scrollContainer: HTMLElement
+): { top: number; left: number } | null {
+	if (!highlight.position || !highlight.page_number) return null;
+
+	const pageView = viewer.getPageView(highlight.page_number - 1);
+	if (!pageView?.div || !pageView?.viewport) return null;
+
+	const { div: pageDiv, viewport } = pageView;
+	const { boundingRect } = highlight.position;
+	const scaleY = viewport.height / boundingRect.height;
+
+	const containerRect = scrollContainer.getBoundingClientRect();
+	const pageRect = (pageDiv as HTMLElement).getBoundingClientRect();
+	const scrollLeft = scrollContainer.scrollLeft;
+
+	const top =
+		pageRect.top -
+		containerRect.top +
+		scrollContainer.scrollTop +
+		boundingRect.y1 * scaleY;
+
+	const pageRightContent = pageRect.right - containerRect.left + scrollLeft;
+	const pageLeftContent = pageRect.left - containerRect.left + scrollLeft;
+
+	const rightGutterLeft = pageRightContent + ANNOTATION_CARD_MARGIN_GAP_PX;
+	const leftGutterLeft = pageLeftContent - ANNOTATION_CARD_MARGIN_GAP_PX - ANNOTATION_CARD_WIDTH_PX;
+
+	let left = rightGutterLeft;
+	if (
+		rightGutterLeft + ANNOTATION_CARD_WIDTH_PX > scrollContainer.scrollWidth &&
+		leftGutterLeft >= 0
+	) {
+		left = leftGutterLeft;
+	}
+
+	return { top, left };
+}
+
 interface PdfHighlighterViewerProps {
 	pdfUrl: string;
 	explicitSearchTerm?: string;
@@ -205,6 +255,8 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 	const [currentSelection, setCurrentSelection] = useState<PdfSelection | null>(null);
 	const [, setCurrentGhostHighlight] = useState<GhostHighlight | null>(null);
 	const [scale, setScale] = useState(1.0);
+	// Ref so ResizeObserver callbacks (which close over a stale scale) can re-apply the current scale
+	const scaleRef = useRef(1.0);
 	const [currentPage, setCurrentPage] = useState(1);
 	const [numPages, setNumPages] = useState<number | null>(null);
 	const [showScrollToTop] = useState(false);
@@ -252,6 +304,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 	// Apply scale changes directly to the viewer
 	// (workaround for react-pdf-highlighter-extended not responding to pdfScaleValue prop changes)
 	useEffect(() => {
+		scaleRef.current = scale;
 		const viewer = highlighterUtilsRef.current?.getViewer();
 		if (viewer) {
 			viewer.currentScaleValue = String(scale);
@@ -306,6 +359,30 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			setCurrentPage(1);
 		}
 	}, []);
+
+	const syncAnnotationCardPositions = useCallback(() => {
+		setAnnotationCards((prev) => {
+			if (prev.length === 0) return prev;
+			const viewer = highlighterUtilsRef.current?.getViewer();
+			const scrollContainer = viewer?.container as HTMLElement | undefined;
+			if (!viewer || !scrollContainer) return prev;
+
+			let changed = false;
+			const next = prev.map((card) => {
+				const h = highlights.find((x) => x.id === card.highlightId);
+				if (!h?.position) return card;
+				const anchor = getAnnotationCardAnchorForHighlight(h, viewer, scrollContainer);
+				if (!anchor) return card;
+				const same =
+					Math.abs(anchor.top - card.top) < 0.5 &&
+					Math.abs(anchor.left - card.left) < 0.5;
+				if (same) return card;
+				changed = true;
+				return { ...card, top: anchor.top, left: anchor.left, scrollContainer };
+			});
+			return changed ? next : prev;
+		});
+	}, [highlights]);
 
 	// Handle selection
 	const handleSelection = useCallback(
@@ -521,7 +598,6 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			}
 		}
 
-		const containerRect = scrollContainer.getBoundingClientRect();
 		const restored: AnnotationCardEntry[] = [];
 		let missingPageView = 0;
 		let attempted = 0;
@@ -532,28 +608,16 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 
 			attempted++;
 
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const pageView = (viewer as any).getPageView(highlight.page_number - 1);
-			if (!pageView?.div || !pageView?.viewport) {
+			const anchor = getAnnotationCardAnchorForHighlight(highlight, viewer, scrollContainer);
+			if (!anchor) {
 				missingPageView += 1;
 				return;
 			}
 
-			const { div: pageDiv, viewport } = pageView;
-			const { boundingRect } = highlight.position;
-			// scaleY converts from stored page-height units to current CSS pixels
-			const scaleY = viewport.height / boundingRect.height;
-
-			// Use getBoundingClientRect so the position is correct regardless of
-			// intermediate offset parents (.pdfViewer vs .PdfHighlighter scroll container).
-			const pageRect = (pageDiv as HTMLElement).getBoundingClientRect();
-			const top = pageRect.top - containerRect.top + scrollContainer.scrollTop + boundingRect.y1 * scaleY;
-			const left = pageRect.right - containerRect.left + 8;
-
 			restored.push({
 				highlightId,
-				top,
-				left,
+				top: anchor.top,
+				left: anchor.left,
 				scrollContainer,
 				initialContent: content,
 				annotationId,
@@ -577,6 +641,57 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			hasRestoredRef.current = true;
 		}
 	}, [pdfReady, annotations, highlights, pdfLayoutTick, scale, numPages, viewerReadyTick]);
+
+	// Keep margin card anchors in sync when zoom/layout changes (restore only sets initial positions once).
+	useEffect(() => {
+		if (!pdfReady) return;
+		syncAnnotationCardPositions();
+	}, [
+		pdfReady,
+		pdfLayoutTick,
+		viewerReadyTick,
+		annotationCards.length,
+		syncAnnotationCardPositions,
+	]);
+
+	// PDF scroll/resize does not trigger React state — re-sync card positions from live page geometry.
+	useEffect(() => {
+		if (!pdfReady) return;
+		const viewer = highlighterUtilsRef.current?.getViewer();
+		const el = viewer?.container as HTMLElement | undefined;
+		if (!el) return;
+
+		let rafId = 0;
+		const scheduleSync = () => {
+			if (rafId !== 0) return;
+			rafId = requestAnimationFrame(() => {
+				rafId = 0;
+				syncAnnotationCardPositions();
+			});
+		};
+
+		el.addEventListener("scroll", scheduleSync, { passive: true });
+		const ro = new ResizeObserver(() => {
+			// Re-apply correct scale synchronously before browser can paint.
+			// Our callback fires after the library's (registered earlier), so the library's stale
+			// ResizeObserver has already reset currentScaleValue by this point. Overriding it here
+			// (no setTimeout) ensures we correct it in the same rendering task, before any frame paint.
+			const v = highlighterUtilsRef.current?.getViewer();
+			if (v && v.currentScaleValue !== String(scaleRef.current)) {
+				v.currentScaleValue = String(scaleRef.current);
+			}
+			scheduleSync();
+		});
+		ro.observe(el);
+		window.addEventListener("resize", scheduleSync);
+
+		return () => {
+			el.removeEventListener("scroll", scheduleSync);
+			ro.disconnect();
+			window.removeEventListener("resize", scheduleSync);
+			if (rafId !== 0) cancelAnimationFrame(rafId);
+		};
+	}, [pdfReady, viewerReadyTick, syncAnnotationCardPositions]);
 
 	// Keep the module-level store in sync so HighlightContainer (in a separate React root) can react
 	useEffect(() => {
@@ -1069,22 +1184,48 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 					setUserMessageReferences={setUserMessageReferences}
 			onAnnotate={(y) => {
 					if (!addAnnotation) return;
-					const scrollContainer = highlighterUtilsRef.current?.getViewer()?.container;
-					if (!scrollContainer) return;
+					const viewer = highlighterUtilsRef.current?.getViewer();
+					const scrollContainer = viewer?.container as HTMLElement | undefined;
+					if (!viewer || !scrollContainer) return;
+
 					const containerRect = scrollContainer.getBoundingClientRect();
 					const scrollTop = scrollContainer.scrollTop;
+					const scrollLeft = scrollContainer.scrollLeft;
 
-					const pdfPage = document.querySelector('#pdf-container .page')
-						?? document.querySelector('#pdf-container [data-page-number]');
-					const pdfRight = pdfPage
-						? pdfPage.getBoundingClientRect().right + 8
-						: window.innerWidth * 0.6;
+					let pos: { top: number; left: number; scrollContainer: Element };
 
-				const pos = {
-					top: (selectionRectTop ?? y) - containerRect.top + scrollTop,
-					left: pdfRight - containerRect.left,
-					scrollContainer,
-				};
+					if (isHighlightInteraction && activeHighlight?.id) {
+						const h = highlights.find((x) => x.id === activeHighlight.id);
+						const anchor =
+							h?.position && h.page_number
+								? getAnnotationCardAnchorForHighlight(h, viewer, scrollContainer)
+								: null;
+						if (anchor) {
+							pos = { ...anchor, scrollContainer };
+						} else {
+							const pdfPage =
+								document.querySelector("#pdf-container .page") ??
+								document.querySelector("#pdf-container [data-page-number]");
+							const pageRect = pdfPage?.getBoundingClientRect();
+							const top = (selectionRectTop ?? y) - containerRect.top + scrollTop;
+							const left = pageRect
+								? pageRect.right - containerRect.left + scrollLeft + ANNOTATION_CARD_MARGIN_GAP_PX
+								: window.innerWidth * 0.6;
+							pos = { top, left, scrollContainer };
+						}
+					} else {
+						const pdfPage =
+							document.querySelector("#pdf-container .page") ??
+							document.querySelector("#pdf-container [data-page-number]");
+						const pageRect = pdfPage?.getBoundingClientRect();
+						pos = {
+							top: (selectionRectTop ?? y) - containerRect.top + scrollTop,
+							left: pageRect
+								? pageRect.right - containerRect.left + scrollLeft + ANNOTATION_CARD_MARGIN_GAP_PX
+								: window.innerWidth * 0.6,
+							scrollContainer,
+						};
+					}
 
 					if (isHighlightInteraction && activeHighlight?.id) {
 						const hid = activeHighlight.id;
