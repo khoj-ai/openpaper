@@ -1,4 +1,4 @@
-import React from 'react';
+import { CitePaperButton } from '@/components/CitePaperButton';
 import { Button } from '@/components/ui/button';
 import {
     Tooltip,
@@ -6,8 +6,12 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { CitePaperButton } from '@/components/CitePaperButton';
+import { cn } from '@/lib/utils';
 import { Eye, EyeOff } from 'lucide-react';
+import React from 'react';
+
+/** Primary panels where the toolbar sits higher (less gap under the top bar). */
+const COMPACT_TOP_OFFSET_TOOLS = new Set(['Chat', 'Annotations', 'Audio']);
 
 interface PaperSidebarProps {
     rightSideFunction: string;
@@ -34,8 +38,8 @@ function NavButton({ item, rightSideFunction, setRightSideFunction }: {
                     variant="ghost"
                     className={`h-7 w-7 p-0 rounded-md ${
                         item.name === rightSideFunction
-                            ? 'bg-blue-500 dark:bg-blue-500 text-blue-100 dark:text-blue-100 hover:bg-blue-600 dark:hover:bg-blue-600'
-                            : 'text-secondary-foreground hover:bg-blue-100 dark:hover:bg-blue-800'
+                            ? 'bg-blue-500 text-blue-100 hover:bg-blue-600 dark:bg-blue-600 dark:text-white dark:hover:bg-blue-500'
+                            : 'text-secondary-foreground hover:bg-blue-100 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-foreground'
                     }`}
                     onClick={() => setRightSideFunction(item.name)}
                 >
@@ -53,9 +57,16 @@ export function PaperSidebar({ rightSideFunction, setRightSideFunction, PaperToo
     const beforeFocus = PaperToolset.nav.filter(item => item.name !== 'Focus');
     const focusTool = PaperToolset.nav.find(item => item.name === 'Focus');
 
+    const toolbarTopClass = COMPACT_TOP_OFFSET_TOOLS.has(rightSideFunction) ? 'top-2' : 'top-14';
+
     return (
         <TooltipProvider>
-            <div className="absolute right-2 top-14 z-20 flex flex-col gap-0.5 p-1 bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-md">
+            <div
+                className={cn(
+                    'absolute right-2 z-20 flex flex-col gap-0.5 p-1 bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-lg transition-[top] duration-200 dark:bg-zinc-900/95 dark:border-zinc-600 dark:ring-1 dark:ring-white/10 dark:shadow-black/40',
+                    toolbarTopClass,
+                )}
+            >
                 {beforeFocus.map((item) => (
                     <NavButton key={item.name} item={item} rightSideFunction={rightSideFunction} setRightSideFunction={setRightSideFunction} />
                 ))}
@@ -76,8 +87,8 @@ export function PaperSidebar({ rightSideFunction, setRightSideFunction, PaperToo
                             variant="ghost"
                             className={`h-7 w-7 p-0 rounded-md ${
                                 showAnnotationCards
-                                    ? 'text-secondary-foreground hover:bg-blue-100 dark:hover:bg-blue-800'
-                                    : 'text-muted-foreground hover:bg-muted'
+                                    ? 'text-secondary-foreground hover:bg-blue-100 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-foreground'
+                                    : 'text-muted-foreground hover:bg-muted dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200'
                             }`}
                             onClick={onToggleAnnotationCards}
                         >

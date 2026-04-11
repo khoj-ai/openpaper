@@ -99,7 +99,7 @@ export function CitePaperButton({ paper, paperId: providedPaperId, minimalist = 
     }
 
     const triggerButton = iconOnly ? (
-        <Button variant="ghost" className="h-7 w-7 p-0 rounded-md text-secondary-foreground hover:bg-blue-100 dark:hover:bg-blue-800">
+        <Button variant="ghost" className="h-7 w-7 p-0 rounded-md text-secondary-foreground hover:bg-blue-100 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-foreground">
             <Quote className="h-4 w-4" />
         </Button>
     ) : (
