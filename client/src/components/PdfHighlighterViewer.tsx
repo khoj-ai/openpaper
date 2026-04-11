@@ -577,6 +577,19 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		return () => bus.off("pagerendered", onPageRendered);
 	}, [pdfReady, numPages, viewerReadyTick]);
 
+	// Reset the restore guard whenever the set of persisted annotation IDs changes (e.g.
+	// after an annotation is created or deleted on the server). This ensures that if the
+	// user dismissed an inline card during the current session, it will be re-created
+	// the next time the annotation list changes.
+	const annotationIdsKey = annotations.map(a => a.id).sort().join(',');
+	const prevAnnotationIdsKeyRef = useRef<string>('');
+	useEffect(() => {
+		if (annotationIdsKey !== prevAnnotationIdsKeyRef.current) {
+			prevAnnotationIdsKeyRef.current = annotationIdsKey;
+			hasRestoredRef.current = false;
+		}
+	}, [annotationIdsKey]);
+
 	// Restore annotation cards from server-persisted annotations on page load
 	useEffect(() => {
 		if (!pdfReady || hasRestoredRef.current) return;

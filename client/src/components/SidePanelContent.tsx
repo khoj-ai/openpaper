@@ -60,10 +60,7 @@ interface SidePanelContentProps {
     annotations: PaperHighlightAnnotation[];
     highlights: PaperHighlight[];
     handleHighlightClick: (highlight: PaperHighlight) => void;
-    addAnnotation: (highlightId: string, content: string) => Promise<PaperHighlightAnnotation>;
     activeHighlight: PaperHighlight | null;
-    updateAnnotation: (annotationId: string, text: string) => void;
-    removeAnnotation: (annotationId: string) => void;
     isSharing: boolean;
     handleShare: () => void;
     handleUnshare: () => void;
@@ -94,10 +91,7 @@ export function SidePanelContent({
     annotations,
     highlights,
     handleHighlightClick,
-    addAnnotation,
     activeHighlight,
-    updateAnnotation,
-    removeAnnotation,
     isSharing,
     handleShare,
     handleUnshare,
@@ -783,10 +777,7 @@ export function SidePanelContent({
                                         highlights={highlights}
                                         user={user}
                                         onHighlightClick={handleHighlightClick}
-                                        addAnnotation={addAnnotation}
                                         activeHighlight={activeHighlight}
-                                        updateAnnotation={updateAnnotation}
-                                        removeAnnotation={removeAnnotation}
                                         renderedHighlightPositions={renderedHighlightPositions}
                                     />
                                 </div>

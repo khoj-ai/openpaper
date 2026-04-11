@@ -107,7 +107,7 @@ export default function PaperView() {
         refreshAnnotations,
     } = useAnnotations(id);
 
-    const [showAnnotationCards, setShowAnnotationCards] = useState(true);
+    const [annotationCardsVisible, setAnnotationCardsVisible] = useState(true);
     const [activeCitationKey, setActiveCitationKey] = useState<string | null>(null);
     const [activeCitationMessageIndex, setActiveCitationMessageIndex] = useState<number | null>(null);
     const [explicitSearchTerm, setExplicitSearchTerm] = useState<string | undefined>(undefined);
@@ -133,6 +133,7 @@ export default function PaperView() {
     const [elapsedTime, setElapsedTime] = useState(0);
 
     const [rightSideFunction, setRightSideFunction] = useState<string>('Overview');
+    const showAnnotationCards = annotationCardsVisible && rightSideFunction !== 'Annotations';
     const [toolset, setToolset] = useState(PaperToolset);
     const initialRsfRef = useRef<string | null>(null);
     const hasInitializedRsf = useRef(false);
@@ -475,10 +476,7 @@ export default function PaperView() {
         annotations,
         highlights,
         handleHighlightClick,
-        addAnnotation,
         activeHighlight,
-        updateAnnotation,
-        removeAnnotation,
         isSharing,
         handleShare,
         handleUnshare,
@@ -530,7 +528,7 @@ export default function PaperView() {
                                     removeAnnotation={removeAnnotation}
                                     currentUser={user}
                                     showAnnotationCards={showAnnotationCards}
-                                    onToggleAnnotationCards={() => setShowAnnotationCards(v => !v)}
+                                    onToggleAnnotationCards={() => setAnnotationCardsVisible(v => !v)}
                                 />
                             )}
                         </div>
@@ -622,7 +620,7 @@ export default function PaperView() {
                                 removeAnnotation={removeAnnotation}
                                 currentUser={user}
                                 showAnnotationCards={showAnnotationCards}
-                                onToggleAnnotationCards={() => setShowAnnotationCards(v => !v)}
+                                onToggleAnnotationCards={() => setAnnotationCardsVisible(v => !v)}
                             />
                         </div>
                     )}
