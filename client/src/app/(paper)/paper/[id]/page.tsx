@@ -4,20 +4,20 @@ import { PdfHighlighterViewer, RenderedHighlightPosition } from '@/components/Pd
 import { Button } from '@/components/ui/button';
 import { fetchFromApi } from '@/lib/api';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 
 import {
-    Highlighter,
-    MessageCircle,
-    Focus,
-    Lightbulb,
     AudioLines,
+    Focus,
+    Highlighter,
+    Lightbulb,
+    MessageCircle,
 } from 'lucide-react';
 import { toast } from "sonner";
 
-import { useHighlighterHighlights } from '@/components/hooks/PdfHighlighterHighlights';
 import { useAnnotations } from '@/components/hooks/PdfAnnotation';
+import { useHighlighterHighlights } from '@/components/hooks/PdfHighlighterHighlights';
 
 import {
     PaperData,
@@ -25,16 +25,16 @@ import {
     PaperUploadJobStatusResponse,
 } from '@/lib/schema';
 
+import { PaperSidebar } from '@/components/PaperSidebar';
 import { PaperStatus, PaperStatusEnum } from '@/components/utils/PdfStatus';
 import { useAuth } from '@/lib/auth';
-import { PaperSidebar } from '@/components/PaperSidebar';
 
 import PaperViewSkeleton from '@/components/PaperViewSkeleton';
 import ReportSkeleton from '@/components/ReportSkeleton';
 
+import { SidePanelContent } from '@/components/SidePanelContent';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Book, Box } from 'lucide-react';
-import { SidePanelContent } from '@/components/SidePanelContent';
 
 const OverviewTool = {
     name: "Overview",
@@ -63,9 +63,9 @@ const AudioTool = {
 
 const PaperToolset = {
     nav: [
+        ChatTool,
         OverviewTool,
         AnnotationsTool,
-        ChatTool,
         AudioTool,
         FocusTool,
     ],
