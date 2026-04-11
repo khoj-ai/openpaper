@@ -133,7 +133,11 @@ export default function PaperView() {
     const [elapsedTime, setElapsedTime] = useState(0);
 
     const [rightSideFunction, setRightSideFunction] = useState<string>('Overview');
-    const showAnnotationCards = annotationCardsVisible && rightSideFunction !== 'Annotations';
+    const rightSideHidesInlineAnnotationCards =
+        rightSideFunction === 'Annotations' ||
+        rightSideFunction === 'Chat' ||
+        rightSideFunction === 'Audio';
+    const showAnnotationCards = annotationCardsVisible && !rightSideHidesInlineAnnotationCards;
     const [toolset, setToolset] = useState(PaperToolset);
     const initialRsfRef = useRef<string | null>(null);
     const hasInitializedRsf = useRef(false);
