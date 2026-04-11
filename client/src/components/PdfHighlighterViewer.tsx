@@ -14,6 +14,7 @@ import type {
 } from "react-pdf-highlighter-extended";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { ChevronUp } from "lucide-react";
 import {
 	PaperHighlight,
@@ -22,14 +23,6 @@ import {
 	HighlightColor,
 } from "@/lib/schema";
 
-// Map highlight color names to rgba values (shared with HighlightContainer)
-const HIGHLIGHT_COLOR_MAP: Record<HighlightColor, string> = {
-	yellow: "rgba(255, 235, 59, 0.4)",
-	green: "rgba(76, 175, 80, 0.4)",
-	blue: "rgba(66, 165, 245, 0.4)",
-	pink: "rgba(236, 64, 122, 0.4)",
-	purple: "rgba(171, 71, 188, 0.4)",
-};
 import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience";
 import { PaperStatus } from "./utils/PdfStatus";
 import InlineAnnotationMenu from "./InlineAnnotationMenu";
@@ -46,6 +39,8 @@ import {
 	PdfToolbar,
 	findTextPages,
 	createTextHighlightOverlays,
+	getAssistantHighlightBackgroundRgba,
+	getUserHighlightBackgroundRgba,
 } from "./pdf-viewer";
 
 // Re-export types for external use
@@ -188,7 +183,6 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		top: number;
 		left: number;
 		scrollContainer: Element;
-		initialContent?: string;
 		annotationId?: string;
 	}
 	const [annotationCards, setAnnotationCards] = useState<AnnotationCardEntry[]>([]);
@@ -292,13 +286,83 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		[highlights]
 	);
 
+	/**
+	 * Highlight rectangles (react-pdf-highlighter-extended) are re-laid out from scaled positions on
+	 * every scroll/textlayerrender. During zoom, PDF.js fires many pagerendereds and ResizeObserver
+	 * updates — rects jump frame-to-frame (flashy). We hide the highlight layer until layout quiets.
+	 */
+	const [pdfHighlightsSuppressedForZoom, setPdfHighlightsSuppressedForZoom] = useState(false);
+	const pendingZoomHighlightRef = useRef(false);
+	const zoomHighlightDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	/** Bumped on each zoom press / safety timeout so in-flight rAF scroll checks don't unsuppress for a stale zoom. */
+	const zoomHighlightSessionRef = useRef(0);
+	const ZOOM_HIGHLIGHT_DEBOUNCE_MS = 300;
+	const ZOOM_SCROLL_STABLE_MAX_FRAMES = 45;
+	/** Consecutive rAF frames with matching scrollTop before we trust scroll has settled. */
+	const ZOOM_SCROLL_STABLE_MATCHES_NEEDED = 2;
+
+	/** Wait until scrollTop matches across several rAF samples (PDF.js can nudge scroll for multiple frames). */
+	const finishZoomWhenScrollStable = useCallback((session: number) => {
+		let prevScroll: number | undefined;
+		let stableMatches = 0;
+		let framesLeft = ZOOM_SCROLL_STABLE_MAX_FRAMES;
+		const unsuppressAfterPaint = () => {
+			requestAnimationFrame(() => {
+				requestAnimationFrame(() => {
+					requestAnimationFrame(() => {
+						if (session !== zoomHighlightSessionRef.current || !pendingZoomHighlightRef.current) return;
+						pendingZoomHighlightRef.current = false;
+						setPdfHighlightsSuppressedForZoom(false);
+					});
+				});
+			});
+		};
+		const tick = () => {
+			requestAnimationFrame(() => {
+				if (session !== zoomHighlightSessionRef.current || !pendingZoomHighlightRef.current) return;
+				const el = highlighterUtilsRef.current?.getViewer()?.container as HTMLElement | undefined;
+				const cur = el?.scrollTop ?? 0;
+				if (prevScroll !== undefined && Math.abs(cur - prevScroll) < 0.5) {
+					stableMatches += 1;
+					if (stableMatches >= ZOOM_SCROLL_STABLE_MATCHES_NEEDED) {
+						unsuppressAfterPaint();
+						return;
+					}
+				} else {
+					stableMatches = 0;
+				}
+				prevScroll = cur;
+				if (--framesLeft <= 0) {
+					unsuppressAfterPaint();
+					return;
+				}
+				tick();
+			});
+		};
+		tick();
+	}, []);
+
 	// Zoom controls
 	const zoomIn = useCallback(() => {
+		if (zoomHighlightDebounceRef.current) {
+			clearTimeout(zoomHighlightDebounceRef.current);
+			zoomHighlightDebounceRef.current = null;
+		}
+		zoomHighlightSessionRef.current += 1;
 		setScale((prev) => Math.min(prev + 0.25, 3));
+		pendingZoomHighlightRef.current = true;
+		setPdfHighlightsSuppressedForZoom(true);
 	}, []);
 
 	const zoomOut = useCallback(() => {
+		if (zoomHighlightDebounceRef.current) {
+			clearTimeout(zoomHighlightDebounceRef.current);
+			zoomHighlightDebounceRef.current = null;
+		}
+		zoomHighlightSessionRef.current += 1;
 		setScale((prev) => Math.max(prev - 0.25, 0.5));
+		pendingZoomHighlightRef.current = true;
+		setPdfHighlightsSuppressedForZoom(true);
 	}, []);
 
 	// Apply scale changes directly to the viewer
@@ -306,10 +370,67 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 	useEffect(() => {
 		scaleRef.current = scale;
 		const viewer = highlighterUtilsRef.current?.getViewer();
-		if (viewer) {
-			viewer.currentScaleValue = String(scale);
+		if (!viewer) return;
+		viewer.currentScaleValue = String(scale);
+
+		// Guard the currentScaleValue setter against the library's stale ResizeObserver.
+		// The library's useLayoutEffect captures pdfScaleValue at the time [highlights, selectionTip,
+		// onSelectionFinished] last changed — NOT when pdfScaleValue changes — so its ResizeObserver
+		// calls handleScaleValue() with an old scale value on every container resize (e.g., when a
+		// horizontal scrollbar appears at 1.25× that wasn't present at 1.0×). This triggers a
+		// 1.25→1→1.25 scale sequence in PDF.js, causing 3+ extra page canvas redraws that visually
+		// flash the PDF content. Block any scale reversion while zoom animation is in progress.
+		let proto: object | null = Object.getPrototypeOf(viewer);
+		let originalDescriptor: PropertyDescriptor | undefined;
+		while (proto) {
+			originalDescriptor = Object.getOwnPropertyDescriptor(proto, 'currentScaleValue');
+			if (originalDescriptor?.set) break;
+			proto = Object.getPrototypeOf(proto);
 		}
+		const originalSet = originalDescriptor?.set;
+		if (!originalSet) return;
+
+		Object.defineProperty(viewer as object, 'currentScaleValue', {
+			get: originalDescriptor!.get,
+			set(value: string) {
+				// During zoom animation, block any setter call that would revert to an old scale
+				if (pendingZoomHighlightRef.current) {
+					const num = parseFloat(value);
+					if (!isNaN(num) && Math.abs(num - scaleRef.current) > 0.001) {
+						return;
+					}
+				}
+				originalSet.call(this, value);
+			},
+			configurable: true,
+		});
+
+		return () => {
+			// Remove the instance-level override so the prototype setter is used again.
+			// The new effect run will re-install it with the updated scale.
+			try {
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				delete (viewer as any).currentScaleValue;
+			} catch {
+				// ignore
+			}
+		};
 	}, [scale]);
+
+	// Safety: never leave highlight overlays suppressed if pagerendered never settles.
+	useEffect(() => {
+		if (!pdfHighlightsSuppressedForZoom) return;
+		const id = setTimeout(() => {
+			if (zoomHighlightDebounceRef.current) {
+				clearTimeout(zoomHighlightDebounceRef.current);
+				zoomHighlightDebounceRef.current = null;
+			}
+			zoomHighlightSessionRef.current += 1;
+			pendingZoomHighlightRef.current = false;
+			setPdfHighlightsSuppressedForZoom(false);
+		}, 3000);
+		return () => clearTimeout(id);
+	}, [pdfHighlightsSuppressedForZoom]);
 
 	// Re-apply scale after container resizes to override the library's stale ResizeObserver
 	// (the library's ResizeObserver captures a stale pdfScaleValue due to missing dependency)
@@ -383,6 +504,16 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			return changed ? next : prev;
 		});
 	}, [highlights]);
+
+	/** Coalesce all layout-driven syncs to at most one per animation frame (avoids burst updates when pagerendered + ResizeObserver + scroll fire together). */
+	const annotationCardSyncRafRef = useRef(0);
+	const scheduleAnnotationCardSync = useCallback(() => {
+		if (annotationCardSyncRafRef.current !== 0) return;
+		annotationCardSyncRafRef.current = requestAnimationFrame(() => {
+			annotationCardSyncRafRef.current = 0;
+			syncAnnotationCardPositions();
+		});
+	}, [syncAnnotationCardPositions]);
 
 	// Handle selection
 	const handleSelection = useCallback(
@@ -532,6 +663,26 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		setIsAnnotating,
 	]);
 
+	// Click outside the inline annotation card (and outside highlight / sidebar rows) clears active highlight
+	useEffect(() => {
+		if (!activeHighlight) return;
+
+		const handleDocumentMouseDown = (e: MouseEvent) => {
+			const target = e.target as HTMLElement | null;
+			if (!target) return;
+
+			if (target.closest("[data-inline-annotation-card]")) return;
+			if (target.closest(".TextHighlight__parts, .TextHighlight__part")) return;
+			if (target.closest("[data-annotation-sidebar-row]")) return;
+			if (target.closest("[data-inline-annotation-menu]")) return;
+
+			setActiveHighlight(null);
+		};
+
+		document.addEventListener("mousedown", handleDocumentMouseDown);
+		return () => document.removeEventListener("mousedown", handleDocumentMouseDown);
+	}, [activeHighlight, setActiveHighlight]);
+
 	// When a new highlight is saved after a text selection annotate, create the pending card
 	useEffect(() => {
 		if (!addAnnotation) return;
@@ -572,10 +723,28 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const bus = (viewer as any)?.eventBus;
 		if (!bus?.on) return;
-		const onPageRendered = () => setPdfLayoutTick((t) => t + 1);
+		const onPageRendered = () => {
+			setPdfLayoutTick((t) => t + 1);
+			if (!pendingZoomHighlightRef.current) return;
+			if (zoomHighlightDebounceRef.current) {
+				clearTimeout(zoomHighlightDebounceRef.current);
+			}
+			zoomHighlightDebounceRef.current = setTimeout(() => {
+				zoomHighlightDebounceRef.current = null;
+				if (!pendingZoomHighlightRef.current) return;
+				const session = zoomHighlightSessionRef.current;
+				finishZoomWhenScrollStable(session);
+			}, ZOOM_HIGHLIGHT_DEBOUNCE_MS);
+		};
 		bus.on("pagerendered", onPageRendered);
-		return () => bus.off("pagerendered", onPageRendered);
-	}, [pdfReady, numPages, viewerReadyTick]);
+		return () => {
+			bus.off("pagerendered", onPageRendered);
+			if (zoomHighlightDebounceRef.current) {
+				clearTimeout(zoomHighlightDebounceRef.current);
+				zoomHighlightDebounceRef.current = null;
+			}
+		};
+	}, [pdfReady, numPages, viewerReadyTick, finishZoomWhenScrollStable]);
 
 	// Reset the restore guard whenever the set of persisted annotation IDs changes (e.g.
 	// after an annotation is created or deleted on the server). This ensures that if the
@@ -603,11 +772,11 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		// would be locked to true with empty arrays and the restore would never run.
 		if (!annotations.length || !highlights.length) return;
 
-		// Group annotations by highlight_id, keep the first (earliest) per highlight
-		const byHighlight = new Map<string, { content: string; annotationId: string }>();
+		// Group annotations by highlight_id, keep the first (earliest) annotationId per highlight
+		const byHighlight = new Map<string, string>();
 		for (const ann of annotations) {
 			if (!byHighlight.has(ann.highlight_id)) {
-				byHighlight.set(ann.highlight_id, { content: ann.content, annotationId: ann.id });
+				byHighlight.set(ann.highlight_id, ann.id);
 			}
 		}
 
@@ -615,7 +784,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		let missingPageView = 0;
 		let attempted = 0;
 
-		byHighlight.forEach(({ content, annotationId }, highlightId) => {
+		byHighlight.forEach((annotationId, highlightId) => {
 			const highlight = highlights.find(h => h.id === highlightId);
 			if (!highlight?.position || !highlight.page_number) return;
 
@@ -632,7 +801,6 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 				top: anchor.top,
 				left: anchor.left,
 				scrollContainer,
-				initialContent: content,
 				annotationId,
 			});
 		});
@@ -655,16 +823,24 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		}
 	}, [pdfReady, annotations, highlights, pdfLayoutTick, scale, numPages, viewerReadyTick]);
 
+	// Auto-remove card entries whose entire annotation thread has been deleted
+	useEffect(() => {
+		setAnnotationCards(prev => prev.filter(card =>
+			!card.annotationId ||
+			annotations.some(a => a.highlight_id === card.highlightId)
+		));
+	}, [annotations]);
+
 	// Keep margin card anchors in sync when zoom/layout changes (restore only sets initial positions once).
 	useEffect(() => {
 		if (!pdfReady) return;
-		syncAnnotationCardPositions();
+		scheduleAnnotationCardSync();
 	}, [
 		pdfReady,
 		pdfLayoutTick,
 		viewerReadyTick,
 		annotationCards.length,
-		syncAnnotationCardPositions,
+		scheduleAnnotationCardSync,
 	]);
 
 	// PDF scroll/resize does not trigger React state — re-sync card positions from live page geometry.
@@ -674,16 +850,11 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		const el = viewer?.container as HTMLElement | undefined;
 		if (!el) return;
 
-		let rafId = 0;
-		const scheduleSync = () => {
-			if (rafId !== 0) return;
-			rafId = requestAnimationFrame(() => {
-				rafId = 0;
-				syncAnnotationCardPositions();
-			});
+		const onScrollOrResize = () => {
+			scheduleAnnotationCardSync();
 		};
 
-		el.addEventListener("scroll", scheduleSync, { passive: true });
+		el.addEventListener("scroll", onScrollOrResize, { passive: true });
 		const ro = new ResizeObserver(() => {
 			// Re-apply correct scale synchronously before browser can paint.
 			// Our callback fires after the library's (registered earlier), so the library's stale
@@ -693,18 +864,21 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			if (v && v.currentScaleValue !== String(scaleRef.current)) {
 				v.currentScaleValue = String(scaleRef.current);
 			}
-			scheduleSync();
+			scheduleAnnotationCardSync();
 		});
 		ro.observe(el);
-		window.addEventListener("resize", scheduleSync);
+		window.addEventListener("resize", onScrollOrResize);
 
 		return () => {
-			el.removeEventListener("scroll", scheduleSync);
+			el.removeEventListener("scroll", onScrollOrResize);
 			ro.disconnect();
-			window.removeEventListener("resize", scheduleSync);
-			if (rafId !== 0) cancelAnimationFrame(rafId);
+			window.removeEventListener("resize", onScrollOrResize);
+			if (annotationCardSyncRafRef.current !== 0) {
+				cancelAnimationFrame(annotationCardSyncRafRef.current);
+				annotationCardSyncRafRef.current = 0;
+			}
 		};
-	}, [pdfReady, viewerReadyTick, syncAnnotationCardPositions]);
+	}, [pdfReady, viewerReadyTick, scheduleAnnotationCardSync]);
 
 	// Keep the module-level store in sync so HighlightContainer (in a separate React root) can react
 	useEffect(() => {
@@ -909,10 +1083,12 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 				);
 				if (existingOverlay) continue;
 
-				// Use different colors based on role and user's color selection
-				const backgroundColor = highlight.role === "assistant"
-					? "rgba(168, 85, 247, 0.3)"  // Purple for assistant
-					: HIGHLIGHT_COLOR_MAP[highlight.color || "blue"]; // User's selected color
+				const overlayIsActive =
+					Boolean(highlight.id) && highlight.id === activeHighlight?.id;
+				const backgroundColor =
+					highlight.role === "assistant"
+						? getAssistantHighlightBackgroundRgba(overlayIsActive)
+						: getUserHighlightBackgroundRgba(highlight.color, overlayIsActive);
 
 				const overlays = createTextHighlightOverlays(
 					textLayer,
@@ -1087,7 +1263,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			pendingTimeouts.forEach((timeout) => clearTimeout(timeout));
 			pendingTimeouts.clear();
 		};
-	}, [pdfReady, highlights, scale, onOverlaysCreated]);
+	}, [pdfReady, highlights, scale, onOverlaysCreated, activeHighlight]);
 
 	return (
 		<div
@@ -1126,7 +1302,12 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			/>
 
 			{/* PDF Viewer — overflow-x-visible so margin annotation cards beside the page are not clipped */}
-			<div className="flex-1 min-h-0 overflow-x-visible overflow-y-hidden relative">
+			<div
+				className={cn(
+					"flex-1 min-h-0 overflow-x-visible overflow-y-hidden relative",
+					pdfHighlightsSuppressedForZoom && "pdf-zoom-layout-pending"
+				)}
+			>
 				<PdfLoader
 					key={pdfLoaderKey}
 					document={effectivePdfUrl}
@@ -1301,13 +1482,13 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 					highlightId={card.highlightId}
 					topPosition={card.top}
 					leftPosition={card.left}
-					initialContent={card.initialContent}
-					annotationId={card.annotationId}
+					annotations={annotations.filter(a => a.highlight_id === card.highlightId)}
 					isActive={card.highlightId === activeId}
 					user={currentUser ?? null}
-				addAnnotation={addAnnotation}
-				updateAnnotation={updateAnnotation}
-				onHeightChange={(h) =>
+					addAnnotation={addAnnotation}
+					updateAnnotation={updateAnnotation}
+					removeAnnotation={removeAnnotation}
+					onHeightChange={(h) =>
 						setCardHeights(prev => {
 							const next = new Map(prev);
 							next.set(card.highlightId, h);
@@ -1319,22 +1500,24 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 							c.highlightId === card.highlightId ? { ...c, annotationId: savedId } : c
 						))
 					}
-				onDelete={() => {
-					if (card.annotationId && removeAnnotation) removeAnnotation(card.annotationId);
-					setAnnotationCards(prev => prev.filter(c => c.highlightId !== card.highlightId));
-					setCardHeights(prev => { const next = new Map(prev); next.delete(card.highlightId); return next; });
-					setIsAnnotating(false);
-					setSelectionRectTop(null);
-				}}
-				onClose={() => {
-					setIsAnnotating(false);
-					setSelectionRectTop(null);
-					// Only remove unsaved cards — saved annotations persist until explicitly deleted
-					if (!card.annotationId) {
-						setAnnotationCards(prev => prev.filter(c => c.highlightId !== card.highlightId));
-						setCardHeights(prev => { const next = new Map(prev); next.delete(card.highlightId); return next; });
-					}
-				}}
+					onClose={() => {
+						setIsAnnotating(false);
+						setSelectionRectTop(null);
+						// Only remove unsaved cards — saved annotation threads persist until all comments are deleted
+						if (!card.annotationId) {
+							setAnnotationCards(prev => prev.filter(c => c.highlightId !== card.highlightId));
+							setCardHeights(prev => { const next = new Map(prev); next.delete(card.highlightId); return next; });
+						}
+					}}
+					onCardFocus={() => {
+						const h = highlights.find(x => x.id === card.highlightId);
+						if (h) {
+							blockScrollOnNextHighlight.current = true;
+							setActiveHighlight(h);
+							setIsHighlightInteraction(true);
+							setSelectedText(h.raw_text ?? "");
+						}
+					}}
 				/>,
 				card.scrollContainer
 			)

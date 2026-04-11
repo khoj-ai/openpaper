@@ -317,3 +317,19 @@
 	border-radius: 2px;
 	pointer-events: none;
 }
+
+/*
+ * Zoom: highlight rects jump every layout pass (library viewport math + DOM overlays from search/text-match).
+ * Parent gets pdf-zoom-layout-pending until pagerendered quiets — see PdfHighlighterViewer.
+ */
+/* No opacity transition: fading 0→1 can run over frames where highlight rects are still wrong. */
+.pdf-zoom-layout-pending .PdfHighlighter__highlight-layer {
+	opacity: 0 !important;
+	pointer-events: none !important;
+}
+
+.pdf-zoom-layout-pending .text-match-highlight-overlay,
+.pdf-zoom-layout-pending .search-highlight-overlay {
+	opacity: 0 !important;
+	pointer-events: none !important;
+}

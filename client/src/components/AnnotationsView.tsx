@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { User as UserIcon } from 'lucide-react';
 
 import {
@@ -36,10 +36,9 @@ interface AnnotationsViewProps {
 	renderedHighlightPositions?: Map<string, RenderedHighlightPosition>;
 }
 
-interface FlatAnnotationItem {
+interface AnnotationThread {
 	highlight: PaperHighlight;
-	annotation: PaperHighlightAnnotation;
-	isFirstForHighlight: boolean;
+	annotations: PaperHighlightAnnotation[];
 }
 
 export function AnnotationsView({
@@ -52,17 +51,11 @@ export function AnnotationsView({
 }: AnnotationsViewProps) {
 	const firstAnnotationRefs = useRef<Record<string, HTMLDivElement | null>>({});
 	const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+	const prevActiveIdRef = useRef<string | null>(null);
+	/** highlight id → expanded full thread (same behavior as inline annotation card) */
+	const [expandedThreads, setExpandedThreads] = useState<Record<string, boolean>>({});
 
-	useEffect(() => {
-		if (activeHighlight?.id) {
-			const element = firstAnnotationRefs.current[activeHighlight.id];
-			if (element && scrollContainerRef.current) {
-				smoothScrollTo(element, scrollContainerRef.current);
-			}
-		}
-	}, [activeHighlight]);
-
-	const flatItems = React.useMemo<FlatAnnotationItem[]>(() => {
+	const threads = useMemo<AnnotationThread[]>(() => {
 		const annotationMap = new Map<string, PaperHighlightAnnotation[]>();
 		for (const ann of annotations) {
 			const existing = annotationMap.get(ann.highlight_id) ?? [];
@@ -105,31 +98,41 @@ export function AnnotationsView({
 			return aTop - bTop;
 		});
 
-		const items: FlatAnnotationItem[] = [];
-		for (const highlight of sorted) {
-			const anns = annotationMap.get(highlight.id!) ?? [];
-			anns.forEach((ann) => {
-				items.push({ highlight, annotation: ann, isFirstForHighlight: false });
-			});
-		}
-
-		// Sort all items newest → oldest
-		items.sort(
-			(a, b) =>
-				new Date(b.annotation.created_at).getTime() -
-				new Date(a.annotation.created_at).getTime()
-		);
-
-		// Recompute isFirstForHighlight after the sort so refs anchor correctly
-		const seenHighlightIds = new Set<string>();
-		return items.map((item) => {
-			const isFirst = !seenHighlightIds.has(item.highlight.id!);
-			seenHighlightIds.add(item.highlight.id!);
-			return { ...item, isFirstForHighlight: isFirst };
-		});
+		return sorted.map((highlight) => ({
+			highlight,
+			annotations: (annotationMap.get(highlight.id!) ?? []).sort(
+				(a, b) =>
+					new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+			),
+		}));
 	}, [highlights, annotations, renderedHighlightPositions]);
 
-	if (flatItems.length === 0) {
+	useEffect(() => {
+		if (activeHighlight?.id) {
+			const element = firstAnnotationRefs.current[activeHighlight.id];
+			if (element && scrollContainerRef.current) {
+				smoothScrollTo(element, scrollContainerRef.current);
+			}
+		}
+	}, [activeHighlight]);
+
+	// When the active highlight changes, collapse only the *previous* highlight's thread — not the
+	// newly selected one. Clearing the whole map was wiping expansion set in the same click as
+	// switching highlights (e.g. B → A required two clicks to expand A).
+	useEffect(() => {
+		const id = activeHighlight?.id ?? null;
+		const prev = prevActiveIdRef.current;
+		if (prev !== null && id !== null && prev !== id) {
+			setExpandedThreads((prevMap) => {
+				const next = { ...prevMap };
+				delete next[prev];
+				return next;
+			});
+		}
+		prevActiveIdRef.current = id;
+	}, [activeHighlight?.id]);
+
+	if (threads.length === 0) {
 		return (
 			<div className="flex flex-col gap-4 text-center">
 				<p className="text-secondary-foreground text-sm">
@@ -143,43 +146,65 @@ export function AnnotationsView({
 		<div className="flex flex-col h-full">
 			<div className="flex-1 overflow-auto" ref={scrollContainerRef}>
 				<div className="divide-y divide-border">
-					{flatItems.map(({ highlight, annotation, isFirstForHighlight }) => {
-						const isActive = activeHighlight?.id === highlight.id;
+					{threads.map(({ highlight, annotations: threadAnns }) => {
+						const hid = highlight.id!;
+						const isActive = activeHighlight?.id === hid;
 						const color: HighlightColor = highlight.role === 'assistant'
 							? 'purple'
 							: (highlight.color || 'blue');
 						const bg = isActive ? ITEM_BG_ACTIVE_MAP[color] : ITEM_BG_MAP[color];
 
+						const hasMulti = threadAnns.length > 1;
+						const expanded = expandedThreads[hid] ?? false;
+						const visible =
+							!hasMulti || expanded ? threadAnns : threadAnns.slice(0, 1);
+						const moreCount = hasMulti && !expanded ? threadAnns.length - 1 : 0;
+
 						return (
 							<div
-								key={annotation.id}
+								key={hid}
+								data-annotation-sidebar-row=""
 								ref={(el) => {
-									if (isFirstForHighlight && highlight.id) {
-										firstAnnotationRefs.current[highlight.id] = el;
-									}
+									firstAnnotationRefs.current[hid] = el;
 								}}
 								className={`px-4 py-3 cursor-pointer transition-colors ${bg}`}
-								onClick={() => onHighlightClick(highlight)}
+								onClick={() => {
+									onHighlightClick(highlight);
+									if (hasMulti && !expanded) {
+										setExpandedThreads((prev) => ({ ...prev, [hid]: true }));
+									}
+								}}
 							>
-								<div className="flex items-center gap-2 mb-2">
-									<div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-muted flex items-center justify-center">
-										{user?.picture ? (
-											// eslint-disable-next-line @next/next/no-img-element
-											<img src={user.picture} alt={user.name} className="w-full h-full object-cover" />
-										) : (
-											<UserIcon size={14} className="text-muted-foreground" />
-										)}
-									</div>
-									<span className="text-sm font-medium text-foreground">
-										{user?.name || 'User'}
-									</span>
-									<span className="text-xs text-muted-foreground">
-										{formatDate(annotation.created_at)}
-									</span>
+								<div className="flex flex-col gap-3">
+									{visible.map((annotation) => (
+										<div key={annotation.id} className="flex flex-col gap-2">
+											<div className="flex items-center gap-2">
+												<div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-muted flex items-center justify-center">
+													{user?.picture ? (
+														// eslint-disable-next-line @next/next/no-img-element
+														<img src={user.picture} alt={user.name} className="w-full h-full object-cover" />
+													) : (
+														<UserIcon size={14} className="text-muted-foreground" />
+													)}
+												</div>
+												<span className="text-sm font-medium text-foreground">
+													{user?.name || 'User'}
+												</span>
+												<span className="text-xs text-muted-foreground">
+													{formatDate(annotation.created_at)}
+												</span>
+											</div>
+											<p className="text-sm text-foreground leading-snug whitespace-pre-wrap pl-10">
+												{annotation.content}
+											</p>
+										</div>
+									))}
+									{moreCount > 0 && (
+										<p className="text-xs text-muted-foreground pl-10">
+											+{moreCount} more {moreCount === 1 ? 'reply' : 'replies'} — click to show
+										</p>
+									)}
 								</div>
-								<p className="text-sm text-foreground leading-snug whitespace-pre-wrap pl-10">
-									{annotation.content}
-								</p>
 							</div>
 						);
 					})}

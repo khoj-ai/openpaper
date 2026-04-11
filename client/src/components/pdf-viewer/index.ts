@@ -6,3 +6,8 @@ export { activeHighlightStore } from "./activeHighlightStore";
 export { usePdfSearch } from "./usePdfSearch";
 export { PdfToolbar } from "./PdfToolbar";
 export { findTextPages, createTextHighlightOverlays, removeHighlightOverlays, computeScaledPositionFromTextLayer } from "./findTextPosition";
+export {
+	getAssistantHighlightBackgroundRgba,
+	getUserHighlightBackgroundRgba,
+	USER_HIGHLIGHT_RGBA,
+} from "./highlightColors";
