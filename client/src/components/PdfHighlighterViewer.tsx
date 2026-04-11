@@ -97,6 +97,7 @@ interface PdfHighlighterViewerProps {
 	removeAnnotation?: (annotationId: string) => void;
 	currentUser?: BasicUser | null;
 	showAnnotationCards?: boolean;
+	onToggleAnnotationCards?: () => void;
 }
 
 export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
@@ -128,6 +129,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		currentUser,
 		annotations,
 		showAnnotationCards = true,
+		onToggleAnnotationCards,
 	} = props;
 
 	// Position anchors for inline annotation cards
@@ -991,6 +993,8 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 				handleStatusChange={handleStatusChange}
 				highlightColor={highlightColor}
 				setHighlightColor={setHighlightColor}
+				showAnnotationCards={showAnnotationCards}
+				onToggleAnnotationCards={onToggleAnnotationCards}
 			/>
 
 			{/* PDF Viewer — overflow-x-visible so margin annotation cards beside the page are not clipped */}

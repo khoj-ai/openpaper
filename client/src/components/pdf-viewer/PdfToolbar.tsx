@@ -13,6 +13,8 @@ import {
 	Search,
 	X,
 	Highlighter,
+	Eye,
+	EyeOff,
 } from "lucide-react";
 import {
 	DropdownMenu,
@@ -66,6 +68,10 @@ interface PdfToolbarProps {
 	// Highlight color
 	highlightColor: HighlightColor;
 	setHighlightColor: (color: HighlightColor) => void;
+
+	/** Margin annotation cards visibility (omit when not wired). */
+	showAnnotationCards?: boolean;
+	onToggleAnnotationCards?: () => void;
 }
 
 export function PdfToolbar({
@@ -93,6 +99,8 @@ export function PdfToolbar({
 	handleStatusChange = () => { },
 	highlightColor,
 	setHighlightColor,
+	showAnnotationCards = true,
+	onToggleAnnotationCards,
 }: PdfToolbarProps) {
 	const currentColorConfig = HIGHLIGHT_COLORS.find((c) => c.color === highlightColor) || HIGHLIGHT_COLORS[2];
 	return (
@@ -266,7 +274,24 @@ export function PdfToolbar({
 					</Button>
 				</div>
 
-				{/* Status dropdown */}
+				{onToggleAnnotationCards && (
+					<Button
+						type="button"
+						size="sm"
+						variant="ghost"
+						className={`h-8 w-8 p-0 ${
+							showAnnotationCards
+								? "text-secondary-foreground hover:bg-muted dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-foreground"
+								: "text-muted-foreground hover:bg-muted dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+						}`}
+						onClick={onToggleAnnotationCards}
+						title={showAnnotationCards ? "Hide annotations" : "Show annotations"}
+					>
+						{showAnnotationCards ? <Eye size={16} /> : <EyeOff size={16} />}
+					</Button>
+				)}
+
+				{/* Reading status */}
 				{paperStatus && (
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>

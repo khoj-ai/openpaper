@@ -773,7 +773,7 @@ export function SidePanelContent({
     return (
         <>
             {
-                rightSideFunction !== 'Focus' && (
+                rightSideFunction !== 'Read' && (
                     <div className="flex-grow h-full overflow-hidden pr-[60px]">
                         {
                             rightSideFunction === 'Annotations' && user && (

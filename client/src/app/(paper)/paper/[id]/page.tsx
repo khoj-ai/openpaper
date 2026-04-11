@@ -41,8 +41,8 @@ const OverviewTool = {
     icon: Lightbulb,
 }
 
-const FocusTool = {
-    name: "Focus",
+const ReadTool = {
+    name: "Read",
     icon: Focus,
 }
 
@@ -67,7 +67,7 @@ const PaperToolset = {
         OverviewTool,
         AnnotationsTool,
         AudioTool,
-        FocusTool,
+        ReadTool,
     ],
 }
 
@@ -140,7 +140,9 @@ export default function PaperView() {
     // Capture the initial rsf from URL on first render
     useEffect(() => {
         if (initialRsfRef.current === null) {
-            initialRsfRef.current = searchParams.get('rsf')?.toLowerCase() || null;
+            let rsf = searchParams.get('rsf')?.toLowerCase() || null;
+            if (rsf === 'focus') rsf = 'read'; // legacy URL param when tool was named Focus
+            initialRsfRef.current = rsf;
         }
     }, [searchParams]);
 
@@ -187,7 +189,7 @@ export default function PaperView() {
     const [mobileView, setMobileView] = useState<'reader' | 'panel'>('reader');
 
     if (isMobile) {
-        toolset.nav = toolset.nav.filter(tool => tool.name !== 'Focus');
+        toolset.nav = toolset.nav.filter(tool => tool.name !== 'Read');
     }
 
     useEffect(() => {
@@ -528,6 +530,7 @@ export default function PaperView() {
                                     removeAnnotation={removeAnnotation}
                                     currentUser={user}
                                     showAnnotationCards={showAnnotationCards}
+                                    onToggleAnnotationCards={() => setShowAnnotationCards(v => !v)}
                                 />
                             )}
                         </div>
@@ -554,8 +557,6 @@ export default function PaperView() {
                                             rightSideFunction={rightSideFunction}
                                             setRightSideFunction={setRightSideFunction}
                                             PaperToolset={toolset}
-                                            showAnnotationCards={showAnnotationCards}
-                                            onToggleAnnotationCards={() => setShowAnnotationCards(v => !v)}
                                         />
                                     </>
                                 )}
@@ -586,7 +587,7 @@ export default function PaperView() {
                 <div
                     className="border-r-2 dark:border-gray-800 border-gray-200 p-0 h-full"
                     style={{
-                        width: rightSideFunction === 'Focus' ? '100%' : `${leftPanelWidth}%`
+                        width: rightSideFunction === 'Read' ? '100%' : `${leftPanelWidth}%`
                     }}
                 >
                     {paperData.file_url && (
@@ -621,13 +622,14 @@ export default function PaperView() {
                                 removeAnnotation={removeAnnotation}
                                 currentUser={user}
                                 showAnnotationCards={showAnnotationCards}
+                                onToggleAnnotationCards={() => setShowAnnotationCards(v => !v)}
                             />
                         </div>
                     )}
                 </div>
 
                 {/* Resizable Divider */}
-                {rightSideFunction !== 'Focus' && (
+                {rightSideFunction !== 'Read' && (
                     <div
                         className="w-2 bg-background hover:bg-blue-100 dark:hover:bg-blue-400 cursor-col-resize transition-colors duration-200 flex-shrink-0 h-full rounded-2xl"
                         onMouseDown={(e) => {
@@ -640,7 +642,7 @@ export default function PaperView() {
                 {/* Right Side Panel */}
                 <div
                     className="flex flex-row h-full relative"
-                    style={rightSideFunction !== 'Focus' ? { width: `${100 - leftPanelWidth}%` } : { width: 'auto' }}
+                    style={rightSideFunction !== 'Read' ? { width: `${100 - leftPanelWidth}%` } : { width: 'auto' }}
                 >
                     {jobId ? (
                         <div className="flex flex-col h-full w-full">
@@ -660,8 +662,6 @@ export default function PaperView() {
                                 rightSideFunction={rightSideFunction}
                                 setRightSideFunction={setRightSideFunction}
                                 PaperToolset={toolset}
-                                showAnnotationCards={showAnnotationCards}
-                                onToggleAnnotationCards={() => setShowAnnotationCards(v => !v)}
                             />
                         </>
                     )}

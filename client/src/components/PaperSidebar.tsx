@@ -7,7 +7,6 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { Eye, EyeOff } from 'lucide-react';
 import React from 'react';
 
 /** Primary panels where the toolbar sits higher (less gap under the top bar). */
@@ -22,8 +21,6 @@ interface PaperSidebarProps {
             icon: React.ComponentType<{ className?: string }>;
         }[];
     };
-    showAnnotationCards: boolean;
-    onToggleAnnotationCards: () => void;
 }
 
 function NavButton({ item, rightSideFunction, setRightSideFunction }: {
@@ -53,9 +50,9 @@ function NavButton({ item, rightSideFunction, setRightSideFunction }: {
     );
 }
 
-export function PaperSidebar({ rightSideFunction, setRightSideFunction, PaperToolset, showAnnotationCards, onToggleAnnotationCards }: PaperSidebarProps) {
-    const beforeFocus = PaperToolset.nav.filter(item => item.name !== 'Focus');
-    const focusTool = PaperToolset.nav.find(item => item.name === 'Focus');
+export function PaperSidebar({ rightSideFunction, setRightSideFunction, PaperToolset }: PaperSidebarProps) {
+    const beforeReadTool = PaperToolset.nav.filter(item => item.name !== 'Read');
+    const readTool = PaperToolset.nav.find(item => item.name === 'Read');
 
     const toolbarTopClass = COMPACT_TOP_OFFSET_TOOLS.has(rightSideFunction) ? 'top-2' : 'top-14';
 
@@ -67,7 +64,7 @@ export function PaperSidebar({ rightSideFunction, setRightSideFunction, PaperToo
                     toolbarTopClass,
                 )}
             >
-                {beforeFocus.map((item) => (
+                {beforeReadTool.map((item) => (
                     <NavButton key={item.name} item={item} rightSideFunction={rightSideFunction} setRightSideFunction={setRightSideFunction} />
                 ))}
                 <Tooltip>
@@ -80,30 +77,8 @@ export function PaperSidebar({ rightSideFunction, setRightSideFunction, PaperToo
                         Cite
                     </TooltipContent>
                 </Tooltip>
-                {/* Annotation cards visibility toggle */}
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button
-                            variant="ghost"
-                            className={`h-7 w-7 p-0 rounded-md ${
-                                showAnnotationCards
-                                    ? 'text-secondary-foreground hover:bg-blue-100 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-foreground'
-                                    : 'text-muted-foreground hover:bg-muted dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200'
-                            }`}
-                            onClick={onToggleAnnotationCards}
-                        >
-                            {showAnnotationCards
-                                ? <Eye className="h-4 w-4" />
-                                : <EyeOff className="h-4 w-4" />
-                            }
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="left" sideOffset={8}>
-                        {showAnnotationCards ? 'Hide annotations' : 'Show annotations'}
-                    </TooltipContent>
-                </Tooltip>
-                {focusTool && (
-                    <NavButton item={focusTool} rightSideFunction={rightSideFunction} setRightSideFunction={setRightSideFunction} />
+                {readTool && (
+                    <NavButton item={readTool} rightSideFunction={rightSideFunction} setRightSideFunction={setRightSideFunction} />
                 )}
             </div>
         </TooltipProvider>
