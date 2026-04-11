@@ -146,6 +146,7 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
     return (
         <div
             ref={menuRef}
+            data-inline-annotation-menu=""
             className="fixed z-30 bg-background shadow-md rounded-lg border border-border"
             style={{ left: `${menuPosition.left}px`, top: `${menuPosition.top}px` }}
             onClick={(e) => e.stopPropagation()}
