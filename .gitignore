@@ -52,3 +52,4 @@ next-env.d.ts
 
 # benchmarking
 benchmark_manifest.json
+eval_dataset.json
