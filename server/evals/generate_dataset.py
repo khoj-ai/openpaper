@@ -164,7 +164,9 @@ def load_dataset(path: str) -> dict:
     """Load existing dataset or create a fresh one."""
     if os.path.exists(path):
         with open(path) as f:
-            return json.load(f)
+            data = json.load(f)
+        data.setdefault("errors", [])
+        return data
     return {
         "version": "1.0",
         "created_at": datetime.now(timezone.utc).isoformat(),
