@@ -82,7 +82,7 @@ class AsyncLLMClient:
     with actual LLM API calls (OpenAI, Anthropic, Google, etc.)
     """
 
-    DEFAULT_TIMEOUT = 40_000  # 40s for text/cached operations
+    DEFAULT_TIMEOUT = 90_000  # 90s for text/cached operations
     PDF_TIMEOUT = 120_000    # 120s for PDF file operations
 
     def __init__(
@@ -102,18 +102,19 @@ class AsyncLLMClient:
             http_options=types.HttpOptions(timeout=timeout),
         )
 
-    async def create_cache(self, cache_content: str, client: genai.Client) -> str:
+    async def create_cache(self, cache_content: str, client: genai.Client, model: Optional[str] = None) -> str:
         """Create a cache entry for the given content.
 
         Args:
             cache_content (str): The content to cache.
             client: The genai client to use.
+            model: Optional model override. Defaults to self.default_model.
 
         Returns:
             str: The cache key for the stored content.
         """
         cached_content = await client.aio.caches.create(
-            model=self.default_model,
+            model=model or self.default_model,
             config=types.CreateCachedContentConfig(
                 contents=types.Content(
                     role='user',
@@ -285,7 +286,8 @@ class PaperOperations(AsyncLLMClient):
         schema: Type[BaseModel],
         status_callback: Callable[[str], None],
         client: genai.Client,
-        cache_key: Optional[str] = None
+        cache_key: Optional[str] = None,
+        llm_model: Optional[str] = None,
     ) -> T:
         """
         Helper function to extract a single metadata field.
@@ -295,6 +297,7 @@ class PaperOperations(AsyncLLMClient):
             paper_content: The paper content.
             status_callback: Optional function to update task status.
             client: The genai client to use.
+            llm_model: Optional LLM model override.
 
         Returns:
             An instance of the provided Pydantic model.
@@ -305,7 +308,7 @@ class PaperOperations(AsyncLLMClient):
         if paper_content and not cache_key:
             prompt = f"Paper Content:\n\n{paper_content}\n\n{prompt}"
 
-        response = await self.generate_content(prompt, cache_key=cache_key, schema=schema, client=client)
+        response = await self.generate_content(prompt, cache_key=cache_key, schema=schema, client=client, model=llm_model)
         response_json = JSONParser.validate_and_extract_json(response)
         instance = model.model_validate(response_json)
 
@@ -353,6 +356,7 @@ class PaperOperations(AsyncLLMClient):
         status_callback: Callable[[str], None],
         client: genai.Client,
         cache_key: Optional[str] = None,
+        llm_model: Optional[str] = None,
     ) -> TitleAuthorsAbstract:
         result = await self._extract_single_metadata_field(
             model=TitleAuthorsAbstract,
@@ -361,6 +365,7 @@ class PaperOperations(AsyncLLMClient):
             paper_content=paper_content,
             status_callback=status_callback,
             client=client,
+            llm_model=llm_model,
         )
         return result
 
@@ -371,6 +376,7 @@ class PaperOperations(AsyncLLMClient):
         status_callback: Callable[[str], None],
         client: genai.Client,
         cache_key: Optional[str] = None,
+        llm_model: Optional[str] = None,
     ) -> InstitutionsKeywords:
         return await self._extract_single_metadata_field(
             model=InstitutionsKeywords,
@@ -379,6 +385,7 @@ class PaperOperations(AsyncLLMClient):
             paper_content=paper_content,
             status_callback=status_callback,
             client=client,
+            llm_model=llm_model,
         )
 
     @retry_llm_operation(max_retries=3, delay=1.0)
@@ -388,6 +395,7 @@ class PaperOperations(AsyncLLMClient):
         status_callback: Callable[[str], None],
         client: genai.Client,
         cache_key: Optional[str] = None,
+        llm_model: Optional[str] = None,
     ) -> SummaryAndCitations:
         result = await self._extract_single_metadata_field(
             model=SummaryAndCitations,
@@ -396,6 +404,7 @@ class PaperOperations(AsyncLLMClient):
             paper_content=paper_content,
             status_callback=status_callback,
             client=client,
+            llm_model=llm_model,
         )
         return result
 
@@ -406,6 +415,7 @@ class PaperOperations(AsyncLLMClient):
         status_callback: Callable[[str], None],
         client: genai.Client,
         cache_key: Optional[str] = None,
+        llm_model: Optional[str] = None,
     ) -> Highlights:
         return await self._extract_single_metadata_field(
             model=Highlights,
@@ -414,6 +424,7 @@ class PaperOperations(AsyncLLMClient):
             cache_key=cache_key,
             schema=Highlights,
             client=client,
+            llm_model=llm_model,
         )
 
     async def extract_paper_metadata(
@@ -433,13 +444,18 @@ class PaperOperations(AsyncLLMClient):
             PaperMetadataExtraction: Extracted metadata
         """
         async with time_it("Extracting paper metadata from LLM", job_id=job_id):
+            # Check for model override via environment variable
+            extraction_model = os.getenv("EXTRACTION_MODEL")
+            if extraction_model:
+                logger.info(f"Using extraction model override: {extraction_model}")
+
             # Create a fresh client for this operation
             client = self._create_client()
 
             try:
                 try:
                     async with time_it("Creating cache for paper content", job_id=job_id):
-                        cache_key = await self.create_cache(paper_content, client)
+                        cache_key = await self.create_cache(paper_content, client, model=extraction_model)
                 except Exception as e:
                     logger.error(f"Failed to create cache: {e}", exc_info=True)
                     cache_key = None
@@ -454,6 +470,7 @@ class PaperOperations(AsyncLLMClient):
                             cache_key=cache_key,
                             status_callback=status_callback,
                             client=client,
+                            llm_model=extraction_model,
                         )),
                         asyncio.create_task(time_it("Extracting institutions and keywords", job_id=job_id)(
                             self.extract_institutions_keywords
@@ -462,6 +479,7 @@ class PaperOperations(AsyncLLMClient):
                             cache_key=cache_key,
                             status_callback=status_callback,
                             client=client,
+                            llm_model=extraction_model,
                         )),
                         asyncio.create_task(time_it("Extracting summary and citations", job_id=job_id)(
                             self.extract_summary_and_citations
@@ -470,6 +488,7 @@ class PaperOperations(AsyncLLMClient):
                             cache_key=cache_key,
                             status_callback=status_callback,
                             client=client,
+                            llm_model=extraction_model,
                         )),
                         asyncio.create_task(time_it("Extracting highlights", job_id=job_id)(
                             self.extract_highlights
@@ -478,6 +497,7 @@ class PaperOperations(AsyncLLMClient):
                             cache_key=cache_key,
                             status_callback=status_callback,
                             client=client,
+                            llm_model=extraction_model,
                         )),
                     ]
 
