@@ -74,6 +74,9 @@ interface SidePanelContentProps {
     setUserMessageReferences: React.Dispatch<React.SetStateAction<string[]>>;
     isMobile: boolean;
     renderedHighlightPositions?: Map<string, RenderedHighlightPosition>;
+    composeHighlightId?: string | null;
+    onComposeHighlightDismiss?: () => void;
+    addAnnotation?: (highlightId: string, content: string) => Promise<PaperHighlightAnnotation>;
 }
 
 interface ChatRequestBody {
@@ -105,6 +108,9 @@ export function SidePanelContent({
     setUserMessageReferences,
     isMobile,
     renderedHighlightPositions,
+    composeHighlightId,
+    onComposeHighlightDismiss,
+    addAnnotation,
 }: SidePanelContentProps) {
     const { user } = useAuth();
     const [conversationId, setConversationId] = useState<string | null>(null);
@@ -779,6 +785,9 @@ export function SidePanelContent({
                                         onHighlightClick={handleHighlightClick}
                                         activeHighlight={activeHighlight}
                                         renderedHighlightPositions={renderedHighlightPositions}
+                                        composeHighlightId={composeHighlightId}
+                                        onComposeHighlightDismiss={onComposeHighlightDismiss}
+                                        addAnnotation={addAnnotation}
                                     />
                                 </div>
                             )

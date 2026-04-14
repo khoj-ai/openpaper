@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { User as UserIcon } from 'lucide-react';
 
 import {
@@ -9,7 +9,8 @@ import {
 import { RenderedHighlightPosition } from './PdfHighlighterViewer';
 import { smoothScrollTo } from '@/lib/animation';
 import { BasicUser } from "@/lib/auth";
-import { formatDate } from '@/lib/utils';
+import { formatAnnotationDate } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 const ITEM_BG_MAP: Record<HighlightColor, string> = {
 	yellow: "bg-yellow-50 dark:bg-yellow-950/20",
@@ -19,13 +20,15 @@ const ITEM_BG_MAP: Record<HighlightColor, string> = {
 	purple: "bg-purple-50 dark:bg-purple-950/20",
 };
 
-const ITEM_BG_ACTIVE_MAP: Record<HighlightColor, string> = {
-	yellow: "bg-yellow-100 dark:bg-yellow-900/30",
-	green:  "bg-green-100 dark:bg-green-900/30",
-	blue:   "bg-blue-100 dark:bg-blue-900/30",
-	pink:   "bg-pink-100 dark:bg-pink-900/30",
-	purple: "bg-purple-100 dark:bg-purple-900/30",
-};
+/** Matches `InlineAnnotationCard` reply field — max-h-48 */
+const REPLY_TEXTAREA_MAX_PX = 192;
+function autoResizeReplyTextarea(el: HTMLTextAreaElement) {
+	el.style.height = "auto";
+	el.style.height = `${Math.min(el.scrollHeight, REPLY_TEXTAREA_MAX_PX)}px`;
+}
+
+const inlineReplyTextareaClassName =
+	"text-sm text-foreground placeholder:text-muted-foreground resize-none w-full min-h-[4rem] max-h-48 px-3 py-2 overflow-y-auto overflow-x-hidden box-border rounded-md border border-black bg-background focus:outline-none focus:ring-0 focus:border-black dark:border-white dark:focus:border-white";
 
 interface AnnotationsViewProps {
 	highlights: PaperHighlight[];
@@ -34,6 +37,10 @@ interface AnnotationsViewProps {
 	activeHighlight?: PaperHighlight | null;
 	user: BasicUser;
 	renderedHighlightPositions?: Map<string, RenderedHighlightPosition>;
+	composeHighlightId?: string | null;
+	onComposeHighlightDismiss?: () => void;
+	addAnnotation?: (highlightId: string, content: string) => Promise<PaperHighlightAnnotation>;
+	readonly?: boolean;
 }
 
 interface AnnotationThread {
@@ -48,12 +55,24 @@ export function AnnotationsView({
 	activeHighlight,
 	user,
 	renderedHighlightPositions,
+	composeHighlightId = null,
+	onComposeHighlightDismiss,
+	addAnnotation,
+	readonly = false,
 }: AnnotationsViewProps) {
 	const firstAnnotationRefs = useRef<Record<string, HTMLDivElement | null>>({});
 	const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+	const composeBlockRef = useRef<HTMLDivElement | null>(null);
+	const composeTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 	const prevActiveIdRef = useRef<string | null>(null);
 	/** highlight id → expanded full thread (same behavior as inline annotation card) */
 	const [expandedThreads, setExpandedThreads] = useState<Record<string, boolean>>({});
+	const [composeDraft, setComposeDraft] = useState('');
+	const [isComposeSaving, setIsComposeSaving] = useState(false);
+	const [replyOpen, setReplyOpen] = useState(false);
+	const [replyDraft, setReplyDraft] = useState('');
+	const [isReplySaving, setIsReplySaving] = useState(false);
+	const replyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
 	const threads = useMemo<AnnotationThread[]>(() => {
 		const annotationMap = new Map<string, PaperHighlightAnnotation[]>();
@@ -64,38 +83,33 @@ export function AnnotationsView({
 		}
 
 		const annotatedHighlights = highlights.filter((h) => {
-			if (!h.id || !annotationMap.has(h.id)) return false;
+			if (!h.id) return false;
+			if (composeHighlightId && h.id === composeHighlightId) return true;
+			if (!annotationMap.has(h.id)) return false;
 			if (h.role === 'user') return true;
 			if (h.position) return true;
 			if (h.id && renderedHighlightPositions?.has(h.id)) return true;
 			return false;
 		});
 
+		const latestMsForHighlight = (highlightId: string): number => {
+			const anns = annotationMap.get(highlightId) ?? [];
+			if (anns.length === 0) {
+				if (composeHighlightId === highlightId) return Number.MAX_SAFE_INTEGER;
+				return 0;
+			}
+			return Math.max(
+				...anns.map((ann) => new Date(ann.created_at).getTime())
+			);
+		};
+
 		const sorted = [...annotatedHighlights].sort((a, b) => {
-			let aPage = a.page_number || 0;
-			let aTop = 0;
-			if (a.position) {
-				aPage = a.position.boundingRect.pageNumber || aPage;
-				aTop = a.position.boundingRect.y1;
-			} else if (a.id && renderedHighlightPositions?.has(a.id)) {
-				const pos = renderedHighlightPositions.get(a.id)!;
-				aPage = pos.page;
-				aTop = pos.top;
-			}
-
-			let bPage = b.page_number || 0;
-			let bTop = 0;
-			if (b.position) {
-				bPage = b.position.boundingRect.pageNumber || bPage;
-				bTop = b.position.boundingRect.y1;
-			} else if (b.id && renderedHighlightPositions?.has(b.id)) {
-				const pos = renderedHighlightPositions.get(b.id)!;
-				bPage = pos.page;
-				bTop = pos.top;
-			}
-
-			if (aPage !== bPage) return aPage - bPage;
-			return aTop - bTop;
+			const idA = a.id!;
+			const idB = b.id!;
+			const tA = latestMsForHighlight(idA);
+			const tB = latestMsForHighlight(idB);
+			if (tB !== tA) return tB - tA;
+			return idA.localeCompare(idB);
 		});
 
 		return sorted.map((highlight) => ({
@@ -105,7 +119,18 @@ export function AnnotationsView({
 					new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
 			),
 		}));
-	}, [highlights, annotations, renderedHighlightPositions]);
+	}, [highlights, annotations, renderedHighlightPositions, composeHighlightId]);
+
+	const listThreads = useMemo(() => {
+		if (!composeHighlightId) return threads;
+		return threads.filter(
+			(t) =>
+				!(
+					t.highlight.id === composeHighlightId &&
+					t.annotations.length === 0
+				)
+		);
+	}, [threads, composeHighlightId]);
 
 	useEffect(() => {
 		if (activeHighlight?.id) {
@@ -132,7 +157,77 @@ export function AnnotationsView({
 		prevActiveIdRef.current = id;
 	}, [activeHighlight?.id]);
 
-	if (threads.length === 0) {
+	useEffect(() => {
+		setComposeDraft('');
+	}, [composeHighlightId]);
+
+	useEffect(() => {
+		setReplyOpen(false);
+		setReplyDraft('');
+	}, [activeHighlight?.id]);
+
+	useLayoutEffect(() => {
+		if (!replyOpen) return;
+		const el = replyTextareaRef.current;
+		if (!el) return;
+		el.focus();
+		autoResizeReplyTextarea(el);
+	}, [replyOpen]);
+
+	useLayoutEffect(() => {
+		if (!composeHighlightId) return;
+		const el = composeTextareaRef.current;
+		if (!el) return;
+		el.focus();
+		autoResizeReplyTextarea(el);
+	}, [composeHighlightId]);
+
+	useEffect(() => {
+		if (!composeHighlightId || !composeBlockRef.current || !scrollContainerRef.current) return;
+		smoothScrollTo(composeBlockRef.current, scrollContainerRef.current);
+	}, [composeHighlightId]);
+
+	const composeTargetHighlight = composeHighlightId
+		? highlights.find((h) => h.id === composeHighlightId)
+		: undefined;
+
+	const handleComposeSave = async () => {
+		if (
+			!composeHighlightId ||
+			!addAnnotation ||
+			!composeDraft.trim() ||
+			isComposeSaving
+		)
+			return;
+		setIsComposeSaving(true);
+		try {
+			await addAnnotation(composeHighlightId, composeDraft.trim());
+			setComposeDraft('');
+			onComposeHighlightDismiss?.();
+		} finally {
+			setIsComposeSaving(false);
+		}
+	};
+
+	const handleComposeCancel = () => {
+		setComposeDraft('');
+		onComposeHighlightDismiss?.();
+	};
+
+	const handleReplySave = async (highlightId: string) => {
+		if (!addAnnotation || !replyDraft.trim() || isReplySaving) return;
+		setIsReplySaving(true);
+		try {
+			await addAnnotation(highlightId, replyDraft.trim());
+			setReplyDraft('');
+			setReplyOpen(false);
+			setExpandedThreads((prev) => ({ ...prev, [highlightId]: true }));
+		} finally {
+			setIsReplySaving(false);
+		}
+	};
+
+	if (threads.length === 0 && !composeHighlightId) {
 		return (
 			<div className="flex flex-col gap-4 text-center">
 				<p className="text-secondary-foreground text-sm">
@@ -145,14 +240,75 @@ export function AnnotationsView({
 	return (
 		<div className="flex flex-col h-full">
 			<div className="flex-1 overflow-auto" ref={scrollContainerRef}>
+				{composeHighlightId && addAnnotation && !readonly && (
+					<div
+						ref={composeBlockRef}
+						className="sticky top-0 z-10 border-b border-border bg-background px-4 py-3 shadow-sm"
+					>
+						<p className="text-xs font-medium text-muted-foreground mb-2">
+							New note
+						</p>
+						{composeTargetHighlight?.raw_text ? (
+							<p className="text-xs text-muted-foreground line-clamp-3 mb-2 whitespace-pre-wrap">
+								<span className="text-muted-foreground/80">&quot;</span>
+								{composeTargetHighlight.raw_text}
+								<span className="text-muted-foreground/80">&quot;</span>
+							</p>
+						) : null}
+						<textarea
+							ref={composeTextareaRef}
+							value={composeDraft}
+							onChange={(e) => {
+								setComposeDraft(e.target.value);
+								autoResizeReplyTextarea(e.target);
+							}}
+							onKeyDown={(e) => {
+								if (e.key === 'Enter' && !e.shiftKey) {
+									e.preventDefault();
+									void handleComposeSave();
+								} else if (e.key === 'Escape') {
+									handleComposeCancel();
+								}
+							}}
+							placeholder="Write a note…"
+							aria-label="New note"
+							className={inlineReplyTextareaClassName}
+							disabled={isComposeSaving}
+							rows={3}
+						/>
+						<div className="flex items-center justify-end gap-2 mt-2">
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								className="h-7 px-2 text-xs text-muted-foreground"
+								onClick={handleComposeCancel}
+								disabled={isComposeSaving}
+							>
+								Cancel
+							</Button>
+							<Button
+								type="button"
+								size="sm"
+								className="h-7 px-3 text-xs"
+								onClick={() => void handleComposeSave()}
+								disabled={isComposeSaving || !composeDraft.trim()}
+							>
+								Save
+							</Button>
+						</div>
+					</div>
+				)}
 				<div className="divide-y divide-border">
-					{threads.map(({ highlight, annotations: threadAnns }) => {
+					{listThreads.map(({ highlight, annotations: threadAnns }) => {
 						const hid = highlight.id!;
 						const isActive = activeHighlight?.id === hid;
 						const color: HighlightColor = highlight.role === 'assistant'
 							? 'purple'
 							: (highlight.color || 'blue');
-						const bg = isActive ? ITEM_BG_ACTIVE_MAP[color] : ITEM_BG_MAP[color];
+						const bg = isActive
+							? "bg-white dark:bg-zinc-950"
+							: ITEM_BG_MAP[color];
 
 						const hasMulti = threadAnns.length > 1;
 						const expanded = expandedThreads[hid] ?? false;
@@ -191,7 +347,7 @@ export function AnnotationsView({
 													{user?.name || 'User'}
 												</span>
 												<span className="text-xs text-muted-foreground">
-													{formatDate(annotation.created_at)}
+													{formatAnnotationDate(annotation.created_at)}
 												</span>
 											</div>
 											<p className="text-sm text-foreground leading-snug whitespace-pre-wrap pl-10">
@@ -205,6 +361,83 @@ export function AnnotationsView({
 										</p>
 									)}
 								</div>
+								{isActive && addAnnotation && !readonly && (
+									<div
+										className="mt-2 pt-0"
+										onMouseDown={(e) => e.stopPropagation()}
+										onClick={(e) => e.stopPropagation()}
+									>
+										{replyOpen ? (
+											<div className="flex flex-col gap-2">
+												<textarea
+													ref={replyTextareaRef}
+													value={replyDraft}
+													onChange={(e) => {
+														setReplyDraft(e.target.value);
+														autoResizeReplyTextarea(e.target);
+													}}
+													onKeyDown={(e) => {
+														if (e.key === 'Enter' && !e.shiftKey) {
+															e.preventDefault();
+															void handleReplySave(hid);
+														} else if (e.key === 'Escape') {
+															setReplyOpen(false);
+															setReplyDraft('');
+														}
+													}}
+													onMouseDown={(e) => e.stopPropagation()}
+													placeholder="Write a reply…"
+													aria-label="Reply"
+													className={inlineReplyTextareaClassName}
+													disabled={isReplySaving}
+													rows={3}
+												/>
+												<div className="flex items-center justify-end gap-2">
+													<Button
+														type="button"
+														variant="ghost"
+														size="sm"
+														className="h-7 px-2 text-xs text-muted-foreground"
+														disabled={isReplySaving}
+														onClick={(e) => {
+															e.stopPropagation();
+															setReplyOpen(false);
+															setReplyDraft('');
+														}}
+														onMouseDown={(e) => e.stopPropagation()}
+													>
+														Cancel
+													</Button>
+													<Button
+														type="button"
+														size="sm"
+														className="h-7 px-3 text-xs"
+														disabled={isReplySaving || !replyDraft.trim()}
+														onClick={(e) => {
+															e.stopPropagation();
+															void handleReplySave(hid);
+														}}
+														onMouseDown={(e) => e.stopPropagation()}
+													>
+														Reply
+													</Button>
+												</div>
+											</div>
+										) : (
+											<button
+												type="button"
+												className="w-full text-left text-sm text-muted-foreground rounded-full border border-border px-3 py-1.5 hover:bg-muted/50 transition-colors cursor-text"
+												onMouseDown={(e) => e.stopPropagation()}
+												onClick={(e) => {
+													e.stopPropagation();
+													setReplyOpen(true);
+												}}
+											>
+												Reply…
+											</button>
+										)}
+									</div>
+								)}
 							</div>
 						);
 					})}

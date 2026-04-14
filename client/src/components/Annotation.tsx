@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { BasicUser } from '@/lib/auth';
 import { HighlightColor, PaperHighlightAnnotation } from '@/lib/schema';
-import { formatDate } from '@/lib/utils';
+import { formatAnnotationDate } from '@/lib/utils';
 import { Check, File, Pencil, Trash2, User as UserIcon, X } from 'lucide-react';
 import React, { useState } from 'react';
 
@@ -76,7 +76,7 @@ export default function Annotation({
                         {isAI ? 'Open Paper' : user?.name || 'User'}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                        {formatDate(annotation.created_at)}
+                        {formatAnnotationDate(annotation.created_at)}
                     </span>
                 </div>
 
@@ -128,7 +128,7 @@ export default function Annotation({
                     {isAI ? 'Open Paper' : user?.name || 'User'}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                    {formatDate(annotation.created_at)}
+                    {formatAnnotationDate(annotation.created_at)}
                 </span>
 
                 {!readonly && removeAnnotation && updateAnnotation && !isAI && (

@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { BasicUser } from "@/lib/auth";
 import { PaperHighlightAnnotation } from "@/lib/schema";
-import { cn, getAlphaHashToBackgroundColor, getInitials, formatDate } from "@/lib/utils";
+import { cn, formatAnnotationDate, getAlphaHashToBackgroundColor, getInitials } from "@/lib/utils";
 import { Pencil, Trash2, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
@@ -262,7 +262,12 @@ export function InlineAnnotationCard({
         <div
             ref={cardRef}
             data-inline-annotation-card=""
-            className={`absolute z-40 w-[280px] border border-border rounded-xl shadow-lg flex flex-col transition-[top,left,background-color,border-color] duration-200 ease-out motion-reduce:transition-none overflow-hidden ${isActive ? "bg-background" : "bg-[#ebebeb] dark:bg-zinc-800"}`}
+            className={cn(
+                "absolute z-40 w-[280px] rounded-xl shadow-lg flex flex-col transition-[top,left,background-color,border-color] duration-200 ease-out motion-reduce:transition-none overflow-hidden",
+                isActive
+                    ? "border border-border bg-background"
+                    : "border-0 bg-[#F9FAFD] dark:bg-zinc-800"
+            )}
             style={{ left: `${leftPosition}px`, top: `${topPosition}px` }}
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => {
@@ -302,20 +307,49 @@ export function InlineAnnotationCard({
                         )}
                     </div>
                     {canWrite ? (
-                        <textarea
-                            ref={newTextareaRef}
-                            value={newContent}
-                            onChange={(e) => {
-                                setNewContent(e.target.value);
-                                autoResizeContained(e.target);
-                            }}
-                            onKeyDown={handleNewKeyDown}
-                            placeholder="Write your notes here and press Enter to save"
-                            aria-label="New annotation"
-                            className="text-sm text-foreground placeholder:text-muted-foreground resize-none w-full min-h-[4rem] max-h-48 px-3 py-2 overflow-y-auto overflow-x-hidden box-border rounded-md border border-black bg-background focus:outline-none focus:ring-0 focus:border-black dark:border-white dark:focus:border-white"
-                            disabled={isSaving}
-                            rows={3}
-                        />
+                        <div className="flex flex-col gap-2">
+                            <textarea
+                                ref={newTextareaRef}
+                                value={newContent}
+                                onChange={(e) => {
+                                    setNewContent(e.target.value);
+                                    autoResizeContained(e.target);
+                                }}
+                                onKeyDown={handleNewKeyDown}
+                                placeholder="Write your notes here…"
+                                aria-label="New annotation"
+                                className="text-sm text-foreground placeholder:text-muted-foreground resize-none w-full min-h-[4rem] max-h-48 px-3 py-2 overflow-y-auto overflow-x-hidden box-border rounded-md border border-black bg-background focus:outline-none focus:ring-0 focus:border-black dark:border-white dark:focus:border-white"
+                                disabled={isSaving}
+                                rows={3}
+                            />
+                            <div className="flex items-center justify-end gap-2">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs text-muted-foreground"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onClose();
+                                    }}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    disabled={isSaving}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    className="h-7 px-3 text-xs"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSaveNew();
+                                    }}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    disabled={!newContent.trim() || isSaving}
+                                >
+                                    Save
+                                </Button>
+                            </div>
+                        </div>
                     ) : (
                         <p className="text-sm text-muted-foreground italic">No annotation yet.</p>
                     )}
@@ -343,7 +377,7 @@ export function InlineAnnotationCard({
                                     </Avatar>
                                     <div className="flex flex-col leading-tight flex-1 min-w-0">
                                         <span className="text-xs font-medium">{displayName}</span>
-                                        <span className="text-[11px] text-muted-foreground">{formatDate(ann.created_at)}</span>
+                                        <span className="text-[11px] text-muted-foreground">{formatAnnotationDate(ann.created_at)}</span>
                                     </div>
                                     {ann.role === "user" && isActive && (
                                         <div className="flex items-center gap-0.5 flex-shrink-0">
@@ -385,7 +419,7 @@ export function InlineAnnotationCard({
                                     )}
                                 </div>
                                 {editingId === ann.id ? (
-                                    <div ref={editBlockRef} className="w-full min-w-0">
+                                    <div ref={editBlockRef} className="w-full min-w-0 flex flex-col gap-2">
                                         <textarea
                                             ref={editTextareaRef}
                                             autoFocus
@@ -400,6 +434,33 @@ export function InlineAnnotationCard({
                                             disabled={isSaving}
                                             rows={3}
                                         />
+                                        <div className="flex items-center justify-end gap-2">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-7 px-2 text-xs text-muted-foreground"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setEditingId(null);
+                                                }}
+                                                onMouseDown={(e) => e.stopPropagation()}
+                                                disabled={isSaving}
+                                            >
+                                                Cancel
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                className="h-7 px-3 text-xs"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleSaveEdit(ann.id);
+                                                }}
+                                                onMouseDown={(e) => e.stopPropagation()}
+                                                disabled={!editContent.trim() || isSaving}
+                                            >
+                                                Save
+                                            </Button>
+                                        </div>
                                     </div>
                                 ) : (
                                     <p className="text-sm text-foreground whitespace-pre-wrap">{ann.content}</p>

@@ -1,6 +1,14 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect, useMemo } from "react";
+import {
+	useRef,
+	useState,
+	useCallback,
+	useEffect,
+	useMemo,
+	type Dispatch,
+	type SetStateAction,
+} from "react";
 import { createPortal } from "react-dom";
 import {
 	PdfLoader,
@@ -143,6 +151,14 @@ interface PdfHighlighterViewerProps {
 	currentUser?: BasicUser | null;
 	showAnnotationCards?: boolean;
 	onToggleAnnotationCards?: () => void;
+	/** When true and inline cards are hidden, route annotate flows to the Annotations side panel */
+	annotationsPanelActive?: boolean;
+	onAnnotateViaSidePanel?: (payload: { highlightId: string }) => void;
+	/** Controlled highlight color (optional; defaults to internal state). */
+	highlightColor?: HighlightColor;
+	setHighlightColor?: Dispatch<SetStateAction<HighlightColor>>;
+	/** When false, color + annotation visibility live on PaperSidebar (desktop). Default true. */
+	showToolbarColorAndEye?: boolean;
 }
 
 export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
@@ -175,6 +191,11 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		annotations,
 		showAnnotationCards = true,
 		onToggleAnnotationCards,
+		annotationsPanelActive = false,
+		onAnnotateViaSidePanel,
+		highlightColor: highlightColorProp,
+		setHighlightColor: setHighlightColorProp,
+		showToolbarColorAndEye = true,
 	} = props;
 
 	// Position anchors for inline annotation cards
@@ -190,6 +211,10 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 	const [selectionRectTop, setSelectionRectTop] = useState<number | null>(null);
 	// Holds position computed during onAnnotate when activeHighlight isn't set yet (new text selection)
 	const [pendingAnnotationPos, setPendingAnnotationPos] = useState<{ top: number; left: number; scrollContainer: Element } | null>(null);
+	/** New selection annotate while Annotations panel is open — wait for highlight id then notify parent */
+	const [pendingSidePanelAnnotate, setPendingSidePanelAnnotate] = useState(false);
+	/** When inline cards are hidden, user clicked a highlight with a persisted thread — show that card only */
+	const [peekAnnotationCardHighlightId, setPeekAnnotationCardHighlightId] = useState<string | null>(null);
 	// Guard: restore annotation cards from server data only once per mount
 	const hasRestoredRef = useRef(false);
 
@@ -265,7 +290,9 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 	 * effect re-run once the viewer is genuinely available.
 	 */
 	const [viewerReadyTick, setViewerReadyTick] = useState(0);
-	const [highlightColor, setHighlightColor] = useState<HighlightColor>("blue");
+	const [internalHighlightColor, setInternalHighlightColor] = useState<HighlightColor>("blue");
+	const highlightColor = highlightColorProp ?? internalHighlightColor;
+	const setHighlightColor = setHighlightColorProp ?? setInternalHighlightColor;
 
 	// Search hook
 	const search = usePdfSearch({
@@ -515,6 +542,39 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		});
 	}, [syncAnnotationCardPositions]);
 
+	const highlightHasPersistedAnnotations = useCallback(
+		(highlightId: string | undefined) =>
+			Boolean(highlightId && annotations.some((a) => a.highlight_id === highlightId)),
+		[annotations]
+	);
+
+	const ensureAnnotationCardEntry = useCallback(
+		(highlightId: string) => {
+			setAnnotationCards((prev) => {
+				if (prev.some((c) => c.highlightId === highlightId)) return prev;
+				const h = highlights.find((x) => x.id === highlightId);
+				if (!h?.position || !h.page_number) return prev;
+				const viewer = highlighterUtilsRef.current?.getViewer();
+				const scrollContainer = viewer?.container as HTMLElement | undefined;
+				if (!viewer || !scrollContainer) return prev;
+				const anchor = getAnnotationCardAnchorForHighlight(h, viewer, scrollContainer);
+				if (!anchor) return prev;
+				const firstAnn = annotations.find((a) => a.highlight_id === highlightId);
+				return [
+					...prev,
+					{
+						highlightId,
+						top: anchor.top,
+						left: anchor.left,
+						scrollContainer,
+						annotationId: firstAnn?.id,
+					},
+				];
+			});
+		},
+		[highlights, annotations]
+	);
+
 	// Handle selection
 	const handleSelection = useCallback(
 		(selection: PdfSelection) => {
@@ -581,7 +641,8 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			setSelectedText(viewportHighlight.content?.text || viewportHighlight.raw_text || "");
 			setSelectionRectTop(event.clientY);
 
-			const originalHighlight = extendedHighlights.find(h => h.id === viewportHighlight.id);
+			const hid = viewportHighlight.id;
+			const originalHighlight = hid ? extendedHighlights.find((h) => h.id === hid) : undefined;
 			if (originalHighlight) {
 				const paperHighlight = extendedToPaperHighlight(originalHighlight);
 				// Don't scroll - the highlight is already in view since user just clicked it
@@ -589,26 +650,69 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 				setActiveHighlight(paperHighlight);
 			}
 
-			// If this highlight already has an open annotation card, skip the context menu
-			// and scroll to center the card (at its natural stored position) in the viewport
-			const card = annotationCards.find(c => c.highlightId === viewportHighlight.id);
-			if (!card) {
+			const openMenuAtHighlight = () => {
 				const target = event.target as HTMLElement;
-				const partsContainer = target.classList.contains('TextHighlight__parts')
+				const partsContainer = target.classList.contains("TextHighlight__parts")
 					? target
-					: (target.closest('.TextHighlight__parts') as HTMLElement | null);
+					: (target.closest(".TextHighlight__parts") as HTMLElement | null);
 				let anchorX = event.clientX;
 				let anchorY = event.clientY + 20;
 				if (partsContainer) {
-					const parts = Array.from(partsContainer.querySelectorAll('.TextHighlight__part'));
+					const parts = Array.from(partsContainer.querySelectorAll(".TextHighlight__part"));
 					if (parts.length > 0) {
-						const rects = parts.map(p => p.getBoundingClientRect());
-						const bottomRect = rects.reduce((prev, curr) => curr.top > prev.top ? curr : prev);
+						const rects = parts.map((p) => p.getBoundingClientRect());
+						const bottomRect = rects.reduce((prev, curr) =>
+							curr.top > prev.top ? curr : prev
+						);
 						anchorX = bottomRect.left;
 						anchorY = bottomRect.bottom;
 					}
 				}
 				setTooltipPosition({ x: anchorX, y: anchorY });
+			};
+
+			if (!hid) return;
+
+			const card = annotationCards.find((c) => c.highlightId === hid);
+			const hasPersisted = highlightHasPersistedAnnotations(hid);
+
+			if (showAnnotationCards) {
+				if (!card) {
+					openMenuAtHighlight();
+				} else {
+					const container = card.scrollContainer as HTMLElement;
+					const targetScrollTop = card.top - container.clientHeight / 2;
+					container.scrollTo({ top: Math.max(0, targetScrollTop), behavior: "smooth" });
+				}
+				return;
+			}
+
+			// Inline cards hidden: peek persisted thread when we can anchor a margin card
+			if (hasPersisted) {
+				const ph = originalHighlight
+					? extendedToPaperHighlight(originalHighlight)
+					: highlights.find((x) => x.id === hid);
+				if (ph?.position && ph.page_number) {
+					const viewer = highlighterUtilsRef.current?.getViewer();
+					const scrollContainer = viewer?.container as HTMLElement | undefined;
+					if (viewer && scrollContainer) {
+						const anchor = getAnnotationCardAnchorForHighlight(ph, viewer, scrollContainer);
+						if (anchor) {
+							setPeekAnnotationCardHighlightId(hid);
+							ensureAnnotationCardEntry(hid);
+							const targetScrollTop = anchor.top - scrollContainer.clientHeight / 2;
+							scrollContainer.scrollTo({
+								top: Math.max(0, targetScrollTop),
+								behavior: "smooth",
+							});
+							return;
+						}
+					}
+				}
+			}
+
+			if (!card) {
+				openMenuAtHighlight();
 			} else {
 				const container = card.scrollContainer as HTMLElement;
 				const targetScrollTop = card.top - container.clientHeight / 2;
@@ -622,6 +726,10 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			setActiveHighlight,
 			extendedHighlights,
 			annotationCards,
+			showAnnotationCards,
+			highlightHasPersistedAnnotations,
+			ensureAnnotationCardEntry,
+			highlights,
 		]
 	);
 
@@ -672,6 +780,10 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			if (!target) return;
 
 			if (target.closest("[data-inline-annotation-card]")) return;
+			// Entire highlight layer + our wrapper: mousedown target is not always a .TextHighlight__part
+			// (gaps, wrapper, or stacking) but the user is still interacting with a highlight.
+			if (target.closest(".PdfHighlighter__highlight-layer")) return;
+			if (target.closest("[data-pdf-text-highlight]")) return;
 			if (target.closest(".TextHighlight__parts, .TextHighlight__part")) return;
 			if (target.closest("[data-annotation-sidebar-row]")) return;
 			if (target.closest("[data-inline-annotation-menu]")) return;
@@ -683,18 +795,62 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		return () => document.removeEventListener("mousedown", handleDocumentMouseDown);
 	}, [activeHighlight, setActiveHighlight]);
 
+	useEffect(() => {
+		if (!activeHighlight) setPeekAnnotationCardHighlightId(null);
+	}, [activeHighlight]);
+
+	useEffect(() => {
+		if (showAnnotationCards) setPeekAnnotationCardHighlightId(null);
+	}, [showAnnotationCards]);
+
 	// When a new highlight is saved after a text selection annotate, create the pending card
+	// or notify the Annotations side panel when margin cards are suppressed
 	useEffect(() => {
 		if (!addAnnotation) return;
 		const hid = activeHighlight?.id;
-		if (isAnnotating && hid && pendingAnnotationPos) {
-			setAnnotationCards(prev => {
-				const exists = prev.find(c => c.highlightId === hid);
-				return exists ? prev : [...prev, { highlightId: hid, ...pendingAnnotationPos }];
-			});
+		if (!isAnnotating || !hid) return;
+
+		const useSidePanel =
+			!showAnnotationCards && annotationsPanelActive && Boolean(onAnnotateViaSidePanel);
+
+		if (pendingAnnotationPos) {
+			if (useSidePanel) {
+				onAnnotateViaSidePanel?.({ highlightId: hid });
+			} else {
+				setAnnotationCards(prev => {
+					const exists = prev.find(c => c.highlightId === hid);
+					return exists ? prev : [...prev, { highlightId: hid, ...pendingAnnotationPos }];
+				});
+				// Margin cards hidden: portal list is peek-filtered — show the new compose card
+				if (!showAnnotationCards) {
+					setPeekAnnotationCardHighlightId(hid);
+				}
+			}
 			setPendingAnnotationPos(null);
 		}
-	}, [addAnnotation, isAnnotating, activeHighlight, pendingAnnotationPos]);
+
+		if (pendingSidePanelAnnotate && useSidePanel) {
+			onAnnotateViaSidePanel?.({ highlightId: hid });
+			setPendingSidePanelAnnotate(false);
+		}
+	}, [
+		addAnnotation,
+		isAnnotating,
+		activeHighlight,
+		pendingAnnotationPos,
+		pendingSidePanelAnnotate,
+		showAnnotationCards,
+		annotationsPanelActive,
+		onAnnotateViaSidePanel,
+	]);
+
+	useEffect(() => {
+		if (!isAnnotating) setPendingSidePanelAnnotate(false);
+	}, [isAnnotating]);
+
+	useEffect(() => {
+		if (!annotationsPanelActive) setPendingSidePanelAnnotate(false);
+	}, [annotationsPanelActive]);
 
 	// Poll for the PDF.js viewer instance becoming available.
 	// The library initialises it with a 100ms debounce, so getViewer() returns null
@@ -762,6 +918,8 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 	// Restore annotation cards from server-persisted annotations on page load
 	useEffect(() => {
 		if (!pdfReady || hasRestoredRef.current) return;
+		// Margin cards are not shown — skip until the user returns to a mode that shows them
+		if (!showAnnotationCards) return;
 
 		const viewer = highlighterUtilsRef.current?.getViewer();
 		const scrollContainer = viewer?.container as HTMLElement | undefined;
@@ -821,7 +979,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			// No annotations to restore at all — nothing to do, lock to stop retrying.
 			hasRestoredRef.current = true;
 		}
-	}, [pdfReady, annotations, highlights, pdfLayoutTick, scale, numPages, viewerReadyTick]);
+	}, [pdfReady, annotations, highlights, pdfLayoutTick, scale, numPages, viewerReadyTick, showAnnotationCards]);
 
 	// Auto-remove card entries whose entire annotation thread has been deleted
 	useEffect(() => {
@@ -1123,8 +1281,39 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 						setActiveHighlight(highlight);
 						setIsHighlightInteraction(true);
 						setSelectedText(highlight.raw_text);
-					const rect = (e.target as HTMLElement).getBoundingClientRect();
-				setTooltipPosition({ x: rect.left, y: (e as MouseEvent).clientY + 20 });
+						const hid = highlight.id;
+						if (
+							hid &&
+							!showAnnotationCards &&
+							highlightHasPersistedAnnotations(hid) &&
+							highlight.position &&
+							highlight.page_number
+						) {
+							const viewer = highlighterUtilsRef.current?.getViewer();
+							const scrollContainer = viewer?.container as HTMLElement | undefined;
+							if (viewer && scrollContainer) {
+								const anchor = getAnnotationCardAnchorForHighlight(
+									highlight,
+									viewer,
+									scrollContainer
+								);
+								if (anchor) {
+									setPeekAnnotationCardHighlightId(hid);
+									ensureAnnotationCardEntry(hid);
+									const targetScrollTop = anchor.top - scrollContainer.clientHeight / 2;
+									scrollContainer.scrollTo({
+										top: Math.max(0, targetScrollTop),
+										behavior: "smooth",
+									});
+									return;
+								}
+							}
+						}
+						const rect = (e.target as HTMLElement).getBoundingClientRect();
+						setTooltipPosition({
+							x: rect.left,
+							y: (e as MouseEvent).clientY + 20,
+						});
 					});
 				});
 			}
@@ -1263,7 +1452,16 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			pendingTimeouts.forEach((timeout) => clearTimeout(timeout));
 			pendingTimeouts.clear();
 		};
-	}, [pdfReady, highlights, scale, onOverlaysCreated, activeHighlight]);
+	}, [
+		pdfReady,
+		highlights,
+		scale,
+		onOverlaysCreated,
+		activeHighlight,
+		showAnnotationCards,
+		highlightHasPersistedAnnotations,
+		ensureAnnotationCardEntry,
+	]);
 
 	return (
 		<div
@@ -1299,6 +1497,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 				setHighlightColor={setHighlightColor}
 				showAnnotationCards={showAnnotationCards}
 				onToggleAnnotationCards={onToggleAnnotationCards}
+				showColorAndEye={showToolbarColorAndEye}
 			/>
 
 			{/* PDF Viewer — overflow-x-visible so margin annotation cards beside the page are not clipped */}
@@ -1382,6 +1581,17 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 					const scrollContainer = viewer?.container as HTMLElement | undefined;
 					if (!viewer || !scrollContainer) return;
 
+					const useSidePanel =
+						!showAnnotationCards && annotationsPanelActive && Boolean(onAnnotateViaSidePanel);
+					if (useSidePanel) {
+						if (isHighlightInteraction && activeHighlight?.id) {
+							onAnnotateViaSidePanel?.({ highlightId: activeHighlight.id });
+						} else {
+							setPendingSidePanelAnnotate(true);
+						}
+						return;
+					}
+
 					const containerRect = scrollContainer.getBoundingClientRect();
 					const scrollTop = scrollContainer.scrollTop;
 					const scrollLeft = scrollContainer.scrollLeft;
@@ -1428,6 +1638,9 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 							const exists = prev.find(c => c.highlightId === hid);
 							return exists ? prev : [...prev, { highlightId: hid, ...pos }];
 						});
+						if (!showAnnotationCards) {
+							setPeekAnnotationCardHighlightId(hid);
+						}
 					} else {
 						// New text selection — highlight not yet saved; wait for async server response
 						setPendingAnnotationPos(pos);
@@ -1437,11 +1650,15 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		)}
 
 	{/* Inline Annotation Cards — one per annotated highlight, persists until closed */}
-	{showAnnotationCards && (() => {
+	{(showAnnotationCards || peekAnnotationCardHighlightId !== null) && (() => {
 		const FALLBACK_HEIGHT = 120;
 		const GAP = 8;
 		const activeId = activeHighlight?.id;
-		const sorted = [...annotationCards].sort((a, b) => a.top - b.top);
+		const peekId = peekAnnotationCardHighlightId;
+		const cardsForLayout = showAnnotationCards
+			? annotationCards
+			: annotationCards.filter((c) => c.highlightId === peekId);
+		const sorted = [...cardsForLayout].sort((a, b) => a.top - b.top);
 		const activeIdx = sorted.findIndex(c => c.highlightId === activeId);
 
 		let adjusted: typeof sorted;
@@ -1503,6 +1720,9 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 					onClose={() => {
 						setIsAnnotating(false);
 						setSelectionRectTop(null);
+						if (peekAnnotationCardHighlightId === card.highlightId) {
+							setPeekAnnotationCardHighlightId(null);
+						}
 						// Only remove unsaved cards — saved annotation threads persist until all comments are deleted
 						if (!card.annotationId) {
 							setAnnotationCards(prev => prev.filter(c => c.highlightId !== card.highlightId));

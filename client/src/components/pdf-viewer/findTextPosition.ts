@@ -256,7 +256,8 @@ export function createTextHighlightOverlays(
 					highlight.style.backgroundColor = backgroundColor;
 					highlight.style.borderRadius = "2px";
 					highlight.style.pointerEvents = "none";
-					highlight.style.mixBlendMode = "multiply";
+					// No mix-blend-multiply: it darkens vs react-pdf-highlighter TextHighlight (solid rgba),
+					// so position-backed and overlay-backed highlights look inconsistent.
 
 					textLayer.appendChild(highlight);
 					matchElements.push(highlight);

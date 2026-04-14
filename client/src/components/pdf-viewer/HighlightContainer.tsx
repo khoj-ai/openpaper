@@ -43,7 +43,11 @@ export function HighlightContainer({ onHighlightClick }: HighlightContainerProps
 
 	if (isTextHighlight) {
 		return (
-			<div onClick={handleClick} style={{ cursor: "pointer" }}>
+			<div
+				data-pdf-text-highlight=""
+				onClick={handleClick}
+				style={{ cursor: "pointer" }}
+			>
 				<TextHighlight
 					isScrolledTo={isScrolledTo}
 					highlight={highlight}
@@ -56,7 +60,11 @@ export function HighlightContainer({ onHighlightClick }: HighlightContainerProps
 	}
 
 	return (
-		<div onClick={handleClick} style={{ cursor: "pointer" }}>
+		<div
+			data-pdf-text-highlight=""
+			onClick={handleClick}
+			style={{ cursor: "pointer" }}
+		>
 			<AreaHighlight
 				isScrolledTo={isScrolledTo}
 				highlight={highlight}
