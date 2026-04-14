@@ -91,16 +91,19 @@ language:
   - en
 size_categories:
   - n<1K
-pretty_name: OpenPaper Eval Dataset
+pretty_name: ResearchQA
 tags:
   - evaluation
   - scientific-papers
   - retrieval-augmented-generation
+  - question-answering
 ---
 
-# OpenPaper Eval Dataset
+# ResearchQA
 
-Evaluation dataset for the OpenPaper scientific paper Q&A system. Contains question-answer pairs generated from scientific papers across multiple domains.
+A general-purpose evaluation dataset for scientific paper question-answering systems. Contains question-answer pairs generated from scientific papers across multiple domains.
+
+Originally built for evaluating [Open Paper](https://openpaper.ai), but designed to be useful for any research paper QA or RAG system.
 
 ## Dataset Details
 
