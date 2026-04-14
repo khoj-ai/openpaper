@@ -14,7 +14,7 @@
 
 set -euo pipefail
 
-HF_REPO="khoj-ai/openpaper-evals"
+HF_REPO="khoj-ai/ResearchQA"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DATASET_PATH="${1:-$SCRIPT_DIR/eval_dataset.json}"
 
