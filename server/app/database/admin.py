@@ -22,7 +22,6 @@ from app.database.models import (
     Subscription,
     User,
 )
-from app.helpers.email import send_email
 from fastapi import FastAPI, Request
 from sqladmin import Admin, ModelView, action
 from sqladmin.authentication import AuthenticationBackend
@@ -30,33 +29,6 @@ from starlette.requests import Request as StarletteRequest
 from starlette.responses import RedirectResponse as StarletteRedirect
 
 logger = logging.getLogger(__name__)
-
-
-def _send_block_notification(user_email: str, user_name: str) -> None:
-    """Send suspension notification email to a blocked user."""
-    greeting = f"Hello {user_name},\n\n" if user_name else "Hello,\n\n"
-    try:
-        send_email(
-            to_email=user_email,
-            subject="Your Open Paper account has been suspended",
-            html_content="",
-            text_content=(
-                f"{greeting}"
-                "Your Open Paper account has been flagged and suspended "
-                "for suspected misconduct of the platform.\n\n"
-                "If you believe this is an error, please contact us at "
-                "team@khoj.dev and we will review your account.\n\n"
-                "- The Open Paper Team"
-            ),
-            from_name="Open Paper",
-            from_address="support@updates.openpaper.ai",
-        )
-        logger.info(f"Blocked notification email sent to {user_email}")
-    except Exception as e:
-        logger.error(
-            f"Failed to send block notification to {user_email}: {e}",
-            exc_info=True,
-        )
 
 
 class UserAdmin(ModelView, model=User):
@@ -87,12 +59,7 @@ class UserAdmin(ModelView, model=User):
             for pk in pk_list:
                 user_obj = db.query(User).get(pk)
                 if user_obj and not user_obj.is_blocked:
-                    user_obj.is_blocked = True
-                    db.add(user_obj)
-                    _send_block_notification(
-                        str(user_obj.email),
-                        str(user_obj.name) if user_obj.name else "",
-                    )
+                    user_crud.set_blocked(db, user=user_obj, blocked=True)
             db.commit()
 
         referer = request.headers.get("referer", "/admin/user/list")
@@ -113,8 +80,7 @@ class UserAdmin(ModelView, model=User):
             for pk in pk_list:
                 user_obj = db.query(User).get(pk)
                 if user_obj and user_obj.is_blocked:
-                    user_obj.is_blocked = False
-                    db.add(user_obj)
+                    user_crud.set_blocked(db, user=user_obj, blocked=False)
             db.commit()
 
         referer = request.headers.get("referer", "/admin/user/list")
@@ -123,10 +89,7 @@ class UserAdmin(ModelView, model=User):
     async def after_model_change(self, data, model, is_created, request):
         """Send notification email when a user is blocked via edit form."""
         if not is_created and getattr(model, "is_blocked", False):
-            _send_block_notification(
-                str(model.email),
-                str(model.name) if model.name else "",
-            )
+            user_crud.send_block_notification(model)
 
 
 class OnboardingAdmin(ModelView, model=Onboarding):

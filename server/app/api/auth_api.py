@@ -549,8 +549,6 @@ async def block_user(
     db: Session = Depends(get_db),
 ):
     """Block or unblock a user. Admin only."""
-    from app.helpers.email import send_email
-
     target_user = user_crud.get(db=db, id=uuid.UUID(request.user_id))
     if not target_user:
         raise HTTPException(
@@ -558,36 +556,10 @@ async def block_user(
             detail="User not found",
         )
 
-    target_user.is_blocked = request.blocked  # type: ignore
-    db.add(target_user)
-    db.commit()
-    db.refresh(target_user)
+    user_crud.set_blocked(db, user=target_user, blocked=request.blocked)
 
     action = "blocked" if request.blocked else "unblocked"
     logger.info(f"User {target_user.email} {action} by admin {admin_user.email}")
-
-    if request.blocked:
-        user_email = str(target_user.email)
-        user_name = str(target_user.name) if target_user.name else ""
-        greeting = f"Hello {user_name},\n\n" if user_name else "Hello,\n\n"
-        try:
-            send_email(
-                to_email=user_email,
-                subject="Your Open Paper account has been suspended",
-                html_content="",
-                text_content=(
-                    f"{greeting}"
-                    "Your Open Paper account has been flagged and suspended "
-                    "for suspected misconduct of the platform.\n\n"
-                    "If you believe this is an error, please contact us at "
-                    "team@khoj.dev and we will review your account.\n\n"
-                    "- The Open Paper Team"
-                ),
-                from_name="Open Paper",
-                from_address="support@updates.openpaper.ai",
-            )
-        except Exception as e:
-            logger.error(f"Failed to send block email: {e}", exc_info=True)
 
     return AuthResponse(
         success=True,

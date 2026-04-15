@@ -208,5 +208,47 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             .first()
         )
 
+    def send_block_notification(self, user: User) -> None:
+        """Send suspension notification email to a blocked user."""
+        from app.helpers.email import send_email
+
+        user_email = str(user.email)
+        user_name = str(user.name) if user.name else ""
+        greeting = f"Hello {user_name}," if user_name else "Hello,"
+        try:
+            send_email(
+                to_email=user_email,
+                subject="Your Open Paper account has been suspended",
+                html_content=(
+                    f"<p>{greeting}</p>"
+                    "<p>Your Open Paper account has been flagged and suspended "
+                    "for suspected misconduct of the platform.</p>"
+                    "<p>If you believe this is an error, please contact us at "
+                    '<a href="mailto:team@khoj.dev">team@khoj.dev</a> '
+                    "and we will review your account.</p>"
+                    "<p>- The Open Paper Team</p>"
+                ),
+                from_name="Open Paper",
+                from_address="support@updates.openpaper.ai",
+            )
+            logger.info(f"Blocked notification email sent to {user_email}")
+        except Exception as e:
+            logger.error(
+                f"Failed to send block notification to {user_email}: {e}",
+                exc_info=True,
+            )
+
+    def set_blocked(self, db: Session, *, user: User, blocked: bool) -> User:
+        """Block or unblock a user. Sends a notification email when blocking."""
+        user.is_blocked = blocked  # type: ignore
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        if blocked:
+            self.send_block_notification(user)
+
+        return user
+
 
 user = CRUDUser(User)
