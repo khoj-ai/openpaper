@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -8,7 +9,7 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
-ADMIN_EMAIL = "saba@khoj.dev"
+ADMIN_EMAIL = os.getenv("ROOT_EMAIL", "saba@khoj.dev")
 ABUSE_LOOKBACK_DAYS = 30
 
 
