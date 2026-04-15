@@ -197,15 +197,39 @@ export default function PaperView() {
     const isMobile = useIsMobile();
     const [mobileView, setMobileView] = useState<'reader' | 'panel'>('reader');
 
-    const rightSideHidesInlineAnnotationCards =
+    /** Margin cards stay off while these side panels are open; Read/mobile reader use `annotationCardsVisible` only. */
+    const sidePanelSuppressesInlineCards =
         rightSideFunction === 'Annotations' ||
         rightSideFunction === 'Chat' ||
-        rightSideFunction === 'Audio' ||
-        rightSideFunction === 'Read';
-    const hideInlineAnnotationCards =
-        rightSideHidesInlineAnnotationCards ||
-        (isMobile && mobileView === 'reader');
-    const showAnnotationCards = annotationCardsVisible && !hideInlineAnnotationCards;
+        rightSideFunction === 'Audio';
+    const showAnnotationCards =
+        annotationCardsVisible && !sidePanelSuppressesInlineCards;
+
+    const prevRightSideRef = useRef(rightSideFunction);
+    useEffect(() => {
+        if (rightSideFunction === 'Read' && prevRightSideRef.current !== 'Read') {
+            setAnnotationCardsVisible(false);
+        }
+        prevRightSideRef.current = rightSideFunction;
+    }, [rightSideFunction]);
+
+    const prevMobileViewRef = useRef<'reader' | 'panel'>(mobileView);
+    const mobileReaderInitialHideRef = useRef(false);
+    useEffect(() => {
+        if (!isMobile) {
+            prevMobileViewRef.current = mobileView;
+            return;
+        }
+        const prev = prevMobileViewRef.current;
+        if (mobileView === 'reader' && prev === 'panel') {
+            setAnnotationCardsVisible(false);
+        }
+        if (mobileView === 'reader' && !mobileReaderInitialHideRef.current) {
+            mobileReaderInitialHideRef.current = true;
+            setAnnotationCardsVisible(false);
+        }
+        prevMobileViewRef.current = mobileView;
+    }, [isMobile, mobileView]);
 
     if (isMobile) {
         toolset.nav = toolset.nav.filter(tool => tool.name !== 'Read');

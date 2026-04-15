@@ -80,6 +80,31 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
         const top = spaceBelow >= MENU_HEIGHT
             ? tooltipPosition.y + MENU_OFFSET
             : tooltipPosition.y - MENU_HEIGHT - MENU_OFFSET;
+        // #region agent log
+        fetch("http://127.0.0.1:7848/ingest/1ffc24a3-d0c6-4802-9576-899d9a9fb32b", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Debug-Session-Id": "434c20",
+            },
+            body: JSON.stringify({
+                sessionId: "434c20",
+                hypothesisId: "H3",
+                location: "InlineAnnotationMenu.tsx:menuPosition",
+                message: "computed menu top",
+                data: {
+                    anchorY: tooltipPosition.y,
+                    innerHeight: window.innerHeight,
+                    spaceBelow,
+                    branchBelow: spaceBelow >= MENU_HEIGHT,
+                    top,
+                    left,
+                },
+                timestamp: Date.now(),
+                runId: "pre-fix",
+            }),
+        }).catch(() => {});
+        // #endregion
         setMenuPosition({ left, top });
     }, [tooltipPosition]);
 

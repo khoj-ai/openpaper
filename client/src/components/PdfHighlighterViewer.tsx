@@ -570,6 +570,34 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			if (domSelection && domSelection.rangeCount > 0) {
 				const range = domSelection.getRangeAt(0);
 				const rect = range.getBoundingClientRect();
+				const clientRects = range.getClientRects();
+				// #region agent log
+				fetch("http://127.0.0.1:7848/ingest/1ffc24a3-d0c6-4802-9576-899d9a9fb32b", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						"X-Debug-Session-Id": "434c20",
+					},
+					body: JSON.stringify({
+						sessionId: "434c20",
+						hypothesisId: "H1-H4",
+						location: "PdfHighlighterViewer.tsx:handleSelection",
+						message: "selection range rects",
+						data: {
+							union: {
+								top: rect.top,
+								bottom: rect.bottom,
+								left: rect.left,
+								height: rect.height,
+							},
+							clientRectCount: clientRects.length,
+							innerHeight: typeof window !== "undefined" ? window.innerHeight : null,
+						},
+						timestamp: Date.now(),
+						runId: "pre-fix",
+					}),
+				}).catch(() => {});
+				// #endregion
 				setTooltipPosition({
 					x: rect.left,
 					y: rect.bottom,

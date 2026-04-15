@@ -16,8 +16,6 @@ import Link from "next/link";
 import { ManageProjectsButton } from "@/components/ManageProjectsButton";
 import { MobilePaperMenu } from "@/components/MobilePaperMenu";
 import { CitePaperButton } from "@/components/CitePaperButton";
-import { PaperHeaderExtrasMenu } from "@/components/PaperHeaderExtrasMenu";
-
 const geistSans = Geist({
 	variable: "--font-geist-sans",
 	subsets: ["latin"],
@@ -106,7 +104,6 @@ export default function RootLayout({
 									<ManageProjectsButton />
 									<CitePaperButton />
 									<SharePaperButton />
-									<PaperHeaderExtrasMenu />
 								</div>
 									{/* Mobile menu */}
 									<MobilePaperMenu />

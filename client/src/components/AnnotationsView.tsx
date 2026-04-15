@@ -293,11 +293,11 @@ export function AnnotationsView({
 						{composeTargetHighlight?.raw_text ? (
 							<div
 								className={cn(
-									"border-l-2 pl-3 mb-2",
+									"min-w-0 border-l-2 pl-3 mb-2",
 									QUOTE_ACCENT_BORDER[highlightSwatchColor(composeTargetHighlight)]
 								)}
 							>
-								<p className="text-xs text-muted-foreground line-clamp-3 whitespace-pre-wrap">
+								<p className="text-xs text-muted-foreground whitespace-pre-wrap break-words">
 									{composeTargetHighlight.raw_text}
 								</p>
 							</div>
@@ -382,11 +382,11 @@ export function AnnotationsView({
 									{highlight.raw_text?.trim() ? (
 										<div
 											className={cn(
-												"border-l-2 pl-3 mb-0",
+												"min-w-0 border-l-2 pl-3 mb-0",
 												QUOTE_ACCENT_BORDER[color]
 											)}
 										>
-											<p className="text-xs text-muted-foreground line-clamp-3 whitespace-pre-wrap">
+											<p className="text-xs text-muted-foreground whitespace-pre-wrap break-words">
 												{highlight.raw_text}
 											</p>
 										</div>
