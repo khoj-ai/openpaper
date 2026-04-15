@@ -75,7 +75,7 @@ interface SidePanelContentProps {
     isMobile: boolean;
     renderedHighlightPositions?: Map<string, RenderedHighlightPosition>;
     composeHighlightId?: string | null;
-    onComposeHighlightDismiss?: () => void;
+    onComposeHighlightDismiss?: (cancelledHighlightId?: string | null) => void;
     addAnnotation?: (highlightId: string, content: string) => Promise<PaperHighlightAnnotation>;
 }
 

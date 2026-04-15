@@ -35,7 +35,7 @@ export function HighlightContainer({ onHighlightClick }: HighlightContainerProps
 		onHighlightClick(highlight, event.nativeEvent);
 	};
 
-	// Inactive highlights are dimmed; active highlight uses the original normal color
+	// Solid hex fills from highlightColors.ts (inactive vs active).
 	const highlightColor =
 		highlight.role === "assistant"
 			? getAssistantHighlightBackgroundRgba(isActive)

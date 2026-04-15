@@ -1,14 +1,6 @@
 "use client";
 
-import {
-	useRef,
-	useState,
-	useCallback,
-	useEffect,
-	useMemo,
-	type Dispatch,
-	type SetStateAction,
-} from "react";
+import { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
 	PdfLoader,
@@ -49,6 +41,7 @@ import {
 	createTextHighlightOverlays,
 	getAssistantHighlightBackgroundRgba,
 	getUserHighlightBackgroundRgba,
+	PDF_TEXT_SELECTION_FILL,
 } from "./pdf-viewer";
 
 // Re-export types for external use
@@ -154,11 +147,6 @@ interface PdfHighlighterViewerProps {
 	/** When true and inline cards are hidden, route annotate flows to the Annotations side panel */
 	annotationsPanelActive?: boolean;
 	onAnnotateViaSidePanel?: (payload: { highlightId: string }) => void;
-	/** Controlled highlight color (optional; defaults to internal state). */
-	highlightColor?: HighlightColor;
-	setHighlightColor?: Dispatch<SetStateAction<HighlightColor>>;
-	/** When false, color + annotation visibility live on PaperSidebar (desktop). Default true. */
-	showToolbarColorAndEye?: boolean;
 }
 
 export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
@@ -193,9 +181,6 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		onToggleAnnotationCards,
 		annotationsPanelActive = false,
 		onAnnotateViaSidePanel,
-		highlightColor: highlightColorProp,
-		setHighlightColor: setHighlightColorProp,
-		showToolbarColorAndEye = true,
 	} = props;
 
 	// Position anchors for inline annotation cards
@@ -290,9 +275,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 	 * effect re-run once the viewer is genuinely available.
 	 */
 	const [viewerReadyTick, setViewerReadyTick] = useState(0);
-	const [internalHighlightColor, setInternalHighlightColor] = useState<HighlightColor>("blue");
-	const highlightColor = highlightColorProp ?? internalHighlightColor;
-	const setHighlightColor = setHighlightColorProp ?? setInternalHighlightColor;
+	const [highlightColor, setHighlightColor] = useState<HighlightColor>("blue");
 
 	// Search hook
 	const search = usePdfSearch({
@@ -687,6 +670,12 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 				return;
 			}
 
+			// Annotations side panel open: scroll list via activeHighlight only — no peek card or inline menu
+			if (annotationsPanelActive && hasPersisted) {
+				setPeekAnnotationCardHighlightId(null);
+				return;
+			}
+
 			// Inline cards hidden: peek persisted thread when we can anchor a margin card
 			if (hasPersisted) {
 				const ph = originalHighlight
@@ -727,6 +716,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			extendedHighlights,
 			annotationCards,
 			showAnnotationCards,
+			annotationsPanelActive,
 			highlightHasPersistedAnnotations,
 			ensureAnnotationCardEntry,
 			highlights,
@@ -1285,6 +1275,15 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 						if (
 							hid &&
 							!showAnnotationCards &&
+							annotationsPanelActive &&
+							highlightHasPersistedAnnotations(hid)
+						) {
+							setPeekAnnotationCardHighlightId(null);
+							return;
+						}
+						if (
+							hid &&
+							!showAnnotationCards &&
 							highlightHasPersistedAnnotations(hid) &&
 							highlight.position &&
 							highlight.page_number
@@ -1459,6 +1458,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		onOverlaysCreated,
 		activeHighlight,
 		showAnnotationCards,
+		annotationsPanelActive,
 		highlightHasPersistedAnnotations,
 		ensureAnnotationCardEntry,
 	]);
@@ -1497,7 +1497,6 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 				setHighlightColor={setHighlightColor}
 				showAnnotationCards={showAnnotationCards}
 				onToggleAnnotationCards={onToggleAnnotationCards}
-				showColorAndEye={showToolbarColorAndEye}
 			/>
 
 			{/* PDF Viewer — overflow-x-visible so margin annotation cards beside the page are not clipped */}
@@ -1551,7 +1550,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 								style={{
 									height: "100%",
 								}}
-								textSelectionColor="rgba(59, 130, 246, 0.3)"
+								textSelectionColor={PDF_TEXT_SELECTION_FILL}
 							>
 								<HighlightContainer onHighlightClick={handleHighlightClick} />
 							</PdfHighlighter>
@@ -1712,11 +1711,13 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 							return next;
 						})
 					}
-					onAnnotationSaved={(savedId) =>
+					onAnnotationSaved={(_savedId) => {
 						setAnnotationCards(prev => prev.map(c =>
-							c.highlightId === card.highlightId ? { ...c, annotationId: savedId } : c
-						))
-					}
+							c.highlightId === card.highlightId ? { ...c, annotationId: _savedId } : c
+						));
+						// Match side-panel compose: drop PDF "active" tint after first note is saved
+						setActiveHighlight(null);
+					}}
 					onClose={() => {
 						setIsAnnotating(false);
 						setSelectionRectTop(null);
@@ -1725,6 +1726,16 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 						}
 						// Only remove unsaved cards — saved annotation threads persist until all comments are deleted
 						if (!card.annotationId) {
+							const hasAnn = annotations.some((a) => a.highlight_id === card.highlightId);
+							if (!hasAnn) {
+								const h = highlights.find((x) => x.id === card.highlightId);
+								if (h) {
+									removeHighlight(h);
+									if (activeHighlight?.id === card.highlightId) {
+										setActiveHighlight(null);
+									}
+								}
+							}
 							setAnnotationCards(prev => prev.filter(c => c.highlightId !== card.highlightId));
 							setCardHeights(prev => { const next = new Map(prev); next.delete(card.highlightId); return next; });
 						}

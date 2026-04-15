@@ -108,6 +108,8 @@ export default function PaperView() {
     } = useAnnotations(id);
 
     const [annotationCardsVisible, setAnnotationCardsVisible] = useState(true);
+    /** When Annotations side panel is open, compose first note / reply here instead of margin cards */
+    const [composeHighlightId, setComposeHighlightId] = useState<string | null>(null);
     const [activeCitationKey, setActiveCitationKey] = useState<string | null>(null);
     const [activeCitationMessageIndex, setActiveCitationMessageIndex] = useState<number | null>(null);
     const [explicitSearchTerm, setExplicitSearchTerm] = useState<string | undefined>(undefined);
@@ -133,11 +135,18 @@ export default function PaperView() {
     const [elapsedTime, setElapsedTime] = useState(0);
 
     const [rightSideFunction, setRightSideFunction] = useState<string>('Overview');
+    const annotationsPanelActive = rightSideFunction === 'Annotations';
     const rightSideHidesInlineAnnotationCards =
         rightSideFunction === 'Annotations' ||
         rightSideFunction === 'Chat' ||
         rightSideFunction === 'Audio';
     const showAnnotationCards = annotationCardsVisible && !rightSideHidesInlineAnnotationCards;
+    useEffect(() => {
+        if (rightSideFunction !== 'Annotations') {
+            setComposeHighlightId(null);
+        }
+    }, [rightSideFunction]);
+
     const [toolset, setToolset] = useState(PaperToolset);
     const initialRsfRef = useRef<string | null>(null);
     const hasInitializedRsf = useRef(false);
@@ -310,9 +319,13 @@ export default function PaperView() {
 
     const handleHighlightClick = useCallback((highlight: PaperHighlight) => {
         setActiveHighlight(highlight);
-        // Use search to navigate to the highlight text in the PDF
-        if (highlight.raw_text) {
+        // Position-backed highlights: PdfHighlighterViewer scrolls via scrollToHighlight only.
+        // Do not set explicitSearchTerm — it triggers usePdfSearch goToMatch(0) (first occurrence)
+        // and fights correct alignment when raw_text appears multiple times.
+        if (highlight.raw_text && !highlight.position) {
             setExplicitSearchTerm(highlight.raw_text);
+        } else {
+            setExplicitSearchTerm(undefined);
         }
     }, []);
 
@@ -470,6 +483,25 @@ export default function PaperView() {
         }
     }, [id, paperData]);
 
+    const onAnnotateViaSidePanel = useCallback((payload: { highlightId: string }) => {
+        setComposeHighlightId(payload.highlightId);
+    }, []);
+
+    const onComposeHighlightDismiss = useCallback(
+        (cancelledHighlightId?: string | null) => {
+            setComposeHighlightId(null);
+            setIsAnnotating(false);
+            // End PDF "selected" emphasis when compose closes — otherwise activeHighlightStore
+            // stays set and the paragraph keeps the active (0.4) tint after Save.
+            setActiveHighlight(null);
+            if (cancelledHighlightId == null || cancelledHighlightId === '') return;
+            if (annotations.some((a) => a.highlight_id === cancelledHighlightId)) return;
+            const h = highlights.find((x) => x.id === cancelledHighlightId);
+            if (h) removeHighlight(h);
+        },
+        [annotations, highlights, removeHighlight, setActiveHighlight]
+    );
+
     if (loading) return <PaperViewSkeleton />;
 
     if (!paperData) return <div>Paper not found</div>;
@@ -493,6 +525,9 @@ export default function PaperView() {
         userMessageReferences,
         setUserMessageReferences,
         renderedHighlightPositions,
+        composeHighlightId,
+        onComposeHighlightDismiss,
+        addAnnotation,
     };
 
     if (isMobile) {
@@ -533,6 +568,8 @@ export default function PaperView() {
                                     currentUser={user}
                                     showAnnotationCards={showAnnotationCards}
                                     onToggleAnnotationCards={() => setAnnotationCardsVisible(v => !v)}
+                                    annotationsPanelActive={annotationsPanelActive}
+                                    onAnnotateViaSidePanel={onAnnotateViaSidePanel}
                                 />
                             )}
                         </div>
@@ -625,6 +662,8 @@ export default function PaperView() {
                                 currentUser={user}
                                 showAnnotationCards={showAnnotationCards}
                                 onToggleAnnotationCards={() => setAnnotationCardsVisible(v => !v)}
+                                annotationsPanelActive={annotationsPanelActive}
+                                onAnnotateViaSidePanel={onAnnotateViaSidePanel}
                             />
                         </div>
                     )}

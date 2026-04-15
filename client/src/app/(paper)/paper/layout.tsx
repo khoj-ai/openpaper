@@ -9,14 +9,14 @@ import { AuthProvider } from "@/lib/auth";
 import { Toaster } from "@/components/ui/sonner";
 import { PostHogProvider, ThemeProvider } from "@/lib/providers";
 import { SharePaperButton } from '@/components/SharePaperButton';
-import { CitationGraphButton } from '@/components/CitationGraphButton';
-import { ImportPaperButton } from '@/components/ImportPaperButton';
 
 import { SidebarController } from "@/components/utils/SidebarAutoCollapse";
 import Image from "next/image";
 import Link from "next/link";
 import { ManageProjectsButton } from "@/components/ManageProjectsButton";
 import { MobilePaperMenu } from "@/components/MobilePaperMenu";
+import { CitePaperButton } from "@/components/CitePaperButton";
+import { PaperHeaderExtrasMenu } from "@/components/PaperHeaderExtrasMenu";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -103,10 +103,10 @@ export default function RootLayout({
 										</Link>
 									{/* Desktop buttons */}
 								<div className="hidden md:flex items-center gap-2">
-									<ImportPaperButton />
 									<ManageProjectsButton />
-									<CitationGraphButton />
+									<CitePaperButton />
 									<SharePaperButton />
+									<PaperHeaderExtrasMenu />
 								</div>
 									{/* Mobile menu */}
 									<MobilePaperMenu />

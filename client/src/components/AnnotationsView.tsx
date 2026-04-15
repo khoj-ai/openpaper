@@ -30,6 +30,30 @@ function autoResizeReplyTextarea(el: HTMLTextAreaElement) {
 const inlineReplyTextareaClassName =
 	"text-sm text-foreground placeholder:text-muted-foreground resize-none w-full min-h-[4rem] max-h-48 px-3 py-2 overflow-y-auto overflow-x-hidden box-border rounded-md border border-black bg-background focus:outline-none focus:ring-0 focus:border-black dark:border-white dark:focus:border-white";
 
+function annotationCreatedMs(iso: string | undefined): number {
+	if (!iso) return NaN;
+	const t = Date.parse(iso);
+	return Number.isFinite(t) ? t : NaN;
+}
+
+/** Newest annotation in the thread (ms since epoch); used for ordering threads latest → oldest */
+function threadLastActivityMs(
+	annotationMap: Map<string, PaperHighlightAnnotation[]>,
+	highlightId: string,
+	composeHighlightId: string | null
+): number {
+	const anns = annotationMap.get(highlightId);
+	if (!anns?.length) {
+		return composeHighlightId === highlightId ? Number.MAX_SAFE_INTEGER : 0;
+	}
+	let max = 0;
+	for (const ann of anns) {
+		const t = annotationCreatedMs(ann.created_at);
+		if (Number.isFinite(t)) max = Math.max(max, t);
+	}
+	return max;
+}
+
 interface AnnotationsViewProps {
 	highlights: PaperHighlight[];
 	annotations: PaperHighlightAnnotation[];
@@ -38,7 +62,7 @@ interface AnnotationsViewProps {
 	user: BasicUser;
 	renderedHighlightPositions?: Map<string, RenderedHighlightPosition>;
 	composeHighlightId?: string | null;
-	onComposeHighlightDismiss?: () => void;
+	onComposeHighlightDismiss?: (cancelledHighlightId?: string | null) => void;
 	addAnnotation?: (highlightId: string, content: string) => Promise<PaperHighlightAnnotation>;
 	readonly?: boolean;
 }
@@ -92,32 +116,31 @@ export function AnnotationsView({
 			return false;
 		});
 
-		const latestMsForHighlight = (highlightId: string): number => {
-			const anns = annotationMap.get(highlightId) ?? [];
-			if (anns.length === 0) {
-				if (composeHighlightId === highlightId) return Number.MAX_SAFE_INTEGER;
-				return 0;
-			}
-			return Math.max(
-				...anns.map((ann) => new Date(ann.created_at).getTime())
-			);
-		};
+		const seenIds = new Set<string>();
+		const dedupedHighlights = annotatedHighlights.filter((h) => {
+			if (!h.id || seenIds.has(h.id)) return false;
+			seenIds.add(h.id);
+			return true;
+		});
 
-		const sorted = [...annotatedHighlights].sort((a, b) => {
+		const sorted = [...dedupedHighlights].sort((a, b) => {
 			const idA = a.id!;
 			const idB = b.id!;
-			const tA = latestMsForHighlight(idA);
-			const tB = latestMsForHighlight(idB);
+			const tA = threadLastActivityMs(annotationMap, idA, composeHighlightId);
+			const tB = threadLastActivityMs(annotationMap, idB, composeHighlightId);
 			if (tB !== tA) return tB - tA;
-			return idA.localeCompare(idB);
+			return idB.localeCompare(idA);
 		});
 
 		return sorted.map((highlight) => ({
 			highlight,
-			annotations: (annotationMap.get(highlight.id!) ?? []).sort(
-				(a, b) =>
-					new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-			),
+			annotations: (annotationMap.get(highlight.id!) ?? []).sort((a, b) => {
+				const ta = annotationCreatedMs(a.created_at);
+				const tb = annotationCreatedMs(b.created_at);
+				return (
+					(Number.isFinite(ta) ? ta : 0) - (Number.isFinite(tb) ? tb : 0)
+				);
+			}),
 		}));
 	}, [highlights, annotations, renderedHighlightPositions, composeHighlightId]);
 
@@ -211,7 +234,7 @@ export function AnnotationsView({
 
 	const handleComposeCancel = () => {
 		setComposeDraft('');
-		onComposeHighlightDismiss?.();
+		onComposeHighlightDismiss?.(composeHighlightId);
 	};
 
 	const handleReplySave = async (highlightId: string) => {

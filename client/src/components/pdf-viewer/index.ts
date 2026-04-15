@@ -9,5 +9,7 @@ export { findTextPages, createTextHighlightOverlays, removeHighlightOverlays, co
 export {
 	getAssistantHighlightBackgroundRgba,
 	getUserHighlightBackgroundRgba,
+	PDF_TEXT_SELECTION_FILL,
+	USER_HIGHLIGHT_FILL,
 	USER_HIGHLIGHT_RGBA,
 } from "./highlightColors";

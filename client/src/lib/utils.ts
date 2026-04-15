@@ -58,34 +58,21 @@ export const formatDate = (dateString: string) => {
 	}
 };
 
-/** Clock time first, then date context — e.g. "11:31 AM - Today", "9:29 PM - Jan 15" */
+/** Actual creation time and calendar date — e.g. "9:30 PM Apr 11", "9:30 PM Apr 11, 2024" when not the current year */
 export const formatAnnotationDate = (dateString: string) => {
+	if (!isDateValid(dateString)) return "";
 	const date = new Date(dateString);
 	const now = new Date();
-	const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-	const isSameCalendarDay = (a: Date, b: Date) =>
-		a.getFullYear() === b.getFullYear() &&
-		a.getMonth() === b.getMonth() &&
-		a.getDate() === b.getDate();
-
-	const dateLabel = (() => {
-		if (isSameCalendarDay(date, now)) return 'Today';
-		const yesterday = new Date(now);
-		yesterday.setDate(yesterday.getDate() - 1);
-		if (isSameCalendarDay(date, yesterday)) return 'Yesterday';
-		const diffMs = now.getTime() - date.getTime();
-		const diffDays = diffMs / (1000 * 60 * 60 * 24);
-		if (diffDays >= 0 && diffDays < 7) {
-			return date.toLocaleDateString([], { weekday: 'short' });
-		}
-		if (date.getFullYear() !== now.getFullYear()) {
-			return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
-		}
-		return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-	})();
-
-	return `${timeStr} - ${dateLabel}`;
+	const timeStr = date.toLocaleTimeString("en-US", {
+		hour: "numeric",
+		minute: "2-digit",
+		hour12: true,
+	});
+	const datePart =
+		date.getFullYear() !== now.getFullYear()
+			? date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+			: date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+	return `${timeStr} ${datePart}`;
 };
 
 export function getAlphaHashToBackgroundColor(input: string): string {

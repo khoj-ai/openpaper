@@ -12,6 +12,7 @@ import {
 	ChevronDown,
 	Search,
 	X,
+	Highlighter,
 	Eye,
 	EyeOff,
 } from "lucide-react";
@@ -63,8 +64,6 @@ interface PdfToolbarProps {
 	/** Margin annotation cards visibility (omit when not wired). */
 	showAnnotationCards?: boolean;
 	onToggleAnnotationCards?: () => void;
-	/** When false, color + eye are omitted (e.g. shown on PaperSidebar). Default true. */
-	showColorAndEye?: boolean;
 }
 
 export function PdfToolbar({
@@ -94,7 +93,6 @@ export function PdfToolbar({
 	setHighlightColor,
 	showAnnotationCards = true,
 	onToggleAnnotationCards,
-	showColorAndEye = true,
 }: PdfToolbarProps) {
 	const currentColorConfig =
 		HIGHLIGHT_COLOR_SWATCHES.find((c) => c.color === highlightColor) || HIGHLIGHT_COLOR_SWATCHES[2];
@@ -207,43 +205,38 @@ export function PdfToolbar({
 				)}
 			</div>
 
-			{showColorAndEye && (
-				<>
-					{/* Separator */}
-					<div className="h-5 w-px bg-gray-300 mx-3" />
+			{/* Separator */}
+			<div className="h-5 w-px bg-gray-300 mx-3" />
 
-					{/* Highlight color picker — circle only (e.g. mobile reader when sidebar is hidden) */}
-					<DropdownMenu>
-						<DropdownMenuTrigger asChild>
-							<Button
-								size="sm"
-								variant="ghost"
-								className="h-8 w-8 p-0 rounded-full"
-								title="Highlight color"
-							>
-								<div
-									className={`w-4 h-4 rounded-full ${currentColorConfig.bg} ring-1 ring-border`}
-								/>
-							</Button>
-						</DropdownMenuTrigger>
-						<DropdownMenuContent align="start" className="min-w-0">
-							<div className="flex gap-1 p-1">
-								{HIGHLIGHT_COLOR_SWATCHES.map(({ color, bg }) => (
-									<button
-										key={color}
-										type="button"
-										onClick={() => setHighlightColor(color)}
-										className={`w-6 h-6 rounded-sm ${bg} hover:scale-110 transition-transform ${
-											highlightColor === color ? "ring-2 ring-offset-1 ring-gray-400" : ""
-										}`}
-										title={color}
-									/>
-								))}
-							</div>
-						</DropdownMenuContent>
-					</DropdownMenu>
-				</>
-			)}
+			{/* Highlight color: marker icon + swatch (original layout) */}
+			<DropdownMenu>
+				<DropdownMenuTrigger asChild>
+					<Button
+						size="sm"
+						variant="ghost"
+						className="h-8 px-2 gap-1.5"
+						title="Highlight color"
+					>
+						<Highlighter size={16} />
+						<div className={`w-3 h-3 rounded-sm ${currentColorConfig.bg}`} />
+					</Button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="start" className="min-w-0">
+					<div className="flex gap-1 p-1">
+						{HIGHLIGHT_COLOR_SWATCHES.map(({ color, bg }) => (
+							<button
+								key={color}
+								type="button"
+								onClick={() => setHighlightColor(color)}
+								className={`w-6 h-6 rounded-sm ${bg} hover:scale-110 transition-transform ${
+									highlightColor === color ? "ring-2 ring-offset-1 ring-gray-400" : ""
+								}`}
+								title={color}
+							/>
+						))}
+					</div>
+				</DropdownMenuContent>
+			</DropdownMenu>
 
 			{/* Spacer */}
 			<div className="flex-1" />
@@ -273,7 +266,7 @@ export function PdfToolbar({
 					</Button>
 				</div>
 
-				{showColorAndEye && onToggleAnnotationCards && (
+				{onToggleAnnotationCards && (
 					<Button
 						type="button"
 						size="sm"
