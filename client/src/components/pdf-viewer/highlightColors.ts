@@ -16,21 +16,21 @@ export const HIGHLIGHT_COLOR_SWATCHES: {
 /**
  * Soft solid fills for PDF text (opaque hex). Using translucent RGBA on saturated base
  * colors still looks loud on white, and overlapping line rects stack alpha and create dark bands.
- * [inactive, active] — inactive stays a light wash; active uses a clearly darker/saturated hex
+ * [inactive, active] — inactive is ~Tailwind 100 (readable on white); active is clearly darker
  * so the focused highlight is easy to spot (not “two pastels”).
  */
 export const USER_HIGHLIGHT_FILL: Record<HighlightColor, [string, string]> = {
-	yellow: ["#FFFBEB", "#FDE68A"],
-	green: ["#F0FDF4", "#86EFAC"],
-	blue: ["#EFF6FF", "#93C5FD"],
-	pink: ["#FDF2F8", "#F9A8D4"],
-	purple: ["#FAF5FF", "#C4B5FD"],
+	yellow: ["#FEF3C7", "#FDE68A"],
+	green: ["#DCFCE7", "#86EFAC"],
+	blue: ["#DBEAFE", "#93C5FD"],
+	pink: ["#FCE7F3", "#F9A8D4"],
+	purple: ["#F3E8FF", "#C4B5FD"],
 };
 
 /** @deprecated Use USER_HIGHLIGHT_FILL — kept for re-exports */
 export const USER_HIGHLIGHT_RGBA = USER_HIGHLIGHT_FILL;
 
-const ASSISTANT_HIGHLIGHT_FILL = ["#F5F3FF", "#A78BFA"] as const;
+const ASSISTANT_HIGHLIGHT_FILL = ["#EDE9FE", "#A78BFA"] as const;
 
 export function getUserHighlightBackgroundRgba(
 	color: HighlightColor | undefined,
@@ -43,5 +43,5 @@ export function getAssistantHighlightBackgroundRgba(isActive: boolean): string {
 	return ASSISTANT_HIGHLIGHT_FILL[isActive ? 1 : 0];
 }
 
-/** Ephemeral text selection while dragging (matches blue idle fill). */
-export const PDF_TEXT_SELECTION_FILL = "#EFF6FF";
+/** Ephemeral text selection while dragging (matches blue inactive fill). */
+export const PDF_TEXT_SELECTION_FILL = "#DBEAFE";
