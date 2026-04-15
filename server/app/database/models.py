@@ -114,6 +114,7 @@ class User(Base):
     picture = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
+    is_blocked = Column(Boolean, default=False, nullable=False)
 
     # OAuth related fields
     auth_provider = Column(String, nullable=False)

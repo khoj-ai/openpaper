@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from app.auth.dependencies import get_current_user, get_required_user
+from app.auth.dependencies import get_admin_user, get_current_user, get_required_user
 from app.auth.email import email_auth_client
 from app.auth.google import google_auth_client
 from app.auth.utils import (
@@ -27,6 +27,7 @@ from app.database.crud.user_crud import user as user_crud
 from app.database.database import get_db
 from app.database.models import PaperStatus, Project, User
 from app.database.telemetry import track_event
+from app.helpers.abuse_detection import check_signup_abuse, send_abuse_alert
 from app.helpers.email import (
     CLIENT_DOMAIN,
     add_to_default_audience,
@@ -107,6 +108,7 @@ async def update_profile(
         picture=str(db_user.picture) if db_user.picture else None,
         is_email_verified=bool(db_user.is_email_verified),
         is_active=is_user_active,
+        is_blocked=bool(db_user.is_blocked),
     )
 
     return AuthResponse(
@@ -233,6 +235,14 @@ async def google_callback(
                 user_id=str(db_user.id),
             )
 
+            # Check for suspected signup abuse
+            try:
+                abuse_matches = check_signup_abuse(db, db_user)
+                if abuse_matches:
+                    send_abuse_alert(db_user, abuse_matches)
+            except Exception as e:
+                logger.error(f"Error during abuse check: {e}", exc_info=True)
+
         # Create a new session
         user_agent = request.headers.get("user-agent")
         client_host = request.client.host if request.client else None
@@ -293,6 +303,13 @@ class EmailSetNameRequest(BaseModel):
     name: str
 
 
+class BlockUserRequest(BaseModel):
+    """Request model for blocking/unblocking a user."""
+
+    user_id: str
+    blocked: bool
+
+
 class EmailVerifyRequest(BaseModel):
     """Request model for email verification."""
 
@@ -332,6 +349,14 @@ async def email_signin(
             db_user = user_crud.create_email_user(db, email=email)
             logger.info(f"Created new email user: {email}")
             newly_created = True
+
+            # Check for suspected signup abuse
+            try:
+                abuse_matches = check_signup_abuse(db, db_user)
+                if abuse_matches:
+                    send_abuse_alert(db_user, abuse_matches)
+            except Exception as e:
+                logger.error(f"Error during abuse check: {e}", exc_info=True)
 
         # Generate verification code
         code, expires_at = email_auth_client.generate_verification_data()
@@ -515,3 +540,56 @@ async def email_verify(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error during verification",
         )
+
+
+@auth_router.post("/admin/block", response_model=AuthResponse)
+async def block_user(
+    request: BlockUserRequest,
+    admin_user: CurrentUser = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Block or unblock a user. Admin only."""
+    from app.helpers.email import send_email
+
+    target_user = user_crud.get(db=db, id=uuid.UUID(request.user_id))
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    target_user.is_blocked = request.blocked  # type: ignore
+    db.add(target_user)
+    db.commit()
+    db.refresh(target_user)
+
+    action = "blocked" if request.blocked else "unblocked"
+    logger.info(f"User {target_user.email} {action} by admin {admin_user.email}")
+
+    if request.blocked:
+        user_email = str(target_user.email)
+        user_name = str(target_user.name) if target_user.name else ""
+        greeting = f"Hello {user_name},\n\n" if user_name else "Hello,\n\n"
+        try:
+            send_email(
+                to_email=user_email,
+                subject="Your Open Paper account has been suspended",
+                html_content="",
+                text_content=(
+                    f"{greeting}"
+                    "Your Open Paper account has been flagged and suspended "
+                    "for suspected misconduct of the platform.\n\n"
+                    "If you believe this is an error, please contact us at "
+                    "team@khoj.dev and we will review your account.\n\n"
+                    "- The Open Paper Team"
+                ),
+                from_name="Open Paper",
+                from_address="support@updates.openpaper.ai",
+            )
+        except Exception as e:
+            logger.error(f"Failed to send block email: {e}", exc_info=True)
+
+    return AuthResponse(
+        success=True,
+        message=f"User {action} successfully",
+    )

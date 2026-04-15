@@ -104,6 +104,7 @@ class CurrentUser(BaseModel):
 
     # is_active describes if the user account is on the RESEARCHER or BASIC plan
     is_active: bool = False
+    is_blocked: bool = False
 
     class ConfigDict:
         from_attributes = True
