@@ -5,7 +5,13 @@ import { useParams } from 'next/navigation';
 import { PdfHighlighterViewer } from '@/components/PdfHighlighterViewer';
 import { AnnotationsView } from '@/components/AnnotationsView';
 import { fetchFromApi } from '@/lib/api';
-import { PaperData, PaperHighlight, PaperHighlightAnnotation, ChatMessage, SharedPaper } from '@/lib/schema';
+import {
+    PaperData,
+    PaperHighlight,
+    PaperHighlightAnnotation,
+    ChatMessage,
+    SharedPaper,
+} from '@/lib/schema';
 import PaperMetadata from '@/components/PaperMetadata';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Book, Box, User } from 'lucide-react';
@@ -446,6 +452,8 @@ export default function SharedPaperView() {
                                 rightSideFunction={rightSideFunction}
                                 setRightSideFunction={setRightSideFunction}
                                 PaperToolset={dynamicPaperToolset}
+                                showAnnotationCards={showAnnotationCards}
+                                onToggleAnnotationCards={() => setShowAnnotationCards((v) => !v)}
                             />
                         </div>
                     )}
@@ -496,7 +504,6 @@ export default function SharedPaperView() {
                             onRefreshUrl={refreshPdfUrl}
                             currentUser={owner ?? null}
                             showAnnotationCards={showAnnotationCards}
-                            onToggleAnnotationCards={() => setShowAnnotationCards((v) => !v)}
                         />
                     ) : (
                         <div className="flex justify-center items-center h-full">PDF could not be loaded.</div>
@@ -571,6 +578,8 @@ export default function SharedPaperView() {
                         rightSideFunction={rightSideFunction}
                         setRightSideFunction={setRightSideFunction}
                         PaperToolset={dynamicPaperToolset}
+                        showAnnotationCards={showAnnotationCards}
+                        onToggleAnnotationCards={() => setShowAnnotationCards((v) => !v)}
                     />
                 </div>
             </div>

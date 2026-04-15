@@ -9,7 +9,7 @@ import {
 import { RenderedHighlightPosition } from './PdfHighlighterViewer';
 import { smoothScrollTo } from '@/lib/animation';
 import { BasicUser } from "@/lib/auth";
-import { formatAnnotationDate } from '@/lib/utils';
+import { cn, formatAnnotationDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 const ITEM_BG_MAP: Record<HighlightColor, string> = {
@@ -19,6 +19,20 @@ const ITEM_BG_MAP: Record<HighlightColor, string> = {
 	pink:   "bg-pink-50 dark:bg-pink-950/20",
 	purple: "bg-purple-50 dark:bg-purple-950/20",
 };
+
+/** Left accent for quoted PDF snippet (matches thread highlight color). */
+const QUOTE_ACCENT_BORDER: Record<HighlightColor, string> = {
+	yellow: "border-yellow-500 dark:border-yellow-400",
+	green: "border-green-600 dark:border-green-500",
+	blue: "border-blue-500 dark:border-blue-400",
+	pink: "border-pink-500 dark:border-pink-400",
+	purple: "border-purple-500 dark:border-purple-400",
+};
+
+function highlightSwatchColor(h: PaperHighlight | undefined): HighlightColor {
+	if (!h) return "blue";
+	return h.role === "assistant" ? "purple" : (h.color || "blue");
+}
 
 /** Matches `InlineAnnotationCard` reply field — max-h-48 */
 const REPLY_TEXTAREA_MAX_PX = 192;
@@ -164,19 +178,24 @@ export function AnnotationsView({
 		}
 	}, [activeHighlight]);
 
-	// When the active highlight changes, collapse only the *previous* highlight's thread — not the
-	// newly selected one. Clearing the whole map was wiping expansion set in the same click as
-	// switching highlights (e.g. B → A required two clicks to expand A).
+	// When the active highlight changes (e.g. user clicked highlighted PDF text): expand that
+	// thread fully so "+N more replies" is not needed. When switching A→B, collapse A's expansion
+	// state and expand B.
 	useEffect(() => {
 		const id = activeHighlight?.id ?? null;
 		const prev = prevActiveIdRef.current;
-		if (prev !== null && id !== null && prev !== id) {
-			setExpandedThreads((prevMap) => {
-				const next = { ...prevMap };
+
+		setExpandedThreads((prevMap) => {
+			const next = { ...prevMap };
+			if (prev !== null && id !== null && prev !== id) {
 				delete next[prev];
-				return next;
-			});
-		}
+			}
+			if (id !== null) {
+				next[id] = true;
+			}
+			return next;
+		});
+
 		prevActiveIdRef.current = id;
 	}, [activeHighlight?.id]);
 
@@ -272,11 +291,16 @@ export function AnnotationsView({
 							New note
 						</p>
 						{composeTargetHighlight?.raw_text ? (
-							<p className="text-xs text-muted-foreground line-clamp-3 mb-2 whitespace-pre-wrap">
-								<span className="text-muted-foreground/80">&quot;</span>
-								{composeTargetHighlight.raw_text}
-								<span className="text-muted-foreground/80">&quot;</span>
-							</p>
+							<div
+								className={cn(
+									"border-l-2 pl-3 mb-2",
+									QUOTE_ACCENT_BORDER[highlightSwatchColor(composeTargetHighlight)]
+								)}
+							>
+								<p className="text-xs text-muted-foreground line-clamp-3 whitespace-pre-wrap">
+									{composeTargetHighlight.raw_text}
+								</p>
+							</div>
 						) : null}
 						<textarea
 							ref={composeTextareaRef}
@@ -355,6 +379,18 @@ export function AnnotationsView({
 								}}
 							>
 								<div className="flex flex-col gap-3">
+									{highlight.raw_text?.trim() ? (
+										<div
+											className={cn(
+												"border-l-2 pl-3 mb-0",
+												QUOTE_ACCENT_BORDER[color]
+											)}
+										>
+											<p className="text-xs text-muted-foreground line-clamp-3 whitespace-pre-wrap">
+												{highlight.raw_text}
+											</p>
+										</div>
+									) : null}
 									{visible.map((annotation) => (
 										<div key={annotation.id} className="flex flex-col gap-2">
 											<div className="flex items-center gap-2">

@@ -143,6 +143,7 @@ interface PdfHighlighterViewerProps {
 	removeAnnotation?: (annotationId: string) => void;
 	currentUser?: BasicUser | null;
 	showAnnotationCards?: boolean;
+	/** When set (e.g. mobile reader without PaperSidebar), wires the eye toggle on PdfToolbar. */
 	onToggleAnnotationCards?: () => void;
 	/** When true and inline cards are hidden, route annotate flows to the Annotations side panel */
 	annotationsPanelActive?: boolean;

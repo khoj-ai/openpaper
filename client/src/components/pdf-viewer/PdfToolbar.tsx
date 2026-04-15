@@ -61,7 +61,10 @@ interface PdfToolbarProps {
 	highlightColor: HighlightColor;
 	setHighlightColor: (color: HighlightColor) => void;
 
-	/** Margin annotation cards visibility (omit when not wired). */
+	/**
+	 * When set (e.g. mobile reader with no PaperSidebar), show the annotation visibility
+	 * toggle on this bar. Desktop uses PaperSidebar at the bottom of the floating tool rail.
+	 */
 	showAnnotationCards?: boolean;
 	onToggleAnnotationCards?: () => void;
 }

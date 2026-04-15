@@ -6,6 +6,7 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { Eye, EyeOff } from 'lucide-react';
 import React from 'react';
 
 /** Primary panels where the toolbar sits higher (less gap under the top bar). */
@@ -20,6 +21,9 @@ interface PaperSidebarProps {
             icon: React.ComponentType<{ className?: string }>;
         }[];
     };
+    /** Margin annotation cards visibility (PDF reader); omit to hide the control. */
+    showAnnotationCards?: boolean;
+    onToggleAnnotationCards?: () => void;
 }
 
 function NavButton({ item, rightSideFunction, setRightSideFunction }: {
@@ -49,7 +53,13 @@ function NavButton({ item, rightSideFunction, setRightSideFunction }: {
     );
 }
 
-export function PaperSidebar({ rightSideFunction, setRightSideFunction, PaperToolset }: PaperSidebarProps) {
+export function PaperSidebar({
+    rightSideFunction,
+    setRightSideFunction,
+    PaperToolset,
+    showAnnotationCards = true,
+    onToggleAnnotationCards,
+}: PaperSidebarProps) {
     const beforeReadTool = PaperToolset.nav.filter(item => item.name !== 'Read');
     const readTool = PaperToolset.nav.find(item => item.name === 'Read');
 
@@ -68,6 +78,29 @@ export function PaperSidebar({ rightSideFunction, setRightSideFunction, PaperToo
                 ))}
                 {readTool && (
                     <NavButton item={readTool} rightSideFunction={rightSideFunction} setRightSideFunction={setRightSideFunction} />
+                )}
+                {onToggleAnnotationCards && (
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                className={cn(
+                                    'h-7 w-7 p-0 rounded-md',
+                                    showAnnotationCards
+                                        ? 'text-secondary-foreground hover:bg-blue-100 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-foreground'
+                                        : 'text-muted-foreground hover:bg-blue-100 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200'
+                                )}
+                                onClick={onToggleAnnotationCards}
+                                aria-label={showAnnotationCards ? 'Hide annotations' : 'Show annotations'}
+                            >
+                                {showAnnotationCards ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="left" sideOffset={8}>
+                            {showAnnotationCards ? 'Hide annotations' : 'Show annotations'}
+                        </TooltipContent>
+                    </Tooltip>
                 )}
             </div>
         </TooltipProvider>
