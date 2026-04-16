@@ -18,6 +18,8 @@ interface PaperSidebarProps {
     PaperToolset: {
         nav: {
             name: string;
+            /** Tooltip / display name; falls back to `name` when omitted */
+            label?: string;
             icon: React.ComponentType<{ className?: string }>;
         }[];
     };
@@ -27,10 +29,11 @@ interface PaperSidebarProps {
 }
 
 function NavButton({ item, rightSideFunction, setRightSideFunction }: {
-    item: { name: string; icon: React.ComponentType<{ className?: string }> };
+    item: { name: string; label?: string; icon: React.ComponentType<{ className?: string }> };
     rightSideFunction: string;
     setRightSideFunction: (value: string) => void;
 }) {
+    const tooltipLabel = item.label ?? item.name;
     return (
         <Tooltip key={item.name}>
             <TooltipTrigger asChild>
@@ -42,12 +45,13 @@ function NavButton({ item, rightSideFunction, setRightSideFunction }: {
                             : 'text-secondary-foreground hover:bg-blue-100 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-foreground'
                     }`}
                     onClick={() => setRightSideFunction(item.name)}
+                    aria-label={tooltipLabel}
                 >
                     <item.icon className="h-5 w-5" />
                 </Button>
             </TooltipTrigger>
             <TooltipContent side="left" sideOffset={8}>
-                {item.name}
+                {tooltipLabel}
             </TooltipContent>
         </Tooltip>
     );
@@ -92,13 +96,15 @@ export function PaperSidebar({
                                         : 'text-muted-foreground hover:bg-blue-100 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200'
                                 )}
                                 onClick={onToggleAnnotationCards}
-                                aria-label={showAnnotationCards ? 'Hide annotations' : 'Show annotations'}
+                                aria-label={
+                                    showAnnotationCards ? 'Hide inline annotations' : 'Show inline annotations'
+                                }
                             >
                                 {showAnnotationCards ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent side="left" sideOffset={8}>
-                            {showAnnotationCards ? 'Hide annotations' : 'Show annotations'}
+                            {showAnnotationCards ? 'Hide inline annotations' : 'Show inline annotations'}
                         </TooltipContent>
                     </Tooltip>
                 )}

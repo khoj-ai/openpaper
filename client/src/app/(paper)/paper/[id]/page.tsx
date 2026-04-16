@@ -38,26 +38,31 @@ import { Book, Box } from 'lucide-react';
 
 const OverviewTool = {
     name: "Overview",
+    label: "Overview",
     icon: Lightbulb,
 }
 
 const ReadTool = {
     name: "Read",
+    label: "Read mode",
     icon: Focus,
 }
 
 const ChatTool = {
     name: "Chat",
+    label: "Show chat",
     icon: MessageCircle,
 }
 
 const AnnotationsTool = {
     name: "Annotations",
+    label: "All annotations",
     icon: Highlighter,
 }
 
 const AudioTool = {
     name: "Audio",
+    label: "Audio",
     icon: AudioLines,
 }
 

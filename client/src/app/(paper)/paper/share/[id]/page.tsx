@@ -54,11 +54,11 @@ export default function SharedPaperView() {
 
     const dynamicPaperToolset = useMemo(() => {
         const navItems = [
-            { name: 'Chat', icon: MessageCircle },
-            { name: 'Annotations', icon: Highlighter },
+            { name: 'Chat', label: 'Show chat', icon: MessageCircle },
+            { name: 'Annotations', label: 'All annotations', icon: Highlighter },
         ];
         if (paperData?.summary) {
-            navItems.unshift({ name: 'Overview', icon: Lightbulb });
+            navItems.unshift({ name: 'Overview', label: 'Overview', icon: Lightbulb });
         }
         return { nav: navItems };
     }, [paperData?.summary]);

@@ -11,6 +11,7 @@ import { smoothScrollTo } from '@/lib/animation';
 import { BasicUser } from "@/lib/auth";
 import { cn, formatAnnotationDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { CollapsibleNoteText } from '@/components/CollapsibleNoteText';
 
 const ITEM_BG_MAP: Record<HighlightColor, string> = {
 	yellow: "bg-yellow-50 dark:bg-yellow-950/20",
@@ -297,9 +298,11 @@ export function AnnotationsView({
 									QUOTE_ACCENT_BORDER[highlightSwatchColor(composeTargetHighlight)]
 								)}
 							>
-								<p className="text-xs text-muted-foreground whitespace-pre-wrap break-words">
-									{composeTargetHighlight.raw_text}
-								</p>
+								<CollapsibleNoteText
+									content={composeTargetHighlight.raw_text}
+									isActive={Boolean(composeHighlightId)}
+									paragraphClassName="text-xs text-muted-foreground whitespace-pre-wrap break-words"
+								/>
 							</div>
 						) : null}
 						<textarea
@@ -386,9 +389,11 @@ export function AnnotationsView({
 												QUOTE_ACCENT_BORDER[color]
 											)}
 										>
-											<p className="text-xs text-muted-foreground whitespace-pre-wrap break-words">
-												{highlight.raw_text}
-											</p>
+											<CollapsibleNoteText
+												content={highlight.raw_text}
+												isActive={isActive}
+												paragraphClassName="text-xs text-muted-foreground whitespace-pre-wrap break-words"
+											/>
 										</div>
 									) : null}
 									{visible.map((annotation) => (
@@ -409,9 +414,13 @@ export function AnnotationsView({
 													{formatAnnotationDate(annotation.created_at)}
 												</span>
 											</div>
-											<p className="text-sm text-foreground leading-snug whitespace-pre-wrap pl-10">
-												{annotation.content}
-											</p>
+											<div className="pl-10">
+												<CollapsibleNoteText
+													content={annotation.content}
+													isActive={isActive}
+													paragraphClassName="text-sm text-foreground leading-snug whitespace-pre-wrap break-words"
+												/>
+											</div>
 										</div>
 									))}
 									{moreCount > 0 && (
