@@ -8,6 +8,68 @@ import { cn, formatAnnotationDate, getAlphaHashToBackgroundColor, getInitials } 
 import { Pencil, Trash2, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
+/** Read-only note body: clamps long text and offers Show more / Show less (overflow measured). */
+function CollapsibleNoteText({
+	content,
+	isActive,
+	onCardFocus,
+}: {
+	content: string;
+	isActive: boolean;
+	onCardFocus?: () => void;
+}) {
+	const [expanded, setExpanded] = useState(false);
+	const [collapsedOverflow, setCollapsedOverflow] = useState(false);
+	const pRef = useRef<HTMLParagraphElement>(null);
+
+	useEffect(() => {
+		if (!isActive) setExpanded(false);
+	}, [isActive]);
+
+	useLayoutEffect(() => {
+		const el = pRef.current;
+		if (!el || expanded) return;
+
+		const measure = () => {
+			setCollapsedOverflow(el.scrollHeight > el.clientHeight);
+		};
+		measure();
+		const ro = new ResizeObserver(measure);
+		ro.observe(el);
+		return () => ro.disconnect();
+	}, [content, expanded]);
+
+	const showToggle = expanded || collapsedOverflow;
+
+	return (
+		<div className="min-w-0 w-full">
+			<p
+				ref={pRef}
+				className={cn(
+					"text-sm text-foreground whitespace-pre-wrap break-words",
+					!expanded && "line-clamp-4"
+				)}
+			>
+				{content}
+			</p>
+			{showToggle && (
+				<button
+					type="button"
+					className="text-xs text-blue-600 hover:underline dark:text-blue-400 mt-1"
+					onClick={(e) => {
+						e.stopPropagation();
+						onCardFocus?.();
+						setExpanded((v) => !v);
+					}}
+					onMouseDown={(e) => e.stopPropagation()}
+				>
+					{expanded ? "Show less" : "Show more"}
+				</button>
+			)}
+		</div>
+	);
+}
+
 interface InlineAnnotationCardProps {
     highlightId: string;
     topPosition: number;
@@ -463,7 +525,11 @@ export function InlineAnnotationCard({
                                         </div>
                                     </div>
                                 ) : (
-                                    <p className="text-sm text-foreground whitespace-pre-wrap">{ann.content}</p>
+                                    <CollapsibleNoteText
+                                        content={ann.content}
+                                        isActive={isActive}
+                                        onCardFocus={onCardFocus}
+                                    />
                                 )}
                             </div>
                         ))}

@@ -36,14 +36,14 @@ function NavButton({ item, rightSideFunction, setRightSideFunction }: {
             <TooltipTrigger asChild>
                 <Button
                     variant="ghost"
-                    className={`h-7 w-7 p-0 rounded-md ${
+                    className={`h-8 w-8 p-0 rounded-md ${
                         item.name === rightSideFunction
                             ? 'bg-blue-500 text-blue-100 hover:bg-blue-600 dark:bg-blue-600 dark:text-white dark:hover:bg-blue-500'
                             : 'text-secondary-foreground hover:bg-blue-100 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-foreground'
                     }`}
                     onClick={() => setRightSideFunction(item.name)}
                 >
-                    <item.icon className="h-4 w-4" />
+                    <item.icon className="h-5 w-5" />
                 </Button>
             </TooltipTrigger>
             <TooltipContent side="left" sideOffset={8}>
@@ -69,7 +69,7 @@ export function PaperSidebar({
         <TooltipProvider>
             <div
                 className={cn(
-                    'absolute right-2 z-20 flex flex-col gap-0.5 p-1 bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-lg transition-[top] duration-200 dark:bg-zinc-900/95 dark:border-zinc-600 dark:ring-1 dark:ring-white/10 dark:shadow-black/40',
+                    'absolute right-2 z-20 flex flex-col gap-1 p-1 bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-lg transition-[top] duration-200 dark:bg-zinc-900/95 dark:border-zinc-600 dark:ring-1 dark:ring-white/10 dark:shadow-black/40',
                     toolbarTopClass,
                 )}
             >
@@ -86,7 +86,7 @@ export function PaperSidebar({
                                 type="button"
                                 variant="ghost"
                                 className={cn(
-                                    'h-7 w-7 p-0 rounded-md',
+                                    'h-8 w-8 p-0 rounded-md',
                                     showAnnotationCards
                                         ? 'text-secondary-foreground hover:bg-blue-100 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-foreground'
                                         : 'text-muted-foreground hover:bg-blue-100 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200'
@@ -94,7 +94,7 @@ export function PaperSidebar({
                                 onClick={onToggleAnnotationCards}
                                 aria-label={showAnnotationCards ? 'Hide annotations' : 'Show annotations'}
                             >
-                                {showAnnotationCards ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                                {showAnnotationCards ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent side="left" sideOffset={8}>
