@@ -359,6 +359,8 @@ def extract_paper_metadata(
 
 MAX_PAGES_PER_QUERY = 10  # Up to 10 pages per query (250 results max)
 
+TARGET_PER_DOMAIN = 50  # Aim for 50 papers per domain, but can be adjusted via CLI
+
 
 def iter_candidate_papers(
     domain: str,
@@ -615,8 +617,8 @@ def main():
     parser.add_argument(
         "--target-per-domain",
         type=int,
-        default=25,
-        help="Number of papers to collect per domain (default: 25)",
+        default=TARGET_PER_DOMAIN,
+        help=f"Number of papers to collect per domain (default: {TARGET_PER_DOMAIN})",
     )
     parser.add_argument(
         "--dry-run",
