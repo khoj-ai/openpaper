@@ -14,6 +14,15 @@ logger = logging.getLogger(__name__)
 
 OPENALEX_MAX_RETRIES = 3
 OPENALEX_RETRY_DELAY = 1  # seconds
+OPENALEX_API_KEY = os.getenv("OPENALEX_API_KEY")
+
+
+def _with_openalex_auth(url: str) -> str:
+    """Append the OpenAlex api_key query parameter to a URL if configured."""
+    if not OPENALEX_API_KEY:
+        return url
+    separator = "&" if "?" in url else "?"
+    return f"{url}{separator}api_key={quote(OPENALEX_API_KEY)}"
 
 
 def _request_with_retry(
@@ -290,7 +299,7 @@ def search_open_alex(
 
     logger.debug(f"Constructed URL: {constructed_url}")
 
-    response = _request_with_retry(constructed_url)
+    response = _request_with_retry(_with_openalex_auth(constructed_url))
 
     logger.info(f"Response Status: {response.status_code}")
     logger.debug(f"Response JSON: {response.json()}")
@@ -328,7 +337,7 @@ def get_host_organization_name(host_organization_url: str) -> Optional[str]:
         logger.warning(f"Unknown host_organization ID type: {org_id}")
         return None
 
-    url = f"https://api.openalex.org/{entity_type}/{org_id}"
+    url = _with_openalex_auth(f"https://api.openalex.org/{entity_type}/{org_id}")
     for attempt in range(OPENALEX_MAX_RETRIES):
         try:
             response = requests.get(url, timeout=10)
@@ -381,7 +390,7 @@ def get_paper_by_open_alex_id(open_alex_id: str) -> Optional[OpenAlexWork]:
     Returns:
         Optional[OpenAlexWork]: The OpenAlexWork object if found, otherwise None.
     """
-    url = f"https://api.openalex.org/works/{quote(open_alex_id)}"
+    url = _with_openalex_auth(f"https://api.openalex.org/works/{quote(open_alex_id)}")
     for attempt in range(OPENALEX_MAX_RETRIES):
         try:
             response = requests.get(url, timeout=10)
@@ -421,7 +430,7 @@ def get_work_by_doi(doi: str) -> Optional[OpenAlexWork]:
     if not doi.startswith("https://doi.org/"):
         doi = f"https://doi.org/{doi}"
 
-    url = f"https://api.openalex.org/works/{doi}"
+    url = _with_openalex_auth(f"https://api.openalex.org/works/{doi}")
     for attempt in range(OPENALEX_MAX_RETRIES):
         try:
             response = requests.get(url, timeout=10)
@@ -458,10 +467,10 @@ def construct_citation_graph(open_alex_id: str) -> OpenAlexCitationGraph:
 
     # Construct the citation graph
     cites_url = f"https://api.openalex.org/works?filter=cites:{quote(open_alex_id)}&page=1&per_page=20"
-    cites_response = _request_with_retry(cites_url)
+    cites_response = _request_with_retry(_with_openalex_auth(cites_url))
 
     cited_by_url = f"https://api.openalex.org/works?filter=cited_by:{quote(open_alex_id)}&page=1&per_page=20"
-    cited_by_response = _request_with_retry(cited_by_url)
+    cited_by_response = _request_with_retry(_with_openalex_auth(cited_by_url))
 
     cites_data = cites_response.json()
     cited_by_data = cited_by_response.json()
