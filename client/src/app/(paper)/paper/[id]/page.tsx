@@ -697,6 +697,9 @@ export default function PaperView() {
                                 removeAnnotation={removeAnnotation}
                                 currentUser={user}
                                 showAnnotationCards={showAnnotationCards}
+                                onToggleAnnotationCards={() =>
+                                    setAnnotationCardsVisible((v) => !v)
+                                }
                                 annotationsPanelActive={annotationsPanelActive}
                                 onAnnotateViaSidePanel={onAnnotateViaSidePanel}
                             />
@@ -738,8 +741,6 @@ export default function PaperView() {
                                 rightSideFunction={rightSideFunction}
                                 setRightSideFunction={setRightSideFunction}
                                 PaperToolset={toolset}
-                                showAnnotationCards={showAnnotationCards}
-                                onToggleAnnotationCards={() => setAnnotationCardsVisible(v => !v)}
                             />
                         </>
                     )}

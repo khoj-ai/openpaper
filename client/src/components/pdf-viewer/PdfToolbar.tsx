@@ -62,8 +62,8 @@ interface PdfToolbarProps {
 	setHighlightColor: (color: HighlightColor) => void;
 
 	/**
-	 * When set (e.g. mobile reader with no PaperSidebar), show the annotation visibility
-	 * toggle on this bar. Desktop uses PaperSidebar at the bottom of the floating tool rail.
+	 * When set, show the inline-annotation visibility toggle on this bar (next to zoom).
+	 * Omit when the parent shows the control elsewhere (e.g. mobile Tools panel with no PDF toolbar).
 	 */
 	showAnnotationCards?: boolean;
 	onToggleAnnotationCards?: () => void;
@@ -280,7 +280,16 @@ export function PdfToolbar({
 								: "text-muted-foreground hover:bg-muted dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
 						}`}
 						onClick={onToggleAnnotationCards}
-						title={showAnnotationCards ? "Hide annotations" : "Show annotations"}
+						title={
+							showAnnotationCards
+								? "Hide inline annotations"
+								: "Show inline annotations"
+						}
+						aria-label={
+							showAnnotationCards
+								? "Hide inline annotations"
+								: "Show inline annotations"
+						}
 					>
 						{showAnnotationCards ? <Eye size={16} /> : <EyeOff size={16} />}
 					</Button>

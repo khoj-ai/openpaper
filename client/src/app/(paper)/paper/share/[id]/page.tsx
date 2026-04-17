@@ -504,6 +504,9 @@ export default function SharedPaperView() {
                             onRefreshUrl={refreshPdfUrl}
                             currentUser={owner ?? null}
                             showAnnotationCards={showAnnotationCards}
+                            onToggleAnnotationCards={() =>
+                                setShowAnnotationCards((v) => !v)
+                            }
                         />
                     ) : (
                         <div className="flex justify-center items-center h-full">PDF could not be loaded.</div>
@@ -578,8 +581,6 @@ export default function SharedPaperView() {
                         rightSideFunction={rightSideFunction}
                         setRightSideFunction={setRightSideFunction}
                         PaperToolset={dynamicPaperToolset}
-                        showAnnotationCards={showAnnotationCards}
-                        onToggleAnnotationCards={() => setShowAnnotationCards((v) => !v)}
                     />
                 </div>
             </div>
