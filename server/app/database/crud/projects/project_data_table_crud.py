@@ -329,7 +329,7 @@ class DataTableJobCRUD(
                 properties={
                     "job_id": str(job_id),
                     "project_id": str(job.project_id),
-                    "num_columns": len(job.columns) if job.columns else 0,
+                    "num_columns": len(job.columns) if job.columns else 0,  # type: ignore
                     "time_to_completion_seconds": time_elapsed,
                 },
                 user_id=str(job.user_id),
