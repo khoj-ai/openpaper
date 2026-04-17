@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { ShieldX } from 'lucide-react';
 import { fetchFromApi } from './api';
 
 export interface BasicUser {
@@ -13,6 +14,7 @@ export interface User extends BasicUser {
 	id: string;
 	email: string;
 	is_active: boolean;
+	is_blocked: boolean;
 }
 
 interface AuthContextType {
@@ -104,6 +106,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 			setLoading(false);
 		}
 	};
+
+	if (!loading && user?.is_blocked) {
+		return (
+			<AuthContext.Provider value={{ user, loading, error, login, logout }}>
+				<div className="flex items-center justify-center h-screen p-4">
+					<div className="w-full max-w-lg text-center space-y-4">
+						<div className="mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 p-4 w-fit">
+							<ShieldX className="h-8 w-8 text-red-600 dark:text-red-400" />
+						</div>
+						<h1 className="text-2xl font-bold">Account Suspended</h1>
+						<p className="text-muted-foreground">
+							Your account has been flagged and suspended for suspected misconduct
+							of the platform.
+						</p>
+						<p className="text-muted-foreground">
+							If you believe this is an error, please contact us at{" "}
+							<a href="mailto:team@khoj.dev" className="text-primary hover:underline font-medium">
+								team@khoj.dev
+							</a>{" "}
+							and we will review your account.
+						</p>
+						<button
+							onClick={() => logout()}
+							className="mt-4 inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+						>
+							Sign out
+						</button>
+					</div>
+				</div>
+			</AuthContext.Provider>
+		);
+	}
 
 	return (
 		<AuthContext.Provider value={{ user, loading, error, login, logout }}>

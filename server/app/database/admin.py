@@ -1,3 +1,4 @@
+import logging
 import os
 
 from app.auth.dependencies import SESSION_COOKIE_NAME
@@ -22,8 +23,12 @@ from app.database.models import (
     User,
 )
 from fastapi import FastAPI, Request
-from sqladmin import Admin, ModelView
+from sqladmin import Admin, ModelView, action
 from sqladmin.authentication import AuthenticationBackend
+from starlette.requests import Request as StarletteRequest
+from starlette.responses import RedirectResponse as StarletteRedirect
+
+logger = logging.getLogger(__name__)
 
 
 class UserAdmin(ModelView, model=User):
@@ -34,8 +39,57 @@ class UserAdmin(ModelView, model=User):
         User.picture,
         User.is_active,
         User.is_admin,
+        User.is_blocked,
     ]
     column_searchable_list = [User.email, User.name]
+
+    @action(
+        name="block_users",
+        label="Block selected users",
+        confirmation_message="Are you sure you want to block the selected users? "
+        "They will be notified by email.",
+        add_in_detail=True,
+        add_in_list=True,
+    )
+    async def action_block_users(self, request: StarletteRequest):
+        pks = request.query_params.get("pks", "")
+        pk_list = [pk.strip() for pk in pks.split(",") if pk.strip()]
+
+        async with aget_db() as db:
+            for pk in pk_list:
+                user_obj = db.query(User).get(pk)
+                if user_obj and not user_obj.is_blocked:
+                    user_crud.set_blocked(db, user=user_obj, blocked=True)
+            db.commit()
+
+        referer = request.headers.get("referer", "/admin/user/list")
+        return StarletteRedirect(referer)
+
+    @action(
+        name="unblock_users",
+        label="Unblock selected users",
+        confirmation_message="Are you sure you want to unblock the selected users?",
+        add_in_detail=True,
+        add_in_list=True,
+    )
+    async def action_unblock_users(self, request: StarletteRequest):
+        pks = request.query_params.get("pks", "")
+        pk_list = [pk.strip() for pk in pks.split(",") if pk.strip()]
+
+        async with aget_db() as db:
+            for pk in pk_list:
+                user_obj = db.query(User).get(pk)
+                if user_obj and user_obj.is_blocked:
+                    user_crud.set_blocked(db, user=user_obj, blocked=False)
+            db.commit()
+
+        referer = request.headers.get("referer", "/admin/user/list")
+        return StarletteRedirect(referer)
+
+    async def after_model_change(self, data, model, is_created, request):
+        """Send notification email when a user is blocked via edit form."""
+        if not is_created and getattr(model, "is_blocked", False):
+            user_crud.send_block_notification(model)
 
 
 class OnboardingAdmin(ModelView, model=Onboarding):

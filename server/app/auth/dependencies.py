@@ -69,6 +69,7 @@ def get_current_user(
         picture=db_user.picture,  # type: ignore
         is_email_verified=bool(db_user.is_email_verified),
         is_active=is_user_active,
+        is_blocked=bool(db_user.is_blocked),
     )
 
 

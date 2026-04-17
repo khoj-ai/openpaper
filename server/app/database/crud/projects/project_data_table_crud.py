@@ -14,6 +14,7 @@ from app.database.models import (
     ProjectRole,
     ProjectRoles,
 )
+from app.database.telemetry import track_event
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
@@ -116,6 +117,17 @@ class DataTableJobCRUD(
 
             # Touch project updated_at so it sorts to top of recent projects
             project_crud.touch(db, obj_in.project_id)
+
+            track_event(
+                "data_table_job_created",
+                properties={
+                    "job_id": str(db_obj.id),
+                    "project_id": str(obj_in.project_id),
+                    "num_columns": len(obj_in.columns),
+                    "columns": obj_in.columns,
+                },
+                user_id=str(user.id),
+            )
 
             return db_obj
         except Exception as e:
@@ -266,18 +278,49 @@ class DataTableJobCRUD(
 
         job.status = status  # type: ignore
 
+        now = datetime.now(timezone.utc)
+
         # Set timestamps based on status
         if status == JobStatus.RUNNING and not job.started_at:
-            job.started_at = datetime.now(timezone.utc)  # type: ignore
+            job.started_at = now  # type: ignore
         elif status in [JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED]:
             if not job.completed_at:
-                job.completed_at = datetime.now(timezone.utc)  # type: ignore
+                job.completed_at = now  # type: ignore
 
         if error_message:
             job.error_message = error_message  # type: ignore
 
         db.commit()
         db.refresh(job)
+
+        # Track completion/failure telemetry
+        time_elapsed = (
+            (now - job.created_at).total_seconds() if job.created_at else None
+        )
+
+        if status == JobStatus.COMPLETED:
+            track_event(
+                "data_table_completed",
+                properties={
+                    "job_id": str(job_id),
+                    "project_id": str(job.project_id),
+                    "num_columns": len(job.columns) if job.columns else 0,
+                    "time_to_completion_seconds": time_elapsed,
+                },
+                user_id=str(job.user_id),
+            )
+        elif status == JobStatus.FAILED:
+            track_event(
+                "data_table_failed",
+                properties={
+                    "job_id": str(job_id),
+                    "project_id": str(job.project_id),
+                    "time_elapsed_seconds": time_elapsed,
+                    "error_message": (error_message or "")[:200],
+                },
+                user_id=str(job.user_id),
+            )
+
         return job
 
     def update_task_id(
@@ -349,6 +392,19 @@ class DataTableResultCRUD(
             db.add(db_obj)
             db.commit()
             db.refresh(db_obj)
+
+            track_event(
+                "data_table_result_created",
+                properties={
+                    "job_id": str(obj_in.job_id),
+                    "result_id": str(db_obj.id),
+                    "num_columns": len(obj_in.columns),
+                    "success": obj_in.success,
+                    "num_row_failures": len(obj_in.row_failures),
+                },
+                user_id=str(user.id) if user else None,
+            )
+
             return db_obj
         except Exception as e:
             db.rollback()
@@ -489,6 +545,15 @@ class DataTableRowCRUD(CRUDBase[DataTableRow, DataTableRowCreate, DataTableRowUp
             db.commit()
             for obj in db_objs:
                 db.refresh(obj)
+
+            track_event(
+                "data_table_rows_created",
+                properties={
+                    "data_table_id": str(rows[0].data_table_id) if rows else None,
+                    "num_rows": len(db_objs),
+                },
+            )
+
             return db_objs
         except Exception as e:
             db.rollback()
