@@ -107,6 +107,7 @@ async def create_audio_overview(
             "job_id": str(job_id_as_uuid),
         },
         user_id=str(current_user.id),
+        db=db,
     )
 
     # Return the job ID immediately so the client can track progress

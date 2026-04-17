@@ -65,7 +65,7 @@ async def create_project(
         if not project:
             raise ValueError("Failed to create project, please check the input data.")
 
-        track_event("project_created", user_id=str(current_user.id))
+        track_event("project_created", user_id=str(current_user.id), db=db)
 
         return JSONResponse(
             status_code=201,
@@ -168,7 +168,7 @@ async def update_project(
                 },
             )
 
-        track_event("project_updated", user_id=str(current_user.id))
+        track_event("project_updated", user_id=str(current_user.id), db=db)
 
         return JSONResponse(status_code=200, content=project.to_dict())
     except Exception as e:
@@ -197,7 +197,7 @@ async def delete_project(
                 },
             )
 
-        track_event("project_deleted", user_id=str(current_user.id))
+        track_event("project_deleted", user_id=str(current_user.id), db=db)
 
         return JSONResponse(
             status_code=200,
@@ -259,6 +259,7 @@ async def change_project_collaborator_role(
                 "new_role": new_role,
                 "project_id": project_id,
             },
+            db=db,
         )
 
         return JSONResponse(
@@ -334,6 +335,7 @@ async def remove_self_from_project(
             "project_self_removed",
             user_id=str(current_user.id),
             properties={"project_id": project_id},
+            db=db,
         )
 
         return JSONResponse(
@@ -375,6 +377,7 @@ async def remove_project_collaborator(
             "project_collaborator_removed",
             user_id=str(current_user.id),
             properties={"removed_role_id": role_id, "project_id": project_id},
+            db=db,
         )
 
         return JSONResponse(

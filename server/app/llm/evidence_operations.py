@@ -171,7 +171,7 @@ class EvidenceOperations(BaseLLMClient):
                     f"characters ({tool_results_size}), compacting."
                 )
                 await self.compact_tool_call_results(
-                    evidence_collection, question, current_user, llm_provider
+                    evidence_collection, question, current_user, llm_provider, db=db
                 )
 
             evidence_gathering_prompt = EVIDENCE_GATHERING_SYSTEM_PROMPT.format(
@@ -344,6 +344,7 @@ class EvidenceOperations(BaseLLMClient):
                         "project_type": project_id is not None,
                     },
                     user_id=str(current_user.id),
+                    db=db,
                 )
 
         # Fallback: if no evidence was gathered, try keyword-based search
@@ -389,6 +390,7 @@ class EvidenceOperations(BaseLLMClient):
                                 "papers_found": len(evidence_collection.evidence),
                             },
                             user_id=str(current_user.id),
+                            db=db,
                         )
                     else:
                         logger.info("Fallback search found no relevant evidence")
@@ -396,6 +398,7 @@ class EvidenceOperations(BaseLLMClient):
                             "fallback_search_no_results",
                             {"keywords": keywords},
                             user_id=str(current_user.id),
+                            db=db,
                         )
             except Exception as e:
                 logger.warning(f"Fallback search failed: {e}")
@@ -403,6 +406,7 @@ class EvidenceOperations(BaseLLMClient):
                     "fallback_search_error",
                     {"error": str(e)},
                     user_id=str(current_user.id),
+                    db=db,
                 )
 
         # Compact evidence if it exceeds the limit for chat response
@@ -421,6 +425,7 @@ class EvidenceOperations(BaseLLMClient):
                 question,
                 current_user,
                 llm_provider,
+                db=db,
             ):
                 yield status
 
@@ -435,6 +440,7 @@ class EvidenceOperations(BaseLLMClient):
         original_question: str,
         current_user: CurrentUser,
         llm_provider: Optional[LLMProvider] = None,
+        db: Optional[Session] = None,
     ) -> None:
         """
         Compact tool call results by summarizing them to reduce context size.
@@ -493,6 +499,7 @@ class EvidenceOperations(BaseLLMClient):
                         "compacted_size": new_size,
                     },
                     user_id=str(current_user.id),
+                    db=db,
                 )
             else:
                 logger.warning("Empty response from LLM during tool result compaction.")
@@ -508,6 +515,7 @@ class EvidenceOperations(BaseLLMClient):
         original_question: str,
         current_user: CurrentUser,
         llm_provider: Optional[LLMProvider] = None,
+        db: Optional[Session] = None,
     ) -> AsyncGenerator[Dict[str, Union[str, Dict[str, List[str]]]], None]:
         """
         Compact evidence to reduce context size for chat response.
@@ -645,6 +653,7 @@ class EvidenceOperations(BaseLLMClient):
                 "compacted_size": new_size,
             },
             user_id=str(current_user.id),
+            db=db,
         )
 
     async def _extract_search_keywords(

@@ -65,13 +65,16 @@ class ProfileUpdateRequest(BaseModel):
 
 
 @auth_router.get("/me", response_model=AuthResponse)
-async def get_me(current_user: Optional[CurrentUser] = Depends(get_current_user)):
+async def get_me(
+    current_user: Optional[CurrentUser] = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Get the current user."""
     if not current_user:
         return AuthResponse(success=False, message="Not authenticated")
 
     # Track the event of fetching user details
-    track_event("user_details_fetched", user_id=str(current_user.id))
+    track_event("user_details_fetched", user_id=str(current_user.id), db=db)
     return AuthResponse(success=True, message="User found", user=current_user)
 
 
@@ -233,6 +236,7 @@ async def google_callback(
                 "user_signup",
                 properties={"auth_provider": "google"},
                 user_id=str(db_user.id),
+                db=db,
             )
 
             # Check for suspected signup abuse
@@ -370,7 +374,7 @@ async def email_signin(
         success = email_auth_client.send_verification_code(email, code)
 
         if success:
-            track_event("email_signin_initiated", user_id=str(db_user.id))
+            track_event("email_signin_initiated", user_id=str(db_user.id), db=db)
             needs_name = not newly_created and not db_user.name
             return AuthResponse(
                 success=True,
@@ -530,7 +534,7 @@ async def email_verify(
             response, token=session.token, expires_at=session.expires_at  # type: ignore
         )
 
-        track_event("email_signin_completed", user_id=str(db_user.id))
+        track_event("email_signin_completed", user_id=str(db_user.id), db=db)
 
         return response
 

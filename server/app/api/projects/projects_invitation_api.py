@@ -151,6 +151,7 @@ async def invite_user_to_project(
                 "roles": [inv["role"] for inv in validated_invites],
                 "success_count": len(invitations),
             },
+            db=db,
         )
 
         return JSONResponse(
@@ -216,6 +217,7 @@ async def accept_invitation(
             "project_invitation_accepted",
             user_id=str(current_user.id),
             properties={"project_id": str(project_role.project_id)},
+            db=db,
         )
 
         project_id = str(project_role.project_id)
@@ -257,6 +259,7 @@ async def reject_invitation(
             "project_invitation_rejected",
             user_id=str(current_user.id),
             properties={"invitation_id": invitation_id},
+            db=db,
         )
 
         return JSONResponse(
@@ -295,6 +298,7 @@ async def retract_invitation(
             "project_invitation_retracted",
             user_id=str(current_user.id),
             properties={"invitation_id": invitation_id},
+            db=db,
         )
 
         return JSONResponse(
