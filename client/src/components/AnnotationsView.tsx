@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { User as UserIcon } from 'lucide-react';
+import { File, User as UserIcon } from 'lucide-react';
 
 import {
 	HighlightColor,
@@ -396,11 +396,15 @@ export function AnnotationsView({
 											/>
 										</div>
 									) : null}
-									{visible.map((annotation) => (
+									{visible.map((annotation) => {
+										const isAI = annotation.role === 'assistant';
+										return (
 										<div key={annotation.id} className="flex flex-col gap-2">
 											<div className="flex items-center gap-2">
-												<div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-muted flex items-center justify-center">
-													{user?.picture ? (
+												<div className={`w-8 h-8 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center ${isAI ? 'bg-blue-100 dark:bg-blue-900' : 'bg-muted'}`}>
+													{isAI ? (
+														<File size={14} className="text-blue-500" />
+													) : user?.picture ? (
 														// eslint-disable-next-line @next/next/no-img-element
 														<img src={user.picture} alt={user.name} className="w-full h-full object-cover" />
 													) : (
@@ -408,7 +412,7 @@ export function AnnotationsView({
 													)}
 												</div>
 												<span className="text-sm font-medium text-foreground">
-													{user?.name || 'User'}
+													{isAI ? 'Open Paper' : user?.name || 'User'}
 												</span>
 												<span className="text-xs text-muted-foreground">
 													{formatAnnotationDate(annotation.created_at)}
@@ -422,7 +426,7 @@ export function AnnotationsView({
 												/>
 											</div>
 										</div>
-									))}
+									)})}
 									{moreCount > 0 && (
 										<p className="text-xs text-muted-foreground pl-10">
 											+{moreCount} more {moreCount === 1 ? 'reply' : 'replies'} — click to show
