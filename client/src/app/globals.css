@@ -333,3 +333,11 @@
 	opacity: 0 !important;
 	pointer-events: none !important;
 }
+
+/*
+ * Left-align PDF pages when the side panel is open and inline annotation cards
+ * are visible, reclaiming the left negative space for margin cards on the right.
+ */
+.pdf-align-left .pdfViewer .page {
+	margin-left: 0 !important;
+}

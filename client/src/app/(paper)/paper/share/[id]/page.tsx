@@ -382,6 +382,7 @@ export default function SharedPaperView() {
                                     currentUser={owner ?? null}
                                     showAnnotationCards={showAnnotationCards}
                                     onToggleAnnotationCards={() => setShowAnnotationCards((v) => !v)}
+                                    sidePanelOpen
                                 />
                             ) : (
                                 <div className="flex justify-center items-center h-full">PDF could not be loaded.</div>
@@ -507,6 +508,7 @@ export default function SharedPaperView() {
                             onToggleAnnotationCards={() =>
                                 setShowAnnotationCards((v) => !v)
                             }
+                            sidePanelOpen
                         />
                     ) : (
                         <div className="flex justify-center items-center h-full">PDF could not be loaded.</div>

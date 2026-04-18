@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect, useMemo } from "react";
+import { useRef, useState, useCallback, useEffect, useMemo, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import {
 	PdfLoader,
@@ -148,6 +148,34 @@ interface PdfHighlighterViewerProps {
 	/** When true and inline cards are hidden, route annotate flows to the Annotations side panel */
 	annotationsPanelActive?: boolean;
 	onAnnotateViaSidePanel?: (payload: { highlightId: string }) => void;
+	/** When true, the side panel is taking horizontal space — left-align PDF pages to make room for margin cards. */
+	sidePanelOpen?: boolean;
+}
+
+/** Syncs PdfLoader's render-prop pdfDocument into parent state without calling setState during render. */
+function PdfDocumentSync({
+	pdfDocument,
+	pdfDocumentRef,
+	setPdfReady,
+	setNumPages,
+}: {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	pdfDocument: any;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	pdfDocumentRef: RefObject<any>;
+	setPdfReady: (ready: boolean) => void;
+	setNumPages: (n: number) => void;
+}) {
+	useEffect(() => {
+		pdfDocumentRef.current = pdfDocument;
+		setPdfReady(true);
+	}, [pdfDocument, pdfDocumentRef, setPdfReady]);
+
+	useEffect(() => {
+		setNumPages(pdfDocument.numPages);
+	}, [pdfDocument.numPages, setNumPages]);
+
+	return null;
 }
 
 export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
@@ -182,6 +210,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		onToggleAnnotationCards,
 		annotationsPanelActive = false,
 		onAnnotateViaSidePanel,
+		sidePanelOpen = false,
 	} = props;
 
 	// Position anchors for inline annotation cards
@@ -1532,7 +1561,8 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			<div
 				className={cn(
 					"flex-1 min-h-0 overflow-x-visible overflow-y-hidden relative",
-					pdfHighlightsSuppressedForZoom && "pdf-zoom-layout-pending"
+					pdfHighlightsSuppressedForZoom && "pdf-zoom-layout-pending",
+					showAnnotationCards && sidePanelOpen && "pdf-align-left"
 				)}
 			>
 				<PdfLoader
@@ -1552,37 +1582,33 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 					}
 				>
 					{(pdfDocument) => {
-						// Store PDF document ref for text extraction
-						if (pdfDocumentRef.current !== pdfDocument) {
-							pdfDocumentRef.current = pdfDocument;
-							if (!pdfReady) {
-								setPdfReady(true);
-							}
-						}
-						// Set numPages when document loads
-						if (pdfDocument.numPages !== numPages) {
-							setNumPages(pdfDocument.numPages);
-						}
-
 						return (
-							<PdfHighlighter
-								pdfDocument={pdfDocument}
-								pdfScaleValue={scale}
-								highlights={extendedHighlights}
-								onSelection={handleSelection}
-								onCreateGhostHighlight={handleCreateGhostHighlight}
-								onRemoveGhostHighlight={handleRemoveGhostHighlight}
-								enableAreaSelection={(event) => event.altKey}
-								utilsRef={(utils) => {
-									highlighterUtilsRef.current = utils;
-								}}
-								style={{
-									height: "100%",
-								}}
-								textSelectionColor={PDF_TEXT_SELECTION_FILL}
-							>
-								<HighlightContainer onHighlightClick={handleHighlightClick} />
-							</PdfHighlighter>
+							<>
+								<PdfDocumentSync
+									pdfDocument={pdfDocument}
+									pdfDocumentRef={pdfDocumentRef}
+									setPdfReady={setPdfReady}
+									setNumPages={setNumPages}
+								/>
+								<PdfHighlighter
+									pdfDocument={pdfDocument}
+									pdfScaleValue={scale}
+									highlights={extendedHighlights}
+									onSelection={handleSelection}
+									onCreateGhostHighlight={handleCreateGhostHighlight}
+									onRemoveGhostHighlight={handleRemoveGhostHighlight}
+									enableAreaSelection={(event) => event.altKey}
+									utilsRef={(utils) => {
+										highlighterUtilsRef.current = utils;
+									}}
+									style={{
+										height: "100%",
+									}}
+									textSelectionColor={PDF_TEXT_SELECTION_FILL}
+								>
+									<HighlightContainer onHighlightClick={handleHighlightClick} />
+								</PdfHighlighter>
+							</>
 						);
 					}}
 				</PdfLoader>

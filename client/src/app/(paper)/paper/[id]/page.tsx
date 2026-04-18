@@ -202,13 +202,7 @@ export default function PaperView() {
     const isMobile = useIsMobile();
     const [mobileView, setMobileView] = useState<'reader' | 'panel'>('reader');
 
-    /** Margin cards stay off while these side panels are open; Read/mobile reader use `annotationCardsVisible` only. */
-    const sidePanelSuppressesInlineCards =
-        rightSideFunction === 'Annotations' ||
-        rightSideFunction === 'Chat' ||
-        rightSideFunction === 'Audio';
-    const showAnnotationCards =
-        annotationCardsVisible && !sidePanelSuppressesInlineCards;
+    const showAnnotationCards = annotationCardsVisible;
 
     const prevRightSideRef = useRef(rightSideFunction);
     useEffect(() => {
@@ -702,6 +696,7 @@ export default function PaperView() {
                                 }
                                 annotationsPanelActive={annotationsPanelActive}
                                 onAnnotateViaSidePanel={onAnnotateViaSidePanel}
+                                sidePanelOpen={rightSideFunction !== 'Read'}
                             />
                         </div>
                     )}
