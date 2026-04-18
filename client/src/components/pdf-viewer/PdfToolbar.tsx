@@ -15,6 +15,9 @@ import {
 	Highlighter,
 	Maximize2,
 	Minimize2,
+	EllipsisVertical,
+	ZoomIn,
+	ZoomOut,
 	ToggleLeft,
 	ToggleRight,
 } from "lucide-react";
@@ -135,7 +138,7 @@ export function PdfToolbar({
 			</div>
 
 			{/* Separator */}
-			<div className="h-5 w-px bg-gray-300 mx-3" />
+			<div className="h-5 w-px bg-gray-300 mx-1.5 md:mx-3" />
 
 			{/* Center section: Search */}
 			<div className="flex items-center gap-1">
@@ -217,7 +220,7 @@ export function PdfToolbar({
 			</div>
 
 			{/* Separator */}
-			<div className="h-5 w-px bg-gray-300 mx-3" />
+			<div className="h-5 w-px bg-gray-300 mx-1.5 md:mx-3" />
 
 			{/* Annotation controls: color picker + visibility toggle in a pill */}
 			<div className="flex items-center gap-0.5 rounded-md border border-gray-200 dark:border-zinc-700 px-0.5 py-0.5">
@@ -280,8 +283,8 @@ export function PdfToolbar({
 			{/* Spacer */}
 			<div className="flex-1" />
 
-			{/* Right section: Zoom + Status */}
-			<div className="flex items-center gap-3">
+			{/* Right section: Zoom + Status + Focus (desktop) */}
+			<div className="hidden md:flex items-center gap-3">
 				{/* Zoom controls */}
 				<div className="flex items-center gap-1">
 					<Button
@@ -344,6 +347,43 @@ export function PdfToolbar({
 						{isReadMode ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
 					</Button>
 				)}
+			</div>
+
+			{/* Right section: overflow menu (mobile) */}
+			<div className="flex md:hidden items-center">
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild>
+						<Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+							<EllipsisVertical size={16} />
+						</Button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="end" className="min-w-40">
+						<DropdownMenuItem onClick={zoomIn}>
+							<ZoomIn size={14} className="mr-2" />
+							Zoom in
+						</DropdownMenuItem>
+						<DropdownMenuItem onClick={zoomOut}>
+							<ZoomOut size={14} className="mr-2" />
+							Zoom out
+						</DropdownMenuItem>
+						{paperStatus && (
+							<>
+								<DropdownMenuItem onClick={() => handleStatusChange("todo")}>
+									{getStatusIcon("todo")}
+									Todo
+								</DropdownMenuItem>
+								<DropdownMenuItem onClick={() => handleStatusChange("reading")}>
+									{getStatusIcon("reading")}
+									Reading
+								</DropdownMenuItem>
+								<DropdownMenuItem onClick={() => handleStatusChange("completed")}>
+									{getStatusIcon("completed")}
+									Completed
+								</DropdownMenuItem>
+							</>
+						)}
+					</DropdownMenuContent>
+				</DropdownMenu>
 			</div>
 		</div>
 	);
