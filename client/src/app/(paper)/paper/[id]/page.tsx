@@ -112,7 +112,7 @@ export default function PaperView() {
         refreshAnnotations,
     } = useAnnotations(id);
 
-    const [annotationCardsVisible, setAnnotationCardsVisible] = useState(true);
+    const [annotationCardsVisible, setAnnotationCardsVisible] = useState(false);
     /** When Annotations side panel is open, compose first note / reply here instead of margin cards */
     const [composeHighlightId, setComposeHighlightId] = useState<string | null>(null);
     const [activeCitationKey, setActiveCitationKey] = useState<string | null>(null);
