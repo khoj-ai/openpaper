@@ -45,6 +45,7 @@ export function HighlightContainer({ onHighlightClick }: HighlightContainerProps
 		return (
 			<div
 				data-pdf-text-highlight=""
+				data-highlight-id={highlight.id || ""}
 				onClick={handleClick}
 				style={{ cursor: "pointer" }}
 			>
@@ -62,6 +63,7 @@ export function HighlightContainer({ onHighlightClick }: HighlightContainerProps
 	return (
 		<div
 			data-pdf-text-highlight=""
+			data-highlight-id={highlight.id || ""}
 			onClick={handleClick}
 			style={{ cursor: "pointer" }}
 		>

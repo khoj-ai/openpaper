@@ -27,6 +27,7 @@ import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience"
 import { PaperStatus } from "./utils/PdfStatus";
 import InlineAnnotationMenu from "./InlineAnnotationMenu";
 import { InlineAnnotationCard } from "./InlineAnnotationCard";
+import { AnnotationHoverCard } from "./AnnotationHoverCard";
 import { BasicUser } from "@/lib/auth";
 
 import {
@@ -230,6 +231,9 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 	const [pendingSidePanelAnnotate, setPendingSidePanelAnnotate] = useState(false);
 	/** When inline cards are hidden, user clicked a highlight with a persisted thread — show that card only */
 	const [peekAnnotationCardHighlightId, setPeekAnnotationCardHighlightId] = useState<string | null>(null);
+	/** Hover card: show annotations on highlight hover when margin cards are hidden */
+	const [hoverHighlightId, setHoverHighlightId] = useState<string | null>(null);
+	const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number } | null>(null);
 	// Guard: restore annotation cards from server data only once per mount
 	const hasRestoredRef = useRef(false);
 
@@ -1107,6 +1111,63 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		}
 	}, [activeHighlight, extendedHighlights]);
 
+	// Hover card: show annotations on highlight hover when margin cards are hidden
+	useEffect(() => {
+		if (showAnnotationCards) {
+			setHoverHighlightId(null);
+			return;
+		}
+		const container = containerRef.current;
+		if (!container) return;
+
+		const getHighlightId = (target: EventTarget | null): string | null => {
+			const el = target as HTMLElement | null;
+			if (!el?.closest) return null;
+			// DOM overlay highlights
+			const overlay = el.closest<HTMLElement>(".text-match-highlight-overlay[data-highlight-id]");
+			if (overlay) return overlay.getAttribute("data-highlight-id");
+			// Positioned highlights from HighlightContainer
+			const positioned = el.closest<HTMLElement>("[data-pdf-text-highlight][data-highlight-id]");
+			if (positioned) return positioned.getAttribute("data-highlight-id");
+			return null;
+		};
+
+		const onMouseOver = (e: MouseEvent) => {
+			const hid = getHighlightId(e.target);
+			if (!hid) return;
+			// Only show if this highlight has persisted annotations
+			if (!annotations.some((a) => a.highlight_id === hid)) return;
+			setHoverHighlightId(hid);
+			setHoverPosition({ x: e.clientX + 12, y: e.clientY + 12 });
+		};
+
+		const onMouseOut = (e: MouseEvent) => {
+			const fromHid = getHighlightId(e.target);
+			const toHid = getHighlightId(e.relatedTarget);
+			// Only hide if we actually left the highlight (not moving between parts of the same highlight)
+			if (fromHid && fromHid === toHid) return;
+			if (fromHid) {
+				setHoverHighlightId(null);
+				setHoverPosition(null);
+			}
+		};
+
+		// Dismiss on click (highlight becomes active / tooltip opens)
+		const onMouseDown = () => {
+			setHoverHighlightId(null);
+			setHoverPosition(null);
+		};
+
+		container.addEventListener("mouseover", onMouseOver);
+		container.addEventListener("mouseout", onMouseOut);
+		container.addEventListener("mousedown", onMouseDown);
+		return () => {
+			container.removeEventListener("mouseover", onMouseOver);
+			container.removeEventListener("mouseout", onMouseOut);
+			container.removeEventListener("mousedown", onMouseDown);
+		};
+	}, [showAnnotationCards, annotations]);
+
 	// Update current page when user scrolls through the PDF
 	useEffect(() => {
 		if (!pdfReady) return;
@@ -1809,6 +1870,15 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			)
 		);
 	})()}
+
+			{/* Annotation hover card — shown on highlight hover when margin cards are hidden */}
+			{!showAnnotationCards && hoverHighlightId && hoverPosition && (
+				<AnnotationHoverCard
+					annotations={annotations.filter((a) => a.highlight_id === hoverHighlightId)}
+					position={hoverPosition}
+					user={currentUser ?? null}
+				/>
+			)}
 
 			{/* Scroll to top button */}
 			{showScrollToTop && (
