@@ -13,8 +13,8 @@ import {
 	Search,
 	X,
 	Highlighter,
-	Eye,
-	EyeOff,
+	ToggleLeft,
+	ToggleRight,
 } from "lucide-react";
 import {
 	DropdownMenu,
@@ -112,7 +112,7 @@ export function PdfToolbar({
 				>
 					<ArrowLeft size={16} />
 				</Button>
-				<span className="text-xs text-secondary-foreground min-w-[4rem] text-center">
+				<span className="text-xs text-secondary-foreground min-w-16 text-center">
 					{currentPage} / {numPages || "?"}
 				</span>
 				<Button
@@ -211,35 +211,63 @@ export function PdfToolbar({
 			{/* Separator */}
 			<div className="h-5 w-px bg-gray-300 mx-3" />
 
-			{/* Highlight color: marker icon + swatch (original layout) */}
-			<DropdownMenu>
-				<DropdownMenuTrigger asChild>
+			{/* Annotation controls: color picker + visibility toggle in a pill */}
+			<div className="flex items-center gap-0.5 rounded-md border border-gray-200 dark:border-zinc-700 px-0.5 py-0.5">
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild>
+						<Button
+							size="sm"
+							variant="ghost"
+							className="h-7 px-2 gap-1.5"
+							title="Highlight color"
+						>
+							<Highlighter size={14} />
+							<div className={`w-3 h-3 rounded-sm ${currentColorConfig.bg}`} />
+						</Button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="start" className="min-w-0">
+						<div className="flex gap-1 p-1">
+							{HIGHLIGHT_COLOR_SWATCHES.map(({ color, bg }) => (
+								<button
+									key={color}
+									type="button"
+									onClick={() => setHighlightColor(color)}
+									className={`w-6 h-6 rounded-sm ${bg} hover:scale-110 transition-transform ${
+										highlightColor === color ? "ring-2 ring-offset-1 ring-gray-400" : ""
+									}`}
+									title={color}
+								/>
+							))}
+						</div>
+					</DropdownMenuContent>
+				</DropdownMenu>
+
+				{onToggleAnnotationCards && (
 					<Button
+						type="button"
 						size="sm"
 						variant="ghost"
-						className="h-8 px-2 gap-1.5"
-						title="Highlight color"
+						className={`h-7 w-7 p-0 ${
+							showAnnotationCards
+								? "text-secondary-foreground hover:bg-muted dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-foreground"
+								: "text-muted-foreground hover:bg-muted dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+						}`}
+						onClick={onToggleAnnotationCards}
+						title={
+							showAnnotationCards
+								? "Hide inline annotations"
+								: "Show inline annotations"
+						}
+						aria-label={
+							showAnnotationCards
+								? "Hide inline annotations"
+								: "Show inline annotations"
+						}
 					>
-						<Highlighter size={16} />
-						<div className={`w-3 h-3 rounded-sm ${currentColorConfig.bg}`} />
+						{showAnnotationCards ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
 					</Button>
-				</DropdownMenuTrigger>
-				<DropdownMenuContent align="start" className="min-w-0">
-					<div className="flex gap-1 p-1">
-						{HIGHLIGHT_COLOR_SWATCHES.map(({ color, bg }) => (
-							<button
-								key={color}
-								type="button"
-								onClick={() => setHighlightColor(color)}
-								className={`w-6 h-6 rounded-sm ${bg} hover:scale-110 transition-transform ${
-									highlightColor === color ? "ring-2 ring-offset-1 ring-gray-400" : ""
-								}`}
-								title={color}
-							/>
-						))}
-					</div>
-				</DropdownMenuContent>
-			</DropdownMenu>
+				)}
+			</div>
 
 			{/* Spacer */}
 			<div className="flex-1" />
@@ -268,32 +296,6 @@ export function PdfToolbar({
 						<Plus size={16} />
 					</Button>
 				</div>
-
-				{onToggleAnnotationCards && (
-					<Button
-						type="button"
-						size="sm"
-						variant="ghost"
-						className={`h-8 w-8 p-0 ${
-							showAnnotationCards
-								? "text-secondary-foreground hover:bg-muted dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-foreground"
-								: "text-muted-foreground hover:bg-muted dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
-						}`}
-						onClick={onToggleAnnotationCards}
-						title={
-							showAnnotationCards
-								? "Hide inline annotations"
-								: "Show inline annotations"
-						}
-						aria-label={
-							showAnnotationCards
-								? "Hide inline annotations"
-								: "Show inline annotations"
-						}
-					>
-						{showAnnotationCards ? <Eye size={16} /> : <EyeOff size={16} />}
-					</Button>
-				)}
 
 				{/* Reading status */}
 				{paperStatus && (
