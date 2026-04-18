@@ -118,6 +118,7 @@ async def create_project_audio_overview(
             "conversable_type": "project",
         },
         user_id=str(current_user.id),
+        db=db,
     )
 
     # Return the job ID immediately so the client can track progress

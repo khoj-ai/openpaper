@@ -69,7 +69,7 @@ async def create_highlight(
         if not highlight:
             raise ValueError("Failed to create highlight, please check the input data.")
 
-        track_event("highlight_created", user_id=str(current_user.id))
+        track_event("highlight_created", user_id=str(current_user.id), db=db)
 
         return JSONResponse(
             status_code=201,
@@ -178,7 +178,7 @@ async def update_highlight(
         if not highlight:
             raise ValueError("Failed to update highlight, please check the input data.")
 
-        track_event("highlight_updated", user_id=str(current_user.id))
+        track_event("highlight_updated", user_id=str(current_user.id), db=db)
 
         return JSONResponse(status_code=200, content=highlight.to_dict())
     except ValueError as e:

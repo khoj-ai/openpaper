@@ -37,6 +37,7 @@ def create_tag(
             "tag_color": tag.color,
         },
         user_id=str(current_user.id),
+        db=db,
     )
 
     return {"id": str(tag.id), "name": tag.name, "color": tag.color}
@@ -78,6 +79,7 @@ def bulk_add_tags(
                 "tag_ids": [str(t_id) for t_id in request.tag_ids],
             },
             user_id=str(current_user.id),
+            db=db,
         )
 
         return {"message": "Tags applied successfully."}
@@ -109,6 +111,7 @@ def remove_tag_from_paper(
         "tag_removed_from_paper",
         properties={"paper_id": paper_id, "tag_id": tag_id},
         user_id=str(current_user.id),
+        db=db,
     )
 
     return

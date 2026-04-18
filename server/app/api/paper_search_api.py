@@ -1,6 +1,6 @@
 import logging
-from typing import Optional, cast
 from enum import Enum
+from typing import Optional, cast
 
 from app.auth.dependencies import get_current_user, get_required_user
 from app.database.crud.paper_crud import PaperUpdate, paper_crud
@@ -8,11 +8,11 @@ from app.database.database import get_db
 from app.database.telemetry import track_event
 from app.helpers.paper_search import (
     OpenAlexFilter,
+    PaperSort,
     construct_citation_graph,
     get_doi,
     get_work_by_doi,
     search_open_alex,
-    PaperSort,
 )
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 # API routes for effectively searching and retrieving papers from external sources
 
 paper_search_router = APIRouter()
+
 
 @paper_search_router.post("/search")
 async def search_papers(
@@ -39,7 +40,9 @@ async def search_papers(
     """
     try:
         # Perform the search operation
-        results = search_open_alex(query, filter=filter, page=page, sort=sort.value if sort else None)
+        results = search_open_alex(
+            query, filter=filter, page=page, sort=sort.value if sort else None
+        )
         track_event(
             "paper_search",
             user_id=current_user.id if current_user else None,
@@ -49,6 +52,7 @@ async def search_papers(
                 "sort": sort.value if sort else None,
                 "results_count": len(results.results),
             },
+            db=db,
         )
         return Response(
             content=results.model_dump_json(), media_type="application/json"
@@ -123,6 +127,7 @@ async def get_paper_graph(
                 "cited_by_count": graph.cited_by.meta.get("count", 0),
                 "cites_count": graph.cites.meta.get("count", 0),
             },
+            db=db,
         )
         return Response(content=graph.model_dump_json(), media_type="application/json")
     except HTTPException:
@@ -136,6 +141,7 @@ async def get_paper_graph(
 async def get_author_works(
     author_id: str,
     page: int = 1,
+    db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_required_user),
 ):
     """
@@ -156,6 +162,7 @@ async def get_author_works(
                 "results_count": len(results.results),
                 "total_count": results.meta.get("count", 0),
             },
+            db=db,
         )
         return Response(
             content=results.model_dump_json(), media_type="application/json"

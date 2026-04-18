@@ -342,6 +342,7 @@ class JobsClient:
                     "duration": upload_duration,
                 },
                 sync=True,
+                db=db,
             )
 
             # Create paper and project association in a single transaction

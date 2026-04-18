@@ -167,6 +167,7 @@ def resubscribe(
                             ),
                         },
                         user_id=str(current_user.id),
+                        db=db,
                     )
 
                     logger.info(
@@ -210,6 +211,7 @@ def resubscribe(
                         "customer_id": str(subscription.stripe_customer_id),
                     },
                     user_id=str(current_user.id),
+                    db=db,
                 )
 
                 logger.info(

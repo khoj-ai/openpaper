@@ -109,6 +109,7 @@ def create_checkout_session(
                 "interval": interval,
             },
             user_id=str(current_user.id),
+            db=db,
         )
 
         # Add customer if available

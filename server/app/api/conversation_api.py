@@ -107,6 +107,7 @@ async def get_shared_paper_conversation(
             "viewed_shared_paper_conversation",
             properties={"share_paper_id": share_paper_id},
             user_id=str(current_user.id) if current_user else None,
+            db=db,
         )
 
         # Fetch messages for the conversation

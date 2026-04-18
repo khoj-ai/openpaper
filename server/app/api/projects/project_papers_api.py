@@ -98,6 +98,7 @@ async def fork_paper_from_project(
                 "source_project_id": request.source_project_id,
                 "paper_id": request.paper_id,
             },
+            db=db,
         )
 
         return JSONResponse(
@@ -194,6 +195,7 @@ async def add_paper_to_project(
             "papers_added_to_project",
             user_id=str(current_user.id),
             properties={"project_id": project_id, "n_papers": len(request.paper_ids)},
+            db=db,
         )
 
         return JSONResponse(
@@ -312,7 +314,7 @@ async def remove_paper_from_project(
                 detail="Project paper association not found or user does not have permission to delete.",
             )
 
-        track_event("paper_removed_from_project", user_id=str(current_user.id))
+        track_event("paper_removed_from_project", user_id=str(current_user.id), db=db)
 
         return JSONResponse(
             status_code=200,
