@@ -151,6 +151,9 @@ interface PdfHighlighterViewerProps {
 	onAnnotateViaSidePanel?: (payload: { highlightId: string }) => void;
 	/** When true, the side panel is taking horizontal space — left-align PDF pages to make room for margin cards. */
 	sidePanelOpen?: boolean;
+	/** Focus / read mode state for the PdfToolbar toggle. */
+	isReadMode?: boolean;
+	onToggleReadMode?: () => void;
 }
 
 /** Syncs PdfLoader's render-prop pdfDocument into parent state without calling setState during render. */
@@ -212,6 +215,8 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		annotationsPanelActive = false,
 		onAnnotateViaSidePanel,
 		sidePanelOpen = false,
+		isReadMode = false,
+		onToggleReadMode,
 	} = props;
 
 	// Position anchors for inline annotation cards
@@ -1616,6 +1621,8 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 				setHighlightColor={setHighlightColor}
 				showAnnotationCards={showAnnotationCards}
 				onToggleAnnotationCards={onToggleAnnotationCards}
+				isReadMode={isReadMode}
+				onToggleReadMode={onToggleReadMode}
 			/>
 
 			{/* PDF Viewer — overflow-x-visible so margin annotation cards beside the page are not clipped */}

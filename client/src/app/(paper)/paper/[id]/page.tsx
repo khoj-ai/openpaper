@@ -9,7 +9,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
     AudioLines,
-    Focus,
     Highlighter,
     Lightbulb,
     MessageCircle,
@@ -42,12 +41,6 @@ const OverviewTool = {
     icon: Lightbulb,
 }
 
-const ReadTool = {
-    name: "Read",
-    label: "Read mode",
-    icon: Focus,
-}
-
 const ChatTool = {
     name: "Chat",
     label: "Show chat",
@@ -72,7 +65,6 @@ const PaperToolset = {
         OverviewTool,
         AnnotationsTool,
         AudioTool,
-        ReadTool,
     ],
 }
 
@@ -174,7 +166,9 @@ export default function PaperView() {
             // Only set from URL on first initialization
             if (!hasInitializedRsf.current) {
                 hasInitializedRsf.current = true;
-                if (rsf && validTools.includes(rsf)) {
+                if (rsf === 'read') {
+                    setRightSideFunction('Read');
+                } else if (rsf && validTools.includes(rsf)) {
                     const toolName = newNav.find(tool => tool.name.toLowerCase() === rsf);
                     setRightSideFunction(toolName ? toolName.name : 'Chat');
                 } else if (hasOverview) {
@@ -203,14 +197,30 @@ export default function PaperView() {
     const [mobileView, setMobileView] = useState<'reader' | 'panel'>('reader');
 
     const showAnnotationCards = annotationCardsVisible;
+    const isReadMode = rightSideFunction === 'Read';
 
+    /** Tracks the last non-Read panel so we can restore it when exiting focus mode. */
+    const lastNonReadFunctionRef = useRef<string>('Chat');
     const prevRightSideRef = useRef(rightSideFunction);
     useEffect(() => {
         if (rightSideFunction === 'Read' && prevRightSideRef.current !== 'Read') {
             setAnnotationCardsVisible(false);
         }
+        if (prevRightSideRef.current !== 'Read') {
+            lastNonReadFunctionRef.current = prevRightSideRef.current;
+        }
         prevRightSideRef.current = rightSideFunction;
     }, [rightSideFunction]);
+
+    const handleToggleReadMode = useCallback(() => {
+        if (isReadMode) {
+            const target = lastNonReadFunctionRef.current;
+            const validTools = toolset.nav.map(t => t.name);
+            setRightSideFunction(validTools.includes(target) ? target : 'Chat');
+        } else {
+            setRightSideFunction('Read');
+        }
+    }, [isReadMode, toolset.nav]);
 
     const prevMobileViewRef = useRef<'reader' | 'panel'>(mobileView);
     const mobileReaderInitialHideRef = useRef(false);
@@ -229,10 +239,6 @@ export default function PaperView() {
         }
         prevMobileViewRef.current = mobileView;
     }, [isMobile, mobileView]);
-
-    if (isMobile) {
-        toolset.nav = toolset.nav.filter(tool => tool.name !== 'Read');
-    }
 
     useEffect(() => {
         if (jobId) {
@@ -697,6 +703,8 @@ export default function PaperView() {
                                 annotationsPanelActive={annotationsPanelActive}
                                 onAnnotateViaSidePanel={onAnnotateViaSidePanel}
                                 sidePanelOpen={rightSideFunction !== 'Read'}
+                                isReadMode={isReadMode}
+                                onToggleReadMode={handleToggleReadMode}
                             />
                         </div>
                     )}

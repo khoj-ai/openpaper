@@ -13,6 +13,8 @@ import {
 	Search,
 	X,
 	Highlighter,
+	Maximize2,
+	Minimize2,
 	ToggleLeft,
 	ToggleRight,
 } from "lucide-react";
@@ -67,6 +69,10 @@ interface PdfToolbarProps {
 	 */
 	showAnnotationCards?: boolean;
 	onToggleAnnotationCards?: () => void;
+
+	/** Focus / read mode: expand PDF to fill the viewport, hiding the side panel. */
+	isReadMode?: boolean;
+	onToggleReadMode?: () => void;
 }
 
 export function PdfToolbar({
@@ -96,6 +102,8 @@ export function PdfToolbar({
 	setHighlightColor,
 	showAnnotationCards = true,
 	onToggleAnnotationCards,
+	isReadMode = false,
+	onToggleReadMode,
 }: PdfToolbarProps) {
 	const currentColorConfig =
 		HIGHLIGHT_COLOR_SWATCHES.find((c) => c.color === highlightColor) || HIGHLIGHT_COLOR_SWATCHES[2];
@@ -321,6 +329,20 @@ export function PdfToolbar({
 							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
+				)}
+
+				{/* Focus / read mode toggle */}
+				{onToggleReadMode && (
+					<Button
+						size="sm"
+						variant="ghost"
+						className="h-8 w-8 p-0"
+						onClick={onToggleReadMode}
+						title={isReadMode ? "Exit focus mode" : "Focus mode"}
+						aria-label={isReadMode ? "Exit focus mode" : "Focus mode"}
+					>
+						{isReadMode ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+					</Button>
 				)}
 			</div>
 		</div>
