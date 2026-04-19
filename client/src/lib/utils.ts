@@ -36,15 +36,43 @@ export const isDateValid = (dateString: string) => {
 export const formatDate = (dateString: string) => {
 	const date = new Date(dateString);
 	const now = new Date();
+	const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+	const isSameCalendarDay = (a: Date, b: Date) =>
+		a.getFullYear() === b.getFullYear() &&
+		a.getMonth() === b.getMonth() &&
+		a.getDate() === b.getDate();
+
+	if (isSameCalendarDay(date, now)) {
+		return `Today ${timeStr}`;
+	}
+
 	const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
 
 	if (diffInHours < 24) {
-		return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+		return timeStr;
 	} else if (diffInHours < 168) { // 7 days
 		return date.toLocaleDateString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
 	} else {
 		return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 	}
+};
+
+/** Actual creation time and calendar date — e.g. "9:30 PM Apr 11", "9:30 PM Apr 11, 2024" when not the current year */
+export const formatAnnotationDate = (dateString: string) => {
+	if (!isDateValid(dateString)) return "";
+	const date = new Date(dateString);
+	const now = new Date();
+	const timeStr = date.toLocaleTimeString("en-US", {
+		hour: "numeric",
+		minute: "2-digit",
+		hour12: true,
+	});
+	const datePart =
+		date.getFullYear() !== now.getFullYear()
+			? date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+			: date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+	return `${timeStr} ${datePart}`;
 };
 
 export function getAlphaHashToBackgroundColor(input: string): string {

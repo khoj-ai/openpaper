@@ -4,8 +4,7 @@ import {
 
 import { useEffect, useState, useRef } from "react";
 import { Button } from "./ui/button";
-import { CommandShortcut, localizeCommandToOS } from "./ui/command";
-import { Bookmark, Copy, Highlighter, MessageCircle, Minus, X } from "lucide-react";
+import { Bookmark, Copy, Highlighter, MessageCircle, Minus } from "lucide-react";
 
 interface InlineAnnotationMenuProps {
     selectedText: string;
@@ -20,12 +19,34 @@ interface InlineAnnotationMenuProps {
     addHighlight: (selectedText: string, doAnnotate?: boolean) => void;
     removeHighlight: (highlight: PaperHighlight) => void;
     setUserMessageReferences: React.Dispatch<React.SetStateAction<string[]>>;
+    onAnnotate: (y: number) => void;
 }
 
-// Estimated height of the menu (5-6 buttons at ~36px each + padding)
-const MENU_HEIGHT = 280;
-const MENU_WIDTH = 220;
-const MENU_OFFSET = 20;
+// Compact horizontal card — always rendered below the anchor
+const MENU_HEIGHT = 40;
+const MENU_WIDTH = 300;
+const MENU_OFFSET = 6;
+
+interface ActionButtonProps {
+    icon: React.ReactNode;
+    label: string;
+    onClick: (e: React.MouseEvent) => void;
+    className?: string;
+}
+
+function ActionButton({ icon, label, onClick, className = "" }: ActionButtonProps) {
+    return (
+        <Button
+            variant="ghost"
+            className={`flex items-center gap-1 h-6 px-1.5 text-[11px] font-normal ${className}`}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={onClick}
+        >
+            {icon}
+            {label}
+        </Button>
+    );
+}
 
 export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
     const {
@@ -39,231 +60,189 @@ export default function InlineAnnotationMenu(props: InlineAnnotationMenuProps) {
         addHighlight,
         removeHighlight,
         setUserMessageReferences,
+        onAnnotate,
     } = props;
 
     const menuRef = useRef<HTMLDivElement>(null);
     const [menuPosition, setMenuPosition] = useState<{ left: number; top: number } | null>(null);
 
-    // Calculate optimal position when tooltip position changes
+    // Always place below the anchor, clamped to viewport edges
     useEffect(() => {
         if (!tooltipPosition) {
             setMenuPosition(null);
             return;
         }
-
-        // Calculate horizontal position (keep existing logic)
-        const left = Math.min(tooltipPosition.x, window.innerWidth - MENU_WIDTH);
-
-        // Calculate vertical position - check if menu fits below cursor
+        const left = Math.min(
+            Math.max(0, tooltipPosition.x),
+            window.innerWidth - MENU_WIDTH
+        );
         const spaceBelow = window.innerHeight - tooltipPosition.y - MENU_OFFSET;
-        const spaceAbove = tooltipPosition.y - MENU_OFFSET;
-
-        let top: number;
-        if (spaceBelow >= MENU_HEIGHT) {
-            // Enough space below - render below cursor
-            top = tooltipPosition.y + MENU_OFFSET;
-        } else if (spaceAbove >= MENU_HEIGHT) {
-            // Not enough space below, but enough above - render above cursor
-            top = tooltipPosition.y - MENU_HEIGHT - MENU_OFFSET;
-        } else {
-            // Not enough space either way - render where there's more space
-            if (spaceBelow >= spaceAbove) {
-                top = tooltipPosition.y + MENU_OFFSET;
-            } else {
-                top = Math.max(10, tooltipPosition.y - MENU_HEIGHT - MENU_OFFSET);
-            }
-        }
-
+        const top = spaceBelow >= MENU_HEIGHT
+            ? tooltipPosition.y + MENU_OFFSET
+            : tooltipPosition.y - MENU_HEIGHT - MENU_OFFSET;
+        // #region agent log
+        fetch("http://127.0.0.1:7848/ingest/1ffc24a3-d0c6-4802-9576-899d9a9fb32b", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Debug-Session-Id": "434c20",
+            },
+            body: JSON.stringify({
+                sessionId: "434c20",
+                hypothesisId: "H3",
+                location: "InlineAnnotationMenu.tsx:menuPosition",
+                message: "computed menu top",
+                data: {
+                    anchorY: tooltipPosition.y,
+                    innerHeight: window.innerHeight,
+                    spaceBelow,
+                    branchBelow: spaceBelow >= MENU_HEIGHT,
+                    top,
+                    left,
+                },
+                timestamp: Date.now(),
+                runId: "pre-fix",
+            }),
+        }).catch(() => {});
+        // #endregion
         setMenuPosition({ left, top });
     }, [tooltipPosition]);
 
+    // Keyboard shortcuts
     useEffect(() => {
-        const handleMouseDown = (e: KeyboardEvent) => {
+        const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === "Escape") {
-                setSelectedText("");
-                setTooltipPosition(null);
-                setIsAnnotating(false);
+                close();
             } else if (e.key === "c" && (e.ctrlKey || e.metaKey)) {
                 navigator.clipboard.writeText(selectedText);
             } else if (e.key === "a" && (e.ctrlKey || e.metaKey)) {
-                setUserMessageReferences((prev: string[]) => {
-                    const newReferences = [...prev, selectedText];
-                    return Array.from(new Set(newReferences)); // Remove duplicates
-                });
+                setUserMessageReferences((prev: string[]) =>
+                    Array.from(new Set([...prev, selectedText]))
+                );
             } else if (e.key === "h" && (e.ctrlKey || e.metaKey)) {
                 addHighlight(selectedText);
                 e.stopPropagation();
             } else if (e.key === "d" && (e.ctrlKey || e.metaKey) && isHighlightInteraction && activeHighlight) {
                 removeHighlight(activeHighlight);
-                setSelectedText("");
-                setTooltipPosition(null);
-                setIsAnnotating(false);
+                close();
             } else if (e.key === "e" && (e.ctrlKey || e.metaKey)) {
+                if (tooltipPosition) onAnnotate(tooltipPosition.y);
                 setIsAnnotating(true);
                 setTooltipPosition(null);
                 setSelectedText("");
             } else {
                 return;
             }
-
             e.preventDefault();
             e.stopPropagation();
-        }
+        };
 
-        window.addEventListener("keydown", handleMouseDown);
-        return () => window.removeEventListener("keydown", handleMouseDown);
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
     }, [selectedText]);
+
+    const close = () => {
+        setSelectedText("");
+        setTooltipPosition(null);
+        setIsAnnotating(false);
+    };
+
+    // Dismiss on outside click
+    useEffect(() => {
+        const handleOutsideClick = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            // Let handleHighlightClick handle highlight clicks — don't close here
+            if (target.closest?.('.TextHighlight__parts, .TextHighlight__part')) return;
+            if (menuRef.current && !menuRef.current.contains(target)) {
+                close();
+            }
+        };
+        const timerId = setTimeout(() => {
+            document.addEventListener("mousedown", handleOutsideClick);
+        }, 100);
+        return () => {
+            clearTimeout(timerId);
+            document.removeEventListener("mousedown", handleOutsideClick);
+        };
+    }, [tooltipPosition]);
 
     if (!tooltipPosition || !menuPosition) return null;
 
     return (
         <div
             ref={menuRef}
-            className="fixed z-30 bg-background shadow-lg rounded-lg p-3 border border-border w-[200px]"
-            style={{
-                left: `${menuPosition.left}px`,
-                top: `${menuPosition.top}px`,
-            }}
+            data-inline-annotation-menu=""
+            className="fixed z-30 bg-background shadow-md rounded-lg border border-border"
+            style={{ left: `${menuPosition.left}px`, top: `${menuPosition.top}px` }}
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
         >
-            <div className="flex flex-col gap-1.5">
-                {/* Copy Button */}
-                <Button
-                    variant="ghost"
-                    className="w-full flex items-center justify-between text-sm font-normal h-9 px-2"
-                    onClick={() => {
-                        navigator.clipboard.writeText(selectedText);
-                        setSelectedText("");
-                        setTooltipPosition(null);
-                        setIsAnnotating(false);
-                    }}
-                >
-                    <div className="flex items-center gap-2">
-                        <Copy size={14} />
-                        Copy
-                    </div>
-                    <CommandShortcut className="text-muted-foreground">
-                        {localizeCommandToOS('C')}
-                    </CommandShortcut>
-                </Button>
-
-                {/* Highlight Button */}
-                {
-                    !isHighlightInteraction && (
-                        <Button
-                            variant="ghost"
-                            className="w-full flex items-center justify-between text-sm font-normal h-9 px-2"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                addHighlight(selectedText, false);
-                            }}
-                        >
-                            <div className="flex items-center gap-2">
-                                <Bookmark size={14} />
-                                Save
-                            </div>
-                            <CommandShortcut className="text-muted-foreground">
-                                {localizeCommandToOS('H')}
-                            </CommandShortcut>
-                        </Button>
-                    )
-                }
-
-                {/* Annotate Button */}
-                {
-                    <Button
-                        variant="ghost"
-                        className="w-full flex items-center justify-between text-sm font-normal h-9 px-2"
-                        onMouseDown={(e) => e.preventDefault()}
+            <div className="flex items-center gap-0.5 p-1">
+                {/* Save — hidden when interacting with an existing highlight */}
+                {!isHighlightInteraction && (
+                    <ActionButton
+                        icon={<Bookmark size={11} />}
+                        label="Save"
                         onClick={(e) => {
                             e.stopPropagation();
-                            setIsAnnotating(true);
-                            setTooltipPosition(null);
-                            setSelectedText("");
-                            if (!isHighlightInteraction) {
-                                addHighlight(selectedText, true);
-                            }
+                            addHighlight(selectedText, false);
                         }}
-                    >
-                        <div className="flex items-center gap-2">
-                            <Highlighter size={14} />
-                            Annotate
-                        </div>
-                        <CommandShortcut className="text-muted-foreground">
-                            {localizeCommandToOS('E')}
-                        </CommandShortcut>
-                    </Button>
-                }
-
-                {/* Add to Chat Button */}
-                <Button
-                    variant="ghost"
-                    className="w-full flex items-center justify-between text-sm font-normal h-9 px-2"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={(e) => {
-                        setUserMessageReferences(prev => Array.from(new Set([...prev, selectedText])));
-                        setSelectedText("");
-                        setTooltipPosition(null);
-                        setIsAnnotating(false);
-                        e.stopPropagation();
-                    }}
-                >
-                    <div className="flex items-center gap-2">
-                        <MessageCircle size={14} />
-                        Ask
-                    </div>
-                    <CommandShortcut className="text-muted-foreground">
-                        {localizeCommandToOS('A')}
-                    </CommandShortcut>
-                </Button>
-
-
-                {/* Remove Highlight Button - Only show when interacting with highlight */}
-                {isHighlightInteraction && activeHighlight && (
-                    <Button
-                        variant="ghost"
-                        className="w-full flex items-center justify-between text-sm font-normal h-9 px-2 text-destructive"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if (activeHighlight) {
-                                removeHighlight(activeHighlight);
-                                setSelectedText("");
-                                setTooltipPosition(null);
-                                setIsAnnotating(false);
-                            }
-                        }}
-                    >
-                        <div className="flex items-center gap-2">
-                            <Minus size={14} />
-                            Delete
-                        </div>
-                        <CommandShortcut className="text-muted-foreground">
-                            {localizeCommandToOS('D')}
-                        </CommandShortcut>
-                    </Button>
+                    />
                 )}
 
-                {/* Close Button */}
-                <Button
-                    variant="ghost"
-                    className="w-full flex items-center justify-between text-sm font-normal h-9 px-2"
-                    onClick={() => {
-                        setSelectedText("");
+                {/* Annotate */}
+                <ActionButton
+                    icon={<Highlighter size={11} />}
+                    label="Annotate"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        if (tooltipPosition) onAnnotate(tooltipPosition.y);
+                        setIsAnnotating(true);
                         setTooltipPosition(null);
-                        setIsAnnotating(false);
+                        setSelectedText("");
+                        if (!isHighlightInteraction) {
+                            addHighlight(selectedText, true);
+                        }
                     }}
-                >
-                    <div className="flex items-center gap-2">
-                        <X size={14} />
-                        Close
-                    </div>
-                    <CommandShortcut className="text-muted-foreground">
-                        Esc
-                    </CommandShortcut>
-                </Button>
+                />
+
+                {/* Ask */}
+                <ActionButton
+                    icon={<MessageCircle size={11} />}
+                    label="Ask"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setUserMessageReferences(prev =>
+                            Array.from(new Set([...prev, selectedText]))
+                        );
+                        close();
+                    }}
+                />
+
+                {/* Copy */}
+                <ActionButton
+                    icon={<Copy size={11} />}
+                    label="Copy"
+                    onClick={() => {
+                        navigator.clipboard.writeText(selectedText);
+                        close();
+                    }}
+                />
+
+                {/* Delete — only when interacting with an existing highlight */}
+                {isHighlightInteraction && activeHighlight && (
+                    <ActionButton
+                        icon={<Minus size={11} />}
+                        label="Delete"
+                        className="text-destructive hover:text-destructive"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            removeHighlight(activeHighlight);
+                            close();
+                        }}
+                    />
+                )}
+
             </div>
         </div>
     );

@@ -128,6 +128,7 @@ export function ProjectPaperPreview({ paper, projectId }: ProjectPaperPreviewPro
                             setSelectedText={() => { }}
                             tooltipPosition={null}
                             setTooltipPosition={() => { }}
+                            isAnnotating={false}
                             setIsAnnotating={() => { }}
                             isHighlightInteraction={false}
                             setIsHighlightInteraction={() => { }}

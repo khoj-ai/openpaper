@@ -60,10 +60,7 @@ interface SidePanelContentProps {
     annotations: PaperHighlightAnnotation[];
     highlights: PaperHighlight[];
     handleHighlightClick: (highlight: PaperHighlight) => void;
-    addAnnotation: (highlightId: string, content: string) => Promise<PaperHighlightAnnotation>;
     activeHighlight: PaperHighlight | null;
-    updateAnnotation: (annotationId: string, text: string) => void;
-    removeAnnotation: (annotationId: string) => void;
     isSharing: boolean;
     handleShare: () => void;
     handleUnshare: () => void;
@@ -77,6 +74,9 @@ interface SidePanelContentProps {
     setUserMessageReferences: React.Dispatch<React.SetStateAction<string[]>>;
     isMobile: boolean;
     renderedHighlightPositions?: Map<string, RenderedHighlightPosition>;
+    composeHighlightId?: string | null;
+    onComposeHighlightDismiss?: (cancelledHighlightId?: string | null) => void;
+    addAnnotation?: (highlightId: string, content: string) => Promise<PaperHighlightAnnotation>;
 }
 
 interface ChatRequestBody {
@@ -94,10 +94,7 @@ export function SidePanelContent({
     annotations,
     highlights,
     handleHighlightClick,
-    addAnnotation,
     activeHighlight,
-    updateAnnotation,
-    removeAnnotation,
     isSharing,
     handleShare,
     handleUnshare,
@@ -111,6 +108,9 @@ export function SidePanelContent({
     setUserMessageReferences,
     isMobile,
     renderedHighlightPositions,
+    composeHighlightId,
+    onComposeHighlightDismiss,
+    addAnnotation,
 }: SidePanelContentProps) {
     const { user } = useAuth();
     const [conversationId, setConversationId] = useState<string | null>(null);
@@ -773,8 +773,8 @@ export function SidePanelContent({
     return (
         <>
             {
-                rightSideFunction !== 'Focus' && (
-                    <div className="flex-grow h-full overflow-hidden">
+                rightSideFunction !== 'Read' && (
+                    <div className="flex-grow h-full overflow-hidden pr-[60px]">
                         {
                             rightSideFunction === 'Annotations' && user && (
                                 <div className={`flex flex-col ${heightClass} overflow-y-auto`}>
@@ -783,11 +783,11 @@ export function SidePanelContent({
                                         highlights={highlights}
                                         user={user}
                                         onHighlightClick={handleHighlightClick}
-                                        addAnnotation={addAnnotation}
                                         activeHighlight={activeHighlight}
-                                        updateAnnotation={updateAnnotation}
-                                        removeAnnotation={removeAnnotation}
                                         renderedHighlightPositions={renderedHighlightPositions}
+                                        composeHighlightId={composeHighlightId}
+                                        onComposeHighlightDismiss={onComposeHighlightDismiss}
+                                        addAnnotation={addAnnotation}
                                     />
                                 </div>
                             )

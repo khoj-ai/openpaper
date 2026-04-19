@@ -186,6 +186,7 @@ export default function DataTablePage() {
                                 setUserMessageReferences={() => { }}
                                 setSelectedText={() => { }}
                                 setTooltipPosition={() => { }}
+                                isAnnotating={false}
                                 setIsAnnotating={() => { }}
                                 setIsHighlightInteraction={() => { }}
                                 isHighlightInteraction={false}

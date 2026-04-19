@@ -4,20 +4,19 @@ import { PdfHighlighterViewer, RenderedHighlightPosition } from '@/components/Pd
 import { Button } from '@/components/ui/button';
 import { fetchFromApi } from '@/lib/api';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 
 import {
-    Highlighter,
-    MessageCircle,
-    Focus,
-    Lightbulb,
     AudioLines,
+    Highlighter,
+    Lightbulb,
+    MessageCircle,
 } from 'lucide-react';
 import { toast } from "sonner";
 
-import { useHighlighterHighlights } from '@/components/hooks/PdfHighlighterHighlights';
 import { useAnnotations } from '@/components/hooks/PdfAnnotation';
+import { useHighlighterHighlights } from '@/components/hooks/PdfHighlighterHighlights';
 
 import {
     PaperData,
@@ -25,49 +24,47 @@ import {
     PaperUploadJobStatusResponse,
 } from '@/lib/schema';
 
+import { PaperSidebar } from '@/components/PaperSidebar';
 import { PaperStatus, PaperStatusEnum } from '@/components/utils/PdfStatus';
 import { useAuth } from '@/lib/auth';
-import { PaperSidebar } from '@/components/PaperSidebar';
 
 import PaperViewSkeleton from '@/components/PaperViewSkeleton';
 import ReportSkeleton from '@/components/ReportSkeleton';
 
+import { SidePanelContent } from '@/components/SidePanelContent';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Book, Box } from 'lucide-react';
-import { SidePanelContent } from '@/components/SidePanelContent';
 
 const OverviewTool = {
     name: "Overview",
+    label: "Overview",
     icon: Lightbulb,
-}
-
-const FocusTool = {
-    name: "Focus",
-    icon: Focus,
 }
 
 const ChatTool = {
     name: "Chat",
+    label: "Show chat",
     icon: MessageCircle,
 }
 
 const AnnotationsTool = {
     name: "Annotations",
+    label: "All annotations",
     icon: Highlighter,
 }
 
 const AudioTool = {
     name: "Audio",
+    label: "Audio",
     icon: AudioLines,
 }
 
 const PaperToolset = {
     nav: [
-        OverviewTool,
         ChatTool,
-        AudioTool,
+        OverviewTool,
         AnnotationsTool,
-        FocusTool,
+        AudioTool,
     ],
 }
 
@@ -107,6 +104,9 @@ export default function PaperView() {
         refreshAnnotations,
     } = useAnnotations(id);
 
+    const [annotationCardsVisible, setAnnotationCardsVisible] = useState(false);
+    /** When Annotations side panel is open, compose first note / reply here instead of margin cards */
+    const [composeHighlightId, setComposeHighlightId] = useState<string | null>(null);
     const [activeCitationKey, setActiveCitationKey] = useState<string | null>(null);
     const [activeCitationMessageIndex, setActiveCitationMessageIndex] = useState<number | null>(null);
     const [explicitSearchTerm, setExplicitSearchTerm] = useState<string | undefined>(undefined);
@@ -132,6 +132,13 @@ export default function PaperView() {
     const [elapsedTime, setElapsedTime] = useState(0);
 
     const [rightSideFunction, setRightSideFunction] = useState<string>('Overview');
+    const annotationsPanelActive = rightSideFunction === 'Annotations';
+    useEffect(() => {
+        if (rightSideFunction !== 'Annotations') {
+            setComposeHighlightId(null);
+        }
+    }, [rightSideFunction]);
+
     const [toolset, setToolset] = useState(PaperToolset);
     const initialRsfRef = useRef<string | null>(null);
     const hasInitializedRsf = useRef(false);
@@ -139,7 +146,9 @@ export default function PaperView() {
     // Capture the initial rsf from URL on first render
     useEffect(() => {
         if (initialRsfRef.current === null) {
-            initialRsfRef.current = searchParams.get('rsf')?.toLowerCase() || null;
+            let rsf = searchParams.get('rsf')?.toLowerCase() || null;
+            if (rsf === 'focus') rsf = 'read'; // legacy URL param when tool was named Focus
+            initialRsfRef.current = rsf;
         }
     }, [searchParams]);
 
@@ -157,7 +166,9 @@ export default function PaperView() {
             // Only set from URL on first initialization
             if (!hasInitializedRsf.current) {
                 hasInitializedRsf.current = true;
-                if (rsf && validTools.includes(rsf)) {
+                if (rsf === 'read') {
+                    setRightSideFunction('Read');
+                } else if (rsf && validTools.includes(rsf)) {
                     const toolName = newNav.find(tool => tool.name.toLowerCase() === rsf);
                     setRightSideFunction(toolName ? toolName.name : 'Chat');
                 } else if (hasOverview) {
@@ -185,9 +196,78 @@ export default function PaperView() {
     const isMobile = useIsMobile();
     const [mobileView, setMobileView] = useState<'reader' | 'panel'>('reader');
 
-    if (isMobile) {
-        toolset.nav = toolset.nav.filter(tool => tool.name !== 'Focus');
-    }
+    const showAnnotationCards = annotationCardsVisible;
+    const isReadMode = rightSideFunction === 'Read';
+
+    /** Auto-narrow side panel while annotating with a margin card visible.
+     *  Skip when the annotation is routed to the Annotations side panel (no margin card). */
+    const ANNOTATE_MIN_PDF_WIDTH = 70; // %
+    const preAnnotateWidthRef = useRef<number | null>(null);
+    const annotationGoesToSidePanel = !showAnnotationCards && annotationsPanelActive;
+    useEffect(() => {
+        const shouldWiden = isAnnotating && !isReadMode && !annotationGoesToSidePanel;
+        if (shouldWiden && preAnnotateWidthRef.current === null) {
+            // Turn on annotation card visibility so the new card is seen
+            if (!annotationCardsVisible) {
+                setAnnotationCardsVisible(true);
+            }
+            preAnnotateWidthRef.current = leftPanelWidth;
+            if (leftPanelWidth < ANNOTATE_MIN_PDF_WIDTH) {
+                setLeftPanelWidth(ANNOTATE_MIN_PDF_WIDTH);
+            }
+        } else if (!shouldWiden && preAnnotateWidthRef.current !== null) {
+            setLeftPanelWidth(preAnnotateWidthRef.current);
+            preAnnotateWidthRef.current = null;
+        }
+    // leftPanelWidth, annotationCardsVisible intentionally excluded — only read on transition
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAnnotating, isReadMode, annotationGoesToSidePanel]);
+
+    /** Tracks the last non-Read panel so we can restore it when exiting focus mode. */
+    const lastNonReadFunctionRef = useRef<string>('Chat');
+    const prevRightSideRef = useRef(rightSideFunction);
+    /** Tracks annotation card visibility before entering Read mode so it can be restored on exit. */
+    const preReadAnnotationCardsRef = useRef<boolean>(false);
+    useEffect(() => {
+        if (rightSideFunction === 'Read' && prevRightSideRef.current !== 'Read') {
+            preReadAnnotationCardsRef.current = annotationCardsVisible;
+        }
+        if (prevRightSideRef.current !== 'Read') {
+            lastNonReadFunctionRef.current = prevRightSideRef.current;
+        }
+        prevRightSideRef.current = rightSideFunction;
+    // annotationCardsVisible intentionally excluded — only read on transition into Read mode
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rightSideFunction]);
+
+    const handleToggleReadMode = useCallback(() => {
+        if (isReadMode) {
+            const target = lastNonReadFunctionRef.current;
+            const validTools = toolset.nav.map(t => t.name);
+            setRightSideFunction(validTools.includes(target) ? target : 'Chat');
+            setAnnotationCardsVisible(preReadAnnotationCardsRef.current);
+        } else {
+            setRightSideFunction('Read');
+        }
+    }, [isReadMode, toolset.nav]);
+
+    const prevMobileViewRef = useRef<'reader' | 'panel'>(mobileView);
+    const mobileReaderInitialHideRef = useRef(false);
+    useEffect(() => {
+        if (!isMobile) {
+            prevMobileViewRef.current = mobileView;
+            return;
+        }
+        const prev = prevMobileViewRef.current;
+        if (mobileView === 'reader' && prev === 'panel') {
+            setAnnotationCardsVisible(false);
+        }
+        if (mobileView === 'reader' && !mobileReaderInitialHideRef.current) {
+            mobileReaderInitialHideRef.current = true;
+            setAnnotationCardsVisible(false);
+        }
+        prevMobileViewRef.current = mobileView;
+    }, [isMobile, mobileView]);
 
     useEffect(() => {
         if (jobId) {
@@ -200,11 +280,6 @@ export default function PaperView() {
         }
     }, [jobId]);
 
-    useEffect(() => {
-        if (isAnnotating) {
-            setRightSideFunction('Annotations');
-        }
-    }, [isAnnotating]);
 
     useEffect(() => {
         if (!jobId) {
@@ -307,9 +382,13 @@ export default function PaperView() {
 
     const handleHighlightClick = useCallback((highlight: PaperHighlight) => {
         setActiveHighlight(highlight);
-        // Use search to navigate to the highlight text in the PDF
-        if (highlight.raw_text) {
+        // Position-backed highlights: PdfHighlighterViewer scrolls via scrollToHighlight only.
+        // Do not set explicitSearchTerm — it triggers usePdfSearch goToMatch(0) (first occurrence)
+        // and fights correct alignment when raw_text appears multiple times.
+        if (highlight.raw_text && !highlight.position) {
             setExplicitSearchTerm(highlight.raw_text);
+        } else {
+            setExplicitSearchTerm(undefined);
         }
     }, []);
 
@@ -467,6 +546,25 @@ export default function PaperView() {
         }
     }, [id, paperData]);
 
+    const onAnnotateViaSidePanel = useCallback((payload: { highlightId: string }) => {
+        setComposeHighlightId(payload.highlightId);
+    }, []);
+
+    const onComposeHighlightDismiss = useCallback(
+        (cancelledHighlightId?: string | null) => {
+            setComposeHighlightId(null);
+            setIsAnnotating(false);
+            // End PDF "selected" emphasis when compose closes — otherwise activeHighlightStore
+            // stays set and the paragraph keeps the active (0.4) tint after Save.
+            setActiveHighlight(null);
+            if (cancelledHighlightId == null || cancelledHighlightId === '') return;
+            if (annotations.some((a) => a.highlight_id === cancelledHighlightId)) return;
+            const h = highlights.find((x) => x.id === cancelledHighlightId);
+            if (h) removeHighlight(h);
+        },
+        [annotations, highlights, removeHighlight, setActiveHighlight]
+    );
+
     if (loading) return <PaperViewSkeleton />;
 
     if (!paperData) return <div>Paper not found</div>;
@@ -477,10 +575,7 @@ export default function PaperView() {
         annotations,
         highlights,
         handleHighlightClick,
-        addAnnotation,
         activeHighlight,
-        updateAnnotation,
-        removeAnnotation,
         isSharing,
         handleShare,
         handleUnshare,
@@ -493,6 +588,9 @@ export default function PaperView() {
         userMessageReferences,
         setUserMessageReferences,
         renderedHighlightPositions,
+        composeHighlightId,
+        onComposeHighlightDismiss,
+        addAnnotation,
     };
 
     if (isMobile) {
@@ -508,6 +606,7 @@ export default function PaperView() {
                                     setUserMessageReferences={setUserMessageReferences}
                                     setSelectedText={setSelectedText}
                                     setTooltipPosition={setTooltipPosition}
+                                    isAnnotating={isAnnotating}
                                     setIsAnnotating={setIsAnnotating}
                                     setIsHighlightInteraction={setIsHighlightInteraction}
                                     isHighlightInteraction={isHighlightInteraction}
@@ -526,13 +625,21 @@ export default function PaperView() {
                                     paperStatus={paperData.status}
                                     onOverlaysCreated={handleOverlaysCreated}
                                     onRefreshUrl={refreshPdfUrl}
+                                    addAnnotation={addAnnotation}
+                                    updateAnnotation={updateAnnotation}
+                                    removeAnnotation={removeAnnotation}
+                                    currentUser={user}
+                                    showAnnotationCards={showAnnotationCards}
+                                    onToggleAnnotationCards={() => setAnnotationCardsVisible((v) => !v)}
+                                    annotationsPanelActive={annotationsPanelActive}
+                                    onAnnotateViaSidePanel={onAnnotateViaSidePanel}
                                 />
                             )}
                         </div>
                     ) : (
                         <div className="w-full h-full">
                             <div
-                                className={`flex flex-row h-full relative ${!jobId ? "pr-[60px]" : ""}`}
+                                className="flex flex-row h-full relative"
                             >
                                 {jobId ? (
                                     <div className="flex flex-col h-full w-full">
@@ -552,6 +659,8 @@ export default function PaperView() {
                                             rightSideFunction={rightSideFunction}
                                             setRightSideFunction={setRightSideFunction}
                                             PaperToolset={toolset}
+                                            showAnnotationCards={showAnnotationCards}
+                                            onToggleAnnotationCards={() => setAnnotationCardsVisible(v => !v)}
                                         />
                                     </>
                                 )}
@@ -582,7 +691,8 @@ export default function PaperView() {
                 <div
                     className="border-r-2 dark:border-gray-800 border-gray-200 p-0 h-full"
                     style={{
-                        width: rightSideFunction === 'Focus' ? '100%' : `${leftPanelWidth}%`
+                        width: rightSideFunction === 'Read' ? '100%' : `${leftPanelWidth}%`,
+                        transition: isDragging ? 'none' : 'width 300ms ease',
                     }}
                 >
                     {paperData.file_url && (
@@ -593,6 +703,7 @@ export default function PaperView() {
                                 setUserMessageReferences={setUserMessageReferences}
                                 setSelectedText={setSelectedText}
                                 setTooltipPosition={setTooltipPosition}
+                                isAnnotating={isAnnotating}
                                 setIsAnnotating={setIsAnnotating}
                                 setIsHighlightInteraction={setIsHighlightInteraction}
                                 isHighlightInteraction={isHighlightInteraction}
@@ -611,13 +722,26 @@ export default function PaperView() {
                                 paperStatus={paperData.status}
                                 onOverlaysCreated={handleOverlaysCreated}
                                 onRefreshUrl={refreshPdfUrl}
+                                addAnnotation={addAnnotation}
+                                updateAnnotation={updateAnnotation}
+                                removeAnnotation={removeAnnotation}
+                                currentUser={user}
+                                showAnnotationCards={showAnnotationCards}
+                                onToggleAnnotationCards={() =>
+                                    setAnnotationCardsVisible((v) => !v)
+                                }
+                                annotationsPanelActive={annotationsPanelActive}
+                                onAnnotateViaSidePanel={onAnnotateViaSidePanel}
+                                sidePanelOpen={rightSideFunction !== 'Read'}
+                                isReadMode={isReadMode}
+                                onToggleReadMode={handleToggleReadMode}
                             />
                         </div>
                     )}
                 </div>
 
                 {/* Resizable Divider */}
-                {rightSideFunction !== 'Focus' && (
+                {rightSideFunction !== 'Read' && (
                     <div
                         className="w-2 bg-background hover:bg-blue-100 dark:hover:bg-blue-400 cursor-col-resize transition-colors duration-200 flex-shrink-0 h-full rounded-2xl"
                         onMouseDown={(e) => {
@@ -629,8 +753,11 @@ export default function PaperView() {
 
                 {/* Right Side Panel */}
                 <div
-                    className={`flex flex-row h-full relative ${!jobId ? "pr-[60px]" : ""}`}
-                    style={rightSideFunction !== 'Focus' ? { width: `${100 - leftPanelWidth}%` } : { width: 'auto' }}
+                    className="flex flex-row h-full relative"
+                    style={{
+                        width: rightSideFunction !== 'Read' ? `${100 - leftPanelWidth}%` : 'auto',
+                        transition: isDragging ? 'none' : 'width 300ms ease',
+                    }}
                 >
                     {jobId ? (
                         <div className="flex flex-col h-full w-full">
@@ -650,7 +777,8 @@ export default function PaperView() {
                                 rightSideFunction={rightSideFunction}
                                 setRightSideFunction={setRightSideFunction}
                                 PaperToolset={toolset}
-                            />                        </>
+                            />
+                        </>
                     )}
                 </div>
             </div>

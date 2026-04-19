@@ -13,6 +13,13 @@ import {
 	Search,
 	X,
 	Highlighter,
+	Maximize2,
+	Minimize2,
+	EllipsisVertical,
+	ZoomIn,
+	ZoomOut,
+	ToggleLeft,
+	ToggleRight,
 } from "lucide-react";
 import {
 	DropdownMenu,
@@ -22,15 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { getStatusIcon, PaperStatus } from "@/components/utils/PdfStatus";
 import { HighlightColor } from "@/lib/schema";
-
-// Color configuration for highlights
-const HIGHLIGHT_COLORS: { color: HighlightColor; bg: string; label: string }[] = [
-	{ color: "yellow", bg: "bg-yellow-300", label: "Yellow" },
-	{ color: "green", bg: "bg-green-400", label: "Green" },
-	{ color: "blue", bg: "bg-blue-400", label: "Blue" },
-	{ color: "pink", bg: "bg-pink-400", label: "Pink" },
-	{ color: "purple", bg: "bg-purple-400", label: "Purple" },
-];
+import { HIGHLIGHT_COLOR_SWATCHES } from "@/components/pdf-viewer/highlightColors";
 
 interface PdfToolbarProps {
 	// Page navigation
@@ -66,6 +65,17 @@ interface PdfToolbarProps {
 	// Highlight color
 	highlightColor: HighlightColor;
 	setHighlightColor: (color: HighlightColor) => void;
+
+	/**
+	 * When set, show the inline-annotation visibility toggle on this bar (next to zoom).
+	 * Omit when the parent shows the control elsewhere (e.g. mobile Tools panel with no PDF toolbar).
+	 */
+	showAnnotationCards?: boolean;
+	onToggleAnnotationCards?: () => void;
+
+	/** Focus / read mode: expand PDF to fill the viewport, hiding the side panel. */
+	isReadMode?: boolean;
+	onToggleReadMode?: () => void;
 }
 
 export function PdfToolbar({
@@ -93,8 +103,13 @@ export function PdfToolbar({
 	handleStatusChange = () => { },
 	highlightColor,
 	setHighlightColor,
+	showAnnotationCards = true,
+	onToggleAnnotationCards,
+	isReadMode = false,
+	onToggleReadMode,
 }: PdfToolbarProps) {
-	const currentColorConfig = HIGHLIGHT_COLORS.find((c) => c.color === highlightColor) || HIGHLIGHT_COLORS[2];
+	const currentColorConfig =
+		HIGHLIGHT_COLOR_SWATCHES.find((c) => c.color === highlightColor) || HIGHLIGHT_COLOR_SWATCHES[2];
 	return (
 		<div className="sticky top-0 z-10 flex items-center bg-white/80 dark:bg-black/80 backdrop-blur-sm px-3 py-2 w-full border-b border-gray-300">
 			{/* Left section: Page navigation */}
@@ -108,7 +123,7 @@ export function PdfToolbar({
 				>
 					<ArrowLeft size={16} />
 				</Button>
-				<span className="text-xs text-secondary-foreground min-w-[4rem] text-center">
+				<span className="text-xs text-secondary-foreground min-w-16 text-center">
 					{currentPage} / {numPages || "?"}
 				</span>
 				<Button
@@ -123,7 +138,7 @@ export function PdfToolbar({
 			</div>
 
 			{/* Separator */}
-			<div className="h-5 w-px bg-gray-300 mx-3" />
+			<div className="h-5 w-px bg-gray-300 mx-1.5 md:mx-3" />
 
 			{/* Center section: Search */}
 			<div className="flex items-center gap-1">
@@ -205,44 +220,71 @@ export function PdfToolbar({
 			</div>
 
 			{/* Separator */}
-			<div className="h-5 w-px bg-gray-300 mx-3" />
+			<div className="h-5 w-px bg-gray-300 mx-1.5 md:mx-3" />
 
-			{/* Highlight color picker */}
-			<DropdownMenu>
-				<DropdownMenuTrigger asChild>
+			{/* Annotation controls: color picker + visibility toggle in a pill */}
+			<div className="flex items-center gap-0.5 rounded-md border border-gray-200 dark:border-zinc-700 px-0.5 py-0.5">
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild>
+						<Button
+							size="sm"
+							variant="ghost"
+							className="h-7 px-2 gap-1.5"
+							title="Highlight color"
+						>
+							<Highlighter size={16} />
+							<div className={`w-3.5 h-3.5 rounded-sm ${currentColorConfig.bg}`} />
+						</Button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="start" className="min-w-0">
+						<div className="flex gap-1 p-1">
+							{HIGHLIGHT_COLOR_SWATCHES.map(({ color, bg }) => (
+								<button
+									key={color}
+									type="button"
+									onClick={() => setHighlightColor(color)}
+									className={`w-6 h-6 rounded-sm ${bg} hover:scale-110 transition-transform ${
+										highlightColor === color ? "ring-2 ring-offset-1 ring-gray-400" : ""
+									}`}
+									title={color}
+								/>
+							))}
+						</div>
+					</DropdownMenuContent>
+				</DropdownMenu>
+
+				{onToggleAnnotationCards && (
 					<Button
+						type="button"
 						size="sm"
 						variant="ghost"
-						className="h-8 px-2 gap-1.5"
-						title="Highlight color"
+						className={`h-7 px-2 ${
+							showAnnotationCards
+								? "bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-900/50 dark:text-blue-400 dark:hover:bg-blue-900/70"
+								: "text-muted-foreground hover:bg-muted dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+						}`}
+						onClick={onToggleAnnotationCards}
+						title={
+							showAnnotationCards
+								? "Hide inline annotations"
+								: "Show inline annotations"
+						}
+						aria-label={
+							showAnnotationCards
+								? "Hide inline annotations"
+								: "Show inline annotations"
+						}
 					>
-						<Highlighter size={16} />
-						<div
-							className={`w-3 h-3 rounded-sm ${currentColorConfig.bg}`}
-						/>
+						{showAnnotationCards ? <ToggleRight className="size-5" /> : <ToggleLeft className="size-5" />}
 					</Button>
-				</DropdownMenuTrigger>
-				<DropdownMenuContent align="start" className="min-w-0">
-					<div className="flex gap-1 p-1">
-						{HIGHLIGHT_COLORS.map(({ color, bg }) => (
-							<button
-								key={color}
-								onClick={() => setHighlightColor(color)}
-								className={`w-6 h-6 rounded-sm ${bg} hover:scale-110 transition-transform ${
-									highlightColor === color ? "ring-2 ring-offset-1 ring-gray-400" : ""
-								}`}
-								title={color}
-							/>
-						))}
-					</div>
-				</DropdownMenuContent>
-			</DropdownMenu>
+				)}
+			</div>
 
 			{/* Spacer */}
 			<div className="flex-1" />
 
-			{/* Right section: Zoom + Status */}
-			<div className="flex items-center gap-3">
+			{/* Right section: Zoom + Status + Focus (desktop) */}
+			<div className="hidden md:flex items-center gap-3">
 				{/* Zoom controls */}
 				<div className="flex items-center gap-1">
 					<Button
@@ -266,7 +308,7 @@ export function PdfToolbar({
 					</Button>
 				</div>
 
-				{/* Status dropdown */}
+				{/* Reading status */}
 				{paperStatus && (
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
@@ -291,6 +333,57 @@ export function PdfToolbar({
 						</DropdownMenuContent>
 					</DropdownMenu>
 				)}
+
+				{/* Focus / read mode toggle */}
+				{onToggleReadMode && (
+					<Button
+						size="sm"
+						variant="ghost"
+						className="h-8 w-8 p-0"
+						onClick={onToggleReadMode}
+						title={isReadMode ? "Exit focus mode" : "Focus mode"}
+						aria-label={isReadMode ? "Exit focus mode" : "Focus mode"}
+					>
+						{isReadMode ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+					</Button>
+				)}
+			</div>
+
+			{/* Right section: overflow menu (mobile) */}
+			<div className="flex md:hidden items-center">
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild>
+						<Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+							<EllipsisVertical size={16} />
+						</Button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="end" className="min-w-40">
+						<DropdownMenuItem onClick={zoomIn}>
+							<ZoomIn size={14} className="mr-2" />
+							Zoom in
+						</DropdownMenuItem>
+						<DropdownMenuItem onClick={zoomOut}>
+							<ZoomOut size={14} className="mr-2" />
+							Zoom out
+						</DropdownMenuItem>
+						{paperStatus && (
+							<>
+								<DropdownMenuItem onClick={() => handleStatusChange("todo")}>
+									{getStatusIcon("todo")}
+									Todo
+								</DropdownMenuItem>
+								<DropdownMenuItem onClick={() => handleStatusChange("reading")}>
+									{getStatusIcon("reading")}
+									Reading
+								</DropdownMenuItem>
+								<DropdownMenuItem onClick={() => handleStatusChange("completed")}>
+									{getStatusIcon("completed")}
+									Completed
+								</DropdownMenuItem>
+							</>
+						)}
+					</DropdownMenuContent>
+				</DropdownMenu>
 			</div>
 		</div>
 	);

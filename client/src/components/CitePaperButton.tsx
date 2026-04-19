@@ -1,16 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
-import { Quote, Loader, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { toast } from 'sonner';
-import { fetchFromApi } from '@/lib/api';
-import { PaperData, PaperItem } from '@/lib/schema';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { citationStyles, copyToClipboard, PaperBase } from '@/components/utils/paperUtils';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import {
     Select,
     SelectContent,
@@ -18,15 +10,24 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { citationStyles, copyToClipboard, PaperBase } from '@/components/utils/paperUtils';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { fetchFromApi } from '@/lib/api';
+import { PaperData, PaperItem } from '@/lib/schema';
+import { Check, Copy, Loader, Quote } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 interface CitePaperButtonProps {
     paper?: (PaperData | PaperItem)[];
     paperId?: string;
     minimalist?: boolean;
     variant?: "ghost" | "outline";
+    iconOnly?: boolean;
 }
 
-export function CitePaperButton({ paper, paperId: providedPaperId, minimalist = false, variant = "ghost" }: CitePaperButtonProps) {
+export function CitePaperButton({ paper, paperId: providedPaperId, minimalist = false, variant = "ghost", iconOnly = false }: CitePaperButtonProps) {
     const pathname = usePathname();
     const [derivedPaperId, setDerivedPaperId] = useState<string | null>(null);
     const [paperData, setPaperData] = useState<(PaperData | PaperItem)[] | null>(paper || null);
@@ -97,7 +98,11 @@ export function CitePaperButton({ paper, paperId: providedPaperId, minimalist = 
         return null;
     }
 
-    const triggerButton = (
+    const triggerButton = iconOnly ? (
+        <Button variant="ghost" className="h-7 w-7 p-0 rounded-md text-secondary-foreground hover:bg-blue-100 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-foreground">
+            <Quote className="h-4 w-4" />
+        </Button>
+    ) : (
         <Button variant={variant} size="sm" className={variant === "outline" ? "h-8 px-3 text-xs" : ""}>
             {(!minimalist || variant === "outline") && <Quote className="h-3.5 w-3.5 mr-1.5" />}
             <span className={minimalist && variant !== "outline" ? "text-sm" : ""}>{isBibliography ? 'Bibliography' : 'Cite'}</span>

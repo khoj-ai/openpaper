@@ -5,7 +5,13 @@ import { useParams } from 'next/navigation';
 import { PdfHighlighterViewer } from '@/components/PdfHighlighterViewer';
 import { AnnotationsView } from '@/components/AnnotationsView';
 import { fetchFromApi } from '@/lib/api';
-import { PaperData, PaperHighlight, PaperHighlightAnnotation, ChatMessage, SharedPaper } from '@/lib/schema';
+import {
+    PaperData,
+    PaperHighlight,
+    PaperHighlightAnnotation,
+    ChatMessage,
+    SharedPaper,
+} from '@/lib/schema';
 import PaperMetadata from '@/components/PaperMetadata';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Book, Box, User } from 'lucide-react';
@@ -44,14 +50,15 @@ export default function SharedPaperView() {
     const [activeCitationKey, setActiveCitationKey] = useState<string | null>(null);
     const [activeCitationMessageIndex, setActiveCitationMessageIndex] = useState<number | null>(null);
     const [explicitSearchTerm, setExplicitSearchTerm] = useState<string>();
+    const [showAnnotationCards, setShowAnnotationCards] = useState(true);
 
     const dynamicPaperToolset = useMemo(() => {
         const navItems = [
-            { name: 'Chat', icon: MessageCircle },
-            { name: 'Annotations', icon: Highlighter },
+            { name: 'Chat', label: 'Show chat', icon: MessageCircle },
+            { name: 'Annotations', label: 'All annotations', icon: Highlighter },
         ];
         if (paperData?.summary) {
-            navItems.unshift({ name: 'Overview', icon: Lightbulb });
+            navItems.unshift({ name: 'Overview', label: 'Overview', icon: Lightbulb });
         }
         return { nav: navItems };
     }, [paperData?.summary]);
@@ -313,19 +320,6 @@ export default function SharedPaperView() {
         fetchConversation();
     }, [shareId]);
 
-    if (loading) {
-        return <div className="flex justify-center items-center h-screen">Loading shared paper...</div>;
-    }
-
-    if (error) {
-        return <div className="flex justify-center items-center h-screen text-red-500">{error}</div>;
-    }
-
-    if (!paperData) {
-        return <div className="flex justify-center items-center h-screen">Shared paper data not found.</div>;
-    }
-
-
     const refreshPdfUrl = useCallback(async (): Promise<string | null> => {
         try {
             const response: SharedPaper = await fetchFromApi(`/api/paper/share?id=${shareId}`);
@@ -342,6 +336,18 @@ export default function SharedPaperView() {
 
     const heightClass = isMobile ? "h-[calc(100vh-128px)]" : "h-[calc(100vh-64px)]";
 
+    if (loading) {
+        return <div className="flex justify-center items-center h-screen">Loading shared paper...</div>;
+    }
+
+    if (error) {
+        return <div className="flex justify-center items-center h-screen text-red-500">{error}</div>;
+    }
+
+    if (!paperData) {
+        return <div className="flex justify-center items-center h-screen">Shared paper data not found.</div>;
+    }
+
 
     if (isMobile) {
         return (
@@ -357,6 +363,7 @@ export default function SharedPaperView() {
                                     setUserMessageReferences={() => { }}
                                     setSelectedText={() => { }}
                                     setTooltipPosition={() => { }}
+                                    isAnnotating={false}
                                     setIsAnnotating={() => { }}
                                     setIsHighlightInteraction={() => { }}
                                     isHighlightInteraction={false}
@@ -369,8 +376,12 @@ export default function SharedPaperView() {
                                     loadHighlights={async () => { }}
                                     removeHighlight={() => { }}
                                     renderAnnotations={() => { }}
-                                    annotations={[]}
+                                    annotations={annotations}
                                     onRefreshUrl={refreshPdfUrl}
+                                    currentUser={owner ?? null}
+                                    showAnnotationCards={showAnnotationCards}
+                                    onToggleAnnotationCards={() => setShowAnnotationCards((v) => !v)}
+                                    sidePanelOpen
                                 />
                             ) : (
                                 <div className="flex justify-center items-center h-full">PDF could not be loaded.</div>
@@ -441,6 +452,8 @@ export default function SharedPaperView() {
                                 rightSideFunction={rightSideFunction}
                                 setRightSideFunction={setRightSideFunction}
                                 PaperToolset={dynamicPaperToolset}
+                                showAnnotationCards={showAnnotationCards}
+                                onToggleAnnotationCards={() => setShowAnnotationCards((v) => !v)}
                             />
                         </div>
                     )}
@@ -475,6 +488,7 @@ export default function SharedPaperView() {
                             setSelectedText={() => { }}
                             setTooltipPosition={() => { }}
                             explicitSearchTerm={explicitSearchTerm}
+                            isAnnotating={false}
                             setIsAnnotating={() => { }}
                             setIsHighlightInteraction={() => { }}
                             isHighlightInteraction={false}
@@ -486,8 +500,14 @@ export default function SharedPaperView() {
                             loadHighlights={async () => { }}
                             removeHighlight={() => { }}
                             renderAnnotations={() => { }}
-                            annotations={[]}
+                            annotations={annotations}
                             onRefreshUrl={refreshPdfUrl}
+                            currentUser={owner ?? null}
+                            showAnnotationCards={showAnnotationCards}
+                            onToggleAnnotationCards={() =>
+                                setShowAnnotationCards((v) => !v)
+                            }
+                            sidePanelOpen
                         />
                     ) : (
                         <div className="flex justify-center items-center h-full">PDF could not be loaded.</div>
