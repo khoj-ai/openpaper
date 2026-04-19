@@ -320,19 +320,6 @@ export default function SharedPaperView() {
         fetchConversation();
     }, [shareId]);
 
-    if (loading) {
-        return <div className="flex justify-center items-center h-screen">Loading shared paper...</div>;
-    }
-
-    if (error) {
-        return <div className="flex justify-center items-center h-screen text-red-500">{error}</div>;
-    }
-
-    if (!paperData) {
-        return <div className="flex justify-center items-center h-screen">Shared paper data not found.</div>;
-    }
-
-
     const refreshPdfUrl = useCallback(async (): Promise<string | null> => {
         try {
             const response: SharedPaper = await fetchFromApi(`/api/paper/share?id=${shareId}`);
@@ -348,6 +335,18 @@ export default function SharedPaperView() {
     }, [shareId]);
 
     const heightClass = isMobile ? "h-[calc(100vh-128px)]" : "h-[calc(100vh-64px)]";
+
+    if (loading) {
+        return <div className="flex justify-center items-center h-screen">Loading shared paper...</div>;
+    }
+
+    if (error) {
+        return <div className="flex justify-center items-center h-screen text-red-500">{error}</div>;
+    }
+
+    if (!paperData) {
+        return <div className="flex justify-center items-center h-screen">Shared paper data not found.</div>;
+    }
 
 
     if (isMobile) {
