@@ -226,14 +226,18 @@ export default function PaperView() {
     /** Tracks the last non-Read panel so we can restore it when exiting focus mode. */
     const lastNonReadFunctionRef = useRef<string>('Chat');
     const prevRightSideRef = useRef(rightSideFunction);
+    /** Tracks annotation card visibility before entering Read mode so it can be restored on exit. */
+    const preReadAnnotationCardsRef = useRef<boolean>(false);
     useEffect(() => {
         if (rightSideFunction === 'Read' && prevRightSideRef.current !== 'Read') {
-            setAnnotationCardsVisible(false);
+            preReadAnnotationCardsRef.current = annotationCardsVisible;
         }
         if (prevRightSideRef.current !== 'Read') {
             lastNonReadFunctionRef.current = prevRightSideRef.current;
         }
         prevRightSideRef.current = rightSideFunction;
+    // annotationCardsVisible intentionally excluded — only read on transition into Read mode
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [rightSideFunction]);
 
     const handleToggleReadMode = useCallback(() => {
@@ -241,6 +245,7 @@ export default function PaperView() {
             const target = lastNonReadFunctionRef.current;
             const validTools = toolset.nav.map(t => t.name);
             setRightSideFunction(validTools.includes(target) ? target : 'Chat');
+            setAnnotationCardsVisible(preReadAnnotationCardsRef.current);
         } else {
             setRightSideFunction('Read');
         }
