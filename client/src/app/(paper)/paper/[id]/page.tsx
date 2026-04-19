@@ -199,6 +199,30 @@ export default function PaperView() {
     const showAnnotationCards = annotationCardsVisible;
     const isReadMode = rightSideFunction === 'Read';
 
+    /** Auto-narrow side panel while annotating with a margin card visible.
+     *  Skip when the annotation is routed to the Annotations side panel (no margin card). */
+    const ANNOTATE_MIN_PDF_WIDTH = 70; // %
+    const preAnnotateWidthRef = useRef<number | null>(null);
+    const annotationGoesToSidePanel = !showAnnotationCards && annotationsPanelActive;
+    useEffect(() => {
+        const shouldWiden = isAnnotating && !isReadMode && !annotationGoesToSidePanel;
+        if (shouldWiden && preAnnotateWidthRef.current === null) {
+            // Turn on annotation card visibility so the new card is seen
+            if (!annotationCardsVisible) {
+                setAnnotationCardsVisible(true);
+            }
+            preAnnotateWidthRef.current = leftPanelWidth;
+            if (leftPanelWidth < ANNOTATE_MIN_PDF_WIDTH) {
+                setLeftPanelWidth(ANNOTATE_MIN_PDF_WIDTH);
+            }
+        } else if (!shouldWiden && preAnnotateWidthRef.current !== null) {
+            setLeftPanelWidth(preAnnotateWidthRef.current);
+            preAnnotateWidthRef.current = null;
+        }
+    // leftPanelWidth, annotationCardsVisible intentionally excluded — only read on transition
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAnnotating, isReadMode, annotationGoesToSidePanel]);
+
     /** Tracks the last non-Read panel so we can restore it when exiting focus mode. */
     const lastNonReadFunctionRef = useRef<string>('Chat');
     const prevRightSideRef = useRef(rightSideFunction);
@@ -662,7 +686,8 @@ export default function PaperView() {
                 <div
                     className="border-r-2 dark:border-gray-800 border-gray-200 p-0 h-full"
                     style={{
-                        width: rightSideFunction === 'Read' ? '100%' : `${leftPanelWidth}%`
+                        width: rightSideFunction === 'Read' ? '100%' : `${leftPanelWidth}%`,
+                        transition: isDragging ? 'none' : 'width 300ms ease',
                     }}
                 >
                     {paperData.file_url && (
@@ -724,7 +749,10 @@ export default function PaperView() {
                 {/* Right Side Panel */}
                 <div
                     className="flex flex-row h-full relative"
-                    style={rightSideFunction !== 'Read' ? { width: `${100 - leftPanelWidth}%` } : { width: 'auto' }}
+                    style={{
+                        width: rightSideFunction !== 'Read' ? `${100 - leftPanelWidth}%` : 'auto',
+                        transition: isDragging ? 'none' : 'width 300ms ease',
+                    }}
                 >
                     {jobId ? (
                         <div className="flex flex-col h-full w-full">

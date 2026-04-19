@@ -1630,7 +1630,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 				className={cn(
 					"flex-1 min-h-0 overflow-x-visible overflow-y-hidden relative",
 					pdfHighlightsSuppressedForZoom && "pdf-zoom-layout-pending",
-					showAnnotationCards && sidePanelOpen && "pdf-align-left"
+					sidePanelOpen && (showAnnotationCards || (isAnnotating && !(annotationsPanelActive && !showAnnotationCards))) && "pdf-align-left"
 				)}
 			>
 				<PdfLoader
