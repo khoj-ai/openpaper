@@ -232,8 +232,8 @@ export function PdfToolbar({
 							className="h-7 px-2 gap-1.5"
 							title="Highlight color"
 						>
-							<Highlighter size={14} />
-							<div className={`w-3 h-3 rounded-sm ${currentColorConfig.bg}`} />
+							<Highlighter size={16} />
+							<div className={`w-3.5 h-3.5 rounded-sm ${currentColorConfig.bg}`} />
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="start" className="min-w-0">
@@ -258,9 +258,9 @@ export function PdfToolbar({
 						type="button"
 						size="sm"
 						variant="ghost"
-						className={`h-7 w-7 p-0 ${
+						className={`h-7 px-2 ${
 							showAnnotationCards
-								? "text-secondary-foreground hover:bg-muted dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-foreground"
+								? "bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-900/50 dark:text-blue-400 dark:hover:bg-blue-900/70"
 								: "text-muted-foreground hover:bg-muted dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
 						}`}
 						onClick={onToggleAnnotationCards}
@@ -275,7 +275,7 @@ export function PdfToolbar({
 								: "Show inline annotations"
 						}
 					>
-						{showAnnotationCards ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
+						{showAnnotationCards ? <ToggleRight className="size-5" /> : <ToggleLeft className="size-5" />}
 					</Button>
 				)}
 			</div>
