@@ -5,6 +5,7 @@ from uuid import UUID
 
 from app.database.crud.base_crud import CRUDBase
 from app.database.crud.projects.project_crud import project_crud
+from app.database.crud.sanitization import sanitize_for_postgres
 from app.database.models import (
     DataTableExtractionJob,
     DataTableExtractionResult,
@@ -19,32 +20,6 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
 logger = logging.getLogger(__name__)
-
-
-def sanitize_for_postgres(value: Any) -> Any:
-    """
-    Recursively sanitize values to remove characters that PostgreSQL cannot store.
-
-    PostgreSQL text and JSONB columns cannot store null characters (\\u0000).
-    This function removes them from strings while preserving the structure of
-    nested dicts and lists.
-
-    Args:
-        value: Any value that might contain problematic characters
-
-    Returns:
-        The sanitized value with null characters removed from strings
-    """
-    if isinstance(value, str):
-        # Remove null characters that PostgreSQL can't handle
-        # \x00 is the null character, \u0000 in unicode escape
-        return value.replace("\x00", "").replace("\u0000", "")
-    elif isinstance(value, dict):
-        return {k: sanitize_for_postgres(v) for k, v in value.items()}
-    elif isinstance(value, list):
-        return [sanitize_for_postgres(item) for item in value]
-    else:
-        return value
 
 
 # ================================
