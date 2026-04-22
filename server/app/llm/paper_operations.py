@@ -6,7 +6,7 @@ from typing import AsyncGenerator, Literal, Optional, Sequence, Union
 import httpx
 from app.database.crud.paper_crud import paper_crud
 from app.database.models import Paper
-from app.llm.base import BaseLLMClient
+from app.llm.base import BaseLLMClient, ModelType
 from app.llm.citation_handler import CitationHandler
 from app.llm.json_parser import JSONParser
 from app.llm.prompts import (
@@ -119,6 +119,7 @@ class PaperOperations(BaseLLMClient):
         llm_provider: Optional[LLMProvider] = None,
         user_references: Optional[Sequence[str]] = None,
         response_style: Optional[str] = "normal",
+        model_type: ModelType = ModelType.DEFAULT,
         db: Session = Depends(get_db),
     ) -> AsyncGenerator[Union[str, dict], None]:
         """
@@ -196,6 +197,7 @@ class PaperOperations(BaseLLMClient):
             system_prompt=formatted_system_prompt,
             history=conversation_history,
             provider=llm_provider,
+            model_type=model_type,
         ):
             text = chunk.text
 
