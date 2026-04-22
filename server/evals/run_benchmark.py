@@ -38,6 +38,7 @@ from app.database.crud.subscription_crud import subscription_crud
 from app.database.crud.user_crud import user as user_crud
 from app.database.database import SessionLocal
 from app.database.models import ConversableType, SubscriptionStatus
+from app.llm.base import ModelType
 from app.llm.operations import operations
 from app.llm.provider import LLMProvider, TextContent
 from app.schemas.responses import FileContent
@@ -319,8 +320,16 @@ def get_completed_row_ids(results: dict) -> set[str]:
 
 
 def get_graded_row_ids(results: dict) -> set[str]:
-    """Return row_ids that already have judge scores."""
-    return {r["row_id"] for r in results["rows"] if "factual_accuracy" in r}
+    """Return row_ids that already have valid judge scores.
+
+    Rows whose judge run errored out (justification == "Judge error") are
+    excluded so they get re-graded on the next run.
+    """
+    return {
+        r["row_id"]
+        for r in results["rows"]
+        if "factual_accuracy" in r and r.get("justification") != "Judge error"
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -334,6 +343,7 @@ async def run_single_question(
     paper_id: str,
     question: str,
     provider: Optional[LLMProvider] = None,
+    model_type: ModelType = ModelType.DEFAULT,
 ) -> dict:
     """Run a single question through chat_with_paper and return the result."""
     # Create a fresh conversation for isolation
@@ -359,6 +369,7 @@ async def run_single_question(
         current_user=current_user,
         llm_provider=provider,
         response_style="normal",
+        model_type=model_type,
         db=db,
     ):
         if isinstance(chunk, dict):
@@ -385,6 +396,7 @@ def run_single_question_baseline(
     paper_id: str,
     question: str,
     provider: Optional[LLMProvider] = None,
+    model_type: ModelType = ModelType.DEFAULT,
 ) -> dict:
     """Run a single question directly against the LLM with the PDF, no harness."""
     import httpx
@@ -412,6 +424,7 @@ def run_single_question_baseline(
         contents=message_content,
         system_prompt=BASELINE_SYSTEM_PROMPT,
         provider=provider,
+        model_type=model_type,
     )
 
     answer_text = response.text.strip() if response and response.text else ""
@@ -430,6 +443,7 @@ async def _run_single_row(
     provider: Optional[LLMProvider],
     max_retries: int,
     baseline: bool,
+    model_type: ModelType = ModelType.DEFAULT,
 ) -> dict:
     """Run a single eval row with retries, using its own DB session.
 
@@ -452,10 +466,16 @@ async def _run_single_row(
                     paper_id,
                     row["question"],
                     provider,
+                    model_type,
                 )
             else:
                 result = await run_single_question(
-                    db, current_user, paper_id, row["question"], provider
+                    db,
+                    current_user,
+                    paper_id,
+                    row["question"],
+                    provider,
+                    model_type,
                 )
             elapsed = time.time() - start
 
@@ -518,6 +538,7 @@ async def run_eval_questions(
     max_retries: int = 3,
     baseline: bool = False,
     batch_size: int = 5,
+    model_type: ModelType = ModelType.DEFAULT,
 ):
     """Run eval questions in parallel batches, writing results to disk after each batch.
 
@@ -584,6 +605,7 @@ async def run_eval_questions(
                 provider=provider,
                 max_retries=max_retries,
                 baseline=baseline,
+                model_type=model_type,
             )
             for row_index, row, paper_id in batch
         ]
@@ -752,7 +774,7 @@ def judge_single_result(result: dict, provider: Optional[LLMProvider] = None) ->
         "factual_accuracy": 0,
         "completeness": 0,
         "groundedness": 0,
-        "justification": f"Judge error",
+        "justification": "Judge error",
     }
 
 
@@ -894,7 +916,7 @@ def print_summary(summary: dict):
 
 
 def get_results_path(
-    output_dir: str, provider_name: str, baseline: bool = False
+    output_dir: str, provider_name: str, baseline: bool = False, fast: bool = False
 ) -> str:
     """Return a stable results file path for this provider.
 
@@ -902,8 +924,11 @@ def get_results_path(
     Use --output to start a fresh run in a different directory.
     """
     os.makedirs(output_dir, exist_ok=True)
-    suffix = "_baseline" if baseline else ""
-    return os.path.join(output_dir, f"eval_{provider_name}{suffix}.json")
+    fast_suffix = "_fast" if fast else ""
+    baseline_suffix = "_baseline" if baseline else ""
+    return os.path.join(
+        output_dir, f"eval_{provider_name}{fast_suffix}{baseline_suffix}.json"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -942,7 +967,7 @@ def discover_providers(output_dir: str) -> list[str]:
     if not os.path.isdir(output_dir):
         return []
     for fname in os.listdir(output_dir):
-        m = re.match(r"eval_(.+?)(?:_baseline)?\.json$", fname)
+        m = re.match(r"eval_(.+?)(?:_fast)?(?:_baseline)?\.json$", fname)
         if m:
             providers.add(m.group(1))
     return sorted(providers)
@@ -1268,17 +1293,27 @@ def main():
         default="evals/results",
         help="Output directory for results (default: evals/results)",
     )
+    parser.add_argument(
+        "--fast",
+        action="store_true",
+        help="Use the provider's fast model instead of its default model",
+    )
     args = parser.parse_args()
 
     provider = parse_provider(args.provider) if args.provider else None
     provider_name = provider.value if provider else "gemini"
+    model_type = ModelType.FAST if args.fast else ModelType.DEFAULT
 
     # Handle --compare: print comparison and exit
     if args.compare:
         if args.provider:
             # Single provider: harness vs baseline
-            harness_path = get_results_path(args.output, provider_name, baseline=False)
-            baseline_path = get_results_path(args.output, provider_name, baseline=True)
+            harness_path = get_results_path(
+                args.output, provider_name, baseline=False, fast=args.fast
+            )
+            baseline_path = get_results_path(
+                args.output, provider_name, baseline=True, fast=args.fast
+            )
             print_comparison(harness_path, baseline_path)
         else:
             # No provider specified: compare all available providers
@@ -1294,6 +1329,8 @@ def main():
         effective_limit = 100
 
     mode_label = "BASELINE" if args.baseline else "HARNESS"
+    if args.fast:
+        mode_label += " (fast)"
 
     # Load dataset and manifest
     with open(args.dataset) as f:
@@ -1307,9 +1344,12 @@ def main():
     )
 
     # Load or create results file (stable path per provider for resumability)
-    results_path = get_results_path(args.output, provider_name, baseline=args.baseline)
+    results_path = get_results_path(
+        args.output, provider_name, baseline=args.baseline, fast=args.fast
+    )
     results = load_results(results_path)
     results["llm_provider"] = provider_name
+    results["model_type"] = model_type.value
     results["mode"] = "baseline" if args.baseline else "harness"
     logger.info(
         f"Results file: {results_path} "
@@ -1369,6 +1409,7 @@ def main():
                 max_retries=args.retries,
                 baseline=args.baseline,
                 batch_size=args.batch_size,
+                model_type=model_type,
             )
         )
 
