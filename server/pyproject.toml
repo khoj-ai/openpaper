@@ -33,6 +33,7 @@ dependencies = [
     "gunicorn>=23.0.0",
     "firecrawl-py>=2.7.0",
     "openai>=1.82.0",
+    "anthropic>=0.96.0",
     "posthog>=4.2.0",
     "pillow>=12.1.1",
     "resend>=2.10.0",

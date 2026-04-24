@@ -7,6 +7,7 @@ from typing import Any, Dict, Iterator, List, Optional
 from app.database.models import Message
 from app.database.telemetry import track_event
 from app.llm.provider import (
+    AnthropicProvider,
     BaseLLMProvider,
     FileContent,
     GeminiProvider,
@@ -38,7 +39,9 @@ class BaseLLMClient:
         for provider in LLMProvider:
             self._initialize_provider(provider)
 
-    def get_chat_model_options(self) -> Dict[LLMProvider, str]:
+    def get_chat_model_options(
+        self, exclude: Optional[List[LLMProvider]] = None
+    ) -> Dict[LLMProvider, str]:
         def _get_display_name(model_name: str) -> str:
             """Format model name for display"""
             split_by_dash = model_name.split("-")
@@ -46,12 +49,13 @@ class BaseLLMClient:
                 return "-".join([part.lower() for part in split_by_dash[:2]])
             return model_name.lower()
 
-        """Get available models for each provider"""
+        excluded = set(exclude or [])
         return {
             provider: _get_display_name(
                 self._get_model_for_type(ModelType.DEFAULT, provider)
             )
             for provider in self._providers.keys()
+            if provider not in excluded
         }
 
     def _initialize_provider(self, provider: LLMProvider) -> None:
@@ -80,6 +84,8 @@ class BaseLLMClient:
                     default_model="gpt-oss-120b",
                     fast_model="zai-glm-4.7",
                 )
+            elif provider == LLMProvider.ANTHROPIC:
+                self._providers[provider] = AnthropicProvider()
             else:
                 raise ValueError(f"Unsupported LLM provider: {provider}")
 

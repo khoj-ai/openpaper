@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Union
 
+import anthropic
 import openai
 from app.database.models import Message
 from app.llm.citation_handler import CitationHandler
@@ -50,6 +51,7 @@ class LLMProvider(Enum):
     OPENAI = "openai"
     GROQ = "groq"
     CEREBRAS = "cerebras"
+    ANTHROPIC = "anthropic"
 
 
 class LLMResponse:
@@ -713,3 +715,337 @@ class OpenAIProvider(BaseLLMProvider):
 
     def get_fast_model(self) -> str:
         return self._fast_model
+
+
+class AnthropicProvider(BaseLLMProvider):
+    """Anthropic (Claude) LLM provider implementation.
+
+    Uses the first-party Anthropic Messages API — not the OpenAI-compat endpoint
+    — so we get tool use, PDF input, extended thinking, structured outputs, and
+    prompt caching.
+    """
+
+    # Default max_tokens sized for the SDK HTTP timeout: non-streaming stays
+    # under the 10-minute limit; streaming can go much higher.
+    DEFAULT_MAX_TOKENS_NONSTREAM = 16000
+    DEFAULT_MAX_TOKENS_STREAM = 64000
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        default_model: Optional[str] = None,
+        fast_model: Optional[str] = None,
+    ):
+        self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
+        if not self.api_key:
+            raise ValueError("ANTHROPIC_API_KEY environment variable is required")
+
+        self._client = anthropic.Anthropic(api_key=self.api_key)
+        self._default_model = default_model or "claude-opus-4-7"
+        self._fast_model = fast_model or "claude-haiku-4-5"
+
+    @property
+    def client(self) -> anthropic.Anthropic:
+        return self._client
+
+    def generate_content(
+        self,
+        model: str,
+        contents: Union[str, MessageParam],
+        system_prompt: Optional[str] = None,
+        history: Optional[List[Message]] = None,
+        function_declarations: Optional[List[Dict]] = None,
+        tool_call_results: Optional[List[ToolCallResult]] = None,
+        enable_thinking: bool = False,
+        schema: Optional[Dict] = None,
+        **kwargs,
+    ) -> LLMResponse:
+        params: Dict[str, Any] = {
+            "model": model,
+            "max_tokens": kwargs.pop("max_tokens", self.DEFAULT_MAX_TOKENS_NONSTREAM),
+        }
+
+        # System prompt as a cacheable text block. Marker on the last system
+        # block caches tools + system together.
+        if system_prompt:
+            params["system"] = [
+                {
+                    "type": "text",
+                    "text": system_prompt,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ]
+
+        params["messages"] = self._prepare_anthropic_messages(
+            history=history or [],
+            new_message=contents,
+            tool_call_results=tool_call_results,
+        )
+
+        # Adaptive thinking is the only on-mode for Opus 4.7; "summarized"
+        # makes the thinking text visible (default is "omitted" on 4.7).
+        if enable_thinking:
+            params["thinking"] = {"type": "adaptive", "display": "summarized"}
+
+        if function_declarations:
+            params["tools"] = [
+                self._convert_tool_declaration(fd) for fd in function_declarations
+            ]
+            # Match Gemini's behavior: force at least one tool call when tools
+            # are provided and no structured-output schema. Callers that want
+            # auto selection can override via kwargs.
+            if not schema:
+                params.setdefault("tool_choice", {"type": "any"})
+
+        if schema:
+            params["output_config"] = {
+                "format": {"type": "json_schema", "schema": schema}
+            }
+
+        params.update(kwargs)
+
+        response = self._client.messages.create(**params)
+
+        text_parts: List[str] = []
+        thinking_parts: List[str] = []
+        tool_calls: List[ToolCall] = []
+
+        for block in response.content:
+            btype = getattr(block, "type", None)
+            if btype == "text":
+                text_parts.append(block.text)
+            elif btype == "thinking":
+                thinking_text = getattr(block, "thinking", "") or ""
+                if thinking_text:
+                    thinking_parts.append(thinking_text)
+            elif btype == "tool_use":
+                tool_calls.append(
+                    ToolCall(
+                        id=block.id,
+                        name=block.name,
+                        args=dict(block.input) if block.input else {},
+                    )
+                )
+
+        if not text_parts and not tool_calls:
+            raise ValueError("Empty response from Anthropic API")
+
+        return LLMResponse(
+            text="".join(text_parts),
+            model=model,
+            provider=LLMProvider.ANTHROPIC,
+            thinking="\n".join(thinking_parts) if thinking_parts else None,
+            tool_calls=tool_calls,
+        )
+
+    def send_message_stream(
+        self,
+        model: str,
+        message: MessageParam,
+        history: List[Message],
+        system_prompt: str,
+        file: FileContent | None = None,
+        **kwargs,
+    ) -> Iterator[StreamChunk]:
+        params: Dict[str, Any] = {
+            "model": model,
+            "max_tokens": kwargs.pop("max_tokens", self.DEFAULT_MAX_TOKENS_STREAM),
+        }
+
+        if system_prompt:
+            params["system"] = [
+                {
+                    "type": "text",
+                    "text": system_prompt,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ]
+
+        params["messages"] = self._prepare_anthropic_messages(
+            history=history,
+            new_message=message,
+            file=file,
+        )
+
+        params.update(kwargs)
+
+        with self._client.messages.stream(**params) as stream:
+            for text in stream.text_stream:
+                yield StreamChunk(
+                    text=text,
+                    model=model,
+                    provider=LLMProvider.ANTHROPIC,
+                    is_done=False,
+                )
+            # Surface usage after the stream completes; helpful for verifying
+            # cache hits via cache_read_input_tokens.
+            final = stream.get_final_message()
+            if final.usage:
+                logger.debug(f"Anthropic usage stats: {final.usage}")
+
+    def get_default_model(self) -> str:
+        return self._default_model
+
+    def get_fast_model(self) -> str:
+        return self._fast_model
+
+    def _convert_tool_declaration(self, func_decl: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert the generic tool-declaration shape to Anthropic's.
+
+        The generic shape uses OpenAI/Gemini's `parameters` key for the JSON
+        schema; Anthropic calls it `input_schema`.
+        """
+        return {
+            "name": func_decl["name"],
+            "description": func_decl.get("description", ""),
+            "input_schema": func_decl.get(
+                "parameters", {"type": "object", "properties": {}}
+            ),
+        }
+
+    def _convert_message_content(self, content: MessageParam) -> Any:
+        """Convert generic message content to Anthropic content blocks."""
+        if isinstance(content, str):
+            return content
+
+        if isinstance(content, list):
+            blocks: List[Dict[str, Any]] = []
+            for item in content:
+                if isinstance(item, TextContent):
+                    blocks.append({"type": "text", "text": item.text})
+                elif isinstance(item, FileContent):
+                    blocks.append(self._file_content_to_block(item))
+                elif isinstance(item, SupplementaryContent):
+                    formatted = f"<{item.label}>\n{item.content}\n</{item.label}>"
+                    blocks.append({"type": "text", "text": formatted})
+            return blocks
+
+        return content
+
+    def _file_content_to_block(self, file: FileContent) -> Dict[str, Any]:
+        """Wrap FileContent as an Anthropic document or image content block.
+
+        Paper PDFs dominate the prefix and repeat across turns, so caching
+        them is the highest-leverage win for this app.
+        """
+        base64_data = base64.b64encode(file.data).decode("utf-8")
+        source = {
+            "type": "base64",
+            "media_type": file.mime_type,
+            "data": base64_data,
+        }
+        outer_type = "document" if file.mime_type == "application/pdf" else "image"
+        return {
+            "type": outer_type,
+            "source": source,
+            "cache_control": {"type": "ephemeral"},
+        }
+
+    def _convert_chat_history_to_api_format(
+        self, messages: List[Message]
+    ) -> List[Dict[str, Any]]:
+        """Convert our DB Message rows to Anthropic message dicts."""
+        api_format: List[Dict[str, Any]] = []
+        for message in messages:
+            references = (
+                CitationHandler.format_citations(message.references["citations"])  # type: ignore
+                if message.references
+                else None
+            )
+            content_text = (
+                f"{message.content}\n\n{references}" if references else message.content
+            )
+            api_format.append(
+                {
+                    "role": "user" if message.role == "user" else "assistant",
+                    "content": str(content_text),
+                }
+            )
+        return api_format
+
+    def _prepare_anthropic_messages(
+        self,
+        history: List[Message],
+        new_message: MessageParam,
+        file: FileContent | None = None,
+        tool_call_results: Optional[List[ToolCallResult]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Assemble the messages array.
+
+        Anthropic requires strict user/assistant alternation. To keep the file
+        block stable across turns (for prompt caching), we inject it at the
+        front of the first user message — either the first history message or,
+        if history is empty, the new user message — rather than adding a
+        standalone file message + synthetic assistant ack.
+
+        For tool-call round-trips, the assistant's tool_use turn is reconstructed
+        from `tool_call_results`, followed by a user turn containing the
+        matching tool_result blocks.
+        """
+        messages: List[Dict[str, Any]] = []
+
+        history_msgs = self._convert_chat_history_to_api_format(history)
+
+        file_block = self._file_content_to_block(file) if file else None
+
+        if file_block and history_msgs and history_msgs[0]["role"] == "user":
+            first = history_msgs[0]
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        file_block,
+                        {"type": "text", "text": str(first["content"])},
+                    ],
+                }
+            )
+            messages.extend(history_msgs[1:])
+            file_block = None  # consumed
+        else:
+            messages.extend(history_msgs)
+
+        if tool_call_results:
+            assistant_tool_blocks: List[Dict[str, Any]] = []
+            for result in tool_call_results:
+                assistant_tool_blocks.append(
+                    {
+                        "type": "tool_use",
+                        "id": result.id or "",
+                        "name": result.name,
+                        "input": result.args,
+                    }
+                )
+            messages.append({"role": "assistant", "content": assistant_tool_blocks})
+
+            tool_result_blocks: List[Dict[str, Any]] = []
+            for result in tool_call_results:
+                value = result.result
+                if isinstance(value, (dict, list)):
+                    value = json.dumps(value)
+                elif not isinstance(value, str):
+                    value = str(value)
+                tool_result_blocks.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": result.id or "",
+                        "content": value,
+                    }
+                )
+            messages.append({"role": "user", "content": tool_result_blocks})
+
+        converted = self._convert_message_content(new_message)
+        if file_block is not None:
+            if isinstance(converted, str):
+                new_content: List[Dict[str, Any]] = [
+                    file_block,
+                    {"type": "text", "text": converted},
+                ]
+            elif isinstance(converted, list):
+                new_content = [file_block, *converted]
+            else:
+                new_content = [file_block]
+            messages.append({"role": "user", "content": new_content})
+        else:
+            messages.append({"role": "user", "content": converted})
+
+        return messages
