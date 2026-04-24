@@ -103,12 +103,6 @@ export interface Conversation {
 }
 
 
-export enum ResponseStyle {
-    Normal = 'normal',
-    Concise = 'concise',
-    Detailed = 'detailed',
-}
-
 export interface OpenAlexPaper {
     id: string
     title: string

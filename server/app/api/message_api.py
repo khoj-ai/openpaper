@@ -87,7 +87,8 @@ async def get_available_models() -> dict:
     return {
         "models": operations.get_chat_model_options(
             exclude=[LLMProvider.GROQ, LLMProvider.CEREBRAS]
-        )
+        ),
+        "default": operations.default_provider.value,
     }
 
 

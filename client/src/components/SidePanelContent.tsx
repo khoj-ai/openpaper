@@ -2,7 +2,6 @@ import {
     ChatMessage,
     PaperData,
     PaperHighlight,
-    ResponseStyle,
     PaperHighlightAnnotation,
     CreditUsage,
     Reference,
@@ -12,7 +11,6 @@ import {
     X,
     Loader,
     ArrowUp,
-    Feather,
     Share2Icon,
     LockIcon,
     Sparkle,
@@ -84,7 +82,6 @@ interface ChatRequestBody {
     conversation_id: string | null;
     paper_id: string;
     user_references: string[];
-    style?: ResponseStyle;
     llm_provider?: string;
 }
 
@@ -123,7 +120,6 @@ export function SidePanelContent({
     const [streamingReferences, setStreamingReferences] = useState<Reference | undefined>(undefined);
     const [creditUsage, setCreditUsage] = useState<CreditUsage | null>(null);
     const { subscription, refetch: refetchSubscription } = useSubscription();
-    const [responseStyle, setResponseStyle] = useState<ResponseStyle>(ResponseStyle.Normal);
     const [selectedModel, setSelectedModel] = useState<string>('');
     const [availableModels, setAvailableModels] = useState<Record<string, string>>({});
     const [nextMonday, setNextMonday] = useState(new Date());
@@ -285,6 +281,9 @@ export function SidePanelContent({
                 const response = await fetchFromApi(`/api/message/models`);
                 if (response.models && Object.keys(response.models).length > 0) {
                     setAvailableModels(response.models);
+                    if (response.default && response.models[response.default]) {
+                        setSelectedModel((current) => current || response.default);
+                    }
                 }
             } catch (error) {
                 console.error('Error fetching available models:', error);
@@ -462,10 +461,6 @@ export function SidePanelContent({
             requestBody.llm_provider = selectedModel;
         }
 
-        if (responseStyle) {
-            requestBody.style = responseStyle;
-        }
-
         try {
             const stream = await fetchStreamFromApi('/api/message/chat/paper', {
                 method: 'POST',
@@ -583,7 +578,7 @@ export function SidePanelContent({
         } finally {
             setIsStreaming(false);
         }
-    }, [currentMessage, isStreaming, conversationId, id, userMessageReferences, selectedModel, responseStyle, transformReferencesToFormat, refetchSubscription]);
+    }, [currentMessage, isStreaming, conversationId, id, userMessageReferences, selectedModel, transformReferencesToFormat, refetchSubscription]);
 
 
     const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -1113,23 +1108,54 @@ export function SidePanelContent({
                                                         <DropdownMenuTrigger asChild>
                                                             <Button
                                                                 variant="ghost"
-                                                                className="w-fit text-sm"
-                                                                title='Settings - Configure model and response style'
+                                                                className="w-fit text-sm gap-1.5"
+                                                                title='Settings - Configure chat model'
                                                                 disabled={isStreaming}
                                                             >
                                                                 <Route
                                                                     className="h-4 w-4 text-secondary-foreground"
                                                                 />
+                                                                {selectedModel && availableModels[selectedModel] && (
+                                                                    <span className="text-xs text-secondary-foreground truncate max-w-[10rem]">
+                                                                        {availableModels[selectedModel]}
+                                                                    </span>
+                                                                )}
                                                             </Button>
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent className="w-56">
                                                             <DropdownMenuSub>
                                                                 <DropdownMenuSubTrigger className="flex items-center">
                                                                     <Sparkle className="mr-2 h-4 w-4" />
-                                                                    <span>Model {selectedModel ? `(${availableModels[selectedModel]})` : ''}</span>
+                                                                    <span className="flex-1">Model {selectedModel ? `(${availableModels[selectedModel]})` : ''}</span>
+                                                                    {subscription && subscription.plan !== 'researcher' && (
+                                                                        <LockIcon className="ml-2 h-3 w-3 text-muted-foreground" />
+                                                                    )}
                                                                 </DropdownMenuSubTrigger>
                                                                 <DropdownMenuSubContent>
-                                                                    {
+                                                                    {subscription && subscription.plan !== 'researcher' ? (
+                                                                        <>
+                                                                            {Object.entries(availableModels).map(([modelKey, modelName]) => (
+                                                                                <DropdownMenuItem
+                                                                                    key={modelKey}
+                                                                                    onClick={() => {
+                                                                                        window.location.href = '/pricing';
+                                                                                    }}
+                                                                                    className="flex items-center justify-between text-muted-foreground"
+                                                                                >
+                                                                                    <span>{modelName}</span>
+                                                                                    <LockIcon className="h-3 w-3" />
+                                                                                </DropdownMenuItem>
+                                                                            ))}
+                                                                            <DropdownMenuItem
+                                                                                onClick={() => {
+                                                                                    window.location.href = '/pricing';
+                                                                                }}
+                                                                                className="flex items-center justify-center mt-1 bg-blue-500 text-white focus:bg-blue-400 focus:text-white font-medium"
+                                                                            >
+                                                                                Upgrade to select models
+                                                                            </DropdownMenuItem>
+                                                                        </>
+                                                                    ) : (
                                                                         Object.entries(availableModels).map(([modelKey, modelName]) => (
                                                                             <DropdownMenuItem
                                                                                 key={modelKey}
@@ -1144,30 +1170,8 @@ export function SidePanelContent({
                                                                                     <Check className="h-4 w-4 text-green-500" />
                                                                                 )}
                                                                             </DropdownMenuItem>
-                                                                        ))}
-                                                                </DropdownMenuSubContent>
-                                                            </DropdownMenuSub>
-                                                            <DropdownMenuSub>
-                                                                <DropdownMenuSubTrigger className="flex items-center">
-                                                                    <Feather className="mr-2 h-4 w-4" />
-                                                                    <span>Response Style {responseStyle ? `(${responseStyle})` : ''}</span>
-                                                                </DropdownMenuSubTrigger>
-                                                                <DropdownMenuSubContent>
-                                                                    {Object.values(ResponseStyle).map((style) => (
-                                                                        <DropdownMenuItem
-                                                                            key={style}
-                                                                            onClick={() => {
-                                                                                setResponseStyle(style);
-                                                                                setRightSideFunction('Chat');
-                                                                            }}
-                                                                            className="flex items-center justify-between"
-                                                                        >
-                                                                            <span>{style}</span>
-                                                                            {style === responseStyle && (
-                                                                                <Check className="h-4 w-4 text-green-500" />
-                                                                            )}
-                                                                        </DropdownMenuItem>
-                                                                    ))}
+                                                                        ))
+                                                                    )}
                                                                 </DropdownMenuSubContent>
                                                             </DropdownMenuSub>
                                                         </DropdownMenuContent>
