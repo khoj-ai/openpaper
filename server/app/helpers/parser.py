@@ -143,11 +143,21 @@ async def validate_url_and_fetch_pdf(url: str) -> tuple[bool, bytes, str]:
             if size_mb < 0.001:  # Less than 1KB
                 return False, b"", "File too small to be a valid PDF"
 
-        # Now download the actual content
-        response = requests.get(str(url), timeout=30)
+        # Stream the download with a running size cap so we bail out early
+        # on servers that don't return a content-length header.
+        max_bytes = MAX_UPLOAD_SIZE_MB * 1024 * 1024
+        response = requests.get(str(url), timeout=30, stream=True)
         response.raise_for_status()
 
-        pdf_bytes = response.content
+        chunks: list[bytes] = []
+        total = 0
+        for chunk in response.iter_content(chunk_size=65536):
+            total += len(chunk)
+            if total > max_bytes:
+                response.close()
+                return False, b"", f"File too large (max {MAX_UPLOAD_SIZE_MB}MB)"
+            chunks.append(chunk)
+        pdf_bytes = b"".join(chunks)
 
         # Validate the downloaded content
         is_valid, error_msg = await validate_pdf_content(pdf_bytes, "URL")
