@@ -13,6 +13,7 @@ Usage:
 
 import argparse
 import asyncio
+import csv
 import difflib
 import json
 import logging
@@ -491,6 +492,10 @@ async def _run_single_row(
                 "question": row["question"],
                 "expected_answer": row["expected_answer"],
                 "expected_references": row["expected_references"],
+                "expected_refusal": row.get("expected_refusal"),
+                "required_sections": row.get("required_sections"),
+                "reasoning_chain": row.get("reasoning_chain"),
+                "false_premise": row.get("false_premise"),
                 "judge_rubric": row.get("judge_rubric"),
                 "actual_answer": result["answer_text"],
                 "actual_citations": result["citations"],
@@ -518,6 +523,10 @@ async def _run_single_row(
         "question": row["question"],
         "expected_answer": row["expected_answer"],
         "expected_references": row["expected_references"],
+        "expected_refusal": row.get("expected_refusal"),
+        "required_sections": row.get("required_sections"),
+        "reasoning_chain": row.get("reasoning_chain"),
+        "false_premise": row.get("false_premise"),
         "judge_rubric": row.get("judge_rubric"),
         "actual_answer": "",
         "actual_citations": [],
@@ -630,16 +639,22 @@ def fuzzy_match(text_a: str, text_b: str) -> float:
 def compute_citation_metrics(
     result: dict, paper_raw_content: Optional[str] = None
 ) -> dict:
-    """Compute citation precision, recall, and accuracy for a single result."""
+    """Compute citation precision, recall, accuracy, and (for adversarial) refusal_correctness."""
     actual_refs = [c.get("reference", "") for c in result.get("actual_citations", [])]
     expected_refs = result.get("expected_references", [])
+    is_adversarial = result.get("question_type") == "adversarial" and result.get(
+        "expected_refusal", True
+    )
 
     if not expected_refs and not actual_refs:
-        return {
+        metrics = {
             "citation_precision": 1.0,
             "citation_recall": 1.0,
             "citation_accuracy": 1.0,
         }
+        if is_adversarial:
+            metrics["refusal_correctness"] = 1.0
+        return metrics
 
     # Citation recall: fraction of expected refs matched by at least one actual citation
     matched_expected = 0
@@ -678,11 +693,32 @@ def compute_citation_metrics(
                 found += 1
         accuracy = found / len(actual_refs)
 
-    return {
+    metrics = {
         "citation_precision": round(precision, 3),
         "citation_recall": round(recall, 3),
         "citation_accuracy": round(accuracy, 3),
     }
+
+    # Refusal correctness (adversarial only): the model should NOT cite anything
+    # outside the optional refutation set. No citations at all = perfect refusal.
+    # Citing only from expected_refs = also correct (legitimately refuting).
+    # Any citation that doesn't match expected_refs = fabrication.
+    if is_adversarial:
+        if not actual_refs:
+            metrics["refusal_correctness"] = 1.0
+        elif not expected_refs:
+            metrics["refusal_correctness"] = 0.0
+        else:
+            all_match = all(
+                any(
+                    fuzzy_match(act, exp) >= SIMILARITY_THRESHOLD
+                    for exp in expected_refs
+                )
+                for act in actual_refs
+            )
+            metrics["refusal_correctness"] = 1.0 if all_match else 0.0
+
+    return metrics
 
 
 # ---------------------------------------------------------------------------
@@ -707,6 +743,19 @@ Scoring guide:
 - completeness (1-5): Does the answer cover all key points from the expected answer? 5 = fully complete, 1 = missing most points
 - groundedness (1-5): Is the answer grounded in paper content (not hallucinated)? 5 = fully grounded, 1 = mostly hallucinated
 
+Question-type-specific guidance:
+- For 'adversarial' questions: the question contains a FALSE PREMISE or asks about \
+something the paper does not address. The CORRECT response is to identify the false \
+premise and refuse to fabricate. Score factual_accuracy = 5 if the model correctly \
+flags the false premise; score 1 if the model confidently fabricates an answer. \
+A confident, fluent answer to an unanswerable question is the WORST possible outcome — \
+it must be scored 1 on factual_accuracy and 1 on groundedness regardless of how \
+plausible the answer sounds.
+- For 'multi_hop' questions: the answer requires synthesizing facts from MULTIPLE \
+distinct sections of the paper. Score completeness = 5 ONLY when the model \
+demonstrably integrates information from each required section listed in the prompt. \
+Score completeness <= 2 if the model addresses only one section when multiple were required.
+
 Return ONLY the JSON object, no other text."""
 
 
@@ -715,9 +764,29 @@ def build_judge_prompt(result: dict) -> str:
     parts = [
         f"**Question:** {result['question']}",
         f"\n**Question Type:** {result['question_type']}",
-        f"\n**Expected Answer:** {result['expected_answer']}",
-        f"\n**Actual Answer:** {result['actual_answer']}",
     ]
+
+    if result.get("false_premise"):
+        parts.append(
+            f"\n**False Premise (what's wrong with the question):** "
+            f"{result['false_premise']}"
+        )
+        parts.append(
+            "\n**Expected Behavior:** The model should identify the false premise "
+            "and refuse to fabricate. A confident answer here is a failure."
+        )
+
+    if result.get("required_sections"):
+        sections = ", ".join(result["required_sections"])
+        parts.append(
+            f"\n**Required Sections (answer must synthesize from all):** {sections}"
+        )
+
+    if result.get("reasoning_chain"):
+        parts.append(f"\n**Expected Reasoning Chain:** {result['reasoning_chain']}")
+
+    parts.append(f"\n**Expected Answer:** {result['expected_answer']}")
+    parts.append(f"\n**Actual Answer:** {result['actual_answer']}")
 
     if result.get("judge_rubric"):
         parts.append(f"\n**Rubric:** {result['judge_rubric']}")
@@ -825,6 +894,20 @@ def grade_results(
 # ---------------------------------------------------------------------------
 
 
+def _fmt_cell(d: dict, key: str, width: int = 10) -> str:
+    """Format a metric value for table display. Renders '—' when absent."""
+    v = d.get(key)
+    if v is None:
+        return f"{'—':>{width}}"
+    return f"{v:>{width}.3f}"
+
+
+def _csv_cell(d: dict, key: str):
+    """Return a metric value or empty string for CSV output when absent."""
+    v = d.get(key)
+    return v if v is not None else ""
+
+
 def compute_summary(graded_results: list[dict]) -> dict:
     """Compute aggregate metrics from graded results."""
     if not graded_results:
@@ -843,6 +926,11 @@ def compute_summary(graded_results: list[dict]) -> dict:
         vals = [r[key] for r in items if key in r and r[key] is not None and r[key] > 0]
         return round(sum(vals) / len(vals), 3) if vals else 0.0
 
+    def avg_binary(items: list[dict], key: str) -> Optional[float]:
+        """Average that includes zeros — for binary 0/1 metrics where 0 is a real failure signal."""
+        vals = [r[key] for r in items if key in r and r[key] is not None]
+        return round(sum(vals) / len(vals), 3) if vals else None
+
     metric_keys = [
         "citation_precision",
         "citation_recall",
@@ -857,17 +945,33 @@ def compute_summary(graded_results: list[dict]) -> dict:
     overall["errors"] = sum(1 for r in graded_results if r.get("error"))
     overall["avg_latency_seconds"] = avg(graded_results, "latency_seconds")
 
+    # refusal_correctness: only meaningful for adversarial rows; binary metric
+    adv_rows = by_type.get("adversarial", [])
+    if adv_rows:
+        rc = avg_binary(adv_rows, "refusal_correctness")
+        if rc is not None:
+            overall["refusal_correctness"] = rc
+
     per_type = {}
     for qt, items in by_type.items():
         per_type[qt] = {key: avg(items, key) for key in metric_keys}
         per_type[qt]["count"] = len(items)
         per_type[qt]["avg_latency_seconds"] = avg(items, "latency_seconds")
+        if qt == "adversarial":
+            rc = avg_binary(items, "refusal_correctness")
+            if rc is not None:
+                per_type[qt]["refusal_correctness"] = rc
 
     per_domain = {}
     for domain, items in by_domain.items():
         per_domain[domain] = {key: avg(items, key) for key in metric_keys}
         per_domain[domain]["count"] = len(items)
         per_domain[domain]["avg_latency_seconds"] = avg(items, "latency_seconds")
+        adv_in_domain = [r for r in items if r.get("question_type") == "adversarial"]
+        if adv_in_domain:
+            rc = avg_binary(adv_in_domain, "refusal_correctness")
+            if rc is not None:
+                per_domain[domain]["refusal_correctness"] = rc
 
     return {
         "overall": overall,
@@ -899,17 +1003,16 @@ def print_summary(summary: dict):
         ("Citation precision", "citation_precision"),
         ("Citation recall", "citation_recall"),
         ("Citation accuracy", "citation_accuracy"),
+        ("Refusal correctness", "refusal_correctness"),
         ("Factual accuracy", "factual_accuracy"),
         ("Completeness", "completeness"),
         ("Groundedness", "groundedness"),
     ]
 
     for label, key in metrics:
-        val = overall.get(key, 0)
-        line = f"{label:<25} {val:>10.3f}"
+        line = f"{label:<25}{_fmt_cell(overall, key, 10)}"
         for qt in sorted(by_type.keys()):
-            qt_val = by_type[qt].get(key, 0)
-            line += f" {qt_val:>15.3f}"
+            line += f" {_fmt_cell(by_type[qt], key, 15)}"
         logger.info(line)
 
     logger.info("=" * 60)
@@ -973,7 +1076,133 @@ def discover_providers(output_dir: str) -> list[str]:
     return sorted(providers)
 
 
-def print_comparison(harness_path: str, baseline_path: str):
+COMPARE_METRICS = [
+    ("Factual accuracy", "factual_accuracy"),
+    ("Completeness", "completeness"),
+    ("Groundedness", "groundedness"),
+    ("Avg latency (s)", "avg_latency_seconds"),
+]
+
+CITATION_METRICS = [
+    ("Citation precision", "citation_precision"),
+    ("Citation recall", "citation_recall"),
+    ("Citation accuracy", "citation_accuracy"),
+    ("Refusal correctness", "refusal_correctness"),
+]
+
+
+def write_comparison_csv(
+    csv_path: str,
+    harness: dict,
+    baseline: dict,
+):
+    """Write a single-provider harness vs baseline comparison to CSV.
+
+    Long-format rows: scope, domain, metric, harness, baseline, delta.
+    Citation metrics (harness only) leave baseline/delta blank.
+    """
+    h_overall = harness.get("summary", {}).get("overall", {})
+    b_overall = baseline.get("summary", {}).get("overall", {})
+    h_by_domain = harness.get("summary", {}).get("by_domain", {})
+    b_by_domain = baseline.get("summary", {}).get("by_domain", {})
+
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["scope", "domain", "metric", "harness", "baseline", "delta"])
+
+        for label, key in COMPARE_METRICS:
+            h_val = h_overall.get(key, 0)
+            b_val = b_overall.get(key, 0)
+            writer.writerow(
+                ["overall", "", label, h_val, b_val, round(h_val - b_val, 3)]
+            )
+
+        for label, key in CITATION_METRICS:
+            writer.writerow(["overall", "", label, _csv_cell(h_overall, key), "", ""])
+
+        all_domains = sorted(set(list(h_by_domain.keys()) + list(b_by_domain.keys())))
+        for domain in all_domains:
+            h_d = h_by_domain.get(domain, {})
+            b_d = b_by_domain.get(domain, {})
+            for label, key in COMPARE_METRICS:
+                h_val = h_d.get(key, 0)
+                b_val = b_d.get(key, 0)
+                writer.writerow(
+                    ["domain", domain, label, h_val, b_val, round(h_val - b_val, 3)]
+                )
+            for label, key in CITATION_METRICS:
+                writer.writerow(["domain", domain, label, _csv_cell(h_d, key), "", ""])
+
+
+def write_all_providers_csv(csv_path: str, all_results: dict):
+    """Write a wide-format cross-provider CSV.
+
+    Columns: scope, domain, metric, then one column per (provider, mode).
+    Citation rows leave non-harness columns blank.
+    """
+    columns: list[tuple[str, str, str]] = []
+    for provider_name in sorted(all_results.keys()):
+        entry = all_results[provider_name]
+        if "harness" in entry:
+            columns.append((provider_name, provider_name, "harness"))
+        if "baseline" in entry:
+            columns.append((f"{provider_name}_base", provider_name, "baseline"))
+
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["scope", "domain", "metric"] + [c[0] for c in columns])
+
+        for label, key in COMPARE_METRICS:
+            row = ["overall", "", label]
+            for _, provider_name, mode in columns:
+                row.append(all_results[provider_name].get(mode, {}).get(key, 0))
+            writer.writerow(row)
+
+        for label, key in CITATION_METRICS:
+            row = ["overall", "", label]
+            for _, provider_name, mode in columns:
+                if mode == "harness":
+                    row.append(
+                        _csv_cell(all_results[provider_name].get("harness", {}), key)
+                    )
+                else:
+                    row.append("")
+            writer.writerow(row)
+
+        all_domains = set()
+        for entry in all_results.values():
+            for mode in ("harness", "baseline"):
+                all_domains.update(entry.get(f"{mode}_by_domain", {}).keys())
+
+        for domain in sorted(all_domains):
+            for label, key in COMPARE_METRICS:
+                row = ["domain", domain, label]
+                for _, provider_name, mode in columns:
+                    domain_data = (
+                        all_results[provider_name]
+                        .get(f"{mode}_by_domain", {})
+                        .get(domain, {})
+                    )
+                    row.append(domain_data.get(key, 0))
+                writer.writerow(row)
+            for label, key in CITATION_METRICS:
+                row = ["domain", domain, label]
+                for _, provider_name, mode in columns:
+                    if mode == "harness":
+                        domain_data = (
+                            all_results[provider_name]
+                            .get("harness_by_domain", {})
+                            .get(domain, {})
+                        )
+                        row.append(_csv_cell(domain_data, key))
+                    else:
+                        row.append("")
+                writer.writerow(row)
+
+
+def print_comparison(
+    harness_path: str, baseline_path: str, csv_path: Optional[str] = None
+):
     """Load harness and baseline results and print a side-by-side comparison for one provider."""
     if not os.path.exists(harness_path):
         logger.error(f"Harness results not found: {harness_path}")
@@ -1034,17 +1263,10 @@ def print_comparison(harness_path: str, baseline_path: str):
     _print_metric_rows(h_summary, b_summary, metrics)
 
     # Citation metrics only apply to harness
-    citation_metrics = [
-        ("Citation precision", "citation_precision"),
-        ("Citation recall", "citation_recall"),
-        ("Citation accuracy", "citation_accuracy"),
-    ]
-
     logger.info("")
     logger.info("Citation metrics (harness only):")
-    for label, key in citation_metrics:
-        h_val = h_summary.get(key, 0)
-        logger.info(f"  {label:<23} {h_val:>10.3f}")
+    for label, key in CITATION_METRICS:
+        logger.info(f"  {label:<23}{_fmt_cell(h_summary, key, 10)}")
 
     # Per-domain breakdown
     h_by_domain = harness.get("summary", {}).get("by_domain", {})
@@ -1069,9 +1291,15 @@ def print_comparison(harness_path: str, baseline_path: str):
 
     logger.info("=" * 70)
 
+    if csv_path:
+        write_comparison_csv(csv_path, harness, baseline)
+        logger.info(f"Wrote comparison CSV: {csv_path}")
+
 
 def print_all_providers_comparison(
-    output_dir: str, dataset_path: str = "evals/eval_dataset.json"
+    output_dir: str,
+    dataset_path: str = "evals/eval_dataset.json",
+    csv_path: Optional[str] = None,
 ):
     """Discover all providers in the results directory and print a cross-provider comparison."""
     providers = discover_providers(output_dir)
@@ -1129,12 +1357,6 @@ def print_all_providers_comparison(
         ("Avg latency (s)", "avg_latency_seconds"),
     ]
 
-    citation_metrics = [
-        ("Citation precision", "citation_precision"),
-        ("Citation recall", "citation_recall"),
-        ("Citation accuracy", "citation_accuracy"),
-    ]
-
     # Header
     logger.info("\n" + "=" * (25 + col_width * len(columns)))
     logger.info("CROSS-PROVIDER COMPARISON")
@@ -1167,13 +1389,13 @@ def print_all_providers_comparison(
     logger.info(header)
     logger.info("-" * (25 + col_width * len([c for c in columns if c[2] == "harness"])))
 
-    for label, key in citation_metrics:
+    for label, key in CITATION_METRICS:
         line = f"{label:<25}"
         for col_label, provider_name, mode in columns:
             if mode != "harness":
                 continue
-            val = all_results[provider_name].get("harness", {}).get(key, 0)
-            line += f"{val:>{col_width}.3f}"
+            harness_data = all_results[provider_name].get("harness", {})
+            line += _fmt_cell(harness_data, key, col_width)
         logger.info(line)
 
     # Per-domain breakdown
@@ -1209,6 +1431,10 @@ def print_all_providers_comparison(
                 logger.info(line)
 
     logger.info("=" * (25 + col_width * len(columns)))
+
+    if csv_path:
+        write_all_providers_csv(csv_path, all_results)
+        logger.info(f"Wrote comparison CSV: {csv_path}")
 
 
 def parse_provider(name: str) -> Optional[LLMProvider]:
@@ -1306,6 +1532,7 @@ def main():
 
     # Handle --compare: print comparison and exit
     if args.compare:
+        os.makedirs(args.output, exist_ok=True)
         if args.provider:
             # Single provider: harness vs baseline
             harness_path = get_results_path(
@@ -1314,10 +1541,17 @@ def main():
             baseline_path = get_results_path(
                 args.output, provider_name, baseline=True, fast=args.fast
             )
-            print_comparison(harness_path, baseline_path)
+            fast_suffix = "_fast" if args.fast else ""
+            csv_path = os.path.join(
+                args.output, f"comparison_{provider_name}{fast_suffix}.csv"
+            )
+            print_comparison(harness_path, baseline_path, csv_path=csv_path)
         else:
             # No provider specified: compare all available providers
-            print_all_providers_comparison(args.output, dataset_path=args.dataset)
+            csv_path = os.path.join(args.output, "comparison_all.csv")
+            print_all_providers_comparison(
+                args.output, dataset_path=args.dataset, csv_path=csv_path
+            )
         return
 
     # Resolve sample size: --full means no limit, --limit N overrides, default is 100
