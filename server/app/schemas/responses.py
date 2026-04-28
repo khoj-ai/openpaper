@@ -189,7 +189,7 @@ class FileContent(BaseModel):
     filename: Optional[str] = None
     type: Literal["file"] = "file"
     # Plain-text equivalent of the file, used by providers that don't accept
-    # native file blocks (e.g. Cerebras, Groq via OpenAI-compat). When set, the
+    # native file blocks (e.g. Cerebras via OpenAI-compat). When set, the
     # provider substitutes this text in place of doing runtime extraction.
     text_fallback: Optional[str] = None
 

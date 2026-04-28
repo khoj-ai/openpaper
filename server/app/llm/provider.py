@@ -49,7 +49,6 @@ logger = logging.getLogger(__name__)
 class LLMProvider(Enum):
     GEMINI = "gemini"
     OPENAI = "openai"
-    GROQ = "groq"
     CEREBRAS = "cerebras"
     ANTHROPIC = "anthropic"
 
@@ -448,8 +447,8 @@ class OpenAIProvider(BaseLLMProvider):
         self._client = openai.OpenAI(api_key=self.api_key, base_url=base_url)
         self._default_model = default_model or "gpt-5.4"
         self._fast_model = fast_model or "gpt-4.1"
-        # Some OpenAI-compatible endpoints (Cerebras, Groq) reject `file` content
-        # blocks. When False, FileContent for PDFs is text-extracted inline.
+        # Some OpenAI-compatible endpoints (e.g. Cerebras) reject `file` content
+        # blocks. When False, FileContent for PDFs uses text_fallback inline.
         self.supports_pdf_input = supports_pdf_input
 
     @property
@@ -593,8 +592,8 @@ class OpenAIProvider(BaseLLMProvider):
                                 }
                             )
                         else:
-                            # Text-only OpenAI-compatible provider (e.g. Cerebras,
-                            # Groq). The caller must supply a pre-extracted text
+                            # Text-only OpenAI-compatible provider (e.g. Cerebras).
+                            # The caller must supply a pre-extracted text
                             # alternative on FileContent.text_fallback.
                             if item.text_fallback is None:
                                 raise ValueError(

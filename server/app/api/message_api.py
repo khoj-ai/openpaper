@@ -85,9 +85,7 @@ async def _stream_chat_chunks(
 @message_router.get("/models")
 async def get_available_models() -> dict:
     return {
-        "models": operations.get_chat_model_options(
-            exclude=[LLMProvider.GROQ, LLMProvider.CEREBRAS]
-        ),
+        "models": operations.get_chat_model_options(exclude=[LLMProvider.CEREBRAS]),
         "default": operations.default_provider.value,
     }
 
