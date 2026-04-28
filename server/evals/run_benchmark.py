@@ -1062,18 +1062,27 @@ def backfill_domains(rows: list[dict], dataset_path: str) -> list[dict]:
     return rows
 
 
-def discover_providers(output_dir: str) -> list[str]:
-    """Scan the results directory and return provider names that have result files."""
+def discover_provider_variants(output_dir: str) -> list[tuple[str, bool]]:
+    """Scan the results directory and return (provider_name, fast) pairs.
+
+    Each variant maps to its own column in the cross-provider comparison;
+    `eval_gemini.json` and `eval_gemini_fast.json` are distinct.
+    """
     import re
 
-    providers = set()
+    seen: set[tuple[str, bool]] = set()
     if not os.path.isdir(output_dir):
         return []
     for fname in os.listdir(output_dir):
-        m = re.match(r"eval_(.+?)(?:_fast)?(?:_baseline)?\.json$", fname)
+        m = re.match(r"eval_(.+?)(_fast)?(_baseline)?\.json$", fname)
         if m:
-            providers.add(m.group(1))
-    return sorted(providers)
+            seen.add((m.group(1), bool(m.group(2))))
+    return sorted(seen)
+
+
+def variant_label(provider_name: str, fast: bool) -> str:
+    """Column label for a provider variant (e.g. 'gemini' or 'gemini_fast')."""
+    return f"{provider_name}_fast" if fast else provider_name
 
 
 COMPARE_METRICS = [
@@ -1301,20 +1310,26 @@ def print_all_providers_comparison(
     dataset_path: str = "evals/eval_dataset.json",
     csv_path: Optional[str] = None,
 ):
-    """Discover all providers in the results directory and print a cross-provider comparison."""
-    providers = discover_providers(output_dir)
-    if not providers:
+    """Discover all provider variants in the results directory and print a cross-provider comparison.
+
+    A variant is a (provider, fast) pair. Default and fast result files are
+    treated as separate columns (e.g. `gemini` and `gemini_fast`).
+    """
+    variants = discover_provider_variants(output_dir)
+    if not variants:
         logger.error(f"No result files found in {output_dir}")
         return
 
     # Load all available results, recomputing summaries from row data
-    # to ensure consistent metrics even for older result files
-    all_results = {}  # provider -> {"harness": summary, "baseline": summary}
-    for provider_name in providers:
+    # to ensure consistent metrics even for older result files.
+    # Keyed by variant label ("gemini", "gemini_fast", etc.).
+    all_results: dict[str, dict] = {}
+    for provider_name, fast in variants:
+        label = variant_label(provider_name, fast)
         entry = {}
         for mode in ("harness", "baseline"):
             path = get_results_path(
-                output_dir, provider_name, baseline=(mode == "baseline")
+                output_dir, provider_name, baseline=(mode == "baseline"), fast=fast
             )
             if os.path.exists(path):
                 with open(path) as f:
@@ -1332,20 +1347,20 @@ def print_all_providers_comparison(
                     )
                     entry[f"{mode}_by_domain"] = summary.get("by_domain", {})
         if entry:
-            all_results[provider_name] = entry
+            all_results[label] = entry
 
     if not all_results:
         logger.error("No results with summary data found. Run grading first.")
         return
 
-    # Build column list: each provider can have harness and/or baseline
-    columns = []  # list of (label, provider_name, mode)
-    for provider_name in sorted(all_results.keys()):
-        entry = all_results[provider_name]
+    # Build column list: each variant can have harness and/or baseline
+    columns = []  # list of (column_label, variant_label, mode)
+    for label in sorted(all_results.keys()):
+        entry = all_results[label]
         if "harness" in entry:
-            columns.append((f"{provider_name}", provider_name, "harness"))
+            columns.append((label, label, "harness"))
         if "baseline" in entry:
-            columns.append((f"{provider_name}_base", provider_name, "baseline"))
+            columns.append((f"{label}_base", label, "baseline"))
 
     col_width = max(len(c[0]) for c in columns) + 2
     col_width = max(col_width, 12)
