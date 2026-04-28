@@ -226,6 +226,10 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		left: number;
 		scrollContainer: Element;
 		annotationId?: string;
+		// True when the highlight was created as part of opening this card
+		// (text-select → annotate). On cancel, that highlight should be removed.
+		// False/undefined when the card was opened on a pre-existing highlight.
+		transientHighlight?: boolean;
 	}
 	const [annotationCards, setAnnotationCards] = useState<AnnotationCardEntry[]>([]);
 	const [cardHeights, setCardHeights] = useState<Map<string, number>>(new Map());
@@ -876,7 +880,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			} else {
 				setAnnotationCards(prev => {
 					const exists = prev.find(c => c.highlightId === hid);
-					return exists ? prev : [...prev, { highlightId: hid, ...pendingAnnotationPos }];
+					return exists ? prev : [...prev, { highlightId: hid, ...pendingAnnotationPos, transientHighlight: true }];
 				});
 				// Margin cards hidden: portal list is peek-filtered — show the new compose card
 				if (!showAnnotationCards) {
@@ -1847,21 +1851,23 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 						if (peekAnnotationCardHighlightId === card.highlightId) {
 							setPeekAnnotationCardHighlightId(null);
 						}
-						// Only remove unsaved cards — saved annotation threads persist until all comments are deleted
-						if (!card.annotationId) {
-							const hasAnn = annotations.some((a) => a.highlight_id === card.highlightId);
-							if (!hasAnn) {
-								const h = highlights.find((x) => x.id === card.highlightId);
-								if (h) {
-									removeHighlight(h);
-									if (activeHighlight?.id === card.highlightId) {
-										setActiveHighlight(null);
-									}
+						// Saved annotation threads persist until all comments are deleted.
+						if (card.annotationId) return;
+						const hasAnn = annotations.some((a) => a.highlight_id === card.highlightId);
+						// Only remove the underlying highlight if it was created as part of this
+						// compose flow (text-select → annotate) and the user never saved a note.
+						// Pre-existing highlights opened via the inline 'annotate' button must persist.
+						if (card.transientHighlight && !hasAnn) {
+							const h = highlights.find((x) => x.id === card.highlightId);
+							if (h) {
+								removeHighlight(h);
+								if (activeHighlight?.id === card.highlightId) {
+									setActiveHighlight(null);
 								}
 							}
-							setAnnotationCards(prev => prev.filter(c => c.highlightId !== card.highlightId));
-							setCardHeights(prev => { const next = new Map(prev); next.delete(card.highlightId); return next; });
 						}
+						setAnnotationCards(prev => prev.filter(c => c.highlightId !== card.highlightId));
+						setCardHeights(prev => { const next = new Map(prev); next.delete(card.highlightId); return next; });
 					}}
 					onCardFocus={() => {
 						const h = highlights.find(x => x.id === card.highlightId);
