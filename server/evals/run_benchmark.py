@@ -417,6 +417,7 @@ def run_single_question_baseline(
             data=pdf_bytes,
             mime_type="application/pdf",
             filename=f"{paper.title or 'paper'}.pdf",
+            text_fallback=str(paper.raw_content) if paper.raw_content else None,
         ),
         TextContent(text=question),
     ]
