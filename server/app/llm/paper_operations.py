@@ -88,6 +88,7 @@ class PaperOperations(BaseLLMClient):
                 data=pdf_bytes,
                 mime_type="application/pdf",
                 filename=f"{paper.title or 'paper'}.pdf",
+                text_fallback=str(paper.raw_content) if paper.raw_content else None,
             ),
             TextContent(text=formatted_prompt),
         ]
@@ -193,6 +194,7 @@ class PaperOperations(BaseLLMClient):
                 data=pdf_bytes,
                 mime_type="application/pdf",
                 filename=f"{paper.title or 'paper'}.pdf",
+                text_fallback=str(paper.raw_content) if paper.raw_content else None,
             ),
             system_prompt=formatted_system_prompt,
             history=conversation_history,

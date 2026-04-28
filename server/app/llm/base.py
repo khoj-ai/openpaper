@@ -76,6 +76,7 @@ class BaseLLMClient:
                     base_url=custom_base_url,
                     default_model="openai/gpt-oss-120b",
                     fast_model="moonshotai/kimi-k2-instruct-0905",
+                    supports_pdf_input=False,
                 )
             elif provider == LLMProvider.CEREBRAS:
                 self._providers[provider] = OpenAIProvider(
@@ -83,6 +84,7 @@ class BaseLLMClient:
                     base_url=os.getenv("CEREBRAS_BASE_URL"),
                     default_model="gpt-oss-120b",
                     fast_model="zai-glm-4.7",
+                    supports_pdf_input=False,
                 )
             elif provider == LLMProvider.ANTHROPIC:
                 self._providers[provider] = AnthropicProvider()

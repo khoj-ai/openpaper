@@ -434,6 +434,7 @@ class OpenAIProvider(BaseLLMProvider):
         base_url: Optional[str] = None,
         default_model: Optional[str] = None,
         fast_model: Optional[str] = None,
+        supports_pdf_input: bool = True,
     ):
 
         # Allow explicit api_key/base_url overrides while keeping env-based defaults.
@@ -447,6 +448,9 @@ class OpenAIProvider(BaseLLMProvider):
         self._client = openai.OpenAI(api_key=self.api_key, base_url=base_url)
         self._default_model = default_model or "gpt-5.4"
         self._fast_model = fast_model or "gpt-4.1"
+        # Some OpenAI-compatible endpoints (Cerebras, Groq) reject `file` content
+        # blocks. When False, FileContent for PDFs is text-extracted inline.
+        self.supports_pdf_input = supports_pdf_input
 
     @property
     def client(self) -> openai.OpenAI:
@@ -575,18 +579,37 @@ class OpenAIProvider(BaseLLMProvider):
                 if isinstance(item, TextContent):
                     content_parts.append({"type": "text", "text": item.text})
                 elif isinstance(item, FileContent):
-                    base64_data = base64.b64encode(item.data).decode("utf-8")
                     if item.mime_type == "application/pdf":
-                        # OpenAI file handling - matches reference format
-                        content_parts.append(
-                            {
-                                "type": "file",
-                                "file": {
-                                    "filename": item.filename or "file.pdf",
-                                    "file_data": f"data:application/pdf;base64,{base64_data}",
-                                },
-                            }
-                        )
+                        if self.supports_pdf_input:
+                            base64_data = base64.b64encode(item.data).decode("utf-8")
+                            # OpenAI file handling - matches reference format
+                            content_parts.append(
+                                {
+                                    "type": "file",
+                                    "file": {
+                                        "filename": item.filename or "file.pdf",
+                                        "file_data": f"data:application/pdf;base64,{base64_data}",
+                                    },
+                                }
+                            )
+                        else:
+                            # Text-only OpenAI-compatible provider (e.g. Cerebras,
+                            # Groq). The caller must supply a pre-extracted text
+                            # alternative on FileContent.text_fallback.
+                            if item.text_fallback is None:
+                                raise ValueError(
+                                    "FileContent.text_fallback is required when "
+                                    "sending a PDF to a provider that does not "
+                                    "support native file input. Pass the paper's "
+                                    "raw_content as text_fallback."
+                                )
+                            filename = item.filename or "document.pdf"
+                            wrapped = (
+                                f'<document filename="{filename}">\n'
+                                f"{item.text_fallback}\n"
+                                f"</document>"
+                            )
+                            content_parts.append({"type": "text", "text": wrapped})
                 elif isinstance(item, SupplementaryContent):
                     # Format supplementary content with XML tags to clearly delineate it
                     formatted = f"<{item.label}>\n{item.content}\n</{item.label}>"

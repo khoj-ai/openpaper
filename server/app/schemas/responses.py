@@ -188,6 +188,10 @@ class FileContent(BaseModel):
     mime_type: str
     filename: Optional[str] = None
     type: Literal["file"] = "file"
+    # Plain-text equivalent of the file, used by providers that don't accept
+    # native file blocks (e.g. Cerebras, Groq via OpenAI-compat). When set, the
+    # provider substitutes this text in place of doing runtime extraction.
+    text_fallback: Optional[str] = None
 
 
 class SupplementaryContent(BaseModel):
