@@ -72,19 +72,8 @@ dataset_path, output_path = sys.argv[1], sys.argv[2]
 with open(dataset_path) as f:
     data = json.load(f)
 
-errors_section = ""
-errors = data.get("errors", [])
-if errors:
-    items = "\n".join(f"- `{e['paper_id'].split('/')[-1]}` — {e.get('error', 'unknown error')}" for e in errors)
-    errors_section = f"""
-## Generation Errors
-
-{len(errors)} papers failed during dataset generation:
-{items}
-"""
-
 readme = f"""---
-license: other
+license: cc-by-nc-4.0
 task_categories:
   - question-answering
 language:
@@ -126,12 +115,30 @@ Originally built for evaluating [Open Paper](https://openpaper.ai), but designed
 | `metadata_chunk_description` | string | Description of the source chunk |
 | `metadata_source_text` | string | Source text from the paper |
 | `row_id` | string | Unique row identifier |
-| `question_type` | string | Type of question (e.g. lookup) |
+| `question_type` | string | One of `lookup`, `comprehension`, `multi_hop`, `adversarial` (see below) |
 | `question` | string | The evaluation question |
 | `expected_answer` | string | Expected answer |
 | `expected_references` | list[string] | Expected reference passages |
 | `judge_rubric` | string | Rubric for judging (if applicable) |
-{errors_section}"""
+
+## Question Types
+
+Each row's `question_type` indicates how the question was constructed and what the model is expected to do:
+
+- **`lookup`** — A factual question whose answer is a specific passage in the paper. Tests verbatim retrieval. `expected_references` contains the exact source passage.
+- **`comprehension`** — An abstractive question requiring synthesis, critique, or reasoning about implications within a single chunk of the paper. Scored against a per-question rubric (`judge_rubric`).
+- **`multi_hop`** — A question that requires combining information from two or more distinct, distant sections of the paper. The answer must NOT be derivable from any single passage. `expected_references` contains one quote per required section, and `metadata_required_sections` / `metadata_reasoning_chain` describe how the hops connect.
+- **`adversarial`** — A question with a *false premise*, or asking about something the paper does not address. The correct behavior is to identify the false premise and refuse to fabricate, not to produce a confident-sounding answer. `metadata_false_premise` states what is wrong with the question; `expected_refusal` indicates whether refusal is the correct response.
+
+## Licensing
+
+This dataset is released under [CC-BY-NC-4.0](https://creativecommons.org/licenses/by-nc/4.0/) **with the following carve-out**:
+
+- **Covered by CC-BY-NC-4.0:** the questions, expected answers, judge rubrics, question-type taxonomy, dataset structure, and all annotations contributed by the dataset authors.
+- **NOT covered by CC-BY-NC-4.0:** quoted passages from source scientific papers that appear in the `metadata_source_text` and `expected_references` fields. These passages remain under the copyright of their original publishers and authors, and are included here as short research excerpts for the purpose of evaluating question-answering systems. Use of these passages is subject to the original publishers' terms and applicable fair-use / fair-dealing provisions in your jurisdiction.
+
+If you redistribute or build on this dataset, you must preserve this carve-out and not represent the embedded source passages as being licensed under CC-BY-NC-4.0.
+"""
 
 with open(output_path, "w") as f:
     f.write(readme)
