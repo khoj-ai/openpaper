@@ -1546,6 +1546,9 @@ def main():
     args = parser.parse_args()
 
     provider = parse_provider(args.provider) if args.provider else LLMProvider.GEMINI
+    if not provider:
+        logger.error("No valid provider specified. Use --provider to select one.")
+        sys.exit(1)
     provider_name = provider.value
     model_type = ModelType.FAST if args.fast else ModelType.DEFAULT
     # Resolved model name drives the results filename (so default vs fast write
