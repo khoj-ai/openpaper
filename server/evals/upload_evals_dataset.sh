@@ -47,6 +47,10 @@ dataset_path, output_path = sys.argv[1], sys.argv[2]
 with open(dataset_path) as f:
     data = json.load(f)
 
+# Top-level fields that are duplicated inside `metadata` for some question types.
+# We drop the top-level copy and keep only the flattened `metadata_*` version.
+DUPLICATED_IN_METADATA = {"required_sections", "reasoning_chain", "false_premise"}
+
 with open(output_path, "w") as out:
     for row in data["rows"]:
         flat = {}
@@ -54,6 +58,8 @@ with open(output_path, "w") as out:
             if k == "metadata":
                 for mk, mv in v.items():
                     flat[f"metadata_{mk}"] = mv
+            elif k in DUPLICATED_IN_METADATA:
+                continue
             elif k == "judge_rubric":
                 flat[k] = v if v is not None else ""
             else:
@@ -104,22 +110,35 @@ Originally built for evaluating [Open Paper](https://openpaper.ai), but designed
 
 ## Schema
 
+The dataset is a flat table where some fields are sparse — they are only populated for certain `question_type` values. The "Populated on" column below indicates which question types use each field; rows of other types will have `null` for that field.
+
+### Always populated
+
 | Field | Type | Description |
 |---|---|---|
+| `row_id` | string | Unique row identifier |
 | `paper_id` | string | OpenAlex paper ID |
 | `paper_doi` | string | Paper DOI |
 | `paper_s3_url` | string | S3 URL for the paper PDF |
 | `domain` | string | Subject domain |
-| `metadata_page_hint` | int | Page number hint |
-| `metadata_section` | string | Section of the paper |
-| `metadata_chunk_description` | string | Description of the source chunk |
-| `metadata_source_text` | string | Source text from the paper |
-| `row_id` | string | Unique row identifier |
 | `question_type` | string | One of `lookup`, `comprehension`, `multi_hop`, `adversarial` (see below) |
 | `question` | string | The evaluation question |
 | `expected_answer` | string | Expected answer |
-| `expected_references` | list[string] | Expected reference passages |
-| `judge_rubric` | string | Rubric for judging (if applicable) |
+| `expected_references` | list[string] | Expected reference passages from the paper |
+| `judge_rubric` | string | Rubric for LLM-as-judge scoring (empty string when not applicable) |
+
+### Sparse fields
+
+| Field | Type | Populated on | Description |
+|---|---|---|---|
+| `metadata_page_hint` | int | `lookup`, `comprehension` | Page number hint for the source chunk |
+| `metadata_section` | string | `lookup`, `comprehension` | Section of the paper the source chunk came from |
+| `metadata_chunk_description` | string | `lookup`, `comprehension` | Short description of the source chunk |
+| `metadata_source_text` | string | `lookup`, `comprehension` | Verbatim source text from the paper |
+| `metadata_required_sections` | list[string] | `multi_hop` | Distinct sections that must be combined to answer the question |
+| `metadata_reasoning_chain` | string | `multi_hop` | Description of how the required sections connect to form the answer |
+| `metadata_false_premise` | string | `adversarial` | Statement of what is wrong with the question's premise |
+| `expected_refusal` | bool | `adversarial` | Whether refusing to answer is the correct response |
 
 ## Question Types
 
