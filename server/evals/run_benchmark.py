@@ -1019,20 +1019,29 @@ def print_summary(summary: dict):
     logger.info("=" * 60)
 
 
-def get_results_path(
-    output_dir: str, provider_name: str, baseline: bool = False, fast: bool = False
-) -> str:
-    """Return a stable results file path for this provider.
+def _sanitize_for_filename(name: str) -> str:
+    """Make a model name safe for use in a filename (e.g. strip path separators)."""
+    return name.replace("/", "-").replace(":", "-")
 
-    Re-running with the same provider resumes into the same file.
-    Use --output to start a fresh run in a different directory.
+
+def get_results_path(
+    output_dir: str,
+    provider: LLMProvider,
+    model_type: ModelType,
+    baseline: bool = False,
+) -> str:
+    """Return a stable results file path keyed by the resolved model name.
+
+    The model name is looked up from (provider, model_type) at call time, so
+    `--provider gemini` and `--provider gemini --fast` write to distinct files
+    because their underlying model names differ. The `_fast` suffix is no
+    longer encoded in the filename — the model name conveys it.
     """
     os.makedirs(output_dir, exist_ok=True)
-    fast_suffix = "_fast" if fast else ""
+    model_name = operations._get_model_for_type(model_type, provider)
+    safe_model = _sanitize_for_filename(model_name)
     baseline_suffix = "_baseline" if baseline else ""
-    return os.path.join(
-        output_dir, f"eval_{provider_name}{fast_suffix}{baseline_suffix}.json"
-    )
+    return os.path.join(output_dir, f"eval_{safe_model}{baseline_suffix}.json")
 
 
 # ---------------------------------------------------------------------------
@@ -1063,27 +1072,22 @@ def backfill_domains(rows: list[dict], dataset_path: str) -> list[dict]:
     return rows
 
 
-def discover_provider_variants(output_dir: str) -> list[tuple[str, bool]]:
-    """Scan the results directory and return (provider_name, fast) pairs.
+def discover_models(output_dir: str) -> list[str]:
+    """Return unique model names that have at least one result file in the dir.
 
-    Each variant maps to its own column in the cross-provider comparison;
-    `eval_gemini.json` and `eval_gemini_fast.json` are distinct.
+    Each model becomes a column in the cross-provider comparison. Harness vs
+    baseline modes are loaded separately for each model.
     """
     import re
 
-    seen: set[tuple[str, bool]] = set()
+    seen: set[str] = set()
     if not os.path.isdir(output_dir):
         return []
     for fname in os.listdir(output_dir):
-        m = re.match(r"eval_(.+?)(_fast)?(_baseline)?\.json$", fname)
+        m = re.match(r"eval_(.+?)(_baseline)?\.json$", fname)
         if m:
-            seen.add((m.group(1), bool(m.group(2))))
+            seen.add(m.group(1))
     return sorted(seen)
-
-
-def variant_label(provider_name: str, fast: bool) -> str:
-    """Column label for a provider variant (e.g. 'gemini' or 'gemini_fast')."""
-    return f"{provider_name}_fast" if fast else provider_name
 
 
 COMPARE_METRICS = [
@@ -1145,9 +1149,9 @@ def write_comparison_csv(
 
 
 def write_all_providers_csv(csv_path: str, all_results: dict):
-    """Write a wide-format cross-provider CSV.
+    """Write a wide-format cross-model CSV.
 
-    Columns: scope, domain, metric, then one column per (provider, mode).
+    Columns: scope, domain, metric, then one column per (model, mode).
     Citation rows leave non-harness columns blank.
     """
     columns: list[tuple[str, str, str]] = []
@@ -1311,27 +1315,26 @@ def print_all_providers_comparison(
     dataset_path: str = "evals/eval_dataset.json",
     csv_path: Optional[str] = None,
 ):
-    """Discover all provider variants in the results directory and print a cross-provider comparison.
+    """Discover all models in the results directory and print a cross-model comparison.
 
-    A variant is a (provider, fast) pair. Default and fast result files are
-    treated as separate columns (e.g. `gemini` and `gemini_fast`).
+    Each unique model name becomes its own column. Default and fast variants
+    of the same provider naturally appear as distinct models because their
+    underlying model names differ.
     """
-    variants = discover_provider_variants(output_dir)
-    if not variants:
+    models = discover_models(output_dir)
+    if not models:
         logger.error(f"No result files found in {output_dir}")
         return
 
     # Load all available results, recomputing summaries from row data
     # to ensure consistent metrics even for older result files.
-    # Keyed by variant label ("gemini", "gemini_fast", etc.).
+    # Keyed by model name (sanitized — same as the on-disk filename stub).
     all_results: dict[str, dict] = {}
-    for provider_name, fast in variants:
-        label = variant_label(provider_name, fast)
+    for model_name in models:
         entry = {}
         for mode in ("harness", "baseline"):
-            path = get_results_path(
-                output_dir, provider_name, baseline=(mode == "baseline"), fast=fast
-            )
+            baseline_suffix = "_baseline" if mode == "baseline" else ""
+            path = os.path.join(output_dir, f"eval_{model_name}{baseline_suffix}.json")
             if os.path.exists(path):
                 with open(path) as f:
                     data = json.load(f)
@@ -1348,14 +1351,14 @@ def print_all_providers_comparison(
                     )
                     entry[f"{mode}_by_domain"] = summary.get("by_domain", {})
         if entry:
-            all_results[label] = entry
+            all_results[model_name] = entry
 
     if not all_results:
         logger.error("No results with summary data found. Run grading first.")
         return
 
-    # Build column list: each variant can have harness and/or baseline
-    columns = []  # list of (column_label, variant_label, mode)
+    # Build column list: each model can have harness and/or baseline
+    columns = []  # list of (column_label, model_key, mode)
     for label in sorted(all_results.keys()):
         entry = all_results[label]
         if "harness" in entry:
@@ -1542,28 +1545,29 @@ def main():
     )
     args = parser.parse_args()
 
-    provider = parse_provider(args.provider) if args.provider else None
-    provider_name = provider.value if provider else "gemini"
+    provider = parse_provider(args.provider) if args.provider else LLMProvider.GEMINI
+    provider_name = provider.value
     model_type = ModelType.FAST if args.fast else ModelType.DEFAULT
+    # Resolved model name drives the results filename (so default vs fast write
+    # to distinct files automatically).
+    model_name = operations._get_model_for_type(model_type, provider)
+    safe_model = _sanitize_for_filename(model_name)
 
     # Handle --compare: print comparison and exit
     if args.compare:
         os.makedirs(args.output, exist_ok=True)
         if args.provider:
-            # Single provider: harness vs baseline
+            # Single provider: harness vs baseline for the selected model
             harness_path = get_results_path(
-                args.output, provider_name, baseline=False, fast=args.fast
+                args.output, provider, model_type, baseline=False
             )
             baseline_path = get_results_path(
-                args.output, provider_name, baseline=True, fast=args.fast
+                args.output, provider, model_type, baseline=True
             )
-            fast_suffix = "_fast" if args.fast else ""
-            csv_path = os.path.join(
-                args.output, f"comparison_{provider_name}{fast_suffix}.csv"
-            )
+            csv_path = os.path.join(args.output, f"comparison_{safe_model}.csv")
             print_comparison(harness_path, baseline_path, csv_path=csv_path)
         else:
-            # No provider specified: compare all available providers
+            # No provider specified: compare every model with results on disk
             csv_path = os.path.join(args.output, "comparison_all.csv")
             print_all_providers_comparison(
                 args.output, dataset_path=args.dataset, csv_path=csv_path
@@ -1593,17 +1597,18 @@ def main():
         f"{dataset.get('total_papers_processed', '?')} papers"
     )
 
-    # Load or create results file (stable path per provider for resumability)
+    # Load or create results file (stable path per (provider, model_type) for resumability)
     results_path = get_results_path(
-        args.output, provider_name, baseline=args.baseline, fast=args.fast
+        args.output, provider, model_type, baseline=args.baseline
     )
     results = load_results(results_path)
     results["llm_provider"] = provider_name
     results["model_type"] = model_type.value
+    results["model_name"] = model_name
     results["mode"] = "baseline" if args.baseline else "harness"
     logger.info(
-        f"Results file: {results_path} "
-        f"({len(results['rows'])} rows from previous run)"
+        f"Results file: {results_path} (model={model_name}, "
+        f"{len(results['rows'])} rows from previous run)"
     )
 
     db = SessionLocal()
