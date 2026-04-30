@@ -18,6 +18,7 @@ import difflib
 import json
 import logging
 import os
+import re
 import sys
 import time
 import uuid
@@ -637,27 +638,67 @@ def fuzzy_match(text_a: str, text_b: str) -> float:
     return difflib.SequenceMatcher(None, text_a.lower(), text_b.lower()).ratio()
 
 
+_WHITESPACE_RE = re.compile(r"\s+")
+# Straight + smart quote chars that LLMs wrap citations in but PDFs don't contain
+# around the same passage; stripped from citation edges before substring matching.
+_CITATION_EDGE_CHARS = "\"'“”‘’ \t.,;:"
+
+
+def _normalize_for_substring(s: str) -> str:
+    """Lowercase and collapse whitespace so PDF line breaks don't break matches.
+
+    PyPDF2 extracts text with newlines at the PDF's visual line endings, while
+    LLM-emitted citations are continuous text — without normalization, literal
+    substring matching misses nearly everything.
+    """
+    return _WHITESPACE_RE.sub(" ", s.lower()).strip()
+
+
+def _normalize_citation_ref(s: str) -> str:
+    """Normalize a citation reference for substring matching against raw paper text.
+
+    Strips wrapping quotes/punctuation that LLMs add when emitting citations
+    but that don't appear in the source PDF text.
+    """
+    return _normalize_for_substring(s).strip(_CITATION_EDGE_CHARS)
+
+
 def compute_citation_metrics(
     result: dict, paper_raw_content: Optional[str] = None
 ) -> dict:
-    """Compute citation precision, recall, accuracy, and (for adversarial) refusal_correctness."""
+    """Compute citation metrics for one row.
+
+    Adversarial rows return only refusal_correctness — precision/recall/accuracy
+    aren't meaningful when the correct behavior is to refuse to cite. Non-adversarial
+    rows return precision/recall and (when paper_raw_content is provided) accuracy.
+    """
     actual_refs = [c.get("reference", "") for c in result.get("actual_citations", [])]
     expected_refs = result.get("expected_references", [])
     is_adversarial = result.get("question_type") == "adversarial" and result.get(
         "expected_refusal", True
     )
 
+    if is_adversarial:
+        # The model should NOT cite anything outside the optional refutation set.
+        # No citations = perfect refusal. Citing only from expected_refs = legitimate
+        # refutation. Any citation that doesn't match expected_refs = fabrication.
+        if not actual_refs:
+            return {"refusal_correctness": 1.0}
+        if not expected_refs:
+            return {"refusal_correctness": 0.0}
+        all_match = all(
+            any(fuzzy_match(act, exp) >= SIMILARITY_THRESHOLD for exp in expected_refs)
+            for act in actual_refs
+        )
+        return {"refusal_correctness": 1.0 if all_match else 0.0}
+
     if not expected_refs and not actual_refs:
-        metrics = {
+        return {
             "citation_precision": 1.0,
             "citation_recall": 1.0,
             "citation_accuracy": 1.0,
         }
-        if is_adversarial:
-            metrics["refusal_correctness"] = 1.0
-        return metrics
 
-    # Citation recall: fraction of expected refs matched by at least one actual citation
     matched_expected = 0
     for exp in expected_refs:
         for act in actual_refs:
@@ -666,7 +707,6 @@ def compute_citation_metrics(
                 break
     recall = matched_expected / len(expected_refs) if expected_refs else 1.0
 
-    # Citation precision: fraction of actual citations that match any expected ref
     matched_actual = 0
     for act in actual_refs:
         for exp in expected_refs:
@@ -675,49 +715,32 @@ def compute_citation_metrics(
                 break
     precision = matched_actual / len(actual_refs) if actual_refs else 1.0
 
-    # Citation accuracy: does the cited text appear in the paper's raw content?
-    accuracy = 1.0
-    if paper_raw_content and actual_refs:
-        found = 0
-        raw_lower = paper_raw_content.lower()
-        for ref in actual_refs:
-            # Check if a substantial portion of the citation appears in the paper
-            ref_words = ref.lower().split()
-            if len(ref_words) > 5:
-                # Check a window of words for containment
-                snippet = " ".join(ref_words[:10])
-                if snippet in raw_lower:
-                    found += 1
-                    continue
-            # Fallback: fuzzy match against raw content windows
-            if ref.lower() in raw_lower:
-                found += 1
-        accuracy = found / len(actual_refs)
-
     metrics = {
         "citation_precision": round(precision, 3),
         "citation_recall": round(recall, 3),
-        "citation_accuracy": round(accuracy, 3),
     }
 
-    # Refusal correctness (adversarial only): the model should NOT cite anything
-    # outside the optional refutation set. No citations at all = perfect refusal.
-    # Citing only from expected_refs = also correct (legitimately refuting).
-    # Any citation that doesn't match expected_refs = fabrication.
-    if is_adversarial:
-        if not actual_refs:
-            metrics["refusal_correctness"] = 1.0
-        elif not expected_refs:
-            metrics["refusal_correctness"] = 0.0
-        else:
-            all_match = all(
-                any(
-                    fuzzy_match(act, exp) >= SIMILARITY_THRESHOLD
-                    for exp in expected_refs
-                )
-                for act in actual_refs
-            )
-            metrics["refusal_correctness"] = 1.0 if all_match else 0.0
+    # Accuracy: does the cited text appear in the paper's raw content?
+    # Omit the key entirely when raw_content isn't available so the aggregator
+    # doesn't conflate "unmeasured" with "perfect".
+    if not actual_refs:
+        metrics["citation_accuracy"] = 1.0
+    elif paper_raw_content:
+        found = 0
+        raw_norm = _normalize_for_substring(paper_raw_content)
+        for ref in actual_refs:
+            ref_norm = _normalize_citation_ref(ref)
+            if not ref_norm:
+                continue
+            if ref_norm in raw_norm:
+                found += 1
+                continue
+            # Fall back to a prefix match: the LLM may append context beyond
+            # what's verbatim in the paper, or paraphrase the tail of a quote.
+            prefix = ref_norm[:80]
+            if len(prefix) >= 20 and prefix in raw_norm:
+                found += 1
+        metrics["citation_accuracy"] = round(found / len(actual_refs), 3)
 
     return metrics
 
@@ -848,46 +871,60 @@ def judge_single_result(result: dict, provider: Optional[LLMProvider] = None) ->
     }
 
 
+CITATION_RESULT_KEYS = (
+    "citation_precision",
+    "citation_recall",
+    "citation_accuracy",
+    "refusal_correctness",
+)
+
+
 def grade_results(
     results: dict,
     results_path: str,
+    paper_raw_content_by_id: Optional[dict[str, str]] = None,
     provider: Optional[LLMProvider] = None,
     skip_judge: bool = False,
     baseline: bool = False,
 ):
     """Grade results in-place with citation metrics and optionally LLM judge.
 
-    Skips rows that are already graded (for resumability).
-    Skips citation metrics for baseline runs (no citation protocol).
-    Writes to disk after each row.
+    Citation metrics are deterministic and cheap, so they're always recomputed
+    (this lets fixes to the metric definitions apply to existing result files).
+    LLM judge runs are skipped on rows that already have valid scores.
+    Skips citation metrics entirely for baseline runs (no citation protocol).
+    Writes to disk after each row that triggers a judge call.
     """
-    already_graded = get_graded_row_ids(results)
+    already_judged = get_graded_row_ids(results)
     rows = results["rows"]
+    raw_by_id = paper_raw_content_by_id or {}
 
     for i, result in enumerate(rows):
         row_id = result.get("row_id", "?")
 
-        if row_id in already_graded:
+        # Citation metrics: always recompute. Clear stale keys first so
+        # adversarial rows don't carry over precision/recall from earlier runs.
+        if not baseline:
+            for key in CITATION_RESULT_KEYS:
+                result.pop(key, None)
+            raw_content = raw_by_id.get(result.get("paper_id", ""))
+            result.update(compute_citation_metrics(result, raw_content))
+
+        if skip_judge or result.get("error") or row_id in already_judged:
             continue
 
         logger.info(f"Grading [{i + 1}/{len(rows)}] {row_id}")
-
-        # Citation metrics (skip for baseline — no citation protocol)
-        if not baseline:
-            citation_scores = compute_citation_metrics(result)
-            result.update(citation_scores)
-
-        # LLM judge (optional)
-        if not skip_judge and not result.get("error"):
-            judge_scores = judge_single_result(result, LLMProvider.GEMINI)
-            result.update(judge_scores)
-            logger.info(
-                f"  Scores: accuracy={judge_scores.get('factual_accuracy')}, "
-                f"completeness={judge_scores.get('completeness')}, "
-                f"groundedness={judge_scores.get('groundedness')}"
-            )
+        judge_scores = judge_single_result(result, LLMProvider.GEMINI)
+        result.update(judge_scores)
+        logger.info(
+            f"  Scores: accuracy={judge_scores.get('factual_accuracy')}, "
+            f"completeness={judge_scores.get('completeness')}, "
+            f"groundedness={judge_scores.get('groundedness')}"
+        )
 
         save_results_file(results, results_path)
+
+    save_results_file(results, results_path)
 
 
 # ---------------------------------------------------------------------------
@@ -923,56 +960,55 @@ def compute_summary(graded_results: list[dict]) -> dict:
         domain = r.get("domain", "unknown")
         by_domain.setdefault(domain, []).append(r)
 
+    # avg() filters zeros — appropriate for 1-5 LLM judge scores where 0 means
+    # the judge errored. Citation metrics live on a 0-1 scale where 0 is a
+    # legitimate score, so they use avg_binary instead.
     def avg(items: list[dict], key: str) -> float:
         vals = [r[key] for r in items if key in r and r[key] is not None and r[key] > 0]
         return round(sum(vals) / len(vals), 3) if vals else 0.0
 
     def avg_binary(items: list[dict], key: str) -> Optional[float]:
-        """Average that includes zeros — for binary 0/1 metrics where 0 is a real failure signal."""
         vals = [r[key] for r in items if key in r and r[key] is not None]
         return round(sum(vals) / len(vals), 3) if vals else None
 
-    metric_keys = [
+    citation_metric_keys = [
         "citation_precision",
         "citation_recall",
         "citation_accuracy",
+        "refusal_correctness",
+    ]
+    judge_metric_keys = [
         "factual_accuracy",
         "completeness",
         "groundedness",
     ]
 
-    overall = {key: avg(graded_results, key) for key in metric_keys}
+    def aggregate(items: list[dict]) -> dict:
+        out: dict = {}
+        for key in citation_metric_keys:
+            v = avg_binary(items, key)
+            if v is not None:
+                out[key] = v
+        for key in judge_metric_keys:
+            out[key] = avg(items, key)
+        return out
+
+    overall = aggregate(graded_results)
     overall["total_rows"] = len(graded_results)
     overall["errors"] = sum(1 for r in graded_results if r.get("error"))
     overall["avg_latency_seconds"] = avg(graded_results, "latency_seconds")
 
-    # refusal_correctness: only meaningful for adversarial rows; binary metric
-    adv_rows = by_type.get("adversarial", [])
-    if adv_rows:
-        rc = avg_binary(adv_rows, "refusal_correctness")
-        if rc is not None:
-            overall["refusal_correctness"] = rc
-
     per_type = {}
     for qt, items in by_type.items():
-        per_type[qt] = {key: avg(items, key) for key in metric_keys}
+        per_type[qt] = aggregate(items)
         per_type[qt]["count"] = len(items)
         per_type[qt]["avg_latency_seconds"] = avg(items, "latency_seconds")
-        if qt == "adversarial":
-            rc = avg_binary(items, "refusal_correctness")
-            if rc is not None:
-                per_type[qt]["refusal_correctness"] = rc
 
     per_domain = {}
     for domain, items in by_domain.items():
-        per_domain[domain] = {key: avg(items, key) for key in metric_keys}
+        per_domain[domain] = aggregate(items)
         per_domain[domain]["count"] = len(items)
         per_domain[domain]["avg_latency_seconds"] = avg(items, "latency_seconds")
-        adv_in_domain = [r for r in items if r.get("question_type") == "adversarial"]
-        if adv_in_domain:
-            rc = avg_binary(adv_in_domain, "refusal_correctness")
-            if rc is not None:
-                per_domain[domain]["refusal_correctness"] = rc
 
     return {
         "overall": overall,
@@ -1675,11 +1711,28 @@ def main():
             logger.warning("No results produced. Check paper sync and dataset.")
             return
 
+        # Build paper_id -> raw_content map for citation accuracy checks.
+        # Keyed by the dataset's external paper_id (which is what each result
+        # row stores), resolved through url_to_paper_id to the DB record.
+        paper_raw_content_by_id: dict[str, str] = {}
+        if not args.baseline:
+            for row in dataset["rows"]:
+                ext_id = row.get("paper_id")
+                if not ext_id or ext_id in paper_raw_content_by_id:
+                    continue
+                db_uuid = url_to_paper_id.get(row.get("paper_s3_url", ""))
+                if not db_uuid:
+                    continue
+                paper = paper_crud.get(db, id=db_uuid)
+                if paper and paper.raw_content:
+                    paper_raw_content_by_id[ext_id] = str(paper.raw_content)
+
         # Phase 3: Grade (incremental, writes to disk per row)
         logger.info("Phase 3: Grading results...")
         grade_results(
             results,
             results_path,
+            paper_raw_content_by_id=paper_raw_content_by_id,
             provider=provider,
             skip_judge=args.skip_grading,
             baseline=args.baseline,
