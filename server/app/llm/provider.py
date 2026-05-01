@@ -11,6 +11,7 @@ import anthropic
 import openai
 from app.database.models import Message
 from app.llm.citation_handler import CitationHandler
+from app.llm.utils import LLMBlockedError
 from app.schemas.responses import (
     FileContent,
     SupplementaryContent,
@@ -23,6 +24,7 @@ from google.genai.types import (
     AutomaticFunctionCallingConfig,
     Content,
     ContentListUnion,
+    FinishReason,
     FunctionCallingConfig,
     FunctionCallingConfigMode,
     FunctionDeclaration,
@@ -239,7 +241,7 @@ class GeminiProvider(BaseLLMProvider):
         )
 
         if not response or (not response.text and not response.function_calls):
-            raise ValueError("Empty response from Gemini API")
+            self._raise_for_empty_response(response, model)
 
         # Extract tool calls from Gemini response, generating IDs for tracking
         tool_calls = []
@@ -269,6 +271,59 @@ class GeminiProvider(BaseLLMProvider):
             thinking=thinking,
             tool_calls=tool_calls,
         )
+
+    @staticmethod
+    def _raise_for_empty_response(
+        response: Optional[GenerateContentResponse], model: str
+    ) -> None:
+        # Non-retryable finish reasons: retrying won't change the outcome.
+        BLOCKED_REASONS = {
+            FinishReason.SAFETY,
+            FinishReason.RECITATION,
+            FinishReason.BLOCKLIST,
+            FinishReason.PROHIBITED_CONTENT,
+            FinishReason.SPII,
+            FinishReason.MALFORMED_FUNCTION_CALL,
+        }
+
+        if response is None:
+            raise ValueError(f"No response object from Gemini ({model})")
+
+        prompt_block = getattr(
+            getattr(response, "prompt_feedback", None), "block_reason", None
+        )
+        if prompt_block:
+            raise LLMBlockedError(
+                f"Gemini blocked the prompt ({model}): block_reason={prompt_block}"
+            )
+
+        candidates = response.candidates or []
+        if not candidates:
+            raise ValueError(
+                f"Gemini returned no candidates ({model}); prompt_feedback="
+                f"{getattr(response, 'prompt_feedback', None)}"
+            )
+
+        candidate = candidates[0]
+        finish_reason = getattr(candidate, "finish_reason", None)
+        parts = (
+            (getattr(candidate.content, "parts", None) or [])
+            if candidate.content
+            else []
+        )
+        thought_only = bool(parts) and all(getattr(p, "thought", False) for p in parts)
+
+        detail = (
+            f"finish_reason={finish_reason}, parts={len(parts)}, "
+            f"thought_only={thought_only}"
+        )
+
+        if finish_reason in BLOCKED_REASONS:
+            raise LLMBlockedError(f"Gemini declined to answer ({model}): {detail}")
+
+        # MAX_TOKENS, OTHER, or STOP-with-empty-text fall through as retryable —
+        # but the message now tells us which one so we can act on it.
+        raise ValueError(f"Empty response from Gemini ({model}): {detail}")
 
     def send_message_stream(
         self,

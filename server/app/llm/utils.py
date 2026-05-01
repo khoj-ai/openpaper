@@ -11,7 +11,14 @@ import openai
 
 logger = logging.getLogger(__name__)
 
-# Exceptions that should trigger a retry with backoff
+
+class LLMBlockedError(Exception):
+    """The model declined to produce output for a reason that retrying won't fix
+    (safety filter, recitation, prompt-level block, malformed function call)."""
+
+
+# Exceptions that should trigger a retry with backoff. LLMBlockedError is
+# deliberately excluded — retrying a safety block just burns time and tokens.
 RETRYABLE_EXCEPTIONS = (
     ValueError,
     json.JSONDecodeError,

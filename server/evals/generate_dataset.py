@@ -50,6 +50,29 @@ RATE_LIMIT_BETWEEN_PAPERS = 2.0  # seconds between LLM calls
 # ---------------------------------------------------------------------------
 
 
+class SectionEvidence(BaseModel):
+    """Evidence from one section/area of a paper.
+
+    A question may require evidence from multiple sections (multi-hop) or just
+    one (lookup/comprehension). Within a section, the alternatives list holds
+    multiple verbatim quotes that each independently support the answer — the
+    model only needs to cite ONE of them to satisfy that section.
+    """
+
+    section_label: str = Field(
+        description="The section/area the evidence comes from, e.g. 'Methods', 'Results', 'Table 3', 'Discussion'"
+    )
+    alternatives: list[str] = Field(
+        description=(
+            "2-3 verbatim quotes from this section that EACH INDEPENDENTLY support "
+            "the answer. Each must be character-for-character from the paper, "
+            "50-200 words, and substantively distinct (different passages, not "
+            "paraphrases of each other). If only one valid passage exists, return "
+            "a single-element list — never fabricate."
+        )
+    )
+
+
 class LookupQuestion(BaseModel):
     question: str = Field(
         description="A factual question answerable by finding an exact passage in the paper"
@@ -57,8 +80,11 @@ class LookupQuestion(BaseModel):
     expected_answer: str = Field(
         description="The correct answer, based on the paper's content"
     )
-    expected_references: list[str] = Field(
-        description="Exact verbatim quotes from the paper that answer the question"
+    expected_references: list[SectionEvidence] = Field(
+        description=(
+            "Exactly ONE SectionEvidence covering the section that contains the "
+            "answer, with 2-3 alternative verbatim quotes inside."
+        )
     )
 
 
@@ -69,8 +95,11 @@ class ComprehensionQuestion(BaseModel):
     expected_answer: str = Field(
         description="A well-reasoned answer drawing on the paper's content"
     )
-    expected_references: list[str] = Field(
-        description="Exact verbatim quotes from the paper supporting the answer"
+    expected_references: list[SectionEvidence] = Field(
+        description=(
+            "1-2 SectionEvidence objects covering the section(s) that support the "
+            "answer. Each contains 2-3 alternative verbatim quotes."
+        )
     )
     judge_rubric: str = Field(
         description="3-5 evaluation criteria for an LLM judge to score answers on a 1-5 scale"
@@ -90,17 +119,13 @@ class MultiHopQuestion(BaseModel):
     expected_answer: str = Field(
         description="Reasoned answer that explicitly combines facts from each required section."
     )
-    expected_references: list[str] = Field(
+    expected_references: list[SectionEvidence] = Field(
         description=(
-            "Verbatim quotes (50-200 words each) drawn from the required sections. "
-            "Provide one quote per required section, in the same order. Each quote "
-            "must contribute a necessary piece of the answer."
-        )
-    )
-    required_sections: list[str] = Field(
-        description=(
-            "Section labels the answer must draw on, e.g. ['Methods', 'Results', "
-            "'Discussion']. Length MUST be >=2 and align 1:1 with expected_references."
+            "TWO OR MORE SectionEvidence objects, one per required section. The "
+            "answer must combine evidence from all of them. Within each "
+            "SectionEvidence, provide 2-3 alternative verbatim quotes from that "
+            "section — the model only needs to cite ONE alternative per section "
+            "to satisfy that hop."
         )
     )
     reasoning_chain: str = Field(
@@ -150,11 +175,12 @@ class AdversarialQuestion(BaseModel):
             "an unexpected way (rare). Always provide a value."
         ),
     )
-    expected_references: list[str] = Field(
+    expected_references: list[SectionEvidence] = Field(
         description=(
             "Usually an empty list. If the paper has a passage that DIRECTLY refutes "
-            "the false premise, include it as a verbatim quote — the model should "
-            "cite it when refusing. Otherwise return []."
+            "the false premise, include exactly ONE SectionEvidence containing 1-2 "
+            "verbatim alternative quotes the model should cite when refusing. "
+            "Otherwise return []."
         ),
     )
     judge_rubric: str = Field(
@@ -237,8 +263,17 @@ passage. The answer should be a concrete fact, number, or detail.
    b) A **comprehension question**: requires synthesis, critique, or understanding \
 of implications. Think: "What does this mean?", "Why did they choose this?", \
 "How does this compare?".
-4. For BOTH question types, provide **expected_references** that are EXACT verbatim \
-quotes (50-200 words each) from the paper. Copy the text character-for-character.
+4. For BOTH question types, provide **expected_references** as a list of \
+SectionEvidence objects:
+   - Lookup: exactly ONE SectionEvidence
+   - Comprehension: ONE OR TWO SectionEvidence objects
+   - Each SectionEvidence has a `section_label` and `alternatives` — 2-3 verbatim \
+quotes from that section that EACH INDEPENDENTLY answer the question.
+   - Quotes must be 50-200 words, copied character-for-character. The 2-3 \
+alternatives must be substantively distinct passages, NOT near-duplicates or \
+paraphrases of each other.
+   - If only one valid passage exists in the section, return a single-alternative \
+SectionEvidence rather than fabricating.
 5. For comprehension questions, provide a **judge_rubric** with 3-5 criteria.
 Output: populate the **chunks** list."""
 
@@ -252,8 +287,12 @@ A reader who has only skimmed one section should not be able to answer. Good see
    - Comparison: "How does the result in Section 4 compare to the baseline cited \
 in Related Work?"
 For each multi-hop question:
-   - List **required_sections** (>=2).
-   - Provide one verbatim **expected_reference** per required section, in matching order.
+   - Provide **expected_references** as a list of TWO OR MORE SectionEvidence \
+objects, one per required section.
+   - Each SectionEvidence has a `section_label` (e.g. 'Methods', 'Results', 'Table 3') \
+and `alternatives` — 2-3 verbatim quotes from that section, each of which \
+independently establishes that section's piece of the answer. The model only \
+needs to cite ONE alternative per section to satisfy the hop.
    - Write a **reasoning_chain** that spells out how the hops combine.
    - Include a **judge_rubric** with an explicit "integrates information from each \
 required section" criterion.
@@ -273,7 +312,8 @@ For each adversarial question:
    - Write the **expected_answer** as a refusal that names what's wrong.
    - Set **expected_refusal=True** unless the paper directly refutes the premise.
    - Only populate **expected_references** if the paper has a passage that DIRECTLY \
-refutes the false premise (in which case the model should cite it when refusing).
+refutes the false premise. In that case, return exactly ONE SectionEvidence with \
+1-2 verbatim alternative quotes the model should cite. Otherwise return [].
    - Include a **judge_rubric** that rewards identifying the false premise and \
 penalizes confident fabrication.
 Output: populate the **adversarial_questions** list."""
@@ -452,6 +492,9 @@ def process_paper(
     rows = []
     oa_id_suffix = paper["openalex_id"].split("/")[-1]  # e.g. "W1234567890"
 
+    def _dump_evidence(refs: list[SectionEvidence]) -> list[dict]:
+        return [ev.model_dump() for ev in refs]
+
     if "chunks" in sections_needed:
         for i, chunk in enumerate(generation.chunks):
             base = {
@@ -475,7 +518,9 @@ def process_paper(
                     "question_type": "lookup",
                     "question": chunk.lookup_question.question,
                     "expected_answer": chunk.lookup_question.expected_answer,
-                    "expected_references": chunk.lookup_question.expected_references,
+                    "expected_references": _dump_evidence(
+                        chunk.lookup_question.expected_references
+                    ),
                     "judge_rubric": None,
                 }
             )
@@ -488,7 +533,9 @@ def process_paper(
                     "question_type": "comprehension",
                     "question": chunk.comprehension_question.question,
                     "expected_answer": chunk.comprehension_question.expected_answer,
-                    "expected_references": chunk.comprehension_question.expected_references,
+                    "expected_references": _dump_evidence(
+                        chunk.comprehension_question.expected_references
+                    ),
                     "judge_rubric": chunk.comprehension_question.judge_rubric,
                 }
             )
@@ -496,6 +543,7 @@ def process_paper(
     # Multi-hop rows (paper-level, not tied to a single chunk)
     if "multi_hop" in sections_needed:
         for j, mh in enumerate(generation.multi_hop_questions):
+            required_sections = [ev.section_label for ev in mh.expected_references]
             rows.append(
                 {
                     "paper_id": paper["openalex_id"],
@@ -503,15 +551,15 @@ def process_paper(
                     "paper_s3_url": paper.get("s3_url"),
                     "domain": paper.get("domain"),
                     "metadata": {
-                        "required_sections": mh.required_sections,
+                        "required_sections": required_sections,
                         "reasoning_chain": mh.reasoning_chain,
                     },
                     "row_id": f"{oa_id_suffix}_multihop{j}",
                     "question_type": "multi_hop",
                     "question": mh.question,
                     "expected_answer": mh.expected_answer,
-                    "expected_references": mh.expected_references,
-                    "required_sections": mh.required_sections,
+                    "expected_references": _dump_evidence(mh.expected_references),
+                    "required_sections": required_sections,
                     "reasoning_chain": mh.reasoning_chain,
                     "judge_rubric": mh.judge_rubric,
                 }
@@ -533,7 +581,7 @@ def process_paper(
                     "question_type": "adversarial",
                     "question": adv.question,
                     "expected_answer": adv.expected_answer,
-                    "expected_references": adv.expected_references,
+                    "expected_references": _dump_evidence(adv.expected_references),
                     "expected_refusal": adv.expected_refusal,
                     "false_premise": adv.false_premise,
                     "judge_rubric": adv.judge_rubric,

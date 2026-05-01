@@ -663,14 +663,33 @@ def _normalize_citation_ref(s: str) -> str:
     return _normalize_for_substring(s).strip(_CITATION_EDGE_CHARS)
 
 
+def _evidence_groups(expected_refs: list) -> list[tuple[str, list[str]]]:
+    """Normalize expected_references into [(section_label, alternatives), ...]."""
+    groups: list[tuple[str, list[str]]] = []
+    for ev in expected_refs or []:
+        label = ev.get("section_label", "") or ""
+        alts = list(ev.get("alternatives", []) or [])
+        if alts:
+            groups.append((label, alts))
+    return groups
+
+
 def compute_citation_metrics(
     result: dict, paper_raw_content: Optional[str] = None
 ) -> dict:
     """Compute citation metrics for one row.
 
-    Adversarial rows return only refusal_correctness — precision/recall/accuracy
-    aren't meaningful when the correct behavior is to refuse to cite. Non-adversarial
-    rows return precision/recall and (when paper_raw_content is provided) accuracy.
+    Adversarial rows return only refusal_correctness — precision/coverage/accuracy
+    aren't meaningful when the correct behavior is to refuse to cite.
+
+    Non-adversarial rows return:
+    - section_coverage: AND across required sections, OR within each section's
+      alternatives. For lookup/comprehension (typically 1 section) this is binary.
+      For multi-hop (N sections) this is fractional (e.g. 2/3 hops covered).
+    - citation_precision: fraction of the model's citations that match SOME
+      alternative in SOME section.
+    - citation_accuracy: fraction of the model's citations that appear in the
+      paper's raw text (only when paper_raw_content is provided).
     """
     actual_refs = [c.get("reference", "") for c in result.get("actual_citations", [])]
     expected_refs = result.get("expected_references", [])
@@ -680,44 +699,71 @@ def compute_citation_metrics(
 
     if is_adversarial:
         # The model should NOT cite anything outside the optional refutation set.
-        # No citations = perfect refusal. Citing only from expected_refs = legitimate
-        # refutation. Any citation that doesn't match expected_refs = fabrication.
+        # No citations = perfect refusal. Flatten alternatives across all sections
+        # so any quote in any SectionEvidence counts as a legit refutation.
+        groups = _evidence_groups(expected_refs)
+        flat_alternatives = [a for _, alts in groups for a in alts]
         if not actual_refs:
             return {"refusal_correctness": 1.0}
-        if not expected_refs:
+        if not flat_alternatives:
             return {"refusal_correctness": 0.0}
         all_match = all(
-            any(fuzzy_match(act, exp) >= SIMILARITY_THRESHOLD for exp in expected_refs)
+            any(
+                fuzzy_match(act, exp) >= SIMILARITY_THRESHOLD
+                for exp in flat_alternatives
+            )
             for act in actual_refs
         )
         return {"refusal_correctness": 1.0 if all_match else 0.0}
 
-    if not expected_refs and not actual_refs:
+    groups = _evidence_groups(expected_refs)
+
+    if not groups and not actual_refs:
         return {
             "citation_precision": 1.0,
-            "citation_recall": 1.0,
+            "section_coverage": 1.0,
             "citation_accuracy": 1.0,
         }
 
-    matched_expected = 0
-    for exp in expected_refs:
-        for act in actual_refs:
-            if fuzzy_match(exp, act) >= SIMILARITY_THRESHOLD:
-                matched_expected += 1
-                break
-    recall = matched_expected / len(expected_refs) if expected_refs else 1.0
+    # Section coverage: for each required section, did the model cite at least
+    # one alternative? AND across sections, OR within each section's alternatives.
+    if groups:
+        sections_satisfied = sum(
+            1
+            for _, alts in groups
+            if any(
+                any(
+                    fuzzy_match(alt, act) >= SIMILARITY_THRESHOLD for act in actual_refs
+                )
+                for alt in alts
+            )
+        )
+        section_coverage = sections_satisfied / len(groups)
+    else:
+        # No expected references but the model cited something — neither right nor
+        # measurable. Keep coverage at 1.0; precision will reflect over-citation.
+        section_coverage = 1.0
 
-    matched_actual = 0
-    for act in actual_refs:
-        for exp in expected_refs:
-            if fuzzy_match(exp, act) >= SIMILARITY_THRESHOLD:
-                matched_actual += 1
-                break
-    precision = matched_actual / len(actual_refs) if actual_refs else 1.0
+    # Precision: for each actual citation, does it match SOME alternative anywhere?
+    flat_alternatives = [a for _, alts in groups for a in alts]
+    if not actual_refs:
+        precision = 1.0
+    elif not flat_alternatives:
+        precision = 0.0
+    else:
+        matched_actual = sum(
+            1
+            for act in actual_refs
+            if any(
+                fuzzy_match(alt, act) >= SIMILARITY_THRESHOLD
+                for alt in flat_alternatives
+            )
+        )
+        precision = matched_actual / len(actual_refs)
 
     metrics = {
         "citation_precision": round(precision, 3),
-        "citation_recall": round(recall, 3),
+        "section_coverage": round(section_coverage, 3),
     }
 
     # Accuracy: does the cited text appear in the paper's raw content?
@@ -817,7 +863,17 @@ def build_judge_prompt(result: dict) -> str:
 
     expected_refs = result.get("expected_references", [])
     if expected_refs:
-        refs_text = "\n".join(f"  - {r}" for r in expected_refs)
+        # Each SectionEvidence carries multiple alternatives that each
+        # independently satisfy that section. Tell the judge any one is enough.
+        blocks = []
+        for ev in expected_refs:
+            section = ev.get("section_label", "?") or "?"
+            alts = ev.get("alternatives", []) or []
+            alt_lines = "\n".join(f"    - {a}" for a in alts)
+            blocks.append(
+                f"  Section: {section} (any ONE of these is sufficient)\n{alt_lines}"
+            )
+        refs_text = "\n".join(blocks)
         parts.append(f"\n**Expected Citations:**\n{refs_text}")
 
     actual_cites = result.get("actual_citations", [])
@@ -873,7 +929,7 @@ def judge_single_result(result: dict, provider: Optional[LLMProvider] = None) ->
 
 CITATION_RESULT_KEYS = (
     "citation_precision",
-    "citation_recall",
+    "section_coverage",
     "citation_accuracy",
     "refusal_correctness",
 )
@@ -973,7 +1029,7 @@ def compute_summary(graded_results: list[dict]) -> dict:
 
     citation_metric_keys = [
         "citation_precision",
-        "citation_recall",
+        "section_coverage",
         "citation_accuracy",
         "refusal_correctness",
     ]
@@ -1038,7 +1094,7 @@ def print_summary(summary: dict):
 
     metrics = [
         ("Citation precision", "citation_precision"),
-        ("Citation recall", "citation_recall"),
+        ("Section coverage", "section_coverage"),
         ("Citation accuracy", "citation_accuracy"),
         ("Refusal correctness", "refusal_correctness"),
         ("Factual accuracy", "factual_accuracy"),
@@ -1135,7 +1191,7 @@ COMPARE_METRICS = [
 
 CITATION_METRICS = [
     ("Citation precision", "citation_precision"),
-    ("Citation recall", "citation_recall"),
+    ("Section coverage", "section_coverage"),
     ("Citation accuracy", "citation_accuracy"),
     ("Refusal correctness", "refusal_correctness"),
 ]
