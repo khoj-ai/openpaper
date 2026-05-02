@@ -21,6 +21,7 @@ import os
 import re
 import sys
 import time
+import unicodedata
 import uuid
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
@@ -643,15 +644,37 @@ _WHITESPACE_RE = re.compile(r"\s+")
 # around the same passage; stripped from citation edges before substring matching.
 _CITATION_EDGE_CHARS = "\"'“”‘’ \t.,;:"
 
+# Unicode chars that LLMs and PDFs disagree on mid-string. NFKD handles ligatures
+# (ﬁ → fi) and many compatibility forms automatically; this table covers the
+# punctuation NFKD leaves alone.
+_UNICODE_FOLD = str.maketrans(
+    {
+        "‘": "'",
+        "’": "'",
+        "‚": "'",
+        "‛": "'",  # single quotes
+        "“": '"',
+        "”": '"',
+        "„": '"',
+        "‟": '"',  # double quotes
+        "–": "-",
+        "—": "-",
+        "−": "-",  # en/em/minus
+        " ": " ",  # non-breaking space
+    }
+)
+
 
 def _normalize_for_substring(s: str) -> str:
-    """Lowercase and collapse whitespace so PDF line breaks don't break matches.
+    """Lowercase, fold unicode punctuation/ligatures, and collapse whitespace.
 
     PyPDF2 extracts text with newlines at the PDF's visual line endings, while
-    LLM-emitted citations are continuous text — without normalization, literal
-    substring matching misses nearly everything.
+    LLM-emitted citations are continuous text. PDFs also contain ligatures
+    (ﬁ, ﬂ) and straight quotes; LLMs emit decomposed letters and smart quotes.
+    Without folding, literal substring matching misses nearly everything.
     """
-    return _WHITESPACE_RE.sub(" ", s.lower()).strip()
+    folded = unicodedata.normalize("NFKD", s).translate(_UNICODE_FOLD)
+    return _WHITESPACE_RE.sub(" ", folded.lower()).strip()
 
 
 def _normalize_citation_ref(s: str) -> str:
@@ -661,6 +684,41 @@ def _normalize_citation_ref(s: str) -> str:
     but that don't appear in the source PDF text.
     """
     return _normalize_for_substring(s).strip(_CITATION_EDGE_CHARS)
+
+
+_PDF_HYPHEN_BREAK_RE = re.compile(r"-\s+")
+
+
+def _strip_all_whitespace(s: str) -> str:
+    """Remove every whitespace char, plus PDF line-break hyphenation. Used
+    as a last-resort substring fallback to absorb PyPDF2 artifacts:
+      - stray mid-word spaces ('o ther' → 'other')
+      - inner punctuation spacing ('(n= 3297)' vs '(n = 3297)')
+      - end-of-line hyphenation ('walkingdis- tance' → 'walkingdistance')
+    """
+    return _WHITESPACE_RE.sub("", _PDF_HYPHEN_BREAK_RE.sub("", s))
+
+
+def _citation_appears_in(ref_norm: str, raw_norm: str, raw_no_ws: str) -> bool:
+    """Best-effort substring check: full string, then 80-char prefix, then
+    no-whitespace fallback for both. The model often appends context past
+    what's verbatim in the paper, so prefix matching is intentional."""
+    if not ref_norm:
+        return False
+    if ref_norm in raw_norm:
+        return True
+    prefix = ref_norm[:80]
+    if len(prefix) >= 20 and prefix in raw_norm:
+        return True
+    # Whitespace-stripped fallback. Use a longer prefix here because once you
+    # remove spaces, 80 chars covers more meaningful tokens.
+    ref_no_ws = _strip_all_whitespace(ref_norm)
+    if len(ref_no_ws) >= 20 and ref_no_ws in raw_no_ws:
+        return True
+    prefix_no_ws = ref_no_ws[:120]
+    if len(prefix_no_ws) >= 20 and prefix_no_ws in raw_no_ws:
+        return True
+    return False
 
 
 def _evidence_groups(expected_refs: list) -> list[tuple[str, list[str]]]:
@@ -682,6 +740,12 @@ def compute_citation_metrics(
     Adversarial rows return only refusal_correctness — precision/coverage/accuracy
     aren't meaningful when the correct behavior is to refuse to cite.
 
+    Adversarial scoring measures fabrication, not exact-passage match: the
+    dataset cannot enumerate every legitimate refutation passage, so we count
+    a refusal as correct iff every cited reference is grounded in the paper's
+    raw text. Off-topic-but-grounded citations are caught by the LLM judge's
+    groundedness score, not here.
+
     Non-adversarial rows return:
     - section_coverage: AND across required sections, OR within each section's
       alternatives. For lookup/comprehension (typically 1 section) this is binary.
@@ -698,23 +762,19 @@ def compute_citation_metrics(
     )
 
     if is_adversarial:
-        # The model should NOT cite anything outside the optional refutation set.
-        # No citations = perfect refusal. Flatten alternatives across all sections
-        # so any quote in any SectionEvidence counts as a legit refutation.
-        groups = _evidence_groups(expected_refs)
-        flat_alternatives = [a for _, alts in groups for a in alts]
         if not actual_refs:
             return {"refusal_correctness": 1.0}
-        if not flat_alternatives:
-            return {"refusal_correctness": 0.0}
-        all_match = all(
-            any(
-                fuzzy_match(act, exp) >= SIMILARITY_THRESHOLD
-                for exp in flat_alternatives
-            )
-            for act in actual_refs
+        if not paper_raw_content:
+            # Can't check grounding without the paper text — leave the metric
+            # absent rather than assigning a misleading score.
+            return {}
+        raw_norm = _normalize_for_substring(paper_raw_content)
+        raw_no_ws = _strip_all_whitespace(raw_norm)
+        all_grounded = all(
+            _citation_appears_in(_normalize_citation_ref(ref), raw_norm, raw_no_ws)
+            for ref in actual_refs
         )
-        return {"refusal_correctness": 1.0 if all_match else 0.0}
+        return {"refusal_correctness": 1.0 if all_grounded else 0.0}
 
     groups = _evidence_groups(expected_refs)
 
@@ -772,20 +832,13 @@ def compute_citation_metrics(
     if not actual_refs:
         metrics["citation_accuracy"] = 1.0
     elif paper_raw_content:
-        found = 0
         raw_norm = _normalize_for_substring(paper_raw_content)
-        for ref in actual_refs:
-            ref_norm = _normalize_citation_ref(ref)
-            if not ref_norm:
-                continue
-            if ref_norm in raw_norm:
-                found += 1
-                continue
-            # Fall back to a prefix match: the LLM may append context beyond
-            # what's verbatim in the paper, or paraphrase the tail of a quote.
-            prefix = ref_norm[:80]
-            if len(prefix) >= 20 and prefix in raw_norm:
-                found += 1
+        raw_no_ws = _strip_all_whitespace(raw_norm)
+        found = sum(
+            1
+            for ref in actual_refs
+            if _citation_appears_in(_normalize_citation_ref(ref), raw_norm, raw_no_ws)
+        )
         metrics["citation_accuracy"] = round(found / len(actual_refs), 3)
 
     return metrics
