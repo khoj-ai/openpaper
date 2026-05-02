@@ -124,8 +124,29 @@ The dataset is a flat table where some fields are sparse — they are only popul
 | `question_type` | string | One of `lookup`, `comprehension`, `multi_hop`, `adversarial` (see below) |
 | `question` | string | The evaluation question |
 | `expected_answer` | string | Expected answer |
-| `expected_references` | list[string] | Expected reference passages from the paper |
+| `expected_references` | list[SectionEvidence] | Expected supporting evidence, grouped by section. See [Expected references](#expected-references) below. |
 | `judge_rubric` | string | Rubric for LLM-as-judge scoring (empty string when not applicable) |
+
+### Expected references
+
+`expected_references` is a list of `SectionEvidence` objects, one per distinct section of the paper that the answer should be grounded in:
+
+```json
+[
+  {{
+    "section_label": "RESULTS",
+    "alternatives": [
+      "Verbatim passage that supports the answer.",
+      "An equally-valid alternative passage from the same section."
+    ]
+  }}
+]
+```
+
+- **`section_label`** — a short human-readable label for the section the evidence comes from (e.g. `"Abstract"`, `"Methods"`, `"RESULTS"`). Not a strict taxonomy; reflects the paper's own headings.
+- **`alternatives`** — one or more verbatim passages from that section, each of which independently satisfies the citation requirement for that section. A model citing any one of them is correct for that section.
+
+Scoring uses **AND across sections, OR within each section's alternatives**: a model must satisfy every required section, but only needs to match one alternative within each. For `lookup` and `comprehension` rows the list is typically a single `SectionEvidence`, so coverage is binary. For `multi_hop` rows it contains one `SectionEvidence` per required section, so coverage is fractional (e.g. 2 of 3 hops covered).
 
 ### Sparse fields
 
@@ -144,10 +165,10 @@ The dataset is a flat table where some fields are sparse — they are only popul
 
 Each row's `question_type` indicates how the question was constructed and what the model is expected to do:
 
-- **`lookup`** — A factual question whose answer is a specific passage in the paper. Tests verbatim retrieval. `expected_references` contains the exact source passage.
-- **`comprehension`** — An abstractive question requiring synthesis, critique, or reasoning about implications within a single chunk of the paper. Scored against a per-question rubric (`judge_rubric`).
-- **`multi_hop`** — A question that requires combining information from two or more distinct, distant sections of the paper. The answer must NOT be derivable from any single passage. `expected_references` contains one quote per required section, and `metadata_required_sections` / `metadata_reasoning_chain` describe how the hops connect.
-- **`adversarial`** — A question with a *false premise*, or asking about something the paper does not address. The correct behavior is to identify the false premise and refuse to fabricate, not to produce a confident-sounding answer. `metadata_false_premise` states what is wrong with the question; `expected_refusal` indicates whether refusal is the correct response.
+- **`lookup`** — A factual question whose answer is a specific passage in the paper. Tests verbatim retrieval. `expected_references` typically holds a single `SectionEvidence` whose `alternatives` list the verbatim passage(s) that satisfy the question.
+- **`comprehension`** — An abstractive question requiring synthesis, critique, or reasoning about implications within a single chunk of the paper. Scored against a per-question rubric (`judge_rubric`). `expected_references` typically holds a single `SectionEvidence` pointing to the supporting passage(s).
+- **`multi_hop`** — A question that requires combining information from two or more distinct, distant sections of the paper. The answer must NOT be derivable from any single passage. `expected_references` holds one `SectionEvidence` per required section, each with one or more alternative passages; `metadata_required_sections` / `metadata_reasoning_chain` describe how the hops connect.
+- **`adversarial`** — A question with a *false premise*, or asking about something the paper does not address. The correct behavior is to identify the false premise and refuse to fabricate, not to produce a confident-sounding answer. `metadata_false_premise` states what is wrong with the question; `expected_refusal` indicates whether refusal is the correct response. `expected_references`, when populated, lists passages that legitimately support the refutation — but the field is intentionally permissive and may be empty for questions where the paper simply doesn't address the topic.
 
 ## Licensing
 

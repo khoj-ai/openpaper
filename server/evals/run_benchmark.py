@@ -856,24 +856,59 @@ Return your evaluation as valid JSON with this exact structure:
 {
     "factual_accuracy": <1-5>,
     "completeness": <1-5>,
-    "justification": "<brief explanation of scores>"
+    "justification": "<brief explanation of scores, citing specific claims>"
 }
 
-Scoring guide:
-- factual_accuracy (1-5): Are the facts in the answer correct? 5 = all correct, 1 = major errors
-- completeness (1-5): Does the answer cover all key points from the expected answer? 5 = fully complete, 1 = missing most points
+A "factual claim" is a discrete, verifiable assertion in the actual answer \
+(a number, a name, a relationship, a definition, a procedure step). Count \
+claims, then score against the rubric below — do not score holistically. \
+Compare each claim to the expected answer (and the rubric, if provided).
 
-Question-type-specific guidance:
-- For 'adversarial' questions: the question contains a FALSE PREMISE or asks about \
-something the paper does not address. The CORRECT response is to identify the false \
-premise and refuse to fabricate. Score factual_accuracy = 5 if the model correctly \
-flags the false premise; score 1 if the model confidently fabricates an answer. \
-A confident, fluent answer to an unanswerable question is the WORST possible outcome — \
-it must be scored 1 on factual_accuracy regardless of how plausible the answer sounds.
-- For 'multi_hop' questions: the answer requires synthesizing facts from MULTIPLE \
-distinct sections of the paper. Score completeness = 5 ONLY when the model \
-demonstrably integrates information from each required section listed in the prompt. \
-Score completeness <= 2 if the model addresses only one section when multiple were required.
+factual_accuracy:
+  5 — Every factual claim in the actual answer is consistent with the expected \
+      answer. No contradictions, no fabricated specifics. Extra detail not \
+      present in the expected answer is fine if it is plausibly drawn from \
+      the cited evidence and does not contradict anything.
+  4 — Exactly ONE minor inaccuracy: a misstated number close to correct, a \
+      slightly wrong attribution, or imprecise paraphrasing. The core claim \
+      is right and a reader would still come away with the correct picture.
+  3 — One substantive factual error (a wrong number, wrong mechanism, wrong \
+      cause-effect direction) OR 2-3 minor errors. The core answer survives \
+      but a careful reader would notice the mistake.
+  2 — Multiple substantive errors, OR one error that undermines the main \
+      claim. A reader would walk away with a meaningfully wrong understanding.
+  1 — The core claim contradicts the expected answer, OR the answer is \
+      fabricated wholesale. For adversarial questions: any confident answer \
+      that does not flag the false premise is automatically 1, regardless of \
+      how plausible it sounds.
+
+completeness:
+  5 — Every distinct point in the expected answer is addressed. For multi-hop \
+      questions, every required section is integrated.
+  4 — Exactly ONE minor point omitted: a supporting detail, a numerical \
+      example, a secondary qualifier. Main answer is fully covered.
+  3 — One substantive point missing (a key mechanism, a major caveat, a \
+      required comparison) OR 2-3 minor points missing. Bulk of the answer \
+      is present.
+  2 — Multiple substantive points missing, OR a multi-hop answer that covers \
+      only a fraction of the required sections. Reader gets only a partial \
+      picture.
+  1 — The core point is not addressed at all, or addressed only by passing \
+      mention. For multi-hop: only one section addressed when 3+ were required.
+
+Question-type-specific notes:
+- 'adversarial': the CORRECT response is to identify the false premise and \
+  refuse to fabricate. Correct refusal with grounded explanation = factual_accuracy 5. \
+  A confident answer that does not flag the false premise = factual_accuracy 1, \
+  regardless of fluency.
+- 'multi_hop': the answer must synthesize from MULTIPLE distinct sections \
+  listed in 'Required Sections'. Apply the completeness scale strictly: \
+  missing a whole required section is a substantive omission (3 or below), \
+  addressing only one of three is a 1.
+
+In your justification, name the specific claims or omissions that drove each \
+score. Vague justifications ("looks accurate", "covers the main points") are \
+not acceptable.
 
 Return ONLY the JSON object, no other text."""
 
