@@ -100,14 +100,6 @@ A general-purpose evaluation dataset for scientific paper question-answering sys
 
 Originally built for evaluating [Open Paper](https://openpaper.ai), but designed to be useful for any research paper QA or RAG system.
 
-## Dataset Details
-
-- **Version:** {data.get('version', '?')}
-- **Created:** {data.get('created_at', '?')[:10]}
-- **Source manifest:** `{data.get('source_manifest', '?')}`
-- **Total rows:** {data.get('total_rows', '?')}
-- **Papers processed:** {data.get('total_papers_processed', '?')}
-
 ## Schema
 
 The dataset is a flat table where some fields are sparse — they are only populated for certain `question_type` values. The "Populated on" column below indicates which question types use each field; rows of other types will have `null` for that field.
