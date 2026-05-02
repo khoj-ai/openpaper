@@ -743,8 +743,7 @@ def compute_citation_metrics(
     Adversarial scoring measures fabrication, not exact-passage match: the
     dataset cannot enumerate every legitimate refutation passage, so we count
     a refusal as correct iff every cited reference is grounded in the paper's
-    raw text. Off-topic-but-grounded citations are caught by the LLM judge's
-    groundedness score, not here.
+    raw text.
 
     Non-adversarial rows return:
     - section_coverage: AND across required sections, OR within each section's
@@ -851,20 +850,18 @@ def compute_citation_metrics(
 JUDGE_SYSTEM_PROMPT = """\
 You are an expert evaluator for a research paper QA system. You will be given \
 a question about a research paper, the expected answer, and the system's actual answer. \
-Score the actual answer on three dimensions.
+Score the actual answer on two dimensions.
 
 Return your evaluation as valid JSON with this exact structure:
 {
     "factual_accuracy": <1-5>,
     "completeness": <1-5>,
-    "groundedness": <1-5>,
     "justification": "<brief explanation of scores>"
 }
 
 Scoring guide:
 - factual_accuracy (1-5): Are the facts in the answer correct? 5 = all correct, 1 = major errors
 - completeness (1-5): Does the answer cover all key points from the expected answer? 5 = fully complete, 1 = missing most points
-- groundedness (1-5): Is the answer grounded in paper content (not hallucinated)? 5 = fully grounded, 1 = mostly hallucinated
 
 Question-type-specific guidance:
 - For 'adversarial' questions: the question contains a FALSE PREMISE or asks about \
@@ -872,8 +869,7 @@ something the paper does not address. The CORRECT response is to identify the fa
 premise and refuse to fabricate. Score factual_accuracy = 5 if the model correctly \
 flags the false premise; score 1 if the model confidently fabricates an answer. \
 A confident, fluent answer to an unanswerable question is the WORST possible outcome — \
-it must be scored 1 on factual_accuracy and 1 on groundedness regardless of how \
-plausible the answer sounds.
+it must be scored 1 on factual_accuracy regardless of how plausible the answer sounds.
 - For 'multi_hop' questions: the answer requires synthesizing facts from MULTIPLE \
 distinct sections of the paper. Score completeness = 5 ONLY when the model \
 demonstrably integrates information from each required section listed in the prompt. \
@@ -945,7 +941,6 @@ def judge_single_result(result: dict, provider: Optional[LLMProvider] = None) ->
         return {
             "factual_accuracy": 0,
             "completeness": 0,
-            "groundedness": 0,
             "justification": "No answer produced (error during generation)",
         }
 
@@ -966,7 +961,6 @@ def judge_single_result(result: dict, provider: Optional[LLMProvider] = None) ->
             return {
                 "factual_accuracy": int(scores.get("factual_accuracy", 0)),
                 "completeness": int(scores.get("completeness", 0)),
-                "groundedness": int(scores.get("groundedness", 0)),
                 "justification": scores.get("justification", ""),
             }
     except Exception as e:
@@ -975,7 +969,6 @@ def judge_single_result(result: dict, provider: Optional[LLMProvider] = None) ->
     return {
         "factual_accuracy": 0,
         "completeness": 0,
-        "groundedness": 0,
         "justification": "Judge error",
     }
 
@@ -1027,8 +1020,7 @@ def grade_results(
         result.update(judge_scores)
         logger.info(
             f"  Scores: accuracy={judge_scores.get('factual_accuracy')}, "
-            f"completeness={judge_scores.get('completeness')}, "
-            f"groundedness={judge_scores.get('groundedness')}"
+            f"completeness={judge_scores.get('completeness')}"
         )
 
         save_results_file(results, results_path)
@@ -1089,7 +1081,6 @@ def compute_summary(graded_results: list[dict]) -> dict:
     judge_metric_keys = [
         "factual_accuracy",
         "completeness",
-        "groundedness",
     ]
 
     def aggregate(items: list[dict]) -> dict:
@@ -1152,7 +1143,6 @@ def print_summary(summary: dict):
         ("Refusal correctness", "refusal_correctness"),
         ("Factual accuracy", "factual_accuracy"),
         ("Completeness", "completeness"),
-        ("Groundedness", "groundedness"),
     ]
 
     for label, key in metrics:
@@ -1238,7 +1228,6 @@ def discover_models(output_dir: str) -> list[str]:
 COMPARE_METRICS = [
     ("Factual accuracy", "factual_accuracy"),
     ("Completeness", "completeness"),
-    ("Groundedness", "groundedness"),
     ("Avg latency (s)", "avg_latency_seconds"),
 ]
 
@@ -1405,7 +1394,6 @@ def print_comparison(
     metrics = [
         ("Factual accuracy", "factual_accuracy"),
         ("Completeness", "completeness"),
-        ("Groundedness", "groundedness"),
         ("Avg latency (s)", "avg_latency_seconds"),
     ]
 
@@ -1517,7 +1505,6 @@ def print_all_providers_comparison(
     metrics = [
         ("Factual accuracy", "factual_accuracy"),
         ("Completeness", "completeness"),
-        ("Groundedness", "groundedness"),
         ("Avg latency (s)", "avg_latency_seconds"),
     ]
 
