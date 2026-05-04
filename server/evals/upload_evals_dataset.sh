@@ -98,7 +98,7 @@ tags:
 
 A general-purpose evaluation dataset for scientific paper question-answering systems. Contains question-answer pairs generated from scientific papers across multiple domains.
 
-Originally built for evaluating [Open Paper](https://openpaper.ai), but designed to be useful for any research paper QA or RAG system.
+Originally built for evaluating [Open Paper](https://openpaper.ai), but designed to be useful for any research paper QA or RAG system. The dataset-generation pipeline, benchmark harness, citation matcher, and LLM judge are open-source at [github.com/khoj-ai/openpaper/tree/master/server/evals](https://github.com/khoj-ai/openpaper/tree/master/server/evals).
 
 ## Schema
 
