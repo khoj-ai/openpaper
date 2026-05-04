@@ -1273,6 +1273,10 @@ CITATION_METRICS = [
     ("Refusal correctness", "refusal_correctness"),
 ]
 
+# Canonical render order for per-question-type breakdowns.
+# Question types absent from this list are appended alphabetically afterward.
+QUESTION_TYPE_ORDER = ("lookup", "comprehension", "multi_hop", "adversarial")
+
 
 def write_comparison_csv(
     csv_path: str,
@@ -1333,7 +1337,9 @@ def write_all_providers_csv(csv_path: str, all_results: dict):
 
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["scope", "domain", "metric"] + [c[0] for c in columns])
+        # `slice` holds the slice key (domain name or question_type label);
+        # `scope` disambiguates which.
+        writer.writerow(["scope", "slice", "metric"] + [c[0] for c in columns])
 
         for label, key in COMPARE_METRICS:
             row = ["overall", "", label]
@@ -1378,6 +1384,39 @@ def write_all_providers_csv(csv_path: str, all_results: dict):
                             .get(domain, {})
                         )
                         row.append(_csv_cell(domain_data, key))
+                    else:
+                        row.append("")
+                writer.writerow(row)
+
+        all_qtypes_set = set()
+        for entry in all_results.values():
+            for mode in ("harness", "baseline"):
+                all_qtypes_set.update(entry.get(f"{mode}_by_question_type", {}).keys())
+        ordered_qtypes = [
+            q for q in QUESTION_TYPE_ORDER if q in all_qtypes_set
+        ] + sorted(all_qtypes_set - set(QUESTION_TYPE_ORDER))
+
+        for qtype in ordered_qtypes:
+            for label, key in COMPARE_METRICS:
+                row = ["question_type", qtype, label]
+                for _, provider_name, mode in columns:
+                    qtype_data = (
+                        all_results[provider_name]
+                        .get(f"{mode}_by_question_type", {})
+                        .get(qtype, {})
+                    )
+                    row.append(_csv_cell(qtype_data, key))
+                writer.writerow(row)
+            for label, key in CITATION_METRICS:
+                row = ["question_type", qtype, label]
+                for _, provider_name, mode in columns:
+                    if mode == "harness":
+                        qtype_data = (
+                            all_results[provider_name]
+                            .get("harness_by_question_type", {})
+                            .get(qtype, {})
+                        )
+                        row.append(_csv_cell(qtype_data, key))
                     else:
                         row.append("")
                 writer.writerow(row)
@@ -1518,6 +1557,9 @@ def print_all_providers_comparison(
                         "errors", 0
                     )
                     entry[f"{mode}_by_domain"] = summary.get("by_domain", {})
+                    entry[f"{mode}_by_question_type"] = summary.get(
+                        "by_question_type", {}
+                    )
         if entry:
             all_results[model_name] = entry
 
@@ -1615,6 +1657,59 @@ def print_all_providers_comparison(
                     val = domain_data.get(key, 0)
                     line += f"{val:>{col_width}.3f}"
                 logger.info(line)
+
+    # Per-question-type breakdown. Mirrors the per-domain block but also prints
+    # citation metrics (harness-only), since the per-type slice is where the
+    # citation metrics carry the most signal — multi-hop drives the spread on
+    # section coverage; adversarial is the only slice with refusal correctness.
+    all_qtypes_set = set()
+    for entry in all_results.values():
+        for mode in ("harness", "baseline"):
+            all_qtypes_set.update(entry.get(f"{mode}_by_question_type", {}).keys())
+    ordered_qtypes = [q for q in QUESTION_TYPE_ORDER if q in all_qtypes_set] + sorted(
+        all_qtypes_set - set(QUESTION_TYPE_ORDER)
+    )
+
+    if ordered_qtypes:
+        harness_columns = [c for c in columns if c[2] == "harness"]
+        logger.info("")
+        logger.info("-" * (25 + col_width * len(columns)))
+        logger.info("BY QUESTION TYPE")
+        logger.info("-" * (25 + col_width * len(columns)))
+
+        for qtype in ordered_qtypes:
+            logger.info(f"\n  {qtype}")
+            header = f"{'Metric':<25}" + "".join(
+                f"{c[0]:>{col_width}}" for c in columns
+            )
+            logger.info(header)
+
+            for label, key in metrics:
+                line = f"{label:<25}"
+                for _, provider_name, mode in columns:
+                    qtype_data = (
+                        all_results[provider_name]
+                        .get(f"{mode}_by_question_type", {})
+                        .get(qtype, {})
+                    )
+                    line += _fmt_cell(qtype_data, key, col_width)
+                logger.info(line)
+
+            if harness_columns:
+                cite_header = f"{'Metric (harness only)':<25}" + "".join(
+                    f"{c[0]:>{col_width}}" for c in harness_columns
+                )
+                logger.info(cite_header)
+                for label, key in CITATION_METRICS:
+                    line = f"{label:<25}"
+                    for _, provider_name, _ in harness_columns:
+                        qtype_data = (
+                            all_results[provider_name]
+                            .get("harness_by_question_type", {})
+                            .get(qtype, {})
+                        )
+                        line += _fmt_cell(qtype_data, key, col_width)
+                    logger.info(line)
 
     logger.info("=" * (25 + col_width * len(columns)))
 
