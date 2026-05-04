@@ -438,7 +438,7 @@ def get_existing_sections_by_paper(dataset: dict) -> dict[str, set[str]]:
 
 def sections_needed_for_paper(existing_sections: set[str]) -> set[str]:
     """Return which sections still need to be generated for a paper."""
-    return set(ALL_SECTIONS) - existing_sections
+    return set(ALL_SECTIONS) - existing_sections  # type: ignore
 
 
 # ---------------------------------------------------------------------------
