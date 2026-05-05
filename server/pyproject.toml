@@ -39,7 +39,7 @@ dependencies = [
     "resend>=2.10.0",
     "celery>=5.5.3",
     "stripe>=12.3.0",
-    "pypdf2>=3.0.1",
+    "pypdf>=5.0.0",
     "exa-py>=1.0.0",
 ]
 

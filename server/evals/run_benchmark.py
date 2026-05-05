@@ -28,7 +28,7 @@ from io import BytesIO
 from typing import Optional
 
 from dotenv import load_dotenv
-from PyPDF2 import PdfReader
+from pypdf import PdfReader
 
 load_dotenv()
 

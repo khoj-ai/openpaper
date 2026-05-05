@@ -27,7 +27,7 @@ import boto3
 import requests
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
-from PyPDF2 import PdfReader
+from pypdf import PdfReader
 
 load_dotenv()
 
