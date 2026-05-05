@@ -19,7 +19,7 @@ from app.database.crud.projects.project_data_table_crud import (
     data_table_row_crud,
 )
 from app.database.crud.projects.project_paper_crud import project_paper_crud
-from app.database.database import get_db
+from app.database.database import SessionLocal, get_db
 from app.database.models import ConversableType, Conversation, JobStatus
 from app.database.telemetry import track_event
 from app.helpers.email import send_data_table_complete_email
@@ -29,7 +29,7 @@ from app.llm.citation_handler import CitationHandler
 from app.llm.operations import operations
 from app.schemas.responses import DataTableResult, PaperMetadataExtraction
 from app.schemas.user import CurrentUser
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -81,6 +81,91 @@ def handle_failed_upload(
     paper_upload_job_crud.mark_as_failed(db=db, job_id=job_id, user=job_user)
 
 
+def post_process_paper(
+    *,
+    paper_id: uuid.UUID,
+    raw_content: str,
+    title: str,
+    authors: list[str],
+    job_user: CurrentUser,
+) -> None:
+    """Run paper post-processing (passage FTS indexing, DOI lookup) off the webhook hot path."""
+    db = SessionLocal()
+    try:
+        # Stamp attempted_metadata_at up front so a concurrent GET /paper
+        # short-circuits its own synchronous DOI lookup while we work.
+        try:
+            paper = paper_crud.get(db=db, id=paper_id, user=job_user)
+            if paper:
+                paper_crud.update(
+                    db=db,
+                    obj_in=PaperUpdate(
+                        attempted_metadata_at=datetime.now(timezone.utc)
+                    ),
+                    db_obj=paper,
+                    user=job_user,
+                )
+        except Exception as e:
+            db.rollback()
+            logger.error(
+                f"Error stamping attempted_metadata_at for paper {paper_id}: {str(e)}",
+                exc_info=True,
+            )
+
+        try:
+            paper_crud.index_paper_passages(
+                db,
+                paper_id=paper_id,
+                raw_content=raw_content,
+            )
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            logger.error(
+                f"Error indexing passages for paper {paper_id}: {str(e)}",
+                exc_info=True,
+            )
+
+        doi: Optional[str] = None
+        try:
+            doi = get_doi(title, authors)
+        except Exception as e:
+            logger.error(
+                f"Error resolving DOI for paper {paper_id}: {str(e)}",
+                exc_info=True,
+            )
+
+        try:
+            paper = paper_crud.get(db=db, id=paper_id, user=job_user)
+            if paper:
+                update_fields: dict = {
+                    "attempted_metadata_at": datetime.now(timezone.utc)
+                }
+                if doi:
+                    update_fields["doi"] = doi
+                paper_crud.update(
+                    db=db,
+                    obj_in=PaperUpdate(**update_fields),
+                    db_obj=paper,
+                    user=job_user,
+                )
+        except Exception as e:
+            db.rollback()
+            logger.error(
+                f"Error finalizing metadata for paper {paper_id}: {str(e)}",
+                exc_info=True,
+            )
+
+        track_event(
+            "doi_resolved",
+            properties={"has_doi": bool(doi)},
+            user_id=str(job_user.id),
+            db=db,
+        )
+    finally:
+        db.close()
+
+
 class PDFImage(BaseModel):
     """
     Schema for an image extracted from a PDF.
@@ -124,7 +209,10 @@ class PdfProcessingWebhookData(BaseModel):
 
 @webhook_router.post("/paper-processing/{job_id}")
 async def handle_paper_processing_webhook(
-    job_id: str, webhook_data: PdfProcessingWebhookData, db: Session = Depends(get_db)
+    job_id: str,
+    webhook_data: PdfProcessingWebhookData,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
 ):
     """Handle webhook from paper processing jobs service."""
 
@@ -240,20 +328,6 @@ async def handle_paper_processing_webhook(
                 user=job_user,
             )
 
-            # Index passages for full-text search
-            if result.raw_content and paper:
-                try:
-                    paper_crud.index_paper_passages(
-                        db,
-                        paper_id=uuid.UUID(str(paper.id)),
-                        raw_content=result.raw_content,
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"Error indexing passages for job {job_id}: {str(e)}",
-                        exc_info=True,
-                    )
-
             # Create highlights/annotations if any
             if metadata.highlights and paper:
                 try:
@@ -307,17 +381,6 @@ async def handle_paper_processing_webhook(
                     )
                     # Don't fail the whole process for conversation/message errors
 
-            # Post-processing: attempt to get DOI
-            doi = get_doi(metadata.title, metadata.authors)
-
-            if doi and paper:
-                paper_crud.update(
-                    db=db,
-                    obj_in=PaperUpdate(doi=doi),
-                    db_obj=paper,
-                    user=job_user,
-                )
-
             # Track metadata extraction event
             track_event(
                 "extracted_metadata",
@@ -327,7 +390,6 @@ async def handle_paper_processing_webhook(
                     "has_abstract": bool(metadata.abstract),
                     "has_summary": bool(metadata.summary),
                     "has_ai_highlights": bool(metadata.highlights),
-                    "has_doi": bool(doi),
                 },
                 user_id=str(user.id),
                 db=db,
@@ -349,6 +411,16 @@ async def handle_paper_processing_webhook(
 
             # Mark job as completed
             paper_upload_job_crud.mark_as_completed(db=db, job_id=job_id, user=job_user)
+
+            if paper:
+                background_tasks.add_task(
+                    post_process_paper,
+                    paper_id=uuid.UUID(str(paper.id)),
+                    raw_content=result.raw_content,
+                    title=metadata.title,
+                    authors=metadata.authors,
+                    job_user=job_user,
+                )
 
         else:
             # Processing failed
