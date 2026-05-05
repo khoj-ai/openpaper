@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Tuple
 
 import requests
-from PyPDF2 import PdfReader
+from pypdf import PdfReader
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
