@@ -75,7 +75,14 @@
     "minimatch": "^9.0.7",
     "hono": "^4.12.4",
     "@hono/node-server": "^1.19.10",
-    "qs": "^6.14.2"
+    "qs": "^6.14.2",
+    "protobufjs": "^7.5.5",
+    "flatted": "^3.4.2",
+    "micromatch/picomatch": "^2.3.2",
+    "tinyglobby/picomatch": "^4.0.4",
+    "express-rate-limit": "^8.2.2",
+    "dompurify": "^3.4.0",
+    "router/path-to-regexp": "^8.4.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
