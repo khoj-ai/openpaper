@@ -121,10 +121,9 @@ export function AnnotationsView({
 			annotationMap.set(ann.highlight_id, existing);
 		}
 
-		const annotatedHighlights = highlights.filter((h) => {
+		const renderableHighlights = highlights.filter((h) => {
 			if (!h.id) return false;
 			if (composeHighlightId && h.id === composeHighlightId) return true;
-			if (!annotationMap.has(h.id)) return false;
 			if (h.role === 'user') return true;
 			if (h.position) return true;
 			if (h.id && renderedHighlightPositions?.has(h.id)) return true;
@@ -132,7 +131,7 @@ export function AnnotationsView({
 		});
 
 		const seenIds = new Set<string>();
-		const dedupedHighlights = annotatedHighlights.filter((h) => {
+		const dedupedHighlights = renderableHighlights.filter((h) => {
 			if (!h.id || seenIds.has(h.id)) return false;
 			seenIds.add(h.id);
 			return true;
