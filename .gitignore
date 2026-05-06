@@ -56,3 +56,8 @@ eval_dataset.json
 eval*.json
 comparison_all.csv
 server/evals/results/charts/*.png
+
+# paper outputs
+*.tex
+build_*tex.sh
+*.sty
