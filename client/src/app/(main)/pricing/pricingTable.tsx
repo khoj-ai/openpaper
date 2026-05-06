@@ -19,12 +19,6 @@ const features: PricingFeature[] = [
         teams: true
     },
     {
-        name: "Paper finder",
-        basic: true,
-        researcher: true,
-        teams: true
-    },
-    {
         name: "Paper uploads",
         basic: "10",
         researcher: "500",
