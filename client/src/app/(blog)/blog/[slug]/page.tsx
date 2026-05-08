@@ -82,6 +82,7 @@ export function generateStaticParams() {
         { slug: 'why_open_source' },
         { slug: 'systematic_review' },
         { slug: 'howtorag' },
+        { slug: 'benchmark' },
     ];
 }
 
