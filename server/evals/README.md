@@ -2,6 +2,8 @@
 
 Measures how well the OpenPaper chat-with-paper pipeline answers questions about research papers, compared against a baseline of sending the raw PDF directly to an LLM.
 
+For the full write-up of the benchmark design, methods, and results, see the **[ResearchQA paper](https://openpaper.ai/blog/benchmark)** (also kept locally as [`paper.md`](paper.md)). The dataset is published on HuggingFace at [`khoj-ai/ResearchQA`](https://huggingface.co/datasets/khoj-ai/ResearchQA).
+
 ## Why
 
 We need to know whether the retrieval, citation, and prompting harness actually improves answer quality over a naive "throw the PDF at the model" approach. This suite gives us repeatable numbers on factual accuracy, completeness, groundedness, citation precision/recall, and latency across providers and domains.
