@@ -2,7 +2,7 @@
 
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from celery import Celery
@@ -56,6 +56,11 @@ def schedule_referral_settlement(
             # must pin the queue here. Must match what the worker's `-Q` set
             # contains (see jobs/scripts/start_worker.sh).
             queue="user_processing",
+        )
+        seconds_until = (eta - datetime.now(timezone.utc)).total_seconds()
+        logger.info(
+            f"Scheduled referral settlement: referral={referral_id} task={task.id} "
+            f"eta={eta.isoformat()} (in {seconds_until:.0f}s)"
         )
         return task.id
     except Exception as e:
