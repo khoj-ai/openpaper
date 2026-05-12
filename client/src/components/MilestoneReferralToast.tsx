@@ -38,9 +38,10 @@ export function MilestoneReferralToast({
     onOpenReferral: () => void;
 }) {
     const firedRef = useRef(false);
+    const inFlightRef = useRef(false);
 
     useEffect(() => {
-        if (firedRef.current) return;
+        if (firedRef.current || inFlightRef.current) return;
         if (!subscription) return;
         if (!hasHitAnyMilestone(subscription)) return;
 
@@ -53,7 +54,7 @@ export function MilestoneReferralToast({
         }
 
         let cancelled = false;
-        firedRef.current = true; // claim the slot immediately to dedupe
+        inFlightRef.current = true;
 
         (async () => {
             try {
@@ -61,21 +62,31 @@ export function MilestoneReferralToast({
                 if (cancelled) return;
                 if (status?.toast_seen) {
                     localStorage.setItem(LOCAL_STORAGE_KEY, "true");
+                    firedRef.current = true;
                     return;
                 }
 
-                toast(
-                    "You're getting a lot out of Open Paper — share with a friend?",
-                    {
-                        description: "Give $6, get $6 toward your subscription.",
-                        icon: <Gift className="h-4 w-4" />,
-                        duration: 12000,
-                        action: {
-                            label: "Refer a friend",
-                            onClick: onOpenReferral,
-                        },
+                toast("Loving Open Paper? Share it.", {
+                    // Stable id: in dev StrictMode or any double-mount, sonner
+                    // collapses duplicates with the same id into one toast.
+                    id: "referral-milestone-toast",
+                    description:
+                        "Give $6, get $6 when a friend upgrades to Researcher.",
+                    icon: <Gift className="h-4 w-4" />,
+                    duration: 12000,
+                    action: {
+                        label: "Refer a friend",
+                        onClick: onOpenReferral,
                     },
-                );
+                    classNames: {
+                        toast: "!min-w-[420px] !p-4 !gap-3",
+                        title: "!text-sm !font-semibold !leading-snug",
+                        description:
+                            "!text-xs !text-muted-foreground !leading-relaxed !mt-1",
+                        icon: "!self-start !mt-0.5",
+                    },
+                });
+                firedRef.current = true;
 
                 // Mark seen now even if they ignore it — we don't want to
                 // re-nudge on every page load. Best-effort.
@@ -86,9 +97,10 @@ export function MilestoneReferralToast({
                 }
                 localStorage.setItem(LOCAL_STORAGE_KEY, "true");
             } catch (err) {
-                // If the status check fails, retry next page load.
-                firedRef.current = false;
+                // Status check failed; allow a retry on next page load.
                 console.debug("referral toast check failed:", err);
+            } finally {
+                inFlightRef.current = false;
             }
         })();
 
