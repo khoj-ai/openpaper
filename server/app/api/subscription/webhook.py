@@ -1,19 +1,21 @@
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import stripe
+from app.api.referral.service import handle_referee_converted
 from app.api.subscription.config import (
     MONTHLY_PRICE_ID,
     STRIPE_WEBHOOK_SECRET,
     YEARLY_PRICE_ID,
     is_valid_price_id,
 )
+from app.database.crud.referral_crud import referral_crud
 from app.database.crud.subscription_crud import subscription_crud
 from app.database.crud.user_crud import user as user_crud
 from app.database.database import get_db
-from app.database.models import SubscriptionPlan, SubscriptionStatus
+from app.database.models import ReferralStatus, SubscriptionPlan, SubscriptionStatus
 from app.database.telemetry import track_event
 from app.helpers.email import (
     notify_billing_issue,
@@ -72,6 +74,7 @@ async def handle_stripe_webhook(
             "invoice.payment_succeeded",
             "subscription_schedule.completed",
             "subscription_schedule.released",
+            "charge.refunded",
         ]:
             logger.info(f"Skipping unsupported event type: {event_type}")
             return {"success": False}
@@ -205,6 +208,16 @@ async def handle_stripe_webhook(
                         user_id=str(user_id),
                         db=db,
                     )
+
+                    # If this user was referred, mark the referrer's credit
+                    # pending and schedule the 30-day settlement callback.
+                    try:
+                        handle_referee_converted(db, user_id)
+                    except Exception as e:
+                        logger.error(
+                            f"Error handling referee conversion for {user_id}: {e}",
+                            exc_info=True,
+                        )
                 else:
                     logger.warning(
                         f"Could not find user for customer {customer_id} when processing subscription.created"
@@ -553,6 +566,56 @@ async def handle_stripe_webhook(
                 logger.error(
                     f"Error processing past due subscription: {e}", exc_info=True
                 )
+
+        elif event_type == "charge.refunded":
+            charge = event["data"]["object"]
+            customer_id = charge.customer
+            try:
+                if not customer_id:
+                    return {"success": True}
+
+                subscription = subscription_crud.get_by_stripe_customer_id(
+                    db, customer_id
+                )
+                if not subscription:
+                    return {"success": True}
+
+                referee_user_id = subscription.user_id
+                referral = referral_crud.get_by_referee(db, referee_user_id)  # type: ignore[arg-type]
+                if not referral:
+                    return {"success": True}
+
+                if str(referral.status) != ReferralStatus.CREDIT_PENDING.value:
+                    # If credit is already available or already clawed back,
+                    # nothing to do here. Refunds after 30 days are not our
+                    # problem.
+                    return {"success": True}
+
+                # Only claw back if the refund landed inside our 14-day post-
+                # conversion window (Stripe's default refund window).
+                converted_at = referral.converted_at  # type: ignore[assignment]
+                if converted_at is None:
+                    return {"success": True}
+                if datetime.now(timezone.utc) - converted_at > timedelta(days=14):  # type: ignore[operator]
+                    return {"success": True}
+
+                referral_crud.mark_clawed_back(
+                    db, referral, reason=f"refund:{charge.id}"
+                )
+                track_event(
+                    event_name="referral_clawed_back",
+                    properties={
+                        "referral_id": str(referral.id),
+                        "charge_id": charge.id,
+                    },
+                    user_id=str(referral.referrer_user_id),
+                    db=db,
+                )
+                logger.info(
+                    f"Clawed back referral {referral.id} due to refund {charge.id}"
+                )
+            except Exception as e:
+                logger.error(f"Error handling refund clawback: {e}", exc_info=True)
 
         elif event_type in [
             "subscription_schedule.completed",

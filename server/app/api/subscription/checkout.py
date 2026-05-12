@@ -2,6 +2,7 @@ import logging
 import uuid
 
 import stripe
+from app.api.referral.service import get_active_attributed_referral
 from app.api.subscription.config import (
     MONTHLY_PRICE_ID,
     YEARLY_PRICE_ID,
@@ -102,11 +103,24 @@ def create_checkout_session(
             "return_url": f"{YOUR_DOMAIN}/subscribed?session_id={{CHECKOUT_SESSION_ID}}",
         }
 
+        # If the user was referred and is still within the attribution window,
+        # auto-apply their one-time coupon. Stripe rejects discounts alongside
+        # allow_promotion_codes, so we drop the latter for referred sessions.
+        attributed_referral = get_active_attributed_referral(db, current_user.id)
+        if attributed_referral and attributed_referral.referee_coupon_id:
+            session_params["discounts"] = [
+                {"coupon": str(attributed_referral.referee_coupon_id)}
+            ]
+            session_params.pop("allow_promotion_codes", None)
+
         # Add telemetry
         track_event(
             event_name="checkout_initiated",
             properties={
                 "interval": interval,
+                "has_referral_discount": bool(
+                    attributed_referral and attributed_referral.referee_coupon_id
+                ),
             },
             user_id=str(current_user.id),
             db=db,

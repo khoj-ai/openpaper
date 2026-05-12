@@ -142,6 +142,57 @@ def check_signup_abuse(
     return matches
 
 
+def check_referral_fraud(referrer: User, referee: User) -> tuple[bool, Optional[str]]:
+    """
+    Lightweight fraud heuristics for a referrer/referee pair.
+
+    Returns (is_clean, reason). The PM fingerprint check is intentionally
+    deferred — it requires a Stripe call and lives outside this module.
+    """
+    if str(referrer.id) == str(referee.id):
+        return False, "self_referral"
+
+    referrer_email = str(referrer.email).lower()
+    referee_email = str(referee.email).lower()
+
+    if normalize_email(referrer_email) == normalize_email(referee_email):
+        return False, "normalized_email_match"
+
+    referrer_local = _email_local_part(referrer_email)
+    referee_local = _email_local_part(referee_email)
+    similarity = _simple_similarity(referrer_local, referee_local)
+    if similarity >= 0.85 and referrer_local != referee_local:
+        return False, f"similar_email_local_part:{similarity:.2f}"
+
+    return True, None
+
+
+def send_referral_threshold_alert(
+    referrer: User, pending_plus_available_cents: int
+) -> None:
+    """Email admin when a single referrer's earnings cross the review threshold."""
+    html = f"""
+    <div style="font-family:sans-serif;max-width:700px;margin:0 auto;">
+        <h2 style="color:#d35400;">Referral Review Threshold Crossed</h2>
+        <p>
+            <b>{referrer.email}</b> (id <code>{referrer.id}</code>) has accumulated
+            <b>${pending_plus_available_cents / 100:.2f}</b> in referral credits.
+        </p>
+        <p>Worth a quick look at their recent referrals in the admin panel.</p>
+    </div>
+    """
+    try:
+        send_email(
+            to_email=ADMIN_EMAIL,
+            subject=f"[Referral Review] {referrer.email} crossed ${pending_plus_available_cents / 100:.0f}",
+            html_content=html,
+            from_name="Open Paper Alerts",
+            from_address="noreply@updates.openpaper.ai",
+        )
+    except Exception as e:
+        logger.error(f"Failed to send referral threshold alert: {e}", exc_info=True)
+
+
 def send_abuse_alert(new_user: User, matches: list[dict]) -> None:
     """Send an email to the admin alerting them of suspected signup abuse."""
     new_email = str(new_user.email)
