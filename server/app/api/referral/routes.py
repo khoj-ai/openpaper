@@ -4,11 +4,14 @@ import logging
 from datetime import datetime, timezone
 
 from app.api.referral.service import (
+    REFEREE_DISCOUNT_PERCENT,
     ReferralAttributionError,
     attribute_referral,
+    get_active_attributed_referral,
     get_summary_payload,
 )
 from app.auth.dependencies import get_required_user
+from app.database.crud.referral_crud import referral_crud
 from app.database.crud.user_crud import user as user_crud
 from app.database.database import get_db
 from app.database.models import ReferralAttributionMethod
@@ -83,6 +86,28 @@ async def attribute(
     )
 
     return {"success": True, "referral_id": str(referral.id)}
+
+
+@router.get("/balance")
+async def get_balance(
+    current_user: CurrentUser = Depends(get_required_user),
+    db: Session = Depends(get_db),
+):
+    """Read-only referral standing for the current user.
+
+    Used by surfaces that want to show "you have $X waiting" or "50% off
+    waiting" without lazy-creating a referral code for users who haven't
+    engaged with the share flow.
+    """
+    summary = referral_crud.get_summary_for_referrer(db, current_user.id)
+    attributed = get_active_attributed_referral(db, current_user.id)
+    return {
+        "pending_cents": summary["pending_cents"],
+        "available_cents": summary["available_cents"],
+        "total_converted": summary["total_converted"],
+        "referee_discount_percent": REFEREE_DISCOUNT_PERCENT,
+        "referee_discount_available": bool(attributed and attributed.referee_coupon_id),
+    }
 
 
 @router.get("/toast-status")
