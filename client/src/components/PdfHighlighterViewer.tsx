@@ -608,43 +608,42 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			setSelectedText(selection.content.text || "");
 			setIsHighlightInteraction(false);
 
+			// Prefer the DOM selection rect (accurate for multi-line text), but fall
+			// back to the library's bounding rect when the DOM selection has been
+			// cleared by the time this handler runs (focus transitions, cross-page
+			// selections, area-selection mode). Without the fallback, the popup
+			// silently fails to appear.
+			let anchorLeft: number | null = null;
+			let anchorTop: number | null = null;
+			let anchorBottom: number | null = null;
+
 			const domSelection = window.getSelection();
 			if (domSelection && domSelection.rangeCount > 0) {
-				const range = domSelection.getRangeAt(0);
-				const rect = range.getBoundingClientRect();
-				const clientRects = range.getClientRects();
-				// #region agent log
-				fetch("http://127.0.0.1:7848/ingest/1ffc24a3-d0c6-4802-9576-899d9a9fb32b", {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						"X-Debug-Session-Id": "434c20",
-					},
-					body: JSON.stringify({
-						sessionId: "434c20",
-						hypothesisId: "H1-H4",
-						location: "PdfHighlighterViewer.tsx:handleSelection",
-						message: "selection range rects",
-						data: {
-							union: {
-								top: rect.top,
-								bottom: rect.bottom,
-								left: rect.left,
-								height: rect.height,
-							},
-							clientRectCount: clientRects.length,
-							innerHeight: typeof window !== "undefined" ? window.innerHeight : null,
-						},
-						timestamp: Date.now(),
-						runId: "pre-fix",
-					}),
-				}).catch(() => {});
-				// #endregion
-				setTooltipPosition({
-					x: rect.left,
-					y: rect.bottom,
-				});
-				setSelectionRectTop(rect.top);
+				const rect = domSelection.getRangeAt(0).getBoundingClientRect();
+				if (rect.width > 0 || rect.height > 0) {
+					anchorLeft = rect.left;
+					anchorTop = rect.top;
+					anchorBottom = rect.bottom;
+				}
+			}
+
+			if (anchorBottom === null) {
+				const viewer = highlighterUtilsRef.current?.getViewer();
+				const { boundingRect } = selection.position;
+				const pageView = viewer?.getPageView(boundingRect.pageNumber - 1);
+				if (pageView?.div && pageView?.viewport) {
+					const pageRect = (pageView.div as HTMLElement).getBoundingClientRect();
+					const scaleX = pageView.viewport.width / boundingRect.width;
+					const scaleY = pageView.viewport.height / boundingRect.height;
+					anchorLeft = pageRect.left + boundingRect.x1 * scaleX;
+					anchorTop = pageRect.top + boundingRect.y1 * scaleY;
+					anchorBottom = pageRect.top + boundingRect.y2 * scaleY;
+				}
+			}
+
+			if (anchorLeft !== null && anchorBottom !== null) {
+				setTooltipPosition({ x: anchorLeft, y: anchorBottom });
+				setSelectionRectTop(anchorTop);
 			}
 		},
 		[setSelectedText, setTooltipPosition, setIsHighlightInteraction]
