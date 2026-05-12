@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Clock, CheckCircle, Gift } from "lucide-react";
-import { useReferralBalance, hasUnusedReferralValue } from "@/hooks/useReferralBalance";
+import { useReferralBalance } from "@/hooks/useReferralBalance";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -222,33 +222,48 @@ export default function PricingPage() {
 
 
 
-            {/* Referral credit / discount banner — only for users with
-                something to redeem who haven't upgraded yet. */}
-            {!isActiveSubscription && hasUnusedReferralValue(referralBalance) && referralBalance && (
+            {/* Referral credit / discount banner. Pre-upgrade: "ready to
+                redeem". Post-upgrade: "earned, already on your subscription". */}
+            {referralBalance && (referralBalance.available_cents > 0 || referralBalance.pending_cents > 0 || referralBalance.referee_discount_available) && (
                 <div className="max-w-2xl mx-auto -mt-8">
                     <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/60 dark:bg-emerald-950/20 p-4 flex items-start gap-3">
                         <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 shrink-0">
                             <Gift className="h-5 w-5" />
                         </div>
                         <div className="flex-1">
-                            <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
-                                {(() => {
-                                    const dollars = (referralBalance.available_cents / 100).toFixed(0);
-                                    const hasCredit = referralBalance.available_cents > 0;
-                                    const hasDiscount = referralBalance.referee_discount_available;
-                                    if (hasCredit && hasDiscount) {
-                                        return `$${dollars} in referral credit + ${referralBalance.referee_discount_percent}% off your first month`;
-                                    }
-                                    if (hasCredit) return `$${dollars} in referral credit ready`;
-                                    if (hasDiscount) return `${referralBalance.referee_discount_percent}% off your first month`;
-                                    return "Referral benefits ready";
-                                })()}
-                            </p>
-                            <p className="text-xs text-emerald-800/80 dark:text-emerald-200/80 mt-1">
-                                Applies automatically at checkout — no code needed.
-                                {referralBalance.pending_cents > 0 &&
-                                    ` $${(referralBalance.pending_cents / 100).toFixed(0)} more clearing soon.`}
-                            </p>
+                            {isActiveSubscription ? (
+                                <>
+                                    <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+                                        ${(referralBalance.available_cents / 100).toFixed(0)} in referral credit earned
+                                    </p>
+                                    <p className="text-xs text-emerald-800/80 dark:text-emerald-200/80 mt-1">
+                                        Credits apply automatically against your invoices.
+                                        {referralBalance.pending_cents > 0 &&
+                                            ` $${(referralBalance.pending_cents / 100).toFixed(0)} more clearing soon.`}
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+                                        {(() => {
+                                            const dollars = (referralBalance.available_cents / 100).toFixed(0);
+                                            const hasCredit = referralBalance.available_cents > 0;
+                                            const hasDiscount = referralBalance.referee_discount_available;
+                                            if (hasCredit && hasDiscount) {
+                                                return `$${dollars} in referral credit + ${referralBalance.referee_discount_percent}% off your first month`;
+                                            }
+                                            if (hasCredit) return `$${dollars} in referral credit ready`;
+                                            if (hasDiscount) return `${referralBalance.referee_discount_percent}% off your first month`;
+                                            return "Referral benefits ready";
+                                        })()}
+                                    </p>
+                                    <p className="text-xs text-emerald-800/80 dark:text-emerald-200/80 mt-1">
+                                        Applies automatically at checkout — no code needed.
+                                        {referralBalance.pending_cents > 0 &&
+                                            ` $${(referralBalance.pending_cents / 100).toFixed(0)} more clearing soon.`}
+                                    </p>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
