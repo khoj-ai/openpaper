@@ -1,6 +1,7 @@
 """User-facing referral API routes."""
 
 import logging
+from datetime import datetime, timezone
 
 from app.api.referral.service import (
     ReferralAttributionError,
@@ -82,3 +83,38 @@ async def attribute(
     )
 
     return {"success": True, "referral_id": str(referral.id)}
+
+
+@router.get("/toast-status")
+async def get_toast_status(
+    current_user: CurrentUser = Depends(get_required_user),
+    db: Session = Depends(get_db),
+):
+    """Lightweight check for whether the milestone toast should be considered.
+
+    Distinct from /me — does not lazy-create a referral code, so calling it on
+    every authenticated page load is cheap and doesn't clutter the DB.
+    """
+    user = user_crud.get(db, id=current_user.id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+    return {"toast_seen": user.referral_toast_seen_at is not None}
+
+
+@router.post("/toast-seen")
+async def mark_toast_seen(
+    current_user: CurrentUser = Depends(get_required_user),
+    db: Session = Depends(get_db),
+):
+    """Idempotent: stamp the user as having seen the referral milestone toast."""
+    user = user_crud.get(db, id=current_user.id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+    if user.referral_toast_seen_at is None:
+        setattr(user, "referral_toast_seen_at", datetime.now(timezone.utc))
+        db.commit()
+    return {"success": True}

@@ -59,6 +59,7 @@ def get_summary_payload(db: Session, user: User) -> dict:
         "referee_discount_percent": REFEREE_DISCOUNT_PERCENT,
         "credit_hold_days": CREDIT_HOLD_DAYS,
         "summary": summary,
+        "toast_seen": user.referral_toast_seen_at is not None,
     }
 
 
