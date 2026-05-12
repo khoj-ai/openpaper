@@ -52,6 +52,10 @@ def schedule_referral_settlement(
             "delayed_referral_settlement_callback",
             kwargs={"webhook_url": webhook_url},
             eta=eta,
+            # Explicit: the server's Celery instance has no task_routes, so we
+            # must pin the queue here. Must match what the worker's `-Q` set
+            # contains (see jobs/scripts/start_worker.sh).
+            queue="user_processing",
         )
         return task.id
     except Exception as e:
