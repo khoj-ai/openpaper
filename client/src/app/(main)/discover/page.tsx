@@ -142,15 +142,7 @@ function DiscoverPageContent() {
         )
     }
 
-    // Load search from URL ?id= param on mount
-    useEffect(() => {
-        const id = searchParams.get("id")
-        if (id) {
-            loadSearchById(id)
-        }
-    }, [searchParams, loadSearchById])
-
-    const handleReset = () => {
+    const resetSearchState = useCallback(() => {
         setQuestion("")
         setSubmittedQuestion(null)
         setSubqueries([])
@@ -162,6 +154,20 @@ function DiscoverPageContent() {
         setMode("scholarly")
         setOnlyOpenAccess(false)
         setYearFilter(null)
+    }, [])
+
+    // Sync page state to the URL: load by ?id=, or reset when navigating back to bare /discover.
+    useEffect(() => {
+        const id = searchParams.get("id")
+        if (id) {
+            loadSearchById(id)
+        } else {
+            resetSearchState()
+        }
+    }, [searchParams, loadSearchById, resetSearchState])
+
+    const handleReset = () => {
+        resetSearchState()
         router.push("/discover")
     }
 
@@ -252,7 +258,7 @@ function DiscoverPageContent() {
                             ])
                         } else if (parsed.type === "done") {
                             if (parsed.search_id) {
-                                router.replace(`/discover?id=${parsed.search_id}`)
+                                router.push(`/discover?id=${parsed.search_id}`)
                             }
                         } else if (parsed.type === "error") {
                             setError(parsed.content)
