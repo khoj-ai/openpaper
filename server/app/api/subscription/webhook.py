@@ -1,9 +1,14 @@
 import logging
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import stripe
+
+CLAWBACK_WINDOW_SECONDS = int(
+    os.getenv("REFERRAL_CLAWBACK_WINDOW_SECONDS", str(14 * 24 * 60 * 60))
+)
 from app.api.referral.service import handle_referee_converted
 from app.api.subscription.config import (
     MONTHLY_PRICE_ID,
@@ -596,7 +601,9 @@ async def handle_stripe_webhook(
                 converted_at = referral.converted_at  # type: ignore[assignment]
                 if converted_at is None:
                     return {"success": True}
-                if datetime.now(timezone.utc) - converted_at > timedelta(days=14):  # type: ignore[operator]
+                if datetime.now(timezone.utc) - converted_at > timedelta(  # type: ignore[operator]
+                    seconds=CLAWBACK_WINDOW_SECONDS
+                ):
                     return {"success": True}
 
                 referral_crud.mark_clawed_back(
