@@ -14,6 +14,11 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { fetchFromApi } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 
+const REFERRAL_STORAGE_KEY = 'op_ref';
+const REFERRAL_MANUAL_FLAG_KEY = 'op_ref_via_manual';
+const REFERRAL_CODE_PATTERN = /^[A-Z0-9]{4,16}$/;
+const REFERRAL_REDEMPTION_WINDOW_DAYS = 30;
+
 function LoginContent() {
 	const { user, loading, error: authError, login } = useAuth();
 	const [error, setError] = useState<string | null>(null);
@@ -39,12 +44,12 @@ function LoginContent() {
 		if (storedProvider) {
 			setLastUsedProvider(storedProvider);
 		}
-		// Surface the existing cookie if the user landed via a shared link.
-		const existing = document.cookie
-			.split('; ')
-			.find((c) => c.startsWith('op_ref='));
+		// Surface the existing referral if the user landed via a shared link.
+		// The ReferralCapture provider writes it to localStorage on any page
+		// load with ?r=<code>.
+		const existing = localStorage.getItem(REFERRAL_STORAGE_KEY);
 		if (existing) {
-			setReferralCode(decodeURIComponent(existing.split('=')[1]));
+			setReferralCode(existing);
 			setReferralApplied(true);
 			setReferralOpen(true);
 		}
@@ -52,14 +57,13 @@ function LoginContent() {
 
 	const applyReferralCode = () => {
 		const normalized = referralCode.trim().toUpperCase();
-		if (!/^[A-Z0-9]{4,16}$/.test(normalized)) {
+		if (!REFERRAL_CODE_PATTERN.test(normalized)) {
 			setEmailError('That referral code doesn’t look right.');
 			return;
 		}
 		setEmailError(null);
-		const maxAge = 60 * 60 * 24 * 90;
-		document.cookie = `op_ref=${encodeURIComponent(normalized)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
-		localStorage.setItem('op_ref_via_manual', 'true');
+		localStorage.setItem(REFERRAL_STORAGE_KEY, normalized);
+		localStorage.setItem(REFERRAL_MANUAL_FLAG_KEY, 'true');
 		setReferralCode(normalized);
 		setReferralApplied(true);
 	};
@@ -388,7 +392,7 @@ function LoginContent() {
 										</div>
 										{referralApplied && (
 											<p className="text-xs text-muted-foreground">
-												50% off your first month — applied at checkout.
+												50% off your first month — applied at checkout. Redeem within {REFERRAL_REDEMPTION_WINDOW_DAYS} days.
 											</p>
 										)}
 									</div>

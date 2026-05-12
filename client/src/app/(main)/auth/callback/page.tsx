@@ -6,23 +6,12 @@ import { Suspense, useEffect, useState } from "react";
 import { OPOnboarding } from "@/components/OPOnboarding";
 import { fetchFromApi } from "@/lib/api";
 
-const REFERRAL_COOKIE = "op_ref";
-
-function readReferralCookie(): string | null {
-	if (typeof document === "undefined") return null;
-	const match = document.cookie
-		.split("; ")
-		.find((c) => c.startsWith(`${REFERRAL_COOKIE}=`));
-	return match ? decodeURIComponent(match.split("=")[1]) : null;
-}
-
-function clearReferralCookie() {
-	if (typeof document === "undefined") return;
-	document.cookie = `${REFERRAL_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
-}
+const REFERRAL_STORAGE_KEY = "op_ref";
+const REFERRAL_MANUAL_FLAG_KEY = "op_ref_via_manual";
 
 async function attemptReferralAttribution(via_link: boolean) {
-	const code = readReferralCookie();
+	if (typeof window === "undefined") return;
+	const code = localStorage.getItem(REFERRAL_STORAGE_KEY);
 	if (!code) return;
 	try {
 		await fetchFromApi("/api/referral/attribute", {
@@ -35,7 +24,8 @@ async function attemptReferralAttribution(via_link: boolean) {
 		// the worst case is a missed attribution, not a broken flow.
 		console.debug("Referral attribution skipped:", err);
 	} finally {
-		clearReferralCookie();
+		localStorage.removeItem(REFERRAL_STORAGE_KEY);
+		localStorage.removeItem(REFERRAL_MANUAL_FLAG_KEY);
 	}
 }
 
@@ -56,9 +46,8 @@ function CallbackContent() {
 		if (welcome) {
 			// Brand-new account — attempt referral attribution. The "via_link"
 			// distinction is informational; manual code entry also lands here
-			// via the same cookie-based pipeline.
-			const viaLink = localStorage.getItem("op_ref_via_manual") !== "true";
-			localStorage.removeItem("op_ref_via_manual");
+			// via the same localStorage pipeline.
+			const viaLink = localStorage.getItem(REFERRAL_MANUAL_FLAG_KEY) !== "true";
 			void attemptReferralAttribution(viaLink);
 			return
 		}

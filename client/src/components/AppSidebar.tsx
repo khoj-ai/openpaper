@@ -93,6 +93,9 @@ const items = [
     },
 ]
 
+// TODO: remove this gate once we're ready to offer referrals to all users
+// (paid + basic). Until then the entry only renders for paid users, or for
+// basic users with banked credits / a pending discount.
 const REFERRAL_ENABLED_FOR_BASIC =
     process.env.NEXT_PUBLIC_REFERRAL_BASIC_ENABLED === "true";
 
