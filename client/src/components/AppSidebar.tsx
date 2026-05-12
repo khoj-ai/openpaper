@@ -6,6 +6,7 @@ import {
     FileText,
     FolderKanban,
     Compass,
+    Gift,
     Home,
     LogOut,
     MessageCircleQuestion,
@@ -17,6 +18,8 @@ import {
     User as UserIcon,
     X
 } from "lucide-react";
+import { ReferralDialog } from "@/components/ReferralDialog";
+import { MilestoneReferralToast } from "@/components/MilestoneReferralToast";
 
 import {
     Sidebar,
@@ -89,16 +92,23 @@ const items = [
     },
 ]
 
+const REFERRAL_ENABLED_FOR_BASIC =
+    process.env.NEXT_PUBLIC_REFERRAL_BASIC_ENABLED === "true";
+
 const UserMenuContent = ({
     user,
     handleLogout,
     toggleDarkMode,
     darkMode,
+    isPaid,
+    onOpenReferral,
 }: {
     user: User,
     handleLogout: () => void,
     toggleDarkMode: () => void,
-    darkMode: boolean
+    darkMode: boolean,
+    isPaid: boolean,
+    onOpenReferral: () => void,
 }) => (
     <div className="flex flex-col gap-1">
         <div className="flex items-center gap-3 p-3">
@@ -133,6 +143,16 @@ const UserMenuContent = ({
                 Plans
             </Button>
         </Link>
+        {(isPaid || REFERRAL_ENABLED_FOR_BASIC) && (
+            <Button
+                variant="ghost"
+                className="w-full justify-start"
+                onClick={onOpenReferral}
+            >
+                <Gift size={16} className="mr-2" />
+                Refer a friend
+            </Button>
+        )}
         {/* Dark Mode Toggle */}
         <Button onClick={toggleDarkMode} variant="ghost" className="w-full justify-start">
             {darkMode ? <Sun size={16} className="mr-2" /> : <Moon size={16} className="mr-2" />}
@@ -286,7 +306,9 @@ export function AppSidebar() {
     const { darkMode, toggleDarkMode } = useIsDarkMode();
     const { subscription, loading: subscriptionLoading } = useSubscription();
     const [dismissedWarning, setDismissedWarning] = useState<string | null>(null);
+    const [referralOpen, setReferralOpen] = useState(false);
     const isMobile = useIsMobile();
+    const isPaid = subscription?.plan === "researcher";
 
     useEffect(() => {
         if (!user) {
@@ -549,7 +571,7 @@ export function AppSidebar() {
                                     </SidebarMenuButton>
                                 </SheetTrigger>
                                 <SheetContent side="bottom">
-                                    <UserMenuContent user={user} handleLogout={handleLogout} toggleDarkMode={toggleDarkMode} darkMode={darkMode} />
+                                    <UserMenuContent user={user} handleLogout={handleLogout} toggleDarkMode={toggleDarkMode} darkMode={darkMode} isPaid={isPaid} onOpenReferral={() => setReferralOpen(true)} />
                                 </SheetContent>
                             </Sheet>
                         ) : (
@@ -567,7 +589,7 @@ export function AppSidebar() {
                                     </SidebarMenuButton>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-60 p-1" align="start">
-                                    <UserMenuContent user={user} handleLogout={handleLogout} toggleDarkMode={toggleDarkMode} darkMode={darkMode} />
+                                    <UserMenuContent user={user} handleLogout={handleLogout} toggleDarkMode={toggleDarkMode} darkMode={darkMode} isPaid={isPaid} onOpenReferral={() => setReferralOpen(true)} />
                                 </PopoverContent>
                             </Popover>
                         )}
@@ -589,6 +611,13 @@ export function AppSidebar() {
                     </SidebarMenuItem>
                 )}
             </SidebarFooter>
+            <ReferralDialog open={referralOpen} onOpenChange={setReferralOpen} />
+            {user && (
+                <MilestoneReferralToast
+                    subscription={subscription}
+                    onOpenReferral={() => setReferralOpen(true)}
+                />
+            )}
         </Sidebar >
     )
 }

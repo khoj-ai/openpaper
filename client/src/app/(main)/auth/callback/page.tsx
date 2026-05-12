@@ -4,6 +4,40 @@ import { Info, Loader2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { OPOnboarding } from "@/components/OPOnboarding";
+import { fetchFromApi } from "@/lib/api";
+
+const REFERRAL_COOKIE = "op_ref";
+
+function readReferralCookie(): string | null {
+	if (typeof document === "undefined") return null;
+	const match = document.cookie
+		.split("; ")
+		.find((c) => c.startsWith(`${REFERRAL_COOKIE}=`));
+	return match ? decodeURIComponent(match.split("=")[1]) : null;
+}
+
+function clearReferralCookie() {
+	if (typeof document === "undefined") return;
+	document.cookie = `${REFERRAL_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
+}
+
+async function attemptReferralAttribution(via_link: boolean) {
+	const code = readReferralCookie();
+	if (!code) return;
+	try {
+		await fetchFromApi("/api/referral/attribute", {
+			method: "POST",
+			body: JSON.stringify({ code, via_link }),
+		});
+	} catch (err) {
+		// Server returns success:false for invalid codes / late attempts; we
+		// don't surface this to the user. Network errors are silent too —
+		// the worst case is a missed attribution, not a broken flow.
+		console.debug("Referral attribution skipped:", err);
+	} finally {
+		clearReferralCookie();
+	}
+}
 
 function CallbackContent() {
 
@@ -20,6 +54,12 @@ function CallbackContent() {
 		setShowWelcome(welcome);
 
 		if (welcome) {
+			// Brand-new account — attempt referral attribution. The "via_link"
+			// distinction is informational; manual code entry also lands here
+			// via the same cookie-based pipeline.
+			const viaLink = localStorage.getItem("op_ref_via_manual") !== "true";
+			localStorage.removeItem("op_ref_via_manual");
+			void attemptReferralAttribution(viaLink);
 			return
 		}
 		else if (success) {

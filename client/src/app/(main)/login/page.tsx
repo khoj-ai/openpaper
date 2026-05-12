@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { AlertCircle, ArrowLeft, Loader2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, Loader2, Tag } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 import Image from "next/image";
@@ -30,13 +30,39 @@ function LoginContent() {
 	const [firstName, setFirstName] = useState('');
 	const [lastName, setLastName] = useState('');
 	const [lastUsedProvider, setLastUsedProvider] = useState<string | null>(null);
+	const [referralCode, setReferralCode] = useState('');
+	const [referralOpen, setReferralOpen] = useState(false);
+	const [referralApplied, setReferralApplied] = useState(false);
 
 	useEffect(() => {
 		const storedProvider = localStorage.getItem('signin-provider');
 		if (storedProvider) {
 			setLastUsedProvider(storedProvider);
 		}
+		// Surface the existing cookie if the user landed via a shared link.
+		const existing = document.cookie
+			.split('; ')
+			.find((c) => c.startsWith('op_ref='));
+		if (existing) {
+			setReferralCode(decodeURIComponent(existing.split('=')[1]));
+			setReferralApplied(true);
+			setReferralOpen(true);
+		}
 	}, []);
+
+	const applyReferralCode = () => {
+		const normalized = referralCode.trim().toUpperCase();
+		if (!/^[A-Z0-9]{4,16}$/.test(normalized)) {
+			setEmailError('That referral code doesn’t look right.');
+			return;
+		}
+		setEmailError(null);
+		const maxAge = 60 * 60 * 24 * 90;
+		document.cookie = `op_ref=${encodeURIComponent(normalized)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+		localStorage.setItem('op_ref_via_manual', 'true');
+		setReferralCode(normalized);
+		setReferralApplied(true);
+	};
 
 
 	// Handle error query param
@@ -326,6 +352,48 @@ function LoginContent() {
 									{emailError}
 								</AlertDescription>
 							</Alert>
+						)}
+						{!showNameInput && !showOtp && (
+							<div className="pt-2">
+								{!referralOpen ? (
+									<button
+										type="button"
+										className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+										onClick={() => setReferralOpen(true)}
+									>
+										<Tag className="h-3 w-3" />
+										Have a referral code?
+									</button>
+								) : (
+									<div className="space-y-2">
+										<div className="flex gap-2">
+											<Input
+												placeholder="ABCD123"
+												value={referralCode}
+												onChange={(e) => {
+													setReferralCode(e.target.value.toUpperCase());
+													setReferralApplied(false);
+												}}
+												className="font-mono text-sm tracking-widest"
+												maxLength={16}
+											/>
+											<Button
+												type="button"
+												variant={referralApplied ? "secondary" : "default"}
+												onClick={applyReferralCode}
+												disabled={referralApplied || !referralCode}
+											>
+												{referralApplied ? <Check className="h-4 w-4" /> : 'Apply'}
+											</Button>
+										</div>
+										{referralApplied && (
+											<p className="text-xs text-muted-foreground">
+												50% off your first month — applied at checkout.
+											</p>
+										)}
+									</div>
+								)}
+							</div>
 						)}
 					</div>
 				</CardContent>
