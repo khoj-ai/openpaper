@@ -360,6 +360,35 @@ def send_confirmation_cancellation_email(
         return False
 
 
+def send_referral_threshold_alert(
+    referrer_email: str,
+    referrer_id: str,
+    pending_plus_available_cents: int,
+) -> None:
+    """Email admin when a single referrer's earnings cross the review threshold."""
+    admin_email = os.getenv("ROOT_EMAIL", "saba@khoj.dev")
+    html = f"""
+    <div style="font-family:sans-serif;max-width:700px;margin:0 auto;">
+        <h2 style="color:#d35400;">Referral Review Threshold Crossed</h2>
+        <p>
+            <b>{referrer_email}</b> (id <code>{referrer_id}</code>) has accumulated
+            <b>${pending_plus_available_cents / 100:.2f}</b> in referral credits.
+        </p>
+        <p>Worth a quick look at their recent referrals in the admin panel.</p>
+    </div>
+    """
+    try:
+        send_email(
+            to_email=admin_email,
+            subject=f"[Referral Review] {referrer_email} crossed ${pending_plus_available_cents / 100:.0f}",
+            html_content=html,
+            from_name="Open Paper Alerts",
+            from_address="noreply@updates.openpaper.ai",
+        )
+    except Exception as e:
+        logger.error(f"Failed to send referral threshold alert: {e}", exc_info=True)
+
+
 def send_referral_converted_email(
     to_email: str,
     referee_email: str,

@@ -167,32 +167,6 @@ def check_referral_fraud(referrer: User, referee: User) -> tuple[bool, Optional[
     return True, None
 
 
-def send_referral_threshold_alert(
-    referrer: User, pending_plus_available_cents: int
-) -> None:
-    """Email admin when a single referrer's earnings cross the review threshold."""
-    html = f"""
-    <div style="font-family:sans-serif;max-width:700px;margin:0 auto;">
-        <h2 style="color:#d35400;">Referral Review Threshold Crossed</h2>
-        <p>
-            <b>{referrer.email}</b> (id <code>{referrer.id}</code>) has accumulated
-            <b>${pending_plus_available_cents / 100:.2f}</b> in referral credits.
-        </p>
-        <p>Worth a quick look at their recent referrals in the admin panel.</p>
-    </div>
-    """
-    try:
-        send_email(
-            to_email=ADMIN_EMAIL,
-            subject=f"[Referral Review] {referrer.email} crossed ${pending_plus_available_cents / 100:.0f}",
-            html_content=html,
-            from_name="Open Paper Alerts",
-            from_address="noreply@updates.openpaper.ai",
-        )
-    except Exception as e:
-        logger.error(f"Failed to send referral threshold alert: {e}", exc_info=True)
-
-
 def send_abuse_alert(new_user: User, matches: list[dict]) -> None:
     """Send an email to the admin alerting them of suspected signup abuse."""
     new_email = str(new_user.email)
