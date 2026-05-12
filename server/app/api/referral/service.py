@@ -28,15 +28,17 @@ logger = logging.getLogger(__name__)
 
 CLIENT_DOMAIN = os.getenv("CLIENT_DOMAIN", "http://localhost:3000")
 
-# How long after attribution a coupon and the attribution itself remain valid.
-ATTRIBUTION_WINDOW_DAYS = 30
+ATTRIBUTION_WINDOW_SECONDS = 30 * 24 * 60 * 60
 # Only freshly-created accounts may be attributed as referees. Prevents an
 # existing user from pasting a stranger's code months later to get a discount.
-REFEREE_FRESHNESS_HOURS = 24
+REFEREE_FRESHNESS_SECONDS = 24 * 60 * 60
 # Stripe coupon configuration.
 REFEREE_DISCOUNT_PERCENT = 50
 # How long the referrer's credit sits in pending before becoming spendable.
-CREDIT_HOLD_DAYS = 30
+# Env-overridable so it can be shortened for local end-to-end testing.
+CREDIT_HOLD_SECONDS = int(
+    os.getenv("REFERRAL_CREDIT_HOLD_SECONDS", str(30 * 24 * 60 * 60))
+)
 # Total pending+available credit (in cents) that triggers an admin review alert.
 REVIEW_THRESHOLD_CENTS = 6000
 
@@ -52,12 +54,14 @@ def build_share_url(code: str) -> str:
 def get_summary_payload(db: Session, user: User) -> dict:
     code = referral_code_crud.get_or_create_for_user(db, user.id)  # type: ignore[arg-type]
     summary = referral_crud.get_summary_for_referrer(db, user.id)  # type: ignore[arg-type]
+    # Round up so that sub-day test windows (e.g. 180s) don't show as "0 days".
+    credit_hold_days = max(1, (CREDIT_HOLD_SECONDS + 86399) // 86400)
     return {
         "code": code.code,
         "share_url": build_share_url(str(code.code)),
         "referrer_credit_cents_per_referral": 600,
         "referee_discount_percent": REFEREE_DISCOUNT_PERCENT,
-        "credit_hold_days": CREDIT_HOLD_DAYS,
+        "credit_hold_days": credit_hold_days,
         "summary": summary,
         "toast_seen": user.referral_toast_seen_at is not None,
     }
@@ -74,7 +78,8 @@ def _create_referee_coupon(referral: Referral) -> Optional[str]:
     try:
         redeem_by = int(
             (
-                datetime.now(timezone.utc) + timedelta(days=ATTRIBUTION_WINDOW_DAYS)
+                datetime.now(timezone.utc)
+                + timedelta(seconds=ATTRIBUTION_WINDOW_SECONDS)
             ).timestamp()
         )
         coupon = stripe.Coupon.create(
@@ -121,7 +126,7 @@ def attribute_referral(
     if referee.created_at is None or referee.created_at < datetime.now(  # type: ignore[operator]
         timezone.utc
     ) - timedelta(
-        hours=REFEREE_FRESHNESS_HOURS
+        seconds=REFEREE_FRESHNESS_SECONDS
     ):
         raise ReferralAttributionError(
             "Referral codes can only be applied to brand-new accounts"
@@ -190,7 +195,7 @@ def handle_referee_converted(db: Session, referee_user_id: uuid.UUID) -> None:
         return
 
     now = datetime.now(timezone.utc)
-    credit_available_at = now + timedelta(days=CREDIT_HOLD_DAYS)
+    credit_available_at = now + timedelta(seconds=CREDIT_HOLD_SECONDS)
     referral_crud.mark_credit_pending(
         db, referral, converted_at=now, credit_available_at=credit_available_at
     )
@@ -235,7 +240,7 @@ def get_active_attributed_referral(
     if not referral:
         return None
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=ATTRIBUTION_WINDOW_DAYS)
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=ATTRIBUTION_WINDOW_SECONDS)
     if referral.created_at and referral.created_at < cutoff:  # type: ignore[operator]
         return None
 

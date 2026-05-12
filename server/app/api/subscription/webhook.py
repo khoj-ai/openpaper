@@ -1,14 +1,9 @@
 import logging
-import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import stripe
-
-CLAWBACK_WINDOW_SECONDS = int(
-    os.getenv("REFERRAL_CLAWBACK_WINDOW_SECONDS", str(14 * 24 * 60 * 60))
-)
 from app.api.referral.service import handle_referee_converted
 from app.api.subscription.config import (
     MONTHLY_PRICE_ID,
@@ -31,6 +26,11 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
+
+# How long after a referee converts we'll still claw back the referrer's
+# pending credit if the referee gets refunded. Matches Stripe's standard
+# refund window.
+CLAWBACK_WINDOW_SECONDS = 14 * 24 * 60 * 60
 
 router = APIRouter()
 
