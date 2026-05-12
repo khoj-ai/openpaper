@@ -16,11 +16,11 @@ from app.database.models import (
     User,
 )
 from app.database.telemetry import track_event
-from app.helpers.abuse_detection import (
-    check_referral_fraud,
+from app.helpers.abuse_detection import check_referral_fraud
+from app.helpers.email import (
+    send_referral_converted_email,
     send_referral_threshold_alert,
 )
-from app.helpers.email import send_referral_converted_email
 from app.helpers.referral_jobs import schedule_referral_settlement
 from sqlalchemy.orm import Session
 
@@ -52,7 +52,14 @@ def build_share_url(code: str) -> str:
 
 
 def get_summary_payload(db: Session, user: User) -> dict:
-    code = referral_code_crud.get_or_create_for_user(db, user.id)  # type: ignore[arg-type]
+    code, newly_created = referral_code_crud.get_or_create_for_user(db, user.id)  # type: ignore[arg-type]
+    if newly_created:
+        track_event(
+            "referral_code_generated",
+            user_id=str(user.id),
+            properties={"code": code.code},
+            db=db,
+        )
     summary = referral_crud.get_summary_for_referrer(db, user.id)  # type: ignore[arg-type]
     # Round up so that sub-day test windows (e.g. 180s) don't show as "0 days".
     credit_hold_days = max(1, (CREDIT_HOLD_SECONDS + 86399) // 86400)
@@ -215,7 +222,10 @@ def handle_referee_converted(db: Session, referee_user_id: uuid.UUID) -> None:
     summary = referral_crud.get_summary_for_referrer(db, uuid.UUID(str(referrer.id)))
     if summary["pending_cents"] + summary["available_cents"] >= REVIEW_THRESHOLD_CENTS:
         send_referral_threshold_alert(
-            referrer, summary["pending_cents"] + summary["available_cents"]
+            referrer_email=str(referrer.email),
+            referrer_id=str(referrer.id),
+            pending_plus_available_cents=summary["pending_cents"]
+            + summary["available_cents"],
         )
 
     track_event(

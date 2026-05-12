@@ -61,10 +61,14 @@ class CRUDReferralCode(CRUDBase[ReferralCode, ReferralCodeCreate, ReferralCodeUp
     def get_by_code(self, db: Session, code: str) -> Optional[ReferralCode]:
         return db.query(self.model).filter(self.model.code == code.upper()).first()
 
-    def get_or_create_for_user(self, db: Session, user_id: uuid.UUID) -> ReferralCode:
+    def get_or_create_for_user(
+        self, db: Session, user_id: uuid.UUID
+    ) -> tuple[ReferralCode, bool]:
+        """Returns (code, newly_created). The bool lets callers fire a
+        telemetry event when a code is generated for the first time."""
         existing = self.get_by_user_id(db, user_id)
         if existing:
-            return existing
+            return existing, False
 
         for _ in range(CODE_MAX_GENERATION_ATTEMPTS):
             candidate = _generate_code()
@@ -73,7 +77,7 @@ class CRUDReferralCode(CRUDBase[ReferralCode, ReferralCodeCreate, ReferralCodeUp
                 db.add(obj)
                 db.commit()
                 db.refresh(obj)
-                return obj
+                return obj, True
 
         raise RuntimeError("Could not generate a unique referral code")
 

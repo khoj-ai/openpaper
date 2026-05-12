@@ -37,10 +37,7 @@ async def get_my_referral_info(
     db: Session = Depends(get_db),
 ):
     user = user_crud.get(db, id=current_user.id)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+    assert user is not None  # get_required_user already guarantees existence
     return get_summary_payload(db, user)
 
 
@@ -51,10 +48,7 @@ async def attribute(
     db: Session = Depends(get_db),
 ):
     user = user_crud.get(db, id=current_user.id)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+    assert user is not None  # get_required_user already guarantees existence
 
     method = (
         ReferralAttributionMethod.LINK
@@ -121,10 +115,7 @@ async def get_toast_status(
     every authenticated page load is cheap and doesn't clutter the DB.
     """
     user = user_crud.get(db, id=current_user.id)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+    assert user is not None  # get_required_user already guarantees existence
     return {"toast_seen": user.referral_toast_seen_at is not None}
 
 
@@ -135,11 +126,13 @@ async def mark_toast_seen(
 ):
     """Idempotent: stamp the user as having seen the referral milestone toast."""
     user = user_crud.get(db, id=current_user.id)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+    assert user is not None  # get_required_user already guarantees existence
     if user.referral_toast_seen_at is None:
         setattr(user, "referral_toast_seen_at", datetime.now(timezone.utc))
         db.commit()
+        track_event(
+            "referral_toast_shown",
+            user_id=str(user.id),
+            db=db,
+        )
     return {"success": True}
