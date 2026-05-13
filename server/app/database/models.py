@@ -105,6 +105,19 @@ class ProjectRoles(str, Enum):
     VIEWER = "viewer"
 
 
+class ReferralStatus(str, Enum):
+    ATTRIBUTED = "attributed"
+    CREDIT_PENDING = "credit_pending"
+    CREDIT_AVAILABLE = "credit_available"
+    REJECTED_FRAUD = "rejected_fraud"
+    CLAWED_BACK = "clawed_back"
+
+
+class ReferralAttributionMethod(str, Enum):
+    LINK = "link"
+    MANUAL_CODE = "manual_code"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -131,6 +144,9 @@ class User(Base):
 
     # Optional profile information
     locale = Column(String, nullable=True)
+
+    # One-shot timestamp for the in-app "refer a friend" milestone toast.
+    referral_toast_seen_at = Column(DateTime(timezone=True), nullable=True)
 
     papers = relationship("Paper", back_populates="user", cascade="all, delete-orphan")
     sessions = relationship(
@@ -179,6 +195,26 @@ class User(Base):
     )
     invitations = relationship(
         "ProjectRoleInvitation", back_populates="inviter", cascade="all, delete-orphan"
+    )
+
+    referral_code = relationship(
+        "ReferralCode",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    referrals_made = relationship(
+        "Referral",
+        foreign_keys="Referral.referrer_user_id",
+        back_populates="referrer",
+        cascade="all, delete-orphan",
+    )
+    referral_received = relationship(
+        "Referral",
+        foreign_keys="Referral.referee_user_id",
+        back_populates="referee",
+        uselist=False,
+        cascade="all, delete-orphan",
     )
 
 
@@ -941,6 +977,73 @@ class DataTableExtractionResult(Base):
         "DataTableRow",
         back_populates="data_table",
         cascade="all, delete-orphan",
+    )
+
+
+class ReferralCode(Base):
+    __tablename__ = "referral_codes"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    code = Column(String(16), nullable=False, unique=True, index=True)
+
+    user = relationship("User", back_populates="referral_code")
+
+
+class Referral(Base):
+    __tablename__ = "referrals"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    referrer_user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    referee_user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+
+    code_used = Column(String(16), nullable=False)
+    attribution_method = Column(
+        String, nullable=False, default=ReferralAttributionMethod.LINK
+    )
+    status = Column(
+        String, nullable=False, default=ReferralStatus.ATTRIBUTED, index=True
+    )
+
+    converted_at = Column(DateTime(timezone=True), nullable=True)
+    credit_available_at = Column(DateTime(timezone=True), nullable=True)
+
+    referrer_credit_cents = Column(Integer, nullable=False, default=600)
+
+    # Stripe coupon issued to the referee for 50% off their first month.
+    referee_coupon_id = Column(String, nullable=True)
+    # Stripe Customer balance transaction created when credit becomes spendable.
+    stripe_balance_transaction_id = Column(String, nullable=True)
+
+    fraud_reason = Column(Text, nullable=True)
+
+    referrer = relationship(
+        "User", foreign_keys=[referrer_user_id], back_populates="referrals_made"
+    )
+    referee = relationship(
+        "User", foreign_keys=[referee_user_id], back_populates="referral_received"
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "referrer_user_id <> referee_user_id",
+            name="check_referral_no_self_referral",
+        ),
     )
 
 

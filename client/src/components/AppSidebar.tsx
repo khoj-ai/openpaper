@@ -6,6 +6,7 @@ import {
     FileText,
     FolderKanban,
     Compass,
+    Gift,
     Home,
     LogOut,
     MessageCircleQuestion,
@@ -17,6 +18,9 @@ import {
     User as UserIcon,
     X
 } from "lucide-react";
+import { ReferralDialog } from "@/components/ReferralDialog";
+import { MilestoneReferralToast } from "@/components/MilestoneReferralToast";
+import { hasUnusedReferralValue, useReferralBalance } from "@/hooks/useReferralBalance";
 
 import {
     Sidebar,
@@ -89,16 +93,30 @@ const items = [
     },
 ]
 
+// TODO: remove this gate once we're ready to offer referrals to all users
+// (paid + basic). Until then the entry only renders for paid users, or for
+// basic users with banked credits / a pending discount.
+const REFERRAL_ENABLED_FOR_BASIC =
+    process.env.NEXT_PUBLIC_REFERRAL_BASIC_ENABLED === "true";
+
+interface ReferralEntry {
+    label: string;
+    sublabel?: string;
+    onClick: () => void;
+}
+
 const UserMenuContent = ({
     user,
     handleLogout,
     toggleDarkMode,
     darkMode,
+    referralEntry,
 }: {
     user: User,
     handleLogout: () => void,
     toggleDarkMode: () => void,
-    darkMode: boolean
+    darkMode: boolean,
+    referralEntry: ReferralEntry | null,
 }) => (
     <div className="flex flex-col gap-1">
         <div className="flex items-center gap-3 p-3">
@@ -133,6 +151,23 @@ const UserMenuContent = ({
                 Plans
             </Button>
         </Link>
+        {referralEntry && (
+            <Button
+                variant="ghost"
+                className="w-full justify-start h-auto py-2"
+                onClick={referralEntry.onClick}
+            >
+                <Gift size={16} className="mr-2" />
+                <span className="flex flex-col items-start">
+                    <span>{referralEntry.label}</span>
+                    {referralEntry.sublabel && (
+                        <span className="text-xs text-muted-foreground font-normal">
+                            {referralEntry.sublabel}
+                        </span>
+                    )}
+                </span>
+            </Button>
+        )}
         {/* Dark Mode Toggle */}
         <Button onClick={toggleDarkMode} variant="ghost" className="w-full justify-start">
             {darkMode ? <Sun size={16} className="mr-2" /> : <Moon size={16} className="mr-2" />}
@@ -286,7 +321,45 @@ export function AppSidebar() {
     const { darkMode, toggleDarkMode } = useIsDarkMode();
     const { subscription, loading: subscriptionLoading } = useSubscription();
     const [dismissedWarning, setDismissedWarning] = useState<string | null>(null);
+    const [referralOpen, setReferralOpen] = useState(false);
     const isMobile = useIsMobile();
+    const isPaid = subscription?.plan === "researcher";
+    const { balance: referralBalance } = useReferralBalance(!!user);
+
+    const referralEntry = ((): ReferralEntry | null => {
+        const hasValue = hasUnusedReferralValue(referralBalance);
+
+        // Basic users with a banked credit or pending discount: route them to
+        // pricing — they can't "use" the credit until they upgrade.
+        if (!isPaid && hasValue && referralBalance) {
+            const dollars = (referralBalance.available_cents / 100).toFixed(0);
+            const hasCredit = referralBalance.available_cents > 0;
+            const hasDiscount = referralBalance.referee_discount_available;
+            let label = "Referral credit waiting";
+            if (hasCredit && hasDiscount) label = `$${dollars} credit + 50% off waiting`;
+            else if (hasCredit) label = `$${dollars} credit waiting`;
+            else if (hasDiscount) label = `${referralBalance.referee_discount_percent}% off waiting`;
+            return {
+                label,
+                sublabel: "Upgrade to redeem",
+                onClick: () => router.push("/pricing"),
+            };
+        }
+
+        if (isPaid || REFERRAL_ENABLED_FOR_BASIC) {
+            const earned =
+                referralBalance && referralBalance.available_cents > 0
+                    ? `$${(referralBalance.available_cents / 100).toFixed(0)} earned`
+                    : undefined;
+            return {
+                label: "Refer a friend",
+                sublabel: earned,
+                onClick: () => setReferralOpen(true),
+            };
+        }
+
+        return null;
+    })();
 
     useEffect(() => {
         if (!user) {
@@ -549,7 +622,7 @@ export function AppSidebar() {
                                     </SidebarMenuButton>
                                 </SheetTrigger>
                                 <SheetContent side="bottom">
-                                    <UserMenuContent user={user} handleLogout={handleLogout} toggleDarkMode={toggleDarkMode} darkMode={darkMode} />
+                                    <UserMenuContent user={user} handleLogout={handleLogout} toggleDarkMode={toggleDarkMode} darkMode={darkMode} referralEntry={referralEntry} />
                                 </SheetContent>
                             </Sheet>
                         ) : (
@@ -567,7 +640,7 @@ export function AppSidebar() {
                                     </SidebarMenuButton>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-60 p-1" align="start">
-                                    <UserMenuContent user={user} handleLogout={handleLogout} toggleDarkMode={toggleDarkMode} darkMode={darkMode} />
+                                    <UserMenuContent user={user} handleLogout={handleLogout} toggleDarkMode={toggleDarkMode} darkMode={darkMode} referralEntry={referralEntry} />
                                 </PopoverContent>
                             </Popover>
                         )}
@@ -589,6 +662,13 @@ export function AppSidebar() {
                     </SidebarMenuItem>
                 )}
             </SidebarFooter>
+            <ReferralDialog open={referralOpen} onOpenChange={setReferralOpen} />
+            {user && (
+                <MilestoneReferralToast
+                    subscription={subscription}
+                    onOpenReferral={() => setReferralOpen(true)}
+                />
+            )}
         </Sidebar >
     )
 }

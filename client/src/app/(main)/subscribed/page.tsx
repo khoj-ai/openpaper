@@ -4,10 +4,11 @@ import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { fetchFromApi } from '@/lib/api'
-import { CheckCircle, XCircle, Upload, MessageSquare, Sparkles, ArrowLeft } from 'lucide-react'
+import { CheckCircle, XCircle, Upload, MessageSquare, Sparkles, ArrowLeft, Gift } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import LoadingIndicator from '@/components/utils/Loading'
 import Link from 'next/link'
+import { ReferralDialog } from '@/components/ReferralDialog'
 
 interface SessionStatusResponse {
     status: string
@@ -25,6 +26,7 @@ function SubscribedPageContent() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>('')
     const [confettiTriggered, setConfettiTriggered] = useState(false)
+    const [referralOpen, setReferralOpen] = useState(false)
 
     const triggerConfetti = () => {
         const duration = 5 * 1000;
@@ -237,28 +239,25 @@ function SubscribedPageContent() {
     // Success state
     if (isSuccess) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 text-center max-w-2xl mx-auto">
+            <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 py-10 text-center max-w-2xl mx-auto">
                 {/* Success Icon */}
-                <div className="relative mb-8">
-                    <div className="relative w-32 h-32 mx-auto">
+                <div className="relative mb-6">
+                    <div className="relative w-24 h-24 mx-auto">
                         <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 via-primary/5 to-transparent rounded-full blur-2xl" />
                         <div className="relative w-full h-full bg-gradient-to-br from-green-500/5 to-primary/10 dark:from-green-500/10 dark:to-primary/20 rounded-2xl flex items-center justify-center border border-green-500/10 shadow-sm">
-                            <CheckCircle className="w-14 h-14 text-green-500" strokeWidth={1.5} />
+                            <CheckCircle className="w-12 h-12 text-green-500" strokeWidth={1.5} />
                         </div>
-                        <div className="absolute -top-2 -right-2 w-12 h-12 bg-background dark:bg-card rounded-xl flex items-center justify-center border border-green-500/20 shadow-md">
-                            <Sparkles className="w-6 h-6 text-green-500" strokeWidth={2} />
+                        <div className="absolute -top-1.5 -right-1.5 w-9 h-9 bg-background dark:bg-card rounded-xl flex items-center justify-center border border-green-500/20 shadow-md">
+                            <Sparkles className="w-5 h-5 text-green-500" strokeWidth={2} />
                         </div>
                     </div>
                 </div>
 
-                <h2 className="text-2xl font-bold text-foreground mb-3">
+                <h2 className="text-2xl font-bold text-foreground mb-2">
                     Welcome to Open Paper - Researcher!
                 </h2>
-                <p className="text-muted-foreground mb-2 max-w-md">
-                    Your subscription is now active{sessionStatus?.customer_email ? ` for ${sessionStatus.customer_email}` : ''}.
-                </p>
-                <p className="text-sm text-muted-foreground mb-8 max-w-md">
-                    You now have access to upgraded features. Here&apos;s what you can do:
+                <p className="text-muted-foreground mb-8 max-w-xl">
+                    Your subscription is now active{sessionStatus?.customer_email ? ` for ${sessionStatus.customer_email}` : ''}. Here&apos;s what you can do now:
                 </p>
 
                 {/* Feature highlights */}
@@ -307,11 +306,31 @@ function SubscribedPageContent() {
                     </Button>
                 </div>
 
-                <div className="mt-8">
+                <div className="mt-6 w-full max-w-md rounded-xl border bg-card p-4 flex items-center gap-3">
+                    <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-primary shrink-0">
+                        <Gift className="h-5 w-5" />
+                    </div>
+                    <div className="text-left flex-1 min-w-0">
+                        <p className="text-sm font-semibold leading-tight">Loving it? Share with a friend</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">Give $6, get $6 toward your subscription.</p>
+                    </div>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setReferralOpen(true)}
+                        className="shrink-0"
+                    >
+                        Share
+                    </Button>
+                </div>
+
+                <div className="mt-6">
                     <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                         or go to your library →
                     </Link>
                 </div>
+
+                <ReferralDialog open={referralOpen} onOpenChange={setReferralOpen} />
             </div>
         )
     }

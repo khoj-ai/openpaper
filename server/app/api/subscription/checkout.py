@@ -2,6 +2,7 @@ import logging
 import uuid
 
 import stripe
+from app.api.referral.service import get_active_attributed_referral
 from app.api.subscription.config import (
     MONTHLY_PRICE_ID,
     YEARLY_PRICE_ID,
@@ -102,11 +103,32 @@ def create_checkout_session(
             "return_url": f"{YOUR_DOMAIN}/subscribed?session_id={{CHECKOUT_SESSION_ID}}",
         }
 
+        # If the user was referred and is still within the attribution window,
+        # auto-apply their one-time coupon. Stripe rejects discounts alongside
+        # allow_promotion_codes, so we drop the latter for referred sessions.
+        #
+        # We don't pre-check the coupon's validity via stripe.Coupon.retrieve.
+        # get_active_attributed_referral already enforces our attribution
+        # window, which matches the redeem_by we set on the Stripe coupon at
+        # attribution time. The only way the two disagree is clock skew (or a
+        # coupon manually deleted in the Stripe dashboard), and we catch that
+        # rare case in the Session.create try/except below — cheaper than a
+        # round-trip on every referred checkout.
+        attributed_referral = get_active_attributed_referral(db, current_user.id)
+        if attributed_referral and attributed_referral.referee_coupon_id:
+            session_params["discounts"] = [
+                {"coupon": str(attributed_referral.referee_coupon_id)}
+            ]
+            session_params.pop("allow_promotion_codes", None)
+
         # Add telemetry
         track_event(
             event_name="checkout_initiated",
             properties={
                 "interval": interval,
+                "has_referral_discount": bool(
+                    attributed_referral and attributed_referral.referee_coupon_id
+                ),
             },
             user_id=str(current_user.id),
             db=db,
@@ -116,7 +138,35 @@ def create_checkout_session(
         if customer_id:
             session_params["customer"] = str(customer_id)
 
-        session = stripe.checkout.Session.create(**session_params)
+        try:
+            session = stripe.checkout.Session.create(**session_params)
+        except stripe.InvalidRequestError as e:  # type: ignore[attr-defined]
+            # Most common cause: the referral coupon expired between
+            # attribution and checkout (Stripe enforces redeem_by independently
+            # of our DB window). Drop the discount and retry once so checkout
+            # still succeeds — the referrer can still earn credit when this
+            # user converts, but the referee discount is forfeited.
+            is_expired_coupon = (
+                "discounts" in session_params
+                and getattr(e, "code", None) == "coupon_expired"
+            )
+            if not is_expired_coupon:
+                raise
+            logger.warning(
+                f"Referral coupon expired for user {current_user.id}, "
+                f"retrying checkout without discount: {e}"
+            )
+            track_event(
+                event_name="referral_coupon_expired_at_checkout",
+                properties={"interval": interval},
+                user_id=str(current_user.id),
+                db=db,
+            )
+            session_params.pop("discounts", None)
+            # Restore the promo-code entry point we dropped earlier so the user
+            # can still type one manually if they have one.
+            session_params["allow_promotion_codes"] = True
+            session = stripe.checkout.Session.create(**session_params)
 
         return {"client_secret": session.client_secret}
 

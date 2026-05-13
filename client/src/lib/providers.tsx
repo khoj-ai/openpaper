@@ -22,6 +22,7 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
     return (
         <PHProvider client={posthog}>
             <SuspendedPostHogPageView />
+            <SuspendedReferralCapture />
             {children}
         </PHProvider>
     )
@@ -54,6 +55,41 @@ function SuspendedPostHogPageView() {
     return (
         <Suspense fallback={null}>
             <PostHogPageView />
+        </Suspense>
+    )
+}
+
+
+const REFERRAL_STORAGE_KEY = "op_ref"
+const REFERRAL_CODE_PATTERN = /^[A-Z0-9]{4,16}$/
+
+// Captures `?r=<code>` into localStorage on every navigation so the post-auth
+// attribution flow can pick it up after a user signs up. localStorage is
+// preferable to a cookie here because we don't need server-side access — the
+// attribution POST is fired from the client at /auth/callback.
+function ReferralCapture() {
+    const searchParams = useSearchParams()
+
+    useEffect(() => {
+        const ref = searchParams.get("r")
+        if (!ref) return
+        const normalized = ref.trim().toUpperCase()
+        if (!REFERRAL_CODE_PATTERN.test(normalized)) return
+        try {
+            localStorage.setItem(REFERRAL_STORAGE_KEY, normalized)
+        } catch {
+            // Some browsers (private mode, quotas) refuse writes. Silent skip
+            // is fine — the worst case is a missed attribution.
+        }
+    }, [searchParams])
+
+    return null
+}
+
+function SuspendedReferralCapture() {
+    return (
+        <Suspense fallback={null}>
+            <ReferralCapture />
         </Suspense>
     )
 }

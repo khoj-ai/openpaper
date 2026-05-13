@@ -56,6 +56,7 @@ eval_dataset.json
 eval*.json
 comparison_all.csv
 server/evals/results/charts/*.png
+neurips.md
 
 # paper outputs
 *.tex

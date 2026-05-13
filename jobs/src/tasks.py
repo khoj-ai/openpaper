@@ -306,3 +306,24 @@ def health_check(self):
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "worker_id": self.request.hostname,
         }
+
+
+@celery_app.task(
+    bind=True,
+    name="delayed_referral_settlement_callback",
+    autoretry_for=(requests.RequestException,),
+    retry_backoff=True,
+    retry_backoff_max=3600,
+    max_retries=10,
+)
+def delayed_referral_settlement_callback(self, webhook_url: str):
+    """
+    Delayed callback for referral credit settlement. Fires at the ETA set when
+    the task was enqueued and POSTs to the server's internal settlement
+    endpoint. The server owns DB + Stripe; this task does nothing but
+    deliver the trigger.
+    """
+    logger.info(f"Firing referral settlement callback: {webhook_url}")
+    resp = requests.post(webhook_url, timeout=30)
+    resp.raise_for_status()
+    return {"status_code": resp.status_code, "webhook_url": webhook_url}

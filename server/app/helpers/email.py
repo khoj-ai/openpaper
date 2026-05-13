@@ -360,6 +360,106 @@ def send_confirmation_cancellation_email(
         return False
 
 
+def send_referral_threshold_alert(
+    referrer_email: str,
+    referrer_id: str,
+    pending_plus_available_cents: int,
+) -> None:
+    """Email admin when a single referrer's earnings cross the review threshold."""
+    admin_email = os.getenv("ROOT_EMAIL", "saba@khoj.dev")
+    html = f"""
+    <div style="font-family:sans-serif;max-width:700px;margin:0 auto;">
+        <h2 style="color:#d35400;">Referral Review Threshold Crossed</h2>
+        <p>
+            <b>{referrer_email}</b> (id <code>{referrer_id}</code>) has accumulated
+            <b>${pending_plus_available_cents / 100:.2f}</b> in referral credits.
+        </p>
+        <p>Worth a quick look at their recent referrals in the admin panel.</p>
+    </div>
+    """
+    try:
+        send_email(
+            to_email=admin_email,
+            subject=f"[Referral Review] {referrer_email} crossed ${pending_plus_available_cents / 100:.0f}",
+            html_content=html,
+            from_name="Open Paper Alerts",
+            from_address="noreply@updates.openpaper.ai",
+        )
+    except Exception as e:
+        logger.error(f"Failed to send referral threshold alert: {e}", exc_info=True)
+
+
+def send_referral_converted_email(
+    to_email: str,
+    referee_email: str,
+    credit_cents: int,
+    available_at: datetime,
+) -> bool:
+    """
+    Notify a referrer that someone they referred has just upgraded. Credit is
+    pending until `available_at`.
+    """
+    try:
+        dollars = credit_cents / 100
+        available_str = available_at.strftime("%B %d, %Y")
+        text = (
+            f"Hi,\n\n"
+            f"Great news — {referee_email} just upgraded to Researcher using your "
+            f"referral link. You've earned a ${dollars:.2f} credit toward your "
+            f"Open Paper subscription.\n\n"
+            f"Your credit will clear our 30-day hold on {available_str}, at which "
+            f"point it'll be ready to apply against your next invoice.\n\n"
+            f"Thanks for spreading the word!\n\n"
+            f"- Saba (Founder, Open Paper)"
+        )
+        payload = resend.Emails.SendParams = {  # type: ignore
+            "from": f"Saba <{REPLY_TO_DEFAULT_EMAIL}>",
+            "reply_to": REPLY_TO_DEFAULT_EMAIL,
+            "to": [to_email],
+            "subject": f"Someone you referred just upgraded - ${dollars:.0f} credit pending",
+            "text": text,
+        }
+        resend.Emails.send(payload)  # type: ignore
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send referral_converted email: {e}", exc_info=True)
+        return False
+
+
+def send_referral_credit_available_email(
+    to_email: str,
+    credit_cents: int,
+) -> bool:
+    """Notify a referrer that their pending credit has cleared the hold."""
+    try:
+        dollars = credit_cents / 100
+        text = (
+            f"Hi,\n\n"
+            f"Your ${dollars:.2f} referral credit has cleared the 30-day hold "
+            f"and is now ready to apply against your Open Paper subscription. "
+            f"It'll come off your next invoice automatically — nothing else for "
+            f"you to do.\n\n"
+            f"If you haven't yet, you can keep sharing your link from the "
+            f"account menu inside Open Paper. Give $6, get $6.\n\n"
+            f"Thanks again!\n\n"
+            f"- Saba (Founder, Open Paper)"
+        )
+        payload = resend.Emails.SendParams = {  # type: ignore
+            "from": f"Saba <{REPLY_TO_DEFAULT_EMAIL}>",
+            "reply_to": REPLY_TO_DEFAULT_EMAIL,
+            "to": [to_email],
+            "subject": f"Your ${dollars:.0f} referral credit is ready",
+            "text": text,
+        }
+        resend.Emails.send(payload)  # type: ignore
+        return True
+    except Exception as e:
+        logger.error(
+            f"Failed to send referral_credit_available email: {e}", exc_info=True
+        )
+        return False
+
+
 def send_data_table_complete_email(
     to_email: str,
     table_title: str,

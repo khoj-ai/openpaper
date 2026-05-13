@@ -4,6 +4,30 @@ import { Info, Loader2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { OPOnboarding } from "@/components/OPOnboarding";
+import { fetchFromApi } from "@/lib/api";
+
+const REFERRAL_STORAGE_KEY = "op_ref";
+const REFERRAL_MANUAL_FLAG_KEY = "op_ref_via_manual";
+
+async function attemptReferralAttribution(via_link: boolean) {
+	if (typeof window === "undefined") return;
+	const code = localStorage.getItem(REFERRAL_STORAGE_KEY);
+	if (!code) return;
+	try {
+		await fetchFromApi("/api/referral/attribute", {
+			method: "POST",
+			body: JSON.stringify({ code, via_link }),
+		});
+	} catch (err) {
+		// Server returns success:false for invalid codes / late attempts; we
+		// don't surface this to the user. Network errors are silent too —
+		// the worst case is a missed attribution, not a broken flow.
+		console.debug("Referral attribution skipped:", err);
+	} finally {
+		localStorage.removeItem(REFERRAL_STORAGE_KEY);
+		localStorage.removeItem(REFERRAL_MANUAL_FLAG_KEY);
+	}
+}
 
 function CallbackContent() {
 
@@ -20,6 +44,11 @@ function CallbackContent() {
 		setShowWelcome(welcome);
 
 		if (welcome) {
+			// Brand-new account — attempt referral attribution. The "via_link"
+			// distinction is informational; manual code entry also lands here
+			// via the same localStorage pipeline.
+			const viaLink = localStorage.getItem(REFERRAL_MANUAL_FLAG_KEY) !== "true";
+			void attemptReferralAttribution(viaLink);
 			return
 		}
 		else if (success) {

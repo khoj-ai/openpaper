@@ -15,6 +15,8 @@ const Toaster = ({ position = "top-right", ...props }: ToasterProps) => {
       toastOptions={{
         classNames: {
           actionButton: "!bg-primary !text-primary-foreground !font-medium !rounded-md !px-3 !py-1.5 !text-sm !transition-colors !shadow-sm hover:!bg-primary/90",
+          closeButton:
+            "!bg-popover !text-popover-foreground !border-border hover:!bg-muted hover:!text-foreground",
         },
       }}
       style={
