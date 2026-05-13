@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, Copy, Loader2, Mail, Share2, Twitter } from "lucide-react";
+import { Check, Copy, Gift, Loader2, Mail, Twitter } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -97,7 +97,7 @@ export function ReferralDialog({
             <DialogContent className="max-w-md">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <Share2 className="h-5 w-5" />
+                        <Gift className="h-5 w-5" />
                         Give $6, get $6
                     </DialogTitle>
                     <DialogDescription>
