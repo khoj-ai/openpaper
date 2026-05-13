@@ -107,17 +107,26 @@ def create_checkout_session(
         # auto-apply their one-time coupon. Stripe rejects discounts alongside
         # allow_promotion_codes, so we drop the latter for referred sessions.
         #
+        # We only attach the coupon for MONTHLY checkouts. The coupon is
+        # percent_off=50, duration=once — on a $96 annual first invoice that
+        # would be a $48 discount instead of the intended ~$6. Annual plans
+        # already carry a steep built-in discount; the referee discount is
+        # designed to lower the barrier to a first monthly commitment.
+        #
         # We don't pre-check the coupon's validity via stripe.Coupon.retrieve.
         # get_active_attributed_referral already enforces our attribution
         # window, which matches the redeem_by we set on the Stripe coupon at
         # attribution time. The only way the two disagree is clock skew (or a
         # coupon manually deleted in the Stripe dashboard), and we catch that
-        # rare case in the Session.create try/except below — cheaper than a
-        # round-trip on every referred checkout.
+        # rare case in the Session.create try/except below.
         attributed_referral = get_active_attributed_referral(db, current_user.id)
-        if attributed_referral and attributed_referral.referee_coupon_id:
+        is_monthly = interval == SubscriptionInterval.MONTHLY
+        applied_referral_discount = bool(
+            attributed_referral and attributed_referral.referee_coupon_id and is_monthly
+        )
+        if applied_referral_discount:
             session_params["discounts"] = [
-                {"coupon": str(attributed_referral.referee_coupon_id)}
+                {"coupon": str(attributed_referral.referee_coupon_id)}  # type: ignore[union-attr]
             ]
             session_params.pop("allow_promotion_codes", None)
 
@@ -126,8 +135,11 @@ def create_checkout_session(
             event_name="checkout_initiated",
             properties={
                 "interval": interval,
-                "has_referral_discount": bool(
-                    attributed_referral and attributed_referral.referee_coupon_id
+                "has_referral_discount": applied_referral_discount,
+                "referral_discount_skipped_for_annual": bool(
+                    attributed_referral
+                    and attributed_referral.referee_coupon_id
+                    and not is_monthly
                 ),
             },
             user_id=str(current_user.id),
