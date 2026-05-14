@@ -9,7 +9,7 @@ from app.database.crud.projects.project_crud import project_crud
 from app.database.models import Paper, Project, ProjectPaper, ProjectRole, ProjectRoles
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 logger = logging.getLogger(__name__)
 
@@ -162,6 +162,60 @@ class ProjectPaperCRUD(
         )
         paper_ids = [pp.paper_id for pp in project_papers]
         papers = db.query(Paper).filter(Paper.id.in_(paper_ids)).all()
+        return papers
+
+    def get_papers_metadata_by_project_id(
+        self, db: Session, *, project_id: uuid.UUID, user: CurrentUser
+    ) -> List[Paper]:
+        """
+        Lightweight variant of get_all_papers_by_project_id for the project
+        papers listing endpoint.
+
+        Loads only the columns needed to render the list and to generate
+        presigned URLs, deliberately avoiding heavy columns such as
+        raw_content, ts_vector, summary, summary_citations and
+        page_offset_map. Those columns can be megabytes per row and were
+        previously fetched and discarded on every list request.
+        """
+        # First, check if the user has access to the project.
+        project_role = (
+            db.query(ProjectRole)
+            .filter(
+                ProjectRole.project_id == project_id,
+                ProjectRole.user_id == user.id,
+            )
+            .first()
+        )
+        if not project_role:
+            return []
+
+        papers = (
+            db.query(Paper)
+            .join(ProjectPaper, ProjectPaper.paper_id == Paper.id)
+            .filter(ProjectPaper.project_id == project_id)
+            .options(
+                load_only(
+                    Paper.title,
+                    Paper.abstract,
+                    Paper.authors,
+                    Paper.institutions,
+                    Paper.keywords,
+                    Paper.status,
+                    Paper.journal,
+                    Paper.publisher,
+                    Paper.doi,
+                    Paper.publish_date,
+                    Paper.user_id,
+                    Paper.created_at,
+                    # Needed by s3_service.get_cached_presigned_urls_bulk
+                    Paper.s3_object_key,
+                    Paper.cached_presigned_url,
+                    Paper.presigned_url_expires_at,
+                    Paper.size_in_kb,
+                )
+            )
+            .all()
+        )
         return papers
 
     def get_project_paper_ids_by_project_id(

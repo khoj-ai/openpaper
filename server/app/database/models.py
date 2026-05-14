@@ -595,6 +595,10 @@ class ProjectRoleInvitation(Base):
 class ProjectRole(Base):
     __tablename__ = "project_role"
 
+    __table_args__ = (
+        Index("ix_project_role_project_id_user_id", "project_id", "user_id"),
+    )
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id = Column(
         UUID(as_uuid=True), ForeignKey("project.id", ondelete="CASCADE"), nullable=False
@@ -615,10 +619,16 @@ class ProjectPaper(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     paper_id = Column(
-        UUID(as_uuid=True), ForeignKey("papers.id", ondelete="RESTRICT"), nullable=False
+        UUID(as_uuid=True),
+        ForeignKey("papers.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
     )
     project_id = Column(
-        UUID(as_uuid=True), ForeignKey("project.id", ondelete="CASCADE"), nullable=False
+        UUID(as_uuid=True),
+        ForeignKey("project.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
 
     project = relationship("Project", back_populates="project_papers")

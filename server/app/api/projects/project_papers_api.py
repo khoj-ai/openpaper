@@ -219,7 +219,7 @@ async def get_project_papers(
 ) -> JSONResponse:
     """Get all papers for a specific project"""
     try:
-        papers = project_paper_crud.get_all_papers_by_project_id(
+        papers = project_paper_crud.get_papers_metadata_by_project_id(
             db, project_id=uuid.UUID(project_id), user=current_user
         )
 
