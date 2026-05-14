@@ -114,6 +114,10 @@ class JobsClient:
             task = celery_app.send_task(
                 "upload_and_process_file",  # Task name as registered by the worker
                 kwargs={"s3_object_key": s3_object_key, "webhook_url": webhook_url},
+                # Explicit: the server's Celery instance has no task_routes, so we
+                # must pin the queue here. Must match what the worker's `-Q` set
+                # contains (see jobs/scripts/start_worker.sh).
+                queue="pdf_processing",
             )
 
             print(f"DEBUG: Task submitted successfully with ID: {task.id}")
@@ -185,6 +189,7 @@ class JobsClient:
                     "data_table": data_table.model_dump(),
                     "webhook_url": webhook_url,
                 },
+                queue="pdf_processing",
             )
 
             print(f"DEBUG: Task submitted successfully with ID: {task.id}")
