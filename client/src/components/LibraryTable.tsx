@@ -197,17 +197,32 @@ export function LibraryTable({
 		if (!handleDelete) return;
 
 		const paperIdsToDelete = Array.from(selectedPapers);
-		const deletePromises = paperIdsToDelete.map(id => handleDelete(id));
+		// allSettled, not all: one failure must not short-circuit the rest, and
+		// the revalidate below must run regardless of partial failures.
+		const results = await Promise.allSettled(
+			paperIdsToDelete.map(id => handleDelete(id))
+		);
 
-		try {
-			await Promise.all(deletePromises);
-			toast.success(`Successfully deleted ${paperIdsToDelete.length} paper(s).`);
-			mutate(); // Revalidate the papers list
-		} catch (error) {
-			console.error("Failed to delete some papers:", error);
-			toast.error("An error occurred while deleting papers.");
+		const succeeded = results.filter(r => r.status === "fulfilled").length;
+		const failed = results.length - succeeded;
+
+		if (succeeded > 0) {
+			toast.success(`Deleted ${succeeded} paper${succeeded !== 1 ? "s" : ""}.`);
+		}
+		if (failed > 0) {
+			const firstError = results.find(
+				(r): r is PromiseRejectedResult => r.status === "rejected"
+			);
+			const reason =
+				firstError?.reason instanceof Error ? firstError.reason.message : null;
+			console.error("Failed to delete some papers:", results);
+			toast.error(
+				`Could not delete ${failed} paper${failed !== 1 ? "s" : ""}.` +
+				(reason ? ` ${reason}` : "")
+			);
 		}
 
+		mutate(); // Revalidate against server truth regardless of outcome
 		setSelectedPapers(new Set());
 	};
 

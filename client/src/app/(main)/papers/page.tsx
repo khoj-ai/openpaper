@@ -90,7 +90,6 @@ const PageSkeleton = () => (
 
 function PapersPageContent() {
     const { papers, isLoading, mutate } = usePapers();
-    const [filteredPapers, setFilteredPapers] = useState<PaperItem[]>([]);
     const { subscription, loading: subscriptionLoading } = useSubscription();
     const router = useRouter();
     const [isCreateProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
@@ -116,31 +115,17 @@ function PapersPageContent() {
         }
     };
 
-    useEffect(() => {
-        if (papers) {
-            const sortedPapers = [...papers].sort((a, b) => {
-                return new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime();
-            });
-            setFilteredPapers(sortedPapers);
-        }
-    }, [papers]);
-
     const deletePaper = async (paperId: string) => {
-        try {
-            await fetchFromApi(`/api/paper?id=${paperId}`, {
-                method: "DELETE",
-            });
-            setFilteredPapers(filteredPapers.filter((paper) => paper.id !== paperId));
-            toast.success("Paper deleted successfully");
-        } catch (error) {
-            if (error instanceof Error && error.message) {
-                toast.error(error.message);
-                throw error;
-            }
-            toast.error("Failed to remove this paper.");
-            throw error;
-        }
-    }
+        await fetchFromApi(`/api/paper?id=${paperId}`, {
+            method: "DELETE",
+        });
+        // Optimistically drop the paper from the SWR cache that LibraryTable
+        // renders. Throws propagate to the caller, which reports the outcome.
+        mutate(
+            (current) => current?.filter((paper) => paper.id !== paperId),
+            { revalidate: false },
+        );
+    };
 
     const handleTableAction = (papers: PaperItem[], action: string) => {
         if (action !== "Make Project") return;
