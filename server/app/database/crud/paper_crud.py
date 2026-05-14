@@ -121,6 +121,13 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
         reading_papers = (
             db.query(Paper)
             .filter(Paper.user_id == user.id, Paper.status == PaperStatus.reading)
+            .join(
+                PaperUploadJob, Paper.upload_job_id == PaperUploadJob.id, isouter=True
+            )
+            .filter(
+                (PaperUploadJob.status == JobStatus.COMPLETED)
+                | (Paper.upload_job_id.is_(None))
+            )
             .order_by(Paper.last_accessed_at.desc())
             .limit(limit)
             .all()
