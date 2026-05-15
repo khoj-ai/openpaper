@@ -24,7 +24,7 @@ from app.schemas.responses import PaperMetadataExtraction, ResponseCitation
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
 from sqlalchemy import func, text
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, load_only, selectinload
 
 logger = logging.getLogger(__name__)
 
@@ -288,7 +288,27 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
         """
         return (
             db.query(Paper)
-            .options(selectinload(Paper.tags))
+            .options(
+                selectinload(Paper.tags),
+                # Library listings only need lightweight metadata. Without this,
+                # the query SELECT *'s heavy columns (raw_content, ts_vector,
+                # summary, summary_citations, page_offset_map) for every paper
+                # in the user's library. Both callers (/api/paper/all and
+                # /api/paper/active) serialize only the columns listed here.
+                load_only(
+                    Paper.title,
+                    Paper.created_at,
+                    Paper.updated_at,
+                    Paper.abstract,
+                    Paper.authors,
+                    Paper.institutions,
+                    Paper.keywords,
+                    Paper.status,
+                    Paper.preview_url,
+                    Paper.size_in_kb,
+                    Paper.publish_date,
+                ),
+            )
             .outerjoin(PaperUploadJob, Paper.upload_job_id == PaperUploadJob.id)
             .filter(
                 Paper.user_id == user.id,
