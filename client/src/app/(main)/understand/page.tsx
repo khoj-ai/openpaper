@@ -2,7 +2,7 @@
 'use client';
 
 import { useSubscription, isChatCreditAtLimit } from '@/hooks/useSubscription';
-import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
+import { fetchFromApi, fetchStreamFromApi, getPaperFileUrl } from '@/lib/api';
 import { useState, useEffect, FormEvent, useRef, useCallback, Suspense, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { usePapers } from '@/hooks/usePapers';
@@ -11,7 +11,6 @@ import { toast } from "sonner";
 
 import {
     ChatMessage,
-    PaperData,
     Reference,
 } from '@/lib/schema';
 import { useAuth } from '@/lib/auth';
@@ -38,7 +37,9 @@ function UnderstandPageContent() {
     const searchParams = useSearchParams();
     const { user, loading: authLoading } = useAuth();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const { papers: fetchedPapers, isLoading: isPapersLoading, error: papersError } = usePapers({ detailed: true });
+    // Paper metadata only — file URLs are fetched lazily per-paper on demand
+    // (via refreshPaperUrl) when a citation/reference is opened.
+    const { papers: fetchedPapers, isLoading: isPapersLoading, error: papersError } = usePapers();
 
     const papers = useMemo(() => {
         if (!fetchedPapers) return [];
@@ -372,8 +373,7 @@ function UnderstandPageContent() {
 
     const refreshPaperUrl = useCallback(async (paperId: string): Promise<string | null> => {
         try {
-            const response: PaperData = await fetchFromApi(`/api/paper?id=${paperId}`);
-            return response.file_url ?? null;
+            return await getPaperFileUrl(paperId);
         } catch (error) {
             console.error('Error refreshing paper URL:', error);
             return null;
