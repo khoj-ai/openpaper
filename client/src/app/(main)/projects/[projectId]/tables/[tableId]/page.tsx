@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { PaperItem, DataTableResult } from "@/lib/schema";
+import { DataTableResult } from "@/lib/schema";
 import DataTableGenerationView from "@/components/DataTableGenerationView";
 import { Loader2, ArrowLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { PdfHighlighterViewer } from "@/components/PdfHighlighterViewer";
 import { useIsMobile } from "@/lib/useMobile";
-import { useProject } from "@/hooks/useProjects";
+import { useProject, useProjectPapers } from "@/hooks/useProjects";
 import { fetchFromApi } from "@/lib/api";
 
 export default function DataTablePage() {
@@ -25,9 +25,10 @@ export default function DataTablePage() {
     const projectId = params.projectId as string;
     const tableId = params.tableId as string;
     const { project } = useProject(projectId);
+    // Papers are loaded with presigned URLs so citation clicks can open the PDF directly.
+    const { papers } = useProjectPapers(projectId, { loadUrls: true });
 
     const [dataTableResult, setDataTableResult] = useState<DataTableResult | null>(null);
-    const [papers, setPapers] = useState<PaperItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -54,22 +55,6 @@ export default function DataTablePage() {
             fetchDataTableResult();
         }
     }, [tableId, fetchDataTableResult]);
-
-    const getProjectPapers = useCallback(async () => {
-        try {
-            const fetchedPapers = await fetchFromApi(`/api/projects/papers/${projectId}`);
-            setPapers(fetchedPapers.papers);
-        } catch (err) {
-            setError("Failed to fetch project papers. Please try again.");
-            console.error(err);
-        }
-    }, [projectId]);
-
-	useEffect(() => {
-		if (projectId) {
-			getProjectPapers();
-		}
-	}, [projectId, getProjectPapers]);
 
     const handleCitationClick = (paperId: string, searchTerm: string) => {
         const paper = papers.find(p => p.id === paperId);
