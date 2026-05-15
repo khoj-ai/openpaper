@@ -214,20 +214,31 @@ async def add_paper_to_project(
 @project_papers_router.get("/{project_id}")
 async def get_project_papers(
     project_id: str,
+    load_urls: bool = False,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_required_user),
 ) -> JSONResponse:
-    """Get all papers for a specific project"""
+    """
+    Get all papers for a specific project.
+
+    Presigned file URLs are only generated when ``load_urls=true``. Most
+    callers (e.g. the project overview page) just need paper metadata, and
+    generating URLs for every paper is expensive on cache expiry. Callers
+    that need a URL for a single paper should use the
+    ``/{project_id}/{paper_id}/file-url`` endpoint instead.
+    """
     try:
         papers = project_paper_crud.get_papers_metadata_by_project_id(
             db, project_id=uuid.UUID(project_id), user=current_user
         )
 
-        # Bulk retrieve presigned URLs for all papers (optimized with parallelization)
-        file_urls = s3_service.get_cached_presigned_urls_bulk(
-            db=db,
-            papers=papers,
-        )
+        file_urls: dict = {}
+        if load_urls:
+            # Bulk retrieve presigned URLs (optimized with parallelization)
+            file_urls = s3_service.get_cached_presigned_urls_bulk(
+                db=db,
+                papers=papers,
+            )
 
         return JSONResponse(
             status_code=200,
