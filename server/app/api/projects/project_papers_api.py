@@ -214,20 +214,31 @@ async def add_paper_to_project(
 @project_papers_router.get("/{project_id}")
 async def get_project_papers(
     project_id: str,
+    load_urls: bool = False,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_required_user),
 ) -> JSONResponse:
-    """Get all papers for a specific project"""
+    """
+    Get all papers for a specific project.
+
+    Presigned file URLs are only generated when ``load_urls=true``. Most
+    callers (e.g. the project overview page) just need paper metadata, and
+    generating URLs for every paper is expensive on cache expiry. Callers
+    that need a URL for a single paper should use the
+    ``/{project_id}/{paper_id}/file-url`` endpoint instead.
+    """
     try:
         papers = project_paper_crud.get_papers_metadata_by_project_id(
             db, project_id=uuid.UUID(project_id), user=current_user
         )
 
-        # Bulk retrieve presigned URLs for all papers (optimized with parallelization)
-        file_urls = s3_service.get_cached_presigned_urls_bulk(
-            db=db,
-            papers=papers,
-        )
+        file_urls: dict = {}
+        if load_urls:
+            # Bulk retrieve presigned URLs (optimized with parallelization)
+            file_urls = s3_service.get_cached_presigned_urls_bulk(
+                db=db,
+                papers=papers,
+            )
 
         return JSONResponse(
             status_code=200,
@@ -261,6 +272,62 @@ async def get_project_papers(
         return JSONResponse(
             status_code=400,
             content={"message": f"Failed to fetch project papers"},
+        )
+
+
+@project_papers_router.get("/{project_id}/{paper_id}/file-url")
+async def get_project_paper_file_url(
+    project_id: str,
+    paper_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+) -> JSONResponse:
+    """
+    Get a presigned file URL for a single paper within a project.
+
+    Access is granted via project membership rather than paper ownership, so
+    collaborators can open papers they don't own. This is the cheap path for
+    "my URL expired, give me a fresh one" — callers should use this instead
+    of refetching the whole project paper list.
+    """
+    try:
+        paper = project_paper_crud.get_paper_by_project(
+            db,
+            paper_id=uuid.UUID(paper_id),
+            project_id=uuid.UUID(project_id),
+            user=current_user,
+        )
+
+        if not paper:
+            raise HTTPException(
+                status_code=404,
+                detail="Paper not found in the specified project or user does not have access.",
+            )
+
+        # The paper may be owned by another collaborator, so resolve the URL
+        # against the paper's owner rather than the current user.
+        file_url = s3_service.get_cached_presigned_url_by_owner(
+            db,
+            paper_id=str(paper.id),
+            object_key=str(paper.s3_object_key),
+            owner_id=str(paper.user_id),
+        )
+
+        if not file_url:
+            raise HTTPException(status_code=404, detail="File not found")
+
+        return JSONResponse(
+            status_code=200,
+            content={"file_url": file_url},
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching project paper file URL: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=400,
+            content={"message": "Failed to fetch project paper file URL"},
         )
 
 

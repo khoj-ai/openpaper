@@ -96,3 +96,29 @@ export async function fetchStreamFromApi(
 export async function getProjectsForPaper(paperId: string) {
     return fetchFromApi(`/api/projects/papers/from/${paperId}`);
 }
+
+/**
+ * Fetch a fresh presigned file URL for a single paper within a project.
+ * Access is granted via project membership, so this works for collaborators
+ * who don't own the paper. Use this instead of refetching the whole project
+ * paper list just to refresh one URL.
+ */
+export async function getProjectPaperFileUrl(
+    projectId: string,
+    paperId: string,
+): Promise<string | null> {
+    const response = await fetchFromApi(
+        `/api/projects/papers/${projectId}/${paperId}/file-url`,
+    );
+    return response?.file_url ?? null;
+}
+
+/**
+ * Fetch a fresh presigned file URL for a single owned paper. The cheap path
+ * for refreshing an expired URL — avoids the metadata enrichment and full
+ * document payload of GET /api/paper.
+ */
+export async function getPaperFileUrl(paperId: string): Promise<string | null> {
+    const response = await fetchFromApi(`/api/paper/${paperId}/file-url`);
+    return response?.file_url ?? null;
+}

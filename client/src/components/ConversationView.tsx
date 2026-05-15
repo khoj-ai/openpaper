@@ -130,6 +130,29 @@ export const ConversationView = ({
 		};
 	}, [isStreaming, statusMessageHistory]);
 
+	// Open a paper in the PDF panel. file_url is loaded lazily, so it may be
+	// absent on the paper — fetch a fresh one on demand when that's the case.
+	const openPaperPdf = useCallback(async (paper: PaperItem, searchText: string | null) => {
+		setActivePaperId(paper.id);
+		setPdfTitle(paper.title);
+		setSearchTerm(searchText);
+		setIsPdfVisible(true);
+
+		if (paper.file_url) {
+			setPdfUrl(paper.file_url);
+			return;
+		}
+
+		// Clear any stale PDF from a previously opened paper while we fetch.
+		setPdfUrl(null);
+		if (onRefreshPaperUrl) {
+			const freshUrl = await onRefreshPaperUrl(paper.id);
+			if (freshUrl) {
+				setPdfUrl(freshUrl);
+			}
+		}
+	}, [onRefreshPaperUrl]);
+
 	const handleCitationClick = (key: string, messageIndex: number) => {
 		originalHandleCitationClick(key, messageIndex);
 		const message = messages[messageIndex];
@@ -139,21 +162,15 @@ export const ConversationView = ({
 		if (!citation) return;
 
 		const paper = papers.find(p => p.id === citation.paper_id);
+		if (!paper) return;
 
-		if (paper && paper.file_url) {
-			setPdfUrl(paper.file_url);
-			setPdfTitle(paper.title);
-			setActivePaperId(paper.id);
-
-			// Strip quotes from the reference if wrapped in them
-			let searchText = citation.reference;
-			if ((searchText.startsWith('"') && searchText.endsWith('"')) ||
-				(searchText.startsWith("'") && searchText.endsWith("'"))) {
-				searchText = searchText.substring(1, searchText.length - 1);
-			}
-			setSearchTerm(searchText);
-			setIsPdfVisible(true);
+		// Strip quotes from the reference if wrapped in them
+		let searchText = citation.reference;
+		if ((searchText.startsWith('"') && searchText.endsWith('"')) ||
+			(searchText.startsWith("'") && searchText.endsWith("'"))) {
+			searchText = searchText.substring(1, searchText.length - 1);
 		}
+		openPaperPdf(paper, searchText);
 	};
 
 	const refreshPdfUrl = useCallback(async (): Promise<string | null> => {
@@ -293,13 +310,7 @@ export const ConversationView = ({
 								}
 								onHighlightClear={() => setHighlightedInfo(null)}
 								onPaperClick={(paper) => {
-									if (paper.file_url) {
-										setPdfUrl(paper.file_url);
-										setPdfTitle(paper.title);
-										setActivePaperId(paper.id);
-										setSearchTerm(null);
-										setIsPdfVisible(true);
-									}
+									openPaperPdf(paper, null);
 								}}
 							/>
 						)}

@@ -74,7 +74,9 @@ export default function ReferencePaperCards({ citations, papers, messageId, mess
                             <div
                                 className="flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
                                 onClick={() => {
-                                    if (onPaperClick && paper.file_url) {
+                                    // file_url is loaded lazily by the click handler,
+                                    // so don't gate the click on it being present.
+                                    if (onPaperClick) {
                                         onPaperClick(paper);
                                     }
                                 }}

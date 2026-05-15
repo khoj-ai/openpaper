@@ -85,14 +85,29 @@ export function useProject(projectId?: string): UseProjectResult {
     };
 }
 
+interface UseProjectPapersOptions {
+    // Whether the list endpoint should also generate presigned file URLs.
+    // Defaults to false — most consumers only need paper metadata, and URL
+    // generation is expensive. Consumers that need a URL for a single paper
+    // should fetch it lazily via getProjectPaperFileUrl instead.
+    loadUrls?: boolean;
+}
+
 interface UseProjectPapersResult {
     papers: PaperItem[];
     isLoading: boolean;
     error: Error | null;
     refetch: () => Promise<void>;
+    // Locally patch a single paper (e.g. to inject a refreshed file_url)
+    // without refetching the whole list.
+    updatePaper: (paperId: string, patch: Partial<PaperItem>) => void;
 }
 
-export function useProjectPapers(projectId?: string): UseProjectPapersResult {
+export function useProjectPapers(
+    projectId?: string,
+    options?: UseProjectPapersOptions,
+): UseProjectPapersResult {
+    const loadUrls = options?.loadUrls ?? false;
     const [papers, setPapers] = useState<PaperItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
@@ -106,7 +121,8 @@ export function useProjectPapers(projectId?: string): UseProjectPapersResult {
         setIsLoading(true);
         setError(null);
         try {
-            const response = await fetchFromApi(`/api/projects/papers/${projectId}`);
+            const query = loadUrls ? "?load_urls=true" : "";
+            const response = await fetchFromApi(`/api/projects/papers/${projectId}${query}`);
             setPapers(response.papers || []);
         } catch (err) {
             setError(err instanceof Error ? err : new Error(`Failed to fetch papers for project ${projectId}`));
@@ -114,17 +130,22 @@ export function useProjectPapers(projectId?: string): UseProjectPapersResult {
         } finally {
             setIsLoading(false);
         }
-    }, [projectId]);
+    }, [projectId, loadUrls]);
 
     useEffect(() => {
         fetchPapers();
     }, [fetchPapers]);
+
+    const updatePaper = useCallback((paperId: string, patch: Partial<PaperItem>) => {
+        setPapers(prev => prev.map(p => (p.id === paperId ? { ...p, ...patch } : p)));
+    }, []);
 
     return {
         papers,
         isLoading,
         error,
         refetch: fetchPapers,
+        updatePaper,
     };
 }
 

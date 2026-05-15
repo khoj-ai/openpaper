@@ -1,8 +1,8 @@
 'use client';
 
 import { useSubscription, isChatCreditAtLimit } from '@/hooks/useSubscription';
-import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
-import { useState, useEffect, FormEvent, useRef, useCallback, Suspense } from 'react';
+import { fetchFromApi, fetchStreamFromApi, getProjectPaperFileUrl } from '@/lib/api';
+import { useState, useEffect, FormEvent, useRef, useCallback, useMemo, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
     Breadcrumb,
@@ -18,7 +18,7 @@ import {
     Reference,
 } from '@/lib/schema';
 import { useAuth } from '@/lib/auth';
-import { useProject } from '@/hooks/useProjects';
+import { useProject, useProjectPapers } from '@/hooks/useProjects';
 import { PaperItem } from "@/lib/schema";
 import { toast } from "sonner";
 import { ConversationView } from '@/components/ConversationView';
@@ -48,9 +48,20 @@ function ProjectConversationPageContent() {
 
     const { user, loading: authLoading } = useAuth();
     const { project } = useProject(projectId);
+    // Paper metadata only — file URLs are fetched lazily per-paper on demand.
+    const { papers: projectPapers, updatePaper } = useProjectPapers(projectId);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isOwner, setIsOwner] = useState<boolean>(true);
-    const [papers, setPapers] = useState<PaperItem[]>([]);
+
+    const papers = useMemo(
+        () =>
+            [...projectPapers].sort(
+                (a: PaperItem, b: PaperItem) =>
+                    new Date(b.created_at || "").getTime() -
+                    new Date(a.created_at || "").getTime(),
+            ),
+        [projectPapers],
+    );
 
     const [currentMessage, setCurrentMessage] = useState('');
     const [isStreaming, setIsStreaming] = useState(false);
@@ -174,37 +185,18 @@ function ProjectConversationPageContent() {
 
     const refreshPaperUrl = useCallback(async (paperId: string): Promise<string | null> => {
         try {
-            const response = await fetchFromApi(`/api/projects/papers/${projectId}`);
-            const match = response.papers?.find((p: PaperItem) => p.id === paperId);
-            if (match?.file_url) {
+            const fileUrl = await getProjectPaperFileUrl(projectId, paperId);
+            if (fileUrl) {
                 // Update the papers state so future clicks use the fresh URL
-                setPapers(prev => prev.map(p => p.id === paperId ? { ...p, file_url: match.file_url } : p));
-                return match.file_url;
+                updatePaper(paperId, { file_url: fileUrl });
+                return fileUrl;
             }
             return null;
         } catch (error) {
             console.error("Error refreshing paper URL:", error);
             return null;
         }
-    }, [projectId]);
-
-    useEffect(() => {
-        const fetchPapers = async () => {
-            try {
-                const response = await fetchFromApi(`/api/projects/papers/${projectId}`)
-                const sortedPapers = response.papers.sort((a: PaperItem, b: PaperItem) => {
-                    return new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime();
-                });
-                setPapers(sortedPapers)
-            } catch (error) {
-                console.error("Error fetching papers:", error)
-            }
-        }
-
-        if (projectId) {
-            fetchPapers();
-        }
-    }, [projectId])
+    }, [projectId, updatePaper]);
 
     useEffect(() => {
         if (isStreaming) {

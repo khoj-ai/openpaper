@@ -147,6 +147,35 @@ async def get_active_paper_ids(
     )
 
 
+@paper_router.get("/{id}/file-url")
+async def get_paper_file_url(
+    id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+) -> JSONResponse:
+    """
+    Get a fresh presigned file URL for a single owned paper.
+
+    This is the cheap path for "my URL expired, give me a fresh one" — it
+    avoids the metadata enrichment and full document payload (raw_content,
+    etc.) that GET /api/paper returns.
+    """
+    paper = paper_crud.get(db, id=id, user=current_user)
+    if not paper:
+        return JSONResponse(status_code=404, content={"message": "Document not found"})
+
+    file_url = s3_service.get_cached_presigned_url(
+        db,
+        paper_id=str(paper.id),
+        object_key=str(paper.s3_object_key),
+        current_user=current_user,
+    )
+    if not file_url:
+        return JSONResponse(status_code=404, content={"message": "File not found"})
+
+    return JSONResponse(status_code=200, content={"file_url": file_url})
+
+
 @paper_router.get("/note")
 async def get_paper_note(
     paper_id: str,
