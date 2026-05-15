@@ -27,7 +27,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Input } from './ui/input';
-import { ProjectCard } from './ProjectCard';
+import { PaperProjectCard } from './PaperProjectCard';
 
 interface PaperProjectsProps {
     id: string;
@@ -170,10 +170,9 @@ export function PaperProjects({ id, view = 'full' }: PaperProjectsProps) {
                     {view === 'full' && <p className="text-sm text-muted-foreground">This paper is a member of the following projects.</p>}
                     <div className="space-y-2">
                         {projects.map(project => (
-                            <ProjectCard
+                            <PaperProjectCard
                                 key={project.id}
                                 project={project}
-                                compact={true}
                                 onUnlink={() => handleUnlink(project.id)}
                             />
                         ))}
@@ -219,10 +218,10 @@ export function PaperProjects({ id, view = 'full' }: PaperProjectsProps) {
                             />
                             <div className="space-y-2 max-h-60 overflow-y-auto">
                                 {filteredProjectsToAdd.map(project => (
-                                    <div key={project.id} className="flex items-center justify-between p-2 border rounded-md">
-                                        <div className='pr-2'>
-                                            <div className="font-semibold">{project.title}</div>
-                                            {project.description && <div className="text-sm text-muted-foreground">{project.description}</div>}
+                                    <div key={project.id} className="flex items-center justify-between gap-2 p-2 border rounded-md">
+                                        <div className='min-w-0 flex-1'>
+                                            <div className="font-semibold truncate">{project.title}</div>
+                                            {project.description && <div className="text-sm text-muted-foreground line-clamp-2">{project.description}</div>}
                                         </div>
                                         <Button
                                             size="sm"

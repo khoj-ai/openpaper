@@ -31,7 +31,7 @@ export function ManageProjectsButton() {
     );
 
     const content = (
-        <div className="grid gap-4">
+        <div className="flex flex-col gap-4 min-w-0">
             {isOpen && paperId ? <PaperProjects id={paperId} /> : null}
         </div>
     );
@@ -59,7 +59,7 @@ export function ManageProjectsButton() {
             <PopoverTrigger asChild>
                 {triggerButton}
             </PopoverTrigger>
-            <PopoverContent className="w-80">
+            <PopoverContent align="end" collisionPadding={16} className="w-80 overflow-hidden">
                 {content}
             </PopoverContent>
         </Popover>
