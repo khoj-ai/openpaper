@@ -216,6 +216,17 @@ class User(Base):
         uselist=False,
         cascade="all, delete-orphan",
     )
+    zotero_oauth_pending = relationship(
+        "ZoteroOAuthPending",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    zotero_connection = relationship(
+        "ZoteroConnection",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
 
 class Session(Base):
@@ -231,6 +242,36 @@ class Session(Base):
     ip_address = Column(String, nullable=True)
 
     user = relationship("User", back_populates="sessions")
+
+
+class ZoteroOAuthPending(Base):
+    __tablename__ = "zotero_oauth_pending"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    oauth_token = Column(String, nullable=False, index=True)
+    oauth_token_secret = Column(String, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+
+    user = relationship("User", back_populates="zotero_oauth_pending")
+
+
+class ZoteroConnection(Base):
+    __tablename__ = "zotero_connections"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    zotero_user_id = Column(String, nullable=False)
+    api_key = Column(String, nullable=False)
+
+    user = relationship("User", back_populates="zotero_connection")
 
 
 class JobStatus(str, Enum):

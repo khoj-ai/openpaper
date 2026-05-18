@@ -72,3 +72,41 @@ async def admin_route(current_user: CurrentUser = Depends(get_admin_user)):
 ## Logging Out
 
 Use the `/api/logout` endpoint to log out users. Set `all_devices=true` query parameter to log out from all devices.
+
+## Zotero OAuth (Account Connect)
+
+Zotero OAuth 1.0a links a user's Zotero library to their existing OpenPaper account. It does **not** create login sessions or new users.
+
+### Setup
+
+1. Register an application at [zotero.org/oauth/apps](https://www.zotero.org/oauth/apps).
+2. Set the **Callback URL** to match `ZOTERO_REDIRECT_URI` exactly (must include scheme, host, and path):
+   - Development: `http://localhost:8000/api/auth/zotero/callback`
+   - Production: `https://your-api-domain/api/auth/zotero/callback`
+3. Add environment variables:
+
+```
+ZOTERO_CLIENT_KEY=your_zotero_client_key
+ZOTERO_CLIENT_SECRET=your_zotero_client_secret
+ZOTERO_REDIRECT_URI=http://localhost:8000/api/auth/zotero/callback
+```
+
+4. Run migrations after pulling schema changes.
+
+### API Endpoints
+
+| Endpoint | Auth | Description |
+|----------|------|-------------|
+| `GET /api/auth/zotero/connect` | Required | Returns `{ "auth_url": "..." }` to redirect the user to Zotero |
+| `GET /api/auth/zotero/callback` | None | Zotero redirect; stores API key and redirects to `/settings?zotero=connected` |
+| `GET /api/auth/zotero/status` | Required | Returns connection status (never exposes the API key) |
+| `DELETE /api/auth/zotero/disconnect` | Required | Removes the stored connection |
+
+### Manual Test
+
+1. Log in via Google or email.
+2. `GET /api/auth/zotero/connect` with your session cookie.
+3. Open `auth_url` in a browser and approve access on Zotero.
+4. Confirm redirect to `/settings?zotero=connected`.
+5. `GET /api/auth/zotero/status` should return `connected: true`.
+6. `DELETE /api/auth/zotero/disconnect` should return success; status should show `connected: false`.
