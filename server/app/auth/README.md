@@ -110,3 +110,23 @@ ZOTERO_REDIRECT_URI=http://localhost:8000/api/auth/zotero/callback
 4. Confirm redirect to `/settings?zotero=connected`.
 5. `GET /api/auth/zotero/status` should return `connected: true`.
 6. `DELETE /api/auth/zotero/disconnect` should return success; status should show `connected: false`.
+
+## Zotero Import
+
+Import journal articles (with PDF or URL fallback) from a connected Zotero library.
+
+| Endpoint | Auth | Description |
+|----------|------|-------------|
+| `POST /api/zotero/import` | Required | Body `{ "limit": 5 }` — import up to 5 new `journalArticle` items |
+| `GET /api/zotero/import/status` | Required | Recent import records for the user |
+
+**Behavior:**
+
+- Only `journalArticle` items; books and web pages are skipped.
+- PDF from Zotero attachment when available; otherwise fetches `url` or DOI link as PDF.
+- Zotero metadata (title, authors, abstract, DOI, publish date) is treated as authoritative, so imports run synchronously on the server: upload the PDF to S3, extract text and page offsets with `pypdf`, persist the paper, and apply Zotero highlights inline.
+- The Celery jobs worker and any LLM API key are **not** required for Zotero import. (Manual uploads still use the jobs worker for AI enrichment.)
+- Highlights are applied only when imported via PDF attachment; URL fallbacks skip annotations.
+- Failed imports (e.g. no PDF available) are marked `failed` and can be retried. Completed items whose underlying paper has since been deleted are automatically re-imported.
+
+**Settings UI:** Use **Import from Zotero** when connected.

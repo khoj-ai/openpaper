@@ -29,7 +29,7 @@ def schedule_referral_settlement(
         "WEBHOOK_BASE_URL", "http://localhost:8000"
     )
     celery_broker_url = celery_broker_url or os.getenv(
-        "CELERY_BROKER_URL", "redis://localhost:6379"
+        "CELERY_BROKER_URL", "pyamqp://guest@localhost:5672//"
     )
 
     try:

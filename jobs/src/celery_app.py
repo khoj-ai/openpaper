@@ -2,10 +2,13 @@
 Celery application configuration and setup.
 """
 import os
+from pathlib import Path
+
 from dotenv import load_dotenv
 from celery import Celery # type: ignore
 
-load_dotenv()  # Load environment variables from .env file
+# Load jobs/.env regardless of process working directory (e.g. Celery worker).
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 BROKER_URL = os.getenv("CELERY_BROKER_URL", "pyamqp://guest@localhost:5672//")
 BACKEND_URL = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")

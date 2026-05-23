@@ -55,7 +55,7 @@ class JobsClient:
             "WEBHOOK_BASE_URL", "http://localhost:8000"
         )
         self.celery_broker_url = celery_broker_url or os.getenv(
-            "CELERY_BROKER_URL", "redis://localhost:6379"
+            "CELERY_BROKER_URL", "pyamqp://guest@localhost:5672//"
         )
         self.celery_api_url = celery_api_url or os.getenv(
             "CELERY_API_URL", "http://localhost:8001"
@@ -132,10 +132,15 @@ class JobsClient:
                     f"and ensure it includes proper credentials. Current URL: {self.celery_broker_url[:20]}... "
                     f"Error: {error_msg}"
                 ) from e
-            else:
+            if "Connection refused" in error_msg or "111" in error_msg:
                 raise Exception(
-                    f"Failed to submit PDF processing job: {error_msg}"
+                    "Cannot reach the Celery message broker (RabbitMQ). "
+                    "Start Docker, then run `uv run start` in the `jobs/` directory. "
+                    f"Broker URL: {self.celery_broker_url}"
                 ) from e
+            raise Exception(
+                f"Failed to submit PDF processing job: {error_msg}"
+            ) from e
 
     def submit_data_table_processing_job(
         self, data_table: DataTableSchema, job_id: str

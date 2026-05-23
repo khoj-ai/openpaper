@@ -45,6 +45,90 @@ logger = logging.getLogger(__name__)
 webhook_router = APIRouter()
 
 
+def _salvage_zotero_import_paper(
+    db: Session,
+    job_id: str,
+    job_user: CurrentUser,
+    result: "PDFProcessingResult",
+    error_message: str,
+) -> Optional[str]:
+    """
+    Best-effort save for Zotero-imported papers when the worker reports failure
+    (typically LLM metadata extraction). Zotero already provided authoritative
+    title/authors/abstract/DOI/publish_date via _apply_metadata_from_zotero, so
+    we keep the paper and attach whatever deterministic outputs the worker did
+    produce (PDF text, preview, S3 location). Returns the paper id on success.
+    """
+    from app.database.crud.zotero_import_crud import zotero_import_crud
+    from app.database.models import ZoteroImportStatus
+
+    existing_paper = paper_crud.get_by_upload_job_id(
+        db=db, upload_job_id=job_id, user=job_user
+    )
+    if not existing_paper or not getattr(existing_paper, "title", None):
+        # No Zotero metadata was applied; cannot salvage.
+        return None
+
+    size_in_kb = (
+        s3_service.get_file_size_in_kb(result.s3_object_key)
+        if result.s3_object_key
+        else None
+    )
+
+    update_payload: dict = {"upload_job_id": job_id}
+    if result.file_url:
+        update_payload["preview_url"] = result.preview_url
+    if result.raw_content:
+        update_payload["raw_content"] = result.raw_content
+    if result.page_offset_map:
+        update_payload["page_offset_map"] = result.page_offset_map
+    if size_in_kb is not None:
+        update_payload["size_in_kb"] = size_in_kb
+
+    paper = paper_crud.update(
+        db=db,
+        obj_in=PaperUpdate(**update_payload),
+        db_obj=existing_paper,
+        user=job_user,
+    )
+
+    paper_upload_job_crud.mark_as_completed(db=db, job_id=job_id, user=job_user)
+
+    zotero_import = zotero_import_crud.get_by_upload_job_id(
+        db, upload_job_id=uuid.UUID(job_id)
+    )
+    if zotero_import and paper:
+        zotero_import_crud.update_status(
+            db,
+            item=zotero_import,
+            status=ZoteroImportStatus.COMPLETED,
+            error_message=f"Imported without AI enrichment: {error_message}",
+            paper_id=uuid.UUID(str(paper.id)),
+        )
+
+    if paper:
+        try:
+            from app.services.zotero_import import apply_zotero_annotations
+
+            apply_zotero_annotations(
+                db=db,
+                upload_job_id=job_id,
+                paper_id=str(paper.id),
+                user=job_user,
+            )
+        except Exception as e:
+            logger.error(
+                f"Error applying Zotero annotations during salvage for job {job_id}: {e}",
+                exc_info=True,
+            )
+
+    logger.info(
+        f"Salvaged Zotero import for job {job_id} with paper {paper.id if paper else 'unknown'} "
+        f"(LLM error: {error_message})"
+    )
+    return str(paper.id) if paper else None
+
+
 def handle_failed_upload(
     db: Session, job_id: str, job_user: CurrentUser, reason: str = "Unknown error"
 ) -> None:
@@ -86,6 +170,21 @@ def handle_failed_upload(
         paper_crud.remove(db=db, id=str(existing_paper.id), user=job_user)
 
     paper_upload_job_crud.mark_as_failed(db=db, job_id=job_id, user=job_user)
+
+    from app.database.crud.zotero_import_crud import zotero_import_crud
+    from app.database.models import ZoteroImportStatus
+
+    zotero_import = zotero_import_crud.get_by_upload_job_id(
+        db, upload_job_id=uuid.UUID(job_id)
+    )
+    if zotero_import:
+        zotero_import_crud.update_status(
+            db,
+            item=zotero_import,
+            status=ZoteroImportStatus.FAILED,
+            error_message=reason,
+            paper_id=None,
+        )
 
 
 def post_process_paper(
@@ -351,6 +450,22 @@ async def handle_paper_processing_webhook(
                     )
                     # Don't fail the whole process for annotation errors
 
+            if paper:
+                try:
+                    from app.services.zotero_import import apply_zotero_annotations
+
+                    apply_zotero_annotations(
+                        db=db,
+                        upload_job_id=job_id,
+                        paper_id=str(paper.id),
+                        user=job_user,
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Error applying Zotero annotations for job {job_id}: {str(e)}",
+                        exc_info=True,
+                    )
+
             if metadata.summary and paper:
                 try:
                     conversation_data = ConversationCreate(
@@ -430,8 +545,29 @@ async def handle_paper_processing_webhook(
                 )
 
         else:
-            # Processing failed
+            # Processing failed.
             error_message = result.error if result.error else "Unknown error"
+
+            from app.database.crud.zotero_import_crud import zotero_import_crud
+
+            zotero_import = zotero_import_crud.get_by_upload_job_id(
+                db, upload_job_id=uuid.UUID(job_id)
+            )
+
+            if zotero_import:
+                salvaged = _salvage_zotero_import_paper(
+                    db=db,
+                    job_id=job_id,
+                    job_user=job_user,
+                    result=result,
+                    error_message=error_message,
+                )
+                if salvaged:
+                    return {
+                        "status": "webhook processed - zotero salvage",
+                        "paper_id": salvaged,
+                    }
+
             handle_failed_upload(
                 db=db, job_id=job_id, job_user=job_user, reason=error_message
             )

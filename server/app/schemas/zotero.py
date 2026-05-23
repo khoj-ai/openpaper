@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ZoteroConnectResponse(BaseModel):
@@ -17,3 +17,42 @@ class ZoteroStatusResponse(BaseModel):
 class ZoteroDisconnectResponse(BaseModel):
     success: bool
     message: str
+
+
+class ZoteroImportRequest(BaseModel):
+    limit: int = Field(default=5, ge=1, le=5)
+
+
+class ZoteroImportItemResult(BaseModel):
+    zotero_item_key: str
+    paper_id: Optional[str] = None
+    upload_job_id: Optional[str] = None
+    import_source: Optional[str] = None
+    title: Optional[str] = None
+
+
+class ZoteroImportError(BaseModel):
+    zotero_item_key: str
+    error: str
+
+
+class ZoteroImportResponse(BaseModel):
+    imported: List[ZoteroImportItemResult]
+    imported_count: int
+    imported_via_url: int
+    skipped_already_imported: int
+    errors: List[ZoteroImportError]
+
+
+class ZoteroImportStatusItem(BaseModel):
+    zotero_item_key: str
+    paper_id: Optional[str] = None
+    upload_job_id: Optional[str] = None
+    import_source: str
+    status: str
+    error_message: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+
+class ZoteroImportStatusListResponse(BaseModel):
+    items: List[ZoteroImportStatusItem]

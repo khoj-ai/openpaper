@@ -1,0 +1,98 @@
+import logging
+
+from app.auth.dependencies import get_required_user
+from app.database.crud.zotero_crud import zotero_crud
+from app.database.crud.zotero_import_crud import zotero_import_crud
+from app.database.database import get_db
+from app.database.telemetry import track_event
+from app.helpers.subscription_limits import can_user_upload_paper
+from app.schemas.user import CurrentUser
+from app.schemas.zotero import (
+    ZoteroImportError,
+    ZoteroImportItemResult,
+    ZoteroImportRequest,
+    ZoteroImportResponse,
+    ZoteroImportStatusItem,
+    ZoteroImportStatusListResponse,
+)
+from app.services.zotero_import import import_batch
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
+
+zotero_router = APIRouter()
+
+
+@zotero_router.post("/import", response_model=ZoteroImportResponse)
+async def zotero_import(
+    request: ZoteroImportRequest,
+    current_user: CurrentUser = Depends(get_required_user),
+    db: Session = Depends(get_db),
+):
+    """Import up to 5 journal articles from Zotero (PDF or URL fallback)."""
+    connection = zotero_crud.get_by_user_id(db, user_id=current_user.id)
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Zotero account not connected",
+        )
+
+    can_upload, upload_err = can_user_upload_paper(db, current_user)
+    if not can_upload:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=upload_err or "Upload limit reached",
+        )
+
+    try:
+        result = await import_batch(db, user=current_user, limit=request.limit)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+    except Exception as e:
+        logger.error("Zotero import failed: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to import from Zotero",
+        ) from e
+
+    if result["imported_count"] > 0:
+        track_event(
+            "zotero_import_batch",
+            user_id=str(current_user.id),
+            properties={"count": result["imported_count"]},
+            db=db,
+        )
+
+    return ZoteroImportResponse(
+        imported=[ZoteroImportItemResult(**item) for item in result["imported"]],
+        imported_count=result["imported_count"],
+        imported_via_url=result["imported_via_url"],
+        skipped_already_imported=result["skipped_already_imported"],
+        errors=[ZoteroImportError(**err) for err in result["errors"]],
+    )
+
+
+@zotero_router.get("/import/status", response_model=ZoteroImportStatusListResponse)
+async def zotero_import_status_list(
+    current_user: CurrentUser = Depends(get_required_user),
+    db: Session = Depends(get_db),
+):
+    """List recent Zotero import records for the current user."""
+    rows = zotero_import_crud.list_recent_by_user(db, user_id=current_user.id)
+    items = [
+        ZoteroImportStatusItem(
+            zotero_item_key=row.zotero_item_key,
+            paper_id=str(row.paper_id) if row.paper_id else None,
+            upload_job_id=str(row.upload_job_id) if row.upload_job_id else None,
+            import_source=row.import_source,
+            status=row.status,
+            error_message=row.error_message,
+            created_at=row.created_at,
+        )
+        for row in rows
+    ]
+    return ZoteroImportStatusListResponse(items=items)

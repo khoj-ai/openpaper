@@ -18,6 +18,21 @@ type ZoteroStatus = {
 	connected_at?: string;
 };
 
+type ZoteroImportStatusItem = {
+	zotero_item_key: string;
+	paper_id?: string;
+	status: string;
+	import_source: string;
+	title?: string;
+};
+
+type ZoteroImportResponse = {
+	imported_count: number;
+	imported_via_url: number;
+	skipped_already_imported: number;
+	errors: { zotero_item_key: string; error: string }[];
+};
+
 function SettingsContent() {
 	const { user, loading } = useAuth();
 	const router = useRouter();
@@ -28,6 +43,8 @@ function SettingsContent() {
 	const [zoteroStatus, setZoteroStatus] = useState<ZoteroStatus | null>(null);
 	const [zoteroLoading, setZoteroLoading] = useState(true);
 	const [zoteroActionLoading, setZoteroActionLoading] = useState(false);
+	const [zoteroImportLoading, setZoteroImportLoading] = useState(false);
+	const [recentImports, setRecentImports] = useState<ZoteroImportStatusItem[]>([]);
 
 	const fetchZoteroStatus = useCallback(async () => {
 		setZoteroLoading(true);
@@ -54,11 +71,26 @@ function SettingsContent() {
 		}
 	}, [user?.name]);
 
+	const fetchRecentImports = useCallback(async () => {
+		try {
+			const data = await fetchFromApi("/api/zotero/import/status");
+			setRecentImports(data.items ?? []);
+		} catch {
+			setRecentImports([]);
+		}
+	}, []);
+
 	useEffect(() => {
 		if (user) {
 			fetchZoteroStatus();
 		}
 	}, [user, fetchZoteroStatus]);
+
+	useEffect(() => {
+		if (user && zoteroStatus?.connected) {
+			fetchRecentImports();
+		}
+	}, [user, zoteroStatus?.connected, fetchRecentImports]);
 
 	useEffect(() => {
 		const zoteroParam = searchParams.get("zotero");
@@ -116,6 +148,40 @@ function SettingsContent() {
 			);
 		} finally {
 			setZoteroActionLoading(false);
+		}
+	};
+
+	const handleZoteroImport = async () => {
+		setZoteroImportLoading(true);
+		try {
+			const data: ZoteroImportResponse = await fetchFromApi("/api/zotero/import", {
+				method: "POST",
+				body: JSON.stringify({ limit: 5 }),
+			});
+			const parts: string[] = [];
+			if (data.imported_count > 0) {
+				parts.push(`Imported ${data.imported_count} paper${data.imported_count === 1 ? "" : "s"}`);
+			}
+			if (data.skipped_already_imported > 0) {
+				parts.push(`${data.skipped_already_imported} already imported`);
+			}
+			if (data.errors?.length > 0) {
+				parts.push(`${data.errors.length} failed`);
+			}
+			if (data.imported_count > 0) {
+				toast.success(parts.join("; ") + ". Processing may take a minute per paper.");
+			} else if (data.errors?.length > 0) {
+				toast.error(parts.join("; ") || "Import failed.");
+			} else {
+				toast.info("No new journal articles to import.");
+			}
+			await fetchRecentImports();
+		} catch (error) {
+			toast.error(
+				error instanceof Error ? error.message : "Failed to import from Zotero."
+			);
+		} finally {
+			setZoteroImportLoading(false);
 		}
 	};
 
@@ -211,22 +277,51 @@ function SettingsContent() {
 						<p className="text-sm text-muted-foreground">Checking connection…</p>
 					) : zoteroStatus?.connected ? (
 						<div className="space-y-3">
+							<p className="text-sm text-muted-foreground">
+								Imports up to 5 journal articles from Zotero (PDF from library, or from item URL if no PDF).
+								Highlights import when stored on a Zotero PDF. Books and web pages are skipped.
+							</p>
 							{zoteroStatus.zotero_user_id && (
 								<p className="text-sm text-muted-foreground">
 									Zotero user ID: {zoteroStatus.zotero_user_id}
 								</p>
 							)}
-							<Button
-								type="button"
-								variant="outline"
-								onClick={handleZoteroDisconnect}
-								disabled={zoteroActionLoading}
-							>
-								{zoteroActionLoading ? (
-									<Loader2 className="h-4 w-4 animate-spin mr-2" />
-								) : null}
-								Disconnect
-							</Button>
+							<div className="flex flex-wrap gap-2">
+								<Button
+									type="button"
+									onClick={handleZoteroImport}
+									disabled={zoteroImportLoading || zoteroActionLoading}
+								>
+									{zoteroImportLoading ? (
+										<Loader2 className="h-4 w-4 animate-spin mr-2" />
+									) : null}
+									Import from Zotero
+								</Button>
+								<Button
+									type="button"
+									variant="outline"
+									onClick={handleZoteroDisconnect}
+									disabled={zoteroActionLoading || zoteroImportLoading}
+								>
+									{zoteroActionLoading ? (
+										<Loader2 className="h-4 w-4 animate-spin mr-2" />
+									) : null}
+									Disconnect
+								</Button>
+							</div>
+							{recentImports.length > 0 && (
+								<div className="space-y-1 pt-2 border-t">
+									<p className="text-xs font-medium text-muted-foreground">Recent imports</p>
+									<ul className="text-xs text-muted-foreground space-y-1">
+										{recentImports.slice(0, 5).map((item) => (
+											<li key={item.zotero_item_key}>
+												{item.status} · {item.import_source}
+												{item.paper_id ? ` · paper ${item.paper_id.slice(0, 8)}…` : ""}
+											</li>
+										))}
+									</ul>
+								</div>
+							)}
 						</div>
 					) : (
 						<Button

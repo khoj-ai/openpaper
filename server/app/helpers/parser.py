@@ -172,6 +172,35 @@ async def validate_url_and_fetch_pdf(url: str) -> tuple[bool, bytes, str]:
         return False, b"", f"Error processing URL: {str(e)}"
 
 
+def extract_pdf_text_and_offsets(
+    pdf_bytes: bytes,
+) -> Tuple[str, dict[int, list[int]]]:
+    """
+    Extract plain text from a PDF along with a {page_number: [start, end]} offset
+    map suitable for storage in `Paper.page_offset_map`. Pages with no extractable
+    text are skipped. Used by callers (e.g. Zotero import) that already have
+    authoritative metadata and only need deterministic text for annotation
+    offset matching.
+    """
+    reader = PdfReader(io.BytesIO(pdf_bytes))
+    parts: list[str] = []
+    page_offsets: dict[int, list[int]] = {}
+    current = 0
+    for idx, page in enumerate(reader.pages):
+        try:
+            text = page.extract_text() or ""
+        except Exception as e:
+            logger.warning("Failed to extract text from page %s: %s", idx + 1, e)
+            text = ""
+        text = text.replace("\x00", "")
+        if not text:
+            continue
+        parts.append(text)
+        page_offsets[idx + 1] = [current, current + len(text)]
+        current += len(text)
+    return "".join(parts), page_offsets
+
+
 def parse_publication_date(date_str: str) -> datetime | None:
     """Parse publication date string in various formats (yyyy-mm-dd, yyyy-mm, yyyy)."""
     if not date_str:

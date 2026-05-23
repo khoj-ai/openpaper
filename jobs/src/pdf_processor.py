@@ -34,6 +34,10 @@ async def process_pdf_file(
     start_time = datetime.now(timezone.utc)
     temp_file_path = None
     preview_object_key = None
+    pdf_text: str = ""
+    page_offsets: dict = {}
+    file_url: str = ""
+    preview_url = None
 
     try:
         logger.info(f"Starting PDF processing for job {job_id}")
@@ -104,6 +108,10 @@ async def process_pdf_file(
             logger.error(f"Failed to extract metadata: {metadata_result}")
             raise metadata_result
         metadata: PaperMetadataExtraction = metadata_result # type: ignore
+
+        if not metadata.title:
+            raise Exception("Failed to extract metadata from PDF")
+
         logger.info(f"Successfully extracted metadata for {safe_filename}")
 
         # Process publication date
@@ -121,10 +129,6 @@ async def process_pdf_file(
 
         logger.info(f"PDF processing completed successfully for {safe_filename} in {duration:.2f} seconds")
 
-        if not metadata.title:
-            # This most likely means the LLM extraction failed
-            raise Exception("Failed to extract metadata from PDF")
-
         return PDFProcessingResult(
             success=True,
             metadata=metadata,
@@ -140,11 +144,19 @@ async def process_pdf_file(
 
     except Exception as e:
         logger.error(f"PDF processing failed for {job_id}: {str(e)}", exc_info=True)
-        # Cleanup logic remains the same
+        # Preserve anything we already extracted deterministically (text, preview, S3
+        # location) so the server can salvage the paper for callers like Zotero
+        # import that already have authoritative metadata.
         return PDFProcessingResult(
             success=False,
             error=str(e),
             job_id=job_id,
+            raw_content=pdf_text or None,
+            page_offset_map=page_offsets or None,
+            s3_object_key=s3_object_key,
+            file_url=file_url or None,
+            preview_url=preview_url,
+            preview_object_key=preview_object_key,
         )
     finally:
         # Clean up temporary file
