@@ -47,7 +47,7 @@ The harness routes each question through [Open Paper](https://openpaper.ai)'s fu
 
 ### Metrics
 
-Each row is scored on up to six metrics, four deterministic and two LLM-judged.
+Each row is scored on up to six metrics, four deterministic and two LLM-evaluated.
 
 The four deterministic metrics are:
 
