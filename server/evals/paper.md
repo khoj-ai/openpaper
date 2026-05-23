@@ -166,6 +166,9 @@ The dataset is publicly released on HuggingFace ([`khoj-ai/ResearchQA`](https://
 
 The single-paper scope is intentional but partial. The most natural extension of this work is to apply the same benchmark-generation paradigm — LLM-drafted questions under a structured-output schema, deterministic citation matching against source text, adversarial slice scored on grounded refusal, per-level anchored LLM judge — to multi-paper QA, where the system must gather evidence across multiple documents to answer a single question. The row's schema structure would generalize to *(paper_id, section_label, alternatives)* triples, and the matcher already operates per-paper. We expect to release a multi-paper companion benchmark in a follow-up.
 
+## Acknowledgements
+
+We thank Chris Lengerich for his advice on the structure and content of this paper.
 
 ## References
 
