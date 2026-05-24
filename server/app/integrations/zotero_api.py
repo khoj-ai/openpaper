@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 ZOTERO_API_BASE = "https://api.zotero.org"
 MAX_RETRIES = 3
+IMPORTABLE_ITEM_TYPES = ("journalArticle", "conferencePaper", "preprint")
 
 
 class ZoteroApiClient:
@@ -72,7 +73,7 @@ class ZoteroApiClient:
             "start": start,
             "sort": "dateModified",
             "direction": "desc",
-            "itemType": "journalArticle || conferencePaper",
+            "itemType": " || ".join(IMPORTABLE_ITEM_TYPES),
         }
         response = self._request("GET", url, params=params)
         items = response.json()
@@ -81,7 +82,7 @@ class ZoteroApiClient:
         return [
             item
             for item in items
-            if item.get("data", {}).get("itemType") in ("journalArticle", "conferencePaper")
+            if item.get("data", {}).get("itemType") in IMPORTABLE_ITEM_TYPES
         ]
 
     def get_children(self, item_key: str) -> List[Dict[str, Any]]:

@@ -20,7 +20,7 @@ class ZoteroDisconnectResponse(BaseModel):
 
 
 class ZoteroImportRequest(BaseModel):
-    limit: int = Field(default=5, ge=1, le=5)
+    limit: int = Field(default=50, ge=1, le=50)
 
 
 class ZoteroImportItemResult(BaseModel):
@@ -44,6 +44,19 @@ class ZoteroImportResponse(BaseModel):
     errors: List[ZoteroImportError]
 
 
+class ZoteroSyncItemResult(BaseModel):
+    zotero_item_key: str
+    paper_id: Optional[str] = None
+    new_annotations_count: int = 0
+
+
+class ZoteroImportAndSyncResponse(ZoteroImportResponse):
+    synced: List[ZoteroSyncItemResult]
+    synced_papers_count: int
+    new_annotations_count: int
+    sync_errors: List[ZoteroImportError]
+
+
 class ZoteroImportStatusItem(BaseModel):
     zotero_item_key: str
     paper_id: Optional[str] = None
@@ -53,6 +66,7 @@ class ZoteroImportStatusItem(BaseModel):
     title: Optional[str] = None
     error_message: Optional[str] = None
     created_at: Optional[datetime] = None
+    last_synced_at: Optional[datetime] = None
 
 
 class ZoteroImportStatusListResponse(BaseModel):

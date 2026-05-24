@@ -313,6 +313,7 @@ class ZoteroImportedItem(Base):
     status = Column(String, nullable=False, default=ZoteroImportStatus.PROCESSING)
     annotations_payload = Column(JSONB, nullable=True)
     error_message = Column(String, nullable=True)
+    last_synced_at = Column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("user_id", "zotero_item_key", name="uq_zotero_import_user_item"),
@@ -816,6 +817,17 @@ class Highlight(Base):
     role = Column(String, nullable=False, default="user")  # 'user' or 'assistant'
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     color = Column(String, nullable=True, default="blue")
+    zotero_annotation_key = Column(String, nullable=True)
+
+    __table_args__ = (
+        Index(
+            "uq_highlight_paper_zotero_annotation_key",
+            "paper_id",
+            "zotero_annotation_key",
+            unique=True,
+            postgresql_where=(zotero_annotation_key.isnot(None)),
+        ),
+    )
 
     # Relationships
     user = relationship("User", back_populates="highlights")

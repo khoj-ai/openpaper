@@ -1,18 +1,18 @@
 "use client"
 
-import { useAuth } from "@/lib/auth";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
-import { Suspense, useCallback, useEffect, useState } from "react";
-import { fetchFromApi } from "@/lib/api";
-import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import { refreshActivePapers } from "@/hooks/useActivePapers";
+import { fetchFromApi } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import { Loader2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useRef } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 type ZoteroStatus = {
 	connected: boolean;
@@ -34,6 +34,9 @@ type ZoteroImportResponse = {
 	imported_via_url: number;
 	skipped_already_imported: number;
 	errors: { zotero_item_key: string; error: string }[];
+	synced_papers_count: number;
+	new_annotations_count: number;
+	sync_errors: { zotero_item_key: string; error: string }[];
 };
 
 function SettingsContent() {
@@ -51,7 +54,8 @@ function SettingsContent() {
 	const [importProgress, setImportProgress] = useState<number | null>(null);
 	const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 	const importDoneRef = useRef(false);
-	const IMPORT_LIMIT = 5;
+	const lastRefreshedDoneRef = useRef(0);
+	const IMPORT_LIMIT = 50;
 
 	const fetchZoteroStatus = useCallback(async () => {
 		setZoteroLoading(true);
@@ -164,6 +168,7 @@ function SettingsContent() {
 
 		const knownPaperIds = new Set(recentImports.map((r) => r.paper_id).filter(Boolean));
 		importDoneRef.current = false;
+		lastRefreshedDoneRef.current = 0;
 
 		pollRef.current = setInterval(async () => {
 			try {
@@ -178,13 +183,17 @@ function SettingsContent() {
 						(i.status === "completed" || i.status === "failed"),
 				).length;
 				setImportProgress(Math.min((done / IMPORT_LIMIT) * 100, 99));
+				if (done > lastRefreshedDoneRef.current) {
+					lastRefreshedDoneRef.current = done;
+					refreshActivePapers();
+				}
 			} catch {
 				// ignore poll errors
 			}
 		}, 1500);
 
 		try {
-			const data: ZoteroImportResponse = await fetchFromApi("/api/zotero/import", {
+			const data: ZoteroImportResponse = await fetchFromApi("/api/zotero/import-and-sync", {
 				method: "POST",
 				body: JSON.stringify({ limit: IMPORT_LIMIT }),
 			});
@@ -195,21 +204,35 @@ function SettingsContent() {
 			if (data.imported_count > 0) {
 				parts.push(`Imported ${data.imported_count} paper${data.imported_count === 1 ? "" : "s"}`);
 			}
+			if (data.synced_papers_count > 0) {
+				const syncPart = `synced ${data.synced_papers_count} paper${data.synced_papers_count === 1 ? "" : "s"}`;
+				if (data.new_annotations_count > 0) {
+					parts.push(
+						`${syncPart} with ${data.new_annotations_count} new highlight${data.new_annotations_count === 1 ? "" : "s"}`,
+					);
+				} else {
+					parts.push(syncPart);
+				}
+			}
 			if (data.skipped_already_imported > 0) {
 				parts.push(`${data.skipped_already_imported} already imported`);
 			}
-			if (data.errors?.length > 0) {
-				parts.push(`${data.errors.length} failed`);
+			const errorCount = (data.errors?.length ?? 0) + (data.sync_errors?.length ?? 0);
+			if (errorCount > 0) {
+				parts.push(`${errorCount} failed`);
 			}
 			if (data.imported_count > 0) {
 				toast.success(parts.join("; ") + ". Processing may take a minute per paper.");
-			} else if (data.errors?.length > 0) {
-				toast.error(parts.join("; ") || "Import failed.");
+			} else if (errorCount > 0 && data.synced_papers_count === 0) {
+				toast.error(parts.join("; ") || "Import and sync failed.");
+			} else if (parts.length > 0) {
+				toast.success(parts.join("; ") + ".");
 			} else {
-				toast.info("No new papers to import.");
+				toast.info("No new papers or highlights to sync.");
 			}
 			setImportProgress(100);
 			await fetchRecentImports();
+			await refreshActivePapers();
 		} catch (error) {
 			toast.error(
 				error instanceof Error ? error.message : "Failed to import from Zotero."
@@ -251,6 +274,10 @@ function SettingsContent() {
 			</div>
 		);
 	}
+
+	const recentImportedPapers = recentImports.filter(
+		(item) => item.title || item.paper_id,
+	);
 
 	return (
 		<div className="max-w-2xl p-6 space-y-6">
@@ -325,8 +352,10 @@ function SettingsContent() {
 					) : zoteroStatus?.connected ? (
 						<div className="space-y-3">
 							<p className="text-sm text-muted-foreground">
-								Imports up to 5 journal articles from Zotero (PDF from library, or from item URL if no PDF).
+								Imports up to 50 journal articles, conference papers, and preprints from Zotero,
+								then syncs new PDF highlights from Zotero into papers you have already imported.
 								Highlights import when stored on a Zotero PDF. Books and web pages are skipped.
+								Annotations you create in Open Paper are not pushed to Zotero.
 							</p>
 						<div className="flex flex-wrap gap-2">
 							<Button
@@ -337,7 +366,7 @@ function SettingsContent() {
 								{zoteroImportLoading ? (
 									<Loader2 className="h-4 w-4 animate-spin mr-2" />
 								) : null}
-								Import from Zotero
+								Import & sync
 							</Button>
 							<Button
 								type="button"
@@ -359,16 +388,14 @@ function SettingsContent() {
 								<Progress value={importProgress} />
 							</div>
 						)}
-							{recentImports.length > 0 && (
+							{recentImportedPapers.length > 0 && (
 								<div className="space-y-1 pt-2 border-t">
 									<p className="text-xs font-medium text-muted-foreground">Recent imports</p>
 									<ul className="list-disc pl-4 text-xs text-muted-foreground space-y-1">
-									{recentImports.slice(0, 5).map((item) => (
+									{recentImportedPapers.slice(0, 5).map((item) => (
 										<li key={item.zotero_item_key}>
 											{item.title
-												?? (item.paper_id
-													? `paper ${item.paper_id.slice(0, 8)}…`
-													: item.status)}
+												?? `paper ${item.paper_id!.slice(0, 8)}…`}
 										</li>
 									))}
 									</ul>

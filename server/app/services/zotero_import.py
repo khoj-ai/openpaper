@@ -15,7 +15,7 @@ from app.database.crud.paper_upload_crud import (
 )
 from app.database.crud.zotero_crud import zotero_crud
 from app.database.crud.zotero_import_crud import zotero_import_crud
-from app.database.models import RoleType, ZoteroImportSource, ZoteroImportStatus
+from app.database.models import Paper, RoleType, ZoteroImportedItem, ZoteroImportSource, ZoteroImportStatus
 from app.helpers.parser import (
     extract_pdf_page_dimensions,
     extract_pdf_text_and_offsets,
@@ -187,6 +187,196 @@ def _convert_zotero_position(ann_data: Dict[str, Any]) -> Optional[Dict[str, Any
     return {"boundingRect": bounding, "rects": rects, "usePdfCoordinates": True}
 
 
+def _serialize_annotations_payload(
+    annotations: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    return [
+        {"key": ann.get("key", ""), "data": ann.get("data", {})}
+        for ann in annotations
+        if ann.get("key")
+    ]
+
+
+def _normalize_payload_item(
+    item: Dict[str, Any],
+) -> Optional[Tuple[str, Dict[str, Any]]]:
+    if not isinstance(item, dict):
+        return None
+    if "data" in item and item.get("key"):
+        data = item.get("data")
+        if isinstance(data, dict):
+            return str(item["key"]), data
+    if item.get("annotationType") is not None or item.get("annotationText") is not None:
+        key = item.get("key") or item.get("annotationKey")
+        if key:
+            return str(key), item
+    return None
+
+
+def _embed_page_dims_in_annotation_data(
+    ann_data: Dict[str, Any],
+    page_dims: Dict[int, Tuple[float, float]],
+) -> None:
+    pos_raw = ann_data.get("annotationPosition")
+    if not pos_raw:
+        return
+    try:
+        pos = json.loads(pos_raw) if isinstance(pos_raw, str) else pos_raw
+        idx = pos.get("pageIndex", 0)
+    except (json.JSONDecodeError, TypeError, AttributeError):
+        idx = 0
+    w, h = page_dims.get(idx, (0.0, 0.0))
+    ann_data["_page_width"] = w
+    ann_data["_page_height"] = h
+
+
+def _get_page_dims_for_paper(paper: Paper) -> Dict[int, Tuple[float, float]]:
+    if not paper.s3_object_key:
+        return {}
+    try:
+        pdf_bytes = s3_service.download_bytes(str(paper.s3_object_key))
+        return extract_pdf_page_dimensions(pdf_bytes)
+    except Exception as e:
+        logger.warning(
+            "Failed to download PDF for page dimensions (paper %s): %s",
+            paper.id,
+            e,
+        )
+        return {}
+
+
+def _apply_single_zotero_annotation(
+    db: Session,
+    *,
+    paper_id: UUID,
+    user: CurrentUser,
+    zotero_annotation_key: str,
+    ann_data: Dict[str, Any],
+    raw_content: str,
+    page_offsets: Optional[Dict[int, Tuple[int, int]]],
+) -> bool:
+    """Create a highlight (+ optional comment) for one Zotero annotation. Returns True if created."""
+    ann_type = (ann_data.get("annotationType") or "highlight").lower()
+
+    if ann_type == "ink":
+        return False
+
+    raw_text = (ann_data.get("annotationText") or "").strip()
+    comment = (ann_data.get("annotationComment") or "").strip()
+
+    is_text_annotation = ann_type in ("highlight", "underline")
+    if ann_type == "note":
+        if not comment:
+            return False
+        raw_text = ""
+    elif ann_type == "image":
+        raw_text = ""
+    elif is_text_annotation and not raw_text and not comment:
+        return False
+
+    start_offset: Optional[int] = None
+    end_offset: Optional[int] = None
+    if raw_text and raw_content:
+        so, eo = find_offsets(raw_text, raw_content)
+        if so >= 0 and eo >= 0:
+            start_offset = so
+            end_offset = eo
+
+    page_number = _page_from_annotation(ann_data)
+    if page_number is None and start_offset is not None and page_offsets:
+        from app.helpers.parser import get_start_page_from_offset
+
+        page_number = get_start_page_from_offset(page_offsets, start_offset)
+
+    position = _convert_zotero_position(ann_data)
+
+    highlight = highlight_crud.create(
+        db,
+        obj_in=HighlightCreate(
+            paper_id=paper_id,
+            raw_text=raw_text,
+            start_offset=start_offset,
+            end_offset=end_offset,
+            page_number=page_number,
+            position=position,
+            role=RoleType.USER,
+            color=_map_zotero_color(ann_data.get("annotationColor")),
+            zotero_annotation_key=zotero_annotation_key,
+        ),
+        user=user,
+    )
+    if not highlight or not highlight.id:
+        return False
+
+    if comment:
+        annotation_crud.create(
+            db,
+            obj_in=AnnotationCreate(
+                paper_id=paper_id,
+                highlight_id=UUID(str(highlight.id)),
+                content=comment,
+                role=RoleType.USER,
+            ),
+            user=user,
+        )
+    return True
+
+
+def _try_backfill_or_apply_annotation(
+    db: Session,
+    *,
+    paper_id: UUID,
+    user: CurrentUser,
+    zotero_annotation_key: str,
+    ann_data: Dict[str, Any],
+    raw_content: str,
+    page_offsets: Optional[Dict[int, Tuple[int, int]]],
+) -> bool:
+    """
+    Backfill an existing highlight's Zotero key when possible; otherwise create a new one.
+    Returns True when a key was backfilled or a new highlight was created.
+    """
+    ann_type = (ann_data.get("annotationType") or "highlight").lower()
+    if ann_type == "ink":
+        return False
+
+    raw_text = (ann_data.get("annotationText") or "").strip()
+    comment = (ann_data.get("annotationComment") or "").strip()
+    if ann_type == "note":
+        if not comment:
+            return False
+        raw_text = ""
+    elif ann_type == "image":
+        raw_text = ""
+    elif ann_type in ("highlight", "underline") and not raw_text and not comment:
+        return False
+
+    page_number = _page_from_annotation(ann_data)
+    candidate = highlight_crud.find_backfill_candidate(
+        db,
+        paper_id=paper_id,
+        raw_text=raw_text,
+        page_number=page_number,
+    )
+    if candidate:
+        highlight_crud.set_zotero_annotation_key(
+            db,
+            highlight=candidate,
+            zotero_annotation_key=zotero_annotation_key,
+        )
+        return True
+
+    return _apply_single_zotero_annotation(
+        db,
+        paper_id=paper_id,
+        user=user,
+        zotero_annotation_key=zotero_annotation_key,
+        ann_data=ann_data,
+        raw_content=raw_content,
+        page_offsets=page_offsets,
+    )
+
+
 async def _resolve_pdf_bytes(
     client: ZoteroApiClient,
     item: Dict[str, Any],
@@ -265,10 +455,10 @@ async def import_batch(
     db: Session,
     *,
     user: CurrentUser,
-    limit: int = 5,
+    limit: int = 50,
 ) -> Dict[str, Any]:
     """
-    Import journal articles and conference papers directly from Zotero.
+    Import journal articles, conference papers, and preprints directly from Zotero.
 
     Zotero already provides authoritative metadata (title, authors, abstract, DOI,
     publish date, tags, annotations), so this path skips the Celery jobs worker and
@@ -454,7 +644,7 @@ async def import_batch(
                     user=user,
                 )
                 annotation_payload = (
-                    [a.get("data", {}) for a in annotations] if annotations else None
+                    _serialize_annotations_payload(annotations) if annotations else None
                 )
 
                 zotero_import_crud.create(
@@ -542,81 +732,22 @@ def apply_zotero_annotations(
             db, paper_id=paper_id, current_user=user
         )
         raw_content = raw_file.raw_content or ""
+        page_offsets = raw_file.page_offsets
 
-        for ann_data in import_row.annotations_payload:
-            if not isinstance(ann_data, dict):
+        for payload_item in import_row.annotations_payload:
+            normalized = _normalize_payload_item(payload_item)
+            if not normalized:
                 continue
-
-            ann_type = (ann_data.get("annotationType") or "highlight").lower()
-
-            # ink annotations (freehand drawing) have no text or useful position
-            if ann_type == "ink":
-                continue
-
-            raw_text = (ann_data.get("annotationText") or "").strip()
-            comment = (ann_data.get("annotationComment") or "").strip()
-
-            # note: comment-only sticky note; image: area snapshot — neither has text
-            is_text_annotation = ann_type in ("highlight", "underline")
-            if ann_type == "note":
-                if not comment:
-                    continue
-                raw_text = ""
-            elif ann_type == "image":
-                raw_text = ""
-            elif is_text_annotation and not raw_text and not comment:
-                continue
-
-            start_offset: Optional[int] = None
-            end_offset: Optional[int] = None
-            if raw_text and raw_content:
-                so, eo = find_offsets(raw_text, raw_content)
-                if so >= 0 and eo >= 0:
-                    start_offset = so
-                    end_offset = eo
-
-            page_number = _page_from_annotation(ann_data)
-            if (
-                page_number is None
-                and start_offset is not None
-                and raw_file.page_offsets
-            ):
-                from app.helpers.parser import get_start_page_from_offset
-
-                page_number = get_start_page_from_offset(
-                    raw_file.page_offsets, start_offset
-                )
-
-            position = _convert_zotero_position(ann_data)
-
-            highlight = highlight_crud.create(
+            zotero_key, ann_data = normalized
+            _apply_single_zotero_annotation(
                 db,
-                obj_in=HighlightCreate(
-                    paper_id=UUID(paper_id),
-                    raw_text=raw_text,
-                    start_offset=start_offset,
-                    end_offset=end_offset,
-                    page_number=page_number,
-                    position=position,
-                    role=RoleType.USER,
-                    color=_map_zotero_color(ann_data.get("annotationColor")),
-                ),
+                paper_id=UUID(paper_id),
                 user=user,
+                zotero_annotation_key=zotero_key,
+                ann_data=ann_data,
+                raw_content=raw_content,
+                page_offsets=page_offsets,
             )
-            if not highlight or not highlight.id:
-                continue
-
-            if comment:
-                annotation_crud.create(
-                    db,
-                    obj_in=AnnotationCreate(
-                        paper_id=UUID(paper_id),
-                        highlight_id=UUID(str(highlight.id)),
-                        content=comment,
-                        role=RoleType.USER,
-                    ),
-                    user=user,
-                )
 
         zotero_import_crud.update_status(
             db,
@@ -638,3 +769,118 @@ def apply_zotero_annotations(
             error_message=str(e),
             paper_id=UUID(paper_id),
         )
+
+
+def _sync_item(
+    db: Session,
+    *,
+    client: ZoteroApiClient,
+    import_row: ZoteroImportedItem,
+    user: CurrentUser,
+) -> Dict[str, Any]:
+    paper_id = import_row.paper_id
+    if not paper_id or not import_row.zotero_attachment_key:
+        raise ValueError("Import row is missing paper or attachment key")
+
+    paper = paper_crud.get(db, id=str(paper_id), user=user)
+    if not paper:
+        raise ValueError("Linked paper no longer exists")
+
+    attachment_children = client.get_children(import_row.zotero_attachment_key)
+    remote_annotations = client.get_annotations_for_attachment(attachment_children)
+    existing_keys = highlight_crud.get_zotero_annotation_keys_for_paper(
+        db, paper_id=UUID(str(paper_id))
+    )
+
+    missing_annotations = [
+        ann
+        for ann in remote_annotations
+        if ann.get("key") and ann["key"] not in existing_keys
+    ]
+
+    new_annotations_count = 0
+    if missing_annotations:
+        page_dims = _get_page_dims_for_paper(paper)
+        raw_file = paper_crud.read_raw_document_content(
+            db, paper_id=str(paper_id), current_user=user
+        )
+        raw_content = raw_file.raw_content or ""
+        page_offsets = raw_file.page_offsets
+
+        for ann in missing_annotations:
+            zotero_key = str(ann["key"])
+            ann_data = dict(ann.get("data") or {})
+            _embed_page_dims_in_annotation_data(ann_data, page_dims)
+            if _try_backfill_or_apply_annotation(
+                db,
+                paper_id=UUID(str(paper_id)),
+                user=user,
+                zotero_annotation_key=zotero_key,
+                ann_data=ann_data,
+                raw_content=raw_content,
+                page_offsets=page_offsets,
+            ):
+                new_annotations_count += 1
+
+    zotero_import_crud.update_after_sync(
+        db,
+        item=import_row,
+        annotations_payload=_serialize_annotations_payload(remote_annotations),
+        last_synced_at=datetime.now(timezone.utc),
+    )
+
+    return {
+        "zotero_item_key": import_row.zotero_item_key,
+        "paper_id": str(paper_id),
+        "new_annotations_count": new_annotations_count,
+    }
+
+
+async def sync_batch(
+    db: Session,
+    *,
+    user: CurrentUser,
+    limit: int = 50,
+) -> Dict[str, Any]:
+    """Append-only sync of new Zotero annotations for already-imported PDF papers."""
+    connection = zotero_crud.get_by_user_id(db, user_id=user.id)
+    if not connection:
+        raise ValueError("Zotero account not connected")
+
+    client = ZoteroApiClient(
+        zotero_user_id=connection.zotero_user_id,
+        api_key=connection.api_key,
+    )
+
+    syncable = zotero_import_crud.list_syncable_by_user(
+        db, user_id=user.id, limit=limit
+    )
+
+    synced: List[Dict[str, Any]] = []
+    errors: List[Dict[str, str]] = []
+    new_annotations_count = 0
+
+    for import_row in syncable:
+        try:
+            result = _sync_item(
+                db, client=client, import_row=import_row, user=user
+            )
+            synced.append(result)
+            new_annotations_count += result["new_annotations_count"]
+        except Exception as e:
+            logger.error(
+                "Zotero sync failed for item %s: %s",
+                import_row.zotero_item_key,
+                e,
+                exc_info=True,
+            )
+            errors.append(
+                {"zotero_item_key": import_row.zotero_item_key, "error": str(e)}
+            )
+
+    return {
+        "synced": synced,
+        "synced_papers_count": len(synced),
+        "new_annotations_count": new_annotations_count,
+        "errors": errors,
+    }

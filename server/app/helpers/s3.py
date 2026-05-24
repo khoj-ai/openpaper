@@ -187,6 +187,20 @@ class S3Service:
             logger.error(f"Error deleting file from S3: {e}")
             return False
 
+    def download_bytes(self, object_key: str) -> bytes:
+        """Download an object from S3 and return its raw bytes."""
+        try:
+            response = self.s3_client.get_object(
+                Bucket=self.bucket_name, Key=object_key
+            )
+            body = response.get("Body")
+            if body is None:
+                raise ValueError(f"S3 object {object_key} has no body")
+            return body.read()
+        except ClientError as e:
+            logger.error(f"Error downloading file from S3: {e}")
+            raise ValueError(f"Failed to download file from S3: {object_key}") from e
+
     def generate_presigned_url(
         self, object_key: str, expiration: int = 86400
     ) -> Optional[str]:

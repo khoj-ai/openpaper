@@ -1,7 +1,8 @@
+from datetime import datetime
 from typing import List, Optional, Tuple
 from uuid import UUID
 
-from app.database.models import Paper, ZoteroImportedItem, ZoteroImportStatus
+from app.database.models import Paper, ZoteroImportedItem, ZoteroImportSource, ZoteroImportStatus
 from sqlalchemy.orm import Session
 
 
@@ -83,6 +84,42 @@ class CRUDZoteroImport:
             item.error_message = error_message
         if paper_id is not None:
             item.paper_id = paper_id
+        db.add(item)
+        db.commit()
+        db.refresh(item)
+        return item
+
+    def list_syncable_by_user(
+        self, db: Session, *, user_id: UUID, limit: int
+    ) -> List[ZoteroImportedItem]:
+        return (
+            db.query(ZoteroImportedItem)
+            .join(Paper, ZoteroImportedItem.paper_id == Paper.id)
+            .filter(
+                ZoteroImportedItem.user_id == user_id,
+                ZoteroImportedItem.status == ZoteroImportStatus.COMPLETED,
+                ZoteroImportedItem.paper_id.isnot(None),
+                ZoteroImportedItem.import_source == ZoteroImportSource.PDF_ATTACHMENT,
+                ZoteroImportedItem.zotero_attachment_key.isnot(None),
+            )
+            .order_by(
+                ZoteroImportedItem.last_synced_at.asc().nullsfirst(),
+                ZoteroImportedItem.created_at.desc(),
+            )
+            .limit(limit)
+            .all()
+        )
+
+    def update_after_sync(
+        self,
+        db: Session,
+        *,
+        item: ZoteroImportedItem,
+        annotations_payload: Optional[list],
+        last_synced_at: datetime,
+    ) -> ZoteroImportedItem:
+        item.annotations_payload = annotations_payload
+        item.last_synced_at = last_synced_at
         db.add(item)
         db.commit()
         db.refresh(item)

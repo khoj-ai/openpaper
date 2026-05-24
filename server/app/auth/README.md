@@ -117,16 +117,18 @@ Import journal articles (with PDF or URL fallback) from a connected Zotero libra
 
 | Endpoint | Auth | Description |
 |----------|------|-------------|
-| `POST /api/zotero/import` | Required | Body `{ "limit": 5 }` — import up to 5 new `journalArticle` items |
+| `POST /api/zotero/import` | Required | Body `{ "limit": 50 }` — import up to 50 new `journalArticle`, `conferencePaper`, or `preprint` items |
+| `POST /api/zotero/import-and-sync` | Required | Import new items, then append-only sync of new Zotero annotations on up to 50 existing PDF imports |
 | `GET /api/zotero/import/status` | Required | Recent import records for the user |
 
 **Behavior:**
 
-- Only `journalArticle` items; books and web pages are skipped.
+- Only `journalArticle`, `conferencePaper`, and `preprint` items; books and web pages are skipped.
 - PDF from Zotero attachment when available; otherwise fetches `url` or DOI link as PDF.
 - Zotero metadata (title, authors, abstract, DOI, publish date) is treated as authoritative, so imports run synchronously on the server: upload the PDF to S3, extract text and page offsets with `pypdf`, persist the paper, and apply Zotero highlights inline.
 - The Celery jobs worker and any LLM API key are **not** required for Zotero import. (Manual uploads still use the jobs worker for AI enrichment.)
 - Highlights are applied only when imported via PDF attachment; URL fallbacks skip annotations.
+- **Sync (append-only):** For already-imported PDF papers, fetches new Zotero annotations by key and adds them to Open Paper. Does not delete or overwrite existing highlights, re-upload PDFs, or push Open Paper annotations to Zotero. Sync does not count against upload limits.
 - Failed imports (e.g. no PDF available) are marked `failed` and can be retried. Completed items whose underlying paper has since been deleted are automatically re-imported.
 
-**Settings UI:** Use **Import from Zotero** when connected.
+**Settings UI:** Use **Import & sync** when connected.

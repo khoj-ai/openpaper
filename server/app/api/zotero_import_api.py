@@ -8,14 +8,16 @@ from app.database.telemetry import track_event
 from app.helpers.subscription_limits import can_user_upload_paper
 from app.schemas.user import CurrentUser
 from app.schemas.zotero import (
+    ZoteroImportAndSyncResponse,
     ZoteroImportError,
     ZoteroImportItemResult,
     ZoteroImportRequest,
     ZoteroImportResponse,
     ZoteroImportStatusItem,
     ZoteroImportStatusListResponse,
+    ZoteroSyncItemResult,
 )
-from app.services.zotero_import import import_batch
+from app.services.zotero_import import import_batch, sync_batch
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -30,7 +32,7 @@ async def zotero_import(
     current_user: CurrentUser = Depends(get_required_user),
     db: Session = Depends(get_db),
 ):
-    """Import up to 5 journal articles from Zotero (PDF or URL fallback)."""
+    """Import up to 50 journal articles, conference papers, and preprints from Zotero (PDF or URL fallback)."""
     connection = zotero_crud.get_by_user_id(db, user_id=current_user.id)
     if not connection:
         raise HTTPException(
@@ -76,6 +78,81 @@ async def zotero_import(
     )
 
 
+@zotero_router.post("/import-and-sync", response_model=ZoteroImportAndSyncResponse)
+async def zotero_import_and_sync(
+    request: ZoteroImportRequest,
+    current_user: CurrentUser = Depends(get_required_user),
+    db: Session = Depends(get_db),
+):
+    """Import new Zotero papers, then append-only sync of annotations on existing imports."""
+    connection = zotero_crud.get_by_user_id(db, user_id=current_user.id)
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Zotero account not connected",
+        )
+
+    can_upload, _upload_err = can_user_upload_paper(db, current_user)
+
+    try:
+        if can_upload:
+            import_result = await import_batch(
+                db, user=current_user, limit=request.limit
+            )
+        else:
+            import_result = {
+                "imported": [],
+                "imported_count": 0,
+                "imported_via_url": 0,
+                "skipped_already_imported": 0,
+                "errors": [],
+            }
+        sync_result = await sync_batch(db, user=current_user, limit=request.limit)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+    except Exception as e:
+        logger.error("Zotero import-and-sync failed: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to import and sync from Zotero",
+        ) from e
+
+    if import_result["imported_count"] > 0:
+        track_event(
+            "zotero_import_batch",
+            user_id=str(current_user.id),
+            properties={"count": import_result["imported_count"]},
+            db=db,
+        )
+    if sync_result["new_annotations_count"] > 0:
+        track_event(
+            "zotero_sync_batch",
+            user_id=str(current_user.id),
+            properties={
+                "papers": sync_result["synced_papers_count"],
+                "annotations": sync_result["new_annotations_count"],
+            },
+            db=db,
+        )
+
+    return ZoteroImportAndSyncResponse(
+        imported=[
+            ZoteroImportItemResult(**item) for item in import_result["imported"]
+        ],
+        imported_count=import_result["imported_count"],
+        imported_via_url=import_result["imported_via_url"],
+        skipped_already_imported=import_result["skipped_already_imported"],
+        errors=[ZoteroImportError(**err) for err in import_result["errors"]],
+        synced=[ZoteroSyncItemResult(**item) for item in sync_result["synced"]],
+        synced_papers_count=sync_result["synced_papers_count"],
+        new_annotations_count=sync_result["new_annotations_count"],
+        sync_errors=[ZoteroImportError(**err) for err in sync_result["errors"]],
+    )
+
+
 @zotero_router.get("/import/status", response_model=ZoteroImportStatusListResponse)
 async def zotero_import_status_list(
     current_user: CurrentUser = Depends(get_required_user),
@@ -93,6 +170,7 @@ async def zotero_import_status_list(
             title=title,
             error_message=row.error_message,
             created_at=row.created_at,
+            last_synced_at=row.last_synced_at,
         )
         for row, title in rows
     ]
