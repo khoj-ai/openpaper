@@ -56,6 +56,7 @@ function SettingsContent() {
 	const importDoneRef = useRef(false);
 	const lastRefreshedDoneRef = useRef(0);
 	const IMPORT_LIMIT = 50;
+	const importTotalRef = useRef(0);
 
 	const fetchZoteroStatus = useCallback(async () => {
 		setZoteroLoading(true);
@@ -169,6 +170,7 @@ function SettingsContent() {
 		const knownPaperIds = new Set(recentImports.map((r) => r.paper_id).filter(Boolean));
 		importDoneRef.current = false;
 		lastRefreshedDoneRef.current = 0;
+		importTotalRef.current = 0;
 
 		pollRef.current = setInterval(async () => {
 			try {
@@ -176,13 +178,16 @@ function SettingsContent() {
 				// guard: discard stale poll responses that arrive after POST completed
 				if (importDoneRef.current) return;
 				const items: ZoteroImportStatusItem[] = data.items ?? [];
-				const done = items.filter(
-					(i) =>
-						i.paper_id &&
-						!knownPaperIds.has(i.paper_id) &&
-						(i.status === "completed" || i.status === "failed"),
+				const newItems = items.filter((i) => !knownPaperIds.has(i.paper_id ?? ""));
+				// Grow the total as more items appear; never shrink it
+				if (newItems.length > importTotalRef.current) {
+					importTotalRef.current = newItems.length;
+				}
+				const done = newItems.filter(
+					(i) => i.status === "completed" || i.status === "failed",
 				).length;
-				setImportProgress(Math.min((done / IMPORT_LIMIT) * 100, 99));
+				const total = importTotalRef.current || IMPORT_LIMIT;
+				setImportProgress(Math.min((done / total) * 100, 99));
 				if (done > lastRefreshedDoneRef.current) {
 					lastRefreshedDoneRef.current = done;
 					refreshActivePapers();
@@ -275,9 +280,12 @@ function SettingsContent() {
 		);
 	}
 
-	const recentImportedPapers = recentImports.filter(
-		(item) => item.title || item.paper_id,
-	);
+	const recentImportedPapers = recentImports.filter((item) => {
+		if (!item.title && !item.paper_id) return false;
+		if (!item.paper_id) return true;
+		const firstIndex = recentImports.findIndex((i) => i.paper_id === item.paper_id);
+		return recentImports.indexOf(item) === firstIndex;
+	});
 
 	return (
 		<div className="max-w-2xl p-6 space-y-6">
@@ -353,9 +361,8 @@ function SettingsContent() {
 						<div className="space-y-3">
 							<p className="text-sm text-muted-foreground">
 								Imports up to 50 journal articles, conference papers, and preprints from Zotero,
-								then syncs new PDF highlights from Zotero into papers you have already imported.
-								Highlights import when stored on a Zotero PDF. Books and web pages are skipped.
-								Annotations you create in Open Paper are not pushed to Zotero.
+								then syncs new PDF highlights from Zotero into papers you have already imported. 
+								Books and web pages are skipped.
 							</p>
 						<div className="flex flex-wrap gap-2">
 							<Button

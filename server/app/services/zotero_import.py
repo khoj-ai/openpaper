@@ -16,6 +16,7 @@ from app.database.crud.paper_upload_crud import (
 from app.database.crud.zotero_crud import zotero_crud
 from app.database.crud.zotero_import_crud import zotero_import_crud
 from app.database.models import Paper, RoleType, ZoteroImportedItem, ZoteroImportSource, ZoteroImportStatus
+from app.helpers.paper_search import normalize_doi
 from app.helpers.parser import (
     extract_pdf_page_dimensions,
     extract_pdf_text_and_offsets,
@@ -420,6 +421,69 @@ async def _resolve_pdf_bytes(
     return None, ZoteroImportSource.URL, None, None, []
 
 
+def _resolve_zotero_attachment_info(
+    client: ZoteroApiClient,
+    item: Dict[str, Any],
+) -> Tuple[str, Optional[str], Optional[str], List[Dict[str, Any]]]:
+    """Return attachment metadata and annotations without downloading the PDF."""
+    item_key = item.get("key", "")
+    data = item.get("data", {})
+    children = client.get_children(item_key)
+    pdf_attachment = client.find_pdf_attachment(children)
+
+    if pdf_attachment:
+        attachment_key = pdf_attachment.get("key", "")
+        attachment_children = client.get_children(attachment_key)
+        annotations = client.get_annotations_for_attachment(attachment_children)
+        return (
+            ZoteroImportSource.PDF_ATTACHMENT,
+            attachment_key or None,
+            None,
+            annotations,
+        )
+
+    urls = client.resolve_item_urls(data)
+    source_url = urls[0] if urls else None
+    return ZoteroImportSource.URL, None, source_url, []
+
+
+async def _link_zotero_item_to_existing_paper(
+    db: Session,
+    *,
+    client: ZoteroApiClient,
+    item: Dict[str, Any],
+    item_key: str,
+    paper: Paper,
+    user: CurrentUser,
+) -> None:
+    """Link a Zotero item to an existing paper and merge any new annotations."""
+    import_source, attachment_key, source_url, annotations = (
+        _resolve_zotero_attachment_info(client, item)
+    )
+    annotation_payload = (
+        _serialize_annotations_payload(annotations) if annotations else None
+    )
+
+    import_row = zotero_import_crud.create(
+        db,
+        user_id=user.id,
+        zotero_item_key=item_key,
+        import_source=import_source,
+        zotero_attachment_key=attachment_key,
+        source_url=source_url,
+        paper_id=UUID(str(paper.id)),
+        annotations_payload=annotation_payload,
+        status=ZoteroImportStatus.COMPLETED,
+    )
+
+    if (
+        import_source == ZoteroImportSource.PDF_ATTACHMENT
+        and attachment_key
+        and annotations
+    ):
+        _sync_item(db, client=client, import_row=import_row, user=user)
+
+
 def _apply_zotero_tags(
     db: Session,
     *,
@@ -481,6 +545,7 @@ async def import_batch(
     imported_via_url = 0
     start = 0
     page_size = 25
+    batch_doi_to_paper: Dict[str, Paper] = {}
 
     while len(imported) < limit:
         items = client.get_top_importable_items(limit=page_size, start=start)
@@ -525,6 +590,25 @@ async def import_batch(
                 # since been deleted from the user's library. Drop it and retry.
                 db.delete(existing_import)
                 db.commit()
+
+            doi = normalize_doi(item_data.get("DOI"))
+            if doi:
+                target_paper = paper_crud.get_by_doi_for_user(
+                    db, user_id=user.id, doi=doi
+                )
+                if not target_paper:
+                    target_paper = batch_doi_to_paper.get(doi)
+                if target_paper:
+                    await _link_zotero_item_to_existing_paper(
+                        db,
+                        client=client,
+                        item=item,
+                        item_key=item_key,
+                        paper=target_paper,
+                        user=user,
+                    )
+                    skipped_already_imported += 1
+                    continue
 
             can_upload, upload_err = can_user_upload_paper(db, user)
             if not can_upload:
@@ -671,6 +755,9 @@ async def import_batch(
 
                 if import_source == ZoteroImportSource.URL:
                     imported_via_url += 1
+
+                if doi:
+                    batch_doi_to_paper[doi] = paper
 
                 imported.append(
                     {

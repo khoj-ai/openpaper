@@ -18,6 +18,7 @@ from app.database.models import (
     RoleType,
     User,
 )
+from app.helpers.paper_search import normalize_doi
 from app.helpers.parser import get_start_page_from_offset
 from app.llm.utils import find_offsets
 from app.schemas.responses import PaperMetadataExtraction, ResponseCitation
@@ -740,6 +741,24 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
                 )
 
         return forked_paper
+
+    def get_by_doi_for_user(
+        self, db: Session, *, user_id: uuid.UUID, doi: str
+    ) -> Optional[Paper]:
+        """Return the user's paper with a matching normalized DOI, if any."""
+        normalized = normalize_doi(doi)
+        if not normalized:
+            return None
+
+        papers = (
+            db.query(Paper)
+            .filter(Paper.user_id == user_id, Paper.doi.isnot(None))
+            .all()
+        )
+        for paper in papers:
+            if paper.doi and normalize_doi(paper.doi) == normalized:
+                return paper
+        return None
 
 
 # Create a single instance to use throughout the application
