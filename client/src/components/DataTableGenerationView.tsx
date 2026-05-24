@@ -110,7 +110,9 @@ export default function DataTableGenerationView({
         ];
 
         const csvContent = csvRows.join('\n');
-        const blob = new Blob([csvContent], { type: 'text/csv' });
+        // Prepend a UTF-8 BOM so Excel detects the encoding (preserving accented
+        // characters) and correctly auto-detects the delimiter on localized installs.
+        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
