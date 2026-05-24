@@ -81,6 +81,15 @@ function getAnnotationCardAnchorForHighlight(
 	const { boundingRect } = highlight.position;
 	const scaleY = viewport.height / boundingRect.height;
 
+	// When coordinates are in PDF space (usePdfCoordinates: true), y1/y2 are
+	// measured from the page BOTTOM (PDF origin). We need to convert to CSS
+	// space where y is measured from the page TOP. Use y2 (the higher PDF
+	// coordinate = visually higher on page = smaller CSS y) to anchor the card
+	// at the top edge of the highlight.
+	const usePdfCoords = !!(highlight.position as { usePdfCoordinates?: boolean }).usePdfCoordinates;
+	const yOffset = usePdfCoords
+		? (boundingRect.height - boundingRect.y2) * scaleY
+		: boundingRect.y1 * scaleY;
 	const containerRect = scrollContainer.getBoundingClientRect();
 	const pageRect = (pageDiv as HTMLElement).getBoundingClientRect();
 	const scrollLeft = scrollContainer.scrollLeft;
@@ -89,7 +98,7 @@ function getAnnotationCardAnchorForHighlight(
 		pageRect.top -
 		containerRect.top +
 		scrollContainer.scrollTop +
-		boundingRect.y1 * scaleY;
+		yOffset;
 
 	const pageRightContent = pageRect.right - containerRect.left + scrollLeft;
 	const pageLeftContent = pageRect.left - containerRect.left + scrollLeft;

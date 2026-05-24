@@ -50,6 +50,7 @@ class ZoteroImportStatusItem(BaseModel):
     upload_job_id: Optional[str] = None
     import_source: str
     status: str
+    title: Optional[str] = None
     error_message: Optional[str] = None
     created_at: Optional[datetime] = None
 

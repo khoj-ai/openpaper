@@ -17,7 +17,9 @@ from app.database.crud.zotero_crud import zotero_crud
 from app.database.crud.zotero_import_crud import zotero_import_crud
 from app.database.models import RoleType, ZoteroImportSource, ZoteroImportStatus
 from app.helpers.parser import (
+    extract_pdf_page_dimensions,
     extract_pdf_text_and_offsets,
+    generate_pdf_preview_from_bytes,
     validate_pdf_content,
     validate_url_and_fetch_pdf,
 )
@@ -112,6 +114,77 @@ def _page_from_annotation(data: Dict[str, Any]) -> Optional[int]:
         except (json.JSONDecodeError, TypeError, ValueError):
             pass
     return None
+
+
+def _convert_zotero_position(ann_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Convert a Zotero annotationPosition (PDF-point coordinate space) into the
+    ScaledPosition dict that react-pdf-highlighter-extended consumes.
+
+    Zotero format:
+        { "pageIndex": 0, "rects": [[x1,y1,x2,y2], ...] }  (y=0 at bottom)
+
+    ScaledPosition format (usePdfCoordinates=true lets the viewer handle the
+    y-axis flip internally):
+        {
+          "boundingRect": {"x1":…,"y1":…,"x2":…,"y2":…,"width":…,"height":…,"pageNumber":1},
+          "rects": [...same shape...],
+          "usePdfCoordinates": true
+        }
+
+    Page width/height (required by the viewer) are read from the _page_width /
+    _page_height keys that import_batch embeds in each annotation dict.
+    """
+    pos_raw = ann_data.get("annotationPosition")
+    if not pos_raw:
+        return None
+    try:
+        position = json.loads(pos_raw) if isinstance(pos_raw, str) else pos_raw
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+    page_index = position.get("pageIndex", 0)
+    page_number = page_index + 1
+    raw_rects = position.get("rects") or []
+    if not raw_rects:
+        return None
+
+    page_w = float(ann_data.get("_page_width") or 0)
+    page_h = float(ann_data.get("_page_height") or 0)
+
+    rects: List[Dict[str, Any]] = []
+    for r in raw_rects:
+        try:
+            if isinstance(r, (list, tuple)) and len(r) >= 4:
+                x1, y1, x2, y2 = float(r[0]), float(r[1]), float(r[2]), float(r[3])
+            elif isinstance(r, dict):
+                x1 = float(r.get("x", r.get("x1", 0)))
+                y1 = float(r.get("y", r.get("y1", 0)))
+                x2 = x1 + float(r.get("width", 0)) if "width" in r else float(r.get("x2", 0))
+                y2 = y1 + float(r.get("height", 0)) if "height" in r else float(r.get("y2", 0))
+            else:
+                continue
+        except (TypeError, ValueError):
+            continue
+        rects.append({
+            "x1": x1, "y1": y1, "x2": x2, "y2": y2,
+            "width": page_w, "height": page_h,
+            "pageNumber": page_number,
+        })
+
+    if not rects:
+        return None
+
+    bounding = {
+        "x1": min(r["x1"] for r in rects),
+        "y1": min(r["y1"] for r in rects),
+        "x2": max(r["x2"] for r in rects),
+        "y2": max(r["y2"] for r in rects),
+        "width": page_w,
+        "height": page_h,
+        "pageNumber": page_number,
+    }
+    return {"boundingRect": bounding, "rects": rects, "usePdfCoordinates": True}
 
 
 async def _resolve_pdf_bytes(
@@ -312,6 +385,29 @@ async def import_batch(
                     )
                     raw_text, page_offset_map = "", {}
 
+                try:
+                    page_dims = extract_pdf_page_dimensions(pdf_bytes)
+                except Exception as e:
+                    logger.warning(
+                        "Failed to extract page dimensions for %s: %s", item_key, e
+                    )
+                    page_dims = {}
+
+                for ann in annotations:
+                    d = ann.get("data", {})
+                    pos_raw = d.get("annotationPosition")
+                    if pos_raw:
+                        try:
+                            pos = json.loads(pos_raw) if isinstance(pos_raw, str) else pos_raw
+                            idx = pos.get("pageIndex", 0)
+                        except (json.JSONDecodeError, TypeError, AttributeError):
+                            idx = 0
+                        w, h = page_dims.get(idx, (0.0, 0.0))
+                        d["_page_width"] = w
+                        d["_page_height"] = h
+
+                _, preview_url = generate_pdf_preview_from_bytes(pdf_bytes)
+
                 data = item.get("data", {})
                 authors = _zotero_creators_to_authors(data.get("creators") or [])
                 publish_date = _parse_zotero_date(data.get("date"))
@@ -324,6 +420,7 @@ async def import_batch(
                         upload_job_id=upload_job_id,
                         raw_content=raw_text or None,
                         page_offset_map=page_offset_map or None,
+                        preview_url=preview_url,
                         title=data.get("title") or None,
                         authors=authors or None,
                         abstract=data.get("abstractNote") or None,
@@ -449,9 +546,25 @@ def apply_zotero_annotations(
         for ann_data in import_row.annotations_payload:
             if not isinstance(ann_data, dict):
                 continue
+
+            ann_type = (ann_data.get("annotationType") or "highlight").lower()
+
+            # ink annotations (freehand drawing) have no text or useful position
+            if ann_type == "ink":
+                continue
+
             raw_text = (ann_data.get("annotationText") or "").strip()
             comment = (ann_data.get("annotationComment") or "").strip()
-            if not raw_text and not comment:
+
+            # note: comment-only sticky note; image: area snapshot — neither has text
+            is_text_annotation = ann_type in ("highlight", "underline")
+            if ann_type == "note":
+                if not comment:
+                    continue
+                raw_text = ""
+            elif ann_type == "image":
+                raw_text = ""
+            elif is_text_annotation and not raw_text and not comment:
                 continue
 
             start_offset: Optional[int] = None
@@ -474,21 +587,13 @@ def apply_zotero_annotations(
                     raw_file.page_offsets, start_offset
                 )
 
-            position = None
-            pos_raw = ann_data.get("annotationPosition")
-            if pos_raw:
-                try:
-                    position = (
-                        json.loads(pos_raw) if isinstance(pos_raw, str) else pos_raw
-                    )
-                except json.JSONDecodeError:
-                    position = None
+            position = _convert_zotero_position(ann_data)
 
             highlight = highlight_crud.create(
                 db,
                 obj_in=HighlightCreate(
                     paper_id=UUID(paper_id),
-                    raw_text=raw_text or comment[:200] if comment else "",
+                    raw_text=raw_text,
                     start_offset=start_offset,
                     end_offset=end_offset,
                     page_number=page_number,

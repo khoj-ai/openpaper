@@ -90,9 +90,10 @@ async def zotero_import_status_list(
             upload_job_id=str(row.upload_job_id) if row.upload_job_id else None,
             import_source=row.import_source,
             status=row.status,
+            title=title,
             error_message=row.error_message,
             created_at=row.created_at,
         )
-        for row in rows
+        for row, title in rows
     ]
     return ZoteroImportStatusListResponse(items=items)

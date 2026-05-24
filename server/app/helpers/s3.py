@@ -41,6 +41,23 @@ class S3Service:
         self.bucket_name = S3_BUCKET_NAME
         self.cloudflare_bucket_name = CLOUDFLARE_BUCKET_NAME
 
+    def public_url_for_object_key(
+        self, object_key: str, expiration: int = 86400
+    ) -> Optional[str]:
+        """Return a fetchable public URL for an S3 object key."""
+        if self.cloudflare_bucket_name:
+            return f"https://{self.cloudflare_bucket_name}/{object_key}"
+        return self.generate_presigned_url(object_key, expiration=expiration)
+
+    def resolve_preview_url(self, preview_url: Optional[str]) -> Optional[str]:
+        """Return a fetchable preview URL, healing legacy https://None/ entries."""
+        if not preview_url:
+            return None
+        if preview_url.startswith("https://None/"):
+            object_key = preview_url[len("https://None/") :]
+            return self.public_url_for_object_key(object_key)
+        return preview_url
+
     def _validate_pdf_url(self, url: str) -> bool:
         """
         Validate if URL points to a PDF file
@@ -60,6 +77,23 @@ class S3Service:
             return response.ok and is_pdf
         except requests.RequestException:
             return False
+
+    def upload_any_file_from_bytes(
+        self,
+        file_bytes: bytes,
+        original_filename: str,
+        content_type: str,
+    ) -> tuple[str, str]:
+        """Upload file bytes to S3 and return the object key and public URL."""
+        object_key = f"{UPLOAD_DIR}/{uuid.uuid4()}-{original_filename}"
+        self.s3_client.put_object(
+            Bucket=self.bucket_name,
+            Key=object_key,
+            Body=file_bytes,
+            ContentType=content_type,
+        )
+        file_url = self.public_url_for_object_key(object_key)
+        return object_key, file_url or ""
 
     def upload_any_file(
         self, file_path: str, original_filename: str, content_type: str

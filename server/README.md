@@ -6,6 +6,8 @@ This server manages the backend for the Open Paper project, which allows users t
 - Python 3.12 or higher
 - [Uv](https://docs.astral.sh/uv/getting-started/installation/)
 - [PostgreSQL database](http://postgresql.org/download/) (Make sure it's running with a user postgres)
+- [Docker](https://docs.docker.com/get-docker/) (for RabbitMQ/Redis used by PDF processing)
+- Jobs service running for uploads and Zotero import (see [jobs/README.md](../jobs/README.md))
 
 ## Setup
 
@@ -30,10 +32,18 @@ GEMINI_API_KEY="your_gemini_api_key" # Replace with your actual API key from ste
 
 ## Start the Application
 
-Run the command below to install dependencies, run db migrations and start the app:
+1. Start the jobs service (RabbitMQ + Celery worker) in a separate terminal:
+```bash
+cd ../jobs
+uv run start
+```
+
+2. Start the API server:
 ```bash
 uv run start
 ```
+
+Optional: set `CELERY_BROKER_URL=pyamqp://guest@localhost:5672//` in `.env` if you use a non-default broker.
 
 ## API Documentation
 

@@ -10,7 +10,9 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { fetchFromApi } from "@/lib/api";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useRef } from "react";
 
 type ZoteroStatus = {
 	connected: boolean;
@@ -24,6 +26,7 @@ type ZoteroImportStatusItem = {
 	status: string;
 	import_source: string;
 	title?: string;
+	created_at?: string;
 };
 
 type ZoteroImportResponse = {
@@ -45,6 +48,10 @@ function SettingsContent() {
 	const [zoteroActionLoading, setZoteroActionLoading] = useState(false);
 	const [zoteroImportLoading, setZoteroImportLoading] = useState(false);
 	const [recentImports, setRecentImports] = useState<ZoteroImportStatusItem[]>([]);
+	const [importProgress, setImportProgress] = useState<number | null>(null);
+	const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+	const importDoneRef = useRef(false);
+	const IMPORT_LIMIT = 5;
 
 	const fetchZoteroStatus = useCallback(async () => {
 		setZoteroLoading(true);
@@ -153,11 +160,37 @@ function SettingsContent() {
 
 	const handleZoteroImport = async () => {
 		setZoteroImportLoading(true);
+		setImportProgress(0);
+
+		const knownPaperIds = new Set(recentImports.map((r) => r.paper_id).filter(Boolean));
+		importDoneRef.current = false;
+
+		pollRef.current = setInterval(async () => {
+			try {
+				const data = await fetchFromApi("/api/zotero/import/status");
+				// guard: discard stale poll responses that arrive after POST completed
+				if (importDoneRef.current) return;
+				const items: ZoteroImportStatusItem[] = data.items ?? [];
+				const done = items.filter(
+					(i) =>
+						i.paper_id &&
+						!knownPaperIds.has(i.paper_id) &&
+						(i.status === "completed" || i.status === "failed"),
+				).length;
+				setImportProgress(Math.min((done / IMPORT_LIMIT) * 100, 99));
+			} catch {
+				// ignore poll errors
+			}
+		}, 1500);
+
 		try {
 			const data: ZoteroImportResponse = await fetchFromApi("/api/zotero/import", {
 				method: "POST",
-				body: JSON.stringify({ limit: 5 }),
+				body: JSON.stringify({ limit: IMPORT_LIMIT }),
 			});
+			// mark done BEFORE setImportProgress(100) so in-flight poll callbacks are discarded
+			importDoneRef.current = true;
+			if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
 			const parts: string[] = [];
 			if (data.imported_count > 0) {
 				parts.push(`Imported ${data.imported_count} paper${data.imported_count === 1 ? "" : "s"}`);
@@ -173,15 +206,20 @@ function SettingsContent() {
 			} else if (data.errors?.length > 0) {
 				toast.error(parts.join("; ") || "Import failed.");
 			} else {
-				toast.info("No new journal articles to import.");
+				toast.info("No new papers to import.");
 			}
+			setImportProgress(100);
 			await fetchRecentImports();
 		} catch (error) {
 			toast.error(
 				error instanceof Error ? error.message : "Failed to import from Zotero."
 			);
 		} finally {
+			// interval already cleared in try; guard against error-path where it wasn't
+			if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+			importDoneRef.current = true;
 			setZoteroImportLoading(false);
+			setTimeout(() => setImportProgress(null), 1500);
 		}
 	};
 
@@ -269,7 +307,9 @@ function SettingsContent() {
 						{zoteroLoading ? (
 							<Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
 						) : zoteroStatus?.connected ? (
-							<Badge variant="secondary">Connected</Badge>
+							<Badge className="bg-green-100 text-green-700 border-green-200 dark:bg-green-900/40 dark:text-green-400">
+							Connected
+						</Badge>
 						) : null}
 					</div>
 
@@ -286,39 +326,49 @@ function SettingsContent() {
 									Zotero user ID: {zoteroStatus.zotero_user_id}
 								</p>
 							)}
-							<div className="flex flex-wrap gap-2">
-								<Button
-									type="button"
-									onClick={handleZoteroImport}
-									disabled={zoteroImportLoading || zoteroActionLoading}
-								>
-									{zoteroImportLoading ? (
-										<Loader2 className="h-4 w-4 animate-spin mr-2" />
-									) : null}
-									Import from Zotero
-								</Button>
-								<Button
-									type="button"
-									variant="outline"
-									onClick={handleZoteroDisconnect}
-									disabled={zoteroActionLoading || zoteroImportLoading}
-								>
-									{zoteroActionLoading ? (
-										<Loader2 className="h-4 w-4 animate-spin mr-2" />
-									) : null}
-									Disconnect
-								</Button>
+						<div className="flex flex-wrap gap-2">
+							<Button
+								type="button"
+								onClick={handleZoteroImport}
+								disabled={zoteroImportLoading || zoteroActionLoading}
+							>
+								{zoteroImportLoading ? (
+									<Loader2 className="h-4 w-4 animate-spin mr-2" />
+								) : null}
+								Import from Zotero
+							</Button>
+							<Button
+								type="button"
+								variant="outline"
+								onClick={handleZoteroDisconnect}
+								disabled={zoteroActionLoading || zoteroImportLoading}
+							>
+								{zoteroActionLoading ? (
+									<Loader2 className="h-4 w-4 animate-spin mr-2" />
+								) : null}
+								Disconnect
+							</Button>
+						</div>
+						{importProgress !== null && (
+							<div className="space-y-1">
+								<p className="text-xs text-muted-foreground">
+									{importProgress < 100 ? "Importing…" : "Import complete"}
+								</p>
+								<Progress value={importProgress} />
 							</div>
+						)}
 							{recentImports.length > 0 && (
 								<div className="space-y-1 pt-2 border-t">
 									<p className="text-xs font-medium text-muted-foreground">Recent imports</p>
 									<ul className="text-xs text-muted-foreground space-y-1">
-										{recentImports.slice(0, 5).map((item) => (
-											<li key={item.zotero_item_key}>
-												{item.status} · {item.import_source}
-												{item.paper_id ? ` · paper ${item.paper_id.slice(0, 8)}…` : ""}
-											</li>
-										))}
+									{recentImports.slice(0, 5).map((item) => (
+										<li key={item.zotero_item_key}>
+											{item.title
+												?? (item.paper_id
+													? `paper ${item.paper_id.slice(0, 8)}…`
+													: item.status)}
+										</li>
+									))}
 									</ul>
 								</div>
 							)}
