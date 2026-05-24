@@ -14,7 +14,7 @@ from google.genai import types
 from google.genai.errors import APIError, ClientError, ServerError
 from typing import Any, Dict, List, Optional, Type, TypeVar, Callable
 
-from pydantic import BaseModel, create_model, Field, ConfigDict
+from pydantic import BaseModel, ValidationError, create_model, Field, ConfigDict
 
 from src.prompts import EXTRACT_COLS_INSTRUCTION, SYSTEM_INSTRUCTIONS_CACHE, EXTRACT_METADATA_PROMPT_TEMPLATE
 from src.schemas import (
@@ -267,6 +267,104 @@ class AsyncLLMClient:
         # If we reach here, all retries failed
         raise last_exception or ValueError("Failed to generate content after all retries")
 
+    async def generate_structured(
+        self,
+        prompt: str,
+        schema: Type[T],
+        client: genai.Client,
+        model: Optional[str] = None,
+        file_path: Optional[str] = None,
+        cache_key: Optional[str] = None,
+        max_retries: int = 3,
+        base_delay: float = 1.0,
+    ) -> T:
+        """
+        Generate content constrained to a Pydantic schema and return a validated instance.
+
+        Prefers the SDK's parsed object (response.parsed); falls back to parsing the raw
+        response text. Retries on transport errors as well as parse/validation failures,
+        adding a corrective instruction on retry. Logs the raw response if all attempts fail.
+        """
+        if not client:
+            raise ValueError("Client is required for generate_structured")
+
+        if not model:
+            model = self.default_model
+
+        base_parts = []
+        if file_path:
+            with open(file_path, "rb") as f:
+                file_data = f.read()
+            base_parts.append(types.Part.from_bytes(data=file_data, mime_type='application/pdf'))
+        base_parts.append(types.Part.from_text(text=prompt))
+
+        # Passing the Pydantic class (not model_json_schema()) lets the SDK populate response.parsed.
+        config = types.GenerateContentConfig(
+            cached_content=cache_key,
+            response_mime_type='application/json',
+            response_schema=schema,
+        )
+
+        last_exception: Optional[Exception] = None
+        last_raw: Optional[str] = None
+
+        for attempt in range(max_retries + 1):
+            parts = list(base_parts)
+            if attempt > 0 and last_raw is not None:
+                parts.append(types.Part.from_text(
+                    text=(
+                        "Your previous response could not be parsed as valid JSON. "
+                        "Respond with ONLY a single JSON object matching the schema — "
+                        "no prose, no markdown code fences, and properly escape any quotes inside string values."
+                    )
+                ))
+
+            try:
+                response = await client.aio.models.generate_content(
+                    model=model,
+                    contents=types.Content(role='user', parts=parts),
+                    config=config,
+                )
+
+                parsed = getattr(response, "parsed", None)
+                if isinstance(parsed, schema):
+                    return parsed
+
+                last_raw = response.text if response else None
+                if not last_raw:
+                    raise ValueError("No content generated from LLM response")
+
+                response_json = JSONParser.validate_and_extract_json(last_raw)
+                return schema.model_validate(response_json)
+
+            except (ServerError, ClientError, APIError, httpx.TimeoutException) as e:
+                last_exception = e
+                if attempt < max_retries:
+                    backoff_time = base_delay * (2 ** attempt) * (0.5 + 0.5 * random.random())
+                    logger.warning(
+                        f"LLM API error (attempt {attempt + 1}/{max_retries + 1}): {e}. "
+                        f"Retrying in {backoff_time:.2f}s"
+                    )
+                    await asyncio.sleep(backoff_time)
+                else:
+                    logger.error(f"All {max_retries + 1} attempts failed for generate_structured: {e}")
+            except (ValueError, ValidationError) as e:
+                last_exception = e
+                if attempt < max_retries:
+                    backoff_time = base_delay * (2 ** attempt) * (0.5 + 0.5 * random.random())
+                    logger.warning(
+                        f"Structured parse failed for {schema.__name__} "
+                        f"(attempt {attempt + 1}/{max_retries + 1}): {e}. Retrying in {backoff_time:.2f}s"
+                    )
+                    await asyncio.sleep(backoff_time)
+                else:
+                    logger.error(
+                        f"All {max_retries + 1} attempts failed to parse structured response for "
+                        f"{schema.__name__}. Raw response (first 1000 chars): {(last_raw or '')[:1000]!r}"
+                    )
+
+        raise last_exception or ValueError("Failed to generate structured content after all retries")
+
 
 class PaperOperations(AsyncLLMClient):
     """
@@ -308,9 +406,9 @@ class PaperOperations(AsyncLLMClient):
         if paper_content and not cache_key:
             prompt = f"Paper Content:\n\n{paper_content}\n\n{prompt}"
 
-        response = await self.generate_content(prompt, cache_key=cache_key, schema=schema, client=client, model=llm_model)
-        response_json = JSONParser.validate_and_extract_json(response)
-        instance = model.model_validate(response_json)
+        instance = await self.generate_structured(
+            prompt, schema=model, cache_key=cache_key, client=client, model=llm_model
+        )
 
         if model == SummaryAndCitations:
             n_citations = len(getattr(instance, "summary_citations", []))
@@ -551,17 +649,22 @@ class PaperOperations(AsyncLLMClient):
         client = self._create_client(timeout=self.PDF_TIMEOUT)
 
         try:
-            cols_str = "\n".join(f"- {col}" for col in columns)
+            # Map each column to a safe field name. User-supplied column names can contain
+            # quotes, apostrophes, accents, or spaces (e.g. Italian columns), which become
+            # fragile JSON property names that the model struggles to generate correctly.
+            aliases: Dict[str, str] = {f"col_{i}": col for i, col in enumerate(columns)}
+
+            cols_str = "\n".join(f'- {alias}: "{col}"' for alias, col in aliases.items())
             prompt = EXTRACT_COLS_INSTRUCTION.format(
                 cols_str=cols_str,
                 n_cols=len(columns)
             )
 
-            # Create the dynamic schema that matches DataTableRow structure
-            # Each column maps to a DataTableCellValue (value + citations)
+            # Create the dynamic schema that matches DataTableRow structure.
+            # Each aliased column maps to a DataTableCellValue (value + citations).
             field_definitions: Dict[str, Any] = {
-                col: (DataTableCellValue, Field(description=f"Value and citations for column '{col}'"))
-                for col in columns
+                alias: (DataTableCellValue, Field(description=f"Value and citations for column: {col!r}"))
+                for alias, col in aliases.items()
             }
 
             # Create the values model that enforces all column names as required fields
@@ -571,22 +674,18 @@ class PaperOperations(AsyncLLMClient):
                 **field_definitions
             )
 
-            response = await self.generate_content(
+            values_instance = await self.generate_structured(
                 prompt,
+                schema=ValuesModel,
                 model=self.default_model,
                 file_path=file_path,
-                schema=ValuesModel,
                 client=client,
             )
 
-            # Parse and validate the response
-            response_json = JSONParser.validate_and_extract_json(response)
-            values_instance = ValuesModel.model_validate(response_json)
-
-            # Convert the Pydantic model to a dict for DataTableRow
+            # Map aliased fields back to the original column names.
             values_dict: Dict[str, DataTableCellValue] = {
-                col: getattr(values_instance, col)
-                for col in columns
+                col: getattr(values_instance, alias)
+                for alias, col in aliases.items()
             }
 
             # Create and return the DataTableRow
