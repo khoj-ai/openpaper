@@ -16,7 +16,7 @@ Three measurement needs follow: (1) a metric that fails fabricated citations ind
 
 ## Methods
 
-Three design constraints shape the implementation. First, deterministic citation metrics wherever possible — every score should be reproducible without an LLM in the loop, with the evaluator reserved for what the matcher cannot do. Second, a schema that admits multiple valid evidence passages per required section, since papers contain many phrasings of the same fact. Third, a harness that runs locally against a fresh database without CI dependencies, so that an engineer can iterate on the underlying retrieval pipeline within minutes. The benchmark's three concrete artifacts are the dataset itself, the harness that runs models against it, and the grader that scores their outputs; we describe each in turn, plus the two pieces of grader machinery — the citation matcher and the LLM evaluator — that account for most of the signal in the results.
+The benchmark has three concrete artifacts — the dataset, the harness that runs models against it, and the grader that scores their outputs — plus two pieces of grader machinery (the citation matcher and the LLM evaluator) that account for most of the signal in the results. We describe each in turn.
 
 ### Dataset construction
 
