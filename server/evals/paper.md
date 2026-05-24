@@ -51,10 +51,10 @@ Each row is scored on up to six metrics, four deterministic and two LLM-evaluate
 
 The four deterministic metrics are:
 
-- **citation precision**: the fraction of the model's citations that match some alternative in some required section — measuring how many of the model's citations were "useful" for the rubric.
-- **section coverage**: the fractional satisfaction of required sections, AND across sections and OR within each section's alternatives — measuring whether the model touched every required section.
-- **citation accuracy**: the fraction of the model's citations that are verifiable substrings of the paper's raw text, after the normalization pass described below — measuring whether the model fabricated quotes.
-- **refusal correctness** (adversarial rows only): 1.0 if the model refused entirely or every citation it produced is grounded in the paper, 0.0 if any cited passage is fabricated — measuring whether the model invented evidence to support its refutation of a false premise.
+- **`citation_precision`**: the fraction of the model's citations that match some alternative in some required section — measuring how many of the model's citations were "useful" for the rubric.
+- **`section_coverage`**: the fractional satisfaction of required sections, AND across sections and OR within each section's alternatives — measuring whether the model touched every required section.
+- **`citation_accuracy`**: the fraction of the model's citations that are verifiable substrings of the paper's raw text, after the normalization pass described below — measuring whether the model fabricated quotes.
+- **`refusal_correctness`** (adversarial rows only): 1.0 if the model refused entirely or every citation it produced is grounded in the paper, 0.0 if any cited passage is fabricated — measuring whether the model invented evidence to support its refutation of a false premise.
 
 The two LLM-evaluated metrics, each on a 1–5 scale with per-level anchored definitions described below, are:
 
@@ -94,7 +94,7 @@ Under the anchored rubric, `completeness` demonstrates meaningful variance. This
 
 ## Results
 
-We ran the benchmark end-to-end through the Open Paper chat-with-paper harness against eight LLMs covering four model providers in two configurations each — a more intelligent model and a faster model: `gemini-3.1-pro-preview` / `gemini-3-flash-preview`, `gpt-5.4` / `gpt-4.1`, `claude-opus-4-7` / `claude-haiku-4-5`, and the Cerebras-hosted `gpt-oss-120b` / `zai-glm-4.7`. Each system answered the same 100-row evenly-spaced sample of the dataset, and each row was graded by the deterministic citation metrics and the LLM evaluator described in *Methods*. Aggregate results are shown below, ranked by a composite of citation-grounding and answer-quality scores.
+We ran the benchmark end-to-end through the Open Paper chat-with-paper harness against eight LLMs in two configurations each — a more intelligent model and a faster model: `gemini-3.1-pro-preview` / `gemini-3-flash-preview`, `gpt-5.4` / `gpt-4.1`, `claude-opus-4-7` / `claude-haiku-4-5`, and the Cerebras-hosted `gpt-oss-120b` / `zai-glm-4.7`. Each system answered the same 100-row evenly-spaced sample of the dataset, and each row was graded by the deterministic citation metrics and the LLM evaluator described in *Methods*. Aggregate results are shown below, ranked by a composite of citation-grounding and answer-quality scores.
 
 | Model                    | Cite. Prec | Sect. Cov | Cite. Acc | Refusal | Factual | Compl. | Lat. (s) |
 |--------------------------|-----------:|----------:|----------:|--------:|--------:|-------:|---------:|
