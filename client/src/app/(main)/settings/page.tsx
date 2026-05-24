@@ -296,13 +296,20 @@ function SettingsContent() {
 					</p>
 				</div>
 
-				<div className="rounded-lg border p-4 space-y-3">
+				<div id="zotero" className="rounded-lg border p-4 space-y-3 scroll-mt-6">
 					<div className="flex items-start justify-between gap-4">
 						<div className="space-y-1">
 							<p className="font-medium">Zotero</p>
-							<p className="text-sm text-muted-foreground">
-								Link your Zotero library to Open Paper.
-							</p>
+							{!zoteroLoading && zoteroStatus?.connected && zoteroStatus.zotero_user_id && (
+								<p className="text-sm text-muted-foreground">
+									Zotero user ID: {zoteroStatus.zotero_user_id}
+								</p>
+							)}
+							{!zoteroLoading && !zoteroStatus?.connected && (
+								<p className="text-sm text-muted-foreground">
+									Link your Zotero library to Open Paper.
+								</p>
+							)}
 						</div>
 						{zoteroLoading ? (
 							<Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
@@ -321,11 +328,6 @@ function SettingsContent() {
 								Imports up to 5 journal articles from Zotero (PDF from library, or from item URL if no PDF).
 								Highlights import when stored on a Zotero PDF. Books and web pages are skipped.
 							</p>
-							{zoteroStatus.zotero_user_id && (
-								<p className="text-sm text-muted-foreground">
-									Zotero user ID: {zoteroStatus.zotero_user_id}
-								</p>
-							)}
 						<div className="flex flex-wrap gap-2">
 							<Button
 								type="button"
@@ -360,7 +362,7 @@ function SettingsContent() {
 							{recentImports.length > 0 && (
 								<div className="space-y-1 pt-2 border-t">
 									<p className="text-xs font-medium text-muted-foreground">Recent imports</p>
-									<ul className="text-xs text-muted-foreground space-y-1">
+									<ul className="list-disc pl-4 text-xs text-muted-foreground space-y-1">
 									{recentImports.slice(0, 5).map((item) => (
 										<li key={item.zotero_item_key}>
 											{item.title

@@ -2,6 +2,7 @@
 
 import {
     AlertTriangle,
+    BookMarked,
     ChevronsUpDown,
     FileText,
     FolderKanban,
@@ -88,6 +89,13 @@ const items = [
         title: "Discover",
         url: "/discover",
         icon: Compass,
+        requiresAuth: true,
+        isNew: true,
+    },
+    {
+        title: "Zotero",
+        url: "/settings#zotero",
+        icon: BookMarked,
         requiresAuth: true,
         isNew: true,
     },
