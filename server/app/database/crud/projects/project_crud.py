@@ -10,6 +10,7 @@ from app.database.models import (
     ConversableType,
     Conversation,
     DataTableExtractionJob,
+    JobStatus,
     Project,
     ProjectPaper,
     ProjectRole,
@@ -134,11 +135,13 @@ class ProjectCRUD(ProjectBaseCRUD[Project, ProjectCreate, ProjectUpdate]):
                     & (
                         AudioOverviewJob.conversable_type
                         == ConversableType.PROJECT.value
-                    ),
+                    )
+                    & (AudioOverviewJob.status == JobStatus.COMPLETED),
                 )
                 .outerjoin(
                     DataTableExtractionJob,
-                    (DataTableExtractionJob.project_id == Project.id),
+                    (DataTableExtractionJob.project_id == Project.id)
+                    & (DataTableExtractionJob.status == JobStatus.COMPLETED),
                 )
                 .filter(ProjectRole.user_id == user.id)
                 .group_by(Project.id, ProjectRole.role, roles_subquery.c.num_roles)
