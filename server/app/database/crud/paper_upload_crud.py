@@ -1,8 +1,15 @@
+import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
 from app.database.crud.base_crud import CRUDBase
-from app.database.models import JobStatus, PaperUploadJob
+from app.database.models import (
+    JobStatus,
+    Paper,
+    PaperUploadJob,
+    ProjectPaper,
+    ProjectRole,
+)
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -118,6 +125,43 @@ class PaperUploadJobCRUD(
             .filter(
                 PaperUploadJob.user_id == user.id,
                 PaperUploadJob.status == JobStatus.PENDING,
+            )
+            .order_by(PaperUploadJob.created_at.asc())
+            .all()
+        )
+
+    def get_in_progress_jobs_for_project(
+        self, db: Session, *, project_id: uuid.UUID, user: CurrentUser
+    ) -> list[tuple[PaperUploadJob, Paper]]:
+        """
+        Get upload jobs that are still in progress for a project, paired with
+        their paper record.
+
+        The paper and its ProjectPaper association are created at upload start
+        (see helpers/pdf_jobs.py), so we can reach the job via
+        ProjectPaper -> Paper.upload_job_id -> PaperUploadJob. Returns jobs that
+        have not yet completed so the client can rehydrate the upload tracker
+        after a page refresh.
+        """
+        # Only members of the project may see its in-progress uploads.
+        project_role = (
+            db.query(ProjectRole)
+            .filter(
+                ProjectRole.project_id == project_id,
+                ProjectRole.user_id == user.id,
+            )
+            .first()
+        )
+        if not project_role:
+            return []
+
+        return (
+            db.query(PaperUploadJob, Paper)
+            .join(Paper, Paper.upload_job_id == PaperUploadJob.id)
+            .join(ProjectPaper, ProjectPaper.paper_id == Paper.id)
+            .filter(
+                ProjectPaper.project_id == project_id,
+                PaperUploadJob.status.in_([JobStatus.PENDING, JobStatus.RUNNING]),
             )
             .order_by(PaperUploadJob.created_at.asc())
             .all()

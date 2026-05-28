@@ -155,6 +155,33 @@ export default function ProjectPage() {
 	}, [chatDisabled, router]);
 
 
+	// Rehydrate the upload tracker after a refresh: in-flight jobs are
+	// otherwise only held in local state and lost on navigation.
+	useEffect(() => {
+		if (!projectId) return;
+		let cancelled = false;
+		(async () => {
+			try {
+				const response = await fetchFromApi(`/api/projects/papers/${projectId}/pending-jobs`);
+				if (cancelled || !response?.jobs?.length) return;
+				const restoredJobs: MinimalJob[] = response.jobs.map((job: { job_id: string; title: string | null }) => ({
+					jobId: job.job_id,
+					fileName: job.title || "Uploading paper…",
+				}));
+				setInitialJobs((prevJobs) => {
+					const known = new Set(prevJobs.map((j) => j.jobId));
+					const newOnes = restoredJobs.filter((j) => !known.has(j.jobId));
+					return newOnes.length ? [...prevJobs, ...newOnes] : prevJobs;
+				});
+			} catch (err) {
+				console.error("Failed to fetch pending upload jobs for project", err);
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [projectId]);
+
 	const handleDeleteConversation = async (conversationId: string) => {
 		try {
 			await fetchFromApi(`/api/conversation/${conversationId}`, {
