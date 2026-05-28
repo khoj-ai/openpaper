@@ -1,3 +1,4 @@
+import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
@@ -6,6 +7,7 @@ from app.database.models import ZoteroImportSource, ZoteroImportStatus
 from app.helpers.paper_search import normalize_doi
 from app.services import zotero_import as zotero_import_module
 from app.services.zotero_import import (
+    _discover_import_candidates,
     _link_zotero_item_to_existing_paper,
     import_batch,
 )
@@ -87,6 +89,11 @@ class TestImportBatchDoiDedup(unittest.IsolatedAsyncioTestCase):
 
     @patch.object(
         zotero_import_module,
+        "_compute_max_new_imports",
+        return_value=(50, None),
+    )
+    @patch.object(
+        zotero_import_module,
         "_link_zotero_item_to_existing_paper",
         new_callable=AsyncMock,
     )
@@ -101,6 +108,7 @@ class TestImportBatchDoiDedup(unittest.IsolatedAsyncioTestCase):
         mock_import_crud: MagicMock,
         mock_paper_crud: MagicMock,
         mock_link: AsyncMock,
+        mock_max_new: MagicMock,
     ) -> None:
         user = MagicMock()
         user.id = uuid4()
@@ -112,6 +120,7 @@ class TestImportBatchDoiDedup(unittest.IsolatedAsyncioTestCase):
         existing_paper = MagicMock()
         existing_paper.id = uuid4()
         mock_paper_crud.get_by_doi_for_user.return_value = existing_paper
+        mock_paper_crud.get_by_normalized_title_for_user.return_value = None
 
         client = MagicMock()
         mock_client_cls.return_value = client
@@ -126,6 +135,11 @@ class TestImportBatchDoiDedup(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["imported_count"], 0)
         mock_link.assert_awaited_once()
 
+    @patch.object(
+        zotero_import_module,
+        "_upload_pdf_to_s3",
+        return_value=("key", "https://example.com/file.pdf"),
+    )
     @patch.object(zotero_import_module, "apply_zotero_annotations")
     @patch.object(zotero_import_module, "_apply_zotero_tags")
     @patch.object(zotero_import_module, "generate_pdf_preview_from_bytes")
@@ -137,7 +151,11 @@ class TestImportBatchDoiDedup(unittest.IsolatedAsyncioTestCase):
     @patch.object(zotero_import_module, "zotero_import_crud")
     @patch.object(zotero_import_module, "zotero_crud")
     @patch.object(zotero_import_module, "ZoteroApiClient")
-    @patch.object(zotero_import_module, "can_user_upload_paper", return_value=(True, None))
+    @patch.object(
+        zotero_import_module,
+        "_compute_max_new_imports",
+        return_value=(50, None),
+    )
     @patch.object(
         zotero_import_module,
         "_resolve_pdf_bytes",
@@ -153,7 +171,7 @@ class TestImportBatchDoiDedup(unittest.IsolatedAsyncioTestCase):
         self,
         mock_link: AsyncMock,
         mock_resolve_pdf: AsyncMock,
-        mock_can_upload: MagicMock,
+        mock_max_new: MagicMock,
         mock_client_cls: MagicMock,
         mock_zotero_crud: MagicMock,
         mock_import_crud: MagicMock,
@@ -165,6 +183,7 @@ class TestImportBatchDoiDedup(unittest.IsolatedAsyncioTestCase):
         mock_preview: MagicMock,
         mock_tags: MagicMock,
         mock_apply_ann: MagicMock,
+        mock_upload_pdf: MagicMock,
     ) -> None:
         user = MagicMock()
         user.id = uuid4()
@@ -173,6 +192,7 @@ class TestImportBatchDoiDedup(unittest.IsolatedAsyncioTestCase):
         )
         mock_import_crud.get_by_item_key.return_value = None
         mock_paper_crud.get_by_doi_for_user.return_value = None
+        mock_paper_crud.get_by_normalized_title_for_user.return_value = None
 
         paper = MagicMock()
         paper.id = uuid4()
@@ -203,6 +223,11 @@ class TestImportBatchDoiDedup(unittest.IsolatedAsyncioTestCase):
         link_kwargs = mock_link.await_args.kwargs
         self.assertEqual(link_kwargs["paper"], paper)
 
+    @patch.object(
+        zotero_import_module,
+        "_upload_pdf_to_s3",
+        return_value=("key", "https://example.com/file.pdf"),
+    )
     @patch.object(zotero_import_module, "apply_zotero_annotations")
     @patch.object(zotero_import_module, "_apply_zotero_tags")
     @patch.object(zotero_import_module, "generate_pdf_preview_from_bytes")
@@ -214,7 +239,11 @@ class TestImportBatchDoiDedup(unittest.IsolatedAsyncioTestCase):
     @patch.object(zotero_import_module, "zotero_import_crud")
     @patch.object(zotero_import_module, "zotero_crud")
     @patch.object(zotero_import_module, "ZoteroApiClient")
-    @patch.object(zotero_import_module, "can_user_upload_paper", return_value=(True, None))
+    @patch.object(
+        zotero_import_module,
+        "_compute_max_new_imports",
+        return_value=(50, None),
+    )
     @patch.object(
         zotero_import_module,
         "_resolve_pdf_bytes",
@@ -224,7 +253,7 @@ class TestImportBatchDoiDedup(unittest.IsolatedAsyncioTestCase):
     async def test_item_without_doi_still_imports(
         self,
         mock_resolve_pdf: AsyncMock,
-        mock_can_upload: MagicMock,
+        mock_max_new: MagicMock,
         mock_client_cls: MagicMock,
         mock_zotero_crud: MagicMock,
         mock_import_crud: MagicMock,
@@ -236,6 +265,7 @@ class TestImportBatchDoiDedup(unittest.IsolatedAsyncioTestCase):
         mock_preview: MagicMock,
         mock_tags: MagicMock,
         mock_apply_ann: MagicMock,
+        mock_upload_pdf: MagicMock,
     ) -> None:
         user = MagicMock()
         user.id = uuid4()
@@ -243,6 +273,7 @@ class TestImportBatchDoiDedup(unittest.IsolatedAsyncioTestCase):
             zotero_user_id="1", api_key="key"
         )
         mock_import_crud.get_by_item_key.return_value = None
+        mock_paper_crud.get_by_normalized_title_for_user.return_value = None
 
         paper = MagicMock()
         paper.id = uuid4()
@@ -269,6 +300,358 @@ class TestImportBatchDoiDedup(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["imported_count"], 1)
         self.assertEqual(result["skipped_already_imported"], 0)
         mock_paper_crud.get_by_doi_for_user.assert_not_called()
+
+
+class TestImportBatchTitleDedup(unittest.IsolatedAsyncioTestCase):
+    TITLE = "Attention Is All You Need"
+
+    def _make_item(
+        self,
+        key: str,
+        *,
+        doi: str | None = None,
+        title: str | None = None,
+    ) -> dict:
+        data: dict = {
+            "title": title if title is not None else self.TITLE,
+            "itemType": "journalArticle",
+        }
+        if doi is not None:
+            data["DOI"] = doi
+        return {"key": key, "data": data}
+
+    @patch.object(
+        zotero_import_module,
+        "_compute_max_new_imports",
+        return_value=(50, None),
+    )
+    @patch.object(
+        zotero_import_module,
+        "_link_zotero_item_to_existing_paper",
+        new_callable=AsyncMock,
+    )
+    @patch.object(zotero_import_module, "paper_crud")
+    @patch.object(zotero_import_module, "zotero_import_crud")
+    @patch.object(zotero_import_module, "zotero_crud")
+    @patch.object(zotero_import_module, "ZoteroApiClient")
+    async def test_skips_when_title_matches_existing_paper(
+        self,
+        mock_client_cls: MagicMock,
+        mock_zotero_crud: MagicMock,
+        mock_import_crud: MagicMock,
+        mock_paper_crud: MagicMock,
+        mock_link: AsyncMock,
+        mock_max_new: MagicMock,
+    ) -> None:
+        user = MagicMock()
+        user.id = uuid4()
+        mock_zotero_crud.get_by_user_id.return_value = MagicMock(
+            zotero_user_id="1", api_key="key"
+        )
+        mock_import_crud.get_by_item_key.return_value = None
+        mock_paper_crud.get_by_doi_for_user.return_value = None
+
+        existing_paper = MagicMock()
+        existing_paper.id = uuid4()
+        mock_paper_crud.get_by_normalized_title_for_user.return_value = (
+            existing_paper
+        )
+
+        client = MagicMock()
+        mock_client_cls.return_value = client
+        client.get_top_importable_items.side_effect = [
+            [self._make_item("ITEM2")],
+            [],
+        ]
+
+        result = await import_batch(MagicMock(), user=user, limit=50)
+
+        self.assertEqual(result["skipped_already_imported"], 1)
+        self.assertEqual(result["imported_count"], 0)
+        mock_link.assert_awaited_once()
+        mock_paper_crud.get_by_normalized_title_for_user.assert_called_once()
+
+    @patch.object(
+        zotero_import_module,
+        "_upload_pdf_to_s3",
+        return_value=("key", "https://example.com/file.pdf"),
+    )
+    @patch.object(zotero_import_module, "apply_zotero_annotations")
+    @patch.object(zotero_import_module, "_apply_zotero_tags")
+    @patch.object(zotero_import_module, "generate_pdf_preview_from_bytes")
+    @patch.object(zotero_import_module, "extract_pdf_page_dimensions")
+    @patch.object(zotero_import_module, "extract_pdf_text_and_offsets")
+    @patch.object(zotero_import_module, "s3_service")
+    @patch.object(zotero_import_module, "paper_upload_job_crud")
+    @patch.object(zotero_import_module, "paper_crud")
+    @patch.object(zotero_import_module, "zotero_import_crud")
+    @patch.object(zotero_import_module, "zotero_crud")
+    @patch.object(zotero_import_module, "ZoteroApiClient")
+    @patch.object(
+        zotero_import_module,
+        "_compute_max_new_imports",
+        return_value=(50, None),
+    )
+    @patch.object(
+        zotero_import_module,
+        "_resolve_pdf_bytes",
+        new_callable=AsyncMock,
+        return_value=(b"%PDF", ZoteroImportSource.PDF_ATTACHMENT, "ATT1", None, []),
+    )
+    @patch.object(
+        zotero_import_module,
+        "_link_zotero_item_to_existing_paper",
+        new_callable=AsyncMock,
+    )
+    async def test_second_duplicate_title_in_batch_links_to_first_paper(
+        self,
+        mock_link: AsyncMock,
+        mock_resolve_pdf: AsyncMock,
+        mock_max_new: MagicMock,
+        mock_client_cls: MagicMock,
+        mock_zotero_crud: MagicMock,
+        mock_import_crud: MagicMock,
+        mock_paper_crud: MagicMock,
+        mock_upload_job_crud: MagicMock,
+        mock_s3: MagicMock,
+        mock_extract_text: MagicMock,
+        mock_extract_dims: MagicMock,
+        mock_preview: MagicMock,
+        mock_tags: MagicMock,
+        mock_apply_ann: MagicMock,
+        mock_upload_pdf: MagicMock,
+    ) -> None:
+        user = MagicMock()
+        user.id = uuid4()
+        mock_zotero_crud.get_by_user_id.return_value = MagicMock(
+            zotero_user_id="1", api_key="key"
+        )
+        mock_import_crud.get_by_item_key.return_value = None
+        mock_paper_crud.get_by_doi_for_user.return_value = None
+        mock_paper_crud.get_by_normalized_title_for_user.return_value = None
+
+        paper = MagicMock()
+        paper.id = uuid4()
+        mock_paper_crud.create.return_value = paper
+        mock_paper_crud.get.return_value = paper
+
+        upload_job = MagicMock()
+        upload_job.id = uuid4()
+        mock_upload_job_crud.create.return_value = upload_job
+
+        mock_s3.upload_file = AsyncMock(
+            return_value=("key", "https://example.com/file.pdf")
+        )
+        mock_extract_text.return_value = ("text", {1: [0, 4]})
+        mock_extract_dims.return_value = {}
+        mock_preview.return_value = (
+            "preview-key",
+            "https://example.com/preview.png",
+        )
+
+        client = MagicMock()
+        mock_client_cls.return_value = client
+        client.get_top_importable_items.side_effect = [
+            [
+                self._make_item("ITEM1"),
+                self._make_item("ITEM2"),
+            ],
+            [],
+        ]
+
+        result = await import_batch(MagicMock(), user=user, limit=50)
+
+        self.assertEqual(result["imported_count"], 1)
+        self.assertEqual(result["skipped_already_imported"], 1)
+        mock_link.assert_awaited_once()
+        link_kwargs = mock_link.await_args.kwargs
+        self.assertEqual(link_kwargs["paper"], paper)
+
+    @patch.object(
+        zotero_import_module,
+        "_upload_pdf_to_s3",
+        return_value=("key", "https://example.com/file.pdf"),
+    )
+    @patch.object(zotero_import_module, "apply_zotero_annotations")
+    @patch.object(zotero_import_module, "_apply_zotero_tags")
+    @patch.object(zotero_import_module, "generate_pdf_preview_from_bytes")
+    @patch.object(zotero_import_module, "extract_pdf_page_dimensions")
+    @patch.object(zotero_import_module, "extract_pdf_text_and_offsets")
+    @patch.object(zotero_import_module, "s3_service")
+    @patch.object(zotero_import_module, "paper_upload_job_crud")
+    @patch.object(zotero_import_module, "paper_crud")
+    @patch.object(zotero_import_module, "zotero_import_crud")
+    @patch.object(zotero_import_module, "zotero_crud")
+    @patch.object(zotero_import_module, "ZoteroApiClient")
+    @patch.object(
+        zotero_import_module,
+        "_compute_max_new_imports",
+        return_value=(50, None),
+    )
+    @patch.object(
+        zotero_import_module,
+        "_resolve_pdf_bytes",
+        new_callable=AsyncMock,
+        return_value=(b"%PDF", ZoteroImportSource.PDF_ATTACHMENT, "ATT1", None, []),
+    )
+    async def test_short_title_does_not_dedup(
+        self,
+        mock_resolve_pdf: AsyncMock,
+        mock_max_new: MagicMock,
+        mock_client_cls: MagicMock,
+        mock_zotero_crud: MagicMock,
+        mock_import_crud: MagicMock,
+        mock_paper_crud: MagicMock,
+        mock_upload_job_crud: MagicMock,
+        mock_s3: MagicMock,
+        mock_extract_text: MagicMock,
+        mock_extract_dims: MagicMock,
+        mock_preview: MagicMock,
+        mock_tags: MagicMock,
+        mock_apply_ann: MagicMock,
+        mock_upload_pdf: MagicMock,
+    ) -> None:
+        user = MagicMock()
+        user.id = uuid4()
+        mock_zotero_crud.get_by_user_id.return_value = MagicMock(
+            zotero_user_id="1", api_key="key"
+        )
+        mock_import_crud.get_by_item_key.return_value = None
+        mock_paper_crud.get_by_normalized_title_for_user.return_value = None
+
+        paper = MagicMock()
+        paper.id = uuid4()
+        mock_paper_crud.create.return_value = paper
+
+        upload_job = MagicMock()
+        upload_job.id = uuid4()
+        mock_upload_job_crud.create.return_value = upload_job
+
+        mock_s3.upload_file = AsyncMock(
+            return_value=("key", "https://example.com/file.pdf")
+        )
+        mock_extract_text.return_value = ("text", {1: [0, 4]})
+        mock_extract_dims.return_value = {}
+        mock_preview.return_value = (
+            "preview-key",
+            "https://example.com/preview.png",
+        )
+
+        client = MagicMock()
+        mock_client_cls.return_value = client
+        client.get_top_importable_items.side_effect = [
+            [self._make_item("ITEM1", title="Short title")],
+            [],
+        ]
+
+        result = await import_batch(MagicMock(), user=user, limit=50)
+
+        self.assertEqual(result["imported_count"], 1)
+        self.assertEqual(result["skipped_already_imported"], 0)
+        mock_paper_crud.get_by_normalized_title_for_user.assert_not_called()
+
+
+class TestDiscoverImportCandidates(unittest.IsolatedAsyncioTestCase):
+    def _make_item(self, key: str) -> dict:
+        return {
+            "key": key,
+            "data": {
+                "title": f"Paper {key}",
+                "itemType": "journalArticle",
+            },
+        }
+
+    @patch.object(zotero_import_module, "_compute_max_new_imports", return_value=(1, None))
+    @patch.object(zotero_import_module, "zotero_import_crud")
+    @patch.object(zotero_import_module, "paper_crud")
+    async def test_caps_candidates_at_upload_slots(
+        self,
+        mock_paper_crud: MagicMock,
+        mock_import_crud: MagicMock,
+        mock_max_new: MagicMock,
+    ) -> None:
+        user = MagicMock()
+        user.id = uuid4()
+        mock_import_crud.get_by_item_key.return_value = None
+        mock_paper_crud.get_by_doi_for_user.return_value = None
+        mock_paper_crud.get_by_normalized_title_for_user.return_value = None
+
+        client = MagicMock()
+        client.get_top_importable_items.side_effect = [
+            [self._make_item("A"), self._make_item("B")],
+            [],
+        ]
+
+        candidates, deferred, skipped, errors = await _discover_import_candidates(
+            MagicMock(),
+            client=client,
+            user=user,
+            limit=50,
+        )
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0]["key"], "A")
+        self.assertEqual(deferred, [])
+        self.assertEqual(skipped, 0)
+        self.assertEqual(errors, [])
+
+
+class TestImportBatchParallel(unittest.IsolatedAsyncioTestCase):
+    @patch.object(zotero_import_module, "_import_one_paper", new_callable=AsyncMock)
+    @patch.object(
+        zotero_import_module,
+        "_discover_import_candidates",
+        new_callable=AsyncMock,
+    )
+    @patch.object(zotero_import_module, "zotero_crud")
+    async def test_runs_gather_over_discovered_candidates(
+        self,
+        mock_zotero_crud: MagicMock,
+        mock_discover: AsyncMock,
+        mock_import_one: AsyncMock,
+    ) -> None:
+        user = MagicMock()
+        user.id = uuid4()
+        mock_zotero_crud.get_by_user_id.return_value = MagicMock(
+            zotero_user_id="1", api_key="key"
+        )
+
+        items = [
+            {"key": "A", "data": {"title": "A"}},
+            {"key": "B", "data": {"title": "B"}},
+            {"key": "C", "data": {"title": "C"}},
+        ]
+        mock_discover.return_value = (items, [], 0, [])
+
+        async def fake_import(item, **kwargs):
+            key = item["key"]
+            return {
+                "status": "imported",
+                "zotero_item_key": key,
+                "paper_id": f"paper-{key}",
+                "upload_job_id": f"job-{key}",
+                "import_source": ZoteroImportSource.PDF_ATTACHMENT,
+                "title": item["data"]["title"],
+            }
+
+        mock_import_one.side_effect = fake_import
+
+        gather_sizes: list[int] = []
+        real_gather = asyncio.gather
+
+        async def track_gather(*coros, **kwargs):
+            gather_sizes.append(len(coros))
+            return await real_gather(*coros, **kwargs)
+
+        with patch(
+            "app.services.zotero_import.asyncio.gather",
+            side_effect=track_gather,
+        ):
+            result = await import_batch(MagicMock(), user=user, limit=50)
+
+        self.assertEqual(gather_sizes, [3])
+        self.assertEqual(result["imported_count"], 3)
+        self.assertEqual(mock_import_one.await_count, 3)
 
 
 if __name__ == "__main__":

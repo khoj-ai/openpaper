@@ -1,8 +1,9 @@
+import asyncio
 import json
 import logging
 from datetime import datetime, timezone
 from io import BytesIO
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict
 from uuid import UUID
 
 from app.database.crud.annotation_crud import AnnotationCreate, annotation_crud
@@ -15,8 +16,9 @@ from app.database.crud.paper_upload_crud import (
 )
 from app.database.crud.zotero_crud import zotero_crud
 from app.database.crud.zotero_import_crud import zotero_import_crud
+from app.database.database import SessionLocal
 from app.database.models import Paper, RoleType, ZoteroImportedItem, ZoteroImportSource, ZoteroImportStatus
-from app.helpers.paper_search import normalize_doi
+from app.helpers.paper_search import normalize_doi, normalize_paper_title
 from app.helpers.parser import (
     extract_pdf_page_dimensions,
     extract_pdf_text_and_offsets,
@@ -25,13 +27,31 @@ from app.helpers.parser import (
     validate_url_and_fetch_pdf,
 )
 from app.helpers.s3 import s3_service
-from app.helpers.subscription_limits import can_user_upload_paper
+from app.helpers.subscription_limits import (
+    PAPER_UPLOAD_KEY,
+    can_user_upload_paper,
+    get_plan_limits,
+    get_user_subscription_plan,
+)
 from app.integrations.zotero_api import ZoteroApiClient
 from app.llm.utils import find_offsets
 from app.schemas.user import CurrentUser
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
+
+ZOTERO_IMPORT_CONCURRENCY = 3
+
+
+class ImportOneResult(TypedDict, total=False):
+    status: Literal["imported", "error"]
+    zotero_item_key: str
+    paper_id: str
+    upload_job_id: str
+    import_source: str
+    title: Optional[str]
+    error: str
+    imported_via_url: bool
 
 
 def _parse_zotero_date(date_str: Optional[str]) -> Optional[str]:
@@ -387,16 +407,20 @@ async def _resolve_pdf_bytes(
     """
     item_key = item.get("key", "")
     data = item.get("data", {})
-    children = client.get_children(item_key)
+    children = await asyncio.to_thread(client.get_children, item_key)
     pdf_attachment = client.find_pdf_attachment(children)
 
     if pdf_attachment:
         attachment_key = pdf_attachment.get("key", "")
         try:
-            pdf_bytes = client.download_attachment_file(attachment_key)
+            pdf_bytes = await asyncio.to_thread(
+                client.download_attachment_file, attachment_key
+            )
             is_valid, err = await validate_pdf_content(pdf_bytes, source="zotero")
             if is_valid:
-                attachment_children = client.get_children(attachment_key)
+                attachment_children = await asyncio.to_thread(
+                    client.get_children, attachment_key
+                )
                 annotations = client.get_annotations_for_attachment(attachment_children)
                 return (
                     pdf_bytes,
@@ -515,6 +539,379 @@ def _apply_zotero_tags(
             )
 
 
+def _compute_max_new_imports(
+    db: Session, user: CurrentUser, limit: int
+) -> Tuple[int, Optional[str]]:
+    """Return how many new papers can be imported and an error if at upload limit."""
+    can_upload, upload_err = can_user_upload_paper(db, user)
+    if not can_upload:
+        return 0, upload_err
+
+    plan = get_user_subscription_plan(db, user)
+    limits = get_plan_limits(plan)
+    paper_limit = limits[PAPER_UPLOAD_KEY]
+    if paper_limit == float("inf"):
+        return limit, None
+
+    current_paper_count = paper_crud.get_total_paper_count(db=db, user=user)
+    remaining_slots = int(paper_limit) - current_paper_count
+    return min(limit, max(0, remaining_slots)), None
+
+
+async def _discover_import_candidates(
+    db: Session,
+    *,
+    client: ZoteroApiClient,
+    user: CurrentUser,
+    limit: int,
+) -> Tuple[
+    List[Dict[str, Any]],
+    List[Tuple[Dict[str, Any], str, str]],
+    int,
+    List[Dict[str, str]],
+]:
+    """
+    Sequential scan of Zotero items: skip/link/dedup, then collect import candidates.
+
+    Returns (candidates, deferred_links, skipped_already_imported, errors).
+    deferred_links entries are (item, item_key, first_item_key_in_batch).
+    """
+    candidates: List[Dict[str, Any]] = []
+    deferred_links: List[Tuple[Dict[str, Any], str, str]] = []
+    errors: List[Dict[str, str]] = []
+    skipped_already_imported = 0
+    batch_doi_claimed: Dict[str, str] = {}
+    batch_title_claimed: Dict[str, str] = {}
+    start = 0
+    page_size = 25
+    upload_limit_hit = False
+
+    max_new, upload_err = _compute_max_new_imports(db, user, limit)
+
+    while len(candidates) < max_new and not upload_limit_hit:
+        items = client.get_top_importable_items(limit=page_size, start=start)
+        if not items:
+            break
+        start += page_size
+
+        for item in items:
+            if len(candidates) >= max_new:
+                break
+
+            item_key = item.get("key", "")
+            if not item_key:
+                continue
+
+            item_data = item.get("data", {})
+            if (
+                not (item_data.get("title") or "").strip()
+                and not (item_data.get("DOI") or "").strip()
+                and not (item_data.get("url") or "").strip()
+            ):
+                logger.debug(
+                    "Skipping Zotero item %s: no title, DOI, or URL", item_key
+                )
+                continue
+
+            existing_import = zotero_import_crud.get_by_item_key(
+                db, user_id=user.id, zotero_item_key=item_key
+            )
+            if existing_import:
+                paper_still_exists = False
+                if existing_import.paper_id:
+                    linked_paper = paper_crud.get(
+                        db, id=str(existing_import.paper_id), user=user
+                    )
+                    paper_still_exists = bool(linked_paper)
+
+                if (
+                    existing_import.status == ZoteroImportStatus.COMPLETED
+                    and paper_still_exists
+                ):
+                    skipped_already_imported += 1
+                    continue
+
+                db.delete(existing_import)
+                db.commit()
+
+            doi = normalize_doi(item_data.get("DOI"))
+            if doi:
+                target_paper = paper_crud.get_by_doi_for_user(
+                    db, user_id=user.id, doi=doi
+                )
+                if target_paper:
+                    await _link_zotero_item_to_existing_paper(
+                        db,
+                        client=client,
+                        item=item,
+                        item_key=item_key,
+                        paper=target_paper,
+                        user=user,
+                    )
+                    skipped_already_imported += 1
+                    continue
+
+                if doi in batch_doi_claimed:
+                    deferred_links.append(
+                        (item, item_key, batch_doi_claimed[doi])
+                    )
+                    skipped_already_imported += 1
+                    continue
+
+            norm_title = normalize_paper_title(item_data.get("title"))
+            if norm_title:
+                target_paper = paper_crud.get_by_normalized_title_for_user(
+                    db,
+                    user_id=user.id,
+                    title=str(item_data.get("title") or ""),
+                )
+                if target_paper:
+                    await _link_zotero_item_to_existing_paper(
+                        db,
+                        client=client,
+                        item=item,
+                        item_key=item_key,
+                        paper=target_paper,
+                        user=user,
+                    )
+                    skipped_already_imported += 1
+                    continue
+
+                if norm_title in batch_title_claimed:
+                    deferred_links.append(
+                        (item, item_key, batch_title_claimed[norm_title])
+                    )
+                    skipped_already_imported += 1
+                    continue
+
+            if len(candidates) >= max_new:
+                if max_new == 0 and upload_err:
+                    errors.append(
+                        {
+                            "zotero_item_key": item_key,
+                            "error": upload_err or "Upload limit",
+                        }
+                    )
+                    upload_limit_hit = True
+                break
+
+            if max_new == 0:
+                errors.append(
+                    {
+                        "zotero_item_key": item_key,
+                        "error": upload_err or "Upload limit",
+                    }
+                )
+                upload_limit_hit = True
+                break
+
+            if doi:
+                batch_doi_claimed[doi] = item_key
+            if norm_title:
+                batch_title_claimed[norm_title] = item_key
+
+            candidates.append(item)
+
+        if len(items) < page_size:
+            break
+
+    return candidates, deferred_links, skipped_already_imported, errors
+
+
+async def _import_one_paper(
+    item: Dict[str, Any],
+    *,
+    user: CurrentUser,
+    zotero_user_id: str,
+    api_key: str,
+) -> ImportOneResult:
+    """Import a single Zotero item using its own DB session and Zotero client."""
+    item_key = item.get("key", "")
+    db = SessionLocal()
+    client = ZoteroApiClient(zotero_user_id=zotero_user_id, api_key=api_key)
+    upload_job_id: Optional[str] = None
+
+    try:
+        pdf_bytes, import_source, attachment_key, source_url, annotations = (
+            await _resolve_pdf_bytes(client, item)
+        )
+        if not pdf_bytes:
+            return {
+                "status": "error",
+                "zotero_item_key": item_key,
+                "error": "No PDF available from attachment or URL",
+            }
+
+        paper_upload_job = paper_upload_job_crud.create(
+            db=db,
+            obj_in=PaperUploadJobCreate(started_at=datetime.now(timezone.utc)),
+            user=user,
+        )
+        if not paper_upload_job or not paper_upload_job.id:
+            return {
+                "status": "error",
+                "zotero_item_key": item_key,
+                "error": "Failed to create upload job",
+            }
+
+        upload_job_id = str(paper_upload_job.id)
+        safe_filename = f"zotero-{item_key}.pdf"
+        s3_object_key, file_url = await asyncio.to_thread(
+            _upload_pdf_to_s3, pdf_bytes, safe_filename
+        )
+
+        try:
+            raw_text, page_offset_map = await asyncio.to_thread(
+                extract_pdf_text_and_offsets, pdf_bytes
+            )
+        except Exception as e:
+            logger.warning(
+                "Server-side PDF text extraction failed for %s: %s",
+                item_key,
+                e,
+            )
+            raw_text, page_offset_map = "", {}
+
+        try:
+            page_dims = await asyncio.to_thread(
+                extract_pdf_page_dimensions, pdf_bytes
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to extract page dimensions for %s: %s", item_key, e
+            )
+            page_dims = {}
+
+        for ann in annotations:
+            d = ann.get("data", {})
+            pos_raw = d.get("annotationPosition")
+            if pos_raw:
+                try:
+                    pos = (
+                        json.loads(pos_raw)
+                        if isinstance(pos_raw, str)
+                        else pos_raw
+                    )
+                    idx = pos.get("pageIndex", 0)
+                except (json.JSONDecodeError, TypeError, AttributeError):
+                    idx = 0
+                w, h = page_dims.get(idx, (0.0, 0.0))
+                d["_page_width"] = w
+                d["_page_height"] = h
+
+        _, preview_url = await asyncio.to_thread(
+            generate_pdf_preview_from_bytes, pdf_bytes
+        )
+
+        data = item.get("data", {})
+        authors = _zotero_creators_to_authors(data.get("creators") or [])
+        publish_date = _parse_zotero_date(data.get("date"))
+
+        paper = paper_crud.create(
+            db=db,
+            obj_in=PaperCreate(
+                file_url=file_url,
+                s3_object_key=s3_object_key,
+                upload_job_id=upload_job_id,
+                raw_content=raw_text or None,
+                page_offset_map=page_offset_map or None,
+                preview_url=preview_url,
+                title=data.get("title") or None,
+                authors=authors or None,
+                abstract=data.get("abstractNote") or None,
+                publish_date=publish_date,
+                size_in_kb=len(pdf_bytes) // 1024,
+            ),
+            user=user,
+        )
+        if not paper or not paper.id:
+            raise Exception("Failed to create paper record after S3 upload")
+
+        doi_value = data.get("DOI")
+        if doi_value:
+            paper_crud.update(
+                db=db,
+                db_obj=paper,
+                obj_in=PaperUpdate(doi=doi_value),
+                user=user,
+            )
+
+        paper_upload_job_crud.mark_as_completed(
+            db=db, job_id=upload_job_id, user=user
+        )
+
+        paper_id = UUID(str(paper.id))
+
+        _apply_zotero_tags(
+            db,
+            paper_id=paper_id,
+            tags_data=data.get("tags") or [],
+            user=user,
+        )
+        annotation_payload = (
+            _serialize_annotations_payload(annotations) if annotations else None
+        )
+
+        zotero_import_crud.create(
+            db,
+            user_id=user.id,
+            zotero_item_key=item_key,
+            import_source=import_source,
+            zotero_attachment_key=attachment_key,
+            source_url=source_url,
+            paper_id=paper_id,
+            upload_job_id=UUID(upload_job_id),
+            annotations_payload=annotation_payload,
+            status=ZoteroImportStatus.PROCESSING,
+        )
+
+        apply_zotero_annotations(
+            db=db,
+            upload_job_id=upload_job_id,
+            paper_id=str(paper.id),
+            user=user,
+        )
+
+        return {
+            "status": "imported",
+            "zotero_item_key": item_key,
+            "paper_id": str(paper_id),
+            "upload_job_id": upload_job_id,
+            "import_source": import_source,
+            "title": data.get("title"),
+            "imported_via_url": import_source == ZoteroImportSource.URL,
+        }
+    except Exception as e:
+        logger.error(
+            "Zotero import failed for item %s: %s",
+            item_key,
+            e,
+            exc_info=True,
+        )
+        if upload_job_id:
+            paper_upload_job_crud.mark_as_failed(
+                db=db, job_id=upload_job_id, user=user
+            )
+        return {
+            "status": "error",
+            "zotero_item_key": item_key,
+            "error": str(e),
+        }
+    finally:
+        db.close()
+
+
+def _upload_pdf_to_s3(pdf_bytes: bytes, safe_filename: str) -> Tuple[str, str]:
+    """Run async S3 upload from a worker thread (boto3 blocks the event loop)."""
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(
+            s3_service.upload_file(BytesIO(pdf_bytes), safe_filename)
+        )
+    finally:
+        loop.close()
+
+
 async def import_batch(
     db: Session,
     *,
@@ -539,249 +936,87 @@ async def import_batch(
         api_key=connection.api_key,
     )
 
+    candidates, deferred_links, skipped_already_imported, errors = (
+        await _discover_import_candidates(
+            db, client=client, user=user, limit=limit
+        )
+    )
+
     imported: List[Dict[str, Any]] = []
-    errors: List[Dict[str, str]] = []
-    skipped_already_imported = 0
     imported_via_url = 0
-    start = 0
-    page_size = 25
-    batch_doi_to_paper: Dict[str, Paper] = {}
 
-    while len(imported) < limit:
-        items = client.get_top_importable_items(limit=page_size, start=start)
-        if not items:
-            break
-        start += page_size
+    if candidates:
+        sem = asyncio.Semaphore(ZOTERO_IMPORT_CONCURRENCY)
 
-        for item in items:
-            if len(imported) >= limit:
-                break
-
-            item_key = item.get("key", "")
-            if not item_key:
-                continue
-
-            # Skip ghost/broken Zotero records that have no title and no URL/DOI.
-            # These are unimportable and should not count as failures.
-            item_data = item.get("data", {})
-            if not (item_data.get("title") or "").strip() and not (item_data.get("DOI") or "").strip() and not (item_data.get("url") or "").strip():
-                logger.debug("Skipping Zotero item %s: no title, DOI, or URL", item_key)
-                continue
-
-            existing_import = zotero_import_crud.get_by_item_key(
-                db, user_id=user.id, zotero_item_key=item_key
-            )
-            if existing_import:
-                paper_still_exists = False
-                if existing_import.paper_id:
-                    linked_paper = paper_crud.get(
-                        db, id=str(existing_import.paper_id), user=user
-                    )
-                    paper_still_exists = bool(linked_paper)
-
-                if (
-                    existing_import.status == ZoteroImportStatus.COMPLETED
-                    and paper_still_exists
-                ):
-                    skipped_already_imported += 1
-                    continue
-
-                # Stale row: previously failed, or completed but the paper has
-                # since been deleted from the user's library. Drop it and retry.
-                db.delete(existing_import)
-                db.commit()
-
-            doi = normalize_doi(item_data.get("DOI"))
-            if doi:
-                target_paper = paper_crud.get_by_doi_for_user(
-                    db, user_id=user.id, doi=doi
-                )
-                if not target_paper:
-                    target_paper = batch_doi_to_paper.get(doi)
-                if target_paper:
-                    await _link_zotero_item_to_existing_paper(
-                        db,
-                        client=client,
-                        item=item,
-                        item_key=item_key,
-                        paper=target_paper,
-                        user=user,
-                    )
-                    skipped_already_imported += 1
-                    continue
-
-            can_upload, upload_err = can_user_upload_paper(db, user)
-            if not can_upload:
-                errors.append(
-                    {"zotero_item_key": item_key, "error": upload_err or "Upload limit"}
-                )
-                break
-
-            pdf_bytes, import_source, attachment_key, source_url, annotations = (
-                await _resolve_pdf_bytes(client, item)
-            )
-            if not pdf_bytes:
-                errors.append(
-                    {
-                        "zotero_item_key": item_key,
-                        "error": "No PDF available from attachment or URL",
-                    }
-                )
-                continue
-
-            paper_upload_job = paper_upload_job_crud.create(
-                db=db,
-                obj_in=PaperUploadJobCreate(
-                    started_at=datetime.now(timezone.utc)
-                ),
-                user=user,
-            )
-            if not paper_upload_job or not paper_upload_job.id:
-                errors.append(
-                    {"zotero_item_key": item_key, "error": "Failed to create upload job"}
-                )
-                continue
-
-            upload_job_id = str(paper_upload_job.id)
-            try:
-                safe_filename = f"zotero-{item_key}.pdf"
-                s3_object_key, file_url = await s3_service.upload_file(
-                    BytesIO(pdf_bytes), safe_filename
-                )
-
-                try:
-                    raw_text, page_offset_map = extract_pdf_text_and_offsets(pdf_bytes)
-                except Exception as e:
-                    logger.warning(
-                        "Server-side PDF text extraction failed for %s: %s",
-                        item_key,
-                        e,
-                    )
-                    raw_text, page_offset_map = "", {}
-
-                try:
-                    page_dims = extract_pdf_page_dimensions(pdf_bytes)
-                except Exception as e:
-                    logger.warning(
-                        "Failed to extract page dimensions for %s: %s", item_key, e
-                    )
-                    page_dims = {}
-
-                for ann in annotations:
-                    d = ann.get("data", {})
-                    pos_raw = d.get("annotationPosition")
-                    if pos_raw:
-                        try:
-                            pos = json.loads(pos_raw) if isinstance(pos_raw, str) else pos_raw
-                            idx = pos.get("pageIndex", 0)
-                        except (json.JSONDecodeError, TypeError, AttributeError):
-                            idx = 0
-                        w, h = page_dims.get(idx, (0.0, 0.0))
-                        d["_page_width"] = w
-                        d["_page_height"] = h
-
-                _, preview_url = generate_pdf_preview_from_bytes(pdf_bytes)
-
-                data = item.get("data", {})
-                authors = _zotero_creators_to_authors(data.get("creators") or [])
-                publish_date = _parse_zotero_date(data.get("date"))
-
-                paper = paper_crud.create(
-                    db=db,
-                    obj_in=PaperCreate(
-                        file_url=file_url,
-                        s3_object_key=s3_object_key,
-                        upload_job_id=upload_job_id,
-                        raw_content=raw_text or None,
-                        page_offset_map=page_offset_map or None,
-                        preview_url=preview_url,
-                        title=data.get("title") or None,
-                        authors=authors or None,
-                        abstract=data.get("abstractNote") or None,
-                        publish_date=publish_date,
-                        size_in_kb=len(pdf_bytes) // 1024,
-                    ),
+        async def run_one(item: Dict[str, Any]) -> ImportOneResult:
+            async with sem:
+                return await _import_one_paper(
+                    item,
                     user=user,
-                )
-                if not paper or not paper.id:
-                    raise Exception("Failed to create paper record after S3 upload")
-
-                doi = data.get("DOI")
-                if doi:
-                    paper_crud.update(
-                        db=db,
-                        db_obj=paper,
-                        obj_in=PaperUpdate(doi=doi),
-                        user=user,
-                    )
-
-                paper_upload_job_crud.mark_as_completed(
-                    db=db, job_id=upload_job_id, user=user
+                    zotero_user_id=connection.zotero_user_id,
+                    api_key=connection.api_key,
                 )
 
-                paper_id = UUID(str(paper.id))
+        raw_results = await asyncio.gather(
+            *[run_one(item) for item in candidates],
+            return_exceptions=True,
+        )
 
-                _apply_zotero_tags(
-                    db,
-                    paper_id=paper_id,
-                    tags_data=data.get("tags") or [],
-                    user=user,
-                )
-                annotation_payload = (
-                    _serialize_annotations_payload(annotations) if annotations else None
-                )
-
-                zotero_import_crud.create(
-                    db,
-                    user_id=user.id,
-                    zotero_item_key=item_key,
-                    import_source=import_source,
-                    zotero_attachment_key=attachment_key,
-                    source_url=source_url,
-                    paper_id=paper_id,
-                    upload_job_id=UUID(upload_job_id),
-                    annotations_payload=annotation_payload,
-                    status=ZoteroImportStatus.PROCESSING,
-                )
-
-                # Apply highlights/annotations inline; this also flips the
-                # ZoteroImportedItem row to COMPLETED on success.
-                apply_zotero_annotations(
-                    db=db,
-                    upload_job_id=upload_job_id,
-                    paper_id=str(paper.id),
-                    user=user,
-                )
-
-                if import_source == ZoteroImportSource.URL:
-                    imported_via_url += 1
-
-                if doi:
-                    batch_doi_to_paper[doi] = paper
-
-                imported.append(
-                    {
-                        "zotero_item_key": item_key,
-                        "paper_id": str(paper_id),
-                        "upload_job_id": upload_job_id,
-                        "import_source": import_source,
-                        "title": data.get("title"),
-                    }
-                )
-            except Exception as e:
+        item_key_to_paper_id: Dict[str, str] = {}
+        for i, raw in enumerate(raw_results):
+            if isinstance(raw, BaseException):
+                item_key = candidates[i].get("key", "")
                 logger.error(
-                    "Zotero import failed for item %s: %s",
+                    "Unexpected Zotero import failure for %s: %s",
                     item_key,
-                    e,
+                    raw,
                     exc_info=True,
                 )
-                paper_upload_job_crud.mark_as_failed(
-                    db=db, job_id=upload_job_id, user=user
+                errors.append(
+                    {
+                        "zotero_item_key": item_key,
+                        "error": str(raw),
+                    }
                 )
-                errors.append({"zotero_item_key": item_key, "error": str(e)})
+                continue
 
-        if len(items) < page_size:
-            break
+            if raw.get("status") == "error":
+                errors.append(
+                    {
+                        "zotero_item_key": raw["zotero_item_key"],
+                        "error": raw.get("error") or "Import failed",
+                    }
+                )
+                continue
+
+            imported.append(
+                {
+                    "zotero_item_key": raw["zotero_item_key"],
+                    "paper_id": raw["paper_id"],
+                    "upload_job_id": raw["upload_job_id"],
+                    "import_source": raw["import_source"],
+                    "title": raw.get("title"),
+                }
+            )
+            if raw.get("imported_via_url"):
+                imported_via_url += 1
+            item_key_to_paper_id[raw["zotero_item_key"]] = raw["paper_id"]
+
+        for item, item_key, first_item_key in deferred_links:
+            first_paper_id = item_key_to_paper_id.get(first_item_key)
+            if not first_paper_id:
+                continue
+            paper = paper_crud.get(db, id=first_paper_id, user=user)
+            if not paper:
+                continue
+            await _link_zotero_item_to_existing_paper(
+                db,
+                client=client,
+                item=item,
+                item_key=item_key,
+                paper=paper,
+                user=user,
+            )
 
     return {
         "imported": imported,

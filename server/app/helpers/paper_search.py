@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import time
+import unicodedata
 from enum import Enum
 from typing import List, Optional
 from urllib.parse import quote, unquote
@@ -513,6 +514,27 @@ def normalize_doi(raw: str | None) -> str | None:
     if re.match(r"10\.\d{4,}/", value, re.IGNORECASE):
         return value.rstrip(".,;:)").lower()
     return None
+
+
+MIN_NORMALIZED_TITLE_LENGTH = 12
+
+
+def normalize_paper_title(raw: str | None) -> str | None:
+    """
+    Normalize a paper title for deduplication comparison.
+
+    Returns None if the title is empty or too short after normalization.
+    """
+    if not raw:
+        return None
+    value = unicodedata.normalize("NFKC", raw.strip())
+    if not value:
+        return None
+    value = re.sub(r"\s+", " ", value).casefold()
+    value = value.rstrip(".,;:)")
+    if len(value) < MIN_NORMALIZED_TITLE_LENGTH:
+        return None
+    return value
 
 
 def get_doi(title: str, authors: Optional[List[str]] = None) -> Optional[str]:
