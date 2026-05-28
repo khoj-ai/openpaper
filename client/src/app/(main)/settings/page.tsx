@@ -200,11 +200,12 @@ function SettingsContent() {
 				const done = newItems.filter(
 					(i) => i.status === "completed" || i.status === "failed",
 				).length;
-				const total = importTotalRef.current || zoteroImportLimit || 1;
+				const total = Math.max(importTotalRef.current, zoteroImportLimit) || 1;
 				setImportProgress(Math.min((done / total) * 100, 99));
 				if (done > lastRefreshedDoneRef.current) {
 					lastRefreshedDoneRef.current = done;
 					refreshActivePapers();
+					refetchSubscription();
 				}
 			} catch {
 				// ignore poll errors
@@ -324,13 +325,6 @@ function SettingsContent() {
 	}
 
 	const hasImported = recentImports.some((i) => i.status === "completed");
-
-	const recentImportedPapers = recentImports.filter((item) => {
-		if (!item.title && !item.paper_id) return false;
-		if (!item.paper_id) return true;
-		const firstIndex = recentImports.findIndex((i) => i.paper_id === item.paper_id);
-		return recentImports.indexOf(item) === firstIndex;
-	});
 
 	return (
 		<div className="max-w-2xl p-6 space-y-6">
@@ -458,19 +452,6 @@ function SettingsContent() {
 								<Progress value={importProgress} />
 							</div>
 						)}
-							{recentImportedPapers.length > 0 && (
-								<div className="space-y-1 pt-2 border-t">
-									<p className="text-xs font-medium text-muted-foreground">Recent imports</p>
-									<ul className="list-disc pl-4 text-xs text-muted-foreground space-y-1">
-									{recentImportedPapers.slice(0, 5).map((item) => (
-										<li key={item.zotero_item_key}>
-											{item.title
-												?? `paper ${item.paper_id!.slice(0, 8)}…`}
-										</li>
-									))}
-									</ul>
-								</div>
-							)}
 						</div>
 					) : (
 						<Button

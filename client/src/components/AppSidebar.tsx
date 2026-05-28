@@ -93,13 +93,6 @@ const items = [
         requiresAuth: true,
         isNew: true,
     },
-    {
-        title: "Zotero",
-        url: "/settings#zotero",
-        icon: BookMarked,
-        requiresAuth: true,
-        isNew: true,
-    },
 ]
 
 // TODO: remove this gate once we're ready to offer referrals to all users
@@ -158,6 +151,15 @@ const UserMenuContent = ({
             >
                 <Route size={16} className="mr-2" />
                 Plans
+            </Button>
+        </Link>
+        <Link href="/settings#zotero" className="w-full">
+            <Button variant="ghost" className="w-full justify-start">
+                <BookMarked size={16} className="mr-2" />
+                Integrations
+                <Badge className="ml-auto text-[10px] px-1.5 py-0 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900">
+                    New
+                </Badge>
             </Button>
         </Link>
         {referralEntry && (
