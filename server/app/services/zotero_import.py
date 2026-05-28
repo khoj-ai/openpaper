@@ -28,10 +28,8 @@ from app.helpers.parser import (
 )
 from app.helpers.s3 import s3_service
 from app.helpers.subscription_limits import (
-    PAPER_UPLOAD_KEY,
     can_user_upload_paper,
-    get_plan_limits,
-    get_user_subscription_plan,
+    get_remaining_paper_upload_slots,
 )
 from app.integrations.zotero_api import ZoteroApiClient
 from app.llm.utils import find_offsets
@@ -547,15 +545,8 @@ def _compute_max_new_imports(
     if not can_upload:
         return 0, upload_err
 
-    plan = get_user_subscription_plan(db, user)
-    limits = get_plan_limits(plan)
-    paper_limit = limits[PAPER_UPLOAD_KEY]
-    if paper_limit == float("inf"):
-        return limit, None
-
-    current_paper_count = paper_crud.get_total_paper_count(db=db, user=user)
-    remaining_slots = int(paper_limit) - current_paper_count
-    return min(limit, max(0, remaining_slots)), None
+    remaining = get_remaining_paper_upload_slots(db, user)
+    return min(limit, remaining), None
 
 
 async def _discover_import_candidates(

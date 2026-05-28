@@ -85,6 +85,22 @@ def get_plan_limits(plan: SubscriptionPlan) -> Dict:
     return SUBSCRIPTION_LIMITS.get(plan, SUBSCRIPTION_LIMITS[SubscriptionPlan.BASIC])
 
 
+def get_remaining_paper_upload_slots(db: Session, user: CurrentUser) -> int:
+    """
+    Return the number of papers the user can still upload under their plan.
+
+    Returns 0 when at or over limit. Returns sys.maxsize for unlimited plans.
+    """
+    plan = get_user_subscription_plan(db, user)
+    limits = get_plan_limits(plan)
+    paper_limit = limits[PAPER_UPLOAD_KEY]
+    if paper_limit == float("inf"):
+        import sys
+        return sys.maxsize
+    current_paper_count = paper_crud.get_total_paper_count(db=db, user=user)
+    return max(0, int(paper_limit) - current_paper_count)
+
+
 def get_user_knowledge_base_size(db: Session, user: CurrentUser) -> int:
     """
     Get the total size of the user's knowledge base in MB.
