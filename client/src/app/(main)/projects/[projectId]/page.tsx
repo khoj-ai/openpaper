@@ -593,14 +593,14 @@ export default function ProjectPage() {
 												setNewQuery(e.target.value)
 											}}
 											onKeyDown={handleKeyDown}
-											className="min-h-[80px] resize-none pr-12 border-none dark:border-none focus:border-blue-400 focus:ring-transparent bg-secondary dark:bg-accent text-primary"
+											className="min-h-[80px] resize-none pr-12 border-none dark:border-none focus-visible:ring-1 focus-visible:ring-blue-400/30 bg-secondary dark:bg-accent text-primary"
 											disabled={chatDisabled || isSubmitting}
 										/>
 										<Button
 											type="submit"
 											disabled={!newQuery.trim() || chatDisabled || isSubmitting}
 											size="sm"
-											className="absolute bottom-3 right-3 h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+											className="absolute bottom-3 right-3 h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
 										>
 											{isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
 										</Button>

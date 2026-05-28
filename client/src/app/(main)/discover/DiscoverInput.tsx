@@ -39,6 +39,11 @@ const YEAR_FILTER_OPTIONS: { value: YearFilter; label: string }[] = [
     { value: "last_5_years", label: "Last 5 years" },
 ]
 
+const MODE_OPTIONS: { value: SearchMode; label: string; description: string }[] = [
+    { value: "scholarly", label: "Scholarly", description: "Structured, indexed academic databases" },
+    { value: "explore", label: "Explore", description: "Preprints, journals, and research sites across the web" },
+]
+
 interface DiscoverInputProps {
     value: string
     onChange: (value: string) => void
@@ -98,6 +103,7 @@ export default function DiscoverInput({
             ? webSources.find(s => s.key === selectedWebSources[0])?.label || "1 source"
             : `${selectedCount} sources`
 
+    const currentModeLabel = MODE_OPTIONS.find(o => o.value === mode)?.label || "Scholarly"
     const currentSortLabel = SORT_OPTIONS.find(o => o.value === sort)?.label || "Relevance"
     const currentYearFilterLabel = YEAR_FILTER_OPTIONS.find(o => o.value === yearFilter)?.label || "All time"
 
@@ -110,44 +116,58 @@ export default function DiscoverInput({
             <div className="relative">
                 <Textarea
                     ref={textareaRef}
+                    autoFocus
                     placeholder={PLACEHOLDERS[mode]}
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    className="min-h-[100px] resize-none pb-12"
+                    className="min-h-[100px] resize-none pb-12 border-none dark:border-none focus-visible:ring-1 focus-visible:ring-blue-400/30 bg-secondary dark:bg-accent text-primary"
                     rows={3}
                 />
 
                 {/* Controls inside textarea */}
                 <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        {/* Mode toggle */}
-                        <div className="flex items-center bg-muted rounded-md p-0.5">
-                            <button
-                                type="button"
-                                onClick={() => onModeChange("scholarly")}
-                                className={cn(
-                                    "px-2.5 py-1 text-sm rounded transition-colors",
-                                    mode === "scholarly"
-                                        ? "bg-background text-foreground shadow-sm"
-                                        : "text-muted-foreground hover:text-foreground"
-                                )}
-                            >
-                                Scholarly
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => onModeChange("explore")}
-                                className={cn(
-                                    "px-2.5 py-1 text-sm rounded transition-colors",
-                                    mode === "explore"
-                                        ? "bg-background text-foreground shadow-sm"
-                                        : "text-muted-foreground hover:text-foreground"
-                                )}
-                            >
-                                Explore
-                            </button>
-                        </div>
+                        {/* Mode dropdown */}
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <button
+                                    type="button"
+                                    className={cn(
+                                        "flex items-center gap-1.5 text-sm rounded-md px-2 py-1 transition-colors text-foreground",
+                                        "bg-background border border-border hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    )}
+                                >
+                                    {currentModeLabel}
+                                    <ChevronDown className="h-3.5 w-3.5" />
+                                </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-72 p-1" align="start">
+                                <div className="space-y-0.5">
+                                    {MODE_OPTIONS.map((option) => (
+                                        <button
+                                            key={option.value}
+                                            type="button"
+                                            onClick={() => onModeChange(option.value)}
+                                            className={cn(
+                                                "w-full flex items-start gap-2 rounded-md px-2 py-1.5 text-sm text-left transition-colors",
+                                                "hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                                mode === option.value && "bg-accent"
+                                            )}
+                                        >
+                                            <Check className={cn(
+                                                "h-3.5 w-3.5 mt-0.5 shrink-0",
+                                                mode === option.value ? "opacity-100" : "opacity-0"
+                                            )} />
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-medium">{option.label}</div>
+                                                <div className="text-xs text-muted-foreground">{option.description}</div>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </PopoverContent>
+                        </Popover>
 
                         {/* Academic mode: sort dropdown and open access filter */}
                         {mode === "scholarly" && (
@@ -158,8 +178,8 @@ export default function DiscoverInput({
                                             type="button"
                                             className={cn(
                                                 "flex items-center gap-1.5 text-sm rounded-md px-2 py-1 transition-colors",
-                                                "hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                                sort ? "text-foreground" : "text-muted-foreground"
+                                                "bg-background border border-border hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                                sort ? "text-foreground" : "text-foreground/70"
                                             )}
                                         >
                                             <ArrowDownNarrowWide className="h-3.5 w-3.5" />
@@ -191,13 +211,13 @@ export default function DiscoverInput({
                                     </PopoverContent>
                                 </Popover>
 
-                                <label className="flex items-center gap-1.5 text-sm rounded-md px-2 py-1 cursor-pointer hover:bg-accent transition-colors">
+                                <label className="flex items-center gap-1.5 text-sm rounded-md px-2 py-1 cursor-pointer bg-background border border-border hover:bg-accent transition-colors">
                                     <Checkbox
                                         checked={onlyOpenAccess}
                                         onCheckedChange={(checked) => onOpenAccessChange(checked === true)}
                                         className="h-3.5 w-3.5"
                                     />
-                                    <span className={onlyOpenAccess ? "text-foreground" : "text-muted-foreground"}>
+                                    <span className={onlyOpenAccess ? "text-foreground" : "text-foreground/70"}>
                                         Open Access
                                     </span>
                                 </label>
@@ -213,8 +233,8 @@ export default function DiscoverInput({
                                         type="button"
                                         className={cn(
                                             "flex items-center gap-1.5 text-sm rounded-md px-2 py-1 transition-colors",
-                                            "hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                            selectedCount > 0 ? "text-foreground" : "text-muted-foreground"
+                                            "bg-background border border-border hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                            selectedCount > 0 ? "text-foreground" : "text-foreground/70"
                                         )}
                                     >
                                         {sourcesLabel}
@@ -254,8 +274,8 @@ export default function DiscoverInput({
                                     type="button"
                                     className={cn(
                                         "flex items-center gap-1.5 text-sm rounded-md px-2 py-1 transition-colors",
-                                        "hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                        yearFilter ? "text-foreground" : "text-muted-foreground"
+                                        "bg-background border border-border hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                        yearFilter ? "text-foreground" : "text-foreground/70"
                                     )}
                                 >
                                     <Calendar className="h-3.5 w-3.5" />
@@ -302,7 +322,7 @@ export default function DiscoverInput({
                             onClick={onSubmit}
                             disabled={!value.trim() || loading}
                             size="sm"
-                            className="gap-2"
+                            className="gap-2 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
                         >
                             <Search className="h-4 w-4" />
                             Search

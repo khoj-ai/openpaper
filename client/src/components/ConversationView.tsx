@@ -9,7 +9,7 @@ import remarkGfm from "remark-gfm";
 import rehypeKatex from "rehype-katex";
 import remarkMath from "remark-math";
 import "katex/dist/katex.min.css";
-import { Loader, ArrowUp, Recycle, X, ChevronDown, ChevronUp, BookOpen } from "lucide-react";
+import { Loader, Send, Recycle, X, ChevronDown, ChevronUp, BookOpen } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import CustomCitationLink from "@/components/utils/CustomCitationLink";
 import {
@@ -223,8 +223,8 @@ export const ConversationView = ({
 		>
 			<div
 				data-message-index={index}
-				className={`relative group prose dark:prose-invert !max-w-full transition-all duration-300 ease-in-out ${msg.role === "user"
-					? "text-lg w-fit animate-fade-in line-clamp-3 mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-600 px-2 py-2 rounded-xl border border-blue-100 dark:border-gray-600"
+				className={`relative group prose dark:prose-invert max-w-full! transition-all duration-300 ease-in-out ${msg.role === "user"
+					? "text-lg w-fit animate-fade-in line-clamp-3 mt-6 bg-linear-to-r from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-600 px-2 py-2 rounded-xl border border-blue-100 dark:border-gray-600"
 					: "w-full text-primary"
 					}`}
 			>
@@ -366,9 +366,9 @@ export const ConversationView = ({
 							</>
 						)}
 						{isStreaming && streamingChunks.length > 0 && (
-							<div className="relative group prose dark:prose-invert !max-w-full rounded-lg w-full text-primary dark:text-primary-foreground transition-all duration-300 ease-in-out">
+							<div className="relative group prose dark:prose-invert max-w-full! rounded-lg w-full text-primary dark:text-primary-foreground transition-all duration-300 ease-in-out">
 								<AnimatedMarkdown
-									className="!p-0"
+									className="p-0!"
 									content={streamingChunks.join("")}
 									remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
 									rehypePlugins={[rehypeKatex]}
@@ -416,7 +416,7 @@ export const ConversationView = ({
 						)}
 						{isStreaming && (
 							<div className="flex items-center gap-3 p-2">
-								<Loader className="animate-spin w-6 h-6 text-blue-500 flex-shrink-0" />
+								<Loader className="animate-spin w-6 h-6 text-blue-500 shrink-0" />
 								<div className="text-sm text-secondary-foreground w-full">
 									{displayedText}
 									{isTyping && <span className="animate-pulse">|</span>}
@@ -485,10 +485,10 @@ export const ConversationView = ({
 								autoFocus
 								placeholder={
 									isCentered
-										? "Discover something in your papers..."
+										? "Look for a specific citation. Find a relevant paper. Collate evidence across your library."
 										: "Ask a follow-up"
 								}
-								className="pr-16 resize-none w-full bg-secondary"
+								className="min-h-20 resize-none pr-12 w-full border-none dark:border-none focus-visible:ring-1 focus-visible:ring-blue-400/30 bg-secondary dark:bg-accent text-primary"
 								disabled={isStreaming || (!isPapersLoading && papers.length === 0) || chatCreditLimitReached || !isOwner}
 								onKeyDown={(e) => {
 									if (e.key === "Enter" && !e.shiftKey) {
@@ -499,11 +499,11 @@ export const ConversationView = ({
 							/>
 							<Button
 								type="submit"
-								variant="ghost"
-								className="absolute top-1/2 right-2 -translate-y-1/2"
-								disabled={isStreaming || (!isPapersLoading && papers.length === 0) || chatCreditLimitReached || !isOwner}
+								size="sm"
+								className="absolute bottom-3 right-3 h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+								disabled={!currentMessage.trim() || isStreaming || (!isPapersLoading && papers.length === 0) || chatCreditLimitReached || !isOwner}
 							>
-								<ArrowUp className="h-5 w-5" />
+								{isStreaming ? <Loader className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
 							</Button>
 						</div>
 						{chatCreditLimitReached && (
@@ -537,7 +537,7 @@ export const ConversationView = ({
 							<X className="h-4 w-4" />
 						</Button>
 					</div>
-					<div className="flex-grow transition-all duration-300 ease-in-out overflow-y-auto">
+					<div className="grow transition-all duration-300 ease-in-out overflow-y-auto">
 						{pdfUrl && (
 							<PdfHighlighterViewer
 								pdfUrl={pdfUrl}
