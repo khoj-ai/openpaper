@@ -49,11 +49,11 @@ logger = logging.getLogger(__name__)
 CONFIDENCE_THRESHOLD = 0.7
 MAX_WEB_ITERATIONS = 3
 
-# Strict JSON schema for the forced extraction backstop (all fields required,
-# nullable via type unions, additionalProperties disabled for OpenAI strict mode).
+# JSON schema for the forced extraction backstop. Only `confidence` is required;
+# the metadata fields are optional so the agent can honestly omit anything it
+# could not find rather than being pressured to fabricate a value.
 CITATION_EXTRACTION_SCHEMA = {
     "type": "object",
-    "additionalProperties": False,
     "properties": {
         "journal": {"type": ["string", "null"]},
         "publisher": {"type": ["string", "null"]},
@@ -62,14 +62,7 @@ CITATION_EXTRACTION_SCHEMA = {
         "source_url": {"type": ["string", "null"]},
         "confidence": {"type": "number"},
     },
-    "required": [
-        "journal",
-        "publisher",
-        "doi",
-        "publish_date",
-        "source_url",
-        "confidence",
-    ],
+    "required": ["confidence"],
 }
 
 find_citation_function = {
@@ -469,6 +462,18 @@ class CitationFinder(BaseLLMClient):
             findings = json.loads(resp.text)
         except Exception:
             logger.exception("Citation extraction failed")
+            return None
+
+        # If nothing usable was found, return None rather than a low-signal dict.
+        if not any(
+            findings.get(f) for f in ("journal", "publisher", "doi", "publish_date")
+        ):
+            steps.append(
+                CitationStep(
+                    kind="submit",
+                    detail="No matching metadata found in gathered sources.",
+                )
+            )
             return None
 
         steps.append(
