@@ -39,11 +39,20 @@ message_router = APIRouter()
 END_DELIMITER = "END_OF_STREAM"
 
 
+def _append_status(messages: Optional[List[str]], message: str) -> None:
+    """Append a status message, collapsing consecutive duplicates (e.g. heartbeats)."""
+    if messages is None or not message:
+        return
+    if not messages or messages[-1] != message:
+        messages.append(message)
+
+
 async def _stream_chat_chunks(
     chunk_generator: AsyncGenerator[Union[dict, str], None],
     content_chunks: List[str],
     evidence_container: dict,
     artifacts: Optional[List] = None,
+    status_messages: Optional[List[str]] = None,
 ) -> AsyncGenerator[str, None]:
     """Helper to stream chat chunks and handle common logic."""
     async for chunk in chunk_generator:
@@ -89,6 +98,7 @@ async def _stream_chat_chunks(
                 logger.warning(f"Failed to serialize references: {json_error}")
                 yield f"{json.dumps({'type': 'error', 'content': 'Failed to serialize references'})}{END_DELIMITER}"
         elif chunk_type == "status":
+            _append_status(status_messages, chunk_content)
             yield f"{json.dumps({'type': 'status', 'content': chunk_content})}{END_DELIMITER}"
 
 
@@ -126,6 +136,7 @@ async def chat_message_multipaper(
             try:
                 content_chunks = []
                 artifacts_collected: List[dict] = []
+                status_messages: List[str] = []
                 start_time = datetime.now(timezone.utc)
                 evidence_container = {"evidence": None}
                 evidence_collection: Optional[EvidenceCollection] = None
@@ -190,6 +201,7 @@ async def chat_message_multipaper(
                             ), "Chunk content must be an EvidenceCollection"
                             evidence_collection = chunk_content
                         elif chunk_type == "status":
+                            _append_status(status_messages, chunk_content)
                             yield f"{json.dumps({'type': 'status', 'content': chunk_content})}{END_DELIMITER}"
                         else:
                             logger.debug(f"received chunks: {chunk}")
@@ -234,6 +246,7 @@ async def chat_message_multipaper(
                     content_chunks=content_chunks,
                     evidence_container=evidence_container,
                     artifacts=artifacts_collected,
+                    status_messages=status_messages,
                 ):
                     yield stream_chunk
 
@@ -248,6 +261,16 @@ async def chat_message_multipaper(
                 assistant_trace = (
                     evidence_collection.to_trace_dict() if evidence_collection else None
                 )
+                # Fold in the live status messages (the "thinking trace") so it
+                # survives reloads, even when there were no tool calls.
+                if status_messages:
+                    assistant_trace = assistant_trace or {}
+                    assistant_trace["status_messages"] = status_messages
+
+                # Surface the trajectory live so the just-answered message can show
+                # it immediately (it's also persisted for reload below).
+                if assistant_trace:
+                    yield f"{json.dumps({'type': 'trace', 'content': assistant_trace})}{END_DELIMITER}"
 
                 formatted_references = (
                     CitationHandler.convert_references_to_dict(
