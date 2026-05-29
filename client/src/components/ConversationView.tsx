@@ -278,12 +278,11 @@ export const ConversationView = ({
 				>
 					{msg.content}
 				</Markdown>
-				{(msg.artifacts ?? msg.bucket?.artifacts)?.map((artifact, i) => (
-					<CitationArtifactCard
-						key={`${msg.id || index}-artifact-${i}`}
-						artifact={artifact}
-					/>
-				))}
+				{(() => {
+					const artifacts = msg.artifacts ?? msg.bucket?.artifacts;
+					if (!artifacts || artifacts.length === 0) return null;
+					return <CitationArtifactCard artifacts={artifacts} />;
+				})()}
 				{msg.references && msg.references["citations"]?.length > 0 ? (
 					<div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
 						<div
@@ -419,12 +418,9 @@ export const ConversationView = ({
 										table: CopyableTable,
 									}}
 								/>
-								{streamingArtifacts?.map((artifact, i) => (
-									<CitationArtifactCard
-										key={`streaming-artifact-${i}`}
-										artifact={artifact}
-									/>
-								))}
+								{streamingArtifacts && streamingArtifacts.length > 0 && (
+									<CitationArtifactCard artifacts={streamingArtifacts} />
+								)}
 								<ChatMessageActions
 									message={streamingChunks.join("")}
 									references={streamingReferences}
