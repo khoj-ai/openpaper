@@ -36,11 +36,64 @@ export interface SharedPaper {
     owner: BasicUser;
 }
 
+export interface CitationArtifactData {
+    paper_id: string;
+    title?: string;
+    authors?: string[];
+    publish_date?: string;
+    journal?: string;
+    publisher?: string;
+    doi?: string;
+}
+
+export interface CitationArtifact {
+    kind: 'citation';
+    paper_id: string;
+    preferred_style: string; // canonical key, e.g. "APA"
+    style_display: string;
+    data: CitationArtifactData;
+    method: string;
+    missing_fields: string[];
+    confidence?: number | null;
+}
+
+export interface MessageTraceToolCall {
+    name: string;
+    args?: Record<string, unknown>;
+}
+
+export interface MessageTraceStep {
+    kind: string;
+    detail: string;
+    data?: Record<string, unknown> | null;
+}
+
+export interface MessageTraceCitation {
+    paper_id: string;
+    method: string;
+    preferred_style: string;
+    steps: MessageTraceStep[];
+}
+
+export interface MessageTrace {
+    // The live "thinking trace" — status messages shown during streaming.
+    status_messages?: string[];
+    tool_calls?: MessageTraceToolCall[];
+    citations?: MessageTraceCitation[];
+}
+
 export interface ChatMessage {
     id?: string;
     role: 'user' | 'assistant';
     content: string;
     references?: Reference;
+    // First-party artifacts (e.g. citations) produced for this turn. `artifacts`
+    // is set for freshly-streamed messages; persisted messages carry them under
+    // `bucket.artifacts` as returned by the server.
+    artifacts?: CitationArtifact[];
+    bucket?: { artifacts?: CitationArtifact[] };
+    // Agent trajectory (tool calls + per-citation subagent steps) for this turn.
+    trace?: MessageTrace;
 }
 
 // Position types for react-pdf-highlighter-extended
