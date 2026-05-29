@@ -43,6 +43,7 @@ async def _stream_chat_chunks(
     chunk_generator: AsyncGenerator[Union[dict, str], None],
     content_chunks: List[str],
     evidence_container: dict,
+    artifacts: Optional[List] = None,
 ) -> AsyncGenerator[str, None]:
     """Helper to stream chat chunks and handle common logic."""
     async for chunk in chunk_generator:
@@ -52,6 +53,15 @@ async def _stream_chat_chunks(
 
         chunk_type = chunk.get("type")
         chunk_content = chunk.get("content", "")
+
+        if chunk_type == "artifact":
+            if artifacts is not None:
+                artifacts.append(chunk_content)
+            try:
+                yield f"{json.dumps({'type': 'artifact', 'content': chunk_content})}{END_DELIMITER}"
+            except (TypeError, ValueError) as json_error:
+                logger.warning(f"Failed to serialize artifact: {json_error}")
+            continue
 
         if chunk_type == "content":
             content_chunks.append(chunk_content)
@@ -115,6 +125,7 @@ async def chat_message_multipaper(
         async def response_generator():
             try:
                 content_chunks = []
+                artifacts_collected: List[dict] = []
                 start_time = datetime.now(timezone.utc)
                 evidence_container = {"evidence": None}
                 evidence_collection: Optional[EvidenceCollection] = None
@@ -222,6 +233,7 @@ async def chat_message_multipaper(
                     chunk_generator=chat_generator,
                     content_chunks=content_chunks,
                     evidence_container=evidence_container,
+                    artifacts=artifacts_collected,
                 ):
                     yield stream_chunk
 
@@ -229,6 +241,13 @@ async def chat_message_multipaper(
 
                 # Save the complete message to the database
                 full_content = "".join(content_chunks)
+
+                assistant_bucket = (
+                    {"artifacts": artifacts_collected} if artifacts_collected else None
+                )
+                assistant_trace = (
+                    evidence_collection.to_trace_dict() if evidence_collection else None
+                )
 
                 formatted_references = (
                     CitationHandler.convert_references_to_dict(
@@ -250,7 +269,7 @@ async def chat_message_multipaper(
                     user=current_user,
                 )
 
-                # Save assistant message with both content and evidence
+                # Save assistant message with content, evidence, artifacts, trace
                 message_crud.create(
                     db,
                     obj_in=MessageCreate(
@@ -258,6 +277,8 @@ async def chat_message_multipaper(
                         role="assistant",
                         content=full_content,
                         references=evidence if evidence else None,
+                        bucket=assistant_bucket,
+                        trace=assistant_trace,
                     ),
                     user=current_user,
                 )
