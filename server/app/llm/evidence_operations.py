@@ -70,8 +70,8 @@ _tool_executor = ThreadPoolExecutor(max_workers=4)
 def _summarize_citation(result: CitationResult) -> str:
     """A compact, text summary of a citation result for the answer model.
 
-    The full structured data is delivered to the user as an interactive card,
-    so the model should reference it rather than re-paste a formatted citation.
+    The full structured data is delivered to the user separately, so the answer
+    model should not re-paste a formatted citation.
     """
     d = result.data
     return (
@@ -80,8 +80,8 @@ def _summarize_citation(result: CitationResult) -> str:
         f"Title: {d.title}; Journal: {d.journal}; Publisher: {d.publisher}; "
         f"DOI: {d.doi}; Date: {d.publish_date}. "
         f"Still missing: {result.missing_fields or 'none'}. "
-        "An interactive citation card with this data is shown to the user; "
-        "do not paste a fully formatted citation in your answer."
+        "This citation is delivered to the user separately; do not write out a "
+        "formatted citation string in your answer."
     )
 
 
