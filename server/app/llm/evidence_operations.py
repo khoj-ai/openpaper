@@ -14,6 +14,7 @@ from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
 from app.database.telemetry import track_event
 from app.llm.base import BaseLLMClient, ModelType
+from app.llm.citation_agent import find_citation_function, run_find_citation
 from app.llm.json_parser import JSONParser
 from app.llm.prompts import (
     EVIDENCE_COMPACTION_PROMPT,
@@ -37,6 +38,7 @@ from app.llm.tools.file_tools import (
 )
 from app.llm.tools.meta_tools import stop_function
 from app.llm.utils import retry_llm_operation
+from app.schemas.citation import CitationResult
 from app.schemas.message import (
     EvidenceCollection,
     EvidenceSummaryResponse,
@@ -63,6 +65,24 @@ HEARTBEAT_INTERVAL_SECONDS = (
 )
 
 _tool_executor = ThreadPoolExecutor(max_workers=4)
+
+
+def _summarize_citation(result: CitationResult) -> str:
+    """A compact, text summary of a citation result for the answer model.
+
+    The full structured data is delivered to the user as an interactive card,
+    so the model should reference it rather than re-paste a formatted citation.
+    """
+    d = result.data
+    return (
+        f"Resolved citation metadata for paper {result.paper_id} "
+        f"(preferred style: {result.style_display}; method: {result.method}). "
+        f"Title: {d.title}; Journal: {d.journal}; Publisher: {d.publisher}; "
+        f"DOI: {d.doi}; Date: {d.publish_date}. "
+        f"Still missing: {result.missing_fields or 'none'}. "
+        "An interactive citation card with this data is shown to the user; "
+        "do not paste a fully formatted citation in your answer."
+    )
 
 
 class EvidenceOperations(BaseLLMClient):
@@ -140,6 +160,7 @@ class EvidenceOperations(BaseLLMClient):
             view_file_function,
             read_abstract_function,
             search_all_files_function,
+            find_citation_function,
             stop_function,
         ]
 
@@ -149,6 +170,7 @@ class EvidenceOperations(BaseLLMClient):
             "view_file": view_file,
             "read_abstract": read_abstract,
             "search_all_files": search_all_files,
+            "find_citation": run_find_citation,
             "stop": lambda: None,
         }
 
@@ -299,28 +321,44 @@ class EvidenceOperations(BaseLLMClient):
                                     "content": f"{pretty_fn_name} - {paper_name}{display_query}",
                                 }
 
-                        evidence_collection.add_tool_call_result(fn_selected, result)
-
-                        preserve_line_numbers = fn_name in [
-                            "search_file",
-                            "search_all_files",
-                        ]
-
-                        if fn_name == "search_all_files" and isinstance(result, dict):
-                            for paper_id, lines in result.items():
-                                evidence_collection.add_evidence(
-                                    paper_id, lines, preserve_line_numbers=True
-                                )
-
-                        paper_id = fn_args.get("paper_id")
-                        if paper_id and (
-                            isinstance(result, str) or isinstance(result, list)
+                        if fn_name == "find_citation" and isinstance(
+                            result, CitationResult
                         ):
-                            evidence_collection.add_evidence(
-                                paper_id,
-                                result,
-                                preserve_line_numbers=preserve_line_numbers,
+                            # Citations are first-party artifacts (rendered as a
+                            # card client-side), not evidence. Capture the
+                            # structured result and feed the model a short
+                            # summary so it can reference but not re-paste it.
+                            evidence_collection.add_artifact(result)
+                            evidence_collection.add_tool_call_result(
+                                fn_selected, _summarize_citation(result)
                             )
+                        else:
+                            evidence_collection.add_tool_call_result(
+                                fn_selected, result
+                            )
+
+                            preserve_line_numbers = fn_name in [
+                                "search_file",
+                                "search_all_files",
+                            ]
+
+                            if fn_name == "search_all_files" and isinstance(
+                                result, dict
+                            ):
+                                for paper_id, lines in result.items():
+                                    evidence_collection.add_evidence(
+                                        paper_id, lines, preserve_line_numbers=True
+                                    )
+
+                            paper_id = fn_args.get("paper_id")
+                            if paper_id and (
+                                isinstance(result, str) or isinstance(result, list)
+                            ):
+                                evidence_collection.add_evidence(
+                                    paper_id,
+                                    result,
+                                    preserve_line_numbers=preserve_line_numbers,
+                                )
 
                     except Exception as e:
                         logger.error(f"Error executing function {fn_name}: {e}")
