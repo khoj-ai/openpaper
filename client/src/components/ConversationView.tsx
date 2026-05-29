@@ -20,8 +20,10 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { ChatMessageActions } from "@/components/ChatMessageActions";
-import { ChatMessage, Reference, PaperItem } from "@/lib/schema";
+import { ChatMessage, Reference, PaperItem, CitationArtifact } from "@/lib/schema";
 import ReferencePaperCards from "@/components/ReferencePaperCards";
+import { CitationArtifactCard } from "@/components/CitationArtifactCard";
+import { MessageTraceViewer } from "@/components/MessageTraceViewer";
 import Link from "next/link";
 import { TopicBubbles } from "@/components/TopicBubbles";
 import { AnimatedGradientText } from "@/components/magicui/animated-gradient-text";
@@ -36,6 +38,7 @@ interface ConversationViewProps {
 	isStreaming: boolean;
 	streamingChunks: string[];
 	streamingReferences?: Reference;
+	streamingArtifacts?: CitationArtifact[];
 	statusMessage: string;
 	error: string | null;
 	isSessionLoading: boolean;
@@ -63,6 +66,7 @@ export const ConversationView = ({
 	isStreaming,
 	streamingChunks,
 	streamingReferences,
+	streamingArtifacts,
 	statusMessage,
 	error,
 	isSessionLoading,
@@ -228,6 +232,7 @@ export const ConversationView = ({
 					: "w-full text-primary"
 					}`}
 			>
+				{msg.role === "assistant" && <MessageTraceViewer trace={msg.trace} />}
 				<Markdown
 					remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
 					rehypePlugins={[rehypeKatex]}
@@ -273,6 +278,12 @@ export const ConversationView = ({
 				>
 					{msg.content}
 				</Markdown>
+				{(msg.artifacts ?? msg.bucket?.artifacts)?.map((artifact, i) => (
+					<CitationArtifactCard
+						key={`${msg.id || index}-artifact-${i}`}
+						artifact={artifact}
+					/>
+				))}
 				{msg.references && msg.references["citations"]?.length > 0 ? (
 					<div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
 						<div
@@ -408,6 +419,12 @@ export const ConversationView = ({
 										table: CopyableTable,
 									}}
 								/>
+								{streamingArtifacts?.map((artifact, i) => (
+									<CitationArtifactCard
+										key={`streaming-artifact-${i}`}
+										artifact={artifact}
+									/>
+								))}
 								<ChatMessageActions
 									message={streamingChunks.join("")}
 									references={streamingReferences}
