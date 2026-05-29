@@ -167,7 +167,7 @@ class GeminiProvider(BaseLLMProvider):
 
         self._client = genai.Client(api_key=self.api_key)
         self._default_model = "gemini-3.1-pro-preview"
-        self._fast_model = "gemini-3-flash-preview"
+        self._fast_model = "gemini-3.5-flash"
 
     @property
     def client(self) -> genai.Client:
@@ -387,11 +387,23 @@ class GeminiProvider(BaseLLMProvider):
         formatted_history = self._convert_chat_history_to_api_format(history)
         messages.extend(formatted_history)
 
-        # Add tool call results if present (multi-turn function calling)
+        # Add the new (user) message. When there are tool call results, this is
+        # the original query and must precede the reconstructed tool exchange so
+        # the sequence is a valid user -> model(call) -> user(response) turn.
+        converted_message = self._convert_message_content(new_message)
+        messages.append(converted_message)
+
+        # Add tool call results if present (multi-turn function calling).
+        # Gemini requires the function-response turn to come immediately after a
+        # model turn containing the matching function calls, so reconstruct both.
         if tool_call_results:
-            # Create function response parts for each tool result
+            function_call_parts = []
             function_response_parts = []
             for result in tool_call_results:
+                function_call_parts.append(
+                    Part.from_function_call(name=result.name, args=result.args or {})
+                )
+
                 # Serialize result to a format Gemini can handle
                 result_value = result.result
                 if isinstance(result_value, (dict, list)):
@@ -408,13 +420,10 @@ class GeminiProvider(BaseLLMProvider):
                     )
                 )
 
-            # Add as a user message containing all function responses
+            # Model turn with the function calls, then user turn with responses.
             if function_response_parts:
+                messages.append(Content(role="model", parts=function_call_parts))
                 messages.append(Content(role="user", parts=function_response_parts))
-
-        # Add the new message last
-        converted_message = self._convert_message_content(new_message)
-        messages.append(converted_message)
 
         return messages  # type: ignore
 
