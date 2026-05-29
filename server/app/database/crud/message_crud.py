@@ -22,6 +22,7 @@ class MessageBase(BaseModel):
     content: str
     references: Optional[Dict[str, Any]] = None
     bucket: Optional[Dict[str, Any]] = None
+    trace: Optional[Dict[str, Any]] = None
 
 
 class MessageCreate(MessageBase):
@@ -33,6 +34,7 @@ class MessageUpdate(BaseModel):
     content: Optional[str] = None
     references: Optional[Dict[str, Any]] = None
     bucket: Optional[Dict[str, Any]] = None
+    trace: Optional[Dict[str, Any]] = None
 
 
 class MessageCRUD(CRUDBase[Message, MessageCreate, MessageUpdate]):
@@ -207,6 +209,7 @@ class MessageCRUD(CRUDBase[Message, MessageCreate, MessageUpdate]):
                 "content": message.content,
                 "references": message.references,
                 "bucket": message.bucket,
+                "trace": message.trace,
                 "sequence": message.sequence,
             }
             formatted_messages.append(message_dict)

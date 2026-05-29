@@ -71,6 +71,7 @@ class PaperUpdate(PaperBase):
     journal: Optional[str] = None
     publisher: Optional[str] = None
     attempted_metadata_at: Optional[datetime] = None
+    field_provenance: Optional[dict] = None
 
 
 class PaperDocumentMetadata(BaseModel):

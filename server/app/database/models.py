@@ -283,6 +283,9 @@ class Message(Base):
     references = Column(JSONB, nullable=True)
 
     bucket = Column(JSONB, nullable=True)  # For any additional attributes
+    # Agent trajectory (tool calls / thinking / subagent steps) for this turn,
+    # so the user can inspect what the model did. See schemas for shape.
+    trace = Column(JSONB, nullable=True)
     sequence = Column(Integer, nullable=False)  # To maintain message order
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
@@ -455,6 +458,9 @@ class Paper(Base):
     journal = Column(String, nullable=True)
     publisher = Column(String, nullable=True)
     attempted_metadata_at = Column(DateTime(timezone=True), nullable=True)
+    # Per-field provenance for agent-filled metadata:
+    # {field: {source_url, filled_by, confidence, filled_at}}
+    field_provenance = Column(JSONB, nullable=True)
 
     size_in_kb = Column(Integer, nullable=True)  # Size of the paper file in KB
 
