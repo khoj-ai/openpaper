@@ -11,6 +11,8 @@ import { toast } from "sonner";
 
 import {
     ChatMessage,
+    CitationArtifact,
+    MessageTrace,
     Reference,
 } from '@/lib/schema';
 import { useAuth } from '@/lib/auth';
@@ -62,6 +64,7 @@ function UnderstandPageContent() {
     const [conversationId, setConversationId] = useState<string | null>(null);
     const [streamingChunks, setStreamingChunks] = useState<string[]>([]);
     const [streamingReferences, setStreamingReferences] = useState<Reference | undefined>(undefined);
+    const [streamingArtifacts, setStreamingArtifacts] = useState<CitationArtifact[]>([]);
     const [currentLoadingMessageIndex, setCurrentLoadingMessageIndex] = useState(0);
     const [displayedText, setDisplayedText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
@@ -230,6 +233,7 @@ function UnderstandPageContent() {
         setIsStreaming(true);
         setStreamingChunks([]);
         setStreamingReferences(undefined);
+        setStreamingArtifacts([]);
         setError(null);
 
         let currentConversationId = conversationId;
@@ -269,6 +273,8 @@ function UnderstandPageContent() {
             const decoder = new TextDecoder();
             let accumulatedContent = '';
             let references: Reference | undefined = undefined;
+            const artifacts: CitationArtifact[] = [];
+            let trace: MessageTrace | undefined = undefined;
             let buffer = '';
 
             while (true) {
@@ -303,6 +309,11 @@ function UnderstandPageContent() {
                             } else if (chunkType === 'references') {
                                 references = chunkContent;
                                 setStreamingReferences(chunkContent);
+                            } else if (chunkType === 'artifact') {
+                                artifacts.push(chunkContent as CitationArtifact);
+                                setStreamingArtifacts(prev => [...prev, chunkContent as CitationArtifact]);
+                            } else if (chunkType === 'trace') {
+                                trace = chunkContent as MessageTrace;
                             } else if (chunkType === 'status') {
                                 setStatusMessage(chunkContent);
                             } else if (chunkType === 'error') {
@@ -329,6 +340,8 @@ function UnderstandPageContent() {
                     role: 'assistant',
                     content: accumulatedContent,
                     references: references,
+                    artifacts: artifacts.length ? artifacts : undefined,
+                    trace: trace,
                 };
                 setMessages(prev => [...prev, finalMessage]);
             }
@@ -389,6 +402,7 @@ function UnderstandPageContent() {
                 isStreaming={isStreaming}
                 streamingChunks={streamingChunks}
                 streamingReferences={streamingReferences}
+                streamingArtifacts={streamingArtifacts}
                 isPapersLoading={isPapersLoading}
                 statusMessage={statusMessage}
                 error={error}

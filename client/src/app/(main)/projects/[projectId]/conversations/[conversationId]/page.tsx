@@ -14,7 +14,9 @@ import {
 } from "@/components/ui/breadcrumb"
 import {
     ChatMessage,
+    CitationArtifact,
     Conversation,
+    MessageTrace,
     Reference,
 } from '@/lib/schema';
 import { useAuth } from '@/lib/auth';
@@ -68,6 +70,7 @@ function ProjectConversationPageContent() {
     const [conversationId, setConversationId] = useState<string | null>(conversationIdFromUrl);
     const [streamingChunks, setStreamingChunks] = useState<string[]>([]);
     const [streamingReferences, setStreamingReferences] = useState<Reference | undefined>(undefined);
+    const [streamingArtifacts, setStreamingArtifacts] = useState<CitationArtifact[]>([]);
     const [currentLoadingMessageIndex, setCurrentLoadingMessageIndex] = useState(0);
     const [displayedText, setDisplayedText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
@@ -270,6 +273,7 @@ function ProjectConversationPageContent() {
         setIsStreaming(true);
         setStreamingChunks([]);
         setStreamingReferences(undefined);
+        setStreamingArtifacts([]);
         setError(null);
 
         const requestBody: ChatRequestBody = {
@@ -301,6 +305,8 @@ function ProjectConversationPageContent() {
             const decoder = new TextDecoder();
             let accumulatedContent = '';
             let references: Reference | undefined = undefined;
+            const artifacts: CitationArtifact[] = [];
+            let trace: MessageTrace | undefined = undefined;
             let buffer = '';
 
             try {
@@ -361,6 +367,11 @@ function ProjectConversationPageContent() {
                                 } else if (chunkType === 'references') {
                                     references = chunkContent;
                                     setStreamingReferences(chunkContent);
+                                } else if (chunkType === 'artifact') {
+                                    artifacts.push(chunkContent as CitationArtifact);
+                                    setStreamingArtifacts(prev => [...prev, chunkContent as CitationArtifact]);
+                                } else if (chunkType === 'trace') {
+                                    trace = chunkContent as MessageTrace;
                                 } else if (chunkType === 'status') {
                                     setStatusMessage(chunkContent);
                                 } else if (chunkType === 'error') {
@@ -395,6 +406,8 @@ function ProjectConversationPageContent() {
                     role: 'assistant',
                     content: accumulatedContent,
                     references: references,
+                    artifacts: artifacts.length ? artifacts : undefined,
+                    trace: trace,
                 };
                 setMessages(prev => {
                     const newMessages = [...prev, finalMessage];
@@ -404,6 +417,7 @@ function ProjectConversationPageContent() {
                 // Clear streaming state immediately after adding final message
                 setStreamingChunks([]);
                 setStreamingReferences(undefined);
+                setStreamingArtifacts([]);
             }
 
         } catch (error) {
@@ -450,6 +464,7 @@ function ProjectConversationPageContent() {
             setIsStreaming(false);
             setStreamingChunks([]);
             setStreamingReferences(undefined);
+            setStreamingArtifacts([]);
             setStatusMessage('');
             refetchSubscription();
         }
@@ -488,6 +503,7 @@ function ProjectConversationPageContent() {
                     isStreaming={isStreaming}
                     streamingChunks={streamingChunks}
                     streamingReferences={streamingReferences}
+                    streamingArtifacts={streamingArtifacts}
                     statusMessage={statusMessage}
                     error={error}
                     isSessionLoading={isSessionLoading}
