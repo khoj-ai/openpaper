@@ -102,6 +102,23 @@ def has_year(publish_date: Optional[str]) -> bool:
     return len(head) == 4 and head.isdigit()
 
 
+def bibliographic_gaps(fields: CitationFields) -> list[str]:
+    """Style-agnostic list of bibliographic fields still missing on a paper.
+
+    Used by the hot-path metadata hydrator to decide whether the agentic
+    fallback has anything left to look for. The labels match the client's
+    "Couldn't find: ..." rendering.
+    """
+    gaps: list[str] = []
+    if not has_year(fields.publish_date):
+        gaps.append("publication date")
+    if not (fields.journal or fields.publisher):
+        gaps.append("publication venue")
+    if not fields.doi:
+        gaps.append("DOI")
+    return gaps
+
+
 def missing_required_fields(fields: CitationFields, style: str) -> list[str]:
     """Return the labels of citation-critical fields still missing for this style.
 

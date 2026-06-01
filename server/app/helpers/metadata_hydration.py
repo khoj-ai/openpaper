@@ -13,12 +13,14 @@ external APIs on every read; pass force=True to bypass the cache window.
 
 import logging
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from app.database.crud.paper_crud import PaperUpdate, paper_crud
 from app.database.models import Paper
+from app.helpers.citations import bibliographic_gaps, fields_from_paper
 from app.helpers.paper_search import get_doi, get_enriched_data
 from app.helpers.parser import parse_publication_date
+from app.llm.citation_recovery import get_recovery_agent
 from app.schemas.user import CurrentUser
 from sqlalchemy.orm import Session
 
@@ -42,12 +44,20 @@ def hydrate_paper_metadata(
     paper: Paper,
     user: Optional[CurrentUser] = None,
     force: bool = False,
+    agentic: bool = False,
+    agentic_steps: Optional[list[Any]] = None,
 ) -> Paper:
     """Resolve DOI + enrich journal/publisher/publish_date for a paper.
 
     Mutates and returns the paper. No-op (returns paper unchanged) when the
     metadata cache is still fresh and force is False. Swallows external API
     errors so callers on a hot path are never broken by lookup failures.
+
+    When `agentic=True`, after the deterministic CrossRef/OpenAlex pass leaves
+    bibliographic gaps, the citation subagent runs an Exa+Firecrawl+LLM
+    extraction fallback (confidence-gated, null-only write-back with
+    field_provenance). This is expensive — only enable on background/off-hot
+    paths (e.g. post-upload, backfill scripts), never on synchronous reads.
     """
     if not force and not _is_metadata_cache_stale(paper):
         return paper
@@ -87,6 +97,11 @@ def hydrate_paper_metadata(
                 )
                 if updated:
                     paper = updated
+
+        if agentic and bibliographic_gaps(fields_from_paper(paper)):
+            paper, _, _ = get_recovery_agent().recover_metadata(
+                db=db, paper=paper, user=user, steps=agentic_steps
+            )
     except Exception:
         logger.exception(
             "Error hydrating metadata for paper %s", paper.id, exc_info=True

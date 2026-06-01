@@ -138,7 +138,7 @@ def post_process_paper(
             paper = paper_crud.get(db=db, id=paper_id, user=job_user)
             if paper:
                 paper = hydrate_paper_metadata(
-                    db=db, paper=paper, user=job_user, force=True
+                    db=db, paper=paper, user=job_user, force=True, agentic=True
                 )
                 doi = str(paper.doi) if paper.doi else None
         except Exception as e:
