@@ -37,12 +37,6 @@ type ZoteroImportResponse = {
 	errors: { zotero_item_key: string; error: string }[];
 };
 
-type ZoteroSyncResponse = {
-	synced_papers_count: number;
-	new_annotations_count: number;
-	sync_errors: { zotero_item_key: string; error: string }[];
-};
-
 function SettingsContent() {
 	const { user, loading } = useAuth();
 	const router = useRouter();
@@ -61,14 +55,11 @@ function SettingsContent() {
 	const [zoteroLoading, setZoteroLoading] = useState(true);
 	const [zoteroActionLoading, setZoteroActionLoading] = useState(false);
 	const [zoteroImportLoading, setZoteroImportLoading] = useState(false);
-	const [zoteroSyncLoading, setZoteroSyncLoading] = useState(false);
 	const [recentImports, setRecentImports] = useState<ZoteroImportStatusItem[]>([]);
 	const [recentImportsLoaded, setRecentImportsLoaded] = useState(false);
 	const [importProgress, setImportProgress] = useState<number | null>(null);
 	const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 	const importDoneRef = useRef(false);
-	const lastRefreshedDoneRef = useRef(0);
-	const importTotalRef = useRef(0);
 
 	const fetchZoteroStatus = useCallback(async () => {
 		setZoteroLoading(true);
@@ -114,9 +105,13 @@ function SettingsContent() {
 
 	useEffect(() => {
 		if (user && zoteroStatus?.connected) {
+			setRecentImportsLoaded(false);
 			fetchRecentImports();
+		} else if (user && zoteroStatus && !zoteroStatus.connected) {
+			setRecentImports([]);
+			setRecentImportsLoaded(false);
 		}
-	}, [user, zoteroStatus?.connected, fetchRecentImports]);
+	}, [user, zoteroStatus?.connected, zoteroStatus, fetchRecentImports]);
 
 	useEffect(() => {
 		const zoteroParam = searchParams.get("zotero");
@@ -124,6 +119,8 @@ function SettingsContent() {
 
 		if (zoteroParam === "connected") {
 			toast.success("Zotero connected.");
+			setRecentImports([]);
+			setRecentImportsLoaded(false);
 			fetchZoteroStatus();
 		} else if (zoteroParam === "error") {
 			toast.error("Failed to connect Zotero.");
@@ -181,45 +178,40 @@ function SettingsContent() {
 		setZoteroImportLoading(true);
 		setImportProgress(0);
 
-		const knownPaperIds = new Set(recentImports.map((r) => r.paper_id).filter(Boolean));
 		importDoneRef.current = false;
-		lastRefreshedDoneRef.current = 0;
-		importTotalRef.current = 0;
 
-		pollRef.current = setInterval(async () => {
+		const finishImport = () => {
+			if (importDoneRef.current) return;
+			if (pollRef.current) {
+				clearInterval(pollRef.current);
+				pollRef.current = null;
+			}
+			importDoneRef.current = true;
+			setZoteroImportLoading(false);
+			setImportProgress(100);
+			setTimeout(() => setImportProgress(null), 1500);
+		};
+
+		const pollImportStatus = async () => {
+			if (importDoneRef.current) return;
 			try {
 				const data = await fetchFromApi("/api/zotero/import/status");
-				// guard: discard stale poll responses that arrive after POST completed
 				if (importDoneRef.current) return;
 				const items: ZoteroImportStatusItem[] = data.items ?? [];
-				const newItems = items.filter((i) => !knownPaperIds.has(i.paper_id ?? ""));
-				// Grow the total as more items appear; never shrink it
-				if (newItems.length > importTotalRef.current) {
-					importTotalRef.current = newItems.length;
-				}
-				const done = newItems.filter(
-					(i) => i.status === "completed" || i.status === "failed",
-				).length;
-				const total = Math.max(importTotalRef.current, zoteroImportLimit) || 1;
-				setImportProgress(Math.min((done / total) * 100, 99));
-				if (done > lastRefreshedDoneRef.current) {
-					lastRefreshedDoneRef.current = done;
-					refreshActivePapers();
-					refetchSubscription();
-				}
+				setRecentImports(items);
+				setRecentImportsLoaded(true);
 			} catch {
 				// ignore poll errors
 			}
-		}, 1500);
+		};
+
+		pollRef.current = setInterval(pollImportStatus, 1500);
 
 		try {
-		const data: ZoteroImportResponse = await fetchFromApi("/api/zotero/import", {
-			method: "POST",
-			body: JSON.stringify({ limit: zoteroImportLimit }),
-		});
-			// mark done BEFORE setImportProgress(100) so in-flight poll callbacks are discarded
-			importDoneRef.current = true;
-			if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+			const data: ZoteroImportResponse = await fetchFromApi("/api/zotero/import", {
+				method: "POST",
+				body: JSON.stringify({ limit: zoteroImportLimit }),
+			});
 			const parts: string[] = [];
 			if (data.imported_count > 0) {
 				parts.push(`Imported ${data.imported_count} paper${data.imported_count === 1 ? "" : "s"}`);
@@ -227,71 +219,30 @@ function SettingsContent() {
 			if (data.skipped_already_imported > 0) {
 				parts.push(`${data.skipped_already_imported} already imported`);
 			}
-		const errorCount = data.errors?.length ?? 0;
-		if (errorCount > 0) {
-			parts.push(`${errorCount} failed`);
-		}
-		if (data.imported_count > 0) {
-			toast.success(parts.join("; ") + ". Processing may take a minute per paper.");
-		} else if (errorCount > 0) {
-			toast.error(parts.join("; ") || "Import failed.");
-		} else if (parts.length > 0) {
-			toast.success(parts.join("; ") + ".");
-		} else {
-			toast.info("No new papers to import.");
-		}
-		setImportProgress(100);
-		await fetchRecentImports();
-		await refreshActivePapers();
-		await refetchSubscription();
-	} catch (error) {
-		const msg = error instanceof Error ? error.message : "Failed to import from Zotero.";
-		if (msg.includes("Upload limit") || msg.includes("paper upload limit")) {
-			toast.warning(msg);
-		} else {
-			toast.error(msg);
-		}
-	} finally {
-		// interval already cleared in try; guard against error-path where it wasn't
-		if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-		importDoneRef.current = true;
-		setZoteroImportLoading(false);
-		setTimeout(() => setImportProgress(null), 1500);
-	}
-};
-
-	const handleZoteroSync = async () => {
-		setZoteroSyncLoading(true);
-		try {
-			const data: ZoteroSyncResponse = await fetchFromApi("/api/zotero/sync", {
-				method: "POST",
-				body: JSON.stringify({ limit: 50 }),
-			});
-			const parts: string[] = [];
-			if (data.synced_papers_count > 0) {
-				const syncPart = `Synced ${data.synced_papers_count} paper${data.synced_papers_count === 1 ? "" : "s"}`;
-				if (data.new_annotations_count > 0) {
-					parts.push(
-						`${syncPart} with ${data.new_annotations_count} new highlight${data.new_annotations_count === 1 ? "" : "s"}`,
-					);
-				} else {
-					parts.push(syncPart);
-				}
-			}
-			const errorCount = data.sync_errors?.length ?? 0;
+			const errorCount = data.errors?.length ?? 0;
 			if (errorCount > 0) {
 				parts.push(`${errorCount} failed`);
 			}
-			if (parts.length > 0) {
+			if (data.imported_count > 0) {
+				toast.success(parts.join("; ") + ". Processing may take a minute per paper.");
+			} else if (errorCount > 0) {
+				toast.error(parts.join("; ") || "Import failed.");
+			} else if (parts.length > 0) {
 				toast.success(parts.join("; ") + ".");
 			} else {
-				toast.info("No new highlights to sync.");
+				toast.info("No new papers to import.");
 			}
+			finishImport();
 			await refreshActivePapers();
+			await refetchSubscription();
 		} catch (error) {
-			toast.error(error instanceof Error ? error.message : "Failed to sync from Zotero.");
-		} finally {
-			setZoteroSyncLoading(false);
+			const msg = error instanceof Error ? error.message : "Failed to import from Zotero.";
+			if (msg.includes("Upload limit") || msg.includes("paper upload limit")) {
+				toast.warning(msg);
+			} else {
+				toast.error(msg);
+			}
+			finishImport();
 		}
 	};
 
@@ -303,6 +254,8 @@ function SettingsContent() {
 			});
 			if (data.success) {
 				toast.success("Zotero disconnected.");
+				setRecentImports([]);
+				setRecentImportsLoaded(false);
 				await fetchZoteroStatus();
 			} else {
 				toast.error(data.message || "Failed to disconnect Zotero.");
@@ -323,8 +276,6 @@ function SettingsContent() {
 			</div>
 		);
 	}
-
-	const hasImported = recentImports.some((i) => i.status === "completed");
 
 	return (
 		<div className="max-w-2xl p-6 space-y-6">
@@ -399,8 +350,8 @@ function SettingsContent() {
 					) : zoteroStatus?.connected ? (
 					<div className="space-y-3">
 					<p className="text-sm text-muted-foreground">
-						Import journal articles, conference papers, and preprints from Zotero (books and web pages are skipped),
-						or sync new PDF highlights from Zotero into papers you have already imported.
+						Import journal articles, conference papers, and preprints from Zotero (books and web pages are skipped).
+						New PDF annotations are synced automatically every 24 hours.
 					</p>
 						{paperUploadsRemaining !== null && paperUploadsTotal !== null && paperUploadsUsed !== null && (
 							<p className="text-xs text-muted-foreground">
@@ -413,30 +364,18 @@ function SettingsContent() {
 					<Button
 						type="button"
 						onClick={handleZoteroImport}
-						disabled={zoteroImportLoading || zoteroSyncLoading || zoteroActionLoading || atPaperLimit}
+						disabled={zoteroImportLoading || zoteroActionLoading || atPaperLimit}
 					>
 						{zoteroImportLoading ? (
 							<Loader2 className="h-4 w-4 animate-spin mr-2" />
 						) : null}
 						Import
 					</Button>
-					{recentImportsLoaded && hasImported ? (
-						<Button
-							type="button"
-							onClick={handleZoteroSync}
-							disabled={zoteroSyncLoading || zoteroImportLoading || zoteroActionLoading}
-						>
-							{zoteroSyncLoading ? (
-								<Loader2 className="h-4 w-4 animate-spin mr-2" />
-							) : null}
-							Sync Annotations
-						</Button>
-					) : null}
 					<Button
 						type="button"
 						variant="outline"
 						onClick={handleZoteroDisconnect}
-						disabled={zoteroActionLoading || zoteroImportLoading || zoteroSyncLoading}
+						disabled={zoteroActionLoading || zoteroImportLoading}
 					>
 						{zoteroActionLoading ? (
 							<Loader2 className="h-4 w-4 animate-spin mr-2" />

@@ -38,7 +38,7 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
-ZOTERO_IMPORT_CONCURRENCY = 3
+ZOTERO_IMPORT_CONCURRENCY = 10
 
 
 class ImportOneResult(TypedDict, total=False):

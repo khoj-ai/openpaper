@@ -44,27 +44,6 @@ class ZoteroImportResponse(BaseModel):
     errors: List[ZoteroImportError]
 
 
-class ZoteroSyncItemResult(BaseModel):
-    zotero_item_key: str
-    paper_id: Optional[str] = None
-    new_annotations_count: int = 0
-
-
-class ZoteroSyncResponse(BaseModel):
-    synced: List[ZoteroSyncItemResult]
-    synced_papers_count: int
-    new_annotations_count: int
-    sync_errors: List[ZoteroImportError]
-
-
-class ZoteroImportAndSyncResponse(ZoteroImportResponse):
-    synced: List[ZoteroSyncItemResult]
-    synced_papers_count: int
-    new_annotations_count: int
-    sync_errors: List[ZoteroImportError]
-    import_blocked_reason: Optional[str] = None
-
-
 class ZoteroImportStatusItem(BaseModel):
     zotero_item_key: str
     paper_id: Optional[str] = None
