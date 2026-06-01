@@ -1,8 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 from uuid import UUID
 
 from app.database.models import Paper, ZoteroImportedItem, ZoteroImportSource, ZoteroImportStatus
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 
@@ -109,6 +110,26 @@ class CRUDZoteroImport:
             .limit(limit)
             .all()
         )
+
+    def list_user_ids_due_for_sync(
+        self, db: Session, *, threshold_hours: int = 24
+    ) -> List[UUID]:
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=threshold_hours)
+        rows = (
+            db.query(ZoteroImportedItem.user_id)
+            .filter(
+                ZoteroImportedItem.status == ZoteroImportStatus.COMPLETED,
+                ZoteroImportedItem.import_source == ZoteroImportSource.PDF_ATTACHMENT,
+                ZoteroImportedItem.zotero_attachment_key.isnot(None),
+                or_(
+                    ZoteroImportedItem.last_synced_at.is_(None),
+                    ZoteroImportedItem.last_synced_at < cutoff,
+                ),
+            )
+            .distinct()
+            .all()
+        )
+        return [row.user_id for row in rows]
 
     def update_after_sync(
         self,

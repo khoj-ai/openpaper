@@ -308,6 +308,28 @@ def health_check(self):
         }
 
 
+@celery_app.task(bind=True, name="periodic_zotero_sync")
+def periodic_zotero_sync(self):
+    """
+    Periodic task that triggers the server to sync new Zotero annotations
+    for all users whose items haven't been synced in the past 24 hours.
+    Fires at the interval configured by ZOTERO_SYNC_INTERVAL_SECONDS (default 24h).
+    """
+    webhook_base = os.getenv("WEBHOOK_BASE_URL", "http://localhost:8000")
+    secret = os.getenv("JOBS_INTERNAL_SECRET", "")
+    url = f"{webhook_base}/api/webhooks/internal/zotero-sync-all"
+    logger.info(f"Triggering periodic Zotero sync via {url}")
+    resp = requests.post(
+        url,
+        timeout=120,
+        headers={"Authorization": f"Bearer {secret}"},
+    )
+    resp.raise_for_status()
+    result = resp.json()
+    logger.info(f"Periodic Zotero sync complete: {result.get('synced_users', 0)} users synced")
+    return result
+
+
 @celery_app.task(
     bind=True,
     name="delayed_referral_settlement_callback",

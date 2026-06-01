@@ -2,6 +2,7 @@
 Celery application configuration and setup.
 """
 import os
+from datetime import timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -32,6 +33,7 @@ celery_app.conf.update(
     task_routes={
         "upload_and_process_file": {"queue": "pdf_processing"},
         "delayed_referral_settlement_callback": {"queue": "user_processing"},
+        "periodic_zotero_sync": {"queue": "zotero_sync"},
     },
     worker_prefetch_multiplier=1,  # Process one task at a time
     task_acks_late=True,
@@ -52,6 +54,16 @@ celery_app.conf.update(
 )
 
 celery_app.autodiscover_tasks()
+
+_sync_interval = int(os.getenv("ZOTERO_SYNC_INTERVAL_SECONDS", str(24 * 3600)))
+
+celery_app.conf.beat_schedule = {
+    "periodic-zotero-sync": {
+        "task": "periodic_zotero_sync",
+        "schedule": timedelta(seconds=_sync_interval),
+        "options": {"queue": "zotero_sync"},
+    },
+}
 
 if __name__ == "__main__":
     celery_app.start()

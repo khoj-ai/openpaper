@@ -3,6 +3,7 @@ Webhook handlers for PDF processing service integration.
 """
 
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -36,7 +37,7 @@ from app.llm.citation_handler import CitationHandler
 from app.llm.operations import operations
 from app.schemas.responses import DataTableResult, PaperMetadataExtraction
 from app.schemas.user import CurrentUser
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -843,3 +844,47 @@ async def settle_referral(referral_id: str, db: Session = Depends(get_db)):
     )
 
     return {"success": True, "referral_id": str(referral.id)}
+
+
+@webhook_router.post("/internal/zotero-sync-all")
+async def trigger_zotero_sync_all(request: Request, db: Session = Depends(get_db)):
+    """
+    Internal endpoint called by the Celery Beat periodic task to sync new Zotero
+    annotations for all users whose items haven't been synced in the past 24 hours.
+    Auth: shared secret via Authorization header (JOBS_INTERNAL_SECRET env var).
+    """
+    from app.database.crud.zotero_import_crud import zotero_import_crud
+    from app.services.zotero_import import sync_batch
+
+    secret = os.getenv("JOBS_INTERNAL_SECRET", "")
+    if secret and request.headers.get("Authorization") != f"Bearer {secret}":
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    user_ids = zotero_import_crud.list_user_ids_due_for_sync(db)
+    logger.info(f"Periodic Zotero sync: found {len(user_ids)} users due for sync")
+
+    results = []
+    for user_id in user_ids:
+        user = user_crud.get(db, id=user_id)
+        if not user:
+            continue
+        try:
+            result = await sync_batch(db, user=user, limit=50)
+            results.append({"user_id": str(user_id), **result})
+            if result.get("new_annotations_count", 0) > 0:
+                track_event(
+                    "zotero_auto_sync",
+                    user_id=str(user_id),
+                    properties={
+                        "papers": result.get("synced_papers_count", 0),
+                        "annotations": result.get("new_annotations_count", 0),
+                    },
+                    db=db,
+                )
+        except Exception as e:
+            logger.error(f"Auto-sync failed for user {user_id}: {e}", exc_info=True)
+            results.append({"user_id": str(user_id), "error": str(e)})
+
+    synced_users = len([r for r in results if "error" not in r])
+    logger.info(f"Periodic Zotero sync complete: {synced_users}/{len(user_ids)} users synced successfully")
+    return {"synced_users": synced_users, "total_users": len(user_ids), "results": results}
