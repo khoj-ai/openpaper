@@ -20,7 +20,7 @@ class ZoteroDisconnectResponse(BaseModel):
 
 
 class ZoteroImportRequest(BaseModel):
-    limit: int = Field(default=50, ge=1, le=50)
+    item_keys: List[str] = Field(..., min_length=1, max_length=50)
 
 
 class ZoteroImportItemResult(BaseModel):
@@ -58,3 +58,18 @@ class ZoteroImportStatusItem(BaseModel):
 
 class ZoteroImportStatusListResponse(BaseModel):
     items: List[ZoteroImportStatusItem]
+
+
+class ZoteroLibraryItem(BaseModel):
+    zotero_item_key: str
+    title: str
+    authors: List[str]
+    date: Optional[str] = None
+    item_type: str
+    venue: Optional[str] = None
+    already_imported: bool
+
+
+class ZoteroLibraryResponse(BaseModel):
+    items: List[ZoteroLibraryItem]
+    remaining_slots: int

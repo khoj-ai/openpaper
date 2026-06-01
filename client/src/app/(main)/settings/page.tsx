@@ -2,17 +2,34 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+	Dialog,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle
+} from "@/components/ui/dialog";
+import {
+	DropdownMenu,
+	DropdownMenuCheckboxItem,
+	DropdownMenuContent,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { refreshActivePapers } from "@/hooks/useActivePapers";
 import { isPaperUploadAtLimit, useSubscription } from "@/hooks/useSubscription";
 import { fetchFromApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { Loader2 } from "lucide-react";
+import { ArrowUpDown, ListFilter, Loader2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 type ZoteroStatus = {
@@ -37,6 +54,256 @@ type ZoteroImportResponse = {
 	errors: { zotero_item_key: string; error: string }[];
 };
 
+type ZoteroLibraryItem = {
+	zotero_item_key: string;
+	title: string;
+	authors: string[];
+	date?: string;
+	item_type: "journalArticle" | "conferencePaper" | "preprint";
+	venue?: string;
+	already_imported: boolean;
+};
+
+type ZoteroLibraryResponse = {
+	items: ZoteroLibraryItem[];
+	remaining_slots: number;
+};
+
+const ITEM_TYPE_LABELS: Record<ZoteroLibraryItem["item_type"], string> = {
+	journalArticle: "Journal",
+	conferencePaper: "Conference",
+	preprint: "Preprint",
+};
+
+type SortBy = "dateModified" | "datePublished";
+
+function ZoteroLibraryModal({
+	open,
+	onOpenChange,
+	loading,
+	items,
+	remainingSlots,
+	selectedKeys,
+	onSelectionChange,
+	onImport,
+}: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	loading: boolean;
+	items: ZoteroLibraryItem[];
+	remainingSlots: number;
+	selectedKeys: Set<string>;
+	onSelectionChange: (keys: Set<string>) => void;
+	onImport: (keys: string[]) => void;
+}) {
+	const [sortBy, setSortBy] = useState<SortBy>("dateModified");
+	const [filterTypes, setFilterTypes] = useState<Set<string>>(
+		new Set(["journalArticle", "conferencePaper", "preprint"])
+	);
+
+	const displayItems = useMemo(() => {
+		const filtered = items.filter((i) => filterTypes.has(i.item_type));
+		if (sortBy === "datePublished") {
+			return [...filtered].sort((a, b) => {
+				if (!a.date && !b.date) return 0;
+				if (!a.date) return 1;
+				if (!b.date) return -1;
+				return b.date.localeCompare(a.date);
+			});
+		}
+		return filtered;
+	}, [items, sortBy, filterTypes]);
+
+	const importable = displayItems.filter((i) => !i.already_imported);
+	const selectedCount = selectedKeys.size;
+	const overLimit = selectedCount > remainingSlots;
+
+	const toggleKey = (key: string) => {
+		const next = new Set(selectedKeys);
+		if (next.has(key)) {
+			next.delete(key);
+		} else {
+			next.add(key);
+		}
+		onSelectionChange(next);
+	};
+
+	const selectAll = () => {
+		const selectable = importable.slice(0, remainingSlots).map((i) => i.zotero_item_key);
+		onSelectionChange(new Set(selectable));
+	};
+
+	const deselectAll = () => onSelectionChange(new Set());
+
+	const toggleFilterType = (type: string, checked: boolean) => {
+		const next = new Set(filterTypes);
+		checked ? next.add(type) : next.delete(type);
+		setFilterTypes(next);
+	};
+
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent className="sm:max-w-3xl">
+				<DialogHeader>
+					<DialogTitle>Select papers to import</DialogTitle>
+				</DialogHeader>
+
+				{loading ? (
+					<div className="flex items-center justify-center py-12">
+						<Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+						<span className="ml-2 text-sm text-muted-foreground">Loading library…</span>
+					</div>
+				) : items.length === 0 ? (
+					<p className="text-sm text-muted-foreground py-6 text-center">
+						No importable papers found in your Zotero library.
+					</p>
+				) : (
+					<>
+						<div className="space-y-2">
+							<p className="text-xs text-muted-foreground">
+								{importable.length} paper{importable.length === 1 ? "" : "s"} available
+								{" · "}
+								{remainingSlots} slot{remainingSlots === 1 ? "" : "s"} remaining
+							</p>
+							<div className="flex items-center justify-between">
+								<div className="flex items-center gap-2">
+									<DropdownMenu>
+										<DropdownMenuTrigger asChild>
+											<Button variant="outline" size="sm" className="h-7 text-xs gap-1">
+												<ArrowUpDown className="h-3 w-3" />
+												{sortBy === "dateModified" ? "Date modified" : "Date published"}
+											</Button>
+										</DropdownMenuTrigger>
+										<DropdownMenuContent align="start">
+											<DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
+												<DropdownMenuRadioItem value="dateModified">Date modified</DropdownMenuRadioItem>
+												<DropdownMenuRadioItem value="datePublished">Date published</DropdownMenuRadioItem>
+											</DropdownMenuRadioGroup>
+										</DropdownMenuContent>
+									</DropdownMenu>
+
+									<DropdownMenu>
+										<DropdownMenuTrigger asChild>
+											<Button variant="outline" size="sm" className="h-7 text-xs gap-1">
+												<ListFilter className="h-3 w-3" />
+												{filterTypes.size === 3
+													? "All types"
+													: `${filterTypes.size} type${filterTypes.size !== 1 ? "s" : ""}`}
+											</Button>
+										</DropdownMenuTrigger>
+										<DropdownMenuContent align="start">
+											{(["journalArticle", "conferencePaper", "preprint"] as const).map((type) => (
+												<DropdownMenuCheckboxItem
+													key={type}
+													checked={filterTypes.has(type)}
+													onCheckedChange={(checked) => toggleFilterType(type, !!checked)}
+												>
+													{ITEM_TYPE_LABELS[type]}
+												</DropdownMenuCheckboxItem>
+											))}
+										</DropdownMenuContent>
+									</DropdownMenu>
+								</div>
+
+								<div className="flex gap-3 text-xs text-muted-foreground">
+									<button
+										type="button"
+										className="underline underline-offset-2 hover:text-foreground transition-colors whitespace-nowrap"
+										onClick={selectAll}
+										disabled={importable.length === 0}
+									>
+										Select all
+									</button>
+									<button
+										type="button"
+										className="underline underline-offset-2 hover:text-foreground transition-colors whitespace-nowrap"
+										onClick={deselectAll}
+									>
+										Deselect all
+									</button>
+								</div>
+							</div>
+						</div>
+
+						<ScrollArea className="max-h-[50vh] border rounded-md">
+							<ul className="divide-y">
+								{displayItems.map((item) => {
+									const checked = selectedKeys.has(item.zotero_item_key);
+									const disabled = item.already_imported || (!checked && overLimit);
+									return (
+										<li
+											key={item.zotero_item_key}
+											className={`flex items-start gap-3 px-4 py-3 ${item.already_imported ? "opacity-50" : ""}`}
+										>
+											<Checkbox
+												id={item.zotero_item_key}
+												checked={item.already_imported ? true : checked}
+												disabled={disabled || item.already_imported}
+												onCheckedChange={() => toggleKey(item.zotero_item_key)}
+												className="mt-0.5 shrink-0"
+											/>
+											<div className="flex-1 min-w-0 space-y-1">
+												<label
+													htmlFor={item.zotero_item_key}
+													className={`text-sm font-medium leading-snug block ${item.already_imported ? "cursor-default" : "cursor-pointer"}`}
+												>
+													{item.title || "(Untitled)"}
+												</label>
+												<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+													<Badge variant={item.item_type === "journalArticle" ? "default" : item.item_type === "conferencePaper" ? "secondary" : "outline"} className="text-xs px-1.5 py-0">
+														{ITEM_TYPE_LABELS[item.item_type]}
+													</Badge>
+													{item.date && <span>{item.date.slice(0, 4)}</span>}
+													{item.venue && (
+														<span className="truncate max-w-[260px]">{item.venue}</span>
+													)}
+													{item.authors.length > 0 && (
+														<span className="truncate max-w-[260px]">
+															{item.authors.slice(0, 3).join(", ")}
+															{item.authors.length > 3 ? " et al." : ""}
+														</span>
+													)}
+													{item.already_imported && (
+														<Badge variant="outline" className="text-xs px-1.5 py-0 text-green-600 border-green-300">
+															Imported
+														</Badge>
+													)}
+												</div>
+											</div>
+										</li>
+									);
+								})}
+							</ul>
+						</ScrollArea>
+					</>
+				)}
+
+				<DialogFooter className="flex-col sm:flex-row items-center gap-2">
+					{!loading && overLimit && (
+						<p className="text-xs text-destructive flex-1">
+							Selection exceeds your remaining {remainingSlots} slot{remainingSlots === 1 ? "" : "s"}.
+						</p>
+					)}
+					{!loading && !overLimit && selectedCount > 0 && (
+						<p className="text-xs text-muted-foreground flex-1">
+							{selectedCount} paper{selectedCount === 1 ? "" : "s"} selected
+						</p>
+					)}
+					<Button variant="outline" onClick={() => onOpenChange(false)}>
+						Cancel
+					</Button>
+					<Button
+						disabled={selectedCount === 0 || overLimit || loading}
+						onClick={() => onImport(Array.from(selectedKeys))}
+					>
+						Import selected ({selectedCount})
+					</Button>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
 function SettingsContent() {
 	const { user, loading } = useAuth();
 	const router = useRouter();
@@ -49,8 +316,6 @@ function SettingsContent() {
 	const paperUploadsRemaining = subscription?.usage?.paper_uploads_remaining ?? null;
 	const paperUploadsTotal = subscription?.limits?.paper_uploads ?? null;
 	const paperUploadsUsed = subscription?.usage?.paper_uploads ?? null;
-	const zoteroImportLimit = Math.min(50, paperUploadsRemaining ?? 50);
-
 	const [zoteroStatus, setZoteroStatus] = useState<ZoteroStatus | null>(null);
 	const [zoteroLoading, setZoteroLoading] = useState(true);
 	const [zoteroActionLoading, setZoteroActionLoading] = useState(false);
@@ -60,6 +325,12 @@ function SettingsContent() {
 	const [importProgress, setImportProgress] = useState<number | null>(null);
 	const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 	const importDoneRef = useRef(false);
+
+	const [showLibraryModal, setShowLibraryModal] = useState(false);
+	const [libraryLoading, setLibraryLoading] = useState(false);
+	const [libraryItems, setLibraryItems] = useState<ZoteroLibraryItem[]>([]);
+	const [libraryRemainingSlots, setLibraryRemainingSlots] = useState(0);
+	const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
 
 	const fetchZoteroStatus = useCallback(async () => {
 		setZoteroLoading(true);
@@ -174,7 +445,24 @@ function SettingsContent() {
 		}
 	};
 
-	const handleZoteroImport = async () => {
+	const handleOpenLibraryModal = async () => {
+		setLibraryLoading(true);
+		setSelectedKeys(new Set());
+		setShowLibraryModal(true);
+		try {
+			const data: ZoteroLibraryResponse = await fetchFromApi("/api/zotero/library");
+			setLibraryItems(data.items ?? []);
+			setLibraryRemainingSlots(data.remaining_slots ?? 0);
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Failed to load Zotero library.");
+			setShowLibraryModal(false);
+		} finally {
+			setLibraryLoading(false);
+		}
+	};
+
+	const handleZoteroImport = async (keysToImport: string[]) => {
+		setShowLibraryModal(false);
 		setZoteroImportLoading(true);
 		setImportProgress(0);
 
@@ -210,7 +498,7 @@ function SettingsContent() {
 		try {
 			const data: ZoteroImportResponse = await fetchFromApi("/api/zotero/import", {
 				method: "POST",
-				body: JSON.stringify({ limit: zoteroImportLimit }),
+				body: JSON.stringify({ item_keys: keysToImport }),
 			});
 			const parts: string[] = [];
 			if (data.imported_count > 0) {
@@ -219,19 +507,38 @@ function SettingsContent() {
 			if (data.skipped_already_imported > 0) {
 				parts.push(`${data.skipped_already_imported} already imported`);
 			}
-			const errorCount = data.errors?.length ?? 0;
-			if (errorCount > 0) {
-				parts.push(`${errorCount} failed`);
-			}
-			if (data.imported_count > 0) {
-				toast.success(parts.join("; ") + ". Processing may take a minute per paper.");
-			} else if (errorCount > 0) {
-				toast.error(parts.join("; ") || "Import failed.");
-			} else if (parts.length > 0) {
-				toast.success(parts.join("; ") + ".");
-			} else {
-				toast.info("No new papers to import.");
-			}
+		const errorCount = data.errors?.length ?? 0;
+		const hasDetailToast = errorCount > 0 && !!data.errors?.length;
+		if (errorCount > 0 && !hasDetailToast) {
+			parts.push(`${errorCount} failed`);
+		}
+		if (data.imported_count > 0) {
+			toast.success(parts.join("; ") + ". Processing may take a minute per paper.");
+		} else if (errorCount > 0 && !hasDetailToast) {
+			toast.error(parts.join("; ") || "Import failed.");
+		} else if (parts.length > 0) {
+			toast.success(parts.join("; ") + ".");
+		} else if (!hasDetailToast) {
+			toast.info("No new papers to import.");
+		}
+		if (hasDetailToast) {
+			const keyToTitle = new Map(libraryItems.map((i) => [i.zotero_item_key, i.title]));
+			toast.error("Some papers could not be imported", {
+				description: (
+					<ul className="mt-1 space-y-2 list-none">
+						{data.errors.map((e) => (
+							<li key={e.zotero_item_key}>
+								<span className="font-medium block">
+									{keyToTitle.get(e.zotero_item_key) ?? e.zotero_item_key}
+								</span>
+								<span className="block text-xs mt-0.5 opacity-75">{e.error}</span>
+							</li>
+						))}
+					</ul>
+				),
+				duration: 15000,
+			});
+		}
 			finishImport();
 			await refreshActivePapers();
 			await refetchSubscription();
@@ -278,6 +585,7 @@ function SettingsContent() {
 	}
 
 	return (
+		<>
 		<div className="max-w-2xl p-6 space-y-6">
 			<h1 className="text-2xl font-bold">Settings</h1>
 
@@ -363,7 +671,7 @@ function SettingsContent() {
 				<div className="flex flex-wrap gap-2">
 					<Button
 						type="button"
-						onClick={handleZoteroImport}
+						onClick={handleOpenLibraryModal}
 						disabled={zoteroImportLoading || zoteroActionLoading || atPaperLimit}
 					>
 						{zoteroImportLoading ? (
@@ -407,6 +715,18 @@ function SettingsContent() {
 				</div>
 			</div>
 		</div>
+
+		<ZoteroLibraryModal
+			open={showLibraryModal}
+			onOpenChange={setShowLibraryModal}
+			loading={libraryLoading}
+			items={libraryItems}
+			remainingSlots={libraryRemainingSlots}
+			selectedKeys={selectedKeys}
+			onSelectionChange={setSelectedKeys}
+			onImport={handleZoteroImport}
+		/>
+		</>
 	);
 }
 

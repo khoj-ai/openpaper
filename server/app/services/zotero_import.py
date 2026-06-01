@@ -399,48 +399,75 @@ def _try_backfill_or_apply_annotation(
 async def _resolve_pdf_bytes(
     client: ZoteroApiClient,
     item: Dict[str, Any],
-) -> Tuple[Optional[bytes], str, Optional[str], Optional[str], List[Dict[str, Any]]]:
+) -> Tuple[Optional[bytes], str, Optional[str], Optional[str], List[Dict[str, Any]], Optional[str]]:
     """
-    Returns (pdf_bytes, import_source, attachment_key, source_url, annotations).
+    Returns (pdf_bytes, import_source, attachment_key, source_url, annotations, failure_reason).
+    failure_reason is set when pdf_bytes is None, describing why the PDF could not be retrieved.
     """
     item_key = item.get("key", "")
     data = item.get("data", {})
     children = await asyncio.to_thread(client.get_children, item_key)
     pdf_attachment = client.find_pdf_attachment(children)
 
+    failure_reason: Optional[str] = None
+
     if pdf_attachment:
         attachment_key = pdf_attachment.get("key", "")
-        try:
-            pdf_bytes = await asyncio.to_thread(
-                client.download_attachment_file, attachment_key
+        link_mode = (pdf_attachment.get("data", {}).get("linkMode") or "").lower()
+        if link_mode == "linked_file":
+            failure_reason = (
+                "PDF is a linked local file and cannot be accessed via the Zotero API. "
+                "In Zotero, right-click the attachment and choose \"Store Copy of File\"."
             )
-            is_valid, err = await validate_pdf_content(pdf_bytes, source="zotero")
-            if is_valid:
-                attachment_children = await asyncio.to_thread(
-                    client.get_children, attachment_key
+        elif link_mode == "linked_url":
+            failure_reason = (
+                "PDF is a linked URL (e.g. a paywalled journal page) and cannot be downloaded directly. "
+                "In Zotero, attach the PDF file itself instead of a URL."
+            )
+        else:
+            try:
+                pdf_bytes = await asyncio.to_thread(
+                    client.download_attachment_file, attachment_key
                 )
-                annotations = client.get_annotations_for_attachment(attachment_children)
-                return (
-                    pdf_bytes,
-                    ZoteroImportSource.PDF_ATTACHMENT,
-                    attachment_key,
-                    None,
-                    annotations,
+                is_valid, err = await validate_pdf_content(pdf_bytes, source="zotero")
+                if is_valid:
+                    attachment_children = await asyncio.to_thread(
+                        client.get_children, attachment_key
+                    )
+                    annotations = client.get_annotations_for_attachment(attachment_children)
+                    return (
+                        pdf_bytes,
+                        ZoteroImportSource.PDF_ATTACHMENT,
+                        attachment_key,
+                        None,
+                        annotations,
+                        None,
+                    )
+                logger.warning(
+                    "Zotero PDF attachment invalid for %s: %s", item_key, err
                 )
-            logger.warning(
-                "Zotero PDF attachment invalid for %s: %s", item_key, err
-            )
-        except Exception as e:
-            logger.warning(
-                "Failed to download Zotero PDF for %s: %s", item_key, e, exc_info=True
-            )
+                failure_reason = f"PDF attachment could not be validated: {err}"
+            except Exception as e:
+                logger.warning(
+                    "Failed to download Zotero PDF for %s: %s", item_key, e, exc_info=True
+                )
+                failure_reason = "PDF attachment download failed."
+    else:
+        failure_reason = "No PDF attached to this item in Zotero."
 
-    for url in client.resolve_item_urls(data):
+    urls = list(client.resolve_item_urls(data))
+    for url in urls:
         is_valid, pdf_bytes, err = await validate_url_and_fetch_pdf(url)
         if is_valid and pdf_bytes:
-            return pdf_bytes, ZoteroImportSource.URL, None, url, []
+            return pdf_bytes, ZoteroImportSource.URL, None, url, [], None
 
-    return None, ZoteroImportSource.URL, None, None, []
+    if urls:
+        failure_reason = (
+            "Could not download a PDF from the item's URL. "
+            "The page may require authentication or does not link to a PDF directly."
+        )
+
+    return None, ZoteroImportSource.URL, None, None, [], failure_reason
 
 
 def _resolve_zotero_attachment_info(
@@ -723,14 +750,14 @@ async def _import_one_paper(
     upload_job_id: Optional[str] = None
 
     try:
-        pdf_bytes, import_source, attachment_key, source_url, annotations = (
+        pdf_bytes, import_source, attachment_key, source_url, annotations, failure_reason = (
             await _resolve_pdf_bytes(client, item)
         )
         if not pdf_bytes:
             return {
                 "status": "error",
                 "zotero_item_key": item_key,
-                "error": "No PDF available from attachment or URL",
+                "error": failure_reason or "No PDF available from attachment or URL",
             }
 
         paper_upload_job = paper_upload_job_crud.create(
@@ -903,14 +930,227 @@ def _upload_pdf_to_s3(pdf_bytes: bytes, safe_filename: str) -> Tuple[str, str]:
         loop.close()
 
 
+def list_library(
+    db: Session,
+    *,
+    user: CurrentUser,
+    limit: int = 100,
+) -> Dict[str, Any]:
+    """
+    Fetch and annotate importable items from the user's Zotero library.
+
+    Returns up to `limit` items sorted by dateModified (Zotero default), each
+    annotated with an `already_imported` flag.
+    """
+    connection = zotero_crud.get_by_user_id(db, user_id=user.id)
+    if not connection:
+        raise ValueError("Zotero account not connected")
+
+    client = ZoteroApiClient(
+        zotero_user_id=connection.zotero_user_id,
+        api_key=connection.api_key,
+    )
+
+    items: List[Dict[str, Any]] = []
+    page_size = 25
+    start = 0
+    while len(items) < limit:
+        batch = client.get_top_importable_items(limit=page_size, start=start)
+        if not batch:
+            break
+        items.extend(batch[: limit - len(items)])
+        if len(batch) < page_size:
+            break
+        start += page_size
+
+    imported_keys: set = set(
+        row.zotero_item_key
+        for row in db.query(ZoteroImportedItem.zotero_item_key)
+        .join(Paper, ZoteroImportedItem.paper_id == Paper.id)
+        .filter(
+            ZoteroImportedItem.user_id == user.id,
+            ZoteroImportedItem.status == ZoteroImportStatus.COMPLETED,
+            ZoteroImportedItem.paper_id.isnot(None),
+        )
+        .all()
+    )
+
+    result = []
+    for item in items:
+        data = item.get("data", {})
+        item_key = item.get("key", "")
+        creators = data.get("creators") or []
+        authors: List[str] = []
+        for c in creators:
+            if c.get("creatorType") not in ("author", None):
+                continue
+            first = (c.get("firstName") or "").strip()
+            last = (c.get("lastName") or "").strip()
+            name = (c.get("name") or "").strip()
+            if name:
+                authors.append(name)
+            elif first or last:
+                authors.append(f"{first} {last}".strip())
+
+        item_type = data.get("itemType", "")
+        venue = (
+            data.get("publicationTitle")
+            or data.get("proceedingsTitle")
+            or data.get("conferenceName")
+            or data.get("repository")
+            or None
+        )
+        result.append(
+            {
+                "zotero_item_key": item_key,
+                "title": (data.get("title") or "").strip(),
+                "authors": authors,
+                "date": _parse_zotero_date(data.get("date")),
+                "item_type": item_type,
+                "venue": venue,
+                "already_imported": item_key in imported_keys,
+            }
+        )
+
+    remaining = get_remaining_paper_upload_slots(db, user)
+    return {"items": result, "remaining_slots": remaining}
+
+
+async def _discover_candidates_by_keys(
+    db: Session,
+    *,
+    client: ZoteroApiClient,
+    user: CurrentUser,
+    item_keys: List[str],
+) -> Tuple[
+    List[Dict[str, Any]],
+    List[Tuple[Dict[str, Any], str, str]],
+    int,
+    List[Dict[str, str]],
+]:
+    """
+    Resolve specific Zotero item keys into import candidates.
+
+    Mirrors the dedup/linking logic of _discover_import_candidates but targets
+    only the caller-specified keys instead of scanning the full library.
+    Returns (candidates, deferred_links, skipped_already_imported, errors).
+    """
+    candidates: List[Dict[str, Any]] = []
+    deferred_links: List[Tuple[Dict[str, Any], str, str]] = []
+    errors: List[Dict[str, str]] = []
+    skipped_already_imported = 0
+    batch_doi_claimed: Dict[str, str] = {}
+    batch_title_claimed: Dict[str, str] = {}
+
+    max_new, upload_err = _compute_max_new_imports(db, user, len(item_keys))
+    if max_new == 0:
+        for key in item_keys:
+            errors.append({"zotero_item_key": key, "error": upload_err or "Upload limit"})
+        return candidates, deferred_links, skipped_already_imported, errors
+
+    items = client.get_items_by_keys(item_keys)
+
+    for item in items:
+        if len(candidates) >= max_new:
+            break
+
+        item_key = item.get("key", "")
+        if not item_key:
+            continue
+
+        item_data = item.get("data", {})
+        if (
+            not (item_data.get("title") or "").strip()
+            and not (item_data.get("DOI") or "").strip()
+            and not (item_data.get("url") or "").strip()
+        ):
+            continue
+
+        existing_import = zotero_import_crud.get_by_item_key(
+            db, user_id=user.id, zotero_item_key=item_key
+        )
+        if existing_import:
+            paper_still_exists = False
+            if existing_import.paper_id:
+                linked_paper = paper_crud.get(
+                    db, id=str(existing_import.paper_id), user=user
+                )
+                paper_still_exists = bool(linked_paper)
+
+            if (
+                existing_import.status == ZoteroImportStatus.COMPLETED
+                and paper_still_exists
+            ):
+                skipped_already_imported += 1
+                continue
+
+            db.delete(existing_import)
+            db.commit()
+
+        doi = normalize_doi(item_data.get("DOI"))
+        if doi:
+            target_paper = paper_crud.get_by_doi_for_user(
+                db, user_id=user.id, doi=doi
+            )
+            if target_paper:
+                await _link_zotero_item_to_existing_paper(
+                    db,
+                    client=client,
+                    item=item,
+                    item_key=item_key,
+                    paper=target_paper,
+                    user=user,
+                )
+                skipped_already_imported += 1
+                continue
+
+            if doi in batch_doi_claimed:
+                deferred_links.append((item, item_key, batch_doi_claimed[doi]))
+                skipped_already_imported += 1
+                continue
+
+        norm_title = normalize_paper_title(item_data.get("title"))
+        if norm_title:
+            target_paper = paper_crud.get_by_normalized_title_for_user(
+                db,
+                user_id=user.id,
+                title=str(item_data.get("title") or ""),
+            )
+            if target_paper:
+                await _link_zotero_item_to_existing_paper(
+                    db,
+                    client=client,
+                    item=item,
+                    item_key=item_key,
+                    paper=target_paper,
+                    user=user,
+                )
+                skipped_already_imported += 1
+                continue
+
+            if norm_title in batch_title_claimed:
+                deferred_links.append((item, item_key, batch_title_claimed[norm_title]))
+                skipped_already_imported += 1
+                continue
+
+        if doi:
+            batch_doi_claimed[doi] = item_key
+        if norm_title:
+            batch_title_claimed[norm_title] = item_key
+
+        candidates.append(item)
+
+    return candidates, deferred_links, skipped_already_imported, errors
+
+
 async def import_batch(
     db: Session,
     *,
     user: CurrentUser,
-    limit: int = 50,
+    item_keys: List[str],
 ) -> Dict[str, Any]:
     """
-    Import journal articles, conference papers, and preprints directly from Zotero.
+    Import the specified Zotero items by key.
 
     Zotero already provides authoritative metadata (title, authors, abstract, DOI,
     publish date, tags, annotations), so this path skips the Celery jobs worker and
@@ -928,8 +1168,8 @@ async def import_batch(
     )
 
     candidates, deferred_links, skipped_already_imported, errors = (
-        await _discover_import_candidates(
-            db, client=client, user=user, limit=limit
+        await _discover_candidates_by_keys(
+            db, client=client, user=user, item_keys=item_keys
         )
     )
 

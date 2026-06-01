@@ -5,10 +5,7 @@ from app.database.crud.zotero_crud import zotero_crud
 from app.database.crud.zotero_import_crud import zotero_import_crud
 from app.database.database import get_db
 from app.database.telemetry import track_event
-from app.helpers.subscription_limits import (
-    can_user_upload_paper,
-    get_remaining_paper_upload_slots,
-)
+from app.helpers.subscription_limits import can_user_upload_paper
 from app.schemas.user import CurrentUser
 from app.schemas.zotero import (
     ZoteroImportError,
@@ -17,8 +14,10 @@ from app.schemas.zotero import (
     ZoteroImportResponse,
     ZoteroImportStatusItem,
     ZoteroImportStatusListResponse,
+    ZoteroLibraryItem,
+    ZoteroLibraryResponse,
 )
-from app.services.zotero_import import import_batch
+from app.services.zotero_import import import_batch, list_library
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -27,13 +26,40 @@ logger = logging.getLogger(__name__)
 zotero_router = APIRouter()
 
 
+@zotero_router.get("/library", response_model=ZoteroLibraryResponse)
+def zotero_library(
+    current_user: CurrentUser = Depends(get_required_user),
+    db: Session = Depends(get_db),
+):
+    """List importable journal articles, conference papers, and preprints from the user's Zotero library."""
+    connection = zotero_crud.get_by_user_id(db, user_id=current_user.id)
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Zotero account not connected",
+        )
+    try:
+        result = list_library(db, user=current_user)
+    except Exception as e:
+        logger.error("Zotero library fetch failed: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to fetch Zotero library",
+        ) from e
+
+    return ZoteroLibraryResponse(
+        items=[ZoteroLibraryItem(**item) for item in result["items"]],
+        remaining_slots=result["remaining_slots"],
+    )
+
+
 @zotero_router.post("/import", response_model=ZoteroImportResponse)
 async def zotero_import(
     request: ZoteroImportRequest,
     current_user: CurrentUser = Depends(get_required_user),
     db: Session = Depends(get_db),
 ):
-    """Import up to 50 journal articles, conference papers, and preprints from Zotero (PDF or URL fallback)."""
+    """Import selected journal articles, conference papers, and preprints from Zotero (PDF or URL fallback)."""
     connection = zotero_crud.get_by_user_id(db, user_id=current_user.id)
     if not connection:
         raise HTTPException(
@@ -48,9 +74,8 @@ async def zotero_import(
             detail=upload_err or "Upload limit reached",
         )
 
-    effective_limit = min(request.limit, get_remaining_paper_upload_slots(db, current_user))
     try:
-        result = await import_batch(db, user=current_user, limit=effective_limit)
+        result = await import_batch(db, user=current_user, item_keys=request.item_keys)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

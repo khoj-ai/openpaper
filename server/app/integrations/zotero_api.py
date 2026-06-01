@@ -85,6 +85,29 @@ class ZoteroApiClient:
             if item.get("data", {}).get("itemType") in IMPORTABLE_ITEM_TYPES
         ]
 
+    def get_items_by_keys(self, item_keys: List[str]) -> List[Dict[str, Any]]:
+        """Fetch specific Zotero items by their item keys.
+
+        Zotero supports up to 50 keys per request via the itemKey query param.
+        """
+        if not item_keys:
+            return []
+        results: List[Dict[str, Any]] = []
+        batch_size = 50
+        for i in range(0, len(item_keys), batch_size):
+            batch = item_keys[i : i + batch_size]
+            url = f"{self._user_base}/items"
+            params = {"itemKey": ",".join(batch), "limit": len(batch)}
+            response = self._request("GET", url, params=params)
+            items = response.json()
+            if isinstance(items, list):
+                results.extend(
+                    item
+                    for item in items
+                    if item.get("data", {}).get("itemType") in IMPORTABLE_ITEM_TYPES
+                )
+        return results
+
     def get_children(self, item_key: str) -> List[Dict[str, Any]]:
         url = f"{self._user_base}/items/{item_key}/children"
         response = self._request("GET", url, params={"limit": 100})
