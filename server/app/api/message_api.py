@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import AsyncGenerator, List, Optional, Union
 
 from app.auth.dependencies import get_required_user
+from app.database.crud.artifact_crud import artifact_crud
 from app.database.crud.conversation_crud import conversation_crud
 from app.database.crud.message_crud import MessageCreate, message_crud
 from app.database.crud.paper_crud import paper_crud
@@ -14,7 +15,7 @@ from app.database.crud.projects.project_conversation_crud import (
 from app.database.crud.projects.project_crud import project_crud
 from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
-from app.database.models import ConversableType
+from app.database.models import ArtifactKind, ConversableType
 from app.database.telemetry import track_event
 from app.llm.base import LLMProvider
 from app.llm.citation_handler import CitationHandler
@@ -255,9 +256,6 @@ async def chat_message_multipaper(
                 # Save the complete message to the database
                 full_content = "".join(content_chunks)
 
-                assistant_bucket = (
-                    {"artifacts": artifacts_collected} if artifacts_collected else None
-                )
                 assistant_trace = (
                     evidence_collection.to_trace_dict() if evidence_collection else None
                 )
@@ -292,19 +290,31 @@ async def chat_message_multipaper(
                     user=current_user,
                 )
 
-                # Save assistant message with content, evidence, artifacts, trace
-                message_crud.create(
+                # Save assistant message with content, evidence, and trace.
+                # Artifacts go into their own table, linked back via message_id.
+                assistant_message = message_crud.create(
                     db,
                     obj_in=MessageCreate(
                         conversation_id=uuid.UUID(request.conversation_id),
                         role="assistant",
                         content=full_content,
                         references=evidence if evidence else None,
-                        bucket=assistant_bucket,
                         trace=assistant_trace,
                     ),
                     user=current_user,
                 )
+
+                if assistant_message and artifacts_collected:
+                    artifact_crud.bulk_create_for_message(
+                        db,
+                        message=assistant_message,
+                        conversation=conversation,
+                        items=[
+                            (ArtifactKind.CITATION, payload)
+                            for payload in artifacts_collected
+                        ],
+                        user=current_user,
+                    )
 
                 # Rename the conversation based on the chat history
                 operations.rename_conversation(
