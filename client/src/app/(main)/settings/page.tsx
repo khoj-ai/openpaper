@@ -27,7 +27,7 @@ import { refreshActivePapers } from "@/hooks/useActivePapers";
 import { isPaperUploadAtLimit, useSubscription } from "@/hooks/useSubscription";
 import { fetchFromApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { ArrowUpDown, ListFilter, Loader2 } from "lucide-react";
+import { ArrowUpDown, ListFilter, Loader2, Search } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -100,9 +100,18 @@ function ZoteroLibraryModal({
 	const [filterTypes, setFilterTypes] = useState<Set<string>>(
 		new Set(["journalArticle", "conferencePaper", "preprint"])
 	);
+	const [searchQuery, setSearchQuery] = useState("");
 
 	const displayItems = useMemo(() => {
-		const filtered = items.filter((i) => filterTypes.has(i.item_type));
+		let filtered = items.filter((i) => filterTypes.has(i.item_type));
+		if (searchQuery.trim()) {
+			const term = searchQuery.toLowerCase();
+			filtered = filtered.filter(
+				(i) =>
+					i.title?.toLowerCase().includes(term) ||
+					i.authors?.join(" ").toLowerCase().includes(term)
+			);
+		}
 		if (sortBy === "datePublished") {
 			return [...filtered].sort((a, b) => {
 				if (!a.date && !b.date) return 0;
@@ -112,10 +121,11 @@ function ZoteroLibraryModal({
 			});
 		}
 		return filtered;
-	}, [items, sortBy, filterTypes]);
+	}, [items, sortBy, filterTypes, searchQuery]);
 
 	const importable = displayItems.filter((i) => !i.already_imported);
 	const selectedCount = selectedKeys.size;
+	const slotsRemaining = Math.max(0, remainingSlots - selectedCount);
 	const overLimit = selectedCount > remainingSlots;
 
 	const toggleKey = (key: string) => {
@@ -159,13 +169,22 @@ function ZoteroLibraryModal({
 					</p>
 				) : (
 					<>
-						<div className="space-y-2">
-							<p className="text-xs text-muted-foreground">
-								{importable.length} paper{importable.length === 1 ? "" : "s"} available
-								{" · "}
-								{remainingSlots} slot{remainingSlots === 1 ? "" : "s"} remaining
-							</p>
-							<div className="flex items-center justify-between">
+					<div className="space-y-2">
+						<p className="text-xs text-muted-foreground">
+							{importable.length} paper{importable.length === 1 ? "" : "s"} available
+							{" · "}
+							{slotsRemaining} slot{slotsRemaining === 1 ? "" : "s"} remaining
+						</p>
+						<div className="relative">
+							<Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+							<Input
+								placeholder="Search by title or author…"
+								value={searchQuery}
+								onChange={(e) => setSearchQuery(e.target.value)}
+								className="pl-7 h-8 text-sm focus-visible:ring-0 focus-visible:ring-offset-0"
+							/>
+						</div>
+						<div className="flex items-center justify-between">
 								<div className="flex items-center gap-2">
 									<DropdownMenu>
 										<DropdownMenuTrigger asChild>
@@ -227,6 +246,11 @@ function ZoteroLibraryModal({
 
 						<ScrollArea className="max-h-[50vh] border rounded-md">
 							<ul className="divide-y">
+								{displayItems.length === 0 && (
+									<li className="px-4 py-8 text-center text-sm text-muted-foreground">
+										No papers match your search.
+									</li>
+								)}
 								{displayItems.map((item) => {
 									const checked = selectedKeys.has(item.zotero_item_key);
 									const disabled = item.already_imported || (!checked && overLimit);
@@ -523,7 +547,7 @@ function SettingsContent() {
 		}
 		if (hasDetailToast) {
 			const keyToTitle = new Map(libraryItems.map((i) => [i.zotero_item_key, i.title]));
-			toast.error("Some papers could not be imported", {
+			toast.error("", {
 				description: (
 					<ul className="mt-1 space-y-2 list-none">
 						{data.errors.map((e) => (
