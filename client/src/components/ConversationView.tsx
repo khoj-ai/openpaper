@@ -278,11 +278,9 @@ export const ConversationView = ({
 				>
 					{msg.content}
 				</Markdown>
-				{(() => {
-					const artifacts = msg.artifacts ?? msg.bucket?.artifacts;
-					if (!artifacts || artifacts.length === 0) return null;
-					return <CitationArtifactCard artifacts={artifacts} />;
-				})()}
+				{msg.artifacts && msg.artifacts.length > 0 && (
+					<CitationArtifactCard artifacts={msg.artifacts} />
+				)}
 				{msg.references && msg.references["citations"]?.length > 0 ? (
 					<div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
 						<div
@@ -375,6 +373,41 @@ export const ConversationView = ({
 								{messages.length > 0 && memoizedMessages}
 							</>
 						)}
+						{isStreaming && (
+							<div className="flex items-center gap-3 p-2">
+								<Loader className="animate-spin w-6 h-6 text-blue-500 shrink-0" />
+								<div className="text-sm text-secondary-foreground w-full">
+									{displayedText}
+									{isTyping && <span className="animate-pulse">|</span>}
+									{statusMessageHistory.length > 0 && (
+										<div className="text-xs text-gray-500 mt-1">
+											<div className="flex justify-between items-center">
+												<span>{statusMessageHistory[statusMessageHistory.length - 1].message}</span>
+												<span className="ml-2 text-gray-400 tabular-nums">({elapsedTime}s)</span>
+											</div>
+											{statusMessageHistory.length > 1 && (
+												<div className="mt-1">
+													<button onClick={() => setIsHistoryOpen(!isHistoryOpen)} className="flex items-center text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+														{isHistoryOpen ? <ChevronUp className="w-4 h-4 mr-1" /> : <ChevronDown className="w-4 h-4 mr-1" />}
+														<span>Progress</span>
+													</button>
+													{isHistoryOpen && (
+														<ul className="mt-2 border-l border-gray-300 dark:border-gray-600">
+															{statusMessageHistory.slice(0, -1).reverse().map((status, index) => (
+																<li key={index} className="relative ml-4 mb-1 text-gray-400">
+																	<div className="absolute w-2 h-2 bg-gray-400 rounded-full top-1.5 -left-5 dark:bg-gray-500"></div>
+																	{status.message}
+																</li>
+															))}
+														</ul>
+													)}
+												</div>
+											)}
+										</div>
+									)}
+								</div>
+							</div>
+						)}
 						{isStreaming && streamingChunks.length > 0 && (
 							<div className="relative group prose dark:prose-invert max-w-full! rounded-lg w-full text-primary dark:text-primary-foreground transition-all duration-300 ease-in-out">
 								<AnimatedMarkdown
@@ -425,41 +458,6 @@ export const ConversationView = ({
 									message={streamingChunks.join("")}
 									references={streamingReferences}
 								/>
-							</div>
-						)}
-						{isStreaming && (
-							<div className="flex items-center gap-3 p-2">
-								<Loader className="animate-spin w-6 h-6 text-blue-500 shrink-0" />
-								<div className="text-sm text-secondary-foreground w-full">
-									{displayedText}
-									{isTyping && <span className="animate-pulse">|</span>}
-									{statusMessageHistory.length > 0 && (
-										<div className="text-xs text-gray-500 mt-1">
-											<div className="flex justify-between items-center">
-												<span>{statusMessageHistory[statusMessageHistory.length - 1].message}</span>
-												<span className="ml-2 text-gray-400 tabular-nums">({elapsedTime}s)</span>
-											</div>
-											{statusMessageHistory.length > 1 && (
-												<div className="mt-1">
-													<button onClick={() => setIsHistoryOpen(!isHistoryOpen)} className="flex items-center text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
-														{isHistoryOpen ? <ChevronUp className="w-4 h-4 mr-1" /> : <ChevronDown className="w-4 h-4 mr-1" />}
-														<span>Progress</span>
-													</button>
-													{isHistoryOpen && (
-														<ul className="mt-2 border-l border-gray-300 dark:border-gray-600">
-															{statusMessageHistory.slice(0, -1).reverse().map((status, index) => (
-																<li key={index} className="relative ml-4 mb-1 text-gray-400">
-																	<div className="absolute w-2 h-2 bg-gray-400 rounded-full top-1.5 -left-5 dark:bg-gray-500"></div>
-																	{status.message}
-																</li>
-															))}
-														</ul>
-													)}
-												</div>
-											)}
-										</div>
-									)}
-								</div>
 							</div>
 						)}
 						<div ref={messagesEndRef} />

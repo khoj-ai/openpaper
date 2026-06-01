@@ -87,11 +87,9 @@ export interface ChatMessage {
     role: 'user' | 'assistant';
     content: string;
     references?: Reference;
-    // First-party artifacts (e.g. citations) produced for this turn. `artifacts`
-    // is set for freshly-streamed messages; persisted messages carry them under
-    // `bucket.artifacts` as returned by the server.
+    // First-party artifacts (e.g. citations) produced for this turn. Set for
+    // both freshly-streamed and persisted/reloaded messages.
     artifacts?: CitationArtifact[];
-    bucket?: { artifacts?: CitationArtifact[] };
     // Agent trajectory (tool calls + per-citation subagent steps) for this turn.
     trace?: MessageTrace;
 }
