@@ -328,6 +328,70 @@ function ZoteroLibraryModal({
 	);
 }
 
+function ZoteroGuideModal({
+	open,
+	onOpenChange,
+}: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+}) {
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent className="sm:max-w-2xl">
+				<DialogHeader>
+					<DialogTitle>How to connect your Zotero account</DialogTitle>
+				</DialogHeader>
+				<ol className="space-y-4 text-sm">
+					<li className="flex gap-3">
+						<span className="font-semibold shrink-0">1.</span>
+						<div>
+							<p className="font-medium">Log in to your Zotero account on the web</p>
+							<p className="text-muted-foreground mt-0.5">
+								Go to{" "}
+								<a
+									href="https://www.zotero.org/user/login"
+									target="_blank"
+									rel="noopener noreferrer"
+									className="underline underline-offset-2 hover:text-foreground"
+								>
+									zotero.org
+								</a>{" "}
+								and sign in (or create a free account).
+							</p>
+						</div>
+					</li>
+				<li className="flex gap-3">
+					<span className="font-semibold shrink-0">2.</span>
+					<div className="space-y-2">
+						<p className="font-medium">Sync with your Zotero desktop app</p>
+						<p className="text-muted-foreground mt-0.5">
+							Open the Zotero desktop app and click the sync button (the circular arrow) in the toolbar to make sure your library is up to date.
+						</p>
+						<img
+							src="/zotero-desktop-sync-button.png"
+							alt="Zotero sync button location in the toolbar"
+							className="border w-full object-cover"
+						/>
+					</div>
+				</li>
+					<li className="flex gap-3">
+						<span className="font-semibold shrink-0">3.</span>
+						<div>
+							<p className="font-medium">Click &quot;Connect Zotero&quot; here</p>
+							<p className="text-muted-foreground mt-0.5">
+								You&apos;ll be redirected to Zotero to authorize Open Paper, then brought back to this page.
+							</p>
+						</div>
+					</li>
+				</ol>
+				<DialogFooter>
+					<Button onClick={() => onOpenChange(false)}>Got it</Button>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
 function SettingsContent() {
 	const { user, loading } = useAuth();
 	const router = useRouter();
@@ -350,6 +414,7 @@ function SettingsContent() {
 	const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 	const importDoneRef = useRef(false);
 
+	const [showZoteroGuide, setShowZoteroGuide] = useState(false);
 	const [showLibraryModal, setShowLibraryModal] = useState(false);
 	const [libraryLoading, setLibraryLoading] = useState(false);
 	const [libraryItems, setLibraryItems] = useState<ZoteroLibraryItem[]>([]);
@@ -662,11 +727,18 @@ function SettingsContent() {
 									Zotero user ID: {zoteroStatus.zotero_user_id}
 								</p>
 							)}
-							{!zoteroLoading && !zoteroStatus?.connected && (
-								<p className="text-sm text-muted-foreground">
-									Link your Zotero library to Open Paper.
-								</p>
-							)}
+						{!zoteroLoading && !zoteroStatus?.connected && (
+							<p className="text-sm text-muted-foreground">
+								Link your Zotero library to Open Paper.{" "}
+								<button
+									type="button"
+									onClick={() => setShowZoteroGuide(true)}
+									className="underline underline-offset-2 hover:text-foreground transition-colors"
+								>
+									Show Detailed Guide
+								</button>
+							</p>
+						)}
 						</div>
 						{zoteroLoading ? (
 							<Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
@@ -750,6 +822,7 @@ function SettingsContent() {
 			onSelectionChange={setSelectedKeys}
 			onImport={handleZoteroImport}
 		/>
+		<ZoteroGuideModal open={showZoteroGuide} onOpenChange={setShowZoteroGuide} />
 		</>
 	);
 }
