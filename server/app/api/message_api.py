@@ -207,9 +207,11 @@ async def chat_message_multipaper(
                         else:
                             logger.debug(f"received chunks: {chunk}")
 
-                if (
-                    evidence_collection is None
-                    or len(evidence_collection.evidence) == 0
+                # Artifacts (e.g. a citation card from find_citation) count as
+                # a real outcome — only short-circuit if we have neither.
+                if evidence_collection is None or (
+                    len(evidence_collection.evidence) == 0
+                    and len(evidence_collection.artifacts) == 0
                 ):
                     json_response = json.dumps(
                         {
