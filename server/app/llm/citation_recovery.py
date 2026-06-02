@@ -39,11 +39,13 @@ logger = logging.getLogger(__name__)
 CONFIDENCE_THRESHOLD = 0.7
 MAX_WEB_ITERATIONS = 3
 
-# JSON schema for the forced extraction backstop. Only `confidence` is required;
-# the metadata fields are optional so the agent can honestly omit anything it
-# could not find rather than being pressured to fabricate a value.
+# JSON schema for the forced extraction backstop. Strict mode (OpenAI/Cerebras)
+# requires every property to be in `required` AND additionalProperties=false; we
+# preserve the honest "couldn't find this" semantics by making the metadata
+# fields nullable — the model must mention each key but can set it to null.
 CITATION_EXTRACTION_SCHEMA = {
     "type": "object",
+    "additionalProperties": False,
     "properties": {
         "journal": {"type": ["string", "null"]},
         "publisher": {"type": ["string", "null"]},
@@ -52,7 +54,14 @@ CITATION_EXTRACTION_SCHEMA = {
         "source_url": {"type": ["string", "null"]},
         "confidence": {"type": "number"},
     },
-    "required": ["confidence"],
+    "required": [
+        "journal",
+        "publisher",
+        "doi",
+        "publish_date",
+        "source_url",
+        "confidence",
+    ],
 }
 
 RECOVERY_SYSTEM_PROMPT = (

@@ -255,7 +255,7 @@ KEYWORD_EXTRACTION_PROMPT = """Extract 3-5 key search terms from this question t
 
 Question: {question}
 
-Return ONLY a JSON array of strings, no explanation. Example: ["term1", "term2", "term3"]
+Return them in the `keywords` field of the JSON object.
 """
 
 ANSWER_EVIDENCE_BASED_QUESTION_SYSTEM_PROMPT = """
