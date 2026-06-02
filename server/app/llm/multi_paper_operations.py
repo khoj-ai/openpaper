@@ -93,6 +93,34 @@ class MultiPaperOperations(EvidenceOperations):
             TextContent(text=formatted_prompt),
         ]
 
+        # Surface any citation artifacts produced during evidence gathering as
+        # first-party cards, and give the answer model the resolved data so it
+        # can reference (but not re-paste) them.
+        citation_artifacts = evidence_gathered.get_artifacts()
+        if citation_artifacts:
+            artifact_payloads = [
+                {
+                    "kind": "citation",
+                    "paper_id": artifact.paper_id,
+                    "preferred_style": artifact.preferred_style,
+                    "style_display": artifact.style_display,
+                    "data": artifact.data.model_dump(),
+                    "method": artifact.method,
+                    "missing_fields": artifact.missing_fields,
+                    "confidence": artifact.confidence,
+                }
+                for artifact in citation_artifacts
+            ]
+            message_content.insert(
+                1,
+                SupplementaryContent(
+                    content=json.dumps(artifact_payloads, indent=2),
+                    label="resolved_citations",
+                ),
+            )
+            for payload in artifact_payloads:
+                yield {"type": "artifact", "content": payload}
+
         queue = asyncio.Queue()
 
         async def pinger():

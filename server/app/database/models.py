@@ -282,12 +282,20 @@ class Message(Base):
     # References from the paper. Key 'citations' maps to list of ResponseCitation dicts
     references = Column(JSONB, nullable=True)
 
-    bucket = Column(JSONB, nullable=True)  # For any additional attributes
+    # Agent trajectory (tool calls / thinking / subagent steps) for this turn,
+    # so the user can inspect what the model did. See schemas for shape.
+    trace = Column(JSONB, nullable=True)
     sequence = Column(Integer, nullable=False)  # To maintain message order
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
     user = relationship("User", back_populates="messages")
     conversation = relationship("Conversation", back_populates="messages")
+    artifacts = relationship(
+        "Artifact",
+        back_populates="message",
+        cascade="all, delete-orphan",
+        order_by="Artifact.created_at",
+    )
 
 
 class ConversableType(str, Enum):
@@ -368,6 +376,65 @@ class Conversation(Base):
             "(conversable_type = 'everything' AND conversable_id IS NULL)",
             name="check_conversable_consistency",
         ),
+    )
+
+
+class ArtifactKind(str, Enum):
+    """First-party artifacts produced by chat (or other agentic flows).
+
+    The DB stores the value as a plain string; this enum is the canonical set
+    used at write time and for CRUD typing.
+    """
+
+    CITATION = "citation"
+
+
+class Artifact(Base):
+    """A first-party artifact (citation card today; charts/images later).
+
+    Scope mirrors `ConversableType` so the same primitive that targets a
+    conversation also targets an artifact's surfacing — a project panel filters
+    `scope_type='project' AND scope_id=<project_id>`, a paper view filters
+    `scope_type='paper' AND scope_id=<paper_id>`, and `everything` artifacts
+    leave `scope_id NULL`.
+    """
+
+    __tablename__ = "artifacts"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    kind = Column(String, nullable=False)  # ArtifactKind value
+    payload = Column(JSONB, nullable=False)
+
+    # Provenance: which assistant message produced this artifact.
+    message_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("messages.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    # Scope — denormalized from the originating conversation so panel queries
+    # are a single indexed lookup, no joins through messages → conversations.
+    scope_type = Column(String, nullable=False)  # ConversableType value
+    scope_id = Column(UUID(as_uuid=True), nullable=True)
+
+    message = relationship("Message", back_populates="artifacts")
+
+    __table_args__ = (
+        Index(
+            "ix_artifacts_scope",
+            "scope_type",
+            "scope_id",
+            "kind",
+            "created_at",
+        ),
+        Index("ix_artifacts_message_id", "message_id"),
     )
 
 
@@ -455,6 +522,9 @@ class Paper(Base):
     journal = Column(String, nullable=True)
     publisher = Column(String, nullable=True)
     attempted_metadata_at = Column(DateTime(timezone=True), nullable=True)
+    # Per-field provenance for agent-filled metadata:
+    # {field: {source_url, filled_by, confidence, filled_at}}
+    field_provenance = Column(JSONB, nullable=True)
 
     size_in_kb = Column(Integer, nullable=True)  # Size of the paper file in KB
 

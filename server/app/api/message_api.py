@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import AsyncGenerator, List, Optional, Union
 
 from app.auth.dependencies import get_required_user
+from app.database.crud.artifact_crud import artifact_crud
 from app.database.crud.conversation_crud import conversation_crud
 from app.database.crud.message_crud import MessageCreate, message_crud
 from app.database.crud.paper_crud import paper_crud
@@ -14,7 +15,7 @@ from app.database.crud.projects.project_conversation_crud import (
 from app.database.crud.projects.project_crud import project_crud
 from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
-from app.database.models import ConversableType
+from app.database.models import ArtifactKind, ConversableType
 from app.database.telemetry import track_event
 from app.llm.base import LLMProvider
 from app.llm.citation_handler import CitationHandler
@@ -39,10 +40,20 @@ message_router = APIRouter()
 END_DELIMITER = "END_OF_STREAM"
 
 
+def _append_status(messages: Optional[List[str]], message: str) -> None:
+    """Append a status message, collapsing consecutive duplicates (e.g. heartbeats)."""
+    if messages is None or not message:
+        return
+    if not messages or messages[-1] != message:
+        messages.append(message)
+
+
 async def _stream_chat_chunks(
     chunk_generator: AsyncGenerator[Union[dict, str], None],
     content_chunks: List[str],
     evidence_container: dict,
+    artifacts: Optional[List] = None,
+    status_messages: Optional[List[str]] = None,
 ) -> AsyncGenerator[str, None]:
     """Helper to stream chat chunks and handle common logic."""
     async for chunk in chunk_generator:
@@ -52,6 +63,15 @@ async def _stream_chat_chunks(
 
         chunk_type = chunk.get("type")
         chunk_content = chunk.get("content", "")
+
+        if chunk_type == "artifact":
+            if artifacts is not None:
+                artifacts.append(chunk_content)
+            try:
+                yield f"{json.dumps({'type': 'artifact', 'content': chunk_content})}{END_DELIMITER}"
+            except (TypeError, ValueError) as json_error:
+                logger.warning(f"Failed to serialize artifact: {json_error}")
+            continue
 
         if chunk_type == "content":
             content_chunks.append(chunk_content)
@@ -79,6 +99,7 @@ async def _stream_chat_chunks(
                 logger.warning(f"Failed to serialize references: {json_error}")
                 yield f"{json.dumps({'type': 'error', 'content': 'Failed to serialize references'})}{END_DELIMITER}"
         elif chunk_type == "status":
+            _append_status(status_messages, chunk_content)
             yield f"{json.dumps({'type': 'status', 'content': chunk_content})}{END_DELIMITER}"
 
 
@@ -115,6 +136,8 @@ async def chat_message_multipaper(
         async def response_generator():
             try:
                 content_chunks = []
+                artifacts_collected: List[dict] = []
+                status_messages: List[str] = []
                 start_time = datetime.now(timezone.utc)
                 evidence_container = {"evidence": None}
                 evidence_collection: Optional[EvidenceCollection] = None
@@ -179,13 +202,16 @@ async def chat_message_multipaper(
                             ), "Chunk content must be an EvidenceCollection"
                             evidence_collection = chunk_content
                         elif chunk_type == "status":
+                            _append_status(status_messages, chunk_content)
                             yield f"{json.dumps({'type': 'status', 'content': chunk_content})}{END_DELIMITER}"
                         else:
                             logger.debug(f"received chunks: {chunk}")
 
-                if (
-                    evidence_collection is None
-                    or len(evidence_collection.evidence) == 0
+                # Artifacts (e.g. a citation card from find_citation) count as
+                # a real outcome — only short-circuit if we have neither.
+                if evidence_collection is None or (
+                    len(evidence_collection.evidence) == 0
+                    and len(evidence_collection.artifacts) == 0
                 ):
                     json_response = json.dumps(
                         {
@@ -222,6 +248,8 @@ async def chat_message_multipaper(
                     chunk_generator=chat_generator,
                     content_chunks=content_chunks,
                     evidence_container=evidence_container,
+                    artifacts=artifacts_collected,
+                    status_messages=status_messages,
                 ):
                     yield stream_chunk
 
@@ -229,6 +257,20 @@ async def chat_message_multipaper(
 
                 # Save the complete message to the database
                 full_content = "".join(content_chunks)
+
+                assistant_trace = (
+                    evidence_collection.to_trace_dict() if evidence_collection else None
+                )
+                # Fold in the live status messages (the "thinking trace") so it
+                # survives reloads, even when there were no tool calls.
+                if status_messages:
+                    assistant_trace = assistant_trace or {}
+                    assistant_trace["status_messages"] = status_messages
+
+                # Surface the trajectory live so the just-answered message can show
+                # it immediately (it's also persisted for reload below).
+                if assistant_trace:
+                    yield f"{json.dumps({'type': 'trace', 'content': assistant_trace})}{END_DELIMITER}"
 
                 formatted_references = (
                     CitationHandler.convert_references_to_dict(
@@ -250,17 +292,31 @@ async def chat_message_multipaper(
                     user=current_user,
                 )
 
-                # Save assistant message with both content and evidence
-                message_crud.create(
+                # Save assistant message with content, evidence, and trace.
+                # Artifacts go into their own table, linked back via message_id.
+                assistant_message = message_crud.create(
                     db,
                     obj_in=MessageCreate(
                         conversation_id=uuid.UUID(request.conversation_id),
                         role="assistant",
                         content=full_content,
                         references=evidence if evidence else None,
+                        trace=assistant_trace,
                     ),
                     user=current_user,
                 )
+
+                if assistant_message and artifacts_collected:
+                    artifact_crud.bulk_create_for_message(
+                        db,
+                        message=assistant_message,
+                        conversation=conversation,
+                        items=[
+                            (ArtifactKind.CITATION, payload)
+                            for payload in artifacts_collected
+                        ],
+                        user=current_user,
+                    )
 
                 # Rename the conversation based on the chat history
                 operations.rename_conversation(

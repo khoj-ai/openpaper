@@ -160,6 +160,7 @@ You are on iteration {n_iteration} of {max_iterations} allowed
 - `search_file`: Targeted regex search within a specific paper - use when you know which paper and what to look for
 - `view_file`: Read specific line ranges - use after search_file to get context around relevant passages
 - `read_file`: Read entire paper content - use sparingly, only when you need comprehensive coverage of a specific paper
+- `find_citation`: Produce a bibliographic citation for a specific paper (by paper_id) in a requested style. Use this when the user asks for a citation, reference, or bibliography entry. It resolves any missing publication metadata automatically, and the resulting citation is presented to the user for you. Call it once per paper to cite.
 - `STOP`: Signal completion when you have gathered sufficient evidence
 
 **Tool Selection Guidelines:**
@@ -167,6 +168,7 @@ You are on iteration {n_iteration} of {max_iterations} allowed
 - Use `read_abstract` to quickly assess papers before diving deeper
 - Use `search_file` with well-crafted regex queries to find specific information
 - Use `view_file` to expand context around search results
+- When the user asks for citations/references, use `find_citation` with the relevant paper_id and the requested style (pass the user's style verbatim, e.g. "APA 7th edition"); do not try to assemble citations by hand from file contents
 - Avoid repeating the same tool call with identical arguments - check the results you've already received
 - Think carefully about search terms that will maximize recall of relevant information
 - Be systematic: cover different aspects of the question rather than repeatedly searching similar terms
@@ -253,7 +255,7 @@ KEYWORD_EXTRACTION_PROMPT = """Extract 3-5 key search terms from this question t
 
 Question: {question}
 
-Return ONLY a JSON array of strings, no explanation. Example: ["term1", "term2", "term3"]
+Return them in the `keywords` field of the JSON object.
 """
 
 ANSWER_EVIDENCE_BASED_QUESTION_SYSTEM_PROMPT = """
@@ -263,6 +265,8 @@ These are the papers available in the library:
 {available_papers}
 
 You will receive collected evidence from a research assistant in a <collected_evidence> block within the user's message. This evidence has been gathered from the papers above. Use it to inform your answer to the user's question.
+
+If a <resolved_citations> block is present, the requested citation(s) are already being delivered to the user separately. Do NOT write out a formatted citation string, and do NOT mention how or where the citation appears (no references to cards, panels, or the UI). If the user only asked for a citation, reply with a brief, natural sentence and flag any metadata that could not be found; otherwise just answer their question normally.
 
 Bear in mind that the evidence may be snippets from the papers, not the full text. You must provide a comprehensive answer that synthesizes the information from the evidence, while also adhering to the following strict formatting rules:
 1. Your response should have two logical parts:
