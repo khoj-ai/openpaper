@@ -53,6 +53,20 @@ class ImportOneResult(TypedDict, total=False):
     imported_via_url: bool
 
 
+def _parse_zotero_date_added(date_str: Optional[str]) -> Optional[datetime]:
+    """Parse Zotero item.data.dateAdded (ISO 8601) for auto-import window checks."""
+    if not date_str:
+        return None
+    try:
+        normalized = date_str.strip().replace("Z", "+00:00")
+        parsed = datetime.fromisoformat(normalized)
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed
+    except (ValueError, TypeError):
+        return None
+
+
 def _parse_zotero_date(date_str: Optional[str]) -> Optional[str]:
     if not date_str:
         return None
@@ -122,12 +136,8 @@ def _map_zotero_color(hex_color: Optional[str]) -> str:
 
 
 def _page_from_annotation(data: Dict[str, Any]) -> Optional[int]:
-    page_label = data.get("annotationPageLabel")
-    if page_label:
-        try:
-            return int(str(page_label).strip())
-        except ValueError:
-            pass
+    """PDF page for viewer placement. Prefer pageIndex from annotationPosition over
+    annotationPageLabel, which is often the journal's printed page number."""
     position_raw = data.get("annotationPosition")
     if position_raw:
         try:
@@ -140,6 +150,12 @@ def _page_from_annotation(data: Dict[str, Any]) -> Optional[int]:
             if page_index is not None:
                 return int(page_index) + 1
         except (json.JSONDecodeError, TypeError, ValueError):
+            pass
+    page_label = data.get("annotationPageLabel")
+    if page_label:
+        try:
+            return int(str(page_label).strip())
+        except ValueError:
             pass
     return None
 
@@ -757,12 +773,29 @@ async def _import_one_paper(
     db = SessionLocal()
     client = ZoteroApiClient(zotero_user_id=zotero_user_id, api_key=api_key)
     upload_job_id: Optional[str] = None
+    import_row: Optional[ZoteroImportedItem] = None
 
     try:
+        import_row = zotero_import_crud.create(
+            db,
+            user_id=user.id,
+            zotero_item_key=item_key,
+            import_source=ZoteroImportSource.PDF_ATTACHMENT,
+            status=ZoteroImportStatus.PROCESSING,
+        )
+
         pdf_bytes, import_source, attachment_key, source_url, annotations, failure_reason = (
             await _resolve_pdf_bytes(client, item)
         )
         if not pdf_bytes:
+            if import_row:
+                zotero_import_crud.update_status(
+                    db,
+                    item=import_row,
+                    status=ZoteroImportStatus.FAILED,
+                    error_message=failure_reason
+                    or "No PDF available from attachment or URL",
+                )
             return {
                 "status": "error",
                 "zotero_item_key": item_key,
@@ -775,6 +808,13 @@ async def _import_one_paper(
             user=user,
         )
         if not paper_upload_job or not paper_upload_job.id:
+            if import_row:
+                zotero_import_crud.update_status(
+                    db,
+                    item=import_row,
+                    status=ZoteroImportStatus.FAILED,
+                    error_message="Failed to create upload job",
+                )
             return {
                 "status": "error",
                 "zotero_item_key": item_key,
@@ -879,18 +919,18 @@ async def _import_one_paper(
             _serialize_annotations_payload(annotations) if annotations else None
         )
 
-        zotero_import_crud.create(
-            db,
-            user_id=user.id,
-            zotero_item_key=item_key,
-            import_source=import_source,
-            zotero_attachment_key=attachment_key,
-            source_url=source_url,
-            paper_id=paper_id,
-            upload_job_id=UUID(upload_job_id),
-            annotations_payload=annotation_payload,
-            status=ZoteroImportStatus.PROCESSING,
-        )
+        if import_row:
+            zotero_import_crud.finalize_processing_import(
+                db,
+                item=import_row,
+                import_source=import_source,
+                zotero_attachment_key=attachment_key,
+                source_url=source_url,
+                paper_id=paper_id,
+                upload_job_id=UUID(upload_job_id),
+                annotations_payload=annotation_payload,
+                last_synced_at=datetime.now(timezone.utc),
+            )
 
         apply_zotero_annotations(
             db=db,
@@ -918,6 +958,13 @@ async def _import_one_paper(
         if upload_job_id:
             paper_upload_job_crud.mark_as_failed(
                 db=db, job_id=upload_job_id, user=user
+            )
+        if import_row:
+            zotero_import_crud.update_status(
+                db,
+                item=import_row,
+                status=ZoteroImportStatus.FAILED,
+                error_message=str(e),
             )
         return {
             "status": "error",
@@ -1015,6 +1062,7 @@ def list_library(
                 "title": (data.get("title") or "").strip(),
                 "authors": authors,
                 "date": _parse_zotero_date(data.get("date")),
+                "date_added": _parse_zotero_date_added(data.get("dateAdded")),
                 "item_type": item_type,
                 "venue": venue,
                 "already_imported": item_key in imported_keys,
@@ -1258,6 +1306,13 @@ async def import_batch(
                 user=user,
             )
 
+    if imported:
+        zotero_crud.set_auto_import_since_if_unset(
+            db,
+            user_id=user.id,
+            since=datetime.now(timezone.utc),
+        )
+
     return {
         "imported": imported,
         "imported_count": len(imported),
@@ -1460,13 +1515,36 @@ async def auto_import_new_papers(
     For Researcher-plan users: detect Zotero library items not yet tracked in
     zotero_imported_items and import them automatically, subject to the user's
     remaining paper upload slots.
+
+    Only items with Zotero dateAdded >= connection.auto_import_since are
+    considered (set when the user completes their first manual import batch).
     """
+    connection = zotero_crud.get_by_user_id(db, user_id=user.id)
+    if not connection:
+        raise ValueError("Zotero account not connected")
+
+    import_since = connection.auto_import_since
+    if import_since is None:
+        logger.info(
+            "auto_import_new_papers: no auto_import_since for user %s, skipping",
+            user.id,
+        )
+        return {"auto_imported_count": 0, "skipped_limit_reached": False}
+
     library = list_library(db, user=user, limit=100)
-    new_keys = [
-        item["zotero_item_key"]
+    candidate_items = [
+        item
         for item in library["items"]
         if not item["already_imported"]
     ]
+    new_keys = []
+    for item in candidate_items:
+        date_added = item.get("date_added")
+        if date_added is None:
+            continue
+        if date_added < import_since:
+            continue
+        new_keys.append(item["zotero_item_key"])
 
     if not new_keys:
         return {"auto_imported_count": 0, "skipped_limit_reached": False}

@@ -378,14 +378,18 @@ async def zotero_status(
     db: Session = Depends(get_db),
 ):
     """Return whether the current user has a linked Zotero account."""
+    from app.database.crud.zotero_import_crud import zotero_import_crud
+
     connection = zotero_crud.get_by_user_id(db=db, user_id=current_user.id)
     if not connection:
         return ZoteroStatusResponse(connected=False)
 
     return ZoteroStatusResponse(
         connected=True,
-        zotero_user_id=connection.zotero_user_id,
         connected_at=connection.created_at,
+        last_synced_at=zotero_import_crud.get_max_last_synced_at(
+            db, user_id=current_user.id
+        ),
     )
 
 

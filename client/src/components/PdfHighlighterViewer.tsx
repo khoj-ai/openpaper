@@ -62,6 +62,24 @@ export interface RenderedHighlightPosition {
 const ANNOTATION_CARD_WIDTH_PX = 280;
 const ANNOTATION_CARD_MARGIN_GAP_PX = 8;
 
+/** Use PDF page index from position when stored page_number is out of range (e.g. Zotero printed page label). */
+function resolveHighlightPageNumber(
+	highlight: PaperHighlight,
+	numPages: number | null
+): number | null {
+	const positionPage = highlight.position?.boundingRect?.pageNumber;
+	const stored = highlight.page_number;
+	if (stored != null && numPages != null && stored >= 1 && stored <= numPages) {
+		return stored;
+	}
+	if (positionPage != null && numPages != null && positionPage >= 1 && positionPage <= numPages) {
+		return positionPage;
+	}
+	if (stored != null && stored >= 1) return stored;
+	if (positionPage != null && positionPage >= 1) return positionPage;
+	return stored ?? positionPage ?? null;
+}
+
 /**
  * Anchor for margin annotation cards: right gutter by default, left gutter if the
  * card would not fit to the right of the page in the scroll container.
@@ -70,11 +88,15 @@ function getAnnotationCardAnchorForHighlight(
 	highlight: PaperHighlight,
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	viewer: any,
-	scrollContainer: HTMLElement
+	scrollContainer: HTMLElement,
+	numPages: number | null = null
 ): { top: number; left: number } | null {
-	if (!highlight.position || !highlight.page_number) return null;
+	if (!highlight.position) return null;
 
-	const pageView = viewer.getPageView(highlight.page_number - 1);
+	const pageNumber = resolveHighlightPageNumber(highlight, numPages);
+	if (!pageNumber) return null;
+
+	const pageView = viewer.getPageView(pageNumber - 1);
 	if (!pageView?.div || !pageView?.viewport) return null;
 
 	const { div: pageDiv, viewport } = pageView;
@@ -554,7 +576,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			const next = prev.map((card) => {
 				const h = highlights.find((x) => x.id === card.highlightId);
 				if (!h?.position) return card;
-				const anchor = getAnnotationCardAnchorForHighlight(h, viewer, scrollContainer);
+				const anchor = getAnnotationCardAnchorForHighlight(h, viewer, scrollContainer, numPages);
 				if (!anchor) return card;
 				const same =
 					Math.abs(anchor.top - card.top) < 0.5 &&
@@ -565,7 +587,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			});
 			return changed ? next : prev;
 		});
-	}, [highlights]);
+	}, [highlights, numPages]);
 
 	/** Coalesce all layout-driven syncs to at most one per animation frame (avoids burst updates when pagerendered + ResizeObserver + scroll fire together). */
 	const annotationCardSyncRafRef = useRef(0);
@@ -588,11 +610,11 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			setAnnotationCards((prev) => {
 				if (prev.some((c) => c.highlightId === highlightId)) return prev;
 				const h = highlights.find((x) => x.id === highlightId);
-				if (!h?.position || !h.page_number) return prev;
+				if (!h?.position) return prev;
 				const viewer = highlighterUtilsRef.current?.getViewer();
 				const scrollContainer = viewer?.container as HTMLElement | undefined;
 				if (!viewer || !scrollContainer) return prev;
-				const anchor = getAnnotationCardAnchorForHighlight(h, viewer, scrollContainer);
+				const anchor = getAnnotationCardAnchorForHighlight(h, viewer, scrollContainer, numPages);
 				if (!anchor) return prev;
 				const firstAnn = annotations.find((a) => a.highlight_id === highlightId);
 				return [
@@ -607,7 +629,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 				];
 			});
 		},
-		[highlights, annotations]
+		[highlights, annotations, numPages]
 	);
 
 	// Handle selection
@@ -760,11 +782,11 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 				const ph = originalHighlight
 					? extendedToPaperHighlight(originalHighlight)
 					: highlights.find((x) => x.id === hid);
-				if (ph?.position && ph.page_number) {
+				if (ph?.position) {
 					const viewer = highlighterUtilsRef.current?.getViewer();
 					const scrollContainer = viewer?.container as HTMLElement | undefined;
 					if (viewer && scrollContainer) {
-						const anchor = getAnnotationCardAnchorForHighlight(ph, viewer, scrollContainer);
+						const anchor = getAnnotationCardAnchorForHighlight(ph, viewer, scrollContainer, numPages);
 						if (anchor) {
 							setPeekAnnotationCardHighlightId(hid);
 							ensureAnnotationCardEntry(hid);
@@ -798,6 +820,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			annotationsPanelActive,
 			highlightHasPersistedAnnotations,
 			ensureAnnotationCardEntry,
+			numPages,
 			highlights,
 		]
 	);
@@ -1013,11 +1036,11 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 
 		byHighlight.forEach((annotationId, highlightId) => {
 			const highlight = highlights.find(h => h.id === highlightId);
-			if (!highlight?.position || !highlight.page_number) return;
+			if (!highlight?.position) return;
 
 			attempted++;
 
-			const anchor = getAnnotationCardAnchorForHighlight(highlight, viewer, scrollContainer);
+			const anchor = getAnnotationCardAnchorForHighlight(highlight, viewer, scrollContainer, numPages);
 			if (!anchor) {
 				missingPageView += 1;
 				return;
@@ -1421,8 +1444,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 							hid &&
 							!showAnnotationCards &&
 							highlightHasPersistedAnnotations(hid) &&
-							highlight.position &&
-							highlight.page_number
+							highlight.position
 						) {
 							const viewer = highlighterUtilsRef.current?.getViewer();
 							const scrollContainer = viewer?.container as HTMLElement | undefined;
@@ -1430,7 +1452,8 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 								const anchor = getAnnotationCardAnchorForHighlight(
 									highlight,
 									viewer,
-									scrollContainer
+									scrollContainer,
+									numPages
 								);
 								if (anchor) {
 									setPeekAnnotationCardHighlightId(hid);
@@ -1735,8 +1758,8 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 					if (isHighlightInteraction && activeHighlight?.id) {
 						const h = highlights.find((x) => x.id === activeHighlight.id);
 						const anchor =
-							h?.position && h.page_number
-								? getAnnotationCardAnchorForHighlight(h, viewer, scrollContainer)
+							h?.position
+								? getAnnotationCardAnchorForHighlight(h, viewer, scrollContainer, numPages)
 								: null;
 						if (anchor) {
 							pos = { ...anchor, scrollContainer };

@@ -1,3 +1,4 @@
+import json
 import unittest
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
@@ -7,6 +8,7 @@ from app.database.models import ZoteroImportSource, ZoteroImportStatus
 from app.services import zotero_import as zotero_import_module
 from app.services.zotero_import import (
     _normalize_payload_item,
+    _page_from_annotation,
     _serialize_annotations_payload,
     _sync_item,
     sync_batch,
@@ -36,6 +38,13 @@ class TestZoteroAnnotationPayload(unittest.TestCase):
         self.assertIsNone(
             _normalize_payload_item({"annotationText": "legacy", "annotationType": "highlight"})
         )
+
+    def test_page_from_annotation_prefers_pdf_page_index_over_printed_label(self) -> None:
+        data = {
+            "annotationPageLabel": "583",
+            "annotationPosition": json.dumps({"pageIndex": 0, "rects": [[0, 0, 1, 1]]}),
+        }
+        self.assertEqual(_page_from_annotation(data), 1)
 
 
 class TestZoteroSyncItem(unittest.TestCase):

@@ -34,9 +34,20 @@ import { toast } from "sonner";
 
 type ZoteroStatus = {
 	connected: boolean;
-	zotero_user_id?: string;
 	connected_at?: string;
+	last_synced_at?: string;
 };
+
+function formatZoteroLastSynced(dateString: string): string {
+	const d = new Date(dateString);
+	const time = d.toLocaleString("en-US", { hour: "2-digit", minute: "2-digit" });
+	const date = d.toLocaleString("en-US", {
+		month: "short",
+		day: "numeric",
+		year: "numeric",
+	});
+	return `${time}, ${date}`;
+}
 
 type ZoteroImportStatusItem = {
 	zotero_item_key: string;
@@ -74,6 +85,19 @@ const ITEM_TYPE_LABELS: Record<ZoteroLibraryItem["item_type"], string> = {
 	conferencePaper: "Conference",
 	preprint: "Preprint",
 };
+
+function defaultZoteroSelection(
+	items: ZoteroLibraryItem[],
+	remainingSlots: number,
+	selectAllByDefault: boolean,
+): Set<string> {
+	if (!selectAllByDefault || remainingSlots <= 0) return new Set();
+	const keys = items
+		.filter((i) => !i.already_imported)
+		.slice(0, remainingSlots)
+		.map((i) => i.zotero_item_key);
+	return new Set(keys);
+}
 
 type SortBy = "dateModified" | "datePublished";
 
@@ -484,6 +508,19 @@ function SettingsContent() {
 		}
 	}, [user, zoteroStatus?.connected, zoteroStatus, fetchRecentImports]);
 
+	const hasSyncableImports = useMemo(
+		() =>
+			recentImports.some(
+				(i) =>
+					i.status === "completed" &&
+					i.paper_id &&
+					i.import_source === "pdf_attachment"
+			),
+		[recentImports]
+	);
+
+	const showSyncAnnotations = recentImportsLoaded && hasSyncableImports;
+
 	useEffect(() => {
 		const zoteroParam = searchParams.get("zotero");
 		if (!zoteroParam) return;
@@ -547,12 +584,16 @@ function SettingsContent() {
 
 	const handleOpenLibraryModal = async () => {
 		setLibraryLoading(true);
-		setSelectedKeys(new Set());
 		setShowLibraryModal(true);
 		try {
 			const data: ZoteroLibraryResponse = await fetchFromApi("/api/zotero/library");
-			setLibraryItems(data.items ?? []);
-			setLibraryRemainingSlots(data.remaining_slots ?? 0);
+			const items = data.items ?? [];
+			const remainingSlots = data.remaining_slots ?? 0;
+			setLibraryItems(items);
+			setLibraryRemainingSlots(remainingSlots);
+			setSelectedKeys(
+				defaultZoteroSelection(items, remainingSlots, hasAutoSync)
+			);
 		} catch (error) {
 			toast.error(error instanceof Error ? error.message : "Failed to load Zotero library.");
 			setShowLibraryModal(false);
@@ -568,7 +609,7 @@ function SettingsContent() {
 
 		importDoneRef.current = false;
 
-		const finishImport = () => {
+		const finishImport = async () => {
 			if (importDoneRef.current) return;
 			if (pollRef.current) {
 				clearInterval(pollRef.current);
@@ -578,6 +619,7 @@ function SettingsContent() {
 			setZoteroImportLoading(false);
 			setImportProgress(100);
 			setTimeout(() => setImportProgress(null), 1500);
+			await fetchRecentImports();
 		};
 
 		const pollImportStatus = async () => {
@@ -639,7 +681,7 @@ function SettingsContent() {
 				duration: 15000,
 			});
 		}
-			finishImport();
+			await finishImport();
 			await refreshActivePapers();
 			await refetchSubscription();
 		} catch (error) {
@@ -649,7 +691,7 @@ function SettingsContent() {
 			} else {
 				toast.error(msg);
 			}
-			finishImport();
+			await finishImport();
 		}
 	};
 
@@ -687,6 +729,7 @@ function SettingsContent() {
 			} else {
 				toast.success("Annotations are already up to date.");
 			}
+			await fetchZoteroStatus();
 		} catch (error) {
 			toast.error(
 				error instanceof Error ? error.message : "Failed to sync Zotero annotations."
@@ -753,9 +796,12 @@ function SettingsContent() {
 					<div className="flex items-start justify-between gap-4">
 						<div className="space-y-1">
 							<p className="font-medium">Zotero</p>
-							{!zoteroLoading && zoteroStatus?.connected && zoteroStatus.zotero_user_id && (
+							{!zoteroLoading && zoteroStatus?.connected && (
 								<p className="text-sm text-muted-foreground">
-									Zotero user ID: {zoteroStatus.zotero_user_id}
+									Last synced:{" "}
+									{zoteroStatus.last_synced_at
+										? formatZoteroLastSynced(zoteroStatus.last_synced_at)
+										: "Not yet"}
 								</p>
 							)}
 						{!zoteroLoading && !zoteroStatus?.connected && (
@@ -809,17 +855,19 @@ function SettingsContent() {
 					) : null}
 					Import
 				</Button>
-				<Button
-					type="button"
-					variant="outline"
-					onClick={handleZoteroSync}
-					disabled={zoteroSyncLoading || zoteroImportLoading || zoteroActionLoading}
-				>
-					{zoteroSyncLoading ? (
-						<Loader2 className="h-4 w-4 animate-spin mr-2" />
-					) : null}
-					Sync Annotations
-				</Button>
+				{showSyncAnnotations && (
+					<Button
+						type="button"
+						variant="outline"
+						onClick={handleZoteroSync}
+						disabled={zoteroSyncLoading || zoteroImportLoading || zoteroActionLoading}
+					>
+						{zoteroSyncLoading ? (
+							<Loader2 className="h-4 w-4 animate-spin mr-2" />
+						) : null}
+						Sync Annotations
+					</Button>
+				)}
 				<Button
 					type="button"
 					variant="outline"

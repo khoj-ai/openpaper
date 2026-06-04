@@ -3,7 +3,7 @@ from typing import List, Optional, Tuple
 from uuid import UUID
 
 from app.database.models import Paper, ZoteroImportedItem, ZoteroImportSource, ZoteroImportStatus
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 
@@ -27,6 +27,15 @@ class CRUDZoteroImport:
             db.query(ZoteroImportedItem)
             .filter(ZoteroImportedItem.upload_job_id == upload_job_id)
             .first()
+        )
+
+    def get_max_last_synced_at(
+        self, db: Session, *, user_id: UUID
+    ) -> Optional[datetime]:
+        return (
+            db.query(func.max(ZoteroImportedItem.last_synced_at))
+            .filter(ZoteroImportedItem.user_id == user_id)
+            .scalar()
         )
 
     def list_recent_by_user(
@@ -132,6 +141,33 @@ class CRUDZoteroImport:
         )
 
         return [row.user_id for row in rows]
+
+    def finalize_processing_import(
+        self,
+        db: Session,
+        *,
+        item: ZoteroImportedItem,
+        import_source: str,
+        zotero_attachment_key: Optional[str],
+        source_url: Optional[str],
+        paper_id: UUID,
+        upload_job_id: UUID,
+        annotations_payload: Optional[list],
+        last_synced_at: Optional[datetime] = None,
+    ) -> ZoteroImportedItem:
+        item.import_source = import_source
+        item.zotero_attachment_key = zotero_attachment_key
+        item.source_url = source_url
+        item.paper_id = paper_id
+        item.upload_job_id = upload_job_id
+        item.annotations_payload = annotations_payload
+        item.error_message = None
+        if last_synced_at is not None:
+            item.last_synced_at = last_synced_at
+        db.add(item)
+        db.commit()
+        db.refresh(item)
+        return item
 
     def update_after_sync(
         self,

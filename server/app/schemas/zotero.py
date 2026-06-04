@@ -10,8 +10,8 @@ class ZoteroConnectResponse(BaseModel):
 
 class ZoteroStatusResponse(BaseModel):
     connected: bool
-    zotero_user_id: Optional[str] = None
     connected_at: Optional[datetime] = None
+    last_synced_at: Optional[datetime] = None
 
 
 class ZoteroDisconnectResponse(BaseModel):
