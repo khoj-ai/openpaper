@@ -1306,13 +1306,6 @@ async def import_batch(
                 user=user,
             )
 
-    if imported:
-        zotero_crud.set_auto_import_since_if_unset(
-            db,
-            user_id=user.id,
-            since=datetime.now(timezone.utc),
-        )
-
     return {
         "imported": imported,
         "imported_count": len(imported),
@@ -1516,17 +1509,17 @@ async def auto_import_new_papers(
     zotero_imported_items and import them automatically, subject to the user's
     remaining paper upload slots.
 
-    Only items with Zotero dateAdded >= connection.auto_import_since are
-    considered (set when the user completes their first manual import batch).
+    Only items with Zotero dateAdded >= max(created_at) on completed
+    zotero_imported_items are considered (first manual import batch).
     """
     connection = zotero_crud.get_by_user_id(db, user_id=user.id)
     if not connection:
         raise ValueError("Zotero account not connected")
 
-    import_since = connection.auto_import_since
+    import_since = zotero_import_crud.get_auto_import_since(db, user_id=user.id)
     if import_since is None:
         logger.info(
-            "auto_import_new_papers: no auto_import_since for user %s, skipping",
+            "auto_import_new_papers: no completed imports for user %s, skipping",
             user.id,
         )
         return {"auto_imported_count": 0, "skipped_limit_reached": False}

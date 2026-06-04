@@ -25,23 +25,24 @@ class TestParseZoteroDateAdded(unittest.TestCase):
 class TestAutoImportWindow(unittest.IsolatedAsyncioTestCase):
     @patch.object(zotero_import_module, "import_batch", new_callable=AsyncMock)
     @patch.object(zotero_import_module, "list_library")
+    @patch.object(zotero_import_module, "zotero_import_crud")
     @patch.object(zotero_import_module, "zotero_crud")
     @patch.object(zotero_import_module, "can_user_upload_paper", return_value=(True, None))
     @patch.object(
         zotero_import_module, "get_remaining_paper_upload_slots", return_value=10
     )
-    async def test_skips_items_before_auto_import_since(
+    async def test_skips_items_before_import_cutoff(
         self,
         _mock_slots: MagicMock,
         _mock_can_upload: MagicMock,
         mock_zotero_crud: MagicMock,
+        mock_zotero_import_crud: MagicMock,
         mock_list_library: MagicMock,
         mock_import_batch: AsyncMock,
     ) -> None:
         since = datetime(2025, 6, 1, tzinfo=timezone.utc)
-        connection = MagicMock()
-        connection.auto_import_since = since
-        mock_zotero_crud.get_by_user_id.return_value = connection
+        mock_zotero_crud.get_by_user_id.return_value = MagicMock()
+        mock_zotero_import_crud.get_auto_import_since.return_value = since
 
         mock_list_library.return_value = {
             "items": [
@@ -72,15 +73,16 @@ class TestAutoImportWindow(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["auto_imported_count"], 1)
 
     @patch.object(zotero_import_module, "list_library")
+    @patch.object(zotero_import_module, "zotero_import_crud")
     @patch.object(zotero_import_module, "zotero_crud")
-    async def test_skips_when_no_auto_import_since(
+    async def test_skips_when_no_completed_imports(
         self,
         mock_zotero_crud: MagicMock,
+        mock_zotero_import_crud: MagicMock,
         mock_list_library: MagicMock,
     ) -> None:
-        connection = MagicMock()
-        connection.auto_import_since = None
-        mock_zotero_crud.get_by_user_id.return_value = connection
+        mock_zotero_crud.get_by_user_id.return_value = MagicMock()
+        mock_zotero_import_crud.get_auto_import_since.return_value = None
 
         user = MagicMock()
         user.id = uuid4()

@@ -92,21 +92,5 @@ class CRUDZotero:
         db.commit()
         return True
 
-    def set_auto_import_since_if_unset(
-        self,
-        db: Session,
-        *,
-        user_id: UUID,
-        since: datetime.datetime,
-    ) -> Optional[ZoteroConnection]:
-        connection = self.get_by_user_id(db, user_id=user_id)
-        if not connection or connection.auto_import_since is not None:
-            return connection
-        connection.auto_import_since = since
-        db.add(connection)
-        db.commit()
-        db.refresh(connection)
-        return connection
-
 
 zotero_crud = CRUDZotero()

@@ -287,8 +287,6 @@ class ZoteroConnection(Base):
     )
     zotero_user_id = Column(String, nullable=False)
     api_key = Column(String, nullable=False)
-    # Earliest auto-import window: only Zotero items with dateAdded >= this are auto-imported.
-    auto_import_since = Column(DateTime(timezone=True), nullable=True)
 
     user = relationship("User", back_populates="zotero_connection")
 

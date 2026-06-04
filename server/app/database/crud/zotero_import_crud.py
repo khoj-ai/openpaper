@@ -38,6 +38,18 @@ class CRUDZoteroImport:
             .scalar()
         )
 
+    def get_auto_import_since(
+        self, db: Session, *, user_id: UUID
+    ) -> Optional[datetime]:
+        return (
+            db.query(func.max(ZoteroImportedItem.created_at))
+            .filter(
+                ZoteroImportedItem.user_id == user_id,
+                ZoteroImportedItem.status == ZoteroImportStatus.COMPLETED,
+            )
+            .scalar()
+        )
+
     def list_recent_by_user(
         self, db: Session, *, user_id: UUID, limit: int = 20
     ) -> List[Tuple[ZoteroImportedItem, Optional[str]]]:
