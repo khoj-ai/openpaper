@@ -188,9 +188,12 @@ function ZoteroLibraryModal({
 						<span className="ml-2 text-sm text-muted-foreground">Loading library…</span>
 					</div>
 				) : items.length === 0 ? (
-					<p className="text-sm text-muted-foreground py-6 text-center">
-						No importable papers found in your Zotero library.
-					</p>
+					<div className="text-sm text-muted-foreground py-6 text-center space-y-2">
+						<p>No importable papers found in your Zotero library.</p>
+						<p>
+							If your papers are in the Zotero desktop app, remember to sync your local library with your web library.
+						</p>
+					</div>
 				) : (
 					<>
 					<div className="space-y-2">
