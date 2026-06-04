@@ -60,6 +60,11 @@ class ZoteroImportStatusListResponse(BaseModel):
     items: List[ZoteroImportStatusItem]
 
 
+class ZoteroSyncResponse(BaseModel):
+    synced_papers_count: int
+    new_annotations_count: int
+
+
 class ZoteroLibraryItem(BaseModel):
     zotero_item_key: str
     title: str

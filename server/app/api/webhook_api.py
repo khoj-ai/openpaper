@@ -854,20 +854,46 @@ async def trigger_zotero_sync_all(request: Request, db: Session = Depends(get_db
     Auth: shared secret via Authorization header (JOBS_INTERNAL_SECRET env var).
     """
     from app.database.crud.zotero_import_crud import zotero_import_crud
-    from app.services.zotero_import import sync_batch
+    from app.helpers.subscription_limits import can_user_auto_sync_zotero
+    from app.services.zotero_import import auto_import_new_papers, sync_batch
 
     secret = os.getenv("JOBS_INTERNAL_SECRET", "")
     if secret and request.headers.get("Authorization") != f"Bearer {secret}":
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    user_ids = zotero_import_crud.list_user_ids_due_for_sync(db)
-    logger.info(f"Periodic Zotero sync: found {len(user_ids)} users due for sync")
+    threshold_seconds = int(request.query_params.get("threshold_seconds", str(24 * 3600)))
+    threshold_hours = threshold_seconds / 3600
+    user_ids = zotero_import_crud.list_user_ids_due_for_sync(db, threshold_hours=threshold_hours)
+    logger.info(f"Periodic Zotero sync: found {len(user_ids)} users due for sync (threshold={threshold_hours:.4f}h)")
+
+    # #region agent log — H4: confirm migration ran and plan check
+    import json as _json
+    from app.helpers.subscription_limits import get_user_subscription_plan as _get_plan
+    _DEBUG_LOG_WH = os.path.join(os.path.dirname(__file__), "../../../.cursor/debug-dcd8e3.log")
+    def _wh_dbg(msg, data, hyp):
+        try:
+            with open(_DEBUG_LOG_WH, "a") as _f:
+                _f.write(_json.dumps({"sessionId": "dcd8e3", "timestamp": int(__import__("datetime").datetime.now(__import__("datetime").timezone.utc).timestamp() * 1000), "location": "webhook_api.py", "message": msg, "data": data, "hypothesisId": hyp}) + "\n")
+        except Exception:
+            pass
+    _wh_dbg("webhook_user_ids_due", {"count": len(user_ids), "user_ids": [str(u) for u in user_ids]}, "H4")
+    # #endregion
 
     results = []
     for user_id in user_ids:
         user = user_crud.get(db, id=user_id)
         if not user:
             continue
+
+        # #region agent log — H4: log plan for each user
+        _plan = _get_plan(db, user)
+        _wh_dbg("user_plan_check", {"user_id": str(user_id), "email": user.email, "plan": str(_plan)}, "H4")
+        # #endregion
+
+        if not can_user_auto_sync_zotero(db, user):
+            logger.debug(f"Skipping auto-sync for basic-plan user {user_id}")
+            continue
+
         try:
             result = await sync_batch(db, user=user, limit=50)
             results.append({"user_id": str(user_id), **result})
@@ -879,6 +905,15 @@ async def trigger_zotero_sync_all(request: Request, db: Session = Depends(get_db
                         "papers": result.get("synced_papers_count", 0),
                         "annotations": result.get("new_annotations_count", 0),
                     },
+                    db=db,
+                )
+
+            import_result = await auto_import_new_papers(db, user=user)
+            if import_result.get("auto_imported_count", 0) > 0:
+                track_event(
+                    "zotero_auto_import_new_papers",
+                    user_id=str(user_id),
+                    properties={"count": import_result["auto_imported_count"]},
                     db=db,
                 )
         except Exception as e:

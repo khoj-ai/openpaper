@@ -1437,3 +1437,45 @@ async def sync_batch(
         "new_annotations_count": new_annotations_count,
         "errors": errors,
     }
+
+
+async def auto_import_new_papers(
+    db: Session,
+    *,
+    user: CurrentUser,
+) -> Dict[str, Any]:
+    """
+    For Researcher-plan users: detect Zotero library items not yet tracked in
+    zotero_imported_items and import them automatically, subject to the user's
+    remaining paper upload slots.
+    """
+    library = list_library(db, user=user, limit=100)
+    new_keys = [
+        item["zotero_item_key"]
+        for item in library["items"]
+        if not item["already_imported"]
+    ]
+
+    if not new_keys:
+        return {"auto_imported_count": 0, "skipped_limit_reached": False}
+
+    can_upload, _ = can_user_upload_paper(db, user)
+    if not can_upload:
+        logger.info(
+            "auto_import_new_papers: upload limit reached for user %s, skipping %d items",
+            user.id,
+            len(new_keys),
+        )
+        return {"auto_imported_count": 0, "skipped_limit_reached": True}
+
+    remaining = get_remaining_paper_upload_slots(db, user)
+    keys_to_import = new_keys[:remaining]
+
+    if not keys_to_import:
+        return {"auto_imported_count": 0, "skipped_limit_reached": True}
+
+    result = await import_batch(db, user=user, item_keys=keys_to_import)
+    return {
+        "auto_imported_count": result.get("imported_count", 0),
+        "skipped_limit_reached": len(new_keys) > len(keys_to_import),
+    }

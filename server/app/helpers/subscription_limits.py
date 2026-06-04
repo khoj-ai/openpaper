@@ -372,6 +372,11 @@ def can_user_run_discover_search(
     return True, None
 
 
+def can_user_auto_sync_zotero(db: Session, user: CurrentUser) -> bool:
+    """Return True if the user's plan allows automatic Zotero sync (Researcher only)."""
+    return get_user_subscription_plan(db, user) == SubscriptionPlan.RESEARCHER
+
+
 def get_user_chat_credits_used_this_week(db: Session, user: CurrentUser) -> int:
     """
     Get the number of chat credits used by the user today.

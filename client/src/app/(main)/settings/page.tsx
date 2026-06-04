@@ -404,10 +404,12 @@ function SettingsContent() {
 	const paperUploadsRemaining = subscription?.usage?.paper_uploads_remaining ?? null;
 	const paperUploadsTotal = subscription?.limits?.paper_uploads ?? null;
 	const paperUploadsUsed = subscription?.usage?.paper_uploads ?? null;
+	const hasAutoSync = subscription?.plan === "researcher";
 	const [zoteroStatus, setZoteroStatus] = useState<ZoteroStatus | null>(null);
 	const [zoteroLoading, setZoteroLoading] = useState(true);
 	const [zoteroActionLoading, setZoteroActionLoading] = useState(false);
 	const [zoteroImportLoading, setZoteroImportLoading] = useState(false);
+	const [zoteroSyncLoading, setZoteroSyncLoading] = useState(false);
 	const [recentImports, setRecentImports] = useState<ZoteroImportStatusItem[]>([]);
 	const [recentImportsLoaded, setRecentImportsLoaded] = useState(false);
 	const [importProgress, setImportProgress] = useState<number | null>(null);
@@ -665,6 +667,26 @@ function SettingsContent() {
 		}
 	};
 
+	const handleZoteroSync = async () => {
+		setZoteroSyncLoading(true);
+		try {
+			const data = await fetchFromApi("/api/zotero/sync", { method: "POST" });
+			if (data.new_annotations_count > 0) {
+				toast.success(
+					`Synced ${data.new_annotations_count} new annotation${data.new_annotations_count === 1 ? "" : "s"} across ${data.synced_papers_count} paper${data.synced_papers_count === 1 ? "" : "s"}.`
+				);
+			} else {
+				toast.success("Annotations are already up to date.");
+			}
+		} catch (error) {
+			toast.error(
+				error instanceof Error ? error.message : "Failed to sync Zotero annotations."
+			);
+		} finally {
+			setZoteroSyncLoading(false);
+		}
+	};
+
 	if (loading || !user) {
 		return (
 			<div className="flex items-center justify-center h-full">
@@ -749,53 +771,67 @@ function SettingsContent() {
 						) : null}
 					</div>
 
-					{zoteroLoading ? (
-						<p className="text-sm text-muted-foreground">Checking connection…</p>
-					) : zoteroStatus?.connected ? (
-					<div className="space-y-3">
-					<p className="text-sm text-muted-foreground">
-						Import journal articles, conference papers, and preprints from Zotero (books and web pages are skipped).
-						New PDF annotations are synced automatically every 24 hours.
-					</p>
-						{paperUploadsRemaining !== null && paperUploadsTotal !== null && paperUploadsUsed !== null && (
+				{zoteroLoading ? (
+					<p className="text-sm text-muted-foreground">Checking connection…</p>
+				) : zoteroStatus?.connected ? (
+				<div className="space-y-3">
+				<p className="text-sm text-muted-foreground">
+					Import journal articles, conference papers, and preprints from Zotero.{" "}
+					{hasAutoSync
+						? "New PDF annotations and new papers are synced automatically every 24 hours."
+						: <>Annotation sync is manual on the Basic plan. <a href="/pricing" className="underline underline-offset-2 hover:text-foreground transition-colors">Upgrade to Researcher</a> for automatic 24-hour sync.</>
+					}
+				</p>
+					{paperUploadsRemaining !== null && paperUploadsTotal !== null && paperUploadsUsed !== null && (
+						<p className="text-xs text-muted-foreground">
+							{atPaperLimit
+								? `Paper limit reached (${paperUploadsUsed}/${paperUploadsTotal}). Delete papers or upgrade to import more.`
+								: `You can import up to ${paperUploadsRemaining} more paper${paperUploadsRemaining === 1 ? "" : "s"} (${paperUploadsUsed}/${paperUploadsTotal} used).`}
+						</p>
+					)}
+			<div className="flex flex-wrap gap-2">
+				<Button
+					type="button"
+					onClick={handleOpenLibraryModal}
+					disabled={zoteroImportLoading || zoteroActionLoading || atPaperLimit}
+				>
+					{zoteroImportLoading ? (
+						<Loader2 className="h-4 w-4 animate-spin mr-2" />
+					) : null}
+					Import
+				</Button>
+				<Button
+					type="button"
+					variant="outline"
+					onClick={handleZoteroSync}
+					disabled={zoteroSyncLoading || zoteroImportLoading || zoteroActionLoading}
+				>
+					{zoteroSyncLoading ? (
+						<Loader2 className="h-4 w-4 animate-spin mr-2" />
+					) : null}
+					Sync Annotations
+				</Button>
+				<Button
+					type="button"
+					variant="outline"
+					onClick={handleZoteroDisconnect}
+					disabled={zoteroActionLoading || zoteroImportLoading}
+				>
+					{zoteroActionLoading ? (
+						<Loader2 className="h-4 w-4 animate-spin mr-2" />
+					) : null}
+					Disconnect
+				</Button>
+			</div>
+					{importProgress !== null && (
+						<div className="space-y-1">
 							<p className="text-xs text-muted-foreground">
-								{atPaperLimit
-									? `Paper limit reached (${paperUploadsUsed}/${paperUploadsTotal}). Delete papers or upgrade to import more.`
-									: `You can import up to ${paperUploadsRemaining} more paper${paperUploadsRemaining === 1 ? "" : "s"} (${paperUploadsUsed}/${paperUploadsTotal} used).`}
+								{importProgress < 100 ? "Importing…" : "Import complete"}
 							</p>
-						)}
-				<div className="flex flex-wrap gap-2">
-					<Button
-						type="button"
-						onClick={handleOpenLibraryModal}
-						disabled={zoteroImportLoading || zoteroActionLoading || atPaperLimit}
-					>
-						{zoteroImportLoading ? (
-							<Loader2 className="h-4 w-4 animate-spin mr-2" />
-						) : null}
-						Import
-					</Button>
-					<Button
-						type="button"
-						variant="outline"
-						onClick={handleZoteroDisconnect}
-						disabled={zoteroActionLoading || zoteroImportLoading}
-					>
-						{zoteroActionLoading ? (
-							<Loader2 className="h-4 w-4 animate-spin mr-2" />
-						) : null}
-						Disconnect
-					</Button>
-				</div>
-						{importProgress !== null && (
-							<div className="space-y-1">
-								<p className="text-xs text-muted-foreground">
-									{importProgress < 100 ? "Importing…" : "Import complete"}
-								</p>
-								<Progress value={importProgress} />
-							</div>
-						)}
+							<Progress value={importProgress} />
 						</div>
+					)}
+					</div>
 					) : (
 						<Button
 							type="button"

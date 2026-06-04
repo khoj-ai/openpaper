@@ -16,8 +16,9 @@ from app.schemas.zotero import (
     ZoteroImportStatusListResponse,
     ZoteroLibraryItem,
     ZoteroLibraryResponse,
+    ZoteroSyncResponse,
 )
-from app.services.zotero_import import import_batch, list_library
+from app.services.zotero_import import import_batch, list_library, sync_batch
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -102,6 +103,45 @@ async def zotero_import(
         imported_via_url=result["imported_via_url"],
         skipped_already_imported=result["skipped_already_imported"],
         errors=[ZoteroImportError(**err) for err in result["errors"]],
+    )
+
+
+@zotero_router.post("/sync", response_model=ZoteroSyncResponse)
+async def zotero_sync(
+    current_user: CurrentUser = Depends(get_required_user),
+    db: Session = Depends(get_db),
+):
+    """Manually trigger annotation sync for all already-imported Zotero PDF papers. Available to all plan tiers."""
+    connection = zotero_crud.get_by_user_id(db, user_id=current_user.id)
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Zotero account not connected",
+        )
+
+    try:
+        result = await sync_batch(db, user=current_user, limit=50)
+    except Exception as e:
+        logger.error("Zotero manual sync failed: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to sync Zotero annotations",
+        ) from e
+
+    if result.get("new_annotations_count", 0) > 0:
+        track_event(
+            "zotero_manual_sync",
+            user_id=str(current_user.id),
+            properties={
+                "papers": result.get("synced_papers_count", 0),
+                "annotations": result.get("new_annotations_count", 0),
+            },
+            db=db,
+        )
+
+    return ZoteroSyncResponse(
+        synced_papers_count=result["synced_papers_count"],
+        new_annotations_count=result["new_annotations_count"],
     )
 
 

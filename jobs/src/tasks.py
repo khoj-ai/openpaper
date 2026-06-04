@@ -317,7 +317,8 @@ def periodic_zotero_sync(self):
     """
     webhook_base = os.getenv("WEBHOOK_BASE_URL", "http://localhost:8000")
     secret = os.getenv("JOBS_INTERNAL_SECRET", "")
-    url = f"{webhook_base}/api/webhooks/internal/zotero-sync-all"
+    sync_interval = int(os.getenv("ZOTERO_SYNC_INTERVAL_SECONDS", str(24 * 3600)))
+    url = f"{webhook_base}/api/webhooks/internal/zotero-sync-all?threshold_seconds={sync_interval}"
     logger.info(f"Triggering periodic Zotero sync via {url}")
     resp = requests.post(
         url,
