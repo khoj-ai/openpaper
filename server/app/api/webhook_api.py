@@ -31,7 +31,7 @@ from app.helpers.email import (
     send_data_table_complete_email,
     send_referral_credit_available_email,
 )
-from app.helpers.paper_search import get_doi
+from app.helpers.metadata_hydration import hydrate_paper_metadata
 from app.helpers.s3 import s3_service
 from app.llm.citation_handler import CitationHandler
 from app.llm.operations import operations
@@ -235,31 +235,16 @@ def post_process_paper(
 
         doi: Optional[str] = None
         try:
-            doi = get_doi(title, authors)
-        except Exception as e:
-            logger.error(
-                f"Error resolving DOI for paper {paper_id}: {str(e)}",
-                exc_info=True,
-            )
-
-        try:
             paper = paper_crud.get(db=db, id=paper_id, user=job_user)
             if paper:
-                update_fields: dict = {
-                    "attempted_metadata_at": datetime.now(timezone.utc)
-                }
-                if doi:
-                    update_fields["doi"] = doi
-                paper_crud.update(
-                    db=db,
-                    obj_in=PaperUpdate(**update_fields),
-                    db_obj=paper,
-                    user=job_user,
+                paper = hydrate_paper_metadata(
+                    db=db, paper=paper, user=job_user, force=True, agentic=True
                 )
+                doi = str(paper.doi) if paper.doi else None
         except Exception as e:
             db.rollback()
             logger.error(
-                f"Error finalizing metadata for paper {paper_id}: {str(e)}",
+                f"Error hydrating metadata for paper {paper_id}: {str(e)}",
                 exc_info=True,
             )
 

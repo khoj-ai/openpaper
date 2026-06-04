@@ -4,6 +4,7 @@ from typing import List
 
 from app.auth.dependencies import get_required_user
 from app.database.crud.paper_crud import paper_crud
+from app.database.crud.paper_upload_crud import paper_upload_job_crud
 from app.database.crud.projects.project_paper_crud import (
     ProjectPaperCreate,
     project_paper_crud,
@@ -272,6 +273,49 @@ async def get_project_papers(
         return JSONResponse(
             status_code=400,
             content={"message": f"Failed to fetch project papers"},
+        )
+
+
+@project_papers_router.get("/{project_id}/pending-jobs")
+async def get_project_pending_jobs(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+) -> JSONResponse:
+    """
+    Get upload jobs still in progress for a project.
+
+    Lets the client rehydrate the upload tracker after a refresh, since the
+    in-flight jobs are otherwise only held in browser state.
+    """
+    try:
+        jobs = paper_upload_job_crud.get_in_progress_jobs_for_project(
+            db, project_id=uuid.UUID(project_id), user=current_user
+        )
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "jobs": [
+                    {
+                        "job_id": str(job.id),
+                        "status": job.status,
+                        "paper_id": str(paper.id),
+                        "title": paper.title,
+                        "started_at": (
+                            job.started_at.isoformat() if job.started_at else None
+                        ),
+                    }
+                    for job, paper in jobs
+                ]
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Error fetching pending project jobs: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=400,
+            content={"message": "Failed to fetch pending project jobs"},
         )
 
 

@@ -2,6 +2,7 @@ import re
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Union
 
+from app.schemas.citation import CitationResult
 from app.schemas.responses import ToolCall, ToolCallResult
 from pydantic import BaseModel, Field
 
@@ -98,6 +99,36 @@ class EvidenceCollection(BaseModel):
         default=False,
         description="Whether evidence has been compacted (citations need resolution)",
     )
+    artifacts: List[CitationResult] = Field(
+        default_factory=list,
+        description="First-party artifacts produced during gathering (e.g. citations)",
+    )
+
+    def add_artifact(self, artifact: CitationResult) -> None:
+        """Record a first-party artifact (e.g. a resolved citation)."""
+        self.artifacts.append(artifact)
+
+    def get_artifacts(self) -> List[CitationResult]:
+        return self.artifacts
+
+    def to_trace_dict(self) -> Optional[Dict[str, Any]]:
+        """Compact trajectory of this turn for user-facing inspection: the tool
+        calls made and, for any citation subagent runs, their internal steps."""
+        tool_calls = [
+            {"name": tc.name, "args": tc.args} for tc in self.previous_tool_calls
+        ]
+        citations = [
+            {
+                "paper_id": a.paper_id,
+                "method": a.method,
+                "preferred_style": a.preferred_style,
+                "steps": [step.model_dump() for step in a.steps],
+            }
+            for a in self.artifacts
+        ]
+        if not tool_calls and not citations:
+            return None
+        return {"tool_calls": tool_calls, "citations": citations}
 
     def load_from_dict(self, evidence_dict: Dict[str, List[str]]) -> None:
         """Load evidence from a dictionary format"""

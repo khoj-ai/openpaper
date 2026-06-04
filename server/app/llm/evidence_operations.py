@@ -14,6 +14,7 @@ from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
 from app.database.telemetry import track_event
 from app.llm.base import BaseLLMClient, ModelType
+from app.llm.citation_agent import find_citation_function, run_find_citation
 from app.llm.json_parser import JSONParser
 from app.llm.prompts import (
     EVIDENCE_COMPACTION_PROMPT,
@@ -37,6 +38,7 @@ from app.llm.tools.file_tools import (
 )
 from app.llm.tools.meta_tools import stop_function
 from app.llm.utils import retry_llm_operation
+from app.schemas.citation import CitationResult
 from app.schemas.message import (
     EvidenceCollection,
     EvidenceSummaryResponse,
@@ -63,6 +65,39 @@ HEARTBEAT_INTERVAL_SECONDS = (
 )
 
 _tool_executor = ThreadPoolExecutor(max_workers=4)
+
+# Structured-output schema for the fallback keyword extractor — provider
+# constrains the response to this shape so we never have to scrape JSON out of
+# a markdown fence again.
+KEYWORD_EXTRACTION_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "keywords": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+    },
+    "required": ["keywords"],
+}
+
+
+def _summarize_citation(result: CitationResult) -> str:
+    """A compact, text summary of a citation result for the answer model.
+
+    The full structured data is delivered to the user separately, so the answer
+    model should not re-paste a formatted citation.
+    """
+    d = result.data
+    return (
+        f"Resolved citation metadata for paper {result.paper_id} "
+        f"(preferred style: {result.style_display}; method: {result.method}). "
+        f"Title: {d.title}; Journal: {d.journal}; Publisher: {d.publisher}; "
+        f"DOI: {d.doi}; Date: {d.publish_date}. "
+        f"Still missing: {result.missing_fields or 'none'}. "
+        "This citation is delivered to the user separately; do not write out a "
+        "formatted citation string in your answer."
+    )
 
 
 class EvidenceOperations(BaseLLMClient):
@@ -140,6 +175,7 @@ class EvidenceOperations(BaseLLMClient):
             view_file_function,
             read_abstract_function,
             search_all_files_function,
+            find_citation_function,
             stop_function,
         ]
 
@@ -149,6 +185,7 @@ class EvidenceOperations(BaseLLMClient):
             "view_file": view_file,
             "read_abstract": read_abstract,
             "search_all_files": search_all_files,
+            "find_citation": run_find_citation,
             "stop": lambda: None,
         }
 
@@ -299,28 +336,44 @@ class EvidenceOperations(BaseLLMClient):
                                     "content": f"{pretty_fn_name} - {paper_name}{display_query}",
                                 }
 
-                        evidence_collection.add_tool_call_result(fn_selected, result)
-
-                        preserve_line_numbers = fn_name in [
-                            "search_file",
-                            "search_all_files",
-                        ]
-
-                        if fn_name == "search_all_files" and isinstance(result, dict):
-                            for paper_id, lines in result.items():
-                                evidence_collection.add_evidence(
-                                    paper_id, lines, preserve_line_numbers=True
-                                )
-
-                        paper_id = fn_args.get("paper_id")
-                        if paper_id and (
-                            isinstance(result, str) or isinstance(result, list)
+                        if fn_name == "find_citation" and isinstance(
+                            result, CitationResult
                         ):
-                            evidence_collection.add_evidence(
-                                paper_id,
-                                result,
-                                preserve_line_numbers=preserve_line_numbers,
+                            # Citations are first-party artifacts (rendered as a
+                            # card client-side), not evidence. Capture the
+                            # structured result and feed the model a short
+                            # summary so it can reference but not re-paste it.
+                            evidence_collection.add_artifact(result)
+                            evidence_collection.add_tool_call_result(
+                                fn_selected, _summarize_citation(result)
                             )
+                        else:
+                            evidence_collection.add_tool_call_result(
+                                fn_selected, result
+                            )
+
+                            preserve_line_numbers = fn_name in [
+                                "search_file",
+                                "search_all_files",
+                            ]
+
+                            if fn_name == "search_all_files" and isinstance(
+                                result, dict
+                            ):
+                                for paper_id, lines in result.items():
+                                    evidence_collection.add_evidence(
+                                        paper_id, lines, preserve_line_numbers=True
+                                    )
+
+                            paper_id = fn_args.get("paper_id")
+                            if paper_id and (
+                                isinstance(result, str) or isinstance(result, list)
+                            ):
+                                evidence_collection.add_evidence(
+                                    paper_id,
+                                    result,
+                                    preserve_line_numbers=preserve_line_numbers,
+                                )
 
                     except Exception as e:
                         logger.error(f"Error executing function {fn_name}: {e}")
@@ -347,8 +400,13 @@ class EvidenceOperations(BaseLLMClient):
                     db=db,
                 )
 
-        # Fallback: if no evidence was gathered, try keyword-based search
-        if not evidence_collection.has_evidence():
+        # Fallback: if no evidence was gathered AND no artifacts (e.g. a pure
+        # citation request that produced a card but no excerpt), try keyword-
+        # based search. Artifacts count as a real outcome — don't waste a call.
+        if (
+            not evidence_collection.has_evidence()
+            and not evidence_collection.get_artifacts()
+        ):
             logger.info(
                 "No evidence gathered through normal flow. "
                 "Attempting fallback keyword search."
@@ -667,22 +725,27 @@ class EvidenceOperations(BaseLLMClient):
         message_content = [TextContent(text=formatted_prompt)]
 
         llm_response = self.generate_content(
-            system_prompt="You are a helpful assistant that extracts search keywords.",
+            system_prompt=(
+                "You extract search keywords. Respond only with the JSON object "
+                "matching the schema."
+            ),
             contents=message_content,
             model_type=ModelType.FAST,
             provider=llm_provider,
+            schema=KEYWORD_EXTRACTION_SCHEMA,
         )
 
         if llm_response and llm_response.text:
             try:
-                keywords = json.loads(llm_response.text.strip())
-                if isinstance(keywords, list):
-                    return [str(k) for k in keywords if k][:5]
-            except json.JSONDecodeError:
-                logger.warning(f"Failed to parse keywords as JSON: {llm_response.text}")
-                text = llm_response.text.strip().strip("[]\"'")
-                keywords = [k.strip().strip("\"'") for k in re.split(r"[,\n]", text)]
-                return [k for k in keywords if k][:5]
+                parsed = json.loads(llm_response.text)
+                keywords = (
+                    parsed.get("keywords", []) if isinstance(parsed, dict) else []
+                )
+                return [str(k) for k in keywords if k][:5]
+            except (json.JSONDecodeError, AttributeError):
+                logger.warning(
+                    f"Failed to parse keyword schema response: {llm_response.text}"
+                )
 
         logger.warning("Failed to extract keywords from question")
         return []

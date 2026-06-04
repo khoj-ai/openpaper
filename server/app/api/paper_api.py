@@ -1,6 +1,5 @@
 import logging
 import uuid
-from datetime import datetime, timezone
 from typing import List, Optional
 
 from app.auth.dependencies import get_current_user, get_required_user
@@ -17,8 +16,7 @@ from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
 from app.database.models import Paper, PaperStatus
 from app.database.telemetry import track_event
-from app.helpers.paper_search import get_doi, get_enriched_data
-from app.helpers.parser import parse_publication_date
+from app.helpers.metadata_hydration import hydrate_paper_metadata
 from app.helpers.s3 import s3_service
 from app.helpers.subscription_limits import can_user_upload_paper
 from app.schemas.responses import ResponseCitation
@@ -35,8 +33,6 @@ logger = logging.getLogger(__name__)
 
 # Create API router with prefix
 paper_router = APIRouter()
-
-CHECK_METADATA_INTERVAL_DAYS = 30
 
 
 class SharePaperSchemaResponse(BaseModel):
@@ -482,8 +478,6 @@ async def get_pdf(
     if not paper:
         return JSONResponse(status_code=404, content={"message": "Document not found"})
 
-    paper_data = paper.to_dict()
-
     signed_url = s3_service.get_cached_presigned_url(
         db,
         paper_id=str(paper.id),
@@ -493,63 +487,9 @@ async def get_pdf(
     if not signed_url:
         return JSONResponse(status_code=404, content={"message": "File not found"})
 
-    should_check_doi = (not paper.doi) and (paper.title is not None)
-    is_cache_stale = (not paper.attempted_metadata_at) or (
-        paper.attempted_metadata_at
-        and (datetime.now(timezone.utc) - paper.attempted_metadata_at).days
-        >= CHECK_METADATA_INTERVAL_DAYS
-    )
+    paper = hydrate_paper_metadata(db=db, paper=paper, user=current_user)
 
-    try:
-        if should_check_doi and is_cache_stale:
-            doi = get_doi(str(paper.title), list(paper.authors) if paper.authors else None)  # type: ignore
-            if doi:
-                paper_crud.update(
-                    db=db, db_obj=paper, obj_in=PaperUpdate(doi=doi), user=current_user
-                )
-            paper_crud.update(
-                db=db,
-                db_obj=paper,
-                obj_in=PaperUpdate(attempted_metadata_at=datetime.now(timezone.utc)),
-                user=current_user,
-            )
-
-        if paper.doi and (not paper.journal and not paper.publisher) and is_cache_stale:
-            enriched_data = get_enriched_data(str(paper.doi))
-            if enriched_data:
-                paper_data["journal"] = enriched_data.journal
-                paper_data["publisher"] = enriched_data.publisher
-
-                publish_datetime = (
-                    parse_publication_date(enriched_data.publication_date)
-                    if enriched_data.publication_date
-                    else paper.publish_date
-                )
-                paper_data["publish_date"] = (
-                    publish_datetime.isoformat() if publish_datetime else None
-                )
-
-                paper_crud.update(
-                    db=db,
-                    db_obj=paper,
-                    obj_in=PaperUpdate(
-                        journal=enriched_data.journal,
-                        publisher=enriched_data.publisher,
-                        publish_date=(
-                            publish_datetime.isoformat() if publish_datetime else None
-                        ),
-                    ),
-                    user=current_user,
-                )
-            paper_crud.update(
-                db=db,
-                db_obj=paper,
-                obj_in=PaperUpdate(attempted_metadata_at=datetime.now(timezone.utc)),
-                user=current_user,
-            )
-    except Exception:
-        logger.exception("Error updating enriched data for paper %s", id, exc_info=True)
-
+    paper_data = paper.to_dict()
     paper_data["file_url"] = signed_url
     paper_data["summary_citations"] = [  # type: ignore
         ResponseCitation.model_validate(citation).model_dump()

@@ -155,6 +155,33 @@ export default function ProjectPage() {
 	}, [chatDisabled, router]);
 
 
+	// Rehydrate the upload tracker after a refresh: in-flight jobs are
+	// otherwise only held in local state and lost on navigation.
+	useEffect(() => {
+		if (!projectId) return;
+		let cancelled = false;
+		(async () => {
+			try {
+				const response = await fetchFromApi(`/api/projects/papers/${projectId}/pending-jobs`);
+				if (cancelled || !response?.jobs?.length) return;
+				const restoredJobs: MinimalJob[] = response.jobs.map((job: { job_id: string; title: string | null }) => ({
+					jobId: job.job_id,
+					fileName: job.title || "Uploading paper…",
+				}));
+				setInitialJobs((prevJobs) => {
+					const known = new Set(prevJobs.map((j) => j.jobId));
+					const newOnes = restoredJobs.filter((j) => !known.has(j.jobId));
+					return newOnes.length ? [...prevJobs, ...newOnes] : prevJobs;
+				});
+			} catch (err) {
+				console.error("Failed to fetch pending upload jobs for project", err);
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [projectId]);
+
 	const handleDeleteConversation = async (conversationId: string) => {
 		try {
 			await fetchFromApi(`/api/conversation/${conversationId}`, {
@@ -566,14 +593,14 @@ export default function ProjectPage() {
 												setNewQuery(e.target.value)
 											}}
 											onKeyDown={handleKeyDown}
-											className="min-h-[80px] resize-none pr-12 border-none dark:border-none focus:border-blue-400 focus:ring-transparent bg-secondary dark:bg-accent text-primary"
+											className="min-h-[80px] resize-none pr-12 border-none dark:border-none focus-visible:ring-1 focus-visible:ring-blue-400/30 bg-secondary dark:bg-accent text-primary"
 											disabled={chatDisabled || isSubmitting}
 										/>
 										<Button
 											type="submit"
 											disabled={!newQuery.trim() || chatDisabled || isSubmitting}
 											size="sm"
-											className="absolute bottom-3 right-3 h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+											className="absolute bottom-3 right-3 h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
 										>
 											{isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
 										</Button>

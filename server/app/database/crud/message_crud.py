@@ -21,7 +21,7 @@ class MessageBase(BaseModel):
     role: str
     content: str
     references: Optional[Dict[str, Any]] = None
-    bucket: Optional[Dict[str, Any]] = None
+    trace: Optional[Dict[str, Any]] = None
 
 
 class MessageCreate(MessageBase):
@@ -32,7 +32,7 @@ class MessageUpdate(BaseModel):
     role: Optional[str] = None
     content: Optional[str] = None
     references: Optional[Dict[str, Any]] = None
-    bucket: Optional[Dict[str, Any]] = None
+    trace: Optional[Dict[str, Any]] = None
 
 
 class MessageCRUD(CRUDBase[Message, MessageCreate, MessageUpdate]):
@@ -206,7 +206,8 @@ class MessageCRUD(CRUDBase[Message, MessageCreate, MessageUpdate]):
                 "role": message.role,
                 "content": message.content,
                 "references": message.references,
-                "bucket": message.bucket,
+                "artifacts": [a.payload for a in message.artifacts] or None,
+                "trace": message.trace,
                 "sequence": message.sequence,
             }
             formatted_messages.append(message_dict)

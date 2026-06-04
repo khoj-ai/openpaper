@@ -9,7 +9,7 @@ import remarkGfm from "remark-gfm";
 import rehypeKatex from "rehype-katex";
 import remarkMath from "remark-math";
 import "katex/dist/katex.min.css";
-import { Loader, ArrowUp, Recycle, X, ChevronDown, ChevronUp, BookOpen } from "lucide-react";
+import { Loader, Send, Recycle, X, ChevronDown, ChevronUp, BookOpen } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import CustomCitationLink from "@/components/utils/CustomCitationLink";
 import {
@@ -20,8 +20,10 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { ChatMessageActions } from "@/components/ChatMessageActions";
-import { ChatMessage, Reference, PaperItem } from "@/lib/schema";
+import { ChatMessage, Reference, PaperItem, CitationArtifact } from "@/lib/schema";
 import ReferencePaperCards from "@/components/ReferencePaperCards";
+import { CitationArtifactCard } from "@/components/CitationArtifactCard";
+import { MessageTraceViewer } from "@/components/MessageTraceViewer";
 import Link from "next/link";
 import { TopicBubbles } from "@/components/TopicBubbles";
 import { AnimatedGradientText } from "@/components/magicui/animated-gradient-text";
@@ -36,6 +38,7 @@ interface ConversationViewProps {
 	isStreaming: boolean;
 	streamingChunks: string[];
 	streamingReferences?: Reference;
+	streamingArtifacts?: CitationArtifact[];
 	statusMessage: string;
 	error: string | null;
 	isSessionLoading: boolean;
@@ -63,6 +66,7 @@ export const ConversationView = ({
 	isStreaming,
 	streamingChunks,
 	streamingReferences,
+	streamingArtifacts,
 	statusMessage,
 	error,
 	isSessionLoading,
@@ -223,11 +227,12 @@ export const ConversationView = ({
 		>
 			<div
 				data-message-index={index}
-				className={`relative group prose dark:prose-invert !max-w-full transition-all duration-300 ease-in-out ${msg.role === "user"
-					? "text-lg w-fit animate-fade-in line-clamp-3 mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-600 px-2 py-2 rounded-xl border border-blue-100 dark:border-gray-600"
+				className={`relative group prose dark:prose-invert max-w-full! transition-all duration-300 ease-in-out ${msg.role === "user"
+					? "text-lg w-fit animate-fade-in line-clamp-3 mt-6 bg-linear-to-r from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-600 px-2 py-2 rounded-xl border border-blue-100 dark:border-gray-600"
 					: "w-full text-primary"
 					}`}
 			>
+				{msg.role === "assistant" && <MessageTraceViewer trace={msg.trace} />}
 				<Markdown
 					remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
 					rehypePlugins={[rehypeKatex]}
@@ -273,6 +278,9 @@ export const ConversationView = ({
 				>
 					{msg.content}
 				</Markdown>
+				{msg.artifacts && msg.artifacts.length > 0 && (
+					<CitationArtifactCard artifacts={msg.artifacts} />
+				)}
 				{msg.references && msg.references["citations"]?.length > 0 ? (
 					<div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
 						<div
@@ -365,10 +373,45 @@ export const ConversationView = ({
 								{messages.length > 0 && memoizedMessages}
 							</>
 						)}
+						{isStreaming && (
+							<div className="flex items-center gap-3 p-2">
+								<Loader className="animate-spin w-6 h-6 text-blue-500 shrink-0" />
+								<div className="text-sm text-secondary-foreground w-full">
+									{displayedText}
+									{isTyping && <span className="animate-pulse">|</span>}
+									{statusMessageHistory.length > 0 && (
+										<div className="text-xs text-gray-500 mt-1">
+											<div className="flex justify-between items-center">
+												<span>{statusMessageHistory[statusMessageHistory.length - 1].message}</span>
+												<span className="ml-2 text-gray-400 tabular-nums">({elapsedTime}s)</span>
+											</div>
+											{statusMessageHistory.length > 1 && (
+												<div className="mt-1">
+													<button onClick={() => setIsHistoryOpen(!isHistoryOpen)} className="flex items-center text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+														{isHistoryOpen ? <ChevronUp className="w-4 h-4 mr-1" /> : <ChevronDown className="w-4 h-4 mr-1" />}
+														<span>Progress</span>
+													</button>
+													{isHistoryOpen && (
+														<ul className="mt-2 border-l border-gray-300 dark:border-gray-600">
+															{statusMessageHistory.slice(0, -1).reverse().map((status, index) => (
+																<li key={index} className="relative ml-4 mb-1 text-gray-400">
+																	<div className="absolute w-2 h-2 bg-gray-400 rounded-full top-1.5 -left-5 dark:bg-gray-500"></div>
+																	{status.message}
+																</li>
+															))}
+														</ul>
+													)}
+												</div>
+											)}
+										</div>
+									)}
+								</div>
+							</div>
+						)}
 						{isStreaming && streamingChunks.length > 0 && (
-							<div className="relative group prose dark:prose-invert !max-w-full rounded-lg w-full text-primary dark:text-primary-foreground transition-all duration-300 ease-in-out">
+							<div className="relative group prose dark:prose-invert max-w-full! rounded-lg w-full text-primary dark:text-primary-foreground transition-all duration-300 ease-in-out">
 								<AnimatedMarkdown
-									className="!p-0"
+									className="p-0!"
 									content={streamingChunks.join("")}
 									remarkPlugins={[[remarkMath, { singleDollarTextMath: false }], remarkGfm]}
 									rehypePlugins={[rehypeKatex]}
@@ -408,45 +451,13 @@ export const ConversationView = ({
 										table: CopyableTable,
 									}}
 								/>
+								{streamingArtifacts && streamingArtifacts.length > 0 && (
+									<CitationArtifactCard artifacts={streamingArtifacts} />
+								)}
 								<ChatMessageActions
 									message={streamingChunks.join("")}
 									references={streamingReferences}
 								/>
-							</div>
-						)}
-						{isStreaming && (
-							<div className="flex items-center gap-3 p-2">
-								<Loader className="animate-spin w-6 h-6 text-blue-500 flex-shrink-0" />
-								<div className="text-sm text-secondary-foreground w-full">
-									{displayedText}
-									{isTyping && <span className="animate-pulse">|</span>}
-									{statusMessageHistory.length > 0 && (
-										<div className="text-xs text-gray-500 mt-1">
-											<div className="flex justify-between items-center">
-												<span>{statusMessageHistory[statusMessageHistory.length - 1].message}</span>
-												<span className="ml-2 text-gray-400 tabular-nums">({elapsedTime}s)</span>
-											</div>
-											{statusMessageHistory.length > 1 && (
-												<div className="mt-1">
-													<button onClick={() => setIsHistoryOpen(!isHistoryOpen)} className="flex items-center text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
-														{isHistoryOpen ? <ChevronUp className="w-4 h-4 mr-1" /> : <ChevronDown className="w-4 h-4 mr-1" />}
-														<span>Progress</span>
-													</button>
-													{isHistoryOpen && (
-														<ul className="mt-2 border-l border-gray-300 dark:border-gray-600">
-															{statusMessageHistory.slice(0, -1).reverse().map((status, index) => (
-																<li key={index} className="relative ml-4 mb-1 text-gray-400">
-																	<div className="absolute w-2 h-2 bg-gray-400 rounded-full top-1.5 -left-5 dark:bg-gray-500"></div>
-																	{status.message}
-																</li>
-															))}
-														</ul>
-													)}
-												</div>
-											)}
-										</div>
-									)}
-								</div>
 							</div>
 						)}
 						<div ref={messagesEndRef} />
@@ -485,10 +496,10 @@ export const ConversationView = ({
 								autoFocus
 								placeholder={
 									isCentered
-										? "Discover something in your papers..."
+										? "Look for a specific citation. Find a relevant paper. Collate evidence across your library."
 										: "Ask a follow-up"
 								}
-								className="pr-16 resize-none w-full bg-secondary"
+								className="min-h-20 resize-none pr-12 w-full border-none dark:border-none focus-visible:ring-1 focus-visible:ring-blue-400/30 bg-secondary dark:bg-accent text-primary"
 								disabled={isStreaming || (!isPapersLoading && papers.length === 0) || chatCreditLimitReached || !isOwner}
 								onKeyDown={(e) => {
 									if (e.key === "Enter" && !e.shiftKey) {
@@ -499,11 +510,11 @@ export const ConversationView = ({
 							/>
 							<Button
 								type="submit"
-								variant="ghost"
-								className="absolute top-1/2 right-2 -translate-y-1/2"
-								disabled={isStreaming || (!isPapersLoading && papers.length === 0) || chatCreditLimitReached || !isOwner}
+								size="sm"
+								className="absolute bottom-3 right-3 h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+								disabled={!currentMessage.trim() || isStreaming || (!isPapersLoading && papers.length === 0) || chatCreditLimitReached || !isOwner}
 							>
-								<ArrowUp className="h-5 w-5" />
+								{isStreaming ? <Loader className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
 							</Button>
 						</div>
 						{chatCreditLimitReached && (
@@ -537,7 +548,7 @@ export const ConversationView = ({
 							<X className="h-4 w-4" />
 						</Button>
 					</div>
-					<div className="flex-grow transition-all duration-300 ease-in-out overflow-y-auto">
+					<div className="grow transition-all duration-300 ease-in-out overflow-y-auto">
 						{pdfUrl && (
 							<PdfHighlighterViewer
 								pdfUrl={pdfUrl}
