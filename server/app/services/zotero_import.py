@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from io import BytesIO
 from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict
@@ -57,12 +58,20 @@ def _parse_zotero_date(date_str: Optional[str]) -> Optional[str]:
         return None
     try:
         s = date_str.strip()
-        if len(s) >= 10:
-            return s[:10]
+        # ISO format: starts with YYYY-MM-DD
+        iso_match = re.match(r"^(\d{4}-\d{2}-\d{2})", s)
+        if iso_match:
+            return iso_match.group(1)
+        # ISO partial: YYYY-MM
         if len(s) == 7 and s[4] == "-":
             return s + "-01"
+        # Bare 4-digit year
         if len(s) == 4 and s.isdigit():
             return s + "-01-01"
+        # Human-readable date (e.g. "August 3, 2025"): extract 4-digit year
+        year_match = re.search(r"\b(\d{4})\b", s)
+        if year_match:
+            return year_match.group(1) + "-01-01"
     except Exception:
         pass
     return None
@@ -1431,9 +1440,12 @@ async def sync_batch(
                 {"zotero_item_key": import_row.zotero_item_key, "error": str(e)}
             )
 
+    unique_paper_ids = {r["paper_id"] for r in synced if r.get("paper_id")}
+
     return {
         "synced": synced,
-        "synced_papers_count": len(synced),
+        "synced_papers_count": len(unique_paper_ids),
+        "synced_zotero_items_count": len(synced),
         "new_annotations_count": new_annotations_count,
         "errors": errors,
     }

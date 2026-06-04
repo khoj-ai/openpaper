@@ -23,7 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { refreshActivePapers } from "@/hooks/useActivePapers";
+import { refreshActivePapers, useActivePapers } from "@/hooks/useActivePapers";
 import { isPaperUploadAtLimit, useSubscription } from "@/hooks/useSubscription";
 import { fetchFromApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -400,6 +400,7 @@ function SettingsContent() {
 	const [isSaving, setIsSaving] = useState(false);
 
 	const { subscription, refetch: refetchSubscription } = useSubscription();
+	const { papers } = useActivePapers();
 	const atPaperLimit = isPaperUploadAtLimit(subscription);
 	const paperUploadsRemaining = subscription?.usage?.paper_uploads_remaining ?? null;
 	const paperUploadsTotal = subscription?.limits?.paper_uploads ?? null;
@@ -464,6 +465,10 @@ function SettingsContent() {
 			fetchZoteroStatus();
 		}
 	}, [user, fetchZoteroStatus]);
+
+	useEffect(() => {
+		refetchSubscription();
+	}, [papers.length, refetchSubscription]);
 
 	useEffect(() => {
 		if (user && zoteroStatus?.connected) {
