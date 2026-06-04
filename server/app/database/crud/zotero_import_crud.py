@@ -1,5 +1,3 @@
-import json
-import os
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 from uuid import UUID
@@ -7,17 +5,6 @@ from uuid import UUID
 from app.database.models import Paper, ZoteroImportedItem, ZoteroImportSource, ZoteroImportStatus
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
-
-# #region agent log
-_DEBUG_LOG = os.path.join(os.path.dirname(__file__), "../../../../.cursor/debug-dcd8e3.log")
-
-def _dbg(msg, data, hyp):
-    try:
-        with open(_DEBUG_LOG, "a") as _f:
-            _f.write(json.dumps({"sessionId": "dcd8e3", "timestamp": int(datetime.now(timezone.utc).timestamp() * 1000), "location": "zotero_import_crud.py", "message": msg, "data": data, "hypothesisId": hyp}) + "\n")
-    except Exception:
-        pass
-# #endregion
 
 
 class CRUDZoteroImport:
@@ -129,31 +116,6 @@ class CRUDZoteroImport:
     ) -> List[UUID]:
         cutoff = datetime.now(timezone.utc) - timedelta(hours=threshold_hours)
 
-        # #region agent log — H1/H2/H3: inspect all items before filtering
-        all_items = db.query(
-            ZoteroImportedItem.user_id,
-            ZoteroImportedItem.zotero_item_key,
-            ZoteroImportedItem.import_source,
-            ZoteroImportedItem.status,
-            ZoteroImportedItem.zotero_attachment_key,
-            ZoteroImportedItem.last_synced_at,
-        ).all()
-        _dbg("all_zotero_imported_items", {
-            "count": len(all_items),
-            "items": [
-                {
-                    "user_id": str(r.user_id),
-                    "key": r.zotero_item_key,
-                    "source": str(r.import_source),
-                    "status": str(r.status),
-                    "has_attachment_key": r.zotero_attachment_key is not None,
-                    "last_synced_at": r.last_synced_at.isoformat() if r.last_synced_at else None,
-                }
-                for r in all_items
-            ]
-        }, "H1_H2_H3")
-        # #endregion
-
         rows = (
             db.query(ZoteroImportedItem.user_id)
             .filter(
@@ -168,13 +130,6 @@ class CRUDZoteroImport:
             .distinct()
             .all()
         )
-
-        # #region agent log — final result after filtering
-        _dbg("list_user_ids_due_for_sync_result", {
-            "cutoff_iso": cutoff.isoformat(),
-            "user_ids": [str(r.user_id) for r in rows],
-        }, "H1_H2_H3")
-        # #endregion
 
         return [row.user_id for row in rows]
 

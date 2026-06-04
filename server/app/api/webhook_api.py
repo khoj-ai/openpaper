@@ -866,29 +866,11 @@ async def trigger_zotero_sync_all(request: Request, db: Session = Depends(get_db
     user_ids = zotero_import_crud.list_user_ids_due_for_sync(db, threshold_hours=threshold_hours)
     logger.info(f"Periodic Zotero sync: found {len(user_ids)} users due for sync (threshold={threshold_hours:.4f}h)")
 
-    # #region agent log — H4: confirm migration ran and plan check
-    import json as _json
-    from app.helpers.subscription_limits import get_user_subscription_plan as _get_plan
-    _DEBUG_LOG_WH = os.path.join(os.path.dirname(__file__), "../../../.cursor/debug-dcd8e3.log")
-    def _wh_dbg(msg, data, hyp):
-        try:
-            with open(_DEBUG_LOG_WH, "a") as _f:
-                _f.write(_json.dumps({"sessionId": "dcd8e3", "timestamp": int(__import__("datetime").datetime.now(__import__("datetime").timezone.utc).timestamp() * 1000), "location": "webhook_api.py", "message": msg, "data": data, "hypothesisId": hyp}) + "\n")
-        except Exception:
-            pass
-    _wh_dbg("webhook_user_ids_due", {"count": len(user_ids), "user_ids": [str(u) for u in user_ids]}, "H4")
-    # #endregion
-
     results = []
     for user_id in user_ids:
         user = user_crud.get(db, id=user_id)
         if not user:
             continue
-
-        # #region agent log — H4: log plan for each user
-        _plan = _get_plan(db, user)
-        _wh_dbg("user_plan_check", {"user_id": str(user_id), "email": user.email, "plan": str(_plan)}, "H4")
-        # #endregion
 
         if not can_user_auto_sync_zotero(db, user):
             logger.debug(f"Skipping auto-sync for basic-plan user {user_id}")

@@ -471,6 +471,10 @@ function SettingsContent() {
 	}, [papers.length, refetchSubscription]);
 
 	useEffect(() => {
+		if (user) refetchSubscription();
+	}, [user?.id, refetchSubscription]);
+
+	useEffect(() => {
 		if (user && zoteroStatus?.connected) {
 			setRecentImportsLoaded(false);
 			fetchRecentImports();
