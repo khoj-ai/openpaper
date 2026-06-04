@@ -1,7 +1,7 @@
 """add zotero oauth tables
 
 Revision ID: d4e8f1a2b3c5
-Revises: b7f5658668f6
+Revises: 6d888f7203ba
 Create Date: 2026-05-18 12:00:00.000000+00:00
 
 """
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "d4e8f1a2b3c5"
-down_revision: Union[str, None] = "b7f5658668f6"
+down_revision: Union[str, None] = "6d888f7203ba"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
