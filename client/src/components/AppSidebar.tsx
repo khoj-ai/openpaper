@@ -2,7 +2,6 @@
 
 import {
     AlertTriangle,
-    BookMarked,
     ChevronsUpDown,
     FileText,
     FolderKanban,
@@ -153,15 +152,6 @@ const UserMenuContent = ({
                 Plans
             </Button>
         </Link>
-        <Link href="/settings#zotero" className="w-full">
-            <Button variant="ghost" className="w-full justify-start">
-                <BookMarked size={16} className="mr-2" />
-                Integrations
-                <Badge className="ml-auto text-[10px] px-1.5 py-0 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900">
-                    New
-                </Badge>
-            </Button>
-        </Link>
         {referralEntry && (
             <Button
                 variant="ghost"
@@ -192,6 +182,20 @@ const UserMenuContent = ({
             <LogOut size={16} className="mr-2" />
             Sign out
         </Button>
+        <div className="px-3 py-2">
+            <p className="text-sm text-muted-foreground px-1 mb-1.5">What&apos;s new</p>
+            <div className="relative ml-2">
+                <Link href="/settings#zotero" className="block">
+                    <div className="relative ml-3 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors">
+                        <span
+                            aria-hidden
+                            className="absolute -left-3 top-1/2 -translate-y-1/2 size-1.5 rounded-full bg-muted-foreground/50"
+                        />
+                        Zotero Integration
+                    </div>
+                </Link>
+            </div>
+        </div>
     </div>
 )
 
