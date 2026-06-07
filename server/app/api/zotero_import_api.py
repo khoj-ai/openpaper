@@ -1,4 +1,5 @@
 import logging
+from typing import List, Optional
 
 from app.auth.dependencies import get_required_user
 from app.database.crud.zotero_crud import zotero_crud
@@ -19,7 +20,7 @@ from app.schemas.zotero import (
     ZoteroSyncResponse,
 )
 from app.services.zotero_import import import_batch, list_library, sync_batch
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -145,14 +146,10 @@ async def zotero_sync(
     )
 
 
-@zotero_router.get("/import/status", response_model=ZoteroImportStatusListResponse)
-async def zotero_import_status_list(
-    current_user: CurrentUser = Depends(get_required_user),
-    db: Session = Depends(get_db),
-):
-    """List recent Zotero import records for the current user."""
-    rows = zotero_import_crud.list_recent_by_user(db, user_id=current_user.id)
-    items = [
+def _zotero_import_status_items(
+    rows: list,
+) -> list[ZoteroImportStatusItem]:
+    return [
         ZoteroImportStatusItem(
             zotero_item_key=row.zotero_item_key,
             paper_id=str(row.paper_id) if row.paper_id else None,
@@ -166,4 +163,20 @@ async def zotero_import_status_list(
         )
         for row, title in rows
     ]
+
+
+@zotero_router.get("/import/status", response_model=ZoteroImportStatusListResponse)
+async def zotero_import_status_list(
+    item_keys: Optional[List[str]] = Query(None),
+    current_user: CurrentUser = Depends(get_required_user),
+    db: Session = Depends(get_db),
+):
+    """List recent Zotero import records for the current user."""
+    if item_keys:
+        rows = zotero_import_crud.list_by_item_keys(
+            db, user_id=current_user.id, item_keys=item_keys
+        )
+    else:
+        rows = zotero_import_crud.list_recent_by_user(db, user_id=current_user.id)
+    items = _zotero_import_status_items(rows)
     return ZoteroImportStatusListResponse(items=items)

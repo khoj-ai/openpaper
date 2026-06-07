@@ -62,6 +62,22 @@ class CRUDZoteroImport:
             .all()
         )
 
+    def list_by_item_keys(
+        self, db: Session, *, user_id: UUID, item_keys: List[str]
+    ) -> List[Tuple[ZoteroImportedItem, Optional[str]]]:
+        if not item_keys:
+            return []
+        return (
+            db.query(ZoteroImportedItem, Paper.title)
+            .outerjoin(Paper, ZoteroImportedItem.paper_id == Paper.id)
+            .filter(
+                ZoteroImportedItem.user_id == user_id,
+                ZoteroImportedItem.zotero_item_key.in_(item_keys),
+            )
+            .order_by(ZoteroImportedItem.created_at.desc())
+            .all()
+        )
+
     def create(
         self,
         db: Session,

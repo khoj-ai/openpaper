@@ -58,6 +58,20 @@ type ZoteroImportStatusItem = {
 	created_at?: string;
 };
 
+function computeImportProgress(
+	items: ZoteroImportStatusItem[],
+	importingKeys: Set<string>,
+	total: number,
+): { done: number; progress: number } {
+	if (total <= 0) return { done: 0, progress: 0 };
+	const done = items.filter(
+		(i) =>
+			importingKeys.has(i.zotero_item_key) &&
+			(i.status === "completed" || i.status === "failed"),
+	).length;
+	return { done, progress: Math.min(100, Math.round((done / total) * 100)) };
+}
+
 type ZoteroImportResponse = {
 	imported_count: number;
 	imported_via_url: number;
@@ -441,8 +455,10 @@ function SettingsContent() {
 	const [recentImports, setRecentImports] = useState<ZoteroImportStatusItem[]>([]);
 	const [recentImportsLoaded, setRecentImportsLoaded] = useState(false);
 	const [importProgress, setImportProgress] = useState<number | null>(null);
+	const [importTotal, setImportTotal] = useState<number | null>(null);
 	const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 	const importDoneRef = useRef(false);
+	const importingKeysRef = useRef<Set<string>>(new Set());
 
 	const [showZoteroGuide, setShowZoteroGuide] = useState(false);
 	const [showLibraryModal, setShowLibraryModal] = useState(false);
@@ -608,6 +624,8 @@ function SettingsContent() {
 	const handleZoteroImport = async (keysToImport: string[]) => {
 		setShowLibraryModal(false);
 		setZoteroImportLoading(true);
+		importingKeysRef.current = new Set(keysToImport);
+		setImportTotal(keysToImport.length);
 		setImportProgress(0);
 
 		importDoneRef.current = false;
@@ -621,24 +639,41 @@ function SettingsContent() {
 			importDoneRef.current = true;
 			setZoteroImportLoading(false);
 			setImportProgress(100);
-			setTimeout(() => setImportProgress(null), 1500);
+			setTimeout(() => {
+				setImportProgress(null);
+				setImportTotal(null);
+				importingKeysRef.current = new Set();
+			}, 1500);
 			await fetchRecentImports();
 		};
+
+		const statusQuery = keysToImport
+			.map((k) => `item_keys=${encodeURIComponent(k)}`)
+			.join("&");
 
 		const pollImportStatus = async () => {
 			if (importDoneRef.current) return;
 			try {
-				const data = await fetchFromApi("/api/zotero/import/status");
+				const data = await fetchFromApi(
+					`/api/zotero/import/status?${statusQuery}`,
+				);
 				if (importDoneRef.current) return;
 				const items: ZoteroImportStatusItem[] = data.items ?? [];
 				setRecentImports(items);
 				setRecentImportsLoaded(true);
+				const { progress } = computeImportProgress(
+					items,
+					importingKeysRef.current,
+					keysToImport.length,
+				);
+				setImportProgress(progress);
 			} catch {
 				// ignore poll errors
 			}
 		};
 
 		pollRef.current = setInterval(pollImportStatus, 1500);
+		void pollImportStatus();
 
 		try {
 			const data: ZoteroImportResponse = await fetchFromApi("/api/zotero/import", {
@@ -883,13 +918,8 @@ function SettingsContent() {
 					Disconnect
 				</Button>
 			</div>
-					{importProgress !== null && (
-						<div className="space-y-1">
-							<p className="text-xs text-muted-foreground">
-								{importProgress < 100 ? "Importing…" : "Import complete"}
-							</p>
-							<Progress value={importProgress} />
-						</div>
+					{importProgress !== null && importTotal !== null && (
+						<Progress value={importProgress} />
 					)}
 					</div>
 					) : (
