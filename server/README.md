@@ -70,6 +70,22 @@ To downgrade the migration, run:
 alembic downgrade -1
 ```
 
+# Tests
+
+Tests live in the `tests/` folder and use Python's built-in `unittest`. Run them from the `server` directory:
+
+```bash
+# All tests
+uv run python -m unittest discover -s tests
+
+# A single test file
+uv run python -m unittest tests.test_zotero_sync
+
+# A single test case or method
+uv run python -m unittest tests.test_zotero_sync.TestZoteroAnnotationPayload
+uv run python -m unittest tests.test_zotero_sync.TestZoteroAnnotationPayload.test_serialize_annotations_payload_keeps_keys
+```
+
 ## Chat with Knowledge Base
 
 We have an `Ask` page, which allows you to ask questions across your entire knowledge base. AI-generated responses come with inline citations which will link to the original papers and show the text citation. Deep-linking is not yet available, but is planned.
