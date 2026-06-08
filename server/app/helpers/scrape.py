@@ -23,11 +23,12 @@ def scrape_web_page(url: str) -> str:
         str: The scraped content of the web page.
     """
     try:
-        response = firecrawl_app.scrape_url(url, formats=["markdown"])
-        if not response.error and response.markdown:
-            return response.markdown
-        else:
-            raise Exception(f"Failed to scrape {url}: {response.error}")
+        # firecrawl-py 4.x: scrape() returns a Document (with .markdown) on
+        # success and raises on failure. There is no .error attribute.
+        document = firecrawl_app.scrape(url, formats=["markdown"])
+        if document.markdown:
+            return document.markdown
+        raise Exception(f"Failed to scrape {url}: no markdown content returned")
     except Exception as e:
         logger.error(f"Error scraping {url}: {str(e)}")
         raise Exception(f"Error scraping {url}: {str(e)}")
