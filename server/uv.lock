@@ -469,19 +469,20 @@ wheels = [
 
 [[package]]
 name = "firecrawl-py"
-version = "2.7.0"
+version = "4.28.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
+    { name = "httpx" },
     { name = "nest-asyncio" },
     { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "requests" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ec/06/9ff7d2f5f37f18bb752c43c1a279c8794c4c7190202304437509a4caff94/firecrawl_py-2.7.0.tar.gz", hash = "sha256:67e683c984a8b708d20ef0a896be7bff7223ccd08fdfea080a66de503284cf36", size = 37828, upload-time = "2025-05-20T19:58:13.246Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2d/09/e7c667875c9a9dac09480e2f69fd46bdd9c1139555b835c3036a9858aff2/firecrawl_py-4.28.2.tar.gz", hash = "sha256:7e6181e2129b63c8d6aec5728d9b2fcf16ea82cb854372ad824b278efd258696", size = 191869, upload-time = "2026-05-28T00:03:48.822Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c8/34/fd9fbab8714f92d31325c54b7631632f13273117009dfa74c03f83319987/firecrawl_py-2.7.0-py3-none-any.whl", hash = "sha256:950d785d950494db448670ec380f93283cf3b553e4969f6aaeb2f3b0eb3eafd8", size = 71213, upload-time = "2025-05-20T19:58:12.032Z" },
+    { url = "https://files.pythonhosted.org/packages/80/08/384ca104c8004ca0541aacd3470e855bd28666d6bdb2101e08446dfcb407/firecrawl_py-4.28.2-py3-none-any.whl", hash = "sha256:0689080cb01672370e5a97963e0df479f6102137aa088857eac0fa287a4269b6", size = 239166, upload-time = "2026-05-28T00:03:47.479Z" },
 ]
 
 [[package]]
@@ -923,7 +924,7 @@ requires-dist = [
     { name = "celery", specifier = ">=5.5.3" },
     { name = "exa-py", specifier = ">=1.0.0" },
     { name = "fastapi", specifier = ">=0.115" },
-    { name = "firecrawl-py", specifier = ">=2.7.0" },
+    { name = "firecrawl-py", specifier = ">=4.28.2" },
     { name = "google-genai", specifier = ">=1.7.0" },
     { name = "gunicorn", specifier = ">=23.0.0" },
     { name = "itsdangerous", specifier = ">=2.2.0" },
