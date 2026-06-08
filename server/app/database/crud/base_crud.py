@@ -59,6 +59,9 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                 db.commit()
             return query.first()
         except Exception as e:
+            # Roll back so a failed (often auto-)flush doesn't leave the session
+            # stuck in PendingRollbackError for every subsequent operation.
+            db.rollback()
             logger.error(
                 f"Error retrieving {self.model.__name__} with ID {id}: {str(e)}",
                 exc_info=True,
@@ -73,6 +76,9 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         try:
             return db.query(self.model).filter(self.model.id == id).first()
         except Exception as e:
+            # Roll back so a failed (often auto-)flush doesn't leave the session
+            # stuck in PendingRollbackError for every subsequent operation.
+            db.rollback()
             logger.error(
                 f"Error retrieving {self.model.__name__} with ID {id}: {str(e)}",
                 exc_info=True,
@@ -93,6 +99,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             query = self._filter_by_user(query, user)
             return query.offset(skip).limit(limit).all()
         except Exception as e:
+            db.rollback()
             logger.error(
                 f"Error retrieving multiple {self.model.__name__} objects: {str(e)}",
                 exc_info=True,
@@ -114,6 +121,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
             return query.first()
         except Exception as e:
+            db.rollback()
             logger.error(
                 f"Error retrieving {self.model.__name__} with filters {filters}: {str(e)}",
                 exc_info=True,
@@ -141,6 +149,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
             return query.offset(skip).limit(limit).all()
         except Exception as e:
+            db.rollback()
             logger.error(
                 f"Error retrieving multiple {self.model.__name__} objects with filters {filters}: {str(e)}",
                 exc_info=True,

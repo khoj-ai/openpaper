@@ -426,6 +426,11 @@ async def handle_paper_processing_webhook(
             f"Error processing webhook for job {job_id}: {str(e)}", exc_info=True
         )
 
+        # Roll back before cleanup: the failure above may have left the session
+        # in a PendingRollbackError state, which would otherwise make every
+        # cleanup query (and mark_as_failed) fail too.
+        db.rollback()
+
         # Clean up the paper record on exception as well
         try:
             handle_failed_upload(db=db, job_id=job_id, job_user=job_user, reason=str(e))
