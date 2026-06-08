@@ -542,8 +542,7 @@ class PaperOperations(AsyncLLMClient):
             PaperMetadataExtraction: Extracted metadata
         """
         async with time_it("Extracting paper metadata from LLM", job_id=job_id):
-            extraction_model = os.getenv("EXTRACTION_MODEL", FAST_CHAT_MODEL)
-            logger.info(f"Using extraction model: {extraction_model}")
+            extraction_model = FAST_CHAT_MODEL
 
             # Create a fresh client for this operation
             client = self._create_client()
@@ -699,12 +698,10 @@ class PaperOperations(AsyncLLMClient):
 
 
 # Create a single instance to use throughout the application
-api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+api_key = os.getenv("GOOGLE_API_KEY")
 
 if not api_key:
-    raise ValueError(
-        "GOOGLE_API_KEY or GEMINI_API_KEY environment variable must be set"
-    )
+    raise ValueError("GOOGLE_API_KEY environment variable is not set")
 
 llm_client = PaperOperations(api_key=api_key, default_model=DEFAULT_CHAT_MODEL)
 fast_llm_client = PaperOperations(api_key=api_key, default_model=FAST_CHAT_MODEL)
