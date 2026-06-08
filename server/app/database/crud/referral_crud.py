@@ -83,6 +83,14 @@ class CRUDReferralCode(CRUDBase[ReferralCode, ReferralCodeCreate, ReferralCodeUp
 
 
 class CRUDReferral(CRUDBase[Referral, ReferralCreate, ReferralUpdate]):
+    def get_by_id(self, db: Session, referral_id: uuid.UUID) -> Optional[Referral]:
+        """Fetch a referral by its primary key.
+
+        Referrals are not user-scoped — callers (e.g. the internal settlement
+        webhook) authenticate via the unguessable referral UUID itself.
+        """
+        return db.query(self.model).filter(self.model.id == referral_id).first()
+
     def get_by_referee(
         self, db: Session, referee_user_id: uuid.UUID
     ) -> Optional[Referral]:

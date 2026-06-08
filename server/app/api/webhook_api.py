@@ -563,6 +563,11 @@ async def handle_paper_processing_webhook(
             f"Error processing webhook for job {job_id}: {str(e)}", exc_info=True
         )
 
+        # Roll back before cleanup: the failure above may have left the session
+        # in a PendingRollbackError state, which would otherwise make every
+        # cleanup query (and mark_as_failed) fail too.
+        db.rollback()
+
         # Clean up the paper record on exception as well
         try:
             handle_failed_upload(db=db, job_id=job_id, job_user=job_user, reason=str(e))
@@ -742,7 +747,7 @@ async def settle_referral(referral_id: str, db: Session = Depends(get_db)):
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid referral id")
 
-    referral = referral_crud.get_no_auth(db, referral_uuid)
+    referral = referral_crud.get_by_id(db, referral_uuid)
     if referral is None:
         raise HTTPException(status_code=404, detail="Referral not found")
 
