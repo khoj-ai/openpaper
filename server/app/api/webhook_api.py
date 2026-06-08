@@ -610,7 +610,7 @@ async def settle_referral(referral_id: str, db: Session = Depends(get_db)):
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid referral id")
 
-    referral = referral_crud.get_no_auth(db, referral_uuid)
+    referral = referral_crud.get_by_id(db, referral_uuid)
     if referral is None:
         raise HTTPException(status_code=404, detail="Referral not found")
 

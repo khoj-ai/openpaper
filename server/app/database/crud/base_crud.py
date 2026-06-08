@@ -68,23 +68,6 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             )
             return None
 
-    def get_no_auth(self, db: Session, id: Any) -> Optional[ModelType]:
-        """
-        Get a single record by ID without user filtering
-        RISK: This method should be used with caution as it bypasses user ownership checks. Use sparingly and only if absolutely necessary.
-        """
-        try:
-            return db.query(self.model).filter(self.model.id == id).first()
-        except Exception as e:
-            # Roll back so a failed (often auto-)flush doesn't leave the session
-            # stuck in PendingRollbackError for every subsequent operation.
-            db.rollback()
-            logger.error(
-                f"Error retrieving {self.model.__name__} with ID {id}: {str(e)}",
-                exc_info=True,
-            )
-            return None
-
     def get_multi(
         self,
         db: Session,
