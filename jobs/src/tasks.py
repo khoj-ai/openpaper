@@ -12,7 +12,7 @@ import requests
 from src.schemas import DataTableSchema
 from src.data_table_processor import construct_data_table
 from src.pdf_processor import process_pdf_file
-from src.celery_app import celery_app
+from src.celery_app import celery_app, ZOTERO_SYNC_INTERVAL_SECONDS
 from src.s3_service import s3_service
 from src.utils import time_it
 
@@ -317,7 +317,7 @@ def periodic_zotero_sync(self):
     """
     webhook_base = os.getenv("WEBHOOK_BASE_URL", "http://localhost:8000")
     secret = os.getenv("JOBS_INTERNAL_SECRET", "")
-    sync_interval = int(os.getenv("ZOTERO_SYNC_INTERVAL_SECONDS", str(24 * 3600)))
+    sync_interval = int(ZOTERO_SYNC_INTERVAL_SECONDS)
     url = f"{webhook_base}/api/webhooks/internal/zotero-sync-all?threshold_seconds={sync_interval}"
     logger.info(f"Triggering periodic Zotero sync via {url}")
     resp = requests.post(

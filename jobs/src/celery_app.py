@@ -53,12 +53,12 @@ celery_app.conf.update(
 
 celery_app.autodiscover_tasks()
 
-SYNC_INTERVAL_SECONDS = str(24 * 3600)  # Default to 24 hours
+ZOTERO_SYNC_INTERVAL_SECONDS = 24 * 3600  # Default to 24 hours
 
 celery_app.conf.beat_schedule = {
     "periodic-zotero-sync": {
         "task": "periodic_zotero_sync",
-        "schedule": timedelta(seconds=int(SYNC_INTERVAL_SECONDS)),
+        "schedule": timedelta(seconds=ZOTERO_SYNC_INTERVAL_SECONDS),
         "options": {"queue": "zotero_sync"},
     },
 }
