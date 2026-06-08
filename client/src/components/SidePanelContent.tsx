@@ -925,6 +925,11 @@ export function SidePanelContent({
                                         {isFetchingHistory ? <ChatHistorySkeleton /> :
                                             (
                                                 <>
+                                                    {messages.length === 0 && (
+                                                        <div className="text-center text-secondary-foreground py-8">
+                                                            What would you like to understand about this paper?
+                                                        </div>
+                                                    )}
 
                                                     {memoizedMessages}
 
