@@ -26,7 +26,7 @@ from app.database.models import (
     ZoteroImportSource,
     ZoteroImportStatus,
 )
-from app.helpers.paper_search import normalize_doi, normalize_paper_title
+from app.helpers.paper_search import normalize_doi
 from app.helpers.parser import (
     extract_pdf_page_dimensions,
     validate_pdf_content,
@@ -656,7 +656,6 @@ async def _discover_import_candidates(
     errors: List[Dict[str, str]] = []
     skipped_already_imported = 0
     batch_doi_claimed: Dict[str, str] = {}
-    batch_title_claimed: Dict[str, str] = {}
     start = 0
     page_size = 25
     upload_limit_hit = False
@@ -729,32 +728,6 @@ async def _discover_import_candidates(
                     skipped_already_imported += 1
                     continue
 
-            norm_title = normalize_paper_title(item_data.get("title"))
-            if norm_title:
-                target_paper = paper_crud.get_by_normalized_title_for_user(
-                    db,
-                    user_id=user.id,
-                    title=str(item_data.get("title") or ""),
-                )
-                if target_paper:
-                    await _link_zotero_item_to_existing_paper(
-                        db,
-                        client=client,
-                        item=item,
-                        item_key=item_key,
-                        paper=target_paper,
-                        user=user,
-                    )
-                    skipped_already_imported += 1
-                    continue
-
-                if norm_title in batch_title_claimed:
-                    deferred_links.append(
-                        (item, item_key, batch_title_claimed[norm_title])
-                    )
-                    skipped_already_imported += 1
-                    continue
-
             if len(candidates) >= max_new:
                 if max_new == 0 and upload_err:
                     errors.append(
@@ -778,8 +751,6 @@ async def _discover_import_candidates(
 
             if doi:
                 batch_doi_claimed[doi] = item_key
-            if norm_title:
-                batch_title_claimed[norm_title] = item_key
 
             candidates.append(item)
 
@@ -1132,7 +1103,6 @@ async def _discover_candidates_by_keys(
     errors: List[Dict[str, str]] = []
     skipped_already_imported = 0
     batch_doi_claimed: Dict[str, str] = {}
-    batch_title_claimed: Dict[str, str] = {}
 
     max_new, upload_err = _compute_max_new_imports(db, user, len(item_keys))
     if max_new == 0:
@@ -1201,34 +1171,8 @@ async def _discover_candidates_by_keys(
                 skipped_already_imported += 1
                 continue
 
-        norm_title = normalize_paper_title(item_data.get("title"))
-        if norm_title:
-            target_paper = paper_crud.get_by_normalized_title_for_user(
-                db,
-                user_id=user.id,
-                title=str(item_data.get("title") or ""),
-            )
-            if target_paper:
-                await _link_zotero_item_to_existing_paper(
-                    db,
-                    client=client,
-                    item=item,
-                    item_key=item_key,
-                    paper=target_paper,
-                    user=user,
-                )
-                skipped_already_imported += 1
-                continue
-
-            if norm_title in batch_title_claimed:
-                deferred_links.append((item, item_key, batch_title_claimed[norm_title]))
-                skipped_already_imported += 1
-                continue
-
         if doi:
             batch_doi_claimed[doi] = item_key
-        if norm_title:
-            batch_title_claimed[norm_title] = item_key
 
         candidates.append(item)
 
