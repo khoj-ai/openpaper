@@ -188,15 +188,15 @@ class CRUDZoteroImport:
         annotations_payload: Optional[list],
         last_synced_at: Optional[datetime] = None,
     ) -> ZoteroImportedItem:
-        item.import_source = import_source
-        item.zotero_attachment_key = zotero_attachment_key
-        item.source_url = source_url
+        setattr(item, "import_source", import_source)
+        setattr(item, "zotero_attachment_key", zotero_attachment_key)
+        setattr(item, "source_url", source_url)
         setattr(item, "paper_id", paper_id)
-        item.upload_job_id = upload_job_id
-        item.annotations_payload = annotations_payload
-        item.error_message = None
+        setattr(item, "upload_job_id", upload_job_id)
+        setattr(item, "annotations_payload", annotations_payload)
+        setattr(item, "error_message", None)
         if last_synced_at is not None:
-            item.last_synced_at = last_synced_at
+            setattr(item, "last_synced_at", last_synced_at)
         db.add(item)
         db.commit()
         db.refresh(item)
@@ -210,8 +210,8 @@ class CRUDZoteroImport:
         annotations_payload: Optional[list],
         last_synced_at: datetime,
     ) -> ZoteroImportedItem:
-        item.annotations_payload = annotations_payload
-        item.last_synced_at = last_synced_at
+        setattr(item, "annotations_payload", annotations_payload)
+        setattr(item, "last_synced_at", last_synced_at)
         db.add(item)
         db.commit()
         db.refresh(item)
