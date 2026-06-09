@@ -42,7 +42,7 @@ dependencies = [
     "stripe>=12.3.0",
     "pypdf>=5.0.0",
     "pymupdf>=1.25.5",
-    "exa-py>=1.0.0"
+    "exa-py>=1.0.0",
 ]
 
 [project.scripts]
