@@ -6,7 +6,6 @@ to the separate jobs service worker, and uses the HTTP API to check task status.
 """
 
 import logging
-import os
 import time
 from io import BytesIO
 from typing import Any, Dict, Optional
@@ -20,6 +19,11 @@ from app.database.crud.projects.project_paper_crud import (
 )
 from app.database.models import PaperUploadJob
 from app.database.telemetry import track_event
+from app.helpers.celery_config import (
+    get_celery_api_url,
+    get_celery_broker_url,
+    get_webhook_base_url,
+)
 from app.helpers.s3 import s3_service
 from app.schemas.responses import DataTableSchema
 from app.schemas.user import CurrentUser
@@ -51,15 +55,9 @@ class JobsClient:
             celery_api_url: Base URL of the Celery API service for status checks
                            (e.g., "http://localhost:8001")
         """
-        self.webhook_base_url = webhook_base_url or os.getenv(
-            "WEBHOOK_BASE_URL", "http://localhost:8000"
-        )
-        self.celery_broker_url = celery_broker_url or os.getenv(
-            "CELERY_BROKER_URL", "pyamqp://guest@localhost:5672//"
-        )
-        self.celery_api_url = celery_api_url or os.getenv(
-            "CELERY_API_URL", "http://localhost:8001"
-        )
+        self.webhook_base_url = get_webhook_base_url(webhook_base_url)
+        self.celery_broker_url = get_celery_broker_url(celery_broker_url)
+        self.celery_api_url = get_celery_api_url(celery_api_url)
 
     def submit_pdf_processing_job(
         self,

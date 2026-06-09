@@ -1,10 +1,10 @@
 """Client for scheduling the delayed referral-settlement callback on the jobs service."""
 
 import logging
-import os
 from datetime import datetime, timezone
 from typing import Optional
 
+from app.helpers.celery_config import get_celery_broker_url, get_webhook_base_url
 from celery import Celery
 from dotenv import load_dotenv
 
@@ -25,12 +25,8 @@ def schedule_referral_settlement(
     settlement webhook on the server. Returns the Celery task id, or None if
     the broker submission failed (the caller decides whether to surface that).
     """
-    webhook_base_url = webhook_base_url or os.getenv(
-        "WEBHOOK_BASE_URL", "http://localhost:8000"
-    )
-    celery_broker_url = celery_broker_url or os.getenv(
-        "CELERY_BROKER_URL", "pyamqp://guest@localhost:5672//"
-    )
+    webhook_base_url = get_webhook_base_url(webhook_base_url)
+    celery_broker_url = get_celery_broker_url(celery_broker_url)
 
     try:
         celery_app = Celery("openpaper_tasks", broker=celery_broker_url)
