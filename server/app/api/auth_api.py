@@ -5,17 +5,17 @@ import random
 import secrets
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, cast
 
 from app.auth.dependencies import get_admin_user, get_current_user, get_required_user
 from app.auth.email import email_auth_client
 from app.auth.google import google_auth_client
-from app.auth.zotero import zotero_auth_client
 from app.auth.utils import (
     clear_session_cookie,
     is_verification_code_valid,
     set_session_cookie,
 )
+from app.auth.zotero import zotero_auth_client
 from app.database.crud.annotation_crud import annotation_crud
 from app.database.crud.highlight_crud import highlight_crud
 from app.database.crud.message_crud import message_crud
@@ -335,7 +335,7 @@ async def zotero_callback(
     error_redirect = f"{client_domain}/settings?zotero=error"
 
     pending = zotero_crud.get_pending_by_token(db=db, oauth_token=oauth_token)
-    if not pending:
+    if not pending or not pending.user_id:
         return RedirectResponse(url=error_redirect, status_code=status.HTTP_302_FOUND)
 
     now = datetime.now(timezone.utc)
@@ -348,7 +348,7 @@ async def zotero_callback(
 
     access_token = zotero_auth_client.get_access_token(
         request_token=oauth_token,
-        request_token_secret=pending.oauth_token_secret,
+        request_token_secret=pending.oauth_token_secret,  # type: ignore
         verifier=oauth_verifier,
     )
     if not access_token:
@@ -356,7 +356,7 @@ async def zotero_callback(
 
     zotero_crud.upsert_connection(
         db=db,
-        user_id=pending.user_id,
+        user_id=pending.user_id,  # type: ignore
         zotero_user_id=access_token.zotero_user_id,
         api_key=access_token.api_key,
     )
@@ -386,7 +386,7 @@ async def zotero_status(
 
     return ZoteroStatusResponse(
         connected=True,
-        connected_at=connection.created_at,
+        connected_at=cast(Optional[datetime], connection.created_at),
         last_synced_at=zotero_import_crud.get_max_last_synced_at(
             db, user_id=current_user.id
         ),
