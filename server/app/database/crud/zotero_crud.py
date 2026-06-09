@@ -60,8 +60,8 @@ class CRUDZotero:
     ) -> ZoteroConnection:
         existing = self.get_by_user_id(db, user_id=user_id)
         if existing:
-            existing.zotero_user_id = zotero_user_id
-            existing.api_key = api_key
+            existing.zotero_user_id = str(zotero_user_id)  # type: ignore[assignment]
+            existing.api_key = str(api_key)  # type: ignore[assignment]
             db.add(existing)
             db.commit()
             db.refresh(existing)
@@ -81,7 +81,9 @@ class CRUDZotero:
         self, db: Session, *, user_id: UUID
     ) -> Optional[ZoteroConnection]:
         return (
-            db.query(ZoteroConnection).filter(ZoteroConnection.user_id == user_id).first()
+            db.query(ZoteroConnection)
+            .filter(ZoteroConnection.user_id == user_id)
+            .first()
         )
 
     def delete_by_user_id(self, db: Session, *, user_id: UUID) -> bool:
