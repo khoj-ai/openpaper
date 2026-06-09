@@ -18,7 +18,7 @@ from app.database.models import (
     RoleType,
     User,
 )
-from app.helpers.paper_search import normalize_doi, normalize_paper_title
+from app.helpers.paper_search import normalize_doi
 from app.helpers.parser import get_start_page_from_offset
 from app.llm.utils import find_offsets
 from app.schemas.responses import PaperMetadataExtraction, ResponseCitation
@@ -751,33 +751,21 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
         if not normalized:
             return None
 
-        papers = (
-            db.query(Paper)
-            .filter(Paper.user_id == user_id, Paper.doi.isnot(None))
-            .all()
+        # normalize_doi yields a bare, lowercased DOI (e.g. "10.1234/abc"). Stored
+        # DOIs may carry a scheme/prefix (https://doi.org/…, doi:…) or different
+        # casing, so match the normalized form as a case-insensitive suffix in the
+        # database rather than scanning every paper in Python.
+        escaped = (
+            normalized.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         )
-        for paper in papers:
-            if paper.doi and normalize_doi(paper.doi) == normalized:
-                return paper
-        return None
-
-    def get_by_normalized_title_for_user(
-        self, db: Session, *, user_id: uuid.UUID, title: str
-    ) -> Optional[Paper]:
-        """Return the user's paper with a matching normalized title, if any."""
-        normalized = normalize_paper_title(title)
-        if not normalized:
-            return None
-
-        papers = (
+        return (
             db.query(Paper)
-            .filter(Paper.user_id == user_id, Paper.title.isnot(None))
-            .all()
+            .filter(
+                Paper.user_id == user_id,
+                func.lower(Paper.doi).like(f"%{escaped}", escape="\\"),
+            )
+            .first()
         )
-        for paper in papers:
-            if paper.title and normalize_paper_title(paper.title) == normalized:
-                return paper
-        return None
 
 
 # Create a single instance to use throughout the application
