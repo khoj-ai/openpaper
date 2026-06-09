@@ -47,7 +47,7 @@ Optional (Zotero, Stripe, Discover, audio, email, PostHog, admin, etc.) are docu
 ## First-time setup
 
 ```bash
-git clone git@github.com:sabaimran/openpaper.git && cd openpaper
+git clone git@github.com:khoj-ai/openpaper.git && cd openpaper
 
 # Server
 cd server && uv sync && cp .env.example .env
@@ -65,11 +65,10 @@ cd ../client && yarn
 
 Use separate terminals, in this order:
 
-| #   | Directory | Command                                                                                             |
-| --- | --------- | --------------------------------------------------------------------------------------------------- |
-| 1   | `jobs/`   | `uv run start` — Docker RabbitMQ/Redis, Celery worker, jobs API                                     |
-| 2   | `jobs/`   | `./scripts/start_beat.sh` — Zotero periodic sync (one instance only; not started by `uv run start`) |
-| 3   | `server/` | `uv run start` — migrations + API                                                                   |
-| 4   | `client/` | `yarn dev`                                                                                          |
+| #   | Directory | Command                                                                                  |
+| --- | --------- | ---------------------------------------------------------------------------------------- |
+| 1   | `jobs/`   | `uv run start` — Docker RabbitMQ/Redis, Celery worker, Celery Beat (Zotero sync), jobs API |
+| 2   | `server/` | `uv run start` — migrations + API                                                        |
+| 3   | `client/` | `yarn dev`                                                                               |
 
 Check: [localhost:8000/docs](http://localhost:8000/docs), [localhost:3000](http://localhost:3000), worker log shows `celery@... ready`.
