@@ -4,7 +4,7 @@ import logging
 import re
 from datetime import datetime, timezone
 from io import BytesIO
-from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict
+from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict, Union, cast
 from uuid import UUID
 
 from app.database.crud.annotation_crud import AnnotationCreate, annotation_crud
@@ -48,15 +48,24 @@ logger = logging.getLogger(__name__)
 ZOTERO_IMPORT_CONCURRENCY = 10
 
 
-class ImportOneResult(TypedDict, total=False):
-    status: Literal["processing", "error"]
+class ImportErrorResult(TypedDict):
+    status: Literal["error"]
+    zotero_item_key: str
+    error: str
+
+
+class ImportProcessingResult(TypedDict):
+    status: Literal["processing"]
     zotero_item_key: str
     paper_id: str
     upload_job_id: str
     import_source: str
     title: Optional[str]
-    error: str
     imported_via_url: bool
+
+
+# Discriminated on `status` so success-only keys (paper_id, etc.) narrow safely.
+ImportOneResult = Union[ImportErrorResult, ImportProcessingResult]
 
 
 def _parse_zotero_date_added(date_str: Optional[str]) -> Optional[datetime]:
@@ -610,7 +619,7 @@ def _apply_zotero_tags(
                     db, obj_in=PaperTagCreate(name=tag_name), user=user
                 )
             paper_tag_crud.add_tag_to_paper(
-                db, paper_id=paper_id, tag_id=tag.id, user=user
+                db, paper_id=paper_id, tag_id=UUID(str(tag.id)), user=user
             )
         except Exception as e:
             logger.warning(
@@ -1009,8 +1018,8 @@ def list_library(
         raise ValueError("Zotero account not connected")
 
     client = ZoteroApiClient(
-        zotero_user_id=connection.zotero_user_id,
-        api_key=connection.api_key,
+        zotero_user_id=str(connection.zotero_user_id),
+        api_key=str(connection.api_key),
     )
 
     items: List[Dict[str, Any]] = []
@@ -1201,8 +1210,8 @@ async def import_batch(
         raise ValueError("Zotero account not connected")
 
     client = ZoteroApiClient(
-        zotero_user_id=connection.zotero_user_id,
-        api_key=connection.api_key,
+        zotero_user_id=str(connection.zotero_user_id),
+        api_key=str(connection.api_key),
     )
 
     candidates, deferred_links, skipped_already_imported, errors = (
@@ -1222,8 +1231,8 @@ async def import_batch(
                 return await _import_one_paper(
                     item,
                     user=user,
-                    zotero_user_id=connection.zotero_user_id,
-                    api_key=connection.api_key,
+                    zotero_user_id=str(connection.zotero_user_id),
+                    api_key=str(connection.api_key),
                 )
 
         raw_results = await asyncio.gather(
@@ -1249,11 +1258,11 @@ async def import_batch(
                 )
                 continue
 
-            if raw.get("status") == "error":
+            if raw["status"] == "error":
                 errors.append(
                     {
                         "zotero_item_key": raw["zotero_item_key"],
-                        "error": raw.get("error") or "Import failed",
+                        "error": raw["error"] or "Import failed",
                     }
                 )
                 continue
@@ -1264,10 +1273,10 @@ async def import_batch(
                     "paper_id": raw["paper_id"],
                     "upload_job_id": raw["upload_job_id"],
                     "import_source": raw["import_source"],
-                    "title": raw.get("title"),
+                    "title": raw["title"],
                 }
             )
-            if raw.get("imported_via_url"):
+            if raw["imported_via_url"]:
                 imported_via_url += 1
             item_key_to_paper_id[raw["zotero_item_key"]] = raw["paper_id"]
 
@@ -1334,7 +1343,10 @@ def apply_zotero_annotations(
         paper = paper_crud.get(db, id=paper_id, user=user)
         page_dims = _get_page_dims_for_paper(paper) if paper else {}
 
-        for payload_item in import_row.annotations_payload:
+        annotations_payload = cast(
+            List[Dict[str, Any]], import_row.annotations_payload or []
+        )
+        for payload_item in annotations_payload:
             normalized = _normalize_payload_item(payload_item)
             if not normalized:
                 continue
@@ -1387,7 +1399,7 @@ def _sync_item(
     if not paper:
         raise ValueError("Linked paper no longer exists")
 
-    attachment_children = client.get_children(import_row.zotero_attachment_key)
+    attachment_children = client.get_children(str(import_row.zotero_attachment_key))
     remote_annotations = client.get_annotations_for_attachment(attachment_children)
     existing_keys = highlight_crud.get_zotero_annotation_keys_for_paper(
         db, paper_id=UUID(str(paper_id))
@@ -1449,8 +1461,8 @@ async def sync_batch(
         raise ValueError("Zotero account not connected")
 
     client = ZoteroApiClient(
-        zotero_user_id=connection.zotero_user_id,
-        api_key=connection.api_key,
+        zotero_user_id=str(connection.zotero_user_id),
+        api_key=str(connection.api_key),
     )
 
     syncable = zotero_import_crud.list_syncable_by_user(
@@ -1474,7 +1486,7 @@ async def sync_batch(
                 exc_info=True,
             )
             errors.append(
-                {"zotero_item_key": import_row.zotero_item_key, "error": str(e)}
+                {"zotero_item_key": str(import_row.zotero_item_key), "error": str(e)}
             )
 
     unique_paper_ids = {r["paper_id"] for r in synced if r.get("paper_id")}

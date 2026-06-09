@@ -424,6 +424,7 @@ class TestImportBatchParallel(unittest.IsolatedAsyncioTestCase):
                 "upload_job_id": f"job-{key}",
                 "import_source": ZoteroImportSource.PDF_ATTACHMENT,
                 "title": item["data"]["title"],
+                "imported_via_url": False,
             }
 
         mock_import_one.side_effect = fake_import
