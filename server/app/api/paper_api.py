@@ -353,7 +353,7 @@ async def get_relevant_papers(
                     "institutions": paper.institutions,
                     "keywords": paper.keywords,
                     "status": paper.status,
-                    "preview_url": s3_service.resolve_preview_url(paper.preview_url),
+                    "preview_url": paper.preview_url,
                     "size_in_kb": paper.size_in_kb,
                 }
                 for paper in papers
