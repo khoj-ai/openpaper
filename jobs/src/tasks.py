@@ -84,10 +84,15 @@ def upload_and_process_file(
     self,
     s3_object_key: str,
     webhook_url: str,
+    skip_metadata_extraction: bool = False,
     **processing_kwargs
 ) -> Dict[str, Any]:
     """
     Process a PDF file from S3 object key and send results to webhook.
+
+    When skip_metadata_extraction is True, the LLM metadata/summary step is
+    skipped and only deterministic outputs (preview, raw text, page offsets)
+    are produced. Used by the Zotero import path.
     """
     task_id = self.request.id
 
@@ -120,6 +125,7 @@ def upload_and_process_file(
                 s3_object_key,
                 task_id,
                 status_callback=write_to_status,
+                skip_metadata_extraction=skip_metadata_extraction,
             )
         )
 

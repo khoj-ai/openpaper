@@ -61,13 +61,21 @@ class JobsClient:
             "CELERY_API_URL", "http://localhost:8001"
         )
 
-    def submit_pdf_processing_job(self, s3_object_key: str, job_id: str) -> str:
+    def submit_pdf_processing_job(
+        self,
+        s3_object_key: str,
+        job_id: str,
+        skip_metadata_extraction: bool = False,
+    ) -> str:
         """
         Submit a PDF processing job to the separate Celery service.
 
         Args:
             s3_object_key: The S3 object key for the PDF file
             job_id: Your internal job ID for tracking
+            skip_metadata_extraction: When True, the worker skips LLM metadata
+                extraction and only produces preview/text/page offsets. Used by
+                the Zotero import path.
 
         Returns:
             str: Celery task ID
@@ -113,7 +121,11 @@ class JobsClient:
             # Submit the task to the queue (the separate jobs service will pick it up)
             task = celery_app.send_task(
                 "upload_and_process_file",  # Task name as registered by the worker
-                kwargs={"s3_object_key": s3_object_key, "webhook_url": webhook_url},
+                kwargs={
+                    "s3_object_key": s3_object_key,
+                    "webhook_url": webhook_url,
+                    "skip_metadata_extraction": skip_metadata_extraction,
+                },
                 # Explicit: the server's Celery instance has no task_routes, so we
                 # must pin the queue here. Must match what the worker's `-Q` set
                 # contains (see jobs/scripts/start_worker.sh).
@@ -138,9 +150,7 @@ class JobsClient:
                     "Start Docker, then run `uv run start` in the `jobs/` directory. "
                     f"Broker URL: {self.celery_broker_url}"
                 ) from e
-            raise Exception(
-                f"Failed to submit PDF processing job: {error_msg}"
-            ) from e
+            raise Exception(f"Failed to submit PDF processing job: {error_msg}") from e
 
     def submit_data_table_processing_job(
         self, data_table: DataTableSchema, job_id: str

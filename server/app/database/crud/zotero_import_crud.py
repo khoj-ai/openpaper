@@ -2,7 +2,12 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 from uuid import UUID
 
-from app.database.models import Paper, ZoteroImportedItem, ZoteroImportSource, ZoteroImportStatus
+from app.database.models import (
+    Paper,
+    ZoteroImportedItem,
+    ZoteroImportSource,
+    ZoteroImportStatus,
+)
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -117,11 +122,11 @@ class CRUDZoteroImport:
         error_message: Optional[str] = None,
         paper_id: Optional[UUID] = None,
     ) -> ZoteroImportedItem:
-        item.status = status
+        setattr(item, "status", status)
         if error_message is not None:
-            item.error_message = error_message
+            setattr(item, "error_message", error_message)
         if paper_id is not None:
-            item.paper_id = paper_id
+            setattr(item, "paper_id", paper_id)
         db.add(item)
         db.commit()
         db.refresh(item)
@@ -186,7 +191,7 @@ class CRUDZoteroImport:
         item.import_source = import_source
         item.zotero_attachment_key = zotero_attachment_key
         item.source_url = source_url
-        item.paper_id = paper_id
+        setattr(item, "paper_id", paper_id)
         item.upload_job_id = upload_job_id
         item.annotations_payload = annotations_payload
         item.error_message = None

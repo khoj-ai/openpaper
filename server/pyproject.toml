@@ -36,12 +36,10 @@ dependencies = [
     "openai>=1.82.0",
     "anthropic>=0.96.0",
     "posthog>=4.2.0",
-    "pillow>=12.2.0",
     "resend>=2.10.0",
     "celery>=5.5.3",
     "stripe>=12.3.0",
     "pypdf>=5.0.0",
-    "pymupdf>=1.25.5",
     "exa-py>=1.0.0",
 ]
 

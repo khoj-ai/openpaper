@@ -13,20 +13,26 @@ from app.database.crud.paper_crud import PaperCreate, PaperUpdate, paper_crud
 from app.database.crud.paper_tag_crud import PaperTagCreate, paper_tag_crud
 from app.database.crud.paper_upload_crud import (
     PaperUploadJobCreate,
+    PaperUploadJobUpdate,
     paper_upload_job_crud,
 )
 from app.database.crud.zotero_crud import zotero_crud
 from app.database.crud.zotero_import_crud import zotero_import_crud
 from app.database.database import SessionLocal
-from app.database.models import Paper, RoleType, ZoteroImportedItem, ZoteroImportSource, ZoteroImportStatus
+from app.database.models import (
+    Paper,
+    RoleType,
+    ZoteroImportedItem,
+    ZoteroImportSource,
+    ZoteroImportStatus,
+)
 from app.helpers.paper_search import normalize_doi, normalize_paper_title
 from app.helpers.parser import (
     extract_pdf_page_dimensions,
-    extract_pdf_text_and_offsets,
-    generate_pdf_preview_from_bytes,
     validate_pdf_content,
     validate_url_and_fetch_pdf,
 )
+from app.helpers.pdf_jobs import jobs_client
 from app.helpers.s3 import s3_service
 from app.helpers.subscription_limits import (
     can_user_upload_paper,
@@ -43,7 +49,7 @@ ZOTERO_IMPORT_CONCURRENCY = 10
 
 
 class ImportOneResult(TypedDict, total=False):
-    status: Literal["imported", "error"]
+    status: Literal["processing", "error"]
     zotero_item_key: str
     paper_id: str
     upload_job_id: str
@@ -204,17 +210,31 @@ def _convert_zotero_position(ann_data: Dict[str, Any]) -> Optional[Dict[str, Any
             elif isinstance(r, dict):
                 x1 = float(r.get("x", r.get("x1", 0)))
                 y1 = float(r.get("y", r.get("y1", 0)))
-                x2 = x1 + float(r.get("width", 0)) if "width" in r else float(r.get("x2", 0))
-                y2 = y1 + float(r.get("height", 0)) if "height" in r else float(r.get("y2", 0))
+                x2 = (
+                    x1 + float(r.get("width", 0))
+                    if "width" in r
+                    else float(r.get("x2", 0))
+                )
+                y2 = (
+                    y1 + float(r.get("height", 0))
+                    if "height" in r
+                    else float(r.get("y2", 0))
+                )
             else:
                 continue
         except (TypeError, ValueError):
             continue
-        rects.append({
-            "x1": x1, "y1": y1, "x2": x2, "y2": y2,
-            "width": page_w, "height": page_h,
-            "pageNumber": page_number,
-        })
+        rects.append(
+            {
+                "x1": x1,
+                "y1": y1,
+                "x2": x2,
+                "y2": y2,
+                "width": page_w,
+                "height": page_h,
+                "pageNumber": page_number,
+            }
+        )
 
     if not rects:
         return None
@@ -424,7 +444,14 @@ def _try_backfill_or_apply_annotation(
 async def _resolve_pdf_bytes(
     client: ZoteroApiClient,
     item: Dict[str, Any],
-) -> Tuple[Optional[bytes], str, Optional[str], Optional[str], List[Dict[str, Any]], Optional[str]]:
+) -> Tuple[
+    Optional[bytes],
+    str,
+    Optional[str],
+    Optional[str],
+    List[Dict[str, Any]],
+    Optional[str],
+]:
     """
     Returns (pdf_bytes, import_source, attachment_key, source_url, annotations, failure_reason).
     failure_reason is set when pdf_bytes is None, describing why the PDF could not be retrieved.
@@ -442,7 +469,7 @@ async def _resolve_pdf_bytes(
         if link_mode == "linked_file":
             failure_reason = (
                 "PDF is a linked local file and cannot be accessed via the Zotero API. "
-                "In Zotero, right-click the attachment and choose \"Store Copy of File\"."
+                'In Zotero, right-click the attachment and choose "Store Copy of File".'
             )
         elif link_mode == "linked_url":
             failure_reason = (
@@ -459,7 +486,9 @@ async def _resolve_pdf_bytes(
                     attachment_children = await asyncio.to_thread(
                         client.get_children, attachment_key
                     )
-                    annotations = client.get_annotations_for_attachment(attachment_children)
+                    annotations = client.get_annotations_for_attachment(
+                        attachment_children
+                    )
                     return (
                         pdf_bytes,
                         ZoteroImportSource.PDF_ATTACHMENT,
@@ -474,7 +503,10 @@ async def _resolve_pdf_bytes(
                 failure_reason = f"PDF attachment could not be validated: {err}"
             except Exception as e:
                 logger.warning(
-                    "Failed to download Zotero PDF for %s: %s", item_key, e, exc_info=True
+                    "Failed to download Zotero PDF for %s: %s",
+                    item_key,
+                    e,
+                    exc_info=True,
                 )
                 failure_reason = "PDF attachment download failed."
     else:
@@ -651,9 +683,7 @@ async def _discover_import_candidates(
                 and not (item_data.get("DOI") or "").strip()
                 and not (item_data.get("url") or "").strip()
             ):
-                logger.debug(
-                    "Skipping Zotero item %s: no title, DOI, or URL", item_key
-                )
+                logger.debug("Skipping Zotero item %s: no title, DOI, or URL", item_key)
                 continue
 
             existing_import = zotero_import_crud.get_by_item_key(
@@ -695,9 +725,7 @@ async def _discover_import_candidates(
                     continue
 
                 if doi in batch_doi_claimed:
-                    deferred_links.append(
-                        (item, item_key, batch_doi_claimed[doi])
-                    )
+                    deferred_links.append((item, item_key, batch_doi_claimed[doi]))
                     skipped_already_imported += 1
                     continue
 
@@ -761,6 +789,34 @@ async def _discover_import_candidates(
     return candidates, deferred_links, skipped_already_imported, errors
 
 
+def _apply_metadata_from_zotero(
+    db: Session,
+    *,
+    paper: Paper,
+    item_data: Dict[str, Any],
+    user: CurrentUser,
+) -> None:
+    """
+    Apply Zotero's authoritative metadata (title, authors, abstract, publish
+    date, DOI) to a paper. Zotero is the source of truth for these fields, so the
+    jobs worker skips LLM extraction and the webhook never overwrites them.
+    """
+    authors = _zotero_creators_to_authors(item_data.get("creators") or [])
+    publish_date = _parse_zotero_date(item_data.get("date"))
+    paper_crud.update(
+        db=db,
+        db_obj=paper,
+        obj_in=PaperUpdate(
+            title=item_data.get("title") or None,
+            authors=authors or None,
+            abstract=item_data.get("abstractNote") or None,
+            publish_date=publish_date,
+            doi=item_data.get("DOI") or None,
+        ),
+        user=user,
+    )
+
+
 async def _import_one_paper(
     item: Dict[str, Any],
     *,
@@ -768,12 +824,22 @@ async def _import_one_paper(
     zotero_user_id: str,
     api_key: str,
 ) -> ImportOneResult:
-    """Import a single Zotero item using its own DB session and Zotero client."""
+    """
+    Submit a single Zotero item to the PDF jobs service for lightweight processing.
+
+    Zotero already supplies authoritative metadata, so we upload the PDF, create
+    the paper with that metadata, and hand off to the jobs worker (with LLM
+    metadata extraction skipped) to fill in the deterministic outputs (preview,
+    raw text, page offsets). The paper-processing webhook finalizes the import
+    and applies Zotero annotations once the worker completes. Returns status
+    "processing" on successful submission.
+    """
     item_key = item.get("key", "")
     db = SessionLocal()
     client = ZoteroApiClient(zotero_user_id=zotero_user_id, api_key=api_key)
     upload_job_id: Optional[str] = None
     import_row: Optional[ZoteroImportedItem] = None
+    created_paper_id: Optional[str] = None
 
     try:
         import_row = zotero_import_crud.create(
@@ -784,9 +850,14 @@ async def _import_one_paper(
             status=ZoteroImportStatus.PROCESSING,
         )
 
-        pdf_bytes, import_source, attachment_key, source_url, annotations, failure_reason = (
-            await _resolve_pdf_bytes(client, item)
-        )
+        (
+            pdf_bytes,
+            import_source,
+            attachment_key,
+            source_url,
+            annotations,
+            failure_reason,
+        ) = await _resolve_pdf_bytes(client, item)
         if not pdf_bytes:
             if import_row:
                 zotero_import_crud.update_status(
@@ -822,71 +893,26 @@ async def _import_one_paper(
             }
 
         upload_job_id = str(paper_upload_job.id)
+
+        # Upload the PDF to S3. Preview, raw text, and page offsets are produced
+        # asynchronously by the jobs worker (with LLM metadata extraction
+        # skipped), so we no longer extract them server-side here.
         safe_filename = f"zotero-{item_key}.pdf"
         s3_object_key, file_url = await asyncio.to_thread(
             _upload_pdf_to_s3, pdf_bytes, safe_filename
         )
 
-        try:
-            raw_text, page_offset_map = await asyncio.to_thread(
-                extract_pdf_text_and_offsets, pdf_bytes
-            )
-        except Exception as e:
-            logger.warning(
-                "Server-side PDF text extraction failed for %s: %s",
-                item_key,
-                e,
-            )
-            raw_text, page_offset_map = "", {}
-
-        try:
-            page_dims = await asyncio.to_thread(
-                extract_pdf_page_dimensions, pdf_bytes
-            )
-        except Exception as e:
-            logger.warning(
-                "Failed to extract page dimensions for %s: %s", item_key, e
-            )
-            page_dims = {}
-
-        for ann in annotations:
-            d = ann.get("data", {})
-            pos_raw = d.get("annotationPosition")
-            if pos_raw:
-                try:
-                    pos = (
-                        json.loads(pos_raw)
-                        if isinstance(pos_raw, str)
-                        else pos_raw
-                    )
-                    idx = pos.get("pageIndex", 0)
-                except (json.JSONDecodeError, TypeError, AttributeError):
-                    idx = 0
-                w, h = page_dims.get(idx, (0.0, 0.0))
-                d["_page_width"] = w
-                d["_page_height"] = h
-
-        _, preview_url = await asyncio.to_thread(
-            generate_pdf_preview_from_bytes, pdf_bytes
-        )
-
+        # Create the paper up front with Zotero's authoritative metadata. The
+        # async paper-processing webhook has no Zotero context, so once the
+        # worker completes it only fills in the deterministic outputs
+        # (preview_url, raw_content, page offsets).
         data = item.get("data", {})
-        authors = _zotero_creators_to_authors(data.get("creators") or [])
-        publish_date = _parse_zotero_date(data.get("date"))
-
         paper = paper_crud.create(
             db=db,
             obj_in=PaperCreate(
                 file_url=file_url,
                 s3_object_key=s3_object_key,
                 upload_job_id=upload_job_id,
-                raw_content=raw_text or None,
-                page_offset_map=page_offset_map or None,
-                preview_url=preview_url,
-                title=data.get("title") or None,
-                authors=authors or None,
-                abstract=data.get("abstractNote") or None,
-                publish_date=publish_date,
                 size_in_kb=len(pdf_bytes) // 1024,
             ),
             user=user,
@@ -894,31 +920,24 @@ async def _import_one_paper(
         if not paper or not paper.id:
             raise Exception("Failed to create paper record after S3 upload")
 
-        doi_value = data.get("DOI")
-        if doi_value:
-            paper_crud.update(
-                db=db,
-                db_obj=paper,
-                obj_in=PaperUpdate(doi=doi_value),
-                user=user,
-            )
-
-        paper_upload_job_crud.mark_as_completed(
-            db=db, job_id=upload_job_id, user=user
-        )
-
         paper_id = UUID(str(paper.id))
+        created_paper_id = str(paper.id)
 
+        _apply_metadata_from_zotero(db, paper=paper, item_data=data, user=user)
         _apply_zotero_tags(
             db,
             paper_id=paper_id,
             tags_data=data.get("tags") or [],
             user=user,
         )
+
         annotation_payload = (
             _serialize_annotations_payload(annotations) if annotations else None
         )
 
+        # Finalize the import row BEFORE submitting the job so the webhook
+        # recognizes this as a Zotero import (and keeps the paper instead of
+        # requiring LLM metadata) even if the worker completes immediately.
         if import_row:
             zotero_import_crud.finalize_processing_import(
                 db,
@@ -929,18 +948,25 @@ async def _import_one_paper(
                 paper_id=paper_id,
                 upload_job_id=UUID(upload_job_id),
                 annotations_payload=annotation_payload,
-                last_synced_at=datetime.now(timezone.utc),
             )
 
-        apply_zotero_annotations(
+        # Hand off to the jobs worker for preview + text extraction (no LLM).
+        paper_upload_job_crud.mark_as_running(db=db, job_id=upload_job_id, user=user)
+        task_id = await asyncio.to_thread(
+            jobs_client.submit_pdf_processing_job,
+            s3_object_key,
+            upload_job_id,
+            True,  # skip_metadata_extraction
+        )
+        paper_upload_job_crud.update(
             db=db,
-            upload_job_id=upload_job_id,
-            paper_id=str(paper.id),
+            db_obj=paper_upload_job,
+            obj_in=PaperUploadJobUpdate(task_id=task_id),
             user=user,
         )
 
         return {
-            "status": "imported",
+            "status": "processing",
             "zotero_item_key": item_key,
             "paper_id": str(paper_id),
             "upload_job_id": upload_job_id,
@@ -955,10 +981,6 @@ async def _import_one_paper(
             e,
             exc_info=True,
         )
-        if upload_job_id:
-            paper_upload_job_crud.mark_as_failed(
-                db=db, job_id=upload_job_id, user=user
-            )
         if import_row:
             zotero_import_crud.update_status(
                 db,
@@ -966,6 +988,19 @@ async def _import_one_paper(
                 status=ZoteroImportStatus.FAILED,
                 error_message=str(e),
             )
+        # Remove the paper created before the failed hand-off so we don't leave
+        # an orphan with no content (the import row's FK is ON DELETE SET NULL).
+        if created_paper_id:
+            try:
+                paper_crud.remove(db=db, id=created_paper_id, user=user)
+            except Exception as cleanup_err:
+                logger.warning(
+                    "Failed to clean up paper %s after Zotero import error: %s",
+                    created_paper_id,
+                    cleanup_err,
+                )
+        if upload_job_id:
+            paper_upload_job_crud.mark_as_failed(db=db, job_id=upload_job_id, user=user)
         return {
             "status": "error",
             "zotero_item_key": item_key,
@@ -1102,7 +1137,9 @@ async def _discover_candidates_by_keys(
     max_new, upload_err = _compute_max_new_imports(db, user, len(item_keys))
     if max_new == 0:
         for key in item_keys:
-            errors.append({"zotero_item_key": key, "error": upload_err or "Upload limit"})
+            errors.append(
+                {"zotero_item_key": key, "error": upload_err or "Upload limit"}
+            )
         return candidates, deferred_links, skipped_already_imported, errors
 
     items = client.get_items_by_keys(item_keys)
@@ -1146,9 +1183,7 @@ async def _discover_candidates_by_keys(
 
         doi = normalize_doi(item_data.get("DOI"))
         if doi:
-            target_paper = paper_crud.get_by_doi_for_user(
-                db, user_id=user.id, doi=doi
-            )
+            target_paper = paper_crud.get_by_doi_for_user(db, user_id=user.id, doi=doi)
             if target_paper:
                 await _link_zotero_item_to_existing_paper(
                     db,
@@ -1210,10 +1245,12 @@ async def import_batch(
     Import the specified Zotero items by key.
 
     Zotero already provides authoritative metadata (title, authors, abstract, DOI,
-    publish date, tags, annotations), so this path skips the Celery jobs worker and
-    the LLM extraction step entirely. We upload the PDF to S3, extract text + page
-    offsets server-side for annotation offset matching, persist the paper with
-    Zotero metadata, and apply highlights inline.
+    publish date, tags, annotations), so each item is uploaded and submitted to the
+    Celery jobs worker with LLM metadata extraction skipped — the worker only
+    produces the deterministic outputs (preview, raw text, page offsets). Import is
+    asynchronous: this returns once items are submitted ("processing"), and the
+    paper-processing webhook finalizes each paper and applies Zotero annotations as
+    the worker completes. Progress is tracked via the zotero_imported_items rows.
     """
     connection = zotero_crud.get_by_user_id(db, user_id=user.id)
     if not connection:
@@ -1328,7 +1365,10 @@ def apply_zotero_annotations(
     if not import_row:
         return
 
-    if import_row.import_source == ZoteroImportSource.URL or not import_row.annotations_payload:
+    if (
+        import_row.import_source == ZoteroImportSource.URL
+        or not import_row.annotations_payload
+    ):
         zotero_import_crud.update_status(
             db,
             item=import_row,
@@ -1344,11 +1384,18 @@ def apply_zotero_annotations(
         raw_content = raw_file.raw_content or ""
         page_offsets = raw_file.page_offsets
 
+        # Page dimensions are needed to convert Zotero annotation positions. The
+        # stored payload no longer carries them (the worker, not the server,
+        # processes the PDF), so derive them from the PDF here.
+        paper = paper_crud.get(db, id=paper_id, user=user)
+        page_dims = _get_page_dims_for_paper(paper) if paper else {}
+
         for payload_item in import_row.annotations_payload:
             normalized = _normalize_payload_item(payload_item)
             if not normalized:
                 continue
             zotero_key, ann_data = normalized
+            _embed_page_dims_in_annotation_data(ann_data, page_dims)
             _apply_single_zotero_annotation(
                 db,
                 paper_id=UUID(paper_id),
@@ -1472,9 +1519,7 @@ async def sync_batch(
 
     for import_row in syncable:
         try:
-            result = _sync_item(
-                db, client=client, import_row=import_row, user=user
-            )
+            result = _sync_item(db, client=client, import_row=import_row, user=user)
             synced.append(result)
             new_annotations_count += result["new_annotations_count"]
         except Exception as e:
@@ -1526,9 +1571,7 @@ async def auto_import_new_papers(
 
     library = list_library(db, user=user, limit=100)
     candidate_items = [
-        item
-        for item in library["items"]
-        if not item["already_imported"]
+        item for item in library["items"] if not item["already_imported"]
     ]
     new_keys = []
     for item in candidate_items:

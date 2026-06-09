@@ -1,12 +1,9 @@
 import io
 import logging
-import uuid
 from datetime import datetime
-from typing import Optional, Tuple
+from typing import Tuple
 
-import pymupdf
 import requests
-from PIL import Image
 from pypdf import PdfReader
 
 logging.basicConfig(level=logging.INFO)
@@ -175,87 +172,24 @@ async def validate_url_and_fetch_pdf(url: str) -> tuple[bool, bytes, str]:
         return False, b"", f"Error processing URL: {str(e)}"
 
 
-def generate_pdf_preview_from_bytes(
-    pdf_bytes: bytes,
-) -> Tuple[Optional[str], Optional[str]]:
-    """
-    Render the first page of a PDF to a PNG preview and upload to S3.
-    Returns (preview_object_key, preview_url) or (None, None) on failure.
-    """
-    from app.helpers.s3 import s3_service
-
-    try:
-        doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
-        if len(doc) == 0:
-            return None, None
-
-        page = doc[0]
-        mat = pymupdf.Matrix(2.0, 2.0)
-        pix = page.get_pixmap(matrix=mat)  # type: ignore[attr-defined]
-        img = Image.open(io.BytesIO(pix.tobytes("png")))
-
-        max_width = 800
-        if img.width > max_width:
-            ratio = max_width / img.width
-            new_height = int(img.height * ratio)
-            img = img.resize((max_width, new_height), Image.Resampling.LANCZOS)
-
-        img_buffer = io.BytesIO()
-        img.save(img_buffer, format="PNG", optimize=True)
-        img_buffer.seek(0)
-
-        preview_filename = f"preview-{uuid.uuid4()}.png"
-        preview_object_key, preview_url = s3_service.upload_any_file_from_bytes(
-            img_buffer.getvalue(),
-            preview_filename,
-            content_type="image/png",
-        )
-        doc.close()
-        return preview_object_key, preview_url
-    except Exception as e:
-        logger.warning("Failed to generate PDF preview: %s", e)
-        return None, None
-
-
 def extract_pdf_page_dimensions(pdf_bytes: bytes) -> dict[int, tuple[float, float]]:
-    """Return {page_index: (width_pts, height_pts)} for every page in the PDF."""
+    """
+    Return {page_index: (width_pts, height_pts)} for every page in the PDF.
+
+    Used to convert Zotero annotation positions (which are in PDF points) into the
+    viewer's coordinate space. Preview/text generation lives in the jobs service;
+    this only needs page geometry, which pypdf reads from the page cropbox.
+    """
     try:
-        doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
-        dims = {i: (page.rect.width, page.rect.height) for i, page in enumerate(doc)}
-        doc.close()
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        dims: dict[int, tuple[float, float]] = {}
+        for i, page in enumerate(reader.pages):
+            box = page.cropbox
+            dims[i] = (float(box.width), float(box.height))
         return dims
     except Exception as e:
         logger.warning("Failed to extract PDF page dimensions: %s", e)
         return {}
-
-
-def extract_pdf_text_and_offsets(
-    pdf_bytes: bytes,
-) -> Tuple[str, dict[int, list[int]]]:
-    """
-    Extract plain text from a PDF along with a {page_number: [start, end]} offset
-    map suitable for storage in `Paper.page_offset_map`. Pages with no extractable
-    text are skipped. Used by callers (e.g. Zotero import) that already have
-    authoritative metadata and only need deterministic text for annotation
-    offset matching.
-    """
-    reader = PdfReader(io.BytesIO(pdf_bytes))
-    parts: list[str] = []
-    page_offsets: dict[int, list[int]] = {}
-    current = 0
-    for idx, page in enumerate(reader.pages):
-        try:
-            text = page.extract_text() or ""
-        except Exception as e:
-            logger.warning("Failed to extract text from page %s: %s", idx + 1, e)
-            text = ""
-        text = text.replace("\x00", "")
-        if not text:
-            continue
-        parts.append(text)
-        page_offsets[idx + 1] = [current, current + len(text)]
-        current += len(text)
-    return "".join(parts), page_offsets
 
 
 def parse_publication_date(date_str: str) -> datetime | None:

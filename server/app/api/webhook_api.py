@@ -46,19 +46,27 @@ logger = logging.getLogger(__name__)
 webhook_router = APIRouter()
 
 
-def _salvage_zotero_import_paper(
+def _finalize_zotero_import(
     db: Session,
     job_id: str,
     job_user: CurrentUser,
     result: "PDFProcessingResult",
-    error_message: str,
+    error_message: Optional[str] = None,
 ) -> Optional[str]:
     """
-    Best-effort save for Zotero-imported papers when the worker reports failure
-    (typically LLM metadata extraction). Zotero already provided authoritative
-    title/authors/abstract/DOI/publish_date via _apply_metadata_from_zotero, so
-    we keep the paper and attach whatever deterministic outputs the worker did
-    produce (PDF text, preview, S3 location). Returns the paper id on success.
+    Finalize a Zotero-imported paper from a jobs-worker result.
+
+    The Zotero import path submits the PDF to the worker with LLM metadata
+    extraction skipped, and applies Zotero's authoritative metadata
+    (title/authors/abstract/DOI/publish_date) up front via
+    _apply_metadata_from_zotero. So here we only fill in the deterministic worker
+    outputs (preview, PDF text, page offsets, file size) and apply the Zotero
+    annotations — we never require or overwrite the Zotero metadata.
+
+    Used on the normal completion path (error_message=None) and as a best-effort
+    salvage when the worker reports failure (error_message set) but still produced
+    partial deterministic outputs (e.g. preview/text). Returns the paper id, or
+    None when there is no Zotero metadata to keep (cannot finalize).
     """
     from app.database.crud.zotero_import_crud import zotero_import_crud
     from app.database.models import ZoteroImportStatus
@@ -67,7 +75,7 @@ def _salvage_zotero_import_paper(
         db=db, upload_job_id=job_id, user=job_user
     )
     if not existing_paper or not getattr(existing_paper, "title", None):
-        # No Zotero metadata was applied; cannot salvage.
+        # No Zotero metadata was applied; cannot finalize.
         return None
 
     size_in_kb = (
@@ -77,7 +85,7 @@ def _salvage_zotero_import_paper(
     )
 
     update_payload: dict = {"upload_job_id": job_id}
-    if result.file_url:
+    if result.preview_url:
         update_payload["preview_url"] = result.preview_url
     if result.raw_content:
         update_payload["raw_content"] = result.raw_content
@@ -95,39 +103,45 @@ def _salvage_zotero_import_paper(
 
     paper_upload_job_crud.mark_as_completed(db=db, job_id=job_id, user=job_user)
 
-    zotero_import = zotero_import_crud.get_by_upload_job_id(
-        db, upload_job_id=uuid.UUID(job_id)
-    )
-    if zotero_import and paper:
-        zotero_import_crud.update_status(
-            db,
-            item=zotero_import,
-            status=ZoteroImportStatus.COMPLETED,
-            error_message=f"Imported without AI enrichment: {error_message}",
-            paper_id=uuid.UUID(str(paper.id)),
+    if not paper:
+        return None
+
+    # When salvaging a partial result, record the worker error on the import row.
+    # apply_zotero_annotations (below) flips the row to COMPLETED but preserves
+    # this note (it only sets error_message when given one).
+    if error_message:
+        zotero_import = zotero_import_crud.get_by_upload_job_id(
+            db, upload_job_id=uuid.UUID(job_id)
+        )
+        if zotero_import:
+            zotero_import_crud.update_status(
+                db,
+                item=zotero_import,
+                status=ZoteroImportStatus.PROCESSING,
+                error_message=f"Imported without full processing: {error_message}",
+                paper_id=uuid.UUID(str(paper.id)),
+            )
+
+    try:
+        from app.services.zotero_import import apply_zotero_annotations
+
+        apply_zotero_annotations(
+            db=db,
+            upload_job_id=job_id,
+            paper_id=str(paper.id),
+            user=job_user,
+        )
+    except Exception as e:
+        logger.error(
+            f"Error applying Zotero annotations for job {job_id}: {e}",
+            exc_info=True,
         )
 
-    if paper:
-        try:
-            from app.services.zotero_import import apply_zotero_annotations
-
-            apply_zotero_annotations(
-                db=db,
-                upload_job_id=job_id,
-                paper_id=str(paper.id),
-                user=job_user,
-            )
-        except Exception as e:
-            logger.error(
-                f"Error applying Zotero annotations during salvage for job {job_id}: {e}",
-                exc_info=True,
-            )
-
     logger.info(
-        f"Salvaged Zotero import for job {job_id} with paper {paper.id if paper else 'unknown'} "
-        f"(LLM error: {error_message})"
+        f"Finalized Zotero import for job {job_id} with paper {paper.id}"
+        + (f" (worker error: {error_message})" if error_message else "")
     )
-    return str(paper.id) if paper else None
+    return str(paper.id)
 
 
 def handle_failed_upload(
@@ -334,8 +348,41 @@ async def handle_paper_processing_webhook(
     status = webhook_data.status
     result = webhook_data.result
 
+    from app.database.crud.zotero_import_crud import zotero_import_crud
+
+    zotero_import = zotero_import_crud.get_by_upload_job_id(
+        db, upload_job_id=uuid.UUID(job_id)
+    )
+
     try:
         if status == "completed" and result.success:
+            # Zotero imports run the worker with LLM metadata extraction skipped,
+            # so they have no `metadata` to apply. Zotero's authoritative metadata
+            # was already set at submit time; here we only fill the deterministic
+            # worker outputs and apply Zotero annotations.
+            if zotero_import:
+                finalized = _finalize_zotero_import(
+                    db=db, job_id=job_id, job_user=job_user, result=result
+                )
+                if finalized:
+                    track_event(
+                        "zotero_paper_processed",
+                        properties={"worker_duration": result.duration},
+                        user_id=str(user.id),
+                        db=db,
+                    )
+                    return {
+                        "status": "webhook processed - zotero import",
+                        "paper_id": finalized,
+                    }
+                handle_failed_upload(
+                    db=db,
+                    job_id=job_id,
+                    job_user=job_user,
+                    reason="Zotero import missing metadata",
+                )
+                return {"status": "webhook processed - zotero import failed"}
+
             # Processing was successful
             metadata = result.metadata
             file_url = result.file_url
@@ -436,22 +483,6 @@ async def handle_paper_processing_webhook(
                     )
                     # Don't fail the whole process for annotation errors
 
-            if paper:
-                try:
-                    from app.services.zotero_import import apply_zotero_annotations
-
-                    apply_zotero_annotations(
-                        db=db,
-                        upload_job_id=job_id,
-                        paper_id=str(paper.id),
-                        user=job_user,
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"Error applying Zotero annotations for job {job_id}: {str(e)}",
-                        exc_info=True,
-                    )
-
             if metadata.summary and paper:
                 try:
                     conversation_data = ConversationCreate(
@@ -534,14 +565,11 @@ async def handle_paper_processing_webhook(
             # Processing failed.
             error_message = result.error if result.error else "Unknown error"
 
-            from app.database.crud.zotero_import_crud import zotero_import_crud
-
-            zotero_import = zotero_import_crud.get_by_upload_job_id(
-                db, upload_job_id=uuid.UUID(job_id)
-            )
-
+            # Best-effort salvage for Zotero imports: Zotero already supplied the
+            # metadata, so keep the paper with whatever deterministic outputs the
+            # worker did produce instead of discarding it.
             if zotero_import:
-                salvaged = _salvage_zotero_import_paper(
+                salvaged = _finalize_zotero_import(
                     db=db,
                     job_id=job_id,
                     job_user=job_user,
@@ -851,10 +879,16 @@ async def trigger_zotero_sync_all(request: Request, db: Session = Depends(get_db
     if secret and request.headers.get("Authorization") != f"Bearer {secret}":
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    threshold_seconds = int(request.query_params.get("threshold_seconds", str(24 * 3600)))
+    threshold_seconds = int(
+        request.query_params.get("threshold_seconds", str(24 * 3600))
+    )
     threshold_hours = threshold_seconds / 3600
-    user_ids = zotero_import_crud.list_user_ids_due_for_sync(db, threshold_hours=threshold_hours)
-    logger.info(f"Periodic Zotero sync: found {len(user_ids)} users due for sync (threshold={threshold_hours:.4f}h)")
+    user_ids = zotero_import_crud.list_user_ids_due_for_sync(
+        db, threshold_hours=threshold_hours
+    )
+    logger.info(
+        f"Periodic Zotero sync: found {len(user_ids)} users due for sync (threshold={threshold_hours:.4f}h)"
+    )
 
     results = []
     for user_id in user_ids:
@@ -893,5 +927,11 @@ async def trigger_zotero_sync_all(request: Request, db: Session = Depends(get_db
             results.append({"user_id": str(user_id), "error": str(e)})
 
     synced_users = len([r for r in results if "error" not in r])
-    logger.info(f"Periodic Zotero sync complete: {synced_users}/{len(user_ids)} users synced successfully")
-    return {"synced_users": synced_users, "total_users": len(user_ids), "results": results}
+    logger.info(
+        f"Periodic Zotero sync complete: {synced_users}/{len(user_ids)} users synced successfully"
+    )
+    return {
+        "synced_users": synced_users,
+        "total_users": len(user_ids),
+        "results": results,
+    }
