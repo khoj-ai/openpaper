@@ -210,7 +210,6 @@ class TestImportBatchDoiDedup(unittest.IsolatedAsyncioTestCase, _ImportPipelineH
         existing_paper = MagicMock()
         existing_paper.id = uuid4()
         mock_paper_crud.get_by_doi_for_user.return_value = existing_paper
-        mock_paper_crud.get_by_normalized_title_for_user.return_value = None
 
         client = MagicMock()
         mock_client_cls.return_value = client
@@ -238,7 +237,6 @@ class TestImportBatchDoiDedup(unittest.IsolatedAsyncioTestCase, _ImportPipelineH
         mock_link: AsyncMock,
     ) -> None:
         mock_paper_crud.get_by_doi_for_user.return_value = None
-        mock_paper_crud.get_by_normalized_title_for_user.return_value = None
 
         user, paper, _ = self._configure_mocks(
             mock_zotero_crud=mock_zotero_crud,
@@ -275,8 +273,6 @@ class TestImportBatchDoiDedup(unittest.IsolatedAsyncioTestCase, _ImportPipelineH
         mock_resolve_pdf: AsyncMock,
         mock_link: AsyncMock,
     ) -> None:
-        mock_paper_crud.get_by_normalized_title_for_user.return_value = None
-
         user, _, _ = self._configure_mocks(
             mock_zotero_crud=mock_zotero_crud,
             mock_import_crud=mock_import_crud,
@@ -294,74 +290,23 @@ class TestImportBatchDoiDedup(unittest.IsolatedAsyncioTestCase, _ImportPipelineH
         mock_paper_crud.get_by_doi_for_user.assert_not_called()
 
 
-class TestImportBatchTitleDedup(
+class TestImportBatchNoTitleDedup(
     unittest.IsolatedAsyncioTestCase, _ImportPipelineHelpers
 ):
+    """Title-based dedup was intentionally dropped: zotero_item_key handles
+    re-imports and DOI handles genuine duplicates. Two same-title items without a
+    matching DOI should both import rather than being silently collapsed."""
+
     TITLE = "Attention Is All You Need"
 
-    def _make_item(
-        self,
-        key: str,
-        *,
-        doi: str | None = None,
-        title: str | None = None,
-    ) -> dict:
-        data: dict = {
-            "title": title if title is not None else self.TITLE,
-            "itemType": "journalArticle",
+    def _make_item(self, key: str) -> dict:
+        return {
+            "key": key,
+            "data": {"title": self.TITLE, "itemType": "journalArticle"},
         }
-        if doi is not None:
-            data["DOI"] = doi
-        return {"key": key, "data": data}
-
-    @patch.object(
-        zotero_import_module,
-        "_compute_max_new_imports",
-        return_value=(50, None),
-    )
-    @patch.object(
-        zotero_import_module,
-        "_link_zotero_item_to_existing_paper",
-        new_callable=AsyncMock,
-    )
-    @patch.object(zotero_import_module, "paper_crud")
-    @patch.object(zotero_import_module, "zotero_import_crud")
-    @patch.object(zotero_import_module, "zotero_crud")
-    @patch.object(zotero_import_module, "ZoteroApiClient")
-    async def test_skips_when_title_matches_existing_paper(
-        self,
-        mock_client_cls: MagicMock,
-        mock_zotero_crud: MagicMock,
-        mock_import_crud: MagicMock,
-        mock_paper_crud: MagicMock,
-        mock_link: AsyncMock,
-        mock_max_new: MagicMock,
-    ) -> None:
-        user = MagicMock()
-        user.id = uuid4()
-        mock_zotero_crud.get_by_user_id.return_value = MagicMock(
-            zotero_user_id="1", api_key="key"
-        )
-        mock_import_crud.get_by_item_key.return_value = None
-        mock_paper_crud.get_by_doi_for_user.return_value = None
-
-        existing_paper = MagicMock()
-        existing_paper.id = uuid4()
-        mock_paper_crud.get_by_normalized_title_for_user.return_value = existing_paper
-
-        client = MagicMock()
-        mock_client_cls.return_value = client
-        client.get_items_by_keys.return_value = [self._make_item("ITEM2")]
-
-        result = await import_batch(MagicMock(), user=user, item_keys=["ITEM2"])
-
-        self.assertEqual(result["skipped_already_imported"], 1)
-        self.assertEqual(result["imported_count"], 0)
-        mock_link.assert_awaited_once()
-        mock_paper_crud.get_by_normalized_title_for_user.assert_called_once()
 
     @_patch_import_pipeline
-    async def test_second_duplicate_title_in_batch_links_to_first_paper(
+    async def test_same_title_without_doi_imports_both(
         self,
         mock_submit_job: MagicMock,
         mock_upload_pdf: MagicMock,
@@ -376,9 +321,8 @@ class TestImportBatchTitleDedup(
         mock_link: AsyncMock,
     ) -> None:
         mock_paper_crud.get_by_doi_for_user.return_value = None
-        mock_paper_crud.get_by_normalized_title_for_user.return_value = None
 
-        user, paper, _ = self._configure_mocks(
+        user, _, _ = self._configure_mocks(
             mock_zotero_crud=mock_zotero_crud,
             mock_import_crud=mock_import_crud,
             mock_paper_crud=mock_paper_crud,
@@ -391,45 +335,10 @@ class TestImportBatchTitleDedup(
             MagicMock(), user=user, item_keys=["ITEM1", "ITEM2"]
         )
 
-        self.assertEqual(result["imported_count"], 1)
-        self.assertEqual(result["skipped_already_imported"], 1)
-        mock_submit_job.assert_called_once()
-        mock_link.assert_awaited_once()
-        link_kwargs = mock_link.await_args.kwargs
-        self.assertEqual(link_kwargs["paper"], paper)
-
-    @_patch_import_pipeline
-    async def test_short_title_does_not_dedup(
-        self,
-        mock_submit_job: MagicMock,
-        mock_upload_pdf: MagicMock,
-        mock_tags: MagicMock,
-        mock_upload_job_crud: MagicMock,
-        mock_paper_crud: MagicMock,
-        mock_import_crud: MagicMock,
-        mock_zotero_crud: MagicMock,
-        mock_client_cls: MagicMock,
-        mock_max_new: MagicMock,
-        mock_resolve_pdf: AsyncMock,
-        mock_link: AsyncMock,
-    ) -> None:
-        mock_paper_crud.get_by_normalized_title_for_user.return_value = None
-
-        user, _, _ = self._configure_mocks(
-            mock_zotero_crud=mock_zotero_crud,
-            mock_import_crud=mock_import_crud,
-            mock_paper_crud=mock_paper_crud,
-            mock_upload_job_crud=mock_upload_job_crud,
-            mock_client_cls=mock_client_cls,
-            items=[self._make_item("ITEM1", title="Short title")],
-        )
-
-        result = await import_batch(MagicMock(), user=user, item_keys=["ITEM1"])
-
-        self.assertEqual(result["imported_count"], 1)
+        self.assertEqual(result["imported_count"], 2)
         self.assertEqual(result["skipped_already_imported"], 0)
-        mock_submit_job.assert_called_once()
-        mock_paper_crud.get_by_normalized_title_for_user.assert_not_called()
+        self.assertEqual(mock_submit_job.call_count, 2)
+        mock_link.assert_not_awaited()
 
 
 class TestDiscoverImportCandidates(unittest.IsolatedAsyncioTestCase):
