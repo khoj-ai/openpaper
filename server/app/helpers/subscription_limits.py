@@ -89,14 +89,12 @@ def get_remaining_paper_upload_slots(db: Session, user: CurrentUser) -> int:
     """
     Return the number of papers the user can still upload under their plan.
 
-    Returns 0 when at or over limit. Returns sys.maxsize for unlimited plans.
+    Returns 0 when at or over limit. All current plans have a finite paper
+    upload limit, so there is no unlimited case to special-case.
     """
     plan = get_user_subscription_plan(db, user)
     limits = get_plan_limits(plan)
     paper_limit = limits[PAPER_UPLOAD_KEY]
-    if paper_limit == float("inf"):
-        import sys
-        return sys.maxsize
     current_paper_count = paper_crud.get_total_paper_count(db=db, user=user)
     return max(0, int(paper_limit) - current_paper_count)
 
