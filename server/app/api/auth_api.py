@@ -26,6 +26,7 @@ from app.database.crud.projects.project_role_invitation_crud import (
 from app.database.crud.subscription_crud import subscription_crud
 from app.database.crud.user_crud import user as user_crud
 from app.database.crud.zotero_crud import zotero_crud
+from app.database.crud.zotero_import_crud import zotero_import_crud
 from app.database.database import get_db
 from app.database.models import PaperStatus, Project, User
 from app.database.telemetry import track_event
@@ -378,8 +379,6 @@ async def zotero_status(
     db: Session = Depends(get_db),
 ):
     """Return whether the current user has a linked Zotero account."""
-    from app.database.crud.zotero_import_crud import zotero_import_crud
-
     connection = zotero_crud.get_by_user_id(db=db, user_id=current_user.id)
     if not connection:
         return ZoteroStatusResponse(connected=False)

@@ -24,8 +24,15 @@ from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.crud.referral_crud import referral_crud
 from app.database.crud.subscription_crud import subscription_crud
 from app.database.crud.user_crud import user as user_crud
+from app.database.crud.zotero_import_crud import zotero_import_crud
 from app.database.database import SessionLocal, get_db
-from app.database.models import ConversableType, Conversation, JobStatus, ReferralStatus
+from app.database.models import (
+    ConversableType,
+    Conversation,
+    JobStatus,
+    ReferralStatus,
+    ZoteroImportStatus,
+)
 from app.database.telemetry import track_event
 from app.helpers.email import (
     send_data_table_complete_email,
@@ -33,10 +40,16 @@ from app.helpers.email import (
 )
 from app.helpers.metadata_hydration import hydrate_paper_metadata
 from app.helpers.s3 import s3_service
+from app.helpers.subscription_limits import can_user_auto_sync_zotero
 from app.llm.citation_handler import CitationHandler
 from app.llm.operations import operations
 from app.schemas.responses import DataTableResult, PaperMetadataExtraction
 from app.schemas.user import CurrentUser
+from app.services.zotero_import import (
+    apply_zotero_annotations,
+    auto_import_new_papers,
+    sync_batch,
+)
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -68,9 +81,6 @@ def _finalize_zotero_import(
     partial deterministic outputs (e.g. preview/text). Returns the paper id, or
     None when there is no Zotero metadata to keep (cannot finalize).
     """
-    from app.database.crud.zotero_import_crud import zotero_import_crud
-    from app.database.models import ZoteroImportStatus
-
     existing_paper = paper_crud.get_by_upload_job_id(
         db=db, upload_job_id=job_id, user=job_user
     )
@@ -123,8 +133,6 @@ def _finalize_zotero_import(
             )
 
     try:
-        from app.services.zotero_import import apply_zotero_annotations
-
         apply_zotero_annotations(
             db=db,
             upload_job_id=job_id,
@@ -185,9 +193,6 @@ def handle_failed_upload(
         paper_crud.remove(db=db, id=str(existing_paper.id), user=job_user)
 
     paper_upload_job_crud.mark_as_failed(db=db, job_id=job_id, user=job_user)
-
-    from app.database.crud.zotero_import_crud import zotero_import_crud
-    from app.database.models import ZoteroImportStatus
 
     zotero_import = zotero_import_crud.get_by_upload_job_id(
         db, upload_job_id=uuid.UUID(job_id)
@@ -347,8 +352,6 @@ async def handle_paper_processing_webhook(
     )
     status = webhook_data.status
     result = webhook_data.result
-
-    from app.database.crud.zotero_import_crud import zotero_import_crud
 
     zotero_import = zotero_import_crud.get_by_upload_job_id(
         db, upload_job_id=uuid.UUID(job_id)
@@ -871,10 +874,6 @@ async def trigger_zotero_sync_all(request: Request, db: Session = Depends(get_db
     annotations for all users whose items haven't been synced in the past 24 hours.
     Auth: shared secret via Authorization header (JOBS_INTERNAL_SECRET env var).
     """
-    from app.database.crud.zotero_import_crud import zotero_import_crud
-    from app.helpers.subscription_limits import can_user_auto_sync_zotero
-    from app.services.zotero_import import auto_import_new_papers, sync_batch
-
     secret = os.getenv("JOBS_INTERNAL_SECRET", "")
     if secret and request.headers.get("Authorization") != f"Bearer {secret}":
         raise HTTPException(status_code=403, detail="Forbidden")
