@@ -10,6 +10,7 @@ from app.database.crud.highlight_crud import HighlightCreate, highlight_crud
 from app.database.crud.paper_image_crud import paper_image_crud
 from app.database.crud.sanitization import sanitize_for_postgres
 from app.database.models import (
+    Highlight,
     JobStatus,
     Paper,
     PaperImage,
@@ -335,6 +336,24 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
         extract_metadata: PaperMetadataExtraction,
         current_user: CurrentUser,
     ):
+        # Idempotency: a redelivered upload job (Celery acks_late) can invoke this
+        # twice for the same paper. If AI highlights already exist, this has
+        # already run — skip to avoid duplicating highlights and annotations.
+        existing_ai_highlight = (
+            db.query(Highlight)
+            .filter(
+                Highlight.paper_id == uuid.UUID(paper_id),
+                Highlight.role == RoleType.ASSISTANT,
+            )
+            .first()
+        )
+        if existing_ai_highlight:
+            logger.info(
+                f"AI highlights already exist for paper {paper_id}, "
+                f"skipping AI annotation creation"
+            )
+            return
+
         raw_file = self.read_raw_document_content(
             db, paper_id=paper_id, current_user=current_user
         )
