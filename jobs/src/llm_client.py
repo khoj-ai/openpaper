@@ -30,6 +30,22 @@ from src.utils import retry_llm_operation, time_it
 
 logger = logging.getLogger(__name__)
 
+
+def _format_api_error(e: Exception) -> Any:
+    """Pull the concise 'error' payload out of a genai API error for logging.
+
+    google-genai's APIError stores the raw response JSON on `.details` (see
+    errors.py) and stringifies as "<code> <status>. <details>", so the full
+    payload is what bloats the logs. When `.details` is a dict, return its
+    'error' value; otherwise (e.g. httpx.TimeoutException, or no 'error' key)
+    fall back to the whole exception.
+    """
+    details = getattr(e, "details", None)
+    if isinstance(details, dict):
+        return details.get("error", e)
+    return e
+
+
 # Constants
 DEFAULT_CHAT_MODEL = "gemini-3.1-pro-preview"
 FAST_CHAT_MODEL = "gemini-3-flash-preview"
@@ -257,12 +273,12 @@ class AsyncLLMClient:
                     # Exponential backoff with jitter
                     backoff_time = base_delay * (2 ** attempt) * (0.5 + 0.5 * random.random())
                     logger.warning(
-                        f"LLM API error (attempt {attempt + 1}/{max_retries + 1}): {e}. "
+                        f"LLM API error (attempt {attempt + 1}/{max_retries + 1}): {_format_api_error(e)}. "
                         f"Retrying in {backoff_time:.2f}s"
                     )
                     await asyncio.sleep(backoff_time)
                 else:
-                    logger.error(f"All {max_retries + 1} attempts failed for generate_content: {e}")
+                    logger.error(f"All {max_retries + 1} attempts failed for generate_content: {_format_api_error(e)}")
 
         # If we reach here, all retries failed
         raise last_exception or ValueError("Failed to generate content after all retries")
@@ -342,12 +358,12 @@ class AsyncLLMClient:
                 if attempt < max_retries:
                     backoff_time = base_delay * (2 ** attempt) * (0.5 + 0.5 * random.random())
                     logger.warning(
-                        f"LLM API error (attempt {attempt + 1}/{max_retries + 1}): {e}. "
+                        f"LLM API failed (attempt {attempt + 1}/{max_retries + 1}): {_format_api_error(e)}. "
                         f"Retrying in {backoff_time:.2f}s"
                     )
                     await asyncio.sleep(backoff_time)
                 else:
-                    logger.error(f"All {max_retries + 1} attempts failed for generate_structured: {e}")
+                    logger.error(f"All {max_retries + 1} attempts failed for generate_structured: {_format_api_error(e)}")
             except (ValueError, ValidationError) as e:
                 last_exception = e
                 if attempt < max_retries:
