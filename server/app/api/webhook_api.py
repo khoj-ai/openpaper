@@ -23,9 +23,10 @@ from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.crud.referral_crud import referral_crud
 from app.database.crud.subscription_crud import subscription_crud
 from app.database.crud.user_crud import user as user_crud
-from app.database.database import SessionLocal, get_db
+from app.database.database import SessionLocal, engine, get_db
 from app.database.models import ConversableType, Conversation, JobStatus, ReferralStatus
 from app.database.telemetry import track_event
+from app.helpers.advisory_locks import AdvisoryLock, AdvisoryLockNamespace
 from app.helpers.email import (
     send_data_table_complete_email,
     send_referral_credit_available_email,
@@ -60,6 +61,19 @@ def handle_failed_upload(
         job_user: The user who owns the job
         reason: Description of why the upload failed
     """
+    # Refuse to tear down a job that already succeeded. A redelivered Celery
+    # task (acks_late) can post a late "failed" webhook after another delivery
+    # already built and committed the paper; deleting it here is what caused
+    # the highlights_paper_id_fkey violations (highlight inserts racing a paper
+    # delete). A completed job means the paper is good — leave it alone.
+    job = paper_upload_job_crud.get(db=db, id=job_id, user=job_user)
+    if job and job.status == JobStatus.COMPLETED:
+        logger.warning(
+            f"Ignoring failed-upload cleanup for already-completed job {job_id} "
+            f"(reason: {reason}); refusing to delete a populated paper"
+        )
+        return
+
     logger.error(f"PDF processing failed for job {job_id}: {reason}")
 
     # Clean up the paper record that was created during upload
@@ -231,10 +245,37 @@ async def handle_paper_processing_webhook(
         name=user.name,
         is_admin=user.is_admin,
     )
+
+    # Serialize concurrent/duplicate deliveries for the same job. Celery retries
+    # with acks_late, so a redelivered task can fire a second webhook while the
+    # first is still processing. Without this, the two handlers race and one can
+    # delete the paper out from under the other (FK violations on highlight
+    # insert). Non-blocking: a loser bails immediately. The lock rides its own
+    # connection so it survives this handler's many intermediate commits.
+    job_lock = AdvisoryLock(
+        engine, namespace=AdvisoryLockNamespace.PAPER_PROCESSING_WEBHOOK, key=job_id
+    )
+    if not job_lock.acquire():
+        logger.warning(
+            f"Webhook for job {job_id} is already being processed by another "
+            f"delivery, ignoring duplicate"
+        )
+        return {"status": "webhook ignored - already being processed"}
+
     status = webhook_data.status
     result = webhook_data.result
 
     try:
+        # Re-check completion under the lock: another delivery may have finished
+        # between our initial read and acquiring the lock.
+        db.refresh(job)
+        if job.status == JobStatus.COMPLETED:
+            logger.warning(
+                f"Job {job_id} completed by a concurrent delivery, ignoring "
+                f"duplicate webhook"
+            )
+            return {"status": "webhook ignored - job already completed"}
+
         if status == "completed" and result.success:
             # Processing was successful
             metadata = result.metadata
@@ -442,6 +483,9 @@ async def handle_paper_processing_webhook(
             paper_upload_job_crud.mark_as_failed(db=db, job_id=job_id, user=job_user)
 
         raise HTTPException(status_code=500, detail="Error processing webhook")
+    finally:
+        # Always release the advisory lock (and return its connection to the pool).
+        job_lock.release()
 
     return {"status": "webhook processed"}
 
