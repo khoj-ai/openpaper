@@ -5,6 +5,7 @@ from app.database.crud.base_crud import CRUDBase
 from app.database.models import Highlight, Paper
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 
@@ -65,20 +66,18 @@ class HighlightCrud(CRUDBase[Highlight, HighlightCreate, HighlightUpdate]):
         raw_text: str,
         page_number: Optional[int],
     ) -> Optional[Highlight]:
-        normalized_text = raw_text.strip().casefold()
+        normalized_text = raw_text.strip()
         query = db.query(Highlight).filter(
             Highlight.paper_id == paper_id,
             Highlight.zotero_annotation_key.is_(None),
+            func.trim(Highlight.raw_text) == normalized_text,
         )
         if page_number is not None:
             query = query.filter(Highlight.page_number == page_number)
 
-        candidates = query.all()
-        matches = [
-            h
-            for h in candidates
-            if (h.raw_text or "").strip().casefold() == normalized_text
-        ]
+        # Only backfill when the match is unambiguous; fetch one extra row so we
+        # can detect (and reject) the multiple-match case without loading them all.
+        matches = query.limit(2).all()
         if len(matches) == 1:
             return matches[0]
         return None
