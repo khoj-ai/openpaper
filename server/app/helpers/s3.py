@@ -187,30 +187,26 @@ class S3Service:
                 ExpiresIn=expiration,
             )
 
-            # Rewrite the raw S3 host to the public Cloudflare CDN host only when
-            # CLOUDFLARE_BUCKET_NAME is configured. Without it, rewriting would
-            # produce an unfetchable "https://None/..." URL, so we return the raw
-            # S3 presigned URL (this is the expected case for local development).
-            if self.cloudflare_bucket_name:
-                if url.startswith(f"https://{self.bucket_name}.s3.amazonaws.com/"):
-                    url = url.replace(
-                        f"https://{self.bucket_name}.s3.amazonaws.com/",
-                        f"https://{self.cloudflare_bucket_name}/",
-                    )
-                elif url.startswith(
-                    f"https://{self.bucket_name}.s3.us-east-1.amazonaws.com/"
-                ):
-                    url = url.replace(
-                        f"https://{self.bucket_name}.s3.us-east-1.amazonaws.com/",
-                        f"https://{self.cloudflare_bucket_name}/",
-                    )
-                elif url.startswith(
-                    f"https://{self.bucket_name}.s3.{AWS_REGION}.amazonaws.com/"
-                ):
-                    url = url.replace(
-                        f"https://{self.bucket_name}.s3.{AWS_REGION}.amazonaws.com/",
-                        f"https://{self.cloudflare_bucket_name}/",
-                    )
+            # Rewrite the raw S3 host to the public Cloudflare CDN host
+            if url.startswith(f"https://{self.bucket_name}.s3.amazonaws.com/"):
+                url = url.replace(
+                    f"https://{self.bucket_name}.s3.amazonaws.com/",
+                    f"https://{self.cloudflare_bucket_name}/",
+                )
+            elif url.startswith(
+                f"https://{self.bucket_name}.s3.us-east-1.amazonaws.com/"
+            ):
+                url = url.replace(
+                    f"https://{self.bucket_name}.s3.us-east-1.amazonaws.com/",
+                    f"https://{self.cloudflare_bucket_name}/",
+                )
+            elif url.startswith(
+                f"https://{self.bucket_name}.s3.{AWS_REGION}.amazonaws.com/"
+            ):
+                url = url.replace(
+                    f"https://{self.bucket_name}.s3.{AWS_REGION}.amazonaws.com/",
+                    f"https://{self.cloudflare_bucket_name}/",
+                )
 
             return url
         except ClientError as e:
@@ -267,21 +263,15 @@ class S3Service:
             if not paper:
                 return None
 
-            # Check if we have a valid cached URL. Reject obviously broken URLs
-            # (e.g. legacy entries written before CLOUDFLARE_BUCKET_NAME was set,
-            # which look like "https://None/...") so they self-heal on next read.
+            # Check if we have a valid cached URL
             now = datetime.now(timezone.utc)
-            cached_url = (
-                str(paper.cached_presigned_url) if paper.cached_presigned_url else None
-            )
             if (
-                cached_url
-                and not cached_url.startswith("https://None/")
+                paper.cached_presigned_url
                 and paper.presigned_url_expires_at
                 and paper.presigned_url_expires_at > now
             ):
                 logger.debug(f"Using cached presigned URL for paper {paper_id}")
-                return cached_url
+                return str(paper.cached_presigned_url)
 
             # Generate new presigned URL
             url = self.generate_presigned_url(object_key, expiration)
@@ -429,18 +419,13 @@ class S3Service:
         for paper in papers:
             paper_id = str(paper.id)
 
-            # Check if we have a valid cached URL. Reject broken legacy
-            # "https://None/..." entries so they self-heal.
-            cached_url = (
-                str(paper.cached_presigned_url) if paper.cached_presigned_url else None
-            )
+            # Check if we have a valid cached URL
             if (
-                cached_url
-                and not cached_url.startswith("https://None/")
+                paper.cached_presigned_url
                 and paper.presigned_url_expires_at
                 and paper.presigned_url_expires_at > now
             ):
-                result[paper_id] = cached_url
+                result[paper_id] = str(paper.cached_presigned_url)
                 logger.debug(f"Using cached presigned URL for paper {paper_id}")
             else:
                 papers_needing_urls.append(paper)
