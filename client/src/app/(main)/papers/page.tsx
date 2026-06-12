@@ -27,6 +27,7 @@ import { CreateProjectDialog } from "@/components/CreateProjectDialog";
 import { useRouter } from "next/navigation";
 import { UploadModal } from "@/components/UploadModal";
 import { usePapers } from "@/hooks/usePapers";
+import { removeActivePaper } from "@/hooks/useActivePapers";
 
 const PageSkeleton = () => (
     <div className="w-full mx-auto p-4">
@@ -125,6 +126,7 @@ function PapersPageContent() {
             (current) => current?.filter((paper) => paper.id !== paperId),
             { revalidate: false },
         );
+        removeActivePaper(paperId);
     };
 
     const handleTableAction = (papers: PaperItem[], action: string) => {

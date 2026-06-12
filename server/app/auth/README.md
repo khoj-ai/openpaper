@@ -72,3 +72,60 @@ async def admin_route(current_user: CurrentUser = Depends(get_admin_user)):
 ## Logging Out
 
 Use the `/api/logout` endpoint to log out users. Set `all_devices=true` query parameter to log out from all devices.
+
+## Zotero OAuth (Account Connect)
+
+Zotero OAuth 1.0a links a user's Zotero library to their existing Open Paper account. It does **not** create login sessions or new users.
+
+### Setup
+
+1. Register an application at [zotero.org/oauth/apps](https://www.zotero.org/oauth/apps).
+2. Set the **Callback URL** to match `ZOTERO_REDIRECT_URI` exactly (must include scheme, host, and path):
+   - Development: `http://localhost:8000/api/auth/zotero/callback`
+   - Production: `https://your-api-domain/api/auth/zotero/callback`
+3. Add environment variables:
+
+```
+ZOTERO_CLIENT_KEY=your_zotero_client_key
+ZOTERO_CLIENT_SECRET=your_zotero_client_secret
+ZOTERO_REDIRECT_URI=http://localhost:8000/api/auth/zotero/callback
+```
+
+### API Endpoints
+
+| Endpoint | Auth | Description |
+|----------|------|-------------|
+| `GET /api/auth/zotero/connect` | Required | Returns `{ "auth_url": "..." }` to redirect the user to Zotero |
+| `GET /api/auth/zotero/callback` | None | Zotero redirect; stores API key and redirects to `/settings?zotero=connected` |
+| `GET /api/auth/zotero/status` | Required | Returns connection status (never exposes the API key) |
+| `DELETE /api/auth/zotero/disconnect` | Required | Removes the stored connection |
+
+### Manual Test
+
+1. Log in via Google or email.
+2. `GET /api/auth/zotero/connect` with your session cookie.
+3. Open `auth_url` in a browser and approve access on Zotero.
+4. Confirm redirect to `/settings?zotero=connected`.
+5. `GET /api/auth/zotero/status` should return `connected: true`.
+6. `DELETE /api/auth/zotero/disconnect` should return success; status should show `connected: false`.
+
+## Zotero Import
+
+Import journal articles (with PDF or URL fallback) from a connected Zotero library.
+
+| Endpoint | Auth | Description |
+|----------|------|-------------|
+| `POST /api/zotero/import` | Required | Body `{ "limit": 50 }` — import up to 50 new `journalArticle`, `conferencePaper`, or `preprint` items |
+| `GET /api/zotero/import/status` | Required | Recent import records for the user |
+
+**Behavior:**
+
+- Only `journalArticle`, `conferencePaper`, and `preprint` items; books and web pages are skipped.
+- PDF from Zotero attachment when available; otherwise fetches `url` or DOI link as PDF.
+- Zotero metadata (title, authors, abstract, DOI, publish date) is treated as authoritative, so imports run synchronously on the server: upload the PDF to S3, extract text and page offsets with `pypdf`, persist the paper, and apply Zotero highlights inline.
+- The Celery jobs worker and any LLM API key are **not** required for Zotero import. (Manual uploads still use the jobs worker for AI enrichment.)
+- Highlights are applied only when imported via PDF attachment; URL fallbacks skip annotations.
+- **Annotation sync (automatic):** New Zotero PDF highlights are synced automatically by a periodic background task (every 24 hours). Sync is append-only and does not count against upload limits.
+- Failed imports (e.g. no PDF available) are marked `failed` and can be retried. Completed items whose underlying paper has since been deleted are automatically re-imported.
+
+**Settings UI:** Use **Import** when connected.

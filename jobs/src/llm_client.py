@@ -564,10 +564,7 @@ class PaperOperations(AsyncLLMClient):
             PaperMetadataExtraction: Extracted metadata
         """
         async with time_it("Extracting paper metadata from LLM", job_id=job_id):
-            # Check for model override via environment variable
-            extraction_model = os.getenv("EXTRACTION_MODEL")
-            if extraction_model:
-                logger.info(f"Using extraction model override: {extraction_model}")
+            extraction_model = FAST_CHAT_MODEL
 
             # Create a fresh client for this operation
             client = self._create_client()

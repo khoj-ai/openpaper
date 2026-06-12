@@ -25,6 +25,7 @@ from app.api.projects.projects_invitation_api import (
     router as projects_invitation_router,
 )
 from app.api.referral import referral_router
+from app.api.zotero_import_api import zotero_router
 from app.api.search_api import search_router
 from app.api.subscription import subscription_router
 from app.api.webhook_api import webhook_router
@@ -88,6 +89,7 @@ app.include_router(webhook_router, prefix="/api/webhooks")  # Webhook routes
 app.include_router(onboarding_router, prefix="/api/onboarding")
 app.include_router(discover_router, prefix="/api/discover")
 app.include_router(referral_router, prefix="/api/referral")
+app.include_router(zotero_router, prefix="/api/zotero")
 
 setup_admin(app)  # Setup admin interface
 

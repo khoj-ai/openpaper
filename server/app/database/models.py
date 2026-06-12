@@ -216,6 +216,34 @@ class User(Base):
         uselist=False,
         cascade="all, delete-orphan",
     )
+    zotero_oauth_pending = relationship(
+        "ZoteroOAuthPending",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    zotero_connection = relationship(
+        "ZoteroConnection",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    zotero_imported_items = relationship(
+        "ZoteroImportedItem",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
+
+class ZoteroImportSource(str, Enum):
+    PDF_ATTACHMENT = "pdf_attachment"
+    URL = "url"
+
+
+class ZoteroImportStatus(str, Enum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 
 class Session(Base):
@@ -231,6 +259,67 @@ class Session(Base):
     ip_address = Column(String, nullable=True)
 
     user = relationship("User", back_populates="sessions")
+
+
+class ZoteroOAuthPending(Base):
+    __tablename__ = "zotero_oauth_pending"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    oauth_token = Column(String, nullable=False, index=True)
+    oauth_token_secret = Column(String, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+
+    user = relationship("User", back_populates="zotero_oauth_pending")
+
+
+class ZoteroConnection(Base):
+    __tablename__ = "zotero_connections"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    zotero_user_id = Column(String, nullable=False)
+    api_key = Column(String, nullable=False)
+
+    user = relationship("User", back_populates="zotero_connection")
+
+
+class ZoteroImportedItem(Base):
+    __tablename__ = "zotero_imported_items"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    zotero_item_key = Column(String, nullable=False)
+    zotero_attachment_key = Column(String, nullable=True)
+    import_source = Column(String, nullable=False)
+    source_url = Column(String, nullable=True)
+    paper_id = Column(
+        UUID(as_uuid=True), ForeignKey("papers.id", ondelete="SET NULL"), nullable=True
+    )
+    upload_job_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("paper_upload_jobs.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    status = Column(String, nullable=False, default=ZoteroImportStatus.PROCESSING)
+    annotations_payload = Column(JSONB, nullable=True)
+    error_message = Column(String, nullable=True)
+    last_synced_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "zotero_item_key", name="uq_zotero_import_user_item"),
+    )
+
+    user = relationship("User", back_populates="zotero_imported_items")
 
 
 class JobStatus(str, Enum):
@@ -798,6 +887,17 @@ class Highlight(Base):
     role = Column(String, nullable=False, default="user")  # 'user' or 'assistant'
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     color = Column(String, nullable=True, default="blue")
+    zotero_annotation_key = Column(String, nullable=True)
+
+    __table_args__ = (
+        Index(
+            "uq_highlight_paper_zotero_annotation_key",
+            "paper_id",
+            "zotero_annotation_key",
+            unique=True,
+            postgresql_where=(zotero_annotation_key.isnot(None)),
+        ),
+    )
 
     # Relationships
     user = relationship("User", back_populates="highlights")

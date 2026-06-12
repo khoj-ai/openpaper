@@ -85,6 +85,20 @@ def get_plan_limits(plan: SubscriptionPlan) -> Dict:
     return SUBSCRIPTION_LIMITS.get(plan, SUBSCRIPTION_LIMITS[SubscriptionPlan.BASIC])
 
 
+def get_remaining_paper_upload_slots(db: Session, user: CurrentUser) -> int:
+    """
+    Return the number of papers the user can still upload under their plan.
+
+    Returns 0 when at or over limit. All current plans have a finite paper
+    upload limit, so there is no unlimited case to special-case.
+    """
+    plan = get_user_subscription_plan(db, user)
+    limits = get_plan_limits(plan)
+    paper_limit = limits[PAPER_UPLOAD_KEY]
+    current_paper_count = paper_crud.get_total_paper_count(db=db, user=user)
+    return max(0, int(paper_limit) - current_paper_count)
+
+
 def get_user_knowledge_base_size(db: Session, user: CurrentUser) -> int:
     """
     Get the total size of the user's knowledge base in MB.
@@ -354,6 +368,11 @@ def can_user_run_discover_search(
         )
 
     return True, None
+
+
+def can_user_auto_sync_zotero(db: Session, user: CurrentUser) -> bool:
+    """Return True if the user's plan allows automatic Zotero sync (Researcher only)."""
+    return get_user_subscription_plan(db, user) == SubscriptionPlan.RESEARCHER
 
 
 def get_user_chat_credits_used_this_week(db: Session, user: CurrentUser) -> int:

@@ -10,5 +10,10 @@ docker start op-redis 2>/dev/null || docker run -d --name op-redis -p 6379:6379 
 # Start Celery worker
 ./scripts/start_worker.sh &
 
+# Start Celery Beat scheduler for periodic tasks (e.g. Zotero auto-sync).
+# Bundled here for local dev so it doesn't need a separate command; run only a
+# single Beat instance (don't launch start_beat.sh separately alongside this).
+./scripts/start_beat.sh &
+
 # Start worker API
 ./scripts/start_api.sh

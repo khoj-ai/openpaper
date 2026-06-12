@@ -4,8 +4,8 @@ import os
 import random
 import secrets
 import uuid
-from datetime import datetime
-from typing import Optional
+from datetime import datetime, timezone
+from typing import Optional, cast
 
 from app.auth.dependencies import get_admin_user, get_current_user, get_required_user
 from app.auth.email import email_auth_client
@@ -15,6 +15,7 @@ from app.auth.utils import (
     is_verification_code_valid,
     set_session_cookie,
 )
+from app.auth.zotero import zotero_auth_client
 from app.database.crud.annotation_crud import annotation_crud
 from app.database.crud.highlight_crud import highlight_crud
 from app.database.crud.message_crud import message_crud
@@ -24,6 +25,8 @@ from app.database.crud.projects.project_role_invitation_crud import (
 )
 from app.database.crud.subscription_crud import subscription_crud
 from app.database.crud.user_crud import user as user_crud
+from app.database.crud.zotero_crud import zotero_crud
+from app.database.crud.zotero_import_crud import zotero_import_crud
 from app.database.database import get_db
 from app.database.models import PaperStatus, Project, User
 from app.database.telemetry import track_event
@@ -35,6 +38,11 @@ from app.helpers.email import (
     send_project_invite_email,
 )
 from app.schemas.user import CurrentUser, UserCreateWithProvider, UserUpdate
+from app.schemas.zotero import (
+    ZoteroConnectResponse,
+    ZoteroDisconnectResponse,
+    ZoteroStatusResponse,
+)
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
@@ -291,6 +299,116 @@ async def google_callback(
             url=redirect_url, status_code=status.HTTP_302_FOUND
         )
         return redirect_response
+
+
+@auth_router.get("/zotero/connect", response_model=ZoteroConnectResponse)
+async def zotero_connect(
+    current_user: CurrentUser = Depends(get_required_user),
+    db: Session = Depends(get_db),
+):
+    """Start Zotero OAuth flow for an authenticated user."""
+    request_token = zotero_auth_client.get_request_token()
+    if not request_token:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to get request token from Zotero",
+        )
+
+    zotero_crud.delete_pending_for_user(db=db, user_id=current_user.id)
+    zotero_crud.create_pending(
+        db=db,
+        user_id=current_user.id,
+        oauth_token=request_token.oauth_token,
+        oauth_token_secret=request_token.oauth_token_secret,
+    )
+
+    auth_url = zotero_auth_client.get_authorize_url(request_token.oauth_token)
+    return ZoteroConnectResponse(auth_url=auth_url)
+
+
+@auth_router.get("/zotero/callback", response_class=RedirectResponse)
+async def zotero_callback(
+    oauth_token: str = Query(...),
+    oauth_verifier: str = Query(...),
+    db: Session = Depends(get_db),
+):
+    """Handle Zotero OAuth callback and store the API key."""
+    error_redirect = f"{client_domain}/settings?zotero=error"
+
+    pending = zotero_crud.get_pending_by_token(db=db, oauth_token=oauth_token)
+    if not pending or not pending.user_id:
+        return RedirectResponse(url=error_redirect, status_code=status.HTTP_302_FOUND)
+
+    now = datetime.now(timezone.utc)
+    expires_at = pending.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at < now:
+        zotero_crud.delete_pending(db=db, pending=pending)
+        return RedirectResponse(url=error_redirect, status_code=status.HTTP_302_FOUND)
+
+    access_token = zotero_auth_client.get_access_token(
+        request_token=oauth_token,
+        request_token_secret=pending.oauth_token_secret,  # type: ignore
+        verifier=oauth_verifier,
+    )
+    if not access_token:
+        return RedirectResponse(url=error_redirect, status_code=status.HTTP_302_FOUND)
+
+    zotero_crud.upsert_connection(
+        db=db,
+        user_id=pending.user_id,  # type: ignore
+        zotero_user_id=access_token.zotero_user_id,
+        api_key=access_token.api_key,
+    )
+    zotero_crud.delete_pending(db=db, pending=pending)
+
+    track_event(
+        "zotero_connected",
+        user_id=str(pending.user_id),
+        db=db,
+    )
+
+    success_redirect = f"{client_domain}/settings?zotero=connected"
+    return RedirectResponse(url=success_redirect, status_code=status.HTTP_302_FOUND)
+
+
+@auth_router.get("/zotero/status", response_model=ZoteroStatusResponse)
+async def zotero_status(
+    current_user: CurrentUser = Depends(get_required_user),
+    db: Session = Depends(get_db),
+):
+    """Return whether the current user has a linked Zotero account."""
+    connection = zotero_crud.get_by_user_id(db=db, user_id=current_user.id)
+    if not connection:
+        return ZoteroStatusResponse(connected=False)
+
+    return ZoteroStatusResponse(
+        connected=True,
+        connected_at=cast(Optional[datetime], connection.created_at),
+        last_synced_at=zotero_import_crud.get_max_last_synced_at(
+            db, user_id=current_user.id
+        ),
+    )
+
+
+@auth_router.delete("/zotero/disconnect", response_model=ZoteroDisconnectResponse)
+async def zotero_disconnect(
+    current_user: CurrentUser = Depends(get_required_user),
+    db: Session = Depends(get_db),
+):
+    """Remove the linked Zotero account for the current user."""
+    deleted = zotero_crud.delete_by_user_id(db=db, user_id=current_user.id)
+    if not deleted:
+        return ZoteroDisconnectResponse(
+            success=False,
+            message="No Zotero account connected",
+        )
+
+    return ZoteroDisconnectResponse(
+        success=True,
+        message="Zotero account disconnected",
+    )
 
 
 # Email Authentication Models

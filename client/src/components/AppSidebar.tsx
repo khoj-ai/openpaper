@@ -54,9 +54,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useIsDarkMode } from "@/hooks/useDarkMode";
 import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isStorageNearLimit, isPaperUploadNearLimit, isChatCreditAtLimit, isChatCreditNearLimit, formatFileSize, getStorageUsagePercentage, getPaperUploadPercentage, getChatCreditUsagePercentage, getAudioOverviewUsagePercentage, getProjectUsagePercentage, getDataTableUsagePercentage, getDiscoverSearchUsagePercentage } from "@/hooks/useSubscription";
 import Link from "next/link";
-import { Conversation, PaperItem, Project, SubscriptionData } from "@/lib/schema";
+import { Conversation, Project, SubscriptionData } from "@/lib/schema";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { CollapsibleSidebarMenu } from "./CollapsibleSidebarMenu";
+import { useActivePapers } from "@/hooks/useActivePapers";
 
 // Menu items.
 const items = [
@@ -181,6 +182,20 @@ const UserMenuContent = ({
             <LogOut size={16} className="mr-2" />
             Sign out
         </Button>
+        <div className="px-3 py-2">
+            <p className="text-sm text-muted-foreground px-1 mb-1.5">What&apos;s new</p>
+            <div className="relative ml-2">
+                <Link href="/settings#zotero" className="block">
+                    <div className="relative ml-3 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors">
+                        <span
+                            aria-hidden
+                            className="absolute -left-3 top-1/2 -translate-y-1/2 size-1.5 rounded-full bg-muted-foreground/50"
+                        />
+                        Zotero Integration
+                    </div>
+                </Link>
+            </div>
+        </div>
     </div>
 )
 
@@ -315,7 +330,7 @@ const UsageLimitCard = ({
 export function AppSidebar() {
     const router = useRouter();
     const { user, logout } = useAuth();
-    const [allPapers, setAllPapers] = useState<PaperItem[]>([]);
+    const { papers: allPapers } = useActivePapers(!!user);
     const [projects, setProjects] = useState<Project[]>([]);
     const [everythingConversations, setEverythingConversations] = useState<Conversation[]>([]);
     const { darkMode, toggleDarkMode } = useIsDarkMode();
@@ -363,32 +378,22 @@ export function AppSidebar() {
 
     useEffect(() => {
         if (!user) {
-            setAllPapers([]);
             setEverythingConversations([]);
+            setProjects([]);
             return;
         }
 
         const fetchData = async () => {
             try {
-                const [papersResponse, conversationsResponse, projectsResponse] = await Promise.all([
-                    fetchFromApi("/api/paper/active"),
+                const [conversationsResponse, projectsResponse] = await Promise.all([
                     fetchFromApi("/api/conversation/everything"),
                     fetchFromApi("/api/projects"),
                 ]);
 
-                if (papersResponse.papers) {
-                    const sortedPapers = papersResponse.papers.sort((a: PaperItem, b: PaperItem) => {
-                        return new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime();
-                    });
-                    setAllPapers(sortedPapers);
-                } else {
-                    setAllPapers([]);
-                }
                 setEverythingConversations(conversationsResponse || []);
                 setProjects(projectsResponse || []);
             } catch (error) {
                 console.error("Error fetching sidebar data:", error);
-                setAllPapers([]);
                 setEverythingConversations([]);
                 setProjects([]);
             }

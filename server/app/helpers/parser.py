@@ -172,6 +172,26 @@ async def validate_url_and_fetch_pdf(url: str) -> tuple[bool, bytes, str]:
         return False, b"", f"Error processing URL: {str(e)}"
 
 
+def extract_pdf_page_dimensions(pdf_bytes: bytes) -> dict[int, tuple[float, float]]:
+    """
+    Return {page_index: (width_pts, height_pts)} for every page in the PDF.
+
+    Used to convert Zotero annotation positions (which are in PDF points) into the
+    viewer's coordinate space. Preview/text generation lives in the jobs service;
+    this only needs page geometry, which pypdf reads from the page cropbox.
+    """
+    try:
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        dims: dict[int, tuple[float, float]] = {}
+        for i, page in enumerate(reader.pages):
+            box = page.cropbox
+            dims[i] = (float(box.width), float(box.height))
+        return dims
+    except Exception as e:
+        logger.warning("Failed to extract PDF page dimensions: %s", e)
+        return {}
+
+
 def parse_publication_date(date_str: str) -> datetime | None:
     """Parse publication date string in various formats (yyyy-mm-dd, yyyy-mm, yyyy)."""
     if not date_str:

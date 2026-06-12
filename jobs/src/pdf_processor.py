@@ -3,7 +3,7 @@ import tempfile
 import os
 import asyncio
 from datetime import datetime, timezone
-from typing import Callable
+from typing import Callable, Optional
 
 from src.schemas import PDFProcessingResult, PaperMetadataExtraction
 from src.s3_service import s3_service
@@ -59,6 +59,7 @@ async def process_pdf_file(
     s3_object_key: str,
     job_id: str,
     status_callback: Callable[[str], None],
+    skip_metadata_extraction: bool = False,
 ) -> PDFProcessingResult:
     """
     Process a PDF file by extracting metadata from bytes.
@@ -68,6 +69,11 @@ async def process_pdf_file(
         s3_object_key: The S3 object key of the PDF file
         job_id: Job ID for tracking
         status_callback: Function to update task status
+        skip_metadata_extraction: When True, skip the LLM metadata/summary
+            extraction entirely and only produce the deterministic outputs
+            (preview, raw text, page offsets). Used by the Zotero import path,
+            which already has authoritative metadata and wants to avoid the
+            extra LLM cost/latency. `metadata` is left None on the result.
 
     Returns:
         PDFProcessingResult: Processing results
@@ -99,37 +105,6 @@ async def process_pdf_file(
             logger.error(f"Failed to extract text from PDF: {e}")
             raise Exception(f"Failed to extract text from PDF: {e}")
 
-        # Short-circuit on too-little text: this is a failed extraction (e.g. a
-        # scanned/image-only PDF), not a real paper. Bail before spending an LLM
-        # cache call + four extraction tasks on garbage, and surface a clear error.
-        extracted_chars = len(pdf_text.strip())
-        if extracted_chars < MIN_EXTRACTED_TEXT_CHARS:
-            raise InsufficientPDFTextError(
-                f"Failed to extract usable text from PDF: only {extracted_chars} "
-                f"characters found (minimum {MIN_EXTRACTED_TEXT_CHARS})"
-            )
-
-        # Cap what we send to the LLM at the model's context window. We keep the
-        # full text for raw_content; only the metadata extraction sees a truncated
-        # copy. If truncation would drop more than (1 - MIN_RETAINED_FRACTION) of
-        # the paper, the extracted metadata wouldn't be representative, so reject.
-        content_for_llm = pdf_text
-        if extracted_chars > MAX_LLM_CONTENT_CHARS:
-            retained_fraction = MAX_LLM_CONTENT_CHARS / extracted_chars
-            if retained_fraction < MIN_RETAINED_FRACTION:
-                raise ExcessivePDFTextError(
-                    f"PDF too large for the model: {extracted_chars} chars exceeds "
-                    f"the ~{MAX_LLM_CONTENT_CHARS}-char budget, and truncating would "
-                    f"keep only {retained_fraction:.0%} of the content "
-                    f"(minimum {MIN_RETAINED_FRACTION:.0%})"
-                )
-            content_for_llm = pdf_text[:MAX_LLM_CONTENT_CHARS]
-            logger.warning(
-                f"PDF for job {job_id} is {extracted_chars} chars; truncating to "
-                f"{MAX_LLM_CONTENT_CHARS} ({retained_fraction:.0%} retained) for "
-                f"metadata extraction"
-            )
-
         # Define async functions for I/O-bound operations
         logger.info(f"About to define async functions for job {job_id}")
 
@@ -141,24 +116,84 @@ async def process_pdf_file(
                 logger.warning(f"Failed to generate preview for {safe_filename}: {str(e)}")
                 return None, None
 
-        # Run I/O-bound tasks and LLM extraction concurrently
-        async with time_it("Running I/O-bound tasks and LLM extraction concurrently", job_id=job_id):
-            preview_task = asyncio.create_task(generate_preview_async())
-            metadata_task = asyncio.create_task(
-                llm_client.extract_paper_metadata(
-                    content_for_llm, job_id=job_id, status_callback=status_callback
+        metadata: Optional[PaperMetadataExtraction] = None
+
+        if skip_metadata_extraction:
+            # Lightweight path (e.g. Zotero import): only the deterministic
+            # preview is needed; the caller already has authoritative metadata.
+            async with time_it("Generating preview (metadata extraction skipped)", job_id=job_id):
+                preview_result = await generate_preview_async()
+        else:
+            # These size limits only matter because we're about to feed the text
+            # to the LLM; they're skipped for authoritative sources (e.g. Zotero)
+            # that take the skip_metadata_extraction path above.
+            extracted_chars = len(pdf_text.strip())
+
+            # Too little text means a failed extraction (e.g. a scanned/image-only
+            # PDF), not a real paper. Bail before spending an LLM cache call + four
+            # extraction tasks on garbage, and surface a clear error.
+            if extracted_chars < MIN_EXTRACTED_TEXT_CHARS:
+                raise InsufficientPDFTextError(
+                    f"Failed to extract usable text from PDF: only {extracted_chars} "
+                    f"characters found (minimum {MIN_EXTRACTED_TEXT_CHARS})"
                 )
-            )
 
-            # Await all tasks
-            results = await asyncio.gather(
-                preview_task,
-                metadata_task,
-                return_exceptions=True
-            )
+            # Cap what we send to the LLM at the model's context window. We keep the
+            # full text for raw_content; only the metadata extraction sees a truncated
+            # copy. If truncation would drop more than (1 - MIN_RETAINED_FRACTION) of
+            # the paper, the extracted metadata wouldn't be representative, so reject.
+            content_for_llm = pdf_text
+            if extracted_chars > MAX_LLM_CONTENT_CHARS:
+                retained_fraction = MAX_LLM_CONTENT_CHARS / extracted_chars
+                if retained_fraction < MIN_RETAINED_FRACTION:
+                    raise ExcessivePDFTextError(
+                        f"PDF too large for the model: {extracted_chars} chars exceeds "
+                        f"the ~{MAX_LLM_CONTENT_CHARS}-char budget, and truncating would "
+                        f"keep only {retained_fraction:.0%} of the content "
+                        f"(minimum {MIN_RETAINED_FRACTION:.0%})"
+                    )
+                content_for_llm = pdf_text[:MAX_LLM_CONTENT_CHARS]
+                logger.warning(
+                    f"PDF for job {job_id} is {extracted_chars} chars; truncating to "
+                    f"{MAX_LLM_CONTENT_CHARS} ({retained_fraction:.0%} retained) for "
+                    f"metadata extraction"
+                )
 
-        # Process results
-        preview_result, metadata_result = results
+            # Run I/O-bound tasks and LLM extraction concurrently
+            async with time_it("Running I/O-bound tasks and LLM extraction concurrently", job_id=job_id):
+                preview_task = asyncio.create_task(generate_preview_async())
+                metadata_task = asyncio.create_task(
+                    llm_client.extract_paper_metadata(
+                        content_for_llm, job_id=job_id, status_callback=status_callback
+                    )
+                )
+
+                # Await all tasks
+                preview_result, metadata_result = await asyncio.gather(
+                    preview_task,
+                    metadata_task,
+                    return_exceptions=True
+                )
+
+            if isinstance(metadata_result, Exception):
+                logger.error(f"Failed to extract metadata: {metadata_result}")
+                raise metadata_result
+            metadata = metadata_result # type: ignore
+            logger.info(f"Successfully extracted metadata for {safe_filename}")
+
+            # Process publication date
+            if metadata and metadata.publish_date:
+                try:
+                    # Simplified date parsing logic
+                    parsed_date = datetime.fromisoformat(metadata.publish_date.replace("Z", "+00:00"))
+                    metadata.publish_date = parsed_date.strftime("%Y-%m-%d")
+                except (ValueError, TypeError):
+                    logger.warning(f"Could not parse date: {metadata.publish_date}, setting to None")
+                    metadata.publish_date = None
+
+            if not metadata or not metadata.title:
+                # This most likely means the LLM extraction failed
+                raise Exception("Failed to extract metadata from PDF")
 
         # Generate file URL from the existing S3 object key
         file_url = f"https://{s3_service.cloudflare_bucket_name}/{s3_object_key}"
@@ -172,30 +207,10 @@ async def process_pdf_file(
             if preview_url:
                 logger.info(f"Generated preview for {safe_filename}: {preview_url}")
 
-        if isinstance(metadata_result, Exception):
-            logger.error(f"Failed to extract metadata: {metadata_result}")
-            raise metadata_result
-        metadata: PaperMetadataExtraction = metadata_result # type: ignore
-        logger.info(f"Successfully extracted metadata for {safe_filename}")
-
-        # Process publication date
-        if metadata and metadata.publish_date:
-            try:
-                # Simplified date parsing logic
-                parsed_date = datetime.fromisoformat(metadata.publish_date.replace("Z", "+00:00"))
-                metadata.publish_date = parsed_date.strftime("%Y-%m-%d")
-            except (ValueError, TypeError):
-                logger.warning(f"Could not parse date: {metadata.publish_date}, setting to None")
-                metadata.publish_date = None
-
         end_time = datetime.now(timezone.utc)
         duration = (end_time - start_time).total_seconds()
 
         logger.info(f"PDF processing completed successfully for {safe_filename} in {duration:.2f} seconds")
-
-        if not metadata.title:
-            # This most likely means the LLM extraction failed
-            raise Exception("Failed to extract metadata from PDF")
 
         return PDFProcessingResult(
             success=True,

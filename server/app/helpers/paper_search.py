@@ -498,6 +498,23 @@ def extract_doi_from_url(url: str) -> str | None:
     return None
 
 
+def normalize_doi(raw: str | None) -> str | None:
+    """Normalize a DOI value for comparison (bare DOI or doi.org URL)."""
+    if not raw:
+        return None
+    value = raw.strip()
+    if not value:
+        return None
+    extracted = extract_doi_from_url(value)
+    if extracted:
+        return extracted.lower()
+    if value.lower().startswith("doi:"):
+        value = value[4:].strip()
+    if re.match(r"10\.\d{4,}/", value, re.IGNORECASE):
+        return value.rstrip(".,;:)").lower()
+    return None
+
+
 def get_doi(title: str, authors: Optional[List[str]] = None) -> Optional[str]:
     """
     Retrieve the DOI for a paper given its title and optional author using a series of external APIs.

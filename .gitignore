@@ -32,6 +32,7 @@ ecs-task-definitions/
 # misc
 .DS_Store
 *.pem
+celerybeat-schedule.db
 
 # debug
 npm-debug.log*

@@ -36,10 +36,9 @@ export const useSubscription = (): UseSubscriptionReturn => {
 // Helper functions for common subscription checks
 export const getStorageUsagePercentage = (subscription: SubscriptionData | null): number => {
     if (!subscription) return 0;
-    const { knowledge_base_size, knowledge_base_size_remaining } = subscription.usage;
-    const total = knowledge_base_size + knowledge_base_size_remaining;
+    const total = subscription.limits.knowledge_base_size;
     if (total === 0) return 0;
-    return (knowledge_base_size / total) * 100;
+    return (subscription.usage.knowledge_base_size / total) * 100;
 };
 
 export const isStorageNearLimit = (subscription: SubscriptionData | null, threshold: number = 75): boolean => {
@@ -52,10 +51,9 @@ export const isStorageAtLimit = (subscription: SubscriptionData | null): boolean
 
 export const getPaperUploadPercentage = (subscription: SubscriptionData | null): number => {
     if (!subscription) return 0;
-    const { paper_uploads, paper_uploads_remaining } = subscription.usage;
-    const total = paper_uploads + paper_uploads_remaining;
+    const total = subscription.limits.paper_uploads;
     if (total === 0) return 0;
-    return (paper_uploads / total) * 100;
+    return (subscription.usage.paper_uploads / total) * 100;
 };
 
 export const isPaperUploadNearLimit = (subscription: SubscriptionData | null, threshold: number = 75): boolean => {
@@ -79,11 +77,9 @@ export const formatFileSize = (sizeInKb: number): string => {
 // Chat credit helper functions
 export const getChatCreditUsagePercentage = (subscription: SubscriptionData | null): number => {
     if (!subscription) return 0;
-    const { chat_credits_used, chat_credits_remaining } = subscription.usage;
-    const total = chat_credits_used + chat_credits_remaining;
-    console.log("Chat credits used:", chat_credits_used, "remaining:", chat_credits_remaining, "total:", total);
+    const total = subscription.limits.chat_credits_weekly;
     if (total === 0) return 0;
-    return (chat_credits_used / total) * 100;
+    return (subscription.usage.chat_credits_used / total) * 100;
 };
 
 export const isChatCreditNearLimit = (subscription: SubscriptionData | null, threshold: number = 75): boolean => {
@@ -97,10 +93,9 @@ export const isChatCreditAtLimit = (subscription: SubscriptionData | null): bool
 // Audio overview credit helper functions
 export const getAudioOverviewUsagePercentage = (subscription: SubscriptionData | null): number => {
     if (!subscription) return 0;
-    const { audio_overviews_used: audio_overviews, audio_overviews_remaining } = subscription.usage;
-    const total = audio_overviews + audio_overviews_remaining;
+    const total = subscription.limits.audio_overviews_weekly;
     if (total === 0) return 0;
-    return (audio_overviews / total) * 100;
+    return (subscription.usage.audio_overviews_used / total) * 100;
 };
 
 export const isAudioOverviewNearLimit = (subscription: SubscriptionData | null, threshold: number = 75): boolean => {
@@ -114,10 +109,9 @@ export const isAudioOverviewAtLimit = (subscription: SubscriptionData | null): b
 // Project usage helper functions
 export const getProjectUsagePercentage = (subscription: SubscriptionData | null): number => {
     if (!subscription) return 0;
-    const { projects, projects_remaining } = subscription.usage;
-    const total = projects + projects_remaining;
+    const total = subscription.limits.projects;
     if (total === 0) return 0;
-    return (projects / total) * 100;
+    return (subscription.usage.projects / total) * 100;
 };
 
 export const isProjectNearLimit = (subscription: SubscriptionData | null, threshold: number = 75): boolean => {
@@ -131,10 +125,9 @@ export const isProjectAtLimit = (subscription: SubscriptionData | null): boolean
 // Data table usage helper functions
 export const getDataTableUsagePercentage = (subscription: SubscriptionData | null): number => {
     if (!subscription) return 0;
-    const { data_tables_used, data_tables_remaining } = subscription.usage;
-    const total = data_tables_used + data_tables_remaining;
+    const total = subscription.limits.data_tables_weekly;
     if (total === 0) return 0;
-    return (data_tables_used / total) * 100;
+    return (subscription.usage.data_tables_used / total) * 100;
 };
 
 export const isDataTableNearLimit = (subscription: SubscriptionData | null, threshold: number = 75): boolean => {
@@ -148,10 +141,9 @@ export const isDataTableAtLimit = (subscription: SubscriptionData | null): boole
 // Discover search usage helper functions
 export const getDiscoverSearchUsagePercentage = (subscription: SubscriptionData | null): number => {
     if (!subscription) return 0;
-    const { discover_searches_used, discover_searches_remaining } = subscription.usage;
-    const total = discover_searches_used + discover_searches_remaining;
+    const total = subscription.limits.discover_searches_weekly;
     if (total === 0) return 0;
-    return (discover_searches_used / total) * 100;
+    return (subscription.usage.discover_searches_used / total) * 100;
 };
 
 export const isDiscoverSearchNearLimit = (subscription: SubscriptionData | null, threshold: number = 75): boolean => {

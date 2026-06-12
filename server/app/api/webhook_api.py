@@ -3,6 +3,7 @@ Webhook handlers for PDF processing service integration.
 """
 
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -23,8 +24,15 @@ from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.crud.referral_crud import referral_crud
 from app.database.crud.subscription_crud import subscription_crud
 from app.database.crud.user_crud import user as user_crud
+from app.database.crud.zotero_import_crud import zotero_import_crud
 from app.database.database import SessionLocal, engine, get_db
-from app.database.models import ConversableType, Conversation, JobStatus, ReferralStatus
+from app.database.models import (
+    ConversableType,
+    Conversation,
+    JobStatus,
+    ReferralStatus,
+    ZoteroImportStatus,
+)
 from app.database.telemetry import track_event
 from app.helpers.advisory_locks import AdvisoryLock, AdvisoryLockNamespace
 from app.helpers.email import (
@@ -33,17 +41,116 @@ from app.helpers.email import (
 )
 from app.helpers.metadata_hydration import hydrate_paper_metadata
 from app.helpers.s3 import s3_service
+from app.helpers.subscription_limits import can_user_auto_sync_zotero
 from app.llm.citation_handler import CitationHandler
 from app.llm.operations import operations
 from app.schemas.responses import DataTableResult, PaperMetadataExtraction
 from app.schemas.user import CurrentUser
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from app.services.zotero_import import (
+    apply_zotero_annotations,
+    auto_import_new_papers,
+    sync_batch,
+)
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
 webhook_router = APIRouter()
+
+
+def _finalize_zotero_import(
+    db: Session,
+    job_id: str,
+    job_user: CurrentUser,
+    result: "PDFProcessingResult",
+    error_message: Optional[str] = None,
+) -> Optional[str]:
+    """
+    Finalize a Zotero-imported paper from a jobs-worker result.
+
+    The Zotero import path submits the PDF to the worker with LLM metadata
+    extraction skipped, and applies Zotero's authoritative metadata
+    (title/authors/abstract/DOI/publish_date) up front via
+    _apply_metadata_from_zotero. So here we only fill in the deterministic worker
+    outputs (preview, PDF text, page offsets, file size) and apply the Zotero
+    annotations — we never require or overwrite the Zotero metadata.
+
+    Used on the normal completion path (error_message=None) and as a best-effort
+    salvage when the worker reports failure (error_message set) but still produced
+    partial deterministic outputs (e.g. preview/text). Returns the paper id, or
+    None when there is no Zotero metadata to keep (cannot finalize).
+    """
+    existing_paper = paper_crud.get_by_upload_job_id(
+        db=db, upload_job_id=job_id, user=job_user
+    )
+    if not existing_paper or not getattr(existing_paper, "title", None):
+        # No Zotero metadata was applied; cannot finalize.
+        return None
+
+    size_in_kb = (
+        s3_service.get_file_size_in_kb(result.s3_object_key)
+        if result.s3_object_key
+        else None
+    )
+
+    update_payload: dict = {"upload_job_id": job_id}
+    if result.preview_url:
+        update_payload["preview_url"] = result.preview_url
+    if result.raw_content:
+        update_payload["raw_content"] = result.raw_content
+    if result.page_offset_map:
+        update_payload["page_offset_map"] = result.page_offset_map
+    if size_in_kb is not None:
+        update_payload["size_in_kb"] = size_in_kb
+
+    paper = paper_crud.update(
+        db=db,
+        obj_in=PaperUpdate(**update_payload),
+        db_obj=existing_paper,
+        user=job_user,
+    )
+
+    paper_upload_job_crud.mark_as_completed(db=db, job_id=job_id, user=job_user)
+
+    if not paper:
+        return None
+
+    # When salvaging a partial result, record the worker error on the import row.
+    # apply_zotero_annotations (below) flips the row to COMPLETED but preserves
+    # this note (it only sets error_message when given one).
+    if error_message:
+        zotero_import = zotero_import_crud.get_by_upload_job_id(
+            db, upload_job_id=uuid.UUID(job_id)
+        )
+        if zotero_import:
+            zotero_import_crud.update_status(
+                db,
+                item=zotero_import,
+                status=ZoteroImportStatus.PROCESSING,
+                error_message=f"Imported without full processing: {error_message}",
+                paper_id=uuid.UUID(str(paper.id)),
+            )
+
+    try:
+        apply_zotero_annotations(
+            db=db,
+            upload_job_id=job_id,
+            paper_id=str(paper.id),
+            user=job_user,
+        )
+    except Exception as e:
+        logger.error(
+            f"Error applying Zotero annotations for job {job_id}: {e}",
+            exc_info=True,
+        )
+
+    logger.info(
+        f"Finalized Zotero import for job {job_id} with paper {paper.id}"
+        + (f" (worker error: {error_message})" if error_message else "")
+    )
+    return str(paper.id)
 
 
 def handle_failed_upload(
@@ -100,6 +207,18 @@ def handle_failed_upload(
         paper_crud.remove(db=db, id=str(existing_paper.id), user=job_user)
 
     paper_upload_job_crud.mark_as_failed(db=db, job_id=job_id, user=job_user)
+
+    zotero_import = zotero_import_crud.get_by_upload_job_id(
+        db, upload_job_id=uuid.UUID(job_id)
+    )
+    if zotero_import:
+        zotero_import_crud.update_status(
+            db,
+            item=zotero_import,
+            status=ZoteroImportStatus.FAILED,
+            error_message=reason,
+            paper_id=None,
+        )
 
 
 def post_process_paper(
@@ -265,6 +384,10 @@ async def handle_paper_processing_webhook(
     status = webhook_data.status
     result = webhook_data.result
 
+    zotero_import = zotero_import_crud.get_by_upload_job_id(
+        db, upload_job_id=uuid.UUID(job_id)
+    )
+
     try:
         # Re-check completion under the lock: another delivery may have finished
         # between our initial read and acquiring the lock.
@@ -277,6 +400,33 @@ async def handle_paper_processing_webhook(
             return {"status": "webhook ignored - job already completed"}
 
         if status == "completed" and result.success:
+            # Zotero imports run the worker with LLM metadata extraction skipped,
+            # so they have no `metadata` to apply. Zotero's authoritative metadata
+            # was already set at submit time; here we only fill the deterministic
+            # worker outputs and apply Zotero annotations.
+            if zotero_import:
+                finalized = _finalize_zotero_import(
+                    db=db, job_id=job_id, job_user=job_user, result=result
+                )
+                if finalized:
+                    track_event(
+                        "zotero_paper_processed",
+                        properties={"worker_duration": result.duration},
+                        user_id=str(user.id),
+                        db=db,
+                    )
+                    return {
+                        "status": "webhook processed - zotero import",
+                        "paper_id": finalized,
+                    }
+                handle_failed_upload(
+                    db=db,
+                    job_id=job_id,
+                    job_user=job_user,
+                    reason="Zotero import missing metadata",
+                )
+                return {"status": "webhook processed - zotero import failed"}
+
             # Processing was successful
             metadata = result.metadata
             file_url = result.file_url
@@ -456,8 +606,26 @@ async def handle_paper_processing_webhook(
                 )
 
         else:
-            # Processing failed
+            # Processing failed.
             error_message = result.error if result.error else "Unknown error"
+
+            # Best-effort salvage for Zotero imports: Zotero already supplied the
+            # metadata, so keep the paper with whatever deterministic outputs the
+            # worker did produce instead of discarding it.
+            if zotero_import:
+                salvaged = _finalize_zotero_import(
+                    db=db,
+                    job_id=job_id,
+                    job_user=job_user,
+                    result=result,
+                    error_message=error_message,
+                )
+                if salvaged:
+                    return {
+                        "status": "webhook processed - zotero salvage",
+                        "paper_id": salvaged,
+                    }
+
             handle_failed_upload(
                 db=db, job_id=job_id, job_user=job_user, reason=error_message
             )
@@ -741,3 +909,72 @@ async def settle_referral(referral_id: str, db: Session = Depends(get_db)):
     )
 
     return {"success": True, "referral_id": str(referral.id)}
+
+
+@webhook_router.post("/internal/zotero-sync-all")
+async def trigger_zotero_sync_all(request: Request, db: Session = Depends(get_db)):
+    """
+    Internal endpoint called by the Celery Beat periodic task to sync new Zotero
+    annotations for all users whose items haven't been synced in the past 24 hours.
+    Auth: shared secret via Authorization header (JOBS_INTERNAL_SECRET env var).
+    """
+    secret = os.getenv("JOBS_INTERNAL_SECRET", "")
+    if secret and request.headers.get("Authorization") != f"Bearer {secret}":
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    threshold_seconds = int(
+        request.query_params.get("threshold_seconds", str(24 * 3600))
+    )
+    threshold_hours = threshold_seconds / 3600
+    user_ids = zotero_import_crud.list_user_ids_due_for_sync(
+        db, threshold_hours=threshold_hours
+    )
+    logger.info(
+        f"Periodic Zotero sync: found {len(user_ids)} users due for sync (threshold={threshold_hours:.4f}h)"
+    )
+
+    results = []
+    for user_id in user_ids:
+        user = user_crud.get(db, id=user_id)
+        if not user:
+            continue
+
+        if not can_user_auto_sync_zotero(db, user):
+            logger.debug(f"Skipping auto-sync for basic-plan user {user_id}")
+            continue
+
+        try:
+            result = await sync_batch(db, user=user, limit=50)
+            results.append({"user_id": str(user_id), **result})
+            if result.get("new_annotations_count", 0) > 0:
+                track_event(
+                    "zotero_auto_sync",
+                    user_id=str(user_id),
+                    properties={
+                        "papers": result.get("synced_papers_count", 0),
+                        "annotations": result.get("new_annotations_count", 0),
+                    },
+                    db=db,
+                )
+
+            import_result = await auto_import_new_papers(db, user=user)
+            if import_result.get("auto_imported_count", 0) > 0:
+                track_event(
+                    "zotero_auto_import_new_papers",
+                    user_id=str(user_id),
+                    properties={"count": import_result["auto_imported_count"]},
+                    db=db,
+                )
+        except Exception as e:
+            logger.error(f"Auto-sync failed for user {user_id}: {e}", exc_info=True)
+            results.append({"user_id": str(user_id), "error": str(e)})
+
+    synced_users = len([r for r in results if "error" not in r])
+    logger.info(
+        f"Periodic Zotero sync complete: {synced_users}/{len(user_ids)} users synced successfully"
+    )
+    return {
+        "synced_users": synced_users,
+        "total_users": len(user_ids),
+        "results": results,
+    }

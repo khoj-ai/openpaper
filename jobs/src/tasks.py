@@ -12,7 +12,7 @@ import requests
 from src.schemas import DataTableSchema
 from src.data_table_processor import construct_data_table
 from src.pdf_processor import process_pdf_file
-from src.celery_app import celery_app
+from src.celery_app import celery_app, ZOTERO_SYNC_INTERVAL_SECONDS
 from src.s3_service import s3_service
 from src.utils import time_it
 
@@ -84,10 +84,15 @@ def upload_and_process_file(
     self,
     s3_object_key: str,
     webhook_url: str,
+    skip_metadata_extraction: bool = False,
     **processing_kwargs
 ) -> Dict[str, Any]:
     """
     Process a PDF file from S3 object key and send results to webhook.
+
+    When skip_metadata_extraction is True, the LLM metadata/summary step is
+    skipped and only deterministic outputs (preview, raw text, page offsets)
+    are produced. Used by the Zotero import path.
     """
     task_id = self.request.id
 
@@ -120,6 +125,7 @@ def upload_and_process_file(
                 s3_object_key,
                 task_id,
                 status_callback=write_to_status,
+                skip_metadata_extraction=skip_metadata_extraction,
             )
         )
 
@@ -306,6 +312,29 @@ def health_check(self):
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "worker_id": self.request.hostname,
         }
+
+
+@celery_app.task(bind=True, name="periodic_zotero_sync")
+def periodic_zotero_sync(self):
+    """
+    Periodic task that triggers the server to sync new Zotero annotations
+    for all users whose items haven't been synced in the past 24 hours.
+    Fires at the interval configured by ZOTERO_SYNC_INTERVAL_SECONDS (default 24h).
+    """
+    webhook_base = os.getenv("WEBHOOK_BASE_URL", "http://localhost:8000")
+    secret = os.getenv("JOBS_INTERNAL_SECRET", "")
+    sync_interval = int(ZOTERO_SYNC_INTERVAL_SECONDS)
+    url = f"{webhook_base}/api/webhooks/internal/zotero-sync-all?threshold_seconds={sync_interval}"
+    logger.info(f"Triggering periodic Zotero sync via {url}")
+    resp = requests.post(
+        url,
+        timeout=120,
+        headers={"Authorization": f"Bearer {secret}"},
+    )
+    resp.raise_for_status()
+    result = resp.json()
+    logger.info(f"Periodic Zotero sync complete: {result.get('synced_users', 0)} users synced")
+    return result
 
 
 @celery_app.task(
