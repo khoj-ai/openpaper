@@ -844,7 +844,11 @@ function SettingsContent() {
 							)}
 						{!zoteroLoading && !zoteroStatus?.connected && (
 							<p className="text-sm text-muted-foreground">
-								Link your Zotero library to Open Paper.{" "}
+								Link your Zotero library to Open Paper.
+							</p>
+						)}
+						{!zoteroLoading && (
+							<p className="text-sm text-muted-foreground">
 								<button
 									type="button"
 									onClick={() => setShowZoteroGuide(true)}
