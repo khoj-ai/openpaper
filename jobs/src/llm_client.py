@@ -51,6 +51,12 @@ DEFAULT_CHAT_MODEL = "gemini-3.1-pro-preview"
 FAST_CHAT_MODEL = "gemini-3-flash-preview"
 CACHE_TTL_SECONDS = 3600
 
+# Gemini rejects caches below 1024 tokens. Below this many characters the content
+# is likely under that floor, so caching can't help — skip it and inline instead
+# of making a doomed caches.create call. ~5000 chars (~1024 tokens even for sparse
+# text at ~5 chars/token) keeps us safely above the floor before we bother caching.
+CACHE_MIN_CONTENT_CHARS = 5000
+
 # Pydantic model type variable
 T = TypeVar("T", bound=BaseModel)
 
@@ -564,12 +570,22 @@ class PaperOperations(AsyncLLMClient):
             client = self._create_client()
 
             try:
-                try:
-                    async with time_it("Creating cache for paper content", job_id=job_id):
-                        cache_key = await self.create_cache(paper_content, client, model=extraction_model)
-                except Exception as e:
-                    logger.error(f"Failed to create cache: {e}", exc_info=True)
+                # Caching only pays off (and is only accepted by Gemini) above the
+                # 1024-token floor; for small papers, skip straight to inline.
+                if len(paper_content) < CACHE_MIN_CONTENT_CHARS:
+                    logger.info(
+                        f"Paper content ({len(paper_content)} chars) below cache floor; "
+                        f"using inline extraction for job {job_id}"
+                    )
                     cache_key = None
+                else:
+                    try:
+                        async with time_it("Creating cache for paper content", job_id=job_id):
+                            cache_key = await self.create_cache(paper_content, client, model=extraction_model)
+                    except Exception as e:
+                        # Inline fallback always covers us, so a cache miss is a warning, not a page.
+                        logger.warning(f"Failed to create cache, falling back to inline extraction: {_format_api_error(e)}")
+                        cache_key = None
 
                 # Run all extraction tasks concurrently
                 async with time_it("Running all metadata extraction tasks concurrently", job_id=job_id):

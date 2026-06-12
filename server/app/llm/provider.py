@@ -735,11 +735,15 @@ class OpenAIProvider(BaseLLMProvider):
         if tool_call_results:
             # First, add an assistant message with the tool calls
             # This reconstructs what the model "said" when it made the tool calls
+            # Reassign synthetic, guaranteed-unique ids paired by position with
+            # the tool messages below. The model/provider (e.g. Cerebras) can
+            # recycle a tool_call id across turns, and OpenAI rejects duplicate
+            # tool_call.id values in the request, so we don't trust result.id here.
             tool_calls_for_assistant: List[ChatCompletionMessageToolCallParam] = []
-            for result in tool_call_results:
+            for i, result in enumerate(tool_call_results):
                 tool_calls_for_assistant.append(
                     {
-                        "id": result.id or "",
+                        "id": f"call_{i}",
                         "type": "function",
                         "function": {
                             "name": result.name,
@@ -755,8 +759,9 @@ class OpenAIProvider(BaseLLMProvider):
             }
             messages.append(assistant_with_tools)
 
-            # Then add tool messages with the results
-            for result in tool_call_results:
+            # Then add tool messages with the results, matching the synthetic
+            # ids assigned to the assistant tool_calls above by position.
+            for i, result in enumerate(tool_call_results):
                 # Serialize result to string for OpenAI
                 result_value = result.result
                 if isinstance(result_value, (dict, list)):
@@ -768,7 +773,7 @@ class OpenAIProvider(BaseLLMProvider):
 
                 tool_msg: ChatCompletionToolMessageParam = {
                     "role": "tool",
-                    "tool_call_id": result.id or "",
+                    "tool_call_id": f"call_{i}",
                     "content": result_str,
                 }
                 messages.append(tool_msg)
