@@ -13,6 +13,13 @@ from src.utils import time_it
 
 logger = logging.getLogger(__name__)
 
+# Minimum amount of extracted text we consider a viable paper. Below this,
+# extraction almost certainly failed (e.g. a scanned/image-only PDF that yielded
+# no real text) rather than being a genuinely short document. ~1000 chars is
+# roughly 250 tokens — well under Gemini's 1024-token cache floor, and far above
+# the few-hundred-character outputs that failed parses produce.
+MIN_EXTRACTED_TEXT_CHARS = 1000
+
 async def process_pdf_file(
     pdf_bytes: bytes,
     s3_object_key: str,
@@ -57,6 +64,20 @@ async def process_pdf_file(
         except Exception as e:
             logger.error(f"Failed to extract text from PDF: {e}")
             raise Exception(f"Failed to extract text from PDF: {e}")
+
+        # Short-circuit on too-little text: this is a failed extraction (e.g. a
+        # scanned/image-only PDF), not a real paper. Bail before spending an LLM
+        # cache call + four extraction tasks on garbage, and surface a clear error.
+        extracted_chars = len(pdf_text.strip())
+        if extracted_chars < MIN_EXTRACTED_TEXT_CHARS:
+            logger.error(
+                f"Extracted only {extracted_chars} chars of text for job {job_id} "
+                f"(min {MIN_EXTRACTED_TEXT_CHARS}); treating as a failed extraction"
+            )
+            raise Exception(
+                f"Failed to extract usable text from PDF: only {extracted_chars} "
+                f"characters found (minimum {MIN_EXTRACTED_TEXT_CHARS})"
+            )
 
         # Define async functions for I/O-bound operations
         logger.info(f"About to define async functions for job {job_id}")
