@@ -13,6 +13,15 @@ from src.utils import time_it
 
 logger = logging.getLogger(__name__)
 
+
+class InsufficientPDFTextError(Exception):
+    """Raised when a PDF yields too little text to be a real paper.
+
+    This is an expected, benign outcome (e.g. a scanned/image-only PDF), so it is
+    logged as a warning rather than an error and should not page.
+    """
+
+
 # Minimum amount of extracted text we consider a viable paper. Below this,
 # extraction almost certainly failed (e.g. a scanned/image-only PDF that yielded
 # no real text) rather than being a genuinely short document. ~1000 chars is
@@ -70,11 +79,7 @@ async def process_pdf_file(
         # cache call + four extraction tasks on garbage, and surface a clear error.
         extracted_chars = len(pdf_text.strip())
         if extracted_chars < MIN_EXTRACTED_TEXT_CHARS:
-            logger.error(
-                f"Extracted only {extracted_chars} chars of text for job {job_id} "
-                f"(min {MIN_EXTRACTED_TEXT_CHARS}); treating as a failed extraction"
-            )
-            raise Exception(
+            raise InsufficientPDFTextError(
                 f"Failed to extract usable text from PDF: only {extracted_chars} "
                 f"characters found (minimum {MIN_EXTRACTED_TEXT_CHARS})"
             )
@@ -159,6 +164,14 @@ async def process_pdf_file(
             duration=duration,
         )
 
+    except InsufficientPDFTextError as e:
+        # Expected, benign failure (e.g. scanned/image-only PDF). Warn, don't page.
+        logger.warning(f"PDF processing skipped for {job_id}: {e}")
+        return PDFProcessingResult(
+            success=False,
+            error=str(e),
+            job_id=job_id,
+        )
     except Exception as e:
         logger.error(f"PDF processing failed for {job_id}: {str(e)}", exc_info=True)
         # Cleanup logic remains the same
