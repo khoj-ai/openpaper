@@ -236,7 +236,13 @@ class MetadataRecoveryAgent(BaseLLMClient):
                 if name not in function_maps:
                     continue
 
-                dedup_key = f"{name}:{args}"
+                # Canonicalize args so semantically identical calls dedup
+                # regardless of key ordering or whitespace from the model.
+                try:
+                    args_key = json.dumps(args, sort_keys=True, default=str)
+                except (TypeError, ValueError):
+                    args_key = str(args)
+                dedup_key = f"{name}:{args_key}"
                 if dedup_key in prev_queries:
                     continue
                 prev_queries.add(dedup_key)
