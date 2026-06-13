@@ -427,6 +427,16 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
                                         </td>
                                     </tr>
                                 )}
+                                {loadedPaper?.zotero_synced && (
+                                    <tr>
+                                        <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">Source</td>
+                                        <td className="px-3 py-2">
+                                            <span className="inline-flex items-center px-2 py-1 bg-red-100 text-red-800 rounded-sm dark:bg-red-900 dark:text-red-200 text-xs">
+                                                Zotero
+                                            </span>
+                                        </td>
+                                    </tr>
+                                )}
                                 <tr>
                                     <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">Institutions</td>
                                     <td className="px-3 py-2">

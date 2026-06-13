@@ -14,7 +14,7 @@ from app.database.crud.paper_note_crud import (
 )
 from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
-from app.database.models import Paper, PaperStatus
+from app.database.models import Paper, PaperStatus, ZoteroImportedItem
 from app.database.telemetry import track_event
 from app.helpers.metadata_hydration import hydrate_paper_metadata
 from app.helpers.s3 import s3_service
@@ -503,6 +503,18 @@ async def get_pdf(
     paper_data["tags"] = [  # type: ignore
         {"id": str(t.id), "name": t.name, "color": t.color} for t in paper.tags  # type: ignore
     ]
+
+    # Flag whether this paper originated from a Zotero import (surfaced as a
+    # provenance badge in the library detail panel).
+    paper_data["zotero_synced"] = (
+        db.query(ZoteroImportedItem.id)
+        .filter(
+            ZoteroImportedItem.paper_id == paper.id,
+            ZoteroImportedItem.user_id == current_user.id,
+        )
+        .first()
+        is not None
+    )
 
     # Return the file URL
     return JSONResponse(status_code=200, content=paper_data)

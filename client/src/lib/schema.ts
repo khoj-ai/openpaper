@@ -27,6 +27,7 @@ export interface PaperData {
     journal?: string;
     doi?: string;
     publisher?: string;
+    zotero_synced?: boolean;
 }
 
 export interface SharedPaper {
