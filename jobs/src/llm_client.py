@@ -640,6 +640,32 @@ class PaperOperations(AsyncLLMClient):
                     highlights,
                 ) = results
 
+                # gather(return_exceptions=True) hands back Exception objects in
+                # place of failed results. Without this, getattr() below would
+                # silently coerce a failed subtask into empty defaults, masking
+                # the real error (e.g. an empty title surfacing downstream as a
+                # generic "Failed to extract metadata from PDF"). Log every
+                # failure with its traceback so the actual cause is visible.
+                subtask_labels = (
+                    "title_authors_abstract",
+                    "institutions_keywords",
+                    "summary_and_citations",
+                    "highlights",
+                )
+                for label, result in zip(subtask_labels, results):
+                    if isinstance(result, BaseException):
+                        logger.error(
+                            f"Metadata subtask '{label}' failed for job {job_id}: {result}",
+                            exc_info=result,
+                        )
+
+                # Title/authors/abstract is the critical subtask — without it the
+                # paper is unusable. Re-raise its real error instead of returning
+                # an object with an empty title. The other subtasks can degrade
+                # gracefully to their defaults via getattr() below.
+                if isinstance(title_authors_abstract, BaseException):
+                    raise title_authors_abstract
+
                 # Combine the results into the final metadata object
                 return PaperMetadataExtraction(
                     title=getattr(title_authors_abstract, "title", ""),

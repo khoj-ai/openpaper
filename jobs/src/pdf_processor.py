@@ -179,10 +179,16 @@ async def process_pdf_file(
                 logger.error(f"Failed to extract metadata: {metadata_result}")
                 raise metadata_result
             metadata = metadata_result # type: ignore
+
+            # Validate before logging success — a missing title means the LLM
+            # extraction effectively failed, even though no exception was raised.
+            if not metadata or not metadata.title:
+                raise Exception("Failed to extract metadata from PDF")
+
             logger.info(f"Successfully extracted metadata for {safe_filename}")
 
             # Process publication date
-            if metadata and metadata.publish_date:
+            if metadata.publish_date:
                 try:
                     # Simplified date parsing logic
                     parsed_date = datetime.fromisoformat(metadata.publish_date.replace("Z", "+00:00"))
@@ -190,10 +196,6 @@ async def process_pdf_file(
                 except (ValueError, TypeError):
                     logger.warning(f"Could not parse date: {metadata.publish_date}, setting to None")
                     metadata.publish_date = None
-
-            if not metadata or not metadata.title:
-                # This most likely means the LLM extraction failed
-                raise Exception("Failed to extract metadata from PDF")
 
         # Generate file URL from the existing S3 object key
         file_url = f"https://{s3_service.cloudflare_bucket_name}/{s3_object_key}"
