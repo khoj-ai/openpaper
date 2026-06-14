@@ -23,6 +23,9 @@ from app.database.models import (
     ReferralCode,
     Subscription,
     User,
+    ZoteroConnection,
+    ZoteroImportedItem,
+    ZoteroOAuthPending,
 )
 from fastapi import FastAPI, Request
 from sqladmin import Admin, ModelView, action
@@ -332,6 +335,80 @@ class ProjectRoleInvitationAdmin(ModelView, model=ProjectRoleInvitation):
     ]
 
 
+class ZoteroConnectionAdmin(ModelView, model=ZoteroConnection):
+    name = "Zotero Connection"
+    name_plural = "Zotero Connections"
+    icon = "fa-solid fa-plug"
+    # api_key is intentionally omitted to avoid exposing the secret.
+    column_list = [
+        ZoteroConnection.id,
+        ZoteroConnection.user_id,
+        ZoteroConnection.zotero_user_id,
+    ]
+    column_searchable_list = [
+        ZoteroConnection.user_id,
+        ZoteroConnection.zotero_user_id,
+    ]
+
+
+class ZoteroImportedItemAdmin(ModelView, model=ZoteroImportedItem):
+    name = "Zotero Imported Item"
+    name_plural = "Zotero Imported Items"
+    icon = "fa-solid fa-file-import"
+    column_list = [
+        ZoteroImportedItem.id,
+        ZoteroImportedItem.user_id,
+        ZoteroImportedItem.zotero_item_key,
+        ZoteroImportedItem.status,
+        ZoteroImportedItem.paper_id,
+        ZoteroImportedItem.error_message,
+        ZoteroImportedItem.last_synced_at,
+    ]
+    column_searchable_list = [
+        ZoteroImportedItem.user_id,
+        ZoteroImportedItem.zotero_item_key,
+        ZoteroImportedItem.status,
+        ZoteroImportedItem.paper_id,
+    ]
+    column_sortable_list = [
+        ZoteroImportedItem.status,
+        ZoteroImportedItem.last_synced_at,
+    ]
+    column_default_sort = [(ZoteroImportedItem.last_synced_at, True)]
+    column_details_list = [
+        ZoteroImportedItem.id,
+        ZoteroImportedItem.user_id,
+        ZoteroImportedItem.zotero_item_key,
+        ZoteroImportedItem.zotero_attachment_key,
+        ZoteroImportedItem.import_source,
+        ZoteroImportedItem.source_url,
+        ZoteroImportedItem.paper_id,
+        ZoteroImportedItem.upload_job_id,
+        ZoteroImportedItem.status,
+        ZoteroImportedItem.annotations_payload,
+        ZoteroImportedItem.error_message,
+        ZoteroImportedItem.last_synced_at,
+    ]
+
+
+class ZoteroOAuthPendingAdmin(ModelView, model=ZoteroOAuthPending):
+    name = "Zotero OAuth Pending"
+    name_plural = "Zotero OAuth Pending"
+    icon = "fa-solid fa-hourglass-half"
+    # oauth_token_secret is intentionally omitted to avoid exposing the secret.
+    column_list = [
+        ZoteroOAuthPending.id,
+        ZoteroOAuthPending.user_id,
+        ZoteroOAuthPending.expires_at,
+    ]
+    column_searchable_list = [
+        ZoteroOAuthPending.user_id,
+    ]
+    column_sortable_list = [
+        ZoteroOAuthPending.expires_at,
+    ]
+
+
 class AdminAuthenticationBackend(AuthenticationBackend):
     super_password = os.getenv("SUPER_PASSWORD", "admin")
     root_email = os.getenv("ROOT_EMAIL", None)
@@ -432,3 +509,6 @@ def setup_admin(app: FastAPI):
     admin.add_view(DataTableRowAdmin)
     admin.add_view(ReferralAdmin)
     admin.add_view(ReferralCodeAdmin)
+    admin.add_view(ZoteroConnectionAdmin)
+    admin.add_view(ZoteroImportedItemAdmin)
+    admin.add_view(ZoteroOAuthPendingAdmin)
