@@ -51,6 +51,20 @@ class ZoteroApiClient:
                 )
                 if response.status_code == 429:
                     retry_after = int(response.headers.get("Retry-After", "2"))
+                    logger.warning(
+                        "Zotero API rate-limited (429): %s %s; retrying after %ss "
+                        "(attempt %d/%d)",
+                        method,
+                        url,
+                        retry_after,
+                        attempt + 1,
+                        MAX_RETRIES,
+                    )
+                    # Record an error so a persistent 429 surfaces real context
+                    # instead of the generic RuntimeError below.
+                    last_error = requests.HTTPError(
+                        f"429 Too Many Requests for url: {url}", response=response
+                    )
                     time.sleep(retry_after)
                     continue
                 backoff = response.headers.get("Backoff")
@@ -60,8 +74,29 @@ class ZoteroApiClient:
                 return response
             except requests.RequestException as e:
                 last_error = e
+                # raise_for_status()'s message omits the response body, which is
+                # where Zotero explains *why* the call failed — capture it here.
+                resp = getattr(e, "response", None)
+                status = resp.status_code if resp is not None else "no response"
+                body = resp.text[:500] if resp is not None and resp.text else ""
+                logger.warning(
+                    "Zotero API request failed: %s %s -> %s (attempt %d/%d): %s%s",
+                    method,
+                    url,
+                    status,
+                    attempt + 1,
+                    MAX_RETRIES,
+                    e,
+                    f" | body: {body}" if body else "",
+                )
                 if attempt < MAX_RETRIES - 1:
                     time.sleep(2**attempt)
+        logger.error(
+            "Zotero API request giving up after %d attempts: %s %s",
+            MAX_RETRIES,
+            method,
+            url,
+        )
         raise last_error or RuntimeError("Zotero API request failed")
 
     def get_top_importable_items(

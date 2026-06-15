@@ -1,6 +1,7 @@
 """
 Celery tasks for Open Paper jobs
 """
+import json
 import logging
 import psutil
 import os
@@ -334,6 +335,19 @@ def periodic_zotero_sync(self):
     resp.raise_for_status()
     result = resp.json()
     logger.info(f"Periodic Zotero sync complete: {result.get('synced_users', 0)} users synced")
+
+    # Celery's task-success log runs the return value through a bounded saferepr,
+    # which collapses nested lists to "[...]" — so per-user sync errors never show
+    # up there. Log them explicitly here where they won't be truncated.
+    for user_result in result.get("results", []):
+        user_errors = user_result.get("errors") or []
+        if user_errors:
+            logger.warning(
+                "Zotero sync errors for user %s: %s",
+                user_result.get("user_id"),
+                json.dumps(user_errors),
+            )
+
     return result
 
 
