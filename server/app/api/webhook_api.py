@@ -934,13 +934,21 @@ async def trigger_zotero_sync_all(request: Request, db: Session = Depends(get_db
     )
 
     results = []
+    skipped = []
     for user_id in user_ids:
         user = user_crud.get(db, id=user_id)
         if not user:
+            logger.info(f"Skipping Zotero auto-sync for {user_id}: user not found")
+            skipped.append({"user_id": str(user_id), "reason": "user_not_found"})
             continue
 
         if not can_user_auto_sync_zotero(db, user):
-            logger.debug(f"Skipping auto-sync for basic-plan user {user_id}")
+            logger.info(
+                f"Skipping Zotero auto-sync for {user_id}: not eligible for auto-sync (basic plan)"
+            )
+            skipped.append(
+                {"user_id": str(user_id), "reason": "auto_sync_not_eligible"}
+            )
             continue
 
         try:
@@ -971,10 +979,13 @@ async def trigger_zotero_sync_all(request: Request, db: Session = Depends(get_db
 
     synced_users = len([r for r in results if "error" not in r])
     logger.info(
-        f"Periodic Zotero sync complete: {synced_users}/{len(user_ids)} users synced successfully"
+        f"Periodic Zotero sync complete: {synced_users}/{len(user_ids)} users synced "
+        f"successfully, {len(skipped)} skipped"
     )
     return {
         "synced_users": synced_users,
         "total_users": len(user_ids),
+        "skipped_users": len(skipped),
         "results": results,
+        "skipped": skipped,
     }
