@@ -2,14 +2,36 @@
 
 import logging
 import os
+import re
+import time
 from dataclasses import dataclass, field
 from typing import Optional
 
+import httpx
 from exa_py import Exa
 
 logger = logging.getLogger(__name__)
 
 EXA_API_KEY = os.getenv("EXA_API_KEY")
+
+# Exa intermittently returns transient 5xx/429s ("Please try again later"); retry
+# those a couple of times before giving up. exa_py raises a plain ValueError whose
+# message embeds the HTTP status, and surfaces transport failures as httpx errors.
+EXA_MAX_RETRIES = 2
+EXA_RETRY_BASE_DELAY = 1.0
+_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+
+
+def _is_retryable_exa_error(e: Exception) -> bool:
+    """True if an Exa failure looks transient and worth retrying."""
+    # Transport-level failures (timeouts, connection resets) are transient.
+    if isinstance(e, httpx.HTTPError):
+        return True
+    # exa_py raises ValueError("Request failed with status code <N>: ...").
+    match = re.search(r"status code (\d{3})", str(e))
+    if match:
+        return int(match.group(1)) in _RETRYABLE_STATUS_CODES
+    return False
 
 
 @dataclass
@@ -128,52 +150,64 @@ def search_exa(
 
     exa = Exa(api_key=EXA_API_KEY)
 
-    try:
-        search_params = {
-            "query": query,
-            "num_results": num_results,
-            "type": "auto",
-            "category": "research paper",
-            "text": {"max_characters": 500},
-            "highlights": {"num_sentences": 3},
-            "summary": {
-                "query": "You're reviewing academic literature. Describe the background and results in 2-3 sentences. The reader already knows this is a research paper, so skip meta-commentary and focus on the actual content and findings. Do not start with 'This paper' or similar phrases. Just summarize the key points."
-            },
-        }
+    search_params = {
+        "query": query,
+        "num_results": num_results,
+        "type": "auto",
+        "category": "research paper",
+        "text": {"max_characters": 500},
+        "highlights": {"num_sentences": 3},
+        "summary": {
+            "query": "You're reviewing academic literature. Describe the background and results in 2-3 sentences. The reader already knows this is a research paper, so skip meta-commentary and focus on the actual content and findings. Do not start with 'This paper' or similar phrases. Just summarize the key points."
+        },
+    }
 
-        search_params["include_domains"] = domains or ACADEMIC_DOMAINS
+    search_params["include_domains"] = domains or ACADEMIC_DOMAINS
 
-        if start_published_date:
-            search_params["start_published_date"] = start_published_date
+    if start_published_date:
+        search_params["start_published_date"] = start_published_date
 
-        response = exa.search_and_contents(**search_params)
+    for attempt in range(EXA_MAX_RETRIES + 1):
+        try:
+            response = exa.search_and_contents(**search_params)
 
-        results = []
-        for result in response.results:
-            # Skip results without a proper title
-            if not result.title or not result.title.strip():
-                continue
+            results = []
+            for result in response.results:
+                # Skip results without a proper title
+                if not result.title or not result.title.strip():
+                    continue
 
-            results.append(
-                ExaResult(
-                    title=result.title.strip(),
-                    url=result.url,
-                    authors=[result.author] if result.author else [],
-                    published_date=result.published_date,
-                    text=result.text,
-                    highlights=result.highlights if result.highlights else [],
-                    highlight_scores=(
-                        result.highlight_scores
-                        if hasattr(result, "highlight_scores")
-                        and result.highlight_scores
-                        else []
-                    ),
-                    favicon=getattr(result, "favicon", None),
-                    summary=getattr(result, "summary", None),
+                results.append(
+                    ExaResult(
+                        title=result.title.strip(),
+                        url=result.url,
+                        authors=[result.author] if result.author else [],
+                        published_date=result.published_date,
+                        text=result.text,
+                        highlights=result.highlights if result.highlights else [],
+                        highlight_scores=(
+                            result.highlight_scores
+                            if hasattr(result, "highlight_scores")
+                            and result.highlight_scores
+                            else []
+                        ),
+                        favicon=getattr(result, "favicon", None),
+                        summary=getattr(result, "summary", None),
+                    )
                 )
-            )
 
-        return results
-    except Exception as e:
-        logger.error(f"Exa search failed for query '{query}': {e}")
-        raise
+            return results
+        except Exception as e:
+            if attempt < EXA_MAX_RETRIES and _is_retryable_exa_error(e):
+                delay = EXA_RETRY_BASE_DELAY * (2**attempt)
+                logger.warning(
+                    f"Exa search transient error (attempt {attempt + 1}/{EXA_MAX_RETRIES + 1}) "
+                    f"for query '{query}': {e}. Retrying in {delay:.1f}s"
+                )
+                time.sleep(delay)
+                continue
+            logger.error(f"Exa search failed for query '{query}': {e}")
+            raise
+
+    # Unreachable: the loop either returns results or raises on the final attempt.
+    raise RuntimeError("Exa search retry loop exited unexpectedly")
