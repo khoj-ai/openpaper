@@ -149,6 +149,76 @@ class ZoteroApiClient:
         children = response.json()
         return children if isinstance(children, list) else []
 
+    def get_pdf_parent_item_keys(self, *, max_items: int = 3000) -> set:
+        """Return the set of top-level item keys that have a stored PDF attachment.
+
+        Fetches attachment items in bulk via a single paginated query rather than
+        making a per-item ``get_children`` call, so the whole library can be
+        classified cheaply before display.
+
+        Only stored PDFs count (``linkMode`` ``imported_file`` / ``imported_url``);
+        ``linked_url`` attachments are hyperlinks Zotero's file API cannot return
+        as a usable PDF, matching the filter in :meth:`find_pdf_attachment`.
+
+        ``max_items`` caps how many attachments are scanned as a safety bound for
+        pathologically large libraries; if hit, some items may be reported as
+        lacking a PDF.
+        """
+        parents: set = set()
+        url = f"{self._user_base}/items"
+        start = 0
+        page_size = 100
+        while start < max_items:
+            params = {
+                "itemType": "attachment",
+                "limit": page_size,
+                "start": start,
+            }
+            response = self._request("GET", url, params=params)
+            items = response.json()
+            if not isinstance(items, list) or not items:
+                break
+            for item in items:
+                data = item.get("data", {})
+                parent = data.get("parentItem")
+                if not parent:
+                    continue
+                # Mirror find_pdf_attachment's "stored PDF" predicate so the modal
+                # only marks items importable when the import pipeline could
+                # actually download a usable PDF from the attachment.
+                if not self._attachment_is_pdf(data):
+                    continue
+                if not self._attachment_is_stored(data):
+                    continue
+                parents.add(parent)
+            if len(items) < page_size:
+                break
+            start += page_size
+        else:
+            logger.warning(
+                "Zotero PDF attachment scan hit the %d-item cap; some library "
+                "items may be reported as having no PDF.",
+                max_items,
+            )
+        return parents
+
+    @staticmethod
+    def _attachment_is_pdf(data: Dict[str, Any]) -> bool:
+        """True if an attachment's ``data`` describes a PDF (by content type or filename)."""
+        content_type = (data.get("contentType") or "").lower()
+        filename = (data.get("filename") or "").lower()
+        return content_type == "application/pdf" or filename.endswith(".pdf")
+
+    @staticmethod
+    def _attachment_is_stored(data: Dict[str, Any]) -> bool:
+        """True if the attachment's file is stored in Zotero's cloud (downloadable via API).
+
+        ``linkMode`` ``"imported_file"`` / ``"imported_url"`` are stored copies;
+        ``"linked_url"`` / ``"linked_file"`` are mere references the file API cannot
+        return as a usable PDF.
+        """
+        return (data.get("linkMode") or "").lower() in ("imported_file", "imported_url")
+
     @staticmethod
     def find_pdf_attachment(children: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         """Return the best PDF attachment child, preferring stored files over linked URLs.
@@ -167,12 +237,9 @@ class ZoteroApiClient:
             data = child.get("data", {})
             if data.get("itemType") != "attachment":
                 continue
-            content_type = (data.get("contentType") or "").lower()
-            filename = (data.get("filename") or "").lower()
-            if content_type != "application/pdf" and not filename.endswith(".pdf"):
+            if not ZoteroApiClient._attachment_is_pdf(data):
                 continue
-            link_mode = (data.get("linkMode") or "").lower()
-            if link_mode in ("imported_file", "imported_url"):
+            if ZoteroApiClient._attachment_is_stored(data):
                 if stored_pdf is None:
                     stored_pdf = child
             else:

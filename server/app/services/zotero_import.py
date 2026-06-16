@@ -106,6 +106,20 @@ def _parse_zotero_date(date_str: Optional[str]) -> Optional[str]:
     return None
 
 
+def _has_importable_metadata(item_data: Dict[str, Any]) -> bool:
+    """True if a Zotero item has enough metadata to be importable.
+
+    An item must have at least a title, DOI, or URL — the import pipeline
+    cannot do anything with an item lacking all three. Used both to skip such
+    items during import and to mark them in the library modal.
+    """
+    return bool(
+        (item_data.get("title") or "").strip()
+        or (item_data.get("DOI") or "").strip()
+        or (item_data.get("url") or "").strip()
+    )
+
+
 def _zotero_creators_to_authors(creators: List[Dict[str, Any]]) -> List[str]:
     authors: List[str] = []
     for creator in creators:
@@ -686,11 +700,7 @@ async def _discover_import_candidates(
                 continue
 
             item_data = item.get("data", {})
-            if (
-                not (item_data.get("title") or "").strip()
-                and not (item_data.get("DOI") or "").strip()
-                and not (item_data.get("url") or "").strip()
-            ):
+            if not _has_importable_metadata(item_data):
                 logger.debug("Skipping Zotero item %s: no title, DOI, or URL", item_key)
                 continue
 
@@ -1046,6 +1056,12 @@ def list_library(
         .all()
     )
 
+    # Determine which top-level items have a stored PDF attachment so the modal
+    # can surface only the papers the import pipeline can actually download a PDF
+    # for (the same stored-PDF predicate find_pdf_attachment uses at import time).
+    # A single bulk attachment scan avoids a per-item children call.
+    pdf_parent_keys: set = client.get_pdf_parent_item_keys()
+
     result = []
     for item in items:
         data = item.get("data", {})
@@ -1081,6 +1097,8 @@ def list_library(
                 "item_type": item_type,
                 "venue": venue,
                 "already_imported": item_key in imported_keys,
+                "has_pdf_attachment": item_key in pdf_parent_keys,
+                "has_metadata": _has_importable_metadata(data),
             }
         )
 
@@ -1132,11 +1150,7 @@ async def _discover_candidates_by_keys(
             continue
 
         item_data = item.get("data", {})
-        if (
-            not (item_data.get("title") or "").strip()
-            and not (item_data.get("DOI") or "").strip()
-            and not (item_data.get("url") or "").strip()
-        ):
+        if not _has_importable_metadata(item_data):
             continue
 
         existing_import = zotero_import_crud.get_by_item_key(

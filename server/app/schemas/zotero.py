@@ -73,6 +73,8 @@ class ZoteroLibraryItem(BaseModel):
     item_type: str
     venue: Optional[str] = None
     already_imported: bool
+    has_pdf_attachment: bool = False
+    has_metadata: bool = True
 
 
 class ZoteroLibraryResponse(BaseModel):

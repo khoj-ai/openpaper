@@ -87,6 +87,8 @@ type ZoteroLibraryItem = {
 	item_type: "journalArticle" | "conferencePaper" | "preprint";
 	venue?: string;
 	already_imported: boolean;
+	has_pdf_attachment: boolean;
+	has_metadata: boolean;
 };
 
 type ZoteroLibraryResponse = {
@@ -107,7 +109,7 @@ function defaultZoteroSelection(
 ): Set<string> {
 	if (!selectAllByDefault || remainingSlots <= 0) return new Set();
 	const keys = items
-		.filter((i) => !i.already_imported)
+		.filter((i) => !i.already_imported && i.has_pdf_attachment && i.has_metadata)
 		.slice(0, remainingSlots)
 		.map((i) => i.zotero_item_key);
 	return new Set(keys);
@@ -161,7 +163,9 @@ function ZoteroLibraryModal({
 		return filtered;
 	}, [items, sortBy, filterTypes, searchQuery]);
 
-	const importable = displayItems.filter((i) => !i.already_imported);
+	const importable = displayItems.filter(
+		(i) => !i.already_imported && i.has_pdf_attachment && i.has_metadata,
+	);
 	const selectedCount = selectedKeys.size;
 	const slotsRemaining = Math.max(0, remainingSlots - selectedCount);
 	const overLimit = selectedCount > remainingSlots;
@@ -294,23 +298,27 @@ function ZoteroLibraryModal({
 								)}
 								{displayItems.map((item) => {
 									const checked = selectedKeys.has(item.zotero_item_key);
-									const disabled = item.already_imported || (!checked && overLimit);
+									const noMetadata = !item.already_imported && !item.has_metadata;
+									const noPdf =
+										!item.already_imported && item.has_metadata && !item.has_pdf_attachment;
+									const unselectable = item.already_imported || noMetadata || noPdf;
+									const disabled = unselectable || (!checked && overLimit);
 									return (
 										<li
 											key={item.zotero_item_key}
-											className={`flex items-start gap-3 px-4 py-3 ${item.already_imported ? "opacity-50" : ""}`}
+											className={`flex items-start gap-3 px-4 py-3 ${unselectable ? "opacity-50" : ""}`}
 										>
 											<Checkbox
 												id={item.zotero_item_key}
 												checked={item.already_imported ? true : checked}
-												disabled={disabled || item.already_imported}
+												disabled={disabled}
 												onCheckedChange={() => toggleKey(item.zotero_item_key)}
 												className="mt-0.5 shrink-0"
 											/>
 											<div className="flex-1 min-w-0 space-y-1">
 												<label
 													htmlFor={item.zotero_item_key}
-													className={`text-sm font-medium leading-snug block ${item.already_imported ? "cursor-default" : "cursor-pointer"}`}
+													className={`text-sm font-medium leading-snug block ${unselectable ? "cursor-default" : "cursor-pointer"}`}
 												>
 													{item.title || "(Untitled)"}
 												</label>
@@ -331,6 +339,16 @@ function ZoteroLibraryModal({
 													{item.already_imported && (
 														<Badge variant="outline" className="text-xs px-1.5 py-0 text-green-600 border-green-300">
 															Imported
+														</Badge>
+													)}
+													{noPdf && (
+														<Badge variant="outline" className="text-xs px-1.5 py-0 text-amber-600 border-amber-300">
+															No PDF attachment
+														</Badge>
+													)}
+													{noMetadata && (
+														<Badge variant="outline" className="text-xs px-1.5 py-0 text-amber-600 border-amber-300">
+															Missing metadata
 														</Badge>
 													)}
 												</div>
