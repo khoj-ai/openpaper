@@ -652,12 +652,37 @@ class PaperOperations(AsyncLLMClient):
                     "summary_and_citations",
                     "highlights",
                 )
-                for label, result in zip(subtask_labels, results):
-                    if isinstance(result, BaseException):
-                        logger.error(
-                            f"Metadata subtask '{label}' failed for job {job_id}: {result}",
-                            exc_info=result,
-                        )
+                failed_subtasks = [
+                    (label, result)
+                    for label, result in zip(subtask_labels, results)
+                    if isinstance(result, BaseException)
+                ]
+                if failed_subtasks:
+                    # The four subtasks share content/cache/model and differ only by
+                    # schema, so a failure common to all of them usually lives in the
+                    # shared request. Log that shape (without dumping paper content) so
+                    # we can see what an "invalid" request actually looks like — size,
+                    # inline-vs-cached path, model, and any odd characters in the text.
+                    non_printable = sum(
+                        1 for c in paper_content
+                        if not c.isprintable() and c not in "\n\r\t"
+                    )
+                    logger.error(
+                        "Metadata extraction failed for job %s [%d/%d subtasks failed]: "
+                        "model=%s, path=%s, paper_content_chars=%d, non_printable_chars=%d",
+                        job_id,
+                        len(failed_subtasks),
+                        len(subtask_labels),
+                        extraction_model or self.default_model,
+                        "inline" if cache_key is None else "cached",
+                        len(paper_content),
+                        non_printable,
+                    )
+                for label, result in failed_subtasks:
+                    logger.error(
+                        f"Metadata subtask '{label}' failed for job {job_id}: {result}",
+                        exc_info=result,
+                    )
 
                 # Title/authors/abstract is the critical subtask — without it the
                 # paper is unusable. Re-raise its real error instead of returning
