@@ -1062,6 +1062,9 @@ def list_library(
     # A single bulk attachment scan avoids a per-item children call.
     pdf_parent_keys: set = client.get_pdf_parent_item_keys()
 
+    # Map collection keys -> names so the modal can offer a collection filter.
+    collection_names: Dict[str, str] = client.get_collections()
+
     result = []
     for item in items:
         data = item.get("data", {})
@@ -1087,15 +1090,28 @@ def list_library(
             or data.get("repository")
             or None
         )
+        tags = [
+            (t.get("tag") or "").strip()
+            for t in (data.get("tags") or [])
+            if (t.get("tag") or "").strip()
+        ]
+        collections = [
+            collection_names[key]
+            for key in (data.get("collections") or [])
+            if key in collection_names
+        ]
         result.append(
             {
                 "zotero_item_key": item_key,
                 "title": (data.get("title") or "").strip(),
                 "authors": authors,
                 "date": _parse_zotero_date(data.get("date")),
-                "date_added": _parse_zotero_date_added(data.get("dateAdded")),
+                # Raw ISO 8601 timestamp (lexically sortable) for the "date added" sort.
+                "date_added": (data.get("dateAdded") or "").strip() or None,
                 "item_type": item_type,
                 "venue": venue,
+                "tags": tags,
+                "collections": collections,
                 "already_imported": item_key in imported_keys,
                 "has_pdf_attachment": item_key in pdf_parent_keys,
                 "has_metadata": _has_importable_metadata(data),

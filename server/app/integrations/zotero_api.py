@@ -149,6 +149,36 @@ class ZoteroApiClient:
         children = response.json()
         return children if isinstance(children, list) else []
 
+    def get_collections(self, *, max_items: int = 3000) -> Dict[str, str]:
+        """Return a ``{collection_key: name}`` map for the user's library.
+
+        Used to translate the collection keys carried on each item into
+        human-readable names for the import modal's collection filter.
+        ``max_items`` caps pagination as a safety bound for unusually large
+        libraries.
+        """
+        result: Dict[str, str] = {}
+        url = f"{self._user_base}/collections"
+        start = 0
+        page_size = 100
+        while start < max_items:
+            response = self._request(
+                "GET", url, params={"limit": page_size, "start": start}
+            )
+            items = response.json()
+            if not isinstance(items, list) or not items:
+                break
+            for collection in items:
+                data = collection.get("data", {}) or {}
+                key = collection.get("key") or data.get("key")
+                name = (data.get("name") or "").strip()
+                if key and name:
+                    result[key] = name
+            if len(items) < page_size:
+                break
+            start += page_size
+        return result
+
     def get_pdf_parent_item_keys(self, *, max_items: int = 3000) -> set:
         """Return the set of top-level item keys that have a stored PDF attachment.
 

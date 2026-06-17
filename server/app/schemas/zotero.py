@@ -72,6 +72,9 @@ class ZoteroLibraryItem(BaseModel):
     date: Optional[str] = None
     item_type: str
     venue: Optional[str] = None
+    date_added: Optional[str] = None
+    tags: List[str] = []
+    collections: List[str] = []
     already_imported: bool
     has_pdf_attachment: bool = False
     has_metadata: bool = True
