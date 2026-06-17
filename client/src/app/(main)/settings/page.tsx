@@ -27,7 +27,7 @@ import { refreshActivePapers, useActivePapers } from "@/hooks/useActivePapers";
 import { isPaperUploadAtLimit, useSubscription } from "@/hooks/useSubscription";
 import { fetchFromApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { ArrowUpDown, ListFilter, Loader2, Search } from "lucide-react";
+import { ArrowUpDown, ListFilter, Loader2, RefreshCw, Search } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -390,9 +390,13 @@ function ZoteroLibraryModal({
 function ZoteroGuideModal({
 	open,
 	onOpenChange,
+	onConnect,
+	connecting,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
+	onConnect?: () => void;
+	connecting?: boolean;
 }) {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
@@ -436,15 +440,27 @@ function ZoteroGuideModal({
 					<li className="flex gap-3">
 						<span className="font-semibold shrink-0">3.</span>
 						<div>
-							<p className="font-medium">Click &quot;Connect Zotero&quot; here</p>
+							<p className="font-medium">Click &quot;Connect Zotero&quot; below</p>
 							<p className="text-muted-foreground mt-0.5">
-								You&apos;ll be redirected to Zotero to authorize Open Paper, then brought back to this page.
+								You&apos;ll be redirected to Zotero to authorize Open Paper, then brought back to this page. Open Paper only reads your library — it never changes anything in Zotero.
 							</p>
 						</div>
 					</li>
 				</ol>
 				<DialogFooter>
-					<Button onClick={() => onOpenChange(false)}>Got it</Button>
+					{onConnect ? (
+						<>
+							<Button variant="outline" onClick={() => onOpenChange(false)} disabled={connecting}>
+								Cancel
+							</Button>
+							<Button onClick={onConnect} disabled={connecting}>
+								{connecting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+								Connect Zotero
+							</Button>
+						</>
+					) : (
+						<Button onClick={() => onOpenChange(false)}>Got it</Button>
+					)}
 				</DialogFooter>
 			</DialogContent>
 		</Dialog>
@@ -829,7 +845,8 @@ function SettingsContent() {
 						id="email"
 						value={user.email}
 						disabled
-						className="bg-muted"
+						title={user.email}
+						className="bg-muted truncate"
 					/>
 				</div>
 				<Button type="submit" disabled={isSaving || !name.trim()}>
@@ -880,9 +897,25 @@ function SettingsContent() {
 						{zoteroLoading ? (
 							<Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
 						) : zoteroStatus?.connected ? (
-							<Badge className="bg-green-100 text-green-700 border-green-200 dark:bg-green-900/40 dark:text-green-400">
-							Connected
-						</Badge>
+							<div className="flex items-center gap-2 shrink-0">
+								{showSyncAnnotations && (
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon"
+										className="h-7 w-7"
+										onClick={handleZoteroSync}
+										disabled={zoteroSyncLoading || zoteroImportLoading || zoteroActionLoading}
+										title="Sync annotations"
+										aria-label="Sync annotations"
+									>
+										<RefreshCw className={`h-4 w-4 ${zoteroSyncLoading ? "animate-spin" : ""}`} />
+									</Button>
+								)}
+								<Badge className="bg-green-100 text-green-700 border-green-200 dark:bg-green-900/40 dark:text-green-400">
+									Connected
+								</Badge>
+							</div>
 						) : null}
 					</div>
 
@@ -915,19 +948,6 @@ function SettingsContent() {
 					) : null}
 					Import
 				</Button>
-				{showSyncAnnotations && (
-					<Button
-						type="button"
-						variant="outline"
-						onClick={handleZoteroSync}
-						disabled={zoteroSyncLoading || zoteroImportLoading || zoteroActionLoading}
-					>
-						{zoteroSyncLoading ? (
-							<Loader2 className="h-4 w-4 animate-spin mr-2" />
-						) : null}
-						Sync
-					</Button>
-				)}
 				<Button
 					type="button"
 					variant="outline"
@@ -945,16 +965,29 @@ function SettingsContent() {
 					)}
 					</div>
 					) : (
-						<Button
-							type="button"
-							onClick={handleZoteroConnect}
-							disabled={zoteroActionLoading}
-						>
-							{zoteroActionLoading ? (
-								<Loader2 className="h-4 w-4 animate-spin mr-2" />
-							) : null}
-							Connect Zotero
-						</Button>
+						<div className="space-y-3">
+							<p className="text-sm text-muted-foreground">
+								Open Paper pulls journal articles, conference papers, and preprints
+								(with PDF attachments) from your Zotero library so you can read and
+								annotate them here.
+							</p>
+							<p className="text-sm text-muted-foreground">
+								It&apos;s a{" "}
+								<span className="font-medium text-foreground">one-way sync</span>:
+								Open Paper only reads from Zotero to bring papers in — it never edits
+								or deletes anything in your Zotero library.
+							</p>
+							<Button
+								type="button"
+								onClick={() => setShowZoteroGuide(true)}
+								disabled={zoteroActionLoading}
+							>
+								{zoteroActionLoading ? (
+									<Loader2 className="h-4 w-4 animate-spin mr-2" />
+								) : null}
+								Connect Zotero
+							</Button>
+						</div>
 					)}
 				</div>
 			</div>
@@ -970,7 +1003,12 @@ function SettingsContent() {
 			onSelectionChange={setSelectedKeys}
 			onImport={handleZoteroImport}
 		/>
-		<ZoteroGuideModal open={showZoteroGuide} onOpenChange={setShowZoteroGuide} />
+		<ZoteroGuideModal
+			open={showZoteroGuide}
+			onOpenChange={setShowZoteroGuide}
+			onConnect={zoteroStatus?.connected ? undefined : handleZoteroConnect}
+			connecting={zoteroActionLoading}
+		/>
 		</>
 	);
 }
