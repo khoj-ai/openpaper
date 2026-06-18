@@ -277,7 +277,7 @@ export function LibraryTable({
 		);
 	}
 
-	const numCols = 7 + (selectable ? 1 : 0);
+	const numCols = 6 + (selectable ? 1 : 0);
 	const allAvailableSelected = availablePapers.length > 0 && selectedPapers.size === availablePapers.length;
 
 
@@ -463,14 +463,6 @@ export function LibraryTable({
 									<TableHead className="min-w-[10rem]">
 										<Button
 											variant="ghost"
-											className="h-auto p-0 font-semibold hover:bg-transparent"
-										>
-											Keywords
-										</Button>
-									</TableHead>
-									<TableHead className="min-w-[10rem]">
-										<Button
-											variant="ghost"
 											className="h-auto p-0 font-semibold hover:bg-transparent hover:text-primary"
 										>
 											Tags
@@ -554,29 +546,6 @@ export function LibraryTable({
 											<TableCell className="py-4 pr-4 whitespace-normal">
 												<div className="text-sm text-muted-foreground leading-relaxed break-words hyphens-auto line-clamp-2">
 													{paper.institutions?.length ? paper.institutions.join(", ") : 'No organizations'}
-												</div>
-											</TableCell>
-											<TableCell className="py-4 pr-4">
-												<div className="text-xs leading-relaxed">
-													{paper.keywords?.length ? (
-														<div className="flex flex-wrap gap-1">
-															{paper.keywords.slice(0, 3).map((keyword, i) => (
-																<span
-																	key={i}
-																	className="inline-block px-2 py-1 bg-secondary text-secondary-foreground rounded-sm"
-																>
-																	{keyword}
-																</span>
-															))}
-															{paper.keywords.length > 3 && (
-																<span className="text-muted-foreground text-xs">
-																	+{paper.keywords.length - 3} more
-																</span>
-															)}
-														</div>
-													) : (
-														<span className="text-muted-foreground">No keywords</span>
-													)}
 												</div>
 											</TableCell>
 											<TableCell className="py-4 pr-4">
