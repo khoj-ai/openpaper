@@ -251,6 +251,27 @@ export default function PaperView() {
         }
     }, [isReadMode, toolset.nav]);
 
+    /** Side-panel function buttons act as toggles: clicking the already-active
+     *  one collapses the panel (focus mode); clicking another opens it. On
+     *  desktop "collapse" means focus/Read mode; on mobile it returns to the
+     *  reader view. */
+    const handleSelectFunction = useCallback((name: string) => {
+        if (name === rightSideFunction) {
+            if (isMobile) {
+                setMobileView('reader');
+            } else {
+                setRightSideFunction('Read');
+            }
+            return;
+        }
+        // Opening a panel from focus mode restores the pre-Read annotation card
+        // visibility, matching the Read-mode toggle.
+        if (isReadMode) {
+            setAnnotationCardsVisible(preReadAnnotationCardsRef.current);
+        }
+        setRightSideFunction(name);
+    }, [rightSideFunction, isReadMode, isMobile]);
+
     const prevMobileViewRef = useRef<'reader' | 'panel'>(mobileView);
     const mobileReaderInitialHideRef = useRef(false);
     useEffect(() => {
@@ -657,7 +678,7 @@ export default function PaperView() {
                                         <SidePanelContent {...sidePanelProps} isMobile={true} />
                                         <PaperSidebar
                                             rightSideFunction={rightSideFunction}
-                                            setRightSideFunction={setRightSideFunction}
+                                            setRightSideFunction={handleSelectFunction}
                                             PaperToolset={toolset}
                                             showAnnotationCards={showAnnotationCards}
                                             onToggleAnnotationCards={() => setAnnotationCardsVisible(v => !v)}
@@ -775,7 +796,7 @@ export default function PaperView() {
                             <SidePanelContent {...sidePanelProps} isMobile={false} />
                             <PaperSidebar
                                 rightSideFunction={rightSideFunction}
-                                setRightSideFunction={setRightSideFunction}
+                                setRightSideFunction={handleSelectFunction}
                                 PaperToolset={toolset}
                             />
                         </>
