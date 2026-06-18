@@ -282,14 +282,14 @@ export function LibraryTable({
 
 
 	return (
-		<div className="space-y-4 w-full max-w-full overflow-hidden" {...props}>
+		<div className="space-y-4 w-full max-w-full" {...props}>
 			<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
 				<div className="flex flex-col md:flex-row items-start md:items-center gap-4 w-full">
 					<Input
 						placeholder="Filter papers by title, authors, organizations, or keywords..."
 						value={searchTerm}
 						onChange={(e) => setSearchTerm(e.target.value)}
-						className="w-full md:max-w-xl"
+						className="w-full md:max-w-xl border-none dark:border-none focus-visible:ring-1 focus-visible:ring-blue-400/30 text-primary"
 					/>
 					<PaperFiltering
 						papers={papers || []}
