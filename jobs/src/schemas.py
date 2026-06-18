@@ -61,7 +61,17 @@ class InstitutionsKeywords(BaseModel):
     institutions: List[str] = Field(
         default=[], description="List of institutions involved in the publication."
     )
-    keywords: List[str] = Field(default=[], description="List of keywords")
+    keywords: List[str] = Field(
+        default=[],
+        description=(
+            "3-8 concise topical keywords describing the paper's subject. "
+            "Write each in normal case (e.g. 'machine learning', 'protein folding'), "
+            "NOT Title Case or ALL CAPS; capitalize only proper nouns and acronyms "
+            "(e.g. 'CRISPR', 'BERT', 'Alzheimer's disease'). Prefer established field "
+            "or topic terms, keep each to a short phrase (not a sentence), and do not "
+            "repeat near-duplicates."
+        ),
+    )
 
 
 class SummaryAndCitations(BaseModel):
@@ -146,7 +156,17 @@ class PaperMetadataExtraction(BaseModel):
     institutions: List[str] = Field(
         default=[], description="List of institutions involved in the publication."
     )
-    keywords: List[str] = Field(default=[], description="List of keywords")
+    keywords: List[str] = Field(
+        default=[],
+        description=(
+            "3-8 concise topical keywords describing the paper's subject. "
+            "Write each in normal case (e.g. 'machine learning', 'protein folding'), "
+            "NOT Title Case or ALL CAPS; capitalize only proper nouns and acronyms "
+            "(e.g. 'CRISPR', 'BERT', 'Alzheimer's disease'). Prefer established field "
+            "or topic terms, keep each to a short phrase (not a sentence), and do not "
+            "repeat near-duplicates."
+        ),
+    )
     summary: str = Field(
         default="",
         description="""
