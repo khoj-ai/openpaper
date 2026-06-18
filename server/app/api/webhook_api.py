@@ -12,6 +12,7 @@ import stripe
 from app.database.crud.conversation_crud import ConversationCreate, conversation_crud
 from app.database.crud.message_crud import MessageCreate, message_crud
 from app.database.crud.paper_crud import PaperUpdate, paper_crud
+from app.database.crud.paper_tag_crud import paper_tag_crud
 from app.database.crud.paper_upload_crud import paper_upload_job_crud
 from app.database.crud.projects.project_data_table_crud import (
     DataTableResultCreate,
@@ -500,7 +501,6 @@ async def handle_paper_processing_webhook(
                     abstract=metadata.abstract,
                     summary="",
                     summary_citations=[],
-                    keywords=metadata.keywords,
                     institutions=metadata.institutions,
                     publish_date=publish_date,
                     raw_content=result.raw_content,
@@ -510,6 +510,25 @@ async def handle_paper_processing_webhook(
                 db_obj=existing_paper,
                 user=job_user,
             )
+
+            # Extracted keywords are stored as reusable user tags rather than a
+            # flat keywords list, reusing any existing tag that matches
+            # case-insensitively. Best-effort: tagging must not fail ingestion.
+            if paper and metadata.keywords:
+                try:
+                    paper_tag_crud.apply_keyword_tags(
+                        db=db,
+                        paper_id=paper.id,
+                        keywords=metadata.keywords,
+                        user_id=job_user.id,
+                    )
+                except Exception as e:
+                    logger.error(
+                        "Failed to apply keyword tags for paper %s: %s",
+                        paper.id,
+                        e,
+                        exc_info=True,
+                    )
 
             # Create highlights/annotations if any
             if metadata.highlights and paper:

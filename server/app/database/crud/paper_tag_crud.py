@@ -5,6 +5,7 @@ from app.database.crud.base_crud import CRUDBase
 from app.database.models import Paper, PaperTag, PaperTagAssociation, User
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 
@@ -48,6 +49,92 @@ class PaperTagCRUD(CRUDBase[PaperTag, PaperTagCreate, PaperTagUpdate]):
             .filter(PaperTag.name == name, PaperTag.user_id == user.id)
             .first()
         )
+
+    def get_or_create_by_name(
+        self,
+        db: Session,
+        *,
+        name: str,
+        user_id: uuid.UUID,
+        commit: bool = True,
+    ) -> Optional[PaperTag]:
+        """Return the user's tag matching ``name`` (case-insensitive, trimmed),
+        creating it with the original casing if none exists.
+
+        Returns ``None`` for blank names. This is the single reuse rule that both
+        keyword ingestion (webhook) and the keywords->tags migration rely on, so
+        neither produces near-duplicate tags differing only by case or whitespace.
+        """
+        normalized = (name or "").strip()
+        if not normalized:
+            return None
+
+        existing = (
+            db.query(PaperTag)
+            .filter(
+                PaperTag.user_id == user_id,
+                func.lower(PaperTag.name) == normalized.lower(),
+            )
+            .first()
+        )
+        if existing:
+            return existing
+
+        db_obj = PaperTag(name=normalized, color=None, user_id=user_id)
+        db.add(db_obj)
+        if commit:
+            db.commit()
+            db.refresh(db_obj)
+        else:
+            # Flush so the generated id is available to callers building
+            # associations within the same (uncommitted) transaction.
+            db.flush()
+        return db_obj
+
+    def apply_keyword_tags(
+        self,
+        db: Session,
+        *,
+        paper_id: uuid.UUID,
+        keywords: List[str],
+        user_id: uuid.UUID,
+        commit: bool = True,
+    ) -> int:
+        """Turn a paper's extracted keywords into user tags and attach them.
+
+        For each keyword, reuses an existing tag (case-insensitive) or creates
+        one, then links it to the paper if not already linked. Idempotent — safe
+        to re-run. Returns the number of new paper<->tag associations created.
+        """
+        if not keywords:
+            return 0
+
+        existing_tag_ids = {
+            row[0]
+            for row in db.query(PaperTagAssociation.tag_id)
+            .filter(PaperTagAssociation.paper_id == paper_id)
+            .all()
+        }
+
+        new_associations = 0
+        seen_tag_ids: set = set()
+        for keyword in keywords:
+            tag = self.get_or_create_by_name(
+                db, name=keyword, user_id=user_id, commit=False
+            )
+            if tag is None or tag.id in seen_tag_ids:
+                continue
+            seen_tag_ids.add(tag.id)
+            if tag.id in existing_tag_ids:
+                continue
+            db.add(PaperTagAssociation(paper_id=paper_id, tag_id=tag.id))
+            new_associations += 1
+
+        if commit:
+            db.commit()
+        else:
+            db.flush()
+        return new_associations
 
     def add_tag_to_paper(
         self, db: Session, *, paper_id: uuid.UUID, tag_id: uuid.UUID, user: CurrentUser

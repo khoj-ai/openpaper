@@ -58,7 +58,13 @@ class PaperMetadataExtraction(BaseModel):
     institutions: List[str] = Field(
         default=[], description="List of institutions involved in the publication."
     )
-    keywords: List[str] = Field(default=[], description="List of keywords")
+    keywords: List[str] = Field(
+        default=[],
+        description=(
+            "3-8 concise topical keywords in normal case (not Title Case or ALL "
+            "CAPS); capitalize only proper nouns and acronyms."
+        ),
+    )
     summary: str = Field(
         default="",
         description="""
