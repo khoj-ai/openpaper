@@ -6,7 +6,7 @@ import { BasicUser } from "@/lib/auth";
 import { PaperHighlightAnnotation } from "@/lib/schema";
 import { cn, formatAnnotationDate, getAlphaHashToBackgroundColor, getInitials } from "@/lib/utils";
 import { CollapsibleNoteText } from "@/components/CollapsibleNoteText";
-import { Pencil, Trash2, X } from "lucide-react";
+import { File, Pencil, Trash2, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 interface InlineAnnotationCardProps {
@@ -364,20 +364,29 @@ export function InlineAnnotationCard({
                             canWrite && isActive ? "pb-2" : "pb-4"
                         )}
                     >
-                        {visibleThread.map((ann) => (
+                        {visibleThread.map((ann) => {
+                            const isAssistant = ann.role === "assistant";
+                            const annName = isAssistant ? "Open Paper" : displayName;
+                            return (
                             <div key={ann.id} className="flex flex-col gap-2">
                                 <div className="flex items-center gap-3">
-                                    <Avatar className="h-7 w-7 flex-shrink-0">
-                                        {user?.picture && <AvatarImage src={user.picture} alt={displayName} />}
-                                        <AvatarFallback
-                                            className="text-[10px] text-white font-medium"
-                                            style={{ backgroundColor: avatarBg }}
-                                        >
-                                            {getInitials(displayName)}
-                                        </AvatarFallback>
-                                    </Avatar>
+                                    {isAssistant ? (
+                                        <div className="h-7 w-7 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center bg-blue-100 dark:bg-blue-900">
+                                            <File size={14} className="text-blue-500" />
+                                        </div>
+                                    ) : (
+                                        <Avatar className="h-7 w-7 flex-shrink-0">
+                                            {user?.picture && <AvatarImage src={user.picture} alt={annName} />}
+                                            <AvatarFallback
+                                                className="text-[10px] text-white font-medium"
+                                                style={{ backgroundColor: avatarBg }}
+                                            >
+                                                {getInitials(annName)}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                    )}
                                     <div className="flex flex-col leading-tight flex-1 min-w-0">
-                                        <span className="text-xs font-medium">{displayName}</span>
+                                        <span className="text-xs font-medium">{annName}</span>
                                         <span className="text-[11px] text-muted-foreground">{formatAnnotationDate(ann.created_at)}</span>
                                     </div>
                                     {ann.role === "user" && isActive && (
@@ -467,11 +476,11 @@ export function InlineAnnotationCard({
                                     <CollapsibleNoteText
                                         content={ann.content}
                                         isActive={isActive}
-                                        onExpandToggle={onCardFocus}
                                     />
                                 )}
                             </div>
-                        ))}
+                            );
+                        })}
                         {moreCount > 0 && (
                             <p className="text-xs text-muted-foreground">
                                 +{moreCount} more {moreCount === 1 ? "reply" : "replies"} — click to show

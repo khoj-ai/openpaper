@@ -81,6 +81,51 @@ function resolveHighlightPageNumber(
 }
 
 /**
+ * Anchor a margin card to a highlight that has no ScaledPosition (AI/assistant and
+ * legacy highlights are painted as DOM overlays inside the page text layer rather
+ * than via the highlighter library). Returns null until the overlay exists, which
+ * only happens once that page's text layer has rendered.
+ */
+function getAnnotationCardAnchorFromOverlay(
+	highlightId: string | undefined,
+	scrollContainer: HTMLElement
+): { top: number; left: number } | null {
+	if (!highlightId) return null;
+	const overlay = scrollContainer.querySelector<HTMLElement>(
+		`.text-match-highlight-overlay[data-highlight-id="${CSS.escape(highlightId)}"]`
+	);
+	if (!overlay) return null;
+
+	const containerRect = scrollContainer.getBoundingClientRect();
+	const overlayRect = overlay.getBoundingClientRect();
+	const scrollLeft = scrollContainer.scrollLeft;
+	const top = overlayRect.top - containerRect.top + scrollContainer.scrollTop;
+
+	// Prefer the page gutter (matching position-based cards); fall back to just
+	// right of the overlay if the enclosing page element can't be found.
+	const pageEl = overlay.closest<HTMLElement>(".page");
+	if (pageEl) {
+		const pageRect = pageEl.getBoundingClientRect();
+		const pageRightContent = pageRect.right - containerRect.left + scrollLeft;
+		const pageLeftContent = pageRect.left - containerRect.left + scrollLeft;
+		const rightGutterLeft = pageRightContent + ANNOTATION_CARD_MARGIN_GAP_PX;
+		const leftGutterLeft =
+			pageLeftContent - ANNOTATION_CARD_MARGIN_GAP_PX - ANNOTATION_CARD_WIDTH_PX;
+		let left = rightGutterLeft;
+		if (
+			rightGutterLeft + ANNOTATION_CARD_WIDTH_PX > scrollContainer.scrollWidth &&
+			leftGutterLeft >= 0
+		) {
+			left = leftGutterLeft;
+		}
+		return { top, left };
+	}
+	const left =
+		overlayRect.right - containerRect.left + scrollLeft + ANNOTATION_CARD_MARGIN_GAP_PX;
+	return { top, left };
+}
+
+/**
  * Anchor for margin annotation cards: right gutter by default, left gutter if the
  * card would not fit to the right of the page in the scroll container.
  */
@@ -91,7 +136,9 @@ function getAnnotationCardAnchorForHighlight(
 	scrollContainer: HTMLElement,
 	numPages: number | null = null
 ): { top: number; left: number } | null {
-	if (!highlight.position) return null;
+	// Highlights without a ScaledPosition (AI/assistant, legacy) render as DOM
+	// overlays — anchor their card to the overlay instead.
+	if (!highlight.position) return getAnnotationCardAnchorFromOverlay(highlight.id, scrollContainer);
 
 	const pageNumber = resolveHighlightPageNumber(highlight, numPages);
 	if (!pageNumber) return null;
@@ -575,7 +622,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			let changed = false;
 			const next = prev.map((card) => {
 				const h = highlights.find((x) => x.id === card.highlightId);
-				if (!h?.position) return card;
+				if (!h) return card;
 				const anchor = getAnnotationCardAnchorForHighlight(h, viewer, scrollContainer, numPages);
 				if (!anchor) return card;
 				const same =
@@ -610,7 +657,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 			setAnnotationCards((prev) => {
 				if (prev.some((c) => c.highlightId === highlightId)) return prev;
 				const h = highlights.find((x) => x.id === highlightId);
-				if (!h?.position) return prev;
+				if (!h) return prev;
 				const viewer = highlighterUtilsRef.current?.getViewer();
 				const scrollContainer = viewer?.container as HTMLElement | undefined;
 				if (!viewer || !scrollContainer) return prev;
@@ -1036,7 +1083,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 
 		byHighlight.forEach((annotationId, highlightId) => {
 			const highlight = highlights.find(h => h.id === highlightId);
-			if (!highlight?.position) return;
+			if (!highlight) return;
 
 			attempted++;
 
