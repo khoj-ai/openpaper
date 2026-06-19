@@ -3,10 +3,12 @@ Migrate existing papers' extracted keywords into user tags.
 
 For every paper that has keywords, each keyword becomes a tag owned by the
 paper's user. Matching is case-insensitive and trimmed, so a keyword that
-matches a tag the user already has is reused rather than duplicated. The
-paper's ``keywords`` array is left intact (non-destructive).
+matches a tag the user already has is reused rather than duplicated. After the
+tags are applied, the paper's ``keywords`` array is cleared so the data lives
+only on the tags (destructive).
 
-Idempotent: re-running only adds missing tag associations.
+Idempotent: re-running is a no-op since migrated papers no longer have
+keywords. Tag application itself only adds missing associations.
 
 Usage:
     python -m app.scripts.migrate_keywords_to_tags [--batch-size 200] [--limit N] [--dry-run]
@@ -54,9 +56,10 @@ def migrate(
 
         processed = 0
         papers_tagged = 0
+        papers_cleared = 0
         associations_created = 0
         errors = 0
-        offset = 0
+        last_id = None
 
         while True:
             if limit is not None and processed >= limit:
@@ -65,7 +68,12 @@ def migrate(
             if limit is not None:
                 page = min(batch_size, limit - processed)
 
-            rows = base.offset(offset).limit(page).all()
+            # Keyset pagination on id: real runs clear keywords, so processed
+            # papers drop out of the filter and offset paging would skip rows.
+            query = base
+            if last_id is not None:
+                query = query.filter(Paper.id > last_id)
+            rows = query.limit(page).all()
             if not rows:
                 break
 
@@ -76,11 +84,18 @@ def migrate(
                         paper_id=paper_id,
                         keywords=keywords or [],
                         user_id=user_id,
-                        commit=not dry_run,
+                        commit=False,
+                    )
+                    # Tags now carry the keyword data; drop them from the paper.
+                    db.query(Paper).filter(Paper.id == paper_id).update(
+                        {Paper.keywords: None}, synchronize_session=False
                     )
                     if dry_run:
                         db.rollback()
+                    else:
+                        db.commit()
                     associations_created += created
+                    papers_cleared += 1
                     if created > 0:
                         papers_tagged += 1
                 except Exception as e:
@@ -89,20 +104,24 @@ def migrate(
                     logger.error("Failed to migrate paper %s: %s", paper_id, e)
 
             processed += len(rows)
-            offset += len(rows)
+            last_id = rows[-1][0]
             logger.info(
-                "Progress: %d/%d papers processed (%d tagged, %d associations, %d errors)",
+                "Progress: %d/%d papers processed (%d tagged, %d cleared, %d associations, %d errors)",
                 processed,
                 total,
                 papers_tagged,
+                papers_cleared,
                 associations_created,
                 errors,
             )
 
         logger.info(
-            "Done. Processed %d papers; %d gained tags; %d associations %s; %d errors.",
+            "Done. Processed %d papers; %d gained tags; %d %s keywords cleared; "
+            "%d associations %s; %d errors.",
             processed,
             papers_tagged,
+            papers_cleared,
+            "would have" if dry_run else "had",
             associations_created,
             "would be created" if dry_run else "created",
             errors,
