@@ -984,13 +984,22 @@ async def trigger_zotero_sync_all(request: Request, db: Session = Depends(get_db
                     db=db,
                 )
 
-            import_result = await auto_import_new_papers(db, user=user)
-            if import_result.get("auto_imported_count", 0) > 0:
-                track_event(
-                    "zotero_auto_import_new_papers",
-                    user_id=str(user_id),
-                    properties={"count": import_result["auto_imported_count"]},
-                    db=db,
+            # Auto-import is a best-effort secondary step. A failure here
+            # shouldn't fail the user's sync (which already succeeded above), but
+            # we still log it so the error is visible rather than swallowed.
+            try:
+                import_result = await auto_import_new_papers(db, user=user)
+                if import_result.get("auto_imported_count", 0) > 0:
+                    track_event(
+                        "zotero_auto_import_new_papers",
+                        user_id=str(user_id),
+                        properties={"count": import_result["auto_imported_count"]},
+                        db=db,
+                    )
+            except Exception as e:
+                logger.error(
+                    f"Auto-import of new papers failed for user {user_id}: {e}",
+                    exc_info=True,
                 )
         except Exception as e:
             logger.error(f"Auto-sync failed for user {user_id}: {e}", exc_info=True)

@@ -1561,7 +1561,9 @@ async def auto_import_new_papers(
     ]
     new_keys = []
     for item in candidate_items:
-        date_added = item.get("date_added")
+        # date_added is a raw Zotero ISO-8601 string; import_since is a tz-aware
+        # datetime. Parse before comparing, or the comparison raises TypeError.
+        date_added = _parse_zotero_date_added(item.get("date_added"))
         if date_added is None:
             continue
         if date_added < import_since:
