@@ -417,6 +417,17 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		[highlights]
 	);
 
+	// Latest active-highlight id for DOM-overlay code that must read the current value
+	// WITHOUT being an effect dependency. Keeping it out of the overlay effect's deps
+	// means changing the active highlight (e.g. while annotating) recolors overlays in
+	// place instead of tearing down and rebuilding every overlay (text search + DOM).
+	const activeHighlightIdRef = useRef<string | undefined>(undefined);
+	activeHighlightIdRef.current = activeHighlight?.id;
+
+	// Coalesces PDF.js `pagerendered` bursts (a storm during fast scroll) into a single
+	// trailing layout tick so the heavy restore/anchor passes don't run per rendered page.
+	const layoutTickDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
 	/**
 	 * Highlight rectangles (react-pdf-highlighter-extended) are re-laid out from scaled positions on
 	 * every scroll/textlayerrender. During zoom, PDF.js fires many pagerendereds and ResizeObserver
@@ -1019,7 +1030,13 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		const bus = (viewer as any)?.eventBus;
 		if (!bus?.on) return;
 		const onPageRendered = () => {
-			setPdfLayoutTick((t) => t + 1);
+			// Coalesce rapid pagerendered events (fast scroll) into one trailing tick so the
+			// restore/anchor effects keyed on pdfLayoutTick don't run for every page.
+			if (layoutTickDebounceRef.current) clearTimeout(layoutTickDebounceRef.current);
+			layoutTickDebounceRef.current = setTimeout(() => {
+				layoutTickDebounceRef.current = null;
+				setPdfLayoutTick((t) => t + 1);
+			}, 120);
 			if (!pendingZoomHighlightRef.current) return;
 			if (zoomHighlightDebounceRef.current) {
 				clearTimeout(zoomHighlightDebounceRef.current);
@@ -1034,6 +1051,10 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		bus.on("pagerendered", onPageRendered);
 		return () => {
 			bus.off("pagerendered", onPageRendered);
+			if (layoutTickDebounceRef.current) {
+				clearTimeout(layoutTickDebounceRef.current);
+				layoutTickDebounceRef.current = null;
+			}
 			if (zoomHighlightDebounceRef.current) {
 				clearTimeout(zoomHighlightDebounceRef.current);
 				zoomHighlightDebounceRef.current = null;
@@ -1105,7 +1126,11 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		if (restored.length > 0) {
 			setAnnotationCards(prev => {
 				const existing = new Set(prev.map(c => c.highlightId));
-				return [...prev, ...restored.filter(c => !existing.has(c.highlightId))];
+				const additions = restored.filter(c => !existing.has(c.highlightId));
+				// Return the same reference when nothing new — prevents a re-render on
+				// every layout tick while the restore effect is still retrying.
+				if (additions.length === 0) return prev;
+				return [...prev, ...additions];
 			});
 		}
 
@@ -1438,7 +1463,7 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 				if (existingOverlay) continue;
 
 				const overlayIsActive =
-					Boolean(highlight.id) && highlight.id === activeHighlight?.id;
+					Boolean(highlight.id) && highlight.id === activeHighlightIdRef.current;
 				const backgroundColor =
 					highlight.role === "assistant"
 						? getAssistantHighlightBackgroundRgba(overlayIsActive)
@@ -1456,6 +1481,10 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 					el.setAttribute("data-highlight-key", key);
 					el.setAttribute("data-highlight-id", highlight.id || "");
 					el.setAttribute("data-page-number", String(pageNumber));
+					// Stored so the active-highlight recolor effect can recompute the fill
+					// without rebuilding the overlay.
+					el.setAttribute("data-role", highlight.role === "assistant" ? "assistant" : "user");
+					if (highlight.color) el.setAttribute("data-color", highlight.color);
 					// Encode position from the overlay's computed style
 					const left = el.style.left;
 					const top = el.style.top;
@@ -1662,12 +1691,33 @@ export function PdfHighlighterViewer(props: PdfHighlighterViewerProps) {
 		highlights,
 		scale,
 		onOverlaysCreated,
-		activeHighlight,
+		// activeHighlight intentionally omitted: overlays read activeHighlightIdRef and a
+		// separate effect recolors them in place, so changing the active highlight no longer
+		// tears down and rebuilds every overlay (the freeze-while-annotating hot path).
 		showAnnotationCards,
 		annotationsPanelActive,
 		highlightHasPersistedAnnotations,
 		ensureAnnotationCardEntry,
 	]);
+
+	// Recolor existing DOM overlays when the active highlight changes — cheap relative to
+	// rebuilding overlays (which re-runs text search + DOM creation per highlight).
+	useEffect(() => {
+		const overlays = document.querySelectorAll<HTMLElement>(
+			".text-match-highlight-overlay[data-highlight-id]"
+		);
+		overlays.forEach((el) => {
+			const hid = el.getAttribute("data-highlight-id");
+			const isActive = Boolean(hid) && hid === activeHighlight?.id;
+			el.style.backgroundColor =
+				el.getAttribute("data-role") === "assistant"
+					? getAssistantHighlightBackgroundRgba(isActive)
+					: getUserHighlightBackgroundRgba(
+						(el.getAttribute("data-color") as HighlightColor | null) ?? undefined,
+						isActive
+					);
+		});
+	}, [activeHighlight]);
 
 	return (
 		<div
