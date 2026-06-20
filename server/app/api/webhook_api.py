@@ -518,7 +518,7 @@ async def handle_paper_processing_webhook(
                 try:
                     paper_tag_crud.apply_keyword_tags(
                         db=db,
-                        paper_id=paper.id,
+                        paper_id=uuid.UUID(str(paper.id)),
                         keywords=metadata.keywords,
                         user_id=job_user.id,
                     )

@@ -54,7 +54,6 @@ class UpdatePaperFieldsSchema(BaseModel):
     authors: Optional[List[str]] = None
     abstract: Optional[str] = None
     institutions: Optional[List[str]] = None
-    keywords: Optional[List[str]] = None
     publish_date: Optional[str] = None
     doi: Optional[str] = None
     journal: Optional[str] = None
@@ -88,7 +87,6 @@ async def get_paper_ids(
             "abstract": paper.abstract,
             "authors": paper.authors,
             "institutions": paper.institutions,
-            "keywords": paper.keywords,
             "status": paper.status,
             "preview_url": paper.preview_url,
             "size_in_kb": paper.size_in_kb,
@@ -128,7 +126,6 @@ async def get_active_paper_ids(
             "abstract": paper.abstract,
             "authors": paper.authors,
             "institutions": paper.institutions,
-            "keywords": paper.keywords,
             "status": paper.status,
             "preview_url": paper.preview_url,
             "size_in_kb": paper.size_in_kb,
@@ -351,7 +348,6 @@ async def get_relevant_papers(
                     "abstract": paper.abstract,
                     "authors": paper.authors,
                     "institutions": paper.institutions,
-                    "keywords": paper.keywords,
                     "status": paper.status,
                     "preview_url": paper.preview_url,
                     "size_in_kb": paper.size_in_kb,

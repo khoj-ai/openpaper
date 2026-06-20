@@ -8,6 +8,7 @@ from app.database.crud.annotation_crud import AnnotationCreate, annotation_crud
 from app.database.crud.base_crud import CRUDBase
 from app.database.crud.highlight_crud import HighlightCreate, highlight_crud
 from app.database.crud.paper_image_crud import paper_image_crud
+from app.database.crud.paper_tag_crud import paper_tag_crud
 from app.database.crud.sanitization import sanitize_for_postgres
 from app.database.models import (
     Highlight,
@@ -15,6 +16,7 @@ from app.database.models import (
     Paper,
     PaperImage,
     PaperStatus,
+    PaperTag,
     PaperUploadJob,
     RoleType,
     User,
@@ -39,7 +41,6 @@ class PaperBase(BaseModel):
     title: Optional[str] = None
     abstract: Optional[str] = None
     institutions: Optional[List[str]] = None
-    keywords: Optional[List[str]] = None
     summary: Optional[str] = None
     summary_citations: Optional[List[ResponseCitation]] = None
     starter_questions: Optional[List[str]] = None
@@ -305,7 +306,6 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
                     Paper.abstract,
                     Paper.authors,
                     Paper.institutions,
-                    Paper.keywords,
                     Paper.status,
                     Paper.preview_url,
                     Paper.size_in_kb,
@@ -669,18 +669,21 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
         user: CurrentUser,
     ) -> List[str]:
         """
-        Get a list of unique topics from all available papers.
+        Get a list of unique tags from all available papers.
         """
-        papers = self.get_all_available_papers(db, user=user)
-        topics = set()
+        rows = (
+            db.query(PaperTag.name)
+            .join(PaperTag.papers)
+            .filter(
+                PaperTag.user_id == user.id,
+                Paper.user_id == user.id,
+                Paper.ts_vector.isnot(None),
+            )
+            .distinct()
+            .all()
+        )
 
-        for paper in papers:
-            if paper.keywords:
-                for keyword in paper.keywords:
-                    if keyword:
-                        topics.add(str(keyword).strip())
-
-        return list(topics)
+        return [name.strip() for (name,) in rows if name and name.strip()]
 
     def get_forked_paper_by_parent_id(
         self, db: Session, *, parent_paper_id: uuid.UUID, user: CurrentUser
@@ -727,7 +730,6 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
             title=str(original_paper.title),
             abstract=str(original_paper.abstract),
             institutions=original_paper.institutions,  # type: ignore
-            keywords=original_paper.keywords,  # type: ignore
             summary=str(original_paper.summary),
             summary_citations=None,  # type: ignore
             starter_questions=original_paper.starter_questions,  # type: ignore
@@ -745,6 +747,23 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
 
         # Create the new paper in the database
         forked_paper = self.create(db, obj_in=new_paper_data, user=current_user)
+
+        # Copy the original paper's tags onto the fork. Tags are user-scoped, so
+        # this reuses the forking user's existing tags (case-insensitive) or
+        # creates new ones, then links them to the forked paper.
+        if forked_paper and original_paper.tags:
+            try:
+                paper_tag_crud.apply_keyword_tags(
+                    db,
+                    paper_id=uuid.UUID(str(forked_paper.id)),
+                    keywords=[str(tag.name) for tag in original_paper.tags if tag.name],  # type: ignore
+                    user_id=current_user.id,
+                )
+            except Exception as e:
+                logger.error(
+                    f"Error copying tags to forked paper {forked_paper.id}: {e}",
+                    exc_info=True,
+                )
 
         # Index passages for the forked paper
         if forked_paper and original_paper.raw_content:

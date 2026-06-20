@@ -199,7 +199,6 @@ class ProjectPaperCRUD(
                     Paper.abstract,
                     Paper.authors,
                     Paper.institutions,
-                    Paper.keywords,
                     Paper.status,
                     Paper.journal,
                     Paper.publisher,

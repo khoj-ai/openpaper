@@ -316,7 +316,9 @@ class ZoteroImportedItem(Base):
     last_synced_at = Column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
-        UniqueConstraint("user_id", "zotero_item_key", name="uq_zotero_import_user_item"),
+        UniqueConstraint(
+            "user_id", "zotero_item_key", name="uq_zotero_import_user_item"
+        ),
     )
 
     user = relationship("User", back_populates="zotero_imported_items")
@@ -578,7 +580,6 @@ class Paper(Base):
     title = Column(Text, nullable=True)
     abstract = Column(Text, nullable=True)
     institutions = Column(ARRAY(String), nullable=True)
-    keywords = Column(ARRAY(String), nullable=True)
     summary = Column(Text, nullable=True)
     summary_citations = Column(JSONB, nullable=True)
     publish_date = Column(DateTime, nullable=True)

@@ -146,7 +146,6 @@ async def get_forked_paper(
                     "abstract": paper.abstract,
                     "authors": paper.authors,
                     "institutions": paper.institutions,
-                    "keywords": paper.keywords,
                     "status": paper.status,
                     "file_url": s3_service.get_cached_presigned_url(
                         db,
@@ -252,7 +251,6 @@ async def get_project_papers(
                         "abstract": paper.abstract,
                         "authors": paper.authors,
                         "institutions": paper.institutions,
-                        "keywords": paper.keywords,
                         "status": paper.status,
                         "journal": paper.journal,
                         "publisher": paper.publisher,
