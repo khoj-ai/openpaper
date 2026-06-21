@@ -524,7 +524,13 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
         If a query is provided, it will filter papers by raw_content.
         If paper_ids is provided, it will filter papers by the given list of IDs.
         """
-        db_query = db.query(Paper).filter(Paper.user_id == user.id)
+        # Eager-load tags in a single batched query: callers like the evidence
+        # pipeline read paper.tags per paper, which would otherwise N+1.
+        db_query = (
+            db.query(Paper)
+            .options(selectinload(Paper.tags))
+            .filter(Paper.user_id == user.id)
+        )
 
         if paper_ids:
             db_query = db_query.filter(Paper.id.in_(paper_ids))

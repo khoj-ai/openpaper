@@ -9,7 +9,7 @@ from app.database.crud.projects.project_crud import project_crud
 from app.database.models import Paper, Project, ProjectPaper, ProjectRole, ProjectRoles
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
-from sqlalchemy.orm import Session, load_only
+from sqlalchemy.orm import Session, load_only, selectinload
 
 logger = logging.getLogger(__name__)
 
@@ -161,7 +161,12 @@ class ProjectPaperCRUD(
             db.query(self.model).filter(self.model.project_id == project_id).all()
         )
         paper_ids = [pp.paper_id for pp in project_papers]
-        papers = db.query(Paper).filter(Paper.id.in_(paper_ids)).all()
+        papers = (
+            db.query(Paper)
+            .options(selectinload(Paper.tags))
+            .filter(Paper.id.in_(paper_ids))
+            .all()
+        )
         return papers
 
     def get_papers_metadata_by_project_id(

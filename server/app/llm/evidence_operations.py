@@ -162,7 +162,7 @@ class EvidenceOperations(BaseLLMClient):
             str(paper.id): {
                 "title": paper.title,
                 "length": len(str(paper.raw_content)),
-                "keywords": paper.keywords,
+                "keywords": [tag.name for tag in paper.tags if tag.name],
                 "authors": paper.authors,
                 "published": paper.publish_date,
             }
