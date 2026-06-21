@@ -447,16 +447,6 @@ export function PaperPreview({ paper, onClose, setPaper }: PaperPreviewProps) {
                                         />
                                     </td>
                                 </tr>
-                                <tr>
-                                    <td className="px-3 py-2 text-muted-foreground font-medium text-right whitespace-nowrap align-top w-24">Keywords</td>
-                                    <td className="px-3 py-2">
-                                        <EditableListField
-                                            values={paper.keywords || []}
-                                            onSave={(values) => updateField({ keywords: values })}
-                                            placeholder="Add keywords"
-                                        />
-                                    </td>
-                                </tr>
                             </tbody>
                         </table>
                     </div>

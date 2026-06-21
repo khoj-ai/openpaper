@@ -160,15 +160,15 @@ export default function PaperCard({ paper, handleDelete, setPaper, minimalist = 
 									</p>
 								)}
 
-								{/* Keywords */}
-								{paper.keywords && paper.keywords.length > 0 && (
+								{/* Tags */}
+								{paper.tags && paper.tags.length > 0 && (
 									<div className="flex flex-wrap gap-1 mb-3">
-										{paper.keywords.slice(0, 3).map((keyword, index) => (
+										{paper.tags.slice(0, 3).map((tag) => (
 											<span
-												key={index}
+												key={tag.id}
 												className="inline-block bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs px-2 py-0.5 rounded"
 											>
-												{keyword}
+												{tag.name}
 											</span>
 										))}
 									</div>

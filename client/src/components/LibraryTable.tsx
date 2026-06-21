@@ -91,7 +91,7 @@ export function LibraryTable({
 					paper.title?.toLowerCase().includes(term) ||
 					paper.authors?.join(', ').toLowerCase().includes(term) ||
 					paper.institutions?.join(', ').toLowerCase().includes(term) ||
-					paper.keywords?.join(', ').toLowerCase().includes(term)
+					paper.tags?.map(t => t.name).join(', ').toLowerCase().includes(term)
 				);
 			});
 		}
@@ -101,9 +101,6 @@ export function LibraryTable({
 				return filters.every(filter => {
 					if (filter.type === 'author') {
 						return paper.authors?.includes(filter.value);
-					}
-					if (filter.type === 'keyword') {
-						return paper.keywords?.includes(filter.value);
 					}
 					if (filter.type === 'tag') {
 						if (filter.value === NO_TAGS_FILTER_VALUE) {
@@ -286,7 +283,7 @@ export function LibraryTable({
 			<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
 				<div className="flex flex-col md:flex-row items-start md:items-center gap-4 w-full">
 					<Input
-						placeholder="Filter papers by title, authors, organizations, or keywords..."
+						placeholder="Filter papers by title, authors, organizations, or tags..."
 						value={searchTerm}
 						onChange={(e) => setSearchTerm(e.target.value)}
 						className="w-full md:max-w-xl border-none dark:border-none focus-visible:ring-1 focus-visible:ring-blue-400/30 text-primary"

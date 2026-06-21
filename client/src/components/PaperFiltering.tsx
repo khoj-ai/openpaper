@@ -26,7 +26,7 @@ import { PaperItem } from "@/lib/schema";
 import { PaperStatusEnum } from "@/components/utils/PdfStatus";
 
 export type Filter = {
-    type: "author" | "keyword" | "status" | "tag"
+    type: "author" | "status" | "tag"
     value: string
 }
 
@@ -48,7 +48,6 @@ interface PaperFilteringProps {
 
 export function PaperFiltering({ papers, onFilterChange, onSortChange, filters, sort, showSort = true }: PaperFilteringProps) {
     const authors = Array.from(new Set(papers.flatMap(p => p.authors || [])))
-    const keywords = Array.from(new Set(papers.flatMap(p => p.keywords || [])))
     const tags = Array.from(new Set(papers.flatMap(p => p.tags?.map(t => t.name) || [])))
 
     const handleSelectFilter = (filter: Filter) => {
@@ -122,33 +121,6 @@ export function PaperFiltering({ papers, onFilterChange, onSortChange, filters, 
                                                 >
                                                     {isFilterActive({ type: "author", value: author }) && <Check className="mr-2 h-4 w-4" />}
                                                     {author}
-                                                </CommandItem>
-                                            ))}
-                                        </CommandGroup>
-                                    </CommandList>
-                                </Command>
-                            </DropdownMenuSubContent>
-                        </DropdownMenuSub>
-                        <DropdownMenuSub>
-                            <DropdownMenuSubTrigger>Keywords</DropdownMenuSubTrigger>
-                            <DropdownMenuSubContent className="p-0">
-                                <Command>
-                                    <CommandInput
-                                        placeholder="Filter keyword..."
-                                        autoFocus={true}
-                                        className="h-9"
-                                    />
-                                    <CommandList>
-                                        <CommandEmpty>No keyword found.</CommandEmpty>
-                                        <CommandGroup>
-                                            {keywords.map(keyword => (
-                                                <CommandItem
-                                                    key={keyword}
-                                                    value={keyword}
-                                                    onSelect={() => handleSelectFilter({ type: "keyword", value: keyword })}
-                                                >
-                                                    {isFilterActive({ type: "keyword", value: keyword }) && <Check className="mr-2 h-4 w-4" />}
-                                                    {keyword}
                                                 </CommandItem>
                                             ))}
                                         </CommandGroup>
