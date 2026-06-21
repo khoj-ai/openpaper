@@ -19,7 +19,7 @@ export interface PaperData {
     summary: string;
     summary_citations?: ReferenceCitation[];
     institutions: string[];
-    keywords: string[];
+    tags?: PaperTag[];
     starter_questions: string[];
     is_public: boolean;
     share_id: string;
@@ -350,7 +350,6 @@ export interface PaperItem {
     title: string
     abstract?: string
     authors?: string[]
-    keywords?: string[]
     institutions?: string[]
     summary?: string
     created_at?: string
