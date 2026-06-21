@@ -66,7 +66,7 @@ class InstitutionsKeywords(BaseModel):
         description=(
             "3-8 concise topical keywords describing the paper's subject. "
             "Write each in title case (e.g. 'Machine Learning', 'Protein Folding'), "
-            "NOT Title Case or ALL CAPS; capitalize only proper nouns and acronyms "
+            "NOT normal case or ALL CAPS; capitalize only proper nouns and acronyms "
             "(e.g. 'CRISPR', 'BERT', 'Alzheimer's Disease'). Prefer established field "
             "or topic terms, keep each to a short phrase (not a sentence), and do not "
             "repeat near-duplicates."
@@ -161,7 +161,7 @@ class PaperMetadataExtraction(BaseModel):
         description=(
             "3-8 concise topical keywords describing the paper's subject. "
             "Write each in title case (e.g. 'Machine Learning', 'Protein Folding'), "
-            "NOT Title Case or ALL CAPS; capitalize only proper nouns and acronyms "
+            "NOT normal case or ALL CAPS; capitalize only proper nouns and acronyms "
             "(e.g. 'CRISPR', 'BERT', 'Alzheimer's Disease'). Prefer established field "
             "or topic terms, keep each to a short phrase (not a sentence), and do not "
             "repeat near-duplicates."
