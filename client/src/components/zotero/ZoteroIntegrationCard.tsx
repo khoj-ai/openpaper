@@ -359,7 +359,7 @@ export function ZoteroIntegrationCard() {
 									onClick={() => setShowZoteroGuide(true)}
 									className="underline underline-offset-2 hover:text-foreground transition-colors"
 								>
-									Show Detailed Guide
+									Instructions and troubleshooting
 								</button>
 							</p>
 						)}
