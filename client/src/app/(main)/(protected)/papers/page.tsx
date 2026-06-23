@@ -418,13 +418,6 @@ function PapersPageContent() {
 export default function PapersPage() {
     const { user, loading: authLoading } = useAuth();
 
-    useEffect(() => {
-        if (!authLoading && !user) {
-            localStorage.setItem('returnTo', window.location.pathname);
-            window.location.href = `/login`;
-        }
-    }, [authLoading, user]);
-
     if (authLoading || !user) {
         return <PageSkeleton />;
     }

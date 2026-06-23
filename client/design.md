@@ -277,10 +277,10 @@ use it intentionally.
   `auth_url` redirect → cookie set by backend → `/auth/callback`. Session is verified against
   `/api/auth/me`.
 
-**Decision — gating.** Per-component `useAuth()` + redirect is the current ad-hoc approach and
-should be replaced. Gate at the **layout level** with a single `RequireAuth` wrapper rendered
-inside the `(main)` and `(paper)` layouts, so individual pages/components stop reimplementing
-the check:
+**Gating — `RequireAuth` at a nested `(protected)` group.** Auth is enforced once at the
+layout level, not re-implemented per page. The wrapper lives at
+`components/auth/RequireAuth.tsx`: while auth resolves it shows a spinner; if unauthenticated
+it `router.replace`s to `/login?returnTo=<path>`; otherwise it renders its children.
 
 ```tsx
 // components/auth/RequireAuth.tsx
@@ -288,11 +288,36 @@ the check:
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
   const router = useRouter()
-  useEffect(() => { if (!loading && !user) router.replace("/login") }, [loading, user])
-  if (loading) return <FullPageSpinner />
+  const pathname = usePathname()
+  useEffect(() => {
+    if (!loading && !user) router.replace(`/login?returnTo=${encodeURIComponent(pathname)}`)
+  }, [loading, user, pathname, router])
+  if (loading) return <Spinner />
   return user ? <>{children}</> : null
 }
 ```
+
+It is **not** applied to a whole route-group layout, because both `(main)` and `(paper)`
+mix public and protected routes (`/login`, `/pricing`, `/paper/share/[id]` must stay open).
+Instead, protected routes live in a nested **`(protected)` route group** whose layout renders
+`<RequireAuth>`. Route groups don't affect URLs, so `/papers` stays `/papers`:
+
+```
+app/(main)/
+├── layout.tsx              # shell: sidebar, providers, AuthProvider
+├── (protected)/layout.tsx  # <RequireAuth> — gates everything below
+│   └── page.tsx, papers/, projects/, settings/, discover/, finder/, graph/, …
+├── login/  pricing/  about/  auth/        # public, outside the group
+
+app/(paper)/paper/
+├── layout.tsx
+├── (protected)/layout.tsx  # <RequireAuth>
+│   └── [id]/               # owner view, gated
+└── share/[id]/             # public shared view, outside the group
+```
+
+**To add a page:** drop it under `(protected)/` if it needs a user, or at the group root if
+it's public. Don't add `useAuth()`-redirect logic to the page itself.
 
 We intentionally do **not** use Next middleware for auth: the authoritative check is a
 backend cookie-session verify, which the client-side provider already performs. Revisit only
@@ -321,7 +346,5 @@ if we need to gate before first paint.
 These are decided above but not yet fully reflected in the code. Move toward them
 opportunistically (when you touch the relevant file), not in a big-bang refactor:
 
-1. Move `components/hooks/Pdf*.ts` into `components/pdf-viewer/` and rename to `use*` (§5).
-2. Replace per-component auth redirects with `RequireAuth` at the layout level (§10).
 3. Collapse `enum` + parallel `*Type` union pairs into the `as const` pattern (§7).
 4. Split oversized components (starting with `AppSidebar`) (§4).

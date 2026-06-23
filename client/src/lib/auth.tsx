@@ -85,8 +85,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 			setLoading(true);
 			const response = await fetchFromApi('/api/auth/google/login');
 			if (response.auth_url) {
-				// Store the current URL as the return location after login
-				localStorage.setItem('returnTo', window.location.pathname);
+				// Store the page the user was trying to reach as the post-login
+				// return location. RequireAuth redirects unauthenticated users to
+				// /login?returnTo=<path>, so prefer that param; fall back to the
+				// current path for users who opened /login directly.
+				const params = new URLSearchParams(window.location.search);
+				const returnTo = params.get('returnTo') || window.location.pathname;
+				localStorage.setItem('returnTo', returnTo);
 				// Redirect to Google OAuth
 				window.location.href = response.auth_url;
 			}

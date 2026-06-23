@@ -73,7 +73,7 @@ export default function PaperView() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const id = params.id as string;
-    const { user, loading: authLoading } = useAuth();
+    const { user } = useAuth();
     const [paperData, setPaperData] = useState<PaperData | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -414,12 +414,6 @@ export default function PaperView() {
     }, []);
 
 
-    useEffect(() => {
-        if (!authLoading && !user) {
-            // Redirect to login if user is not authenticated
-            window.location.href = `/login`;
-        }
-    }, [authLoading, user]);
 
     useEffect(() => {
         if (activeHighlight) {

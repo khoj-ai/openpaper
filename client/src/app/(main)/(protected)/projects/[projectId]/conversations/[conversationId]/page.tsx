@@ -137,11 +137,6 @@ function ProjectConversationPageContent() {
         });
     }, [messages]);
 
-    useEffect(() => {
-        if (!authLoading && !user) {
-            window.location.href = `/login`;
-        }
-    }, [authLoading, user]);
 
     const fetchMessages = useCallback(async (id: string) => {
         try {

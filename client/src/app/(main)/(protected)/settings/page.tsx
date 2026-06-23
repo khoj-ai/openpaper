@@ -8,21 +8,13 @@ import { ZoteroIntegrationCard } from "@/components/zotero";
 import { fetchFromApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { Loader2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 function SettingsContent() {
 	const { user, loading } = useAuth();
-	const router = useRouter();
 	const [name, setName] = useState("");
 	const [isSaving, setIsSaving] = useState(false);
-
-	useEffect(() => {
-		if (!loading && !user) {
-			router.push("/login?returnTo=/settings");
-		}
-	}, [user, loading, router]);
 
 	useEffect(() => {
 		if (user?.name) {

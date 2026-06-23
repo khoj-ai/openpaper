@@ -94,14 +94,9 @@ function ProjectsPage() {
 	};
 
 	useEffect(() => {
-		if (userLoading) return;
-		if (!user) {
-			localStorage.setItem('returnTo', window.location.pathname);
-			router.push("/login");
-			return;
-		}
+		if (userLoading || !user) return;
 		getProjects();
-	}, [userLoading, user, router]);
+	}, [userLoading, user]);
 
 	useEffect(() => {
 		const PROJECT_LIMIT_TOAST_KEY = "project_limit_toast_shown";
