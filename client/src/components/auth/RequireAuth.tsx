@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth";
 
 /**
  * Gates its children behind authentication. Rendered once at the layout level for
- * protected route groups (see design.md §10) so individual pages don't reimplement
+ * protected route groups (see design.md, "Routing & auth") so individual pages don't reimplement
  * the auth check. While auth is resolving it shows a spinner; if the user is
  * unauthenticated it redirects to /login, preserving the current path as returnTo.
  */

@@ -272,7 +272,54 @@ use it intentionally.
 
 ---
 
-## 10. Routing & auth
+## 10. Visual language
+
+Grounded in what the codebase already does — these resolve drift, they don't invent a system.
+We ride Tailwind + shadcn defaults; only the conventions below are load-bearing.
+
+**Typography.** Font is **Geist** (`--font-geist-sans`; `--font-geist-mono` for code). Use this
+de-facto scale; don't introduce new sizes:
+
+| Role | Class |
+| --- | --- |
+| Page title | `text-2xl` / `text-3xl` + `font-bold` |
+| Section heading | `text-lg` + `font-semibold`/`font-medium` |
+| Body (default) | `text-sm` |
+| Secondary / metadata / caption | `text-xs text-muted-foreground` |
+
+Body is `text-sm`, not `text-base` — this is a dense, information-first UI. Reserve `text-base`+
+for marketing/landing pages.
+
+**Iconography.** `lucide-react`, sized with **Tailwind classes** (`h-4 w-4`), **not** the `size`
+prop — className sizing is the shadcn idiom, composes with `cn()`, and is already the majority.
+Standard sizes:
+- `h-4 w-4` (16px) — default, inline with `text-sm`
+- `h-3 w-3` / `h-3.5 w-3.5` (12–14px) — dense contexts, `text-xs`
+- `h-5 w-5`+ — emphasis / standalone
+
+For icon + text, rely on the parent's flex `gap-2` (shadcn `Button` spaces SVG children
+automatically); `mr-2` is the older idiom in existing code — prefer `gap` for new work.
+Decorative icons get `aria-hidden`; icon-only buttons get an `aria-label`.
+
+**Motion & transitions.** Default to **`transition-colors`** or `transition-opacity` — avoid
+`transition-all` (it animates unintended properties). Durations are **200–300ms**
+(`duration-200`/`duration-300`); reserve `duration-500`+ for deliberate entrances. The universal
+spinner is `Loader2` + `animate-spin`; `animate-pulse` for skeleton shimmer; `animate-fade-in`
+(custom, in `globals.css`) for mounts. Don't animate essential motion against
+`prefers-reduced-motion`.
+
+**Responsive & mobile.** Mobile breakpoint is **768px**, via `useIsMobile()`
+(`hooks/use-mobile.ts`). Two ways to adapt, in order of preference:
+1. **Tailwind responsive prefixes** (`md:flex`, `hidden md:block`) — the default; no JS, no
+   layout shift, works during SSR.
+2. **`useIsMobile()` branch** — only when the layouts differ *structurally* (different
+   components or interaction model), not just CSS. The canonical case is mobile `Sheet` /
+   desktop `Popover` for one trigger (see `components/sidebar/SidebarFooter.tsx`). Don't gate
+   purely-visual differences on JS.
+
+---
+
+## 11. Routing & auth
 
 - **Route groups organize by layout**, not feature: `(main)` = authenticated shell,
   `(paper)` = reader, `(home)`/`(blog)`/`(legal)` = public. Put a route where its chrome
@@ -329,13 +376,17 @@ if we need to gate before first paint.
 
 ---
 
-## 11. UX conventions
+## 12. UX conventions
 
 - **Feedback is a toast.** Use `sonner`: `toast.success(...)` / `toast.error(...)` on the
   result of every user-initiated mutation. Log technical detail with `console.error`; show the
   user a friendly message.
-- **Loading** is the hook's `isLoading` boolean → skeleton or spinner. Don't render
-  half-populated data.
+- **Async states — handle all three**, driven off the hook's `{ isLoading, error, <data> }`:
+  - *Loading* → `Skeleton` (`@/components/ui/skeleton`) for content-shaped placeholders, or
+    `Loader2` + `animate-spin` for actions. Don't render half-populated data.
+  - *Empty* → an explicit empty state (short message + a primary action), never a blank region.
+  - *Error* → `toast.error` for transient/action failures; an inline message for a failed page
+    load. Never fail silently.
 - **Forms** are `react-hook-form` + a `zod` schema via `zodResolver`, using the `Form` /
   `FormField` / `FormControl` / `FormMessage` compound components. Submit handlers are async
   and surface errors via `FormMessage` (field) and a toast (request).
@@ -345,6 +396,6 @@ if we need to gate before first paint.
 
 ---
 
-## 12. Open conventions to converge
+## 13. Open conventions to converge
 
 List new divergences here as they appear, and move toward them opportunistically (when you touch the relevant file), not in a big-bang refactor.
