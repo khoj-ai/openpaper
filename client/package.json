@@ -71,6 +71,8 @@
   "resolutions": {
     "pdfjs-dist": "4.10.38",
     "fast-uri": "^3.1.2",
+    "@eslint/eslintrc/js-yaml": "^4.2.0",
+    "**/cosmiconfig/js-yaml": "^4.2.0",
     "@radix-ui/react-slot": "^1.2.3",
     "preact": "^10.28.2",
     "minimatch": "^9.0.7",
