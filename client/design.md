@@ -116,8 +116,10 @@ function Stat({ className, tone, ...props }: StatProps) {
 trees; reach for Context only for genuinely cross-cutting state.
 
 **Size guideline.** A component over ~300 lines is a smell. Split presentational subsections
-out and lift data logic into a hook. (`AppSidebar` is the current outlier — do not treat it
-as the model.)
+into their own components and lift derived/data logic into helpers or a hook. `components/sidebar/`
+is the worked example: a `<300`-line `AppSidebar` orchestrator composes `SidebarNav` and
+`SidebarFooter`, with pure logic (`getSubscriptionWarning`, `buildReferralEntry`) and config
+(`navItems`) pulled into sibling modules.
 
 ---
 
@@ -345,7 +347,4 @@ if we need to gate before first paint.
 
 ## 12. Open conventions to converge
 
-These are decided above but not yet fully reflected in the code. Move toward them
-opportunistically (when you touch the relevant file), not in a big-bang refactor:
-
-4. Split oversized components (starting with `AppSidebar`) (§4).
+List new divergences here as they appear, and move toward them opportunistically (when you touch the relevant file), not in a big-bang refactor.
