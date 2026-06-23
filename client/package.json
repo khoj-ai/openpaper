@@ -82,7 +82,7 @@
     "micromatch/picomatch": "^2.3.2",
     "tinyglobby/picomatch": "^4.0.4",
     "express-rate-limit": "^8.2.2",
-    "dompurify": "^3.4.0",
+    "dompurify": "^3.4.11",
     "router/path-to-regexp": "^8.4.0",
     "@tailwindcss/postcss/postcss": "^8.5.10",
     "shadcn/postcss": "^8.5.10"
