@@ -8,7 +8,7 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import { RichAudioOverview } from "./RichAudioOverview";
-import { AudioProgress } from "./hooks/useAudioPlayback";
+import { AudioProgress } from "@/hooks/useAudioPlayback";
 
 interface AudioOverviewCardProps {
     overview: AudioOverview;

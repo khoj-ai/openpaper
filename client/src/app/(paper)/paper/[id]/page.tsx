@@ -15,8 +15,8 @@ import {
 } from 'lucide-react';
 import { toast } from "sonner";
 
-import { useAnnotations } from '@/components/hooks/PdfAnnotation';
-import { useHighlighterHighlights } from '@/components/hooks/PdfHighlighterHighlights';
+import { useAnnotations } from '@/components/pdf-viewer/useAnnotations';
+import { useHighlighterHighlights } from '@/components/pdf-viewer/useHighlighterHighlights';
 
 import {
     PaperData,

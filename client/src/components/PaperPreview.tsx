@@ -11,7 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { PaperProjects } from "./PaperProjects";
 import { TagSelector } from "./TagSelector";
 import { fetchFromApi } from "@/lib/api";
-import { useHighlighterHighlights } from "./hooks/PdfHighlighterHighlights";
+import { useHighlighterHighlights } from "@/components/pdf-viewer/useHighlighterHighlights";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { CitePaperButton } from "./CitePaperButton";
 import { Skeleton } from "@/components/ui/skeleton";

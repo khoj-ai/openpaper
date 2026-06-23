@@ -31,7 +31,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import DataTableSchemaModal, { FieldDefinition } from "./DataTableSchemaModal";
-import { useAudioPlayback } from "./hooks/useAudioPlayback";
+import { useAudioPlayback } from "@/hooks/useAudioPlayback";
 
 interface ArtifactsProps {
     projectId: string;
