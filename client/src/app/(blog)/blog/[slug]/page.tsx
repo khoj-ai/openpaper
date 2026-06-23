@@ -83,6 +83,7 @@ export function generateStaticParams() {
         { slug: 'systematic_review' },
         { slug: 'howtorag' },
         { slug: 'benchmark' },
+        { slug: 'zotero' },
     ];
 }
 
