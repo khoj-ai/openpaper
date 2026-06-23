@@ -52,7 +52,7 @@ export function SharePaperButton() {
         try {
             const response = await fetchFromApi(`/api/paper/share?id=${paperId}`, { method: 'POST' });
             if (paperData) {
-                setPaperData({ ...paperData, share_id: response.share_id });
+                setPaperData({ ...paperData, share_id: response.share_id, is_public: response.is_public });
             } else {
                 const data = await fetchFromApi(`/api/paper?id=${paperId}`);
                 setPaperData(data);
@@ -66,13 +66,13 @@ export function SharePaperButton() {
     }, [paperId, paperData]);
 
     const handleUnshare = useCallback(async () => {
-        if (!paperId || !paperData || !paperData.share_id || isSharing) return;
+        if (!paperId || !paperData || !paperData.is_public || isSharing) return;
         setIsSharing(true);
         try {
-            await fetchFromApi(`/api/paper/unshare?id=${paperId}`, {
+            const response = await fetchFromApi(`/api/paper/unshare?id=${paperId}`, {
                 method: 'POST',
             });
-            setPaperData(prev => prev ? { ...prev, share_id: "" } : null);
+            setPaperData(prev => prev ? { ...prev, share_id: response.share_id, is_public: response.is_public } : null);
             toast.success("Paper is now private.");
         } catch (error) {
             console.error('Error unsharing paper:', error);
@@ -101,7 +101,7 @@ export function SharePaperButton() {
                 </div>
             ) : (
                 <div>
-                    {paperData.share_id ? (
+                    {paperData.is_public ? (
                         <div className="space-y-3">
                             <p className="text-sm text-muted-foreground">This paper is currently public. Anyone with the link can view it.</p>
                             <div className="flex items-center space-x-2">

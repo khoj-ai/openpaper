@@ -529,9 +529,10 @@ async def share_pdf(
     # Fetch the document from the database
     paper = paper_crud.get(db, id=id, user=current_user)
 
-    paper_crud.make_public(db, paper_id=id, user=current_user)
     if not paper:
         return JSONResponse(status_code=404, content={"message": "Document not found"})
+
+    paper_crud.make_public(db, paper_id=id, user=current_user)
 
     track_event(
         "paper_share",
@@ -543,12 +544,13 @@ async def share_pdf(
         db=db,
     )
 
-    # Return the generated share id
+    # Return the updated sharing state so the client can use it as the source of truth
     return JSONResponse(
         status_code=200,
         content={
             "message": "Document shared successfully",
             "share_id": paper.share_id,
+            "is_public": paper.is_public,
         },
     )
 
@@ -581,11 +583,13 @@ async def unshare_pdf(
         db=db,
     )
 
-    # Return the generated share id
+    # Return the updated sharing state so the client can use it as the source of truth
     return JSONResponse(
         status_code=200,
         content={
             "message": "Document unshared successfully",
+            "share_id": paper.share_id,
+            "is_public": paper.is_public,
         },
     )
 

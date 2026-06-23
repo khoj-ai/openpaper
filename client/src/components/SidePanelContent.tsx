@@ -791,7 +791,7 @@ export function SidePanelContent({
                             rightSideFunction === 'Share' && paperData && (
                                 <div className={`flex flex-col ${heightClass} p-4 space-y-4`}>
                                     <h3 className="text-lg font-semibold">Share Paper</h3>
-                                    {paperData.share_id ? (
+                                    {paperData.is_public ? (
                                         <div className="space-y-3">
                                             <p className="text-sm text-muted-foreground">This paper is currently public. Anyone with the link can view it.</p>
                                             <div className="flex items-center space-x-2">

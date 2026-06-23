@@ -515,7 +515,7 @@ export default function PaperView() {
             const response = await fetchFromApi(`/api/paper/share?id=${id}`, {
                 method: 'POST',
             });
-            setPaperData(prev => prev ? { ...prev, share_id: response.share_id } : null);
+            setPaperData(prev => prev ? { ...prev, share_id: response.share_id, is_public: response.is_public } : null);
             const shareUrl = `${window.location.origin}/paper/share/${response.share_id}`;
             await navigator.clipboard.writeText(shareUrl);
             toast.success("Sharing link copied to clipboard!");
@@ -528,13 +528,13 @@ export default function PaperView() {
     }, [id, paperData, isSharing]);
 
     const handleUnshare = useCallback(async () => {
-        if (!id || !paperData || !paperData.share_id || isSharing) return;
+        if (!id || !paperData || !paperData.is_public || isSharing) return;
         setIsSharing(true);
         try {
-            await fetchFromApi(`/api/paper/unshare?id=${id}`, {
+            const response = await fetchFromApi(`/api/paper/unshare?id=${id}`, {
                 method: 'POST',
             });
-            setPaperData(prev => prev ? { ...prev, share_id: "" } : null);
+            setPaperData(prev => prev ? { ...prev, share_id: response.share_id, is_public: response.is_public } : null);
             toast.success("Paper is now private.");
         } catch (error) {
             console.error('Error unsharing paper:', error);
