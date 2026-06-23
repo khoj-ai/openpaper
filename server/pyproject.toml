@@ -39,7 +39,7 @@ dependencies = [
     "resend>=2.10.0",
     "celery>=5.5.3",
     "stripe>=12.3.0",
-    "pypdf>=5.0.0",
+    "pypdf>=6.13.3",
     "exa-py>=1.0.0",
 ]
 
@@ -50,7 +50,7 @@ start = "app:start"
 [tool.uv]
 constraint-dependencies = [
     "pyasn1>=0.6.3",
-    "aiohttp>=3.13.4",
+    "aiohttp>=3.14.1",
     "mako>=1.3.11",
     "urllib3>=2.7.0",
     "starlette>=1.3.1",
