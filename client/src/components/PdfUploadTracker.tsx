@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { fetchFromApi } from "@/lib/api";
-import { PaperUploadJobStatusResponse, JobStatusType, MinimalJob } from "@/lib/schema";
+import { PaperUploadJobStatusResponse, JobStatus, MinimalJob } from "@/lib/schema";
 import { CheckCircle2, ChevronDown, XCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface Job extends MinimalJob {
-	status: JobStatusType;
+	status: JobStatus;
 	details?: PaperUploadJobStatusResponse;
 	paperId?: string;
 }
@@ -49,7 +49,7 @@ const PdfUploadTracker: React.FC<PdfUploadTrackerProps> = ({ initialJobs, onComp
 				const completedPaperId = completedJobs.get(j.jobId);
 				return {
 					...j,
-					status: completedPaperId ? 'completed' as JobStatusType : 'pending' as JobStatusType,
+					status: completedPaperId ? 'completed' as JobStatus : 'pending' as JobStatus,
 					paperId: completedPaperId
 				};
 			})];

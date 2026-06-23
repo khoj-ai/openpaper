@@ -232,15 +232,15 @@ export interface OpenAlexMatchResponse {
     cited_by: OpenAlexResponse;
 }
 
-export enum JobStatus {
-    PENDING = 'pending',
-    RUNNING = 'running',
-    COMPLETED = 'completed',
-    FAILED = 'failed',
-    CANCELLED = 'cancelled'
-}
+export const JobStatus = {
+    PENDING: 'pending',
+    RUNNING: 'running',
+    COMPLETED: 'completed',
+    FAILED: 'failed',
+    CANCELLED: 'cancelled',
+} as const;
 
-export type JobStatusType = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+export type JobStatus = (typeof JobStatus)[keyof typeof JobStatus];
 
 export const SubscriptionStatus = {
     ACTIVE: 'active',
@@ -251,14 +251,14 @@ export const SubscriptionStatus = {
     UNPAID: 'unpaid',
 } as const;
 
-export type SubscriptionStatusType = typeof SubscriptionStatus[keyof typeof SubscriptionStatus];
+export type SubscriptionStatus = (typeof SubscriptionStatus)[keyof typeof SubscriptionStatus];
 
 export interface UserSubscription {
     has_subscription: boolean;
     had_subscription: boolean;
     requires_payment_update: boolean;
     subscription: {
-        status: SubscriptionStatusType;
+        status: SubscriptionStatus;
         interval: "month" | "year";
         current_period_end: string;
         current_period_start: string;
@@ -325,7 +325,7 @@ export interface PaperImage {
 
 export interface JobStatusResponse {
     job_id: string;
-    status: JobStatusType;
+    status: JobStatus;
     title: string | null;
     started_at: string;
     created_at: string;
@@ -420,11 +420,13 @@ export interface MinimalJob {
     fileName: string;
 }
 
-export enum ProjectRole {
-    Admin = 'admin',
-    Editor = 'editor',
-    Viewer = 'viewer',
-}
+export const ProjectRole = {
+    Admin: 'admin',
+    Editor: 'editor',
+    Viewer: 'viewer',
+} as const;
+
+export type ProjectRole = (typeof ProjectRole)[keyof typeof ProjectRole];
 
 export interface Collaborator {
     id: string;
@@ -458,7 +460,7 @@ export interface DataTableJob {
     columns: string[] | null;
     task_id: string | null;
     title: string | null;
-    status: JobStatusType;
+    status: JobStatus;
     started_at: string | null;
     completed_at: string | null;
     created_at: string | null;

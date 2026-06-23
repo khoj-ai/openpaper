@@ -190,20 +190,22 @@ Document any SWR introduction here. Do not pre-emptively cache.
 
 - **All shared types live in `src/lib/schema.ts`** and mirror the backend response shapes.
   Don't redeclare API shapes locally.
-- **Decision — enums.** Prefer `as const` objects with a derived union type over TS `enum`s
-  (avoids the runtime/`erasableSyntaxOnly` footguns and gives string literal ergonomics).
-  Migrate the existing `enum`/parallel-`*Type`-union pairs (e.g. `JobStatus` enum +
-  `JobStatusType` union) to this single pattern as they're touched:
+- **Decision — no TS `enum`s.** Use `as const` objects with a derived union type instead
+  (avoids the runtime/`erasableSyntaxOnly` footguns and gives string-literal ergonomics).
+  The value object and the type share **one name** — no parallel `*Type` union aliases:
 
   ```ts
   export const JobStatus = {
-    Pending: "pending", Running: "running", Completed: "completed",
-    Failed: "failed", Cancelled: "cancelled",
+    PENDING: "pending", RUNNING: "running", COMPLETED: "completed",
+    FAILED: "failed", CANCELLED: "cancelled",
   } as const
   export type JobStatus = (typeof JobStatus)[keyof typeof JobStatus]
   ```
 
-  One name for the values, one name for the type. No parallel union aliases.
+  `JobStatus`, `SubscriptionStatus`, and `ProjectRole` all follow this. Note one consequence:
+  because members are now plain string literals (not nominal enum members), a `switch` over
+  the union is genuinely exhaustive — a `default` branch narrows the discriminant to `never`,
+  so cast (`status as string`) if you keep one as a runtime safety net.
 - Use string-literal unions for small closed sets that have no runtime use
   (`HighlightType`, `HighlightColor`).
 
@@ -346,5 +348,4 @@ if we need to gate before first paint.
 These are decided above but not yet fully reflected in the code. Move toward them
 opportunistically (when you touch the relevant file), not in a big-bang refactor:
 
-3. Collapse `enum` + parallel `*Type` union pairs into the `as const` pattern (§7).
 4. Split oversized components (starting with `AppSidebar`) (§4).

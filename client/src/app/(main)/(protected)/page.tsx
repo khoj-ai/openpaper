@@ -15,7 +15,7 @@ import { MessageCircleWarning, File } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
 import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience";
-import { PaperItem, JobStatusType, PaperUploadJobStatusResponse, Project } from "@/lib/schema";
+import { PaperItem, JobStatus, PaperUploadJobStatusResponse, Project } from "@/lib/schema";
 import { toast } from "sonner";
 import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isPaperUploadNearLimit, isStorageNearLimit } from "@/hooks/useSubscription";
 import { uploadFiles, uploadFromUrlWithFallback } from "@/lib/uploadUtils";
@@ -34,7 +34,7 @@ export default function Home() {
 	const [isUploading, setIsUploading] = useState(false);
 
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	const [jobUploadStatus, setJobUploadStatus] = useState<JobStatusType | null>(null);
+	const [jobUploadStatus, setJobUploadStatus] = useState<JobStatus | null>(null);
 
 	const [relevantPapers, setRelevantPapers] = useState<PaperItem[]>([]);
 	const [projects, setProjects] = useState<Project[]>([]);

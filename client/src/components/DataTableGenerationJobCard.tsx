@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Clock, Loader2, CheckCircle, XCircle, AlertCircle, Table, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
-import { DataTableJob, DataTableJobStatusResponse, JobStatusType, JobStatus } from "@/lib/schema";
+import { DataTableJob, DataTableJobStatusResponse, JobStatus } from "@/lib/schema";
 import { formatDateTime } from "./utils/paperUtils";
 import { fetchFromApi } from "@/lib/api";
 import Link from "next/link";
@@ -12,7 +12,7 @@ interface DataTableGenerationJobCardProps {
     projectId: string;
 }
 
-const getStatusIcon = (status: JobStatusType) => {
+const getStatusIcon = (status: JobStatus) => {
     switch (status) {
         case JobStatus.PENDING:
             return <Clock className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />;
@@ -29,7 +29,7 @@ const getStatusIcon = (status: JobStatusType) => {
     }
 };
 
-const getStatusText = (status: JobStatusType) => {
+const getStatusText = (status: JobStatus) => {
     switch (status) {
         case JobStatus.PENDING:
             return 'Queued';
@@ -41,12 +41,16 @@ const getStatusText = (status: JobStatusType) => {
             return 'Failed';
         case JobStatus.CANCELLED:
             return 'Cancelled';
-        default:
-            return status.charAt(0).toUpperCase() + status.slice(1);
+        default: {
+            // Defensive fallback for an unexpected status string from the backend.
+            // The union is exhaustive, so `status` narrows to `never` here.
+            const fallback = status as string;
+            return fallback.charAt(0).toUpperCase() + fallback.slice(1);
+        }
     }
 };
 
-const getStatusColor = (status: JobStatusType) => {
+const getStatusColor = (status: JobStatus) => {
     switch (status) {
         case JobStatus.PENDING:
             return 'text-yellow-600 dark:text-yellow-400';

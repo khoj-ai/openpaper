@@ -18,7 +18,7 @@ import EnigmaticLoadingExperience from './EnigmaticLoadingExperience';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { JobStatusType } from '@/lib/schema';
+import { JobStatus as JobStatusValue } from '@/lib/schema';
 import { useSubscription, isAudioOverviewAtLimit, nextMonday } from '@/hooks/useSubscription';
 import Link from 'next/link';
 import { EnhancedAudioPlayer } from './EnhancedAudioPlayer';
@@ -33,7 +33,7 @@ interface AudioOverviewProps {
 
 interface JobStatus {
     job_id: string;
-    status: JobStatusType;
+    status: JobStatusValue;
     status_message: string | null;
     paper_id: string;
 }
@@ -367,7 +367,7 @@ export function AudioOverviewPanel({ paper_id, paper_title, setExplicitSearchTer
 
 
 
-    const getStatusColor = (status: JobStatusType) => {
+    const getStatusColor = (status: JobStatusValue) => {
         switch (status) {
             case 'completed': return 'text-green-600';
             case 'running': return 'text-blue-600';
