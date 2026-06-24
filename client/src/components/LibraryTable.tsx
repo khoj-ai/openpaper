@@ -553,7 +553,7 @@ export function LibraryTable({
 																<span
 																	key={tag.id}
 																	onClick={(e) => { e.stopPropagation(); handleTagClick(tag.name); }}
-																	className="group relative inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-sm dark:bg-blue-900 dark:text-blue-200 cursor-pointer"
+																	className="group relative inline-flex items-center px-2 py-1 bg-secondary text-secondary-foreground rounded-sm cursor-pointer hover:bg-secondary/80 transition-colors"
 																>
 																	{tag.name}
 																	<button
@@ -561,7 +561,7 @@ export function LibraryTable({
 																			e.stopPropagation();
 																			handleRemoveTag(paper.id, tag.id);
 																		}}
-																		className="ml-1.5 -mr-1 p-0.5 bg-blue-200/50 dark:bg-blue-800/50 text-blue-700 dark:text-blue-100 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+																		className="ml-1.5 -mr-1 p-0.5 bg-foreground/10 text-muted-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
 																	>
 																		<X className="h-2.5 w-2.5" />
 																	</button>
