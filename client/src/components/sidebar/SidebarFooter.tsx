@@ -7,7 +7,6 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -23,7 +22,7 @@ import {
 } from "@/components/ui/sheet";
 import { User } from "@/lib/auth";
 import { SubscriptionData } from "@/lib/schema";
-import { UserMenuContent } from "./UserMenuContent";
+import { UserAvatar, UserMenuContent } from "./UserMenuContent";
 import { UsageLimitCard } from "./UsageLimitCard";
 import { ReferralEntry } from "./referralEntry";
 import { SubscriptionWarning } from "./subscriptionWarning";
@@ -117,10 +116,7 @@ export function AppSidebarFooter({
                             <SheetTrigger asChild>
                                 <SidebarMenuButton className="flex items-center gap-2">
                                     <span className="flex min-w-0 flex-1 items-center gap-2">
-                                        <Avatar className="h-6 w-6 shrink-0">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            {user.picture ? <img src={user.picture} alt={user.name || user.email} /> : <UserIcon size={16} />}
-                                        </Avatar>
+                                        <UserAvatar user={user} className="h-6 w-6 shrink-0" iconSize={16} />
                                         <span className="truncate">{user.name || user.email}</span>
                                     </span>
                                     <ChevronsUpDown className="h-4 w-4 shrink-0" />
@@ -135,10 +131,7 @@ export function AppSidebarFooter({
                             <PopoverTrigger asChild>
                                 <SidebarMenuButton className="flex items-center gap-2">
                                     <span className="flex min-w-0 flex-1 items-center gap-2">
-                                        <Avatar className="h-6 w-6 shrink-0">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            {user.picture ? (<img src={user.picture} alt={user.name || user.email} />) : (<UserIcon size={16} />)}
-                                        </Avatar>
+                                        <UserAvatar user={user} className="h-6 w-6 shrink-0" iconSize={16} />
                                         <span className="truncate">{user.name || user.email}</span>
                                     </span>
                                     <ChevronsUpDown className="h-4 w-4 shrink-0" />

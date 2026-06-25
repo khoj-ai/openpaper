@@ -11,7 +11,7 @@ import {
     Sun,
     User as UserIcon,
 } from "lucide-react";
-import { Avatar } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
     Tooltip,
@@ -19,7 +19,21 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { User } from "@/lib/auth";
+import { getAlphaHashToBackgroundColor, getInitials } from "@/lib/utils";
 import { ReferralEntry } from "./referralEntry";
+
+export const UserAvatar = ({ user, className, iconSize }: { user: User, className: string, iconSize: number }) => {
+    const displayName = user.name || user.email;
+
+    return (
+        <Avatar className={className}>
+            {user.picture && <AvatarImage src={user.picture} alt={displayName || "User"} />}
+            <AvatarFallback className={displayName ? getAlphaHashToBackgroundColor(displayName) : "bg-muted text-muted-foreground"}>
+                {displayName ? getInitials(displayName) : <UserIcon size={iconSize} />}
+            </AvatarFallback>
+        </Avatar>
+    );
+};
 
 export const UserMenuContent = ({
     user,
@@ -36,10 +50,7 @@ export const UserMenuContent = ({
 }) => (
     <div className="flex flex-col gap-1">
         <div className="flex items-center gap-3 p-3">
-            <Avatar className="h-10 w-10 shrink-0">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                {user.picture ? (<img src={user.picture} alt={user.name || user.email} />) : (<UserIcon size={24} />)}
-            </Avatar>
+            <UserAvatar user={user} className="h-10 w-10 shrink-0" iconSize={24} />
             <div className="min-w-0 flex-1">
                 <Tooltip>
                     <TooltipTrigger asChild>
