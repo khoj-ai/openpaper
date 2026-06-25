@@ -116,14 +116,14 @@ export function AppSidebarFooter({
                         <Sheet>
                             <SheetTrigger asChild>
                                 <SidebarMenuButton className="flex items-center gap-2">
-                                    <span className="flex items-center gap-2 truncate">
-                                        <Avatar className="h-6 w-6">
+                                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                                        <Avatar className="h-6 w-6 shrink-0">
                                             {/* eslint-disable-next-line @next/next/no-img-element */}
                                             {user.picture ? <img src={user.picture} alt={user.name || user.email} /> : <UserIcon size={16} />}
                                         </Avatar>
                                         <span className="truncate">{user.name || user.email}</span>
                                     </span>
-                                    <ChevronsUpDown className="h-4 w-4 ml-auto" />
+                                    <ChevronsUpDown className="h-4 w-4 shrink-0" />
                                 </SidebarMenuButton>
                             </SheetTrigger>
                             <SheetContent side="bottom">
@@ -134,14 +134,14 @@ export function AppSidebarFooter({
                         <Popover>
                             <PopoverTrigger asChild>
                                 <SidebarMenuButton className="flex items-center gap-2">
-                                    <span className="flex items-center gap-2 truncate">
-                                        <Avatar className="h-6 w-6">
+                                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                                        <Avatar className="h-6 w-6 shrink-0">
                                             {/* eslint-disable-next-line @next/next/no-img-element */}
                                             {user.picture ? (<img src={user.picture} alt={user.name || user.email} />) : (<UserIcon size={16} />)}
                                         </Avatar>
                                         <span className="truncate">{user.name || user.email}</span>
                                     </span>
-                                    <ChevronsUpDown className="h-4 w-4 ml-auto" />
+                                    <ChevronsUpDown className="h-4 w-4 shrink-0" />
                                 </SidebarMenuButton>
                             </PopoverTrigger>
                             <PopoverContent className="w-60 p-1" align="start">
