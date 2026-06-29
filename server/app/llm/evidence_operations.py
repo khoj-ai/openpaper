@@ -112,6 +112,7 @@ class EvidenceOperations(BaseLLMClient):
         llm_provider: Optional[LLMProvider] = None,
         user_references: Optional[Sequence[str]] = None,
         project_id: Optional[str] = None,
+        restrict_to_paper_ids: Optional[List[str]] = None,
         db: Session = Depends(get_db),
     ) -> AsyncGenerator[
         Mapping[str, Union[str, Dict[str, List[str]], EvidenceCollection]], None
@@ -157,6 +158,14 @@ class EvidenceOperations(BaseLLMClient):
                 db,
                 user=current_user,
             )
+
+        # @-mention scoping: hard-limit the available papers to the mentioned
+        # set. Withholding out-of-scope papers from formatted_paper_options
+        # means the model is never offered them, and the per-paper tools reject
+        # any id that isn't listed here (see the guard in the tool-call loop).
+        if restrict_to_paper_ids is not None:
+            allowed_ids = set(restrict_to_paper_ids)
+            all_papers = [paper for paper in all_papers if str(paper.id) in allowed_ids]
 
         formatted_paper_options = {
             str(paper.id): {
@@ -317,6 +326,7 @@ class EvidenceOperations(BaseLLMClient):
                                 **_args,
                                 current_user=current_user,
                                 project_id=project_id,
+                                restrict_to_paper_ids=restrict_to_paper_ids,
                                 db=db,
                             )
 
@@ -428,6 +438,7 @@ class EvidenceOperations(BaseLLMClient):
                             current_user=current_user,
                             db=db,
                             project_id=project_id,
+                            restrict_to_paper_ids=restrict_to_paper_ids,
                         )
 
                         if search_results:

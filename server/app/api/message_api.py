@@ -117,6 +117,42 @@ class MultiPaperChatRequest(BaseModel):
     user_references: Optional[List[str]] = None
     llm_provider: Optional[LLMProvider] = None
     project_id: Optional[str] = None
+    # @-mention scoping: when any of these are set, the chat's search space is
+    # hard-limited to the union of the mentioned papers and the papers in the
+    # mentioned projects.
+    mentioned_paper_ids: Optional[List[str]] = None
+    mentioned_project_ids: Optional[List[str]] = None
+
+
+def _resolve_scoped_paper_ids(
+    db: Session,
+    current_user: CurrentUser,
+    request: "MultiPaperChatRequest",
+) -> Optional[List[str]]:
+    """Resolve @-mentions into a flat, user-scoped set of paper ids.
+
+    A paper mention contributes itself; a project mention contributes all of
+    its papers. Every id is resolved through a user-scoped CRUD call, so a
+    mention the user can't access is silently dropped. Returns None when there
+    are no mentions at all (i.e. no scoping should be applied).
+    """
+    if not request.mentioned_paper_ids and not request.mentioned_project_ids:
+        return None
+
+    scoped: set[str] = set()
+
+    for paper_id in request.mentioned_paper_ids or []:
+        paper = paper_crud.get(db, id=paper_id, user=current_user)
+        if paper:
+            scoped.add(str(paper.id))
+
+    for project_id in request.mentioned_project_ids or []:
+        paper_ids = project_paper_crud.get_project_paper_ids_by_project_id(
+            db, project_id=uuid.UUID(project_id), user=current_user
+        )
+        scoped.update(str(pid) for pid in paper_ids)
+
+    return list(scoped)
 
 
 @message_router.post("/chat/everything")
@@ -181,6 +217,10 @@ async def chat_message_multipaper(
                 ):
                     raise ValueError("Conversation is not of type PROJECT.")
 
+                # @-mention scoping: resolve mentioned papers/projects into a
+                # flat set of in-scope paper ids (None == no scoping).
+                scoped_paper_ids = _resolve_scoped_paper_ids(db, current_user, request)
+
                 async for chunk in operations.gather_evidence(
                     conversation_id=request.conversation_id,
                     question=request.user_query,
@@ -189,6 +229,7 @@ async def chat_message_multipaper(
                     user_references=request.user_references,
                     db=db,
                     project_id=request.project_id,
+                    restrict_to_paper_ids=scoped_paper_ids,
                 ):
                     # Parse the chunk as a dictionary
                     if isinstance(chunk, dict):
@@ -233,6 +274,14 @@ async def chat_message_multipaper(
                         db,
                         user=current_user,
                     )
+
+                # Keep the answer-generation paper set aligned with the scoped
+                # evidence space so citations can't reference out-of-scope papers.
+                if scoped_paper_ids is not None:
+                    allowed_ids = set(scoped_paper_ids)
+                    all_papers = [
+                        paper for paper in all_papers if str(paper.id) in allowed_ids
+                    ]
 
                 chat_generator = operations.chat_with_papers(
                     question=request.user_query,

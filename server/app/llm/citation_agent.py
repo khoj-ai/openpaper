@@ -243,8 +243,11 @@ def run_find_citation(
     db: Session,
     style: str = "APA",
     project_id: Optional[str] = None,
+    restrict_to_paper_ids: Optional[list[str]] = None,
 ) -> CitationResult:
     """Tool entry point matching the multi-paper evidence loop's call signature."""
+    if restrict_to_paper_ids is not None and paper_id not in restrict_to_paper_ids:
+        raise ValueError("Paper is not in the scoped set for this conversation")
     return _get_finder().find_citation(
         db=db,
         paper_id=paper_id,
