@@ -11,7 +11,7 @@ interface UseProjectsResult {
     refetch: () => Promise<void>;
 }
 
-export function useProjects(): UseProjectsResult {
+export function useProjects(detailed = false): UseProjectsResult {
     const [projects, setProjects] = useState<Project[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
@@ -20,7 +20,11 @@ export function useProjects(): UseProjectsResult {
         setIsLoading(true);
         setError(null);
         try {
-            const response = await fetchFromApi("/api/projects");
+            // detailed=true includes metadata (num_papers, num_conversations, …)
+            // that the plain list omits.
+            const response = await fetchFromApi(
+                detailed ? "/api/projects?detailed=true" : "/api/projects",
+            );
             setProjects(response || []);
         } catch (err) {
             setError(err instanceof Error ? err : new Error("Failed to fetch projects"));
@@ -32,7 +36,7 @@ export function useProjects(): UseProjectsResult {
 
     useEffect(() => {
         fetchProjects();
-    }, []);
+    }, [detailed]);
 
     return {
         projects,
