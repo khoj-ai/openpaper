@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from app.database.crud.base_crud import CRUDBase
@@ -23,6 +23,8 @@ class MessageBase(BaseModel):
     content: str
     references: Optional[Dict[str, Any]] = None
     trace: Optional[Dict[str, Any]] = None
+    # Denormalized @-mention context snapshot: [{kind, id, title}].
+    scope: Optional[List[Dict[str, Any]]] = None
 
 
 class MessageCreate(MessageBase):
@@ -34,6 +36,7 @@ class MessageUpdate(BaseModel):
     content: Optional[str] = None
     references: Optional[Dict[str, Any]] = None
     trace: Optional[Dict[str, Any]] = None
+    scope: Optional[List[Dict[str, Any]]] = None
 
 
 class MessageCRUD(CRUDBase[Message, MessageCreate, MessageUpdate]):
@@ -219,6 +222,7 @@ class MessageCRUD(CRUDBase[Message, MessageCreate, MessageUpdate]):
                 "references": message.references,
                 "artifacts": [a.payload for a in message.artifacts] or None,
                 "trace": message.trace,
+                "scope": message.scope,
                 "sequence": message.sequence,
             }
             formatted_messages.append(message_dict)

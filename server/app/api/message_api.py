@@ -124,35 +124,51 @@ class MultiPaperChatRequest(BaseModel):
     mentioned_project_ids: Optional[List[str]] = None
 
 
-def _resolve_scoped_paper_ids(
+def _resolve_mention_scope(
     db: Session,
     current_user: CurrentUser,
     request: "MultiPaperChatRequest",
-) -> Optional[List[str]]:
-    """Resolve @-mentions into a flat, user-scoped set of paper ids.
+) -> tuple[Optional[List[str]], Optional[List[dict]]]:
+    """Resolve @-mentions into (scoped_paper_ids, scope_snapshot).
 
-    A paper mention contributes itself; a project mention contributes all of
-    its papers. Every id is resolved through a user-scoped CRUD call, so a
-    mention the user can't access is silently dropped. Returns None when there
-    are no mentions at all (i.e. no scoping should be applied).
+    - scoped_paper_ids: the flat, user-scoped set of paper ids the search is
+      hard-limited to — a paper mention contributes itself, a project mention
+      contributes all of its papers. Used for retrieval scoping.
+    - scope_snapshot: a denormalized [{kind, id, title}] of the mentioned
+      entities themselves (a project stays a single entry, not its papers),
+      persisted on the user message so it renders faithfully later.
+
+    Every id is resolved through a user-scoped CRUD call, so a mention the user
+    can't access is silently dropped. Both values are None when there are no
+    mentions at all (i.e. no scoping should be applied).
     """
     if not request.mentioned_paper_ids and not request.mentioned_project_ids:
-        return None
+        return None, None
 
     scoped: set[str] = set()
+    snapshot: List[dict] = []
 
     for paper_id in request.mentioned_paper_ids or []:
         paper = paper_crud.get(db, id=paper_id, user=current_user)
         if paper:
             scoped.add(str(paper.id))
+            snapshot.append(
+                {"kind": "paper", "id": str(paper.id), "title": paper.title}
+            )
 
     for project_id in request.mentioned_project_ids or []:
+        project = project_crud.get(db, id=project_id, user=current_user)
+        if not project:
+            continue
         paper_ids = project_paper_crud.get_project_paper_ids_by_project_id(
             db, project_id=uuid.UUID(project_id), user=current_user
         )
         scoped.update(str(pid) for pid in paper_ids)
+        snapshot.append(
+            {"kind": "project", "id": str(project.id), "title": project.title}
+        )
 
-    return list(scoped)
+    return list(scoped), snapshot
 
 
 @message_router.post("/chat/everything")
@@ -218,8 +234,11 @@ async def chat_message_multipaper(
                     raise ValueError("Conversation is not of type PROJECT.")
 
                 # @-mention scoping: resolve mentioned papers/projects into a
-                # flat set of in-scope paper ids (None == no scoping).
-                scoped_paper_ids = _resolve_scoped_paper_ids(db, current_user, request)
+                # flat set of in-scope paper ids (None == no scoping) plus a
+                # denormalized snapshot to persist on the user message.
+                scoped_paper_ids, scope_snapshot = _resolve_mention_scope(
+                    db, current_user, request
+                )
 
                 async for chunk in operations.gather_evidence(
                     conversation_id=request.conversation_id,
@@ -329,7 +348,7 @@ async def chat_message_multipaper(
                     else None
                 )
 
-                # Save user message
+                # Save user message, with the @-mention scope snapshot attached.
                 message_crud.create(
                     db,
                     obj_in=MessageCreate(
@@ -337,6 +356,7 @@ async def chat_message_multipaper(
                         role="user",
                         content=request.user_query,
                         references=formatted_references,
+                        scope=scope_snapshot,
                     ),
                     user=current_user,
                 )

@@ -376,6 +376,10 @@ class Message(Base):
     # Agent trajectory (tool calls / thinking / subagent steps) for this turn,
     # so the user can inspect what the model did. See schemas for shape.
     trace = Column(JSONB, nullable=True)
+    # @-mention context the user attached to this (user) turn: a denormalized
+    # snapshot list of [{kind, id, title}] so it renders faithfully even if the
+    # mentioned paper/project is later renamed or deleted.
+    scope = Column(JSONB, nullable=True)
     sequence = Column(Integer, nullable=False)  # To maintain message order
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
