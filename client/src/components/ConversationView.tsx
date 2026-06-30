@@ -362,7 +362,7 @@ export const ConversationView = ({
 			</div>
 			{msg.role === "user" && msg.scope && msg.scope.length > 0 && (
 				<div className="mt-1.5 self-start max-w-full">
-					<MentionContextBar entities={scopeItemsToEntities(msg.scope)} />
+					<MentionContextBar entities={scopeItemsToEntities(msg.scope)} linkable />
 				</div>
 			)}
 		</div>

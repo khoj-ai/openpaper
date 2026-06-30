@@ -1,6 +1,7 @@
 "use client";
 
 import { RefObject, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { AtSign, ChevronDown, FileText, FolderOpen, X } from "lucide-react";
 import { MessageScopeItem, PaperItem, Project } from "@/lib/schema";
 import {
@@ -402,18 +403,41 @@ export function MentionDropdown({
 	);
 }
 
+/** The route a mention links to, or null if it isn't directly navigable. */
+function entityHref(entity: MentionEntity): string | null {
+	if (entity.kind === "paper") return `/paper/${entity.id}`;
+	if (entity.kind === "project") return `/projects/${entity.id}`;
+	return null;
+}
+
 function MentionPill({
 	entity,
 	onRemove,
+	href,
 }: {
 	entity: MentionEntity;
 	onRemove?: () => void;
+	href?: string | null;
 }) {
 	const Icon = entity.kind === "paper" ? FileText : FolderOpen;
-	return (
-		<span className="inline-flex max-w-[200px] items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs text-foreground">
+	const inner = (
+		<>
 			<Icon className="h-3 w-3 shrink-0 text-muted-foreground" />
 			<span className="truncate">{entity.label}</span>
+		</>
+	);
+	return (
+		<span className="inline-flex max-w-[200px] items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs text-foreground">
+			{href ? (
+				<Link
+					href={href}
+					className="inline-flex min-w-0 items-center gap-1 hover:underline"
+				>
+					{inner}
+				</Link>
+			) : (
+				inner
+			)}
 			{onRemove && (
 				<button
 					type="button"
@@ -437,10 +461,13 @@ function MentionPill({
 export function MentionContextBar({
 	entities,
 	onRemove,
+	linkable = false,
 }: {
 	entities: MentionEntity[];
 	// Omit to render the bar read-only (e.g. on a persisted message).
 	onRemove?: (kind: MentionKind, id: string) => void;
+	// When true, each pill links through to its paper/project page.
+	linkable?: boolean;
 }) {
 	const [open, setOpen] = useState(false);
 
@@ -453,6 +480,7 @@ export function MentionContextBar({
 					<MentionPill
 						key={`${entity.kind}-${entity.id}`}
 						entity={entity}
+						href={linkable ? entityHref(entity) : undefined}
 						onRemove={
 							onRemove ? () => onRemove(entity.kind, entity.id) : undefined
 						}
@@ -481,13 +509,28 @@ export function MentionContextBar({
 				<div className="flex max-h-60 flex-col gap-0.5 overflow-y-auto">
 					{entities.map((entity) => {
 						const Icon = entity.kind === "paper" ? FileText : FolderOpen;
+						const href = linkable ? entityHref(entity) : null;
+						const rowInner = (
+							<>
+								<Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+								<span className="truncate text-sm">{entity.label}</span>
+							</>
+						);
 						return (
 							<div
 								key={`${entity.kind}-${entity.id}`}
 								className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-accent"
 							>
-								<Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-								<span className="truncate text-sm">{entity.label}</span>
+								{href ? (
+									<Link
+										href={href}
+										className="flex min-w-0 flex-1 items-center gap-2 hover:underline"
+									>
+										{rowInner}
+									</Link>
+								) : (
+									rowInner
+								)}
 								{onRemove && (
 									<button
 										type="button"
