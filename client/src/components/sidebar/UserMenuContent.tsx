@@ -11,10 +11,29 @@ import {
     Sun,
     User as UserIcon,
 } from "lucide-react";
-import { Avatar } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { User } from "@/lib/auth";
+import { getAlphaHashToBackgroundColor, getInitials } from "@/lib/utils";
 import { ReferralEntry } from "./referralEntry";
+
+export const UserAvatar = ({ user, className, iconSize }: { user: User, className: string, iconSize: number }) => {
+    const displayName = user.name || user.email;
+
+    return (
+        <Avatar className={className}>
+            {user.picture && <AvatarImage src={user.picture} alt={displayName || "User"} />}
+            <AvatarFallback className={displayName ? getAlphaHashToBackgroundColor(displayName) : "bg-muted text-muted-foreground"}>
+                {displayName ? getInitials(displayName) : <UserIcon size={iconSize} />}
+            </AvatarFallback>
+        </Avatar>
+    );
+};
 
 export const UserMenuContent = ({
     user,
@@ -31,13 +50,24 @@ export const UserMenuContent = ({
 }) => (
     <div className="flex flex-col gap-1">
         <div className="flex items-center gap-3 p-3">
-            <Avatar className="h-10 w-10">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                {user.picture ? (<img src={user.picture} alt={user.name || user.email} />) : (<UserIcon size={24} />)}
-            </Avatar>
-            <div>
-                <h3 className="font-medium">{user.name || user.email}</h3>
-                <p className="text-sm text-muted-foreground">{user.email}</p>
+            <UserAvatar user={user} className="h-10 w-10 shrink-0" iconSize={24} />
+            <div className="min-w-0 flex-1">
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <h3 className="truncate font-medium">{user.name || user.email}</h3>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" align="start" className="max-w-72 break-words text-left">
+                        {user.name || user.email}
+                    </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <p className="truncate text-sm text-muted-foreground">{user.email}</p>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" align="start" className="max-w-72 break-words text-left">
+                        {user.email}
+                    </TooltipContent>
+                </Tooltip>
             </div>
         </div>
         <Link href="/settings" className="w-full">

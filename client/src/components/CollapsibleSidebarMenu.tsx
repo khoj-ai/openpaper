@@ -39,8 +39,10 @@ export function CollapsibleSidebarMenu<T extends { id: string; title?: string; }
     maxItems = 7,
     tag,
 }: CollapsibleSidebarMenuProps<T>) {
+    const hasSubItems = items.length > 0;
+
     return (
-        <Collapsible asChild defaultOpen={defaultOpen} className="group/collapsible">
+        <Collapsible asChild defaultOpen={defaultOpen && hasSubItems} className="group/collapsible">
             <SidebarMenuItem>
                 <div className="flex items-center w-full">
                     <Link href={url} className="flex items-center flex-1" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
@@ -55,33 +57,38 @@ export function CollapsibleSidebarMenu<T extends { id: string; title?: string; }
                         </SidebarMenuButton>
                     </Link>
                     <CollapsibleTrigger asChild>
-                        <button className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded">
+                        <button
+                            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded disabled:text-muted-foreground/40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                            disabled={!hasSubItems}
+                        >
                             <ChevronDown className="h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
                         </button>
                     </CollapsibleTrigger>
                 </div>
-                <CollapsibleContent>
-                    <SidebarMenuSub>
-                        {items.slice(0, maxItems).map((item) => (
-                            <SidebarMenuSubItem key={item.id}>
-                                <SidebarMenuSubButton asChild>
-                                    <Link href={getItemUrl(item)} className="text-xs font-medium w-full h-fit my-1">
-                                        <p className="line-clamp-3">{getItemName ? getItemName(item) : item.title}</p>
-                                    </Link>
-                                </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                        ))}
-                        {items.length > maxItems && (
-                            <SidebarMenuSubItem>
-                                <SidebarMenuSubButton asChild>
-                                    <Link href={viewAllUrl} className="text-xs font-medium h-fit my-1">
-                                        {viewAllText} <ArrowRight className="inline h-3 w-3 ml-1" />
-                                    </Link>
-                                </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                        )}
-                    </SidebarMenuSub>
-                </CollapsibleContent>
+                {hasSubItems && (
+                    <CollapsibleContent>
+                        <SidebarMenuSub>
+                            {items.slice(0, maxItems).map((item) => (
+                                <SidebarMenuSubItem key={item.id}>
+                                    <SidebarMenuSubButton asChild>
+                                        <Link href={getItemUrl(item)} className="text-xs font-medium w-full h-fit my-1">
+                                            <p className="line-clamp-3">{getItemName ? getItemName(item) : item.title}</p>
+                                        </Link>
+                                    </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                            ))}
+                            {items.length > maxItems && (
+                                <SidebarMenuSubItem>
+                                    <SidebarMenuSubButton asChild>
+                                        <Link href={viewAllUrl} className="text-xs font-medium h-fit my-1">
+                                            {viewAllText} <ArrowRight className="inline h-3 w-3 ml-1" />
+                                        </Link>
+                                    </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                            )}
+                        </SidebarMenuSub>
+                    </CollapsibleContent>
+                )}
             </SidebarMenuItem>
         </Collapsible>
     );
