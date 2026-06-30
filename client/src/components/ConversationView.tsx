@@ -20,7 +20,15 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { ChatMessageActions } from "@/components/ChatMessageActions";
-import { ChatMessage, Reference, PaperItem, CitationArtifact } from "@/lib/schema";
+import { ChatMessage, Reference, PaperItem, CitationArtifact, Project } from "@/lib/schema";
+import {
+	useMentionAutocomplete,
+	MentionDropdown,
+	MentionContextBar,
+	MentionSelection,
+	EMPTY_MENTION_SELECTION,
+	scopeItemsToEntities,
+} from "@/components/chat/MentionAutocomplete";
 import ReferencePaperCards from "@/components/ReferencePaperCards";
 import { CitationArtifactCard } from "@/components/CitationArtifactCard";
 import { MessageTraceViewer } from "@/components/MessageTraceViewer";
@@ -56,6 +64,12 @@ interface ConversationViewProps {
 	setHighlightedInfo: (info: { paperId: string; messageIndex: number } | null) => void;
 	authLoading: boolean;
 	onRefreshPaperUrl?: (paperId: string) => Promise<string | null>;
+	// @-mention scoping (optional). When onMentionSelectionChange is provided,
+	// the input gains a Google-Docs-style "@" dropdown for scoping the chat to
+	// specific papers/projects.
+	projects?: Project[];
+	mentionSelection?: MentionSelection;
+	onMentionSelectionChange?: (selection: MentionSelection) => void;
 }
 
 export const ConversationView = ({
@@ -84,6 +98,9 @@ export const ConversationView = ({
 	setHighlightedInfo,
 	authLoading,
 	onRefreshPaperUrl,
+	projects = [],
+	mentionSelection = EMPTY_MENTION_SELECTION,
+	onMentionSelectionChange,
 }: ConversationViewProps) => {
 	const messagesContainerRef = useRef<HTMLDivElement>(null);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -97,6 +114,18 @@ export const ConversationView = ({
 	const [isPdfVisible, setIsPdfVisible] = useState(false);
 	const [collapsedReferences, setCollapsedReferences] = useState<Set<number>>(new Set());
 	const isMobile = useIsMobile();
+
+	const mentionsEnabled = !!onMentionSelectionChange;
+	const mention = useMentionAutocomplete({
+		papers,
+		projects,
+		value: currentMessage,
+		onValueChange: onCurrentMessageChange,
+		selection: mentionSelection,
+		onSelectionChange: onMentionSelectionChange ?? (() => { }),
+		textareaRef: inputMessageRef,
+	});
+	const hasSelectedMentions = mentionsEnabled && mention.selectedEntities.length > 0;
 
 	const [statusMessageHistory, setStatusMessageHistory] = useState<{ message: string; startTime: number }[]>([]);
 	const [elapsedTime, setElapsedTime] = useState(0);
@@ -223,8 +252,9 @@ export const ConversationView = ({
 	const memoizedMessages = messages.map((msg, index) => (
 		<div
 			key={`${msg.id || `msg-${index}`}-${msg.role}`} // Use a stable and unique key
-			className="flex flex-row gap-2 items-end transition-all duration-300 ease-in-out"
+			className="flex flex-col transition-all duration-300 ease-in-out"
 		>
+			<div className="flex flex-row gap-2 items-end">
 			<div
 				data-message-index={index}
 				className={`relative group prose dark:prose-invert max-w-full! transition-all duration-300 ease-in-out ${msg.role === "user"
@@ -329,6 +359,12 @@ export const ConversationView = ({
 					)
 				)}
 			</div>
+			</div>
+			{msg.role === "user" && msg.scope && msg.scope.length > 0 && (
+				<div className="mt-1.5 self-start max-w-full">
+					<MentionContextBar entities={scopeItemsToEntities(msg.scope)} />
+				</div>
+			)}
 		</div>
 	));
 
@@ -488,10 +524,30 @@ export const ConversationView = ({
 						</AnimatedGradientText>
 					)}
 					<form onSubmit={handleNewSubmit} className="w-full transition-all duration-300 ease-in-out" ref={chatInputFormRef}>
-						<div className="relative w-full transition-all duration-300 ease-in-out">
+						<div className="relative w-full rounded-md bg-secondary dark:bg-accent focus-within:ring-1 focus-within:ring-blue-400/30 transition-all duration-300 ease-in-out">
+							{mentionsEnabled && (
+								<MentionDropdown
+									open={mention.isOpen}
+									items={mention.items}
+									activeIndex={mention.activeIndex}
+									onSelect={mention.selectEntity}
+									onHover={mention.setActiveIndex}
+								/>
+							)}
+							{/* Attached context lives inside the input box, since it's
+							    part of the prompt we send. Collapses past 3 to keep the
+							    box from growing more than a single row. */}
+							{mentionsEnabled && hasSelectedMentions && (
+								<div className="px-3 pt-2.5">
+									<MentionContextBar
+										entities={mention.selectedEntities}
+										onRemove={mention.removeMention}
+									/>
+								</div>
+							)}
 							<Textarea
 								value={currentMessage}
-								onChange={handleTextareaChange}
+								onChange={mentionsEnabled ? mention.handleTextChange : handleTextareaChange}
 								ref={inputMessageRef}
 								autoFocus
 								placeholder={
@@ -499,9 +555,12 @@ export const ConversationView = ({
 										? "Look for a specific citation. Find a relevant paper. Collate evidence across your library."
 										: "Ask a follow-up"
 								}
-								className="min-h-20 resize-none pr-12 w-full border-none dark:border-none focus-visible:ring-1 focus-visible:ring-blue-400/30 bg-secondary dark:bg-accent text-primary"
+								className="min-h-20 resize-none pr-12 w-full border-none dark:border-none bg-transparent dark:bg-transparent shadow-none focus-visible:ring-0 text-primary"
 								disabled={isStreaming || (!isPapersLoading && papers.length === 0) || chatCreditLimitReached || !isOwner}
 								onKeyDown={(e) => {
+									if (mentionsEnabled && mention.handleKeyDown(e)) {
+										return;
+									}
 									if (e.key === "Enter" && !e.shiftKey) {
 										e.preventDefault();
 										handleNewSubmit(e);
