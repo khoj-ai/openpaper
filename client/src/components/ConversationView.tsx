@@ -9,7 +9,7 @@ import remarkGfm from "remark-gfm";
 import rehypeKatex from "rehype-katex";
 import remarkMath from "remark-math";
 import "katex/dist/katex.min.css";
-import { Loader, Send, Recycle, X, ChevronDown, ChevronUp, BookOpen } from "lucide-react";
+import { Loader, Send, Recycle, X, ChevronDown, ChevronUp, BookOpen, AtSign } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import CustomCitationLink from "@/components/utils/CustomCitationLink";
 import {
@@ -70,6 +70,8 @@ interface ConversationViewProps {
 	projects?: Project[];
 	mentionSelection?: MentionSelection;
 	onMentionSelectionChange?: (selection: MentionSelection) => void;
+	// Project chat scopes mentions to papers only (no projects/highlights).
+	mentionPapersOnly?: boolean;
 }
 
 export const ConversationView = ({
@@ -101,6 +103,7 @@ export const ConversationView = ({
 	projects = [],
 	mentionSelection = EMPTY_MENTION_SELECTION,
 	onMentionSelectionChange,
+	mentionPapersOnly = false,
 }: ConversationViewProps) => {
 	const messagesContainerRef = useRef<HTMLDivElement>(null);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -118,12 +121,13 @@ export const ConversationView = ({
 	const mentionsEnabled = !!onMentionSelectionChange;
 	const mention = useMentionAutocomplete({
 		papers,
-		projects,
+		projects: mentionPapersOnly ? [] : projects,
 		value: currentMessage,
 		onValueChange: onCurrentMessageChange,
 		selection: mentionSelection,
 		onSelectionChange: onMentionSelectionChange ?? (() => { }),
 		textareaRef: inputMessageRef,
+		enableHighlights: !mentionPapersOnly,
 	});
 	const hasSelectedMentions = mentionsEnabled && mention.selectedEntities.length > 0;
 
@@ -555,7 +559,7 @@ export const ConversationView = ({
 										? "Look for a specific citation. Find a relevant paper. Collate evidence across your library."
 										: "Ask a follow-up"
 								}
-								className="min-h-20 resize-none pr-12 w-full border-none dark:border-none bg-transparent dark:bg-transparent shadow-none focus-visible:ring-0 text-primary"
+								className="min-h-20 resize-none w-full border-none dark:border-none bg-transparent dark:bg-transparent shadow-none focus-visible:ring-0 text-primary"
 								disabled={isStreaming || (!isPapersLoading && papers.length === 0) || chatCreditLimitReached || !isOwner}
 								onKeyDown={(e) => {
 									if (mentionsEnabled && mention.handleKeyDown(e)) {
@@ -567,14 +571,34 @@ export const ConversationView = ({
 									}
 								}}
 							/>
-							<Button
-								type="submit"
-								size="sm"
-								className="absolute bottom-3 right-3 h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
-								disabled={!currentMessage.trim() || isStreaming || (!isPapersLoading && papers.length === 0) || chatCreditLimitReached || !isOwner}
-							>
-								{isStreaming ? <Loader className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-							</Button>
+							{/* Bottom toolbar: context actions on the left, send on the
+							    right — kept out of the textarea so neither overlaps text. */}
+							<div className="flex items-center justify-between px-2 pb-2">
+								<div className="flex items-center gap-1">
+									{mentionsEnabled && (
+										<Button
+											type="button"
+											size="sm"
+											variant="ghost"
+											onClick={() => mention.openMentionMenu()}
+											title="Add context (@)"
+											aria-label="Add context"
+											className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+											disabled={isStreaming || (!isPapersLoading && papers.length === 0) || chatCreditLimitReached || !isOwner}
+										>
+											<AtSign className="w-4 h-4" />
+										</Button>
+									)}
+								</div>
+								<Button
+									type="submit"
+									size="sm"
+									className="h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+									disabled={!currentMessage.trim() || isStreaming || (!isPapersLoading && papers.length === 0) || chatCreditLimitReached || !isOwner}
+								>
+									{isStreaming ? <Loader className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+								</Button>
+							</div>
 						</div>
 						{chatCreditLimitReached && (
 							<div className="text-center text-sm text-secondary-foreground mt-2">
