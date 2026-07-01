@@ -29,6 +29,7 @@ interface ChatRequestBody {
     conversation_id: string | null;
     mentioned_paper_ids?: string[];
     mentioned_project_ids?: string[];
+    mentioned_highlight_ids?: string[];
 }
 
 const chatLoadingMessages = [
@@ -282,6 +283,11 @@ function UnderstandPageContent() {
             }
             if (submittedMentions.projectIds.length > 0) {
                 requestBody.mentioned_project_ids = submittedMentions.projectIds;
+            }
+            if (submittedMentions.highlights.length > 0) {
+                requestBody.mentioned_highlight_ids = submittedMentions.highlights.map(
+                    (h) => h.id,
+                );
             }
         }
 

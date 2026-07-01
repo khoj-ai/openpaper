@@ -89,6 +89,10 @@ export interface MessageScopeItem {
     kind: 'paper' | 'project' | 'highlight';
     id: string;
     title: string;
+    // For highlight mentions: the parent paper, so the pill can link to it
+    // and show the paper title on hover.
+    paper_id?: string;
+    paper_title?: string;
 }
 
 export interface ChatMessage {
