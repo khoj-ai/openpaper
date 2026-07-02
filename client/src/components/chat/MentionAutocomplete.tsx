@@ -650,6 +650,8 @@ function MentionPill({
 			{href ? (
 				<Link
 					href={href}
+					target="_blank"
+					rel="noopener noreferrer"
 					className="inline-flex min-w-0 items-center gap-1 hover:underline"
 				>
 					{inner}
@@ -780,6 +782,8 @@ export function MentionContextBar({
 								{href ? (
 									<Link
 										href={href}
+										target="_blank"
+										rel="noopener noreferrer"
 										className="flex min-w-0 flex-1 items-center gap-2 hover:underline"
 									>
 										{rowInner}
