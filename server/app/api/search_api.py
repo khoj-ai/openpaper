@@ -2,12 +2,14 @@ import logging
 
 from app.auth.dependencies import get_required_user
 from app.database.database import get_db
-from app.database.models import Annotation, Highlight, Paper
+from app.database.models import Annotation, Highlight, Paper, Project, ProjectRole
 from app.database.queries.search import search_knowledge_base
 from app.database.telemetry import track_event
+from app.schemas.scope import MentionItem, MentionResult, ScopeType
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
+from sqlalchemy import or_, func
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -125,4 +127,100 @@ async def get_search_stats(
         logger.error(f"Error getting search stats: {e}", exc_info=True)
         raise HTTPException(
             status_code=500, detail="An error occurred while getting search statistics"
+        )
+
+
+@search_router.get("/mentions")
+async def search_mentions(
+    q: str = Query(..., description="Search query for @-mention autocomplete"),
+    limit: int = Query(
+        5, ge=1, le=20, description="Max results per section"
+    ),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """
+    Search for papers, projects, highlights, and comments to power the
+    @-mention autocomplete in the Ask input.
+    Results are grouped by type for rendering in the dropdown.
+    """
+    try:
+        if not q or len(q.strip()) < 1:
+            return JSONResponse(
+                status_code=200,
+                content=MentionResult().model_dump(),
+            )
+
+        search_pattern = f"%{q.lower()}%"
+
+        # Search papers by title
+        paper_query = (
+            db.query(Paper)
+            .filter(
+                Paper.user_id == current_user.id,
+                func.lower(Paper.title).like(search_pattern),
+            )
+            .order_by(Paper.last_accessed_at.desc())
+            .limit(limit)
+            .all()
+        )
+
+        papers = [
+            MentionItem(
+                type=ScopeType.PAPER,
+                id=str(p.id),
+                label=p.title or "Untitled Paper",
+                subtitle=", ".join(p.authors[:2]) + (" et al." if len(p.authors) > 2 else "") if p.authors else None,
+            )
+            for p in paper_query
+            if p.title
+        ]
+
+        # Search projects by title
+        # Direct query on Project model since projects are visible via ProjectRole
+        project_query = (
+            db.query(Project)
+            .filter(
+                func.lower(Project.title).like(search_pattern),
+                Project.id.in_(
+                    db.query(ProjectRole.project_id).filter(
+                        ProjectRole.user_id == current_user.id,
+                    )
+                ),
+            )
+            .order_by(Project.title)
+            .limit(limit)
+            .all()
+        )
+
+        projects = [
+            MentionItem(
+                type=ScopeType.PROJECT,
+                id=str(p.id),
+                label=p.title or "Untitled Project",
+                subtitle=p.description,
+            )
+            for p in project_query
+            if p.title
+        ]
+
+        # Deferred: highlights and comments support
+        # TODO: Add highlight search by raw_text
+        # TODO: Add comment (annotation) search by content
+
+        result = MentionResult(
+            papers=papers,
+            projects=projects,
+        )
+
+        return JSONResponse(
+            status_code=200,
+            content=result.model_dump(),
+        )
+
+    except Exception as e:
+        logger.error(f"Error searching mentions: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while searching for mentions",
         )

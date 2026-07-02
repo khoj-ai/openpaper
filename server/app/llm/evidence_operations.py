@@ -45,6 +45,7 @@ from app.schemas.message import (
     OriginalSnippet,
     ToolResultCompactionResponse,
 )
+from app.schemas.scope import filter_papers_by_scope
 from app.schemas.user import CurrentUser
 from fastapi import Depends
 from sqlalchemy.orm import Session
@@ -112,6 +113,7 @@ class EvidenceOperations(BaseLLMClient):
         llm_provider: Optional[LLMProvider] = None,
         user_references: Optional[Sequence[str]] = None,
         project_id: Optional[str] = None,
+        scope: Optional[List[dict]] = None,
         db: Session = Depends(get_db),
     ) -> AsyncGenerator[
         Mapping[str, Union[str, Dict[str, List[str]], EvidenceCollection]], None
@@ -157,6 +159,28 @@ class EvidenceOperations(BaseLLMClient):
                 db,
                 user=current_user,
             )
+
+        # Apply scope filtering if specified
+        if scope:
+            all_papers = filter_papers_by_scope(
+                all_papers,
+                scope,
+                get_project_papers_fn=lambda project_id: (
+                    project_paper_crud.get_all_papers_by_project_id(
+                        db, project_id=uuid.UUID(project_id), user=current_user
+                    )
+                ),
+            )
+            if not all_papers:
+                yield {
+                    "type": "status",
+                    "content": "No papers found matching the selected scope.",
+                }
+                yield {
+                    "type": "evidence_gathered",
+                    "content": EvidenceCollection(),
+                }
+                return
 
         formatted_paper_options = {
             str(paper.id): {

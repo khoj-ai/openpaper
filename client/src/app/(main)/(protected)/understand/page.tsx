@@ -14,6 +14,7 @@ import {
     CitationArtifact,
     MessageTrace,
     Reference,
+    ScopeItem,
 } from '@/lib/schema';
 import { useAuth } from '@/lib/auth';
 
@@ -71,6 +72,8 @@ function UnderstandPageContent() {
     const [statusMessage, setStatusMessage] = useState('');
 
     const [isSessionLoading, setIsSessionLoading] = useState(true);
+
+    const [scope, setScope] = useState<ScopeItem[]>([]);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputMessageRef = useRef<HTMLTextAreaElement>(null);
@@ -252,9 +255,10 @@ function UnderstandPageContent() {
             }
         }
 
-        const requestBody: ChatRequestBody = {
+        const requestBody: ChatRequestBody & { scope?: ScopeItem[] } = {
             user_query: userMessage.content,
             conversation_id: currentConversationId,
+            scope: scope.length > 0 ? scope : undefined,
         };
 
         try {
@@ -416,6 +420,8 @@ function UnderstandPageContent() {
                 setHighlightedInfo={setHighlightedInfo}
                 authLoading={authLoading}
                 onRefreshPaperUrl={refreshPaperUrl}
+                scope={scope}
+                onScopeChange={setScope}
             />
         </div>
     );

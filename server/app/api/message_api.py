@@ -117,6 +117,7 @@ class MultiPaperChatRequest(BaseModel):
     user_references: Optional[List[str]] = None
     llm_provider: Optional[LLMProvider] = None
     project_id: Optional[str] = None
+    scope: Optional[List[dict]] = None
 
 
 @message_router.post("/chat/everything")
@@ -189,6 +190,7 @@ async def chat_message_multipaper(
                     user_references=request.user_references,
                     db=db,
                     project_id=request.project_id,
+                    scope=request.scope,
                 ):
                     # Parse the chunk as a dictionary
                     if isinstance(chunk, dict):
@@ -243,6 +245,7 @@ async def chat_message_multipaper(
                     current_user=current_user,
                     all_papers=all_papers,
                     db=db,
+                    scope=request.scope,
                 )
                 async for stream_chunk in _stream_chat_chunks(
                     chunk_generator=chat_generator,

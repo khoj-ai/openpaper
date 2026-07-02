@@ -24,6 +24,7 @@ from app.llm.provider import LLMProvider, StreamChunk, SupplementaryContent, Tex
 from app.llm.utils import retry_llm_operation
 from app.schemas.message import EvidenceCollection
 from app.schemas.responses import AudioOverviewForLLM
+from app.schemas.scope import ScopeItem, ScopeType
 from app.schemas.user import CurrentUser
 from fastapi import Depends
 from sqlalchemy.orm import Session
@@ -46,6 +47,7 @@ class MultiPaperOperations(EvidenceOperations):
         evidence_gathered: EvidenceCollection,
         llm_provider: Optional[LLMProvider] = None,
         user_references: Optional[Sequence[str]] = None,
+        scope: Optional[List[dict]] = None,
         db: Session = Depends(get_db),
     ) -> AsyncGenerator[Union[str, dict], None]:
         """
@@ -56,6 +58,27 @@ class MultiPaperOperations(EvidenceOperations):
             if user_references
             else None
         )
+
+        # Build scope instruction for the LLM
+        scope_instruction = ""
+        if scope:
+            labels = []
+            for item in scope:
+                try:
+                    parsed = ScopeItem.model_validate(item)
+                    labels.append(f'"{parsed.label}" ({parsed.type.value})')
+                except Exception:
+                    continue
+            if labels:
+                scope_instruction = (
+                    "IMPORTANT: The user has scoped this query to specific items. "
+                    "Your answer MUST ONLY reference evidence from the following items "
+                    "in the library:\n"
+                    + "\n".join(f"- {label}" for label in labels)
+                    + "\n\nDo NOT reference any other papers, projects, or sources "
+                    "outside this scope. If the answer cannot be found within these "
+                    "scoped items, say so rather than using information from other sources."
+                )
 
         casted_conversation_id = uuid.UUID(conversation_id)
 
@@ -71,6 +94,7 @@ class MultiPaperOperations(EvidenceOperations):
 
         formatted_system_prompt = ANSWER_EVIDENCE_BASED_QUESTION_SYSTEM_PROMPT.format(
             available_papers=formatted_paper_options,
+            scope_instruction=scope_instruction,
         )
 
         formatted_prompt = ANSWER_EVIDENCE_BASED_QUESTION_MESSAGE.format(

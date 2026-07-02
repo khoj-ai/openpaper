@@ -541,3 +541,19 @@ export interface UseSubscriptionReturn {
     error: string | null;
     refetch: () => Promise<void>;
 }
+
+export type ScopeType = "paper" | "project" | "highlight" | "comment";
+
+export interface ScopeItem {
+    type: ScopeType;
+    id: string;
+    label: string;
+    subtitle?: string;
+}
+
+export interface MentionResult {
+    papers: ScopeItem[];
+    projects: ScopeItem[];
+    highlights: ScopeItem[];
+    comments: ScopeItem[];
+}

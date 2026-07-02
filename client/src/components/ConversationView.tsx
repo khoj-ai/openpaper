@@ -20,7 +20,9 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { ChatMessageActions } from "@/components/ChatMessageActions";
-import { ChatMessage, Reference, PaperItem, CitationArtifact } from "@/lib/schema";
+import { ChatMessage, Reference, PaperItem, CitationArtifact, ScopeItem, MentionResult } from "@/lib/schema";
+import { AtMentionDropdown } from "@/components/AtMentionDropdown";
+import { ScopeChips } from "@/components/ScopeChips";
 import ReferencePaperCards from "@/components/ReferencePaperCards";
 import { CitationArtifactCard } from "@/components/CitationArtifactCard";
 import { MessageTraceViewer } from "@/components/MessageTraceViewer";
@@ -54,8 +56,10 @@ interface ConversationViewProps {
 	handleCitationClick: (key: string, messageIndex: number) => void;
 	highlightedInfo: { paperId: string; messageIndex: number } | null;
 	setHighlightedInfo: (info: { paperId: string; messageIndex: number } | null) => void;
-	authLoading: boolean;
-	onRefreshPaperUrl?: (paperId: string) => Promise<string | null>;
+    authLoading: boolean;
+    onRefreshPaperUrl?: (paperId: string) => Promise<string | null>;
+    scope?: ScopeItem[];
+    onScopeChange?: (scope: ScopeItem[]) => void;
 }
 
 export const ConversationView = ({
@@ -82,8 +86,10 @@ export const ConversationView = ({
 	handleCitationClick: originalHandleCitationClick,
 	highlightedInfo,
 	setHighlightedInfo,
-	authLoading,
-	onRefreshPaperUrl,
+    authLoading,
+    onRefreshPaperUrl,
+    scope = [],
+    onScopeChange,
 }: ConversationViewProps) => {
 	const messagesContainerRef = useRef<HTMLDivElement>(null);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -98,9 +104,15 @@ export const ConversationView = ({
 	const [collapsedReferences, setCollapsedReferences] = useState<Set<number>>(new Set());
 	const isMobile = useIsMobile();
 
-	const [statusMessageHistory, setStatusMessageHistory] = useState<{ message: string; startTime: number }[]>([]);
-	const [elapsedTime, setElapsedTime] = useState(0);
-	const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+    const [statusMessageHistory, setStatusMessageHistory] = useState<{ message: string; startTime: number }[]>([]);
+    const [elapsedTime, setElapsedTime] = useState(0);
+    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
+    // @-mention state
+    const [isMentionOpen, setIsMentionOpen] = useState(false);
+    const [mentionSearchTerm, setMentionSearchTerm] = useState("");
+    const [mentionAnchorRect, setMentionAnchorRect] = useState<DOMRect | null>(null);
+    const mentionInputRef = useRef<HTMLTextAreaElement>(null);
 
 	useEffect(() => {
 		if (statusMessage && (statusMessageHistory.length === 0 || statusMessageHistory[statusMessageHistory.length - 1].message !== statusMessage)) {
@@ -198,14 +210,73 @@ export const ConversationView = ({
 		});
 	}, []);
 
-	const handleTextareaChange = useCallback(
-		(e: React.ChangeEvent<HTMLTextAreaElement>) => {
-			onCurrentMessageChange(e.target.value);
-		},
-		[onCurrentMessageChange]
-	);
+    const handleTextareaChange = useCallback(
+        (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+            const value = e.target.value;
+            onCurrentMessageChange(value);
 
-	const handleNewSubmit = useCallback(
+            // Detect @-mention
+            const lastAtIndex = value.lastIndexOf("@");
+            if (lastAtIndex !== -1) {
+                const afterAt = value.slice(lastAtIndex + 1);
+                if (!afterAt.startsWith(" ") && afterAt.length > 0) {
+                    const spaceIndex = afterAt.indexOf(" ");
+                    const term = spaceIndex === -1 ? afterAt : afterAt.slice(0, spaceIndex);
+                    setMentionSearchTerm(term);
+                    setIsMentionOpen(true);
+                    // Position dropdown below the textarea
+                    const textarea = mentionInputRef.current;
+                    if (textarea) {
+                        const rect = textarea.getBoundingClientRect();
+                        setMentionAnchorRect(rect);
+                    }
+                    return;
+                }
+            }
+            setIsMentionOpen(false);
+            setMentionSearchTerm("");
+        },
+        [onCurrentMessageChange]
+    );
+
+    const handleMentionSelect = useCallback(
+        (item: ScopeItem) => {
+            // Remove the @mention text from the input
+            const lastAtIndex = currentMessage.lastIndexOf("@");
+            if (lastAtIndex !== -1) {
+                const afterAt = currentMessage.slice(lastAtIndex + 1);
+                const spaceIndex = afterAt.indexOf(" ");
+                const termLength = spaceIndex === -1 ? afterAt.length : spaceIndex;
+                const before = currentMessage.slice(0, lastAtIndex);
+                const after = currentMessage.slice(lastAtIndex + 1 + termLength);
+                const newValue = (before + after).replace(/  +/g, " ").trim();
+                onCurrentMessageChange(newValue);
+            }
+            // Add to scope
+            if (onScopeChange) {
+                onScopeChange([...scope, item]);
+            }
+            setIsMentionOpen(false);
+            setMentionSearchTerm("");
+        },
+        [currentMessage, onCurrentMessageChange, onScopeChange, scope]
+    );
+
+    const handleMentionClose = useCallback(() => {
+        setIsMentionOpen(false);
+        setMentionSearchTerm("");
+    }, []);
+
+    const handleRemoveScope = useCallback(
+        (id: string) => {
+            if (onScopeChange) {
+                onScopeChange(scope.filter((s) => s.id !== id));
+            }
+        },
+        [onScopeChange, scope]
+    );
+
+    const handleNewSubmit = useCallback(
 		async (e: FormEvent | null = null) => {
 			if (e) {
 				e.preventDefault();
@@ -487,27 +558,49 @@ export const ConversationView = ({
 							What would you like to discover in your papers?
 						</AnimatedGradientText>
 					)}
-					<form onSubmit={handleNewSubmit} className="w-full transition-all duration-300 ease-in-out" ref={chatInputFormRef}>
-						<div className="relative w-full transition-all duration-300 ease-in-out">
-							<Textarea
-								value={currentMessage}
-								onChange={handleTextareaChange}
-								ref={inputMessageRef}
-								autoFocus
-								placeholder={
-									isCentered
-										? "Look for a specific citation. Find a relevant paper. Collate evidence across your library."
-										: "Ask a follow-up"
-								}
-								className="min-h-20 resize-none pr-12 w-full border-none dark:border-none focus-visible:ring-1 focus-visible:ring-blue-400/30 bg-secondary dark:bg-accent text-primary"
-								disabled={isStreaming || (!isPapersLoading && papers.length === 0) || chatCreditLimitReached || !isOwner}
-								onKeyDown={(e) => {
-									if (e.key === "Enter" && !e.shiftKey) {
-										e.preventDefault();
-										handleNewSubmit(e);
-									}
-								}}
-							/>
+                    <form onSubmit={handleNewSubmit} className="w-full transition-all duration-300 ease-in-out" ref={chatInputFormRef}>
+                        <div className="relative w-full transition-all duration-300 ease-in-out">
+                            <ScopeChips items={scope} onRemove={handleRemoveScope} />
+                            <Textarea
+                                value={currentMessage}
+                                onChange={handleTextareaChange}
+                                ref={(el) => {
+                                    inputMessageRef.current = el;
+                                    mentionInputRef.current = el;
+                                }}
+                                autoFocus
+                                placeholder={
+                                    isCentered
+                                        ? "Look for a specific citation. Find a relevant paper. Collate evidence across your library."
+                                        : "Ask a follow-up"
+                                }
+                                className="min-h-20 resize-none pr-12 w-full border-none dark:border-none focus-visible:ring-1 focus-visible:ring-blue-400/30 bg-secondary dark:bg-accent text-primary"
+                                disabled={isStreaming || (!isPapersLoading && papers.length === 0) || chatCreditLimitReached || !isOwner}
+                                onKeyDown={(e) => {
+                                    if (isMentionOpen) {
+                                        if (e.key === "Enter" && !e.shiftKey) {
+                                            e.preventDefault();
+                                            // Let the dropdown handle selection
+                                            return;
+                                        }
+                                        if (e.key === "Escape") {
+                                            handleMentionClose();
+                                        }
+                                        return;
+                                    }
+                                    if (e.key === "Enter" && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleNewSubmit(e);
+                                    }
+                                }}
+                            />
+                            <AtMentionDropdown
+                                isOpen={isMentionOpen}
+                                searchTerm={mentionSearchTerm}
+                                anchorRect={mentionAnchorRect}
+                                onSelect={handleMentionSelect}
+                                onClose={handleMentionClose}
+                            />
 							<Button
 								type="submit"
 								size="sm"
