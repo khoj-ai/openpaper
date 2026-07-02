@@ -316,7 +316,7 @@ export const ConversationView = ({
 					<CitationArtifactCard artifacts={msg.artifacts} />
 				)}
 				{msg.references && msg.references["citations"]?.length > 0 ? (
-					<div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+					<div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
 						<div
 							className="flex items-center justify-between"
 							id="references-section"
