@@ -464,6 +464,31 @@ async def chat_message_multipaper(
                     db=db, conversation_id=request.conversation_id, user=current_user
                 )
 
+                # @-mention scoping usage: whether the client asked to scope,
+                # what actually resolved (by entity type), and the effective
+                # search-space size after resolution.
+                scope_items = scope_snapshot or []
+                mention_scope_props = {
+                    "requested_mention_scope": bool(
+                        request.mentioned_paper_ids
+                        or request.mentioned_project_ids
+                        or request.mentioned_highlight_ids
+                    ),
+                    "used_mention_scope": len(scope_items) > 0,
+                    "num_mentioned_papers": sum(
+                        1 for i in scope_items if i.get("kind") == "paper"
+                    ),
+                    "num_mentioned_projects": sum(
+                        1 for i in scope_items if i.get("kind") == "project"
+                    ),
+                    "num_mentioned_highlights": sum(
+                        1 for i in scope_items if i.get("kind") == "highlight"
+                    ),
+                    "num_scoped_papers": (
+                        len(scoped_paper_ids) if scoped_paper_ids is not None else 0
+                    ),
+                }
+
                 # Track chat message event
                 track_event(
                     "did_chat_message",
@@ -480,6 +505,7 @@ async def chat_message_multipaper(
                         ).total_seconds(),
                         "type": conversation.conversable_type,
                         "project_id": request.project_id,
+                        **mention_scope_props,
                     },
                     user_id=str(current_user.id),
                     db=db,
