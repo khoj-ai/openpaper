@@ -58,6 +58,8 @@ export interface MentionEntity {
 	sublabel?: string;
 	// For highlight mentions: the parent paper (for scoping + linking).
 	paperId?: string;
+	// For highlight mentions: the annotations written on the highlight.
+	annotations?: string[];
 	// Why this suggestion matched, when it's not obvious from the label — e.g. a
 	// highlight surfaced because one of its annotations matched the query.
 	matchContext?: string;
@@ -120,6 +122,7 @@ export function selectionToScopeItems(
 			title: h.label,
 			paper_id: h.paperId,
 			paper_title: h.sublabel,
+			annotations: h.annotations,
 		})),
 	];
 }
@@ -135,14 +138,22 @@ export function scopeItemsToEntities(
 		paperId: item.paper_id,
 		// Surfaced in the hover card (e.g. a highlight's source paper title).
 		sublabel: item.paper_title,
+		annotations: item.annotations,
 	}));
 }
+
+// Mention queries may contain spaces (papers/projects/highlights have
+// multi-word names), so whitespace no longer ends the token. A newline ends it,
+// and this cap stops an abandoned "@" + sentence from tracking forever / firing
+// the highlight search. The menu still hides itself once nothing matches.
+const MAX_MENTION_QUERY_LEN = 64;
 
 /**
  * Find an in-progress "@mention" token ending at the caret. A token starts at
  * an "@" that is at the start of the text or preceded by whitespace, and runs
- * up to the caret with no intervening whitespace. Returns null when the caret
- * is not inside such a token (so an email like "a@b" never triggers it).
+ * up to the caret (spaces included). Returns null when the caret is not inside
+ * such a token (so an email like "a@b" never triggers it), when a newline
+ * intervenes, or when the query runs longer than MAX_MENTION_QUERY_LEN.
  */
 function findMentionToken(
 	value: string,
@@ -150,14 +161,13 @@ function findMentionToken(
 ): { start: number; query: string } | null {
 	for (let i = caret - 1; i >= 0; i--) {
 		const ch = value[i];
+		if (ch === "\n") return null;
 		if (ch === "@") {
 			const before = i === 0 ? " " : value[i - 1];
-			if (/\s/.test(before)) {
-				return { start: i, query: value.slice(i + 1, caret) };
-			}
-			return null;
+			if (!/\s/.test(before)) return null;
+			const query = value.slice(i + 1, caret);
+			return query.length > MAX_MENTION_QUERY_LEN ? null : { start: i, query };
 		}
-		if (/\s/.test(ch)) return null;
 	}
 	return null;
 }
@@ -242,6 +252,15 @@ export function useMentionAutocomplete({
 				const flattened: MentionEntity[] = [];
 				const seen = new Set<string>();
 				for (const paper of res?.papers || []) {
+					// Group the paper's matching annotations by their highlight so
+					// each surfaced highlight can carry its notes.
+					const notesByHighlight = new Map<string, string[]>();
+					for (const a of paper.annotations || []) {
+						if (!a.highlight || !a.content) continue;
+						const arr = notesByHighlight.get(a.highlight.id) || [];
+						arr.push(a.content);
+						notesByHighlight.set(a.highlight.id, arr);
+					}
 					const pushHighlight = (h: HighlightResult, matchContext?: string) => {
 						if (!h || seen.has(h.id)) return;
 						seen.add(h.id);
@@ -251,6 +270,7 @@ export function useMentionAutocomplete({
 							label: h.raw_text,
 							sublabel: paper.title || undefined,
 							paperId: paper.id,
+							annotations: notesByHighlight.get(h.id),
 							matchContext,
 						});
 					};
@@ -650,23 +670,34 @@ function MentionPill({
 		</span>
 	);
 
-	// Show the hover card when the label is clipped, always for highlights (to
-	// reveal the source paper), or whenever there's match context to explain.
+	// The highlight's annotations (fall back to the matched annotation when the
+	// full set isn't available, e.g. a not-yet-reloaded live selection).
 	const isHighlight = entity.kind === "highlight";
+	const notes =
+		entity.annotations && entity.annotations.length > 0
+			? entity.annotations
+			: entity.matchContext
+				? [entity.matchContext]
+				: [];
+	// Show the hover card when the label is clipped, always for highlights (to
+	// reveal the source paper), or whenever there are notes to surface.
 	const showTooltip =
-		truncated || (isHighlight && !!entity.sublabel) || !!entity.matchContext;
+		truncated || (isHighlight && !!entity.sublabel) || notes.length > 0;
 	if (!showTooltip) return pill;
 	return (
 		<Tooltip>
 			<TooltipTrigger asChild>{pill}</TooltipTrigger>
 			<TooltipContent className="max-w-xs break-words">
 				<p className="whitespace-pre-wrap">{entity.label}</p>
-				{entity.matchContext && (
-					<p className="mt-1 flex items-start gap-1 text-xs opacity-75">
+				{notes.map((note, i) => (
+					<p
+						key={`${i}-${note.slice(0, 12)}`}
+						className="mt-1 flex items-start gap-1 text-xs opacity-75"
+					>
 						<MessageSquareText className="mt-0.5 h-3 w-3 shrink-0" />
-						<span className="whitespace-pre-wrap">{entity.matchContext}</span>
+						<span className="whitespace-pre-wrap">{note}</span>
 					</p>
-				)}
+				))}
 				{isHighlight && entity.sublabel && (
 					<p className="mt-1 text-xs opacity-75">{entity.sublabel}</p>
 				)}

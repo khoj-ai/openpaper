@@ -93,6 +93,8 @@ export interface MessageScopeItem {
     // and show the paper title on hover.
     paper_id?: string;
     paper_title?: string;
+    // For highlight mentions: the annotations written on the highlight.
+    annotations?: string[];
 }
 
 export interface ChatMessage {
