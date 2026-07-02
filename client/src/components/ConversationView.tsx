@@ -9,8 +9,7 @@ import remarkGfm from "remark-gfm";
 import rehypeKatex from "rehype-katex";
 import remarkMath from "remark-math";
 import "katex/dist/katex.min.css";
-import { Loader, Send, Recycle, X, ChevronDown, ChevronUp, BookOpen, AtSign } from "lucide-react";
-import { Textarea } from "@/components/ui/textarea";
+import { Loader, Recycle, X, ChevronDown, ChevronUp, BookOpen } from "lucide-react";
 import CustomCitationLink from "@/components/utils/CustomCitationLink";
 import {
 	Dialog,
@@ -21,9 +20,8 @@ import {
 } from "@/components/ui/dialog";
 import { ChatMessageActions } from "@/components/ChatMessageActions";
 import { ChatMessage, Reference, PaperItem, CitationArtifact, Project } from "@/lib/schema";
+import { MentionInput } from "@/components/chat/MentionInput";
 import {
-	useMentionAutocomplete,
-	MentionDropdown,
 	MentionContextBar,
 	MentionSelection,
 	EMPTY_MENTION_SELECTION,
@@ -117,19 +115,6 @@ export const ConversationView = ({
 	const [isPdfVisible, setIsPdfVisible] = useState(false);
 	const [collapsedReferences, setCollapsedReferences] = useState<Set<number>>(new Set());
 	const isMobile = useIsMobile();
-
-	const mentionsEnabled = !!onMentionSelectionChange;
-	const mention = useMentionAutocomplete({
-		papers,
-		projects: mentionPapersOnly ? [] : projects,
-		value: currentMessage,
-		onValueChange: onCurrentMessageChange,
-		selection: mentionSelection,
-		onSelectionChange: onMentionSelectionChange ?? (() => { }),
-		textareaRef: inputMessageRef,
-		enableHighlights: !mentionPapersOnly,
-	});
-	const hasSelectedMentions = mentionsEnabled && mention.selectedEntities.length > 0;
 
 	const [statusMessageHistory, setStatusMessageHistory] = useState<{ message: string; startTime: number }[]>([]);
 	const [elapsedTime, setElapsedTime] = useState(0);
@@ -231,24 +216,15 @@ export const ConversationView = ({
 		});
 	}, []);
 
-	const handleTextareaChange = useCallback(
-		(e: React.ChangeEvent<HTMLTextAreaElement>) => {
-			onCurrentMessageChange(e.target.value);
-		},
-		[onCurrentMessageChange]
-	);
-
 	const handleNewSubmit = useCallback(
-		async (e: FormEvent | null = null) => {
+		(e?: FormEvent) => {
 			if (e) {
 				e.preventDefault();
 			}
 			if (isCentered) {
 				setIsCentered(false);
 			}
-
-			if (!e) return;
-			await onSubmit(e);
+			onSubmit();
 		},
 		[isCentered, onSubmit, setIsCentered]
 	);
@@ -528,78 +504,22 @@ export const ConversationView = ({
 						</AnimatedGradientText>
 					)}
 					<form onSubmit={handleNewSubmit} className="w-full transition-all duration-300 ease-in-out" ref={chatInputFormRef}>
-						<div className="relative w-full rounded-md bg-secondary dark:bg-accent focus-within:ring-1 focus-within:ring-blue-400/30 transition-all duration-300 ease-in-out">
-							{mentionsEnabled && (
-								<MentionDropdown
-									open={mention.isOpen}
-									items={mention.items}
-									activeIndex={mention.activeIndex}
-									onSelect={mention.selectEntity}
-									onHover={mention.setActiveIndex}
-								/>
-							)}
-							{/* Attached context lives inside the input box, since it's
-							    part of the prompt we send. Collapses past 3 to keep the
-							    box from growing more than a single row. */}
-							{mentionsEnabled && hasSelectedMentions && (
-								<div className="px-3 pt-2.5">
-									<MentionContextBar
-										entities={mention.selectedEntities}
-										onRemove={mention.removeMention}
-									/>
-								</div>
-							)}
-							<Textarea
-								value={currentMessage}
-								onChange={mentionsEnabled ? mention.handleTextChange : handleTextareaChange}
-								ref={inputMessageRef}
-								autoFocus
-								placeholder={
-									isCentered
-										? "Look for a specific citation. Find a relevant paper. Collate evidence across your library."
-										: "Ask a follow-up"
-								}
-								className="min-h-20 resize-none w-full border-none dark:border-none bg-transparent dark:bg-transparent shadow-none focus-visible:ring-0 text-primary"
-								disabled={isStreaming || (!isPapersLoading && papers.length === 0) || chatCreditLimitReached || !isOwner}
-								onKeyDown={(e) => {
-									if (mentionsEnabled && mention.handleKeyDown(e)) {
-										return;
-									}
-									if (e.key === "Enter" && !e.shiftKey) {
-										e.preventDefault();
-										handleNewSubmit(e);
-									}
-								}}
-							/>
-							{/* Bottom toolbar: context actions on the left, send on the
-							    right — kept out of the textarea so neither overlaps text. */}
-							<div className="flex items-center justify-between px-2 pb-2">
-								<div className="flex items-center gap-1">
-									{mentionsEnabled && (
-										<Button
-											type="button"
-											size="sm"
-											variant="ghost"
-											onClick={() => mention.openMentionMenu()}
-											title="Add context (@)"
-											aria-label="Add context"
-											className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-											disabled={isStreaming || (!isPapersLoading && papers.length === 0) || chatCreditLimitReached || !isOwner}
-										>
-											<AtSign className="w-4 h-4" />
-										</Button>
-									)}
-								</div>
-								<Button
-									type="submit"
-									size="sm"
-									className="h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
-									disabled={!currentMessage.trim() || isStreaming || (!isPapersLoading && papers.length === 0) || chatCreditLimitReached || !isOwner}
-								>
-									{isStreaming ? <Loader className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-								</Button>
-							</div>
-						</div>
+						<MentionInput
+							value={currentMessage}
+							onValueChange={onCurrentMessageChange}
+							onSubmit={handleNewSubmit}
+							papers={papers}
+							projects={projects}
+							papersOnly={mentionPapersOnly}
+							selection={mentionSelection}
+							onSelectionChange={onMentionSelectionChange}
+							placeholder={isCentered ? "Look for a specific citation. Find a relevant paper. Collate evidence across your library." : "Ask a follow-up"}
+							disabled={isStreaming || (!isPapersLoading && papers.length === 0) || chatCreditLimitReached || !isOwner}
+							sendDisabled={!currentMessage.trim()}
+							busy={isStreaming}
+							autoFocus
+							textareaRef={inputMessageRef}
+						/>
 						{chatCreditLimitReached && (
 							<div className="text-center text-sm text-secondary-foreground mt-2">
 								Nice! You have used your chat credits for the week.{" "}
