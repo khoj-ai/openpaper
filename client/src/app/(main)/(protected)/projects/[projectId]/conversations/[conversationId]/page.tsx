@@ -176,7 +176,21 @@ function ProjectConversationPageContent() {
             if (pendingQuery) {
                 setIsSessionLoading(false);
                 localStorage.removeItem(`pending-query-${conversationIdFromUrl}`);
-                handleSubmit(null, pendingQuery);
+                // Apply any @-mention scope carried over from the project page.
+                const pendingMentionsRaw = localStorage.getItem(`pending-mentions-${conversationIdFromUrl}`);
+                localStorage.removeItem(`pending-mentions-${conversationIdFromUrl}`);
+                let pendingMentions: MentionSelection | undefined;
+                if (pendingMentionsRaw) {
+                    try {
+                        const paperIds = JSON.parse(pendingMentionsRaw);
+                        if (Array.isArray(paperIds) && paperIds.length > 0) {
+                            pendingMentions = { paperIds, projectIds: [], highlights: [] };
+                        }
+                    } catch {
+                        // ignore malformed pending mentions
+                    }
+                }
+                handleSubmit(null, pendingQuery, pendingMentions);
             } else if (messages.length === 0 && isSessionLoading && !isStreaming) {
                 fetchMessages(conversationIdFromUrl);
             }
@@ -257,7 +271,7 @@ function ProjectConversationPageContent() {
         }
     }, [isStreaming]);
 
-    const handleSubmit = useCallback(async (e: FormEvent | null = null, message?: string) => {
+    const handleSubmit = useCallback(async (e: FormEvent | null = null, message?: string, mentionsOverride?: MentionSelection) => {
         if (e) {
             e.preventDefault();
         }
@@ -267,7 +281,7 @@ function ProjectConversationPageContent() {
         if (!query.trim() || isStreaming || !conversationId) return;
 
         // Snapshot @-mention scope for this send, then clear it from the input.
-        const submittedMentions = mentionSelection;
+        const submittedMentions = mentionsOverride ?? mentionSelection;
         const userMessage: ChatMessage = {
             role: 'user',
             content: query,
