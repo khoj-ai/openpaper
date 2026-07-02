@@ -211,6 +211,12 @@ def _resolve_mention_scope(
             }
             highlights_by_paper[paper_id_str] = group
 
+        annotation_contents = [
+            annotation.content
+            for annotation in highlight.annotations
+            if annotation.content
+        ]
+
         snapshot.append(
             {
                 "kind": "highlight",
@@ -218,6 +224,7 @@ def _resolve_mention_scope(
                 "title": highlight.raw_text,
                 "paper_id": paper_id_str,
                 "paper_title": group["paper_title"],
+                "annotations": annotation_contents,
             }
         )
 
@@ -225,11 +232,7 @@ def _resolve_mention_scope(
             {
                 "highlighted_text": highlight.raw_text,
                 "page_number": highlight.page_number,
-                "annotations": [
-                    annotation.content
-                    for annotation in highlight.annotations
-                    if annotation.content
-                ],
+                "annotations": annotation_contents,
             }
         )
 
