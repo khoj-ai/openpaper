@@ -83,6 +83,20 @@ export interface MessageTrace {
     citations?: MessageTraceCitation[];
 }
 
+// Denormalized snapshot of an @-mention attached to a user message, frozen at
+// send time so it renders even if the paper/project is later renamed/deleted.
+export interface MessageScopeItem {
+    kind: 'paper' | 'project' | 'highlight';
+    id: string;
+    title: string;
+    // For highlight mentions: the parent paper, so the pill can link to it
+    // and show the paper title on hover.
+    paper_id?: string;
+    paper_title?: string;
+    // For highlight mentions: the annotations written on the highlight.
+    annotations?: string[];
+}
+
 export interface ChatMessage {
     id?: string;
     role: 'user' | 'assistant';
@@ -93,6 +107,8 @@ export interface ChatMessage {
     artifacts?: CitationArtifact[];
     // Agent trajectory (tool calls + per-citation subagent steps) for this turn.
     trace?: MessageTrace;
+    // @-mention context attached to this (user) turn.
+    scope?: MessageScopeItem[];
 }
 
 // Position types for react-pdf-highlighter-extended

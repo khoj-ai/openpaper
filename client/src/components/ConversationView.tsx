@@ -9,8 +9,7 @@ import remarkGfm from "remark-gfm";
 import rehypeKatex from "rehype-katex";
 import remarkMath from "remark-math";
 import "katex/dist/katex.min.css";
-import { Loader, Send, Recycle, X, ChevronDown, ChevronUp, BookOpen } from "lucide-react";
-import { Textarea } from "@/components/ui/textarea";
+import { Loader, Recycle, X, ChevronDown, ChevronUp, BookOpen } from "lucide-react";
 import CustomCitationLink from "@/components/utils/CustomCitationLink";
 import {
 	Dialog,
@@ -20,7 +19,14 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { ChatMessageActions } from "@/components/ChatMessageActions";
-import { ChatMessage, Reference, PaperItem, CitationArtifact } from "@/lib/schema";
+import { ChatMessage, Reference, PaperItem, CitationArtifact, Project } from "@/lib/schema";
+import { MentionInput } from "@/components/chat/MentionInput";
+import {
+	MentionContextBar,
+	MentionSelection,
+	EMPTY_MENTION_SELECTION,
+	scopeItemsToEntities,
+} from "@/components/chat/MentionAutocomplete";
 import ReferencePaperCards from "@/components/ReferencePaperCards";
 import { CitationArtifactCard } from "@/components/CitationArtifactCard";
 import { MessageTraceViewer } from "@/components/MessageTraceViewer";
@@ -56,6 +62,14 @@ interface ConversationViewProps {
 	setHighlightedInfo: (info: { paperId: string; messageIndex: number } | null) => void;
 	authLoading: boolean;
 	onRefreshPaperUrl?: (paperId: string) => Promise<string | null>;
+	// @-mention scoping (optional). When onMentionSelectionChange is provided,
+	// the input gains a Google-Docs-style "@" dropdown for scoping the chat to
+	// specific papers/projects.
+	projects?: Project[];
+	mentionSelection?: MentionSelection;
+	onMentionSelectionChange?: (selection: MentionSelection) => void;
+	// Project chat scopes mentions to papers only (no projects/highlights).
+	mentionPapersOnly?: boolean;
 }
 
 export const ConversationView = ({
@@ -84,6 +98,10 @@ export const ConversationView = ({
 	setHighlightedInfo,
 	authLoading,
 	onRefreshPaperUrl,
+	projects = [],
+	mentionSelection = EMPTY_MENTION_SELECTION,
+	onMentionSelectionChange,
+	mentionPapersOnly = false,
 }: ConversationViewProps) => {
 	const messagesContainerRef = useRef<HTMLDivElement>(null);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -198,24 +216,15 @@ export const ConversationView = ({
 		});
 	}, []);
 
-	const handleTextareaChange = useCallback(
-		(e: React.ChangeEvent<HTMLTextAreaElement>) => {
-			onCurrentMessageChange(e.target.value);
-		},
-		[onCurrentMessageChange]
-	);
-
 	const handleNewSubmit = useCallback(
-		async (e: FormEvent | null = null) => {
+		(e?: FormEvent) => {
 			if (e) {
 				e.preventDefault();
 			}
 			if (isCentered) {
 				setIsCentered(false);
 			}
-
-			if (!e) return;
-			await onSubmit(e);
+			onSubmit();
 		},
 		[isCentered, onSubmit, setIsCentered]
 	);
@@ -223,8 +232,9 @@ export const ConversationView = ({
 	const memoizedMessages = messages.map((msg, index) => (
 		<div
 			key={`${msg.id || `msg-${index}`}-${msg.role}`} // Use a stable and unique key
-			className="flex flex-row gap-2 items-end transition-all duration-300 ease-in-out"
+			className="flex flex-col transition-all duration-300 ease-in-out"
 		>
+			<div className="flex flex-row gap-2 items-end">
 			<div
 				data-message-index={index}
 				className={`relative group prose dark:prose-invert max-w-full! transition-all duration-300 ease-in-out ${msg.role === "user"
@@ -282,7 +292,7 @@ export const ConversationView = ({
 					<CitationArtifactCard artifacts={msg.artifacts} />
 				)}
 				{msg.references && msg.references["citations"]?.length > 0 ? (
-					<div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+					<div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
 						<div
 							className="flex items-center justify-between"
 							id="references-section"
@@ -329,6 +339,12 @@ export const ConversationView = ({
 					)
 				)}
 			</div>
+			</div>
+			{msg.role === "user" && msg.scope && msg.scope.length > 0 && (
+				<div className="mt-1.5 self-start max-w-full">
+					<MentionContextBar entities={scopeItemsToEntities(msg.scope)} linkable />
+				</div>
+			)}
 		</div>
 	));
 
@@ -488,35 +504,22 @@ export const ConversationView = ({
 						</AnimatedGradientText>
 					)}
 					<form onSubmit={handleNewSubmit} className="w-full transition-all duration-300 ease-in-out" ref={chatInputFormRef}>
-						<div className="relative w-full transition-all duration-300 ease-in-out">
-							<Textarea
-								value={currentMessage}
-								onChange={handleTextareaChange}
-								ref={inputMessageRef}
-								autoFocus
-								placeholder={
-									isCentered
-										? "Look for a specific citation. Find a relevant paper. Collate evidence across your library."
-										: "Ask a follow-up"
-								}
-								className="min-h-20 resize-none pr-12 w-full border-none dark:border-none focus-visible:ring-1 focus-visible:ring-blue-400/30 bg-secondary dark:bg-accent text-primary"
-								disabled={isStreaming || (!isPapersLoading && papers.length === 0) || chatCreditLimitReached || !isOwner}
-								onKeyDown={(e) => {
-									if (e.key === "Enter" && !e.shiftKey) {
-										e.preventDefault();
-										handleNewSubmit(e);
-									}
-								}}
-							/>
-							<Button
-								type="submit"
-								size="sm"
-								className="absolute bottom-3 right-3 h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
-								disabled={!currentMessage.trim() || isStreaming || (!isPapersLoading && papers.length === 0) || chatCreditLimitReached || !isOwner}
-							>
-								{isStreaming ? <Loader className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-							</Button>
-						</div>
+						<MentionInput
+							value={currentMessage}
+							onValueChange={onCurrentMessageChange}
+							onSubmit={handleNewSubmit}
+							papers={papers}
+							projects={projects}
+							papersOnly={mentionPapersOnly}
+							selection={mentionSelection}
+							onSelectionChange={onMentionSelectionChange}
+							placeholder={isCentered ? "Look for a specific citation. Find a relevant paper. Collate evidence across your library." : "Ask a follow-up"}
+							disabled={isStreaming || (!isPapersLoading && papers.length === 0) || chatCreditLimitReached || !isOwner}
+							sendDisabled={!currentMessage.trim()}
+							busy={isStreaming}
+							autoFocus
+							textareaRef={inputMessageRef}
+						/>
 						{chatCreditLimitReached && (
 							<div className="text-center text-sm text-secondary-foreground mt-2">
 								Nice! You have used your chat credits for the week.{" "}

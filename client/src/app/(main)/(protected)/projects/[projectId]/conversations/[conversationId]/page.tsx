@@ -24,11 +24,18 @@ import { useProject, useProjectPapers } from '@/hooks/useProjects';
 import { PaperItem } from "@/lib/schema";
 import { toast } from "sonner";
 import { ConversationView } from '@/components/ConversationView';
+import {
+    MentionSelection,
+    EMPTY_MENTION_SELECTION,
+    mentionSelectionIsEmpty,
+    selectionToScopeItems,
+} from '@/components/chat/MentionAutocomplete';
 
 interface ChatRequestBody {
     user_query: string;
     conversation_id: string | null;
     project_id?: string;
+    mentioned_paper_ids?: string[];
 }
 
 const chatLoadingMessages = [
@@ -54,6 +61,7 @@ function ProjectConversationPageContent() {
     const { papers: projectPapers, updatePaper } = useProjectPapers(projectId);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isOwner, setIsOwner] = useState<boolean>(true);
+    const [mentionSelection, setMentionSelection] = useState<MentionSelection>(EMPTY_MENTION_SELECTION);
 
     const papers = useMemo(
         () =>
@@ -168,7 +176,21 @@ function ProjectConversationPageContent() {
             if (pendingQuery) {
                 setIsSessionLoading(false);
                 localStorage.removeItem(`pending-query-${conversationIdFromUrl}`);
-                handleSubmit(null, pendingQuery);
+                // Apply any @-mention scope carried over from the project page.
+                const pendingMentionsRaw = localStorage.getItem(`pending-mentions-${conversationIdFromUrl}`);
+                localStorage.removeItem(`pending-mentions-${conversationIdFromUrl}`);
+                let pendingMentions: MentionSelection | undefined;
+                if (pendingMentionsRaw) {
+                    try {
+                        const paperIds = JSON.parse(pendingMentionsRaw);
+                        if (Array.isArray(paperIds) && paperIds.length > 0) {
+                            pendingMentions = { paperIds, projectIds: [], highlights: [] };
+                        }
+                    } catch {
+                        // ignore malformed pending mentions
+                    }
+                }
+                handleSubmit(null, pendingQuery, pendingMentions);
             } else if (messages.length === 0 && isSessionLoading && !isStreaming) {
                 fetchMessages(conversationIdFromUrl);
             }
@@ -249,7 +271,7 @@ function ProjectConversationPageContent() {
         }
     }, [isStreaming]);
 
-    const handleSubmit = useCallback(async (e: FormEvent | null = null, message?: string) => {
+    const handleSubmit = useCallback(async (e: FormEvent | null = null, message?: string, mentionsOverride?: MentionSelection) => {
         if (e) {
             e.preventDefault();
         }
@@ -258,8 +280,17 @@ function ProjectConversationPageContent() {
 
         if (!query.trim() || isStreaming || !conversationId) return;
 
-        const userMessage: ChatMessage = { role: 'user', content: query };
+        // Snapshot @-mention scope for this send, then clear it from the input.
+        const submittedMentions = mentionsOverride ?? mentionSelection;
+        const userMessage: ChatMessage = {
+            role: 'user',
+            content: query,
+            scope: mentionSelectionIsEmpty(submittedMentions)
+                ? undefined
+                : selectionToScopeItems(submittedMentions, papers, []),
+        };
         setMessages(prev => [...prev, userMessage]);
+        setMentionSelection(EMPTY_MENTION_SELECTION);
 
         if (!message) {
             setCurrentMessage('');
@@ -276,6 +307,9 @@ function ProjectConversationPageContent() {
             conversation_id: conversationId,
             project_id: projectId,
         };
+        if (submittedMentions.paperIds.length > 0) {
+            requestBody.mentioned_paper_ids = submittedMentions.paperIds;
+        }
 
         try {
             const stream = await fetchStreamFromApi('/api/message/chat/everything', {
@@ -463,7 +497,7 @@ function ProjectConversationPageContent() {
             setStatusMessage('');
             refetchSubscription();
         }
-    }, [currentMessage, isStreaming, conversationId, projectId, router, refetchSubscription]);
+    }, [currentMessage, isStreaming, conversationId, projectId, router, refetchSubscription, mentionSelection, papers]);
 
     const [error, setError] = useState<string | null>(null);
 
@@ -516,6 +550,9 @@ function ProjectConversationPageContent() {
                     setHighlightedInfo={setHighlightedInfo}
                     authLoading={authLoading}
                     onRefreshPaperUrl={refreshPaperUrl}
+                    mentionSelection={mentionSelection}
+                    onMentionSelectionChange={setMentionSelection}
+                    mentionPapersOnly
                 />
             </div>
         </div>

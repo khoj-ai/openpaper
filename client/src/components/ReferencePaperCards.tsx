@@ -40,7 +40,7 @@ export default function ReferencePaperCards({ citations, papers, messageId, mess
     }, {} as Record<string, Citation[]>);
 
     return (
-        <div className="my-0 space-y-4">
+        <div className="mt-3 space-y-3">
             {Object.entries(paperCitationGroups).map(([paperId, paperCitations]) => {
                 const paper = papers.find(p => p.id === paperId);
                 if (!paper) return null;
@@ -60,7 +60,7 @@ export default function ReferencePaperCards({ citations, papers, messageId, mess
                     >
                         {/* Paper Info - Clickable */}
                         <div
-                            className={`flex items-start gap-3 pb-3 ${isExpanded ? 'border-b' : ''}`}
+                            className={`flex items-start gap-3 ${isExpanded ? 'border-b pb-3' : ''}`}
                         >
                             <div
                                 className="flex-shrink-0 bg-secondary rounded-lg px-2 py-1 cursor-pointer hover:bg-secondary/80 transition-colors"
@@ -90,18 +90,18 @@ export default function ReferencePaperCards({ citations, papers, messageId, mess
                             </div>
                         </div>
 
-                        {/* Citations - Expandable */}
+                        {/* Citations - Expandable. A clean hanging-indent list
+                            rather than a stack of filled boxes. */}
                         {isExpanded && (
-                            <div className="space-y-2">
+                            <div className="space-y-3">
                                 {paperCitations.map((citation) => (
-                                    <div
-                                        key={citation.key}
-                                        className="p-3 rounded-md bg-muted/30 hover:bg-muted/50 transition-colors"
-                                    >
-                                        <span className="font-mono text-xs font-semibold text-blue-600 dark:text-blue-400 mr-2">
+                                    <div key={citation.key} className="flex gap-2.5">
+                                        <span className="font-mono text-xs font-semibold text-blue-600 dark:text-blue-400 shrink-0 leading-relaxed">
                                             [{citation.key}]
                                         </span>
-                                        <span className="text-sm text-foreground">{citation.reference}</span>
+                                        <span className="text-sm leading-relaxed text-foreground/90">
+                                            {citation.reference}
+                                        </span>
                                     </div>
                                 ))}
                             </div>

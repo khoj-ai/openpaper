@@ -6,6 +6,13 @@ import { fetchFromApi, fetchStreamFromApi, getPaperFileUrl } from '@/lib/api';
 import { useState, useEffect, FormEvent, useRef, useCallback, Suspense, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { usePapers } from '@/hooks/usePapers';
+import { useProjects } from '@/hooks/useProjects';
+import {
+    MentionSelection,
+    EMPTY_MENTION_SELECTION,
+    mentionSelectionIsEmpty,
+    selectionToScopeItems,
+} from '@/components/chat/MentionAutocomplete';
 
 import { toast } from "sonner";
 
@@ -20,6 +27,9 @@ import { useAuth } from '@/lib/auth';
 interface ChatRequestBody {
     user_query: string;
     conversation_id: string | null;
+    mentioned_paper_ids?: string[];
+    mentioned_project_ids?: string[];
+    mentioned_highlight_ids?: string[];
 }
 
 const chatLoadingMessages = [
@@ -42,6 +52,8 @@ function UnderstandPageContent() {
     // Paper metadata only — file URLs are fetched lazily per-paper on demand
     // (via refreshPaperUrl) when a citation/reference is opened.
     const { papers: fetchedPapers, isLoading: isPapersLoading, error: papersError } = usePapers();
+    const { projects } = useProjects(true);
+    const [mentionSelection, setMentionSelection] = useState<MentionSelection>(EMPTY_MENTION_SELECTION);
 
     const papers = useMemo(() => {
         if (!fetchedPapers) return [];
@@ -221,9 +233,18 @@ function UnderstandPageContent() {
 
         if (!currentMessage.trim() || isStreaming) return;
 
-        const userMessage: ChatMessage = { role: 'user', content: currentMessage };
+        // Snapshot @-mention scope for this send, then clear it from the input.
+        const submittedMentions = mentionSelection;
+        const userMessage: ChatMessage = {
+            role: 'user',
+            content: currentMessage,
+            scope: mentionSelectionIsEmpty(submittedMentions)
+                ? undefined
+                : selectionToScopeItems(submittedMentions, papers, projects),
+        };
         setMessages(prev => [...prev, userMessage]);
         setCurrentMessage('');
+        setMentionSelection(EMPTY_MENTION_SELECTION);
 
         setIsStreaming(true);
         setStreamingChunks([]);
@@ -256,6 +277,19 @@ function UnderstandPageContent() {
             user_query: userMessage.content,
             conversation_id: currentConversationId,
         };
+        if (!mentionSelectionIsEmpty(submittedMentions)) {
+            if (submittedMentions.paperIds.length > 0) {
+                requestBody.mentioned_paper_ids = submittedMentions.paperIds;
+            }
+            if (submittedMentions.projectIds.length > 0) {
+                requestBody.mentioned_project_ids = submittedMentions.projectIds;
+            }
+            if (submittedMentions.highlights.length > 0) {
+                requestBody.mentioned_highlight_ids = submittedMentions.highlights.map(
+                    (h) => h.id,
+                );
+            }
+        }
 
         try {
             const stream = await fetchStreamFromApi('/api/message/chat/everything', {
@@ -352,7 +386,7 @@ function UnderstandPageContent() {
             setStatusMessage('');
             refetchSubscription();
         }
-    }, [currentMessage, isStreaming, conversationId]);
+    }, [currentMessage, isStreaming, conversationId, mentionSelection]);
 
     const [error, setError] = useState<string | null>(null);
 
@@ -416,6 +450,9 @@ function UnderstandPageContent() {
                 setHighlightedInfo={setHighlightedInfo}
                 authLoading={authLoading}
                 onRefreshPaperUrl={refreshPaperUrl}
+                projects={projects}
+                mentionSelection={mentionSelection}
+                onMentionSelectionChange={setMentionSelection}
             />
         </div>
     );

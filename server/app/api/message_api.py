@@ -7,6 +7,7 @@ from typing import AsyncGenerator, List, Optional, Union
 from app.auth.dependencies import get_required_user
 from app.database.crud.artifact_crud import artifact_crud
 from app.database.crud.conversation_crud import conversation_crud
+from app.database.crud.highlight_crud import highlight_crud
 from app.database.crud.message_crud import MessageCreate, message_crud
 from app.database.crud.paper_crud import paper_crud
 from app.database.crud.projects.project_conversation_crud import (
@@ -117,6 +118,125 @@ class MultiPaperChatRequest(BaseModel):
     user_references: Optional[List[str]] = None
     llm_provider: Optional[LLMProvider] = None
     project_id: Optional[str] = None
+    # @-mention scoping: when any of these are set, the chat's search space is
+    # hard-limited to the union of the mentioned papers, the papers in the
+    # mentioned projects, and the parent papers of the mentioned highlights.
+    mentioned_paper_ids: Optional[List[str]] = None
+    mentioned_project_ids: Optional[List[str]] = None
+    mentioned_highlight_ids: Optional[List[str]] = None
+
+
+def _resolve_mention_scope(
+    db: Session,
+    current_user: CurrentUser,
+    request: "MultiPaperChatRequest",
+) -> tuple[Optional[List[str]], Optional[List[dict]], Optional[List[dict]]]:
+    """Resolve @-mentions into (scoped_paper_ids, scope_snapshot, highlights).
+
+    - scoped_paper_ids: the flat, user-scoped set of paper ids the search is
+      hard-limited to — a paper mention contributes itself, a project mention
+      contributes all of its papers, a highlight mention contributes its parent
+      paper. Used for retrieval scoping.
+    - scope_snapshot: a denormalized [{kind, id, title, ...}] of the mentioned
+      entities themselves (a project stays a single entry, not its papers),
+      persisted on the user message so it renders faithfully later.
+    - highlights: [{paper_id, highlighted_text, notes}] for the mentioned
+      highlights, injected into the answer prompt so the model sees the exact
+      attached passages.
+
+    Every id is resolved through a user-scoped CRUD call, so a mention the user
+    can't access is silently dropped. All values are None when there are no
+    mentions at all (i.e. no scoping should be applied).
+    """
+    if (
+        not request.mentioned_paper_ids
+        and not request.mentioned_project_ids
+        and not request.mentioned_highlight_ids
+    ):
+        return None, None, None
+
+    scoped: set[str] = set()
+    snapshot: List[dict] = []
+
+    for paper_id in request.mentioned_paper_ids or []:
+        # In a project chat, resolve via project access (papers may be shared,
+        # i.e. not owned by the current user); otherwise resolve by ownership.
+        if request.project_id:
+            paper = project_paper_crud.get_paper_by_project(
+                db,
+                paper_id=uuid.UUID(paper_id),
+                project_id=uuid.UUID(request.project_id),
+                user=current_user,
+            )
+        else:
+            paper = paper_crud.get(db, id=paper_id, user=current_user)
+        if paper:
+            scoped.add(str(paper.id))
+            snapshot.append(
+                {"kind": "paper", "id": str(paper.id), "title": paper.title}
+            )
+
+    for project_id in request.mentioned_project_ids or []:
+        project = project_crud.get(db, id=project_id, user=current_user)
+        if not project:
+            continue
+        paper_ids = project_paper_crud.get_project_paper_ids_by_project_id(
+            db, project_id=uuid.UUID(project_id), user=current_user
+        )
+        scoped.update(str(pid) for pid in paper_ids)
+        snapshot.append(
+            {"kind": "project", "id": str(project.id), "title": project.title}
+        )
+
+    # Mentioned highlights are grouped by parent paper so each highlighted
+    # passage is delivered with that paper's title + abstract for grounding,
+    # rather than a bare paper id the model would have to cross-reference.
+    highlights_by_paper: dict[str, dict] = {}
+    for highlight_id in request.mentioned_highlight_ids or []:
+        highlight = highlight_crud.get(db, id=highlight_id, user=current_user)
+        if not highlight:
+            continue
+        paper_id_str = str(highlight.paper_id)
+        # The parent paper joins the search scope so it stays searchable.
+        scoped.add(paper_id_str)
+
+        group = highlights_by_paper.get(paper_id_str)
+        if group is None:
+            paper = paper_crud.get(db, id=paper_id_str, user=current_user)
+            group = {
+                "paper_id": paper_id_str,
+                "paper_title": paper.title if paper else None,
+                "paper_abstract": paper.abstract if paper else None,
+                "highlights": [],
+            }
+            highlights_by_paper[paper_id_str] = group
+
+        annotation_contents = [
+            annotation.content
+            for annotation in highlight.annotations
+            if annotation.content
+        ]
+
+        snapshot.append(
+            {
+                "kind": "highlight",
+                "id": str(highlight.id),
+                "title": highlight.raw_text,
+                "paper_id": paper_id_str,
+                "paper_title": group["paper_title"],
+                "annotations": annotation_contents,
+            }
+        )
+
+        group["highlights"].append(
+            {
+                "highlighted_text": highlight.raw_text,
+                "page_number": highlight.page_number,
+                "annotations": annotation_contents,
+            }
+        )
+
+    return list(scoped), snapshot, list(highlights_by_paper.values())
 
 
 @message_router.post("/chat/everything")
@@ -181,6 +301,16 @@ async def chat_message_multipaper(
                 ):
                     raise ValueError("Conversation is not of type PROJECT.")
 
+                # @-mention scoping: resolve mentioned papers/projects/highlights
+                # into a flat set of in-scope paper ids (None == no scoping), a
+                # denormalized snapshot to persist on the user message, and the
+                # highlight passages to inject into the answer.
+                (
+                    scoped_paper_ids,
+                    scope_snapshot,
+                    mentioned_highlights,
+                ) = _resolve_mention_scope(db, current_user, request)
+
                 async for chunk in operations.gather_evidence(
                     conversation_id=request.conversation_id,
                     question=request.user_query,
@@ -189,6 +319,7 @@ async def chat_message_multipaper(
                     user_references=request.user_references,
                     db=db,
                     project_id=request.project_id,
+                    restrict_to_paper_ids=scoped_paper_ids,
                 ):
                     # Parse the chunk as a dictionary
                     if isinstance(chunk, dict):
@@ -234,6 +365,14 @@ async def chat_message_multipaper(
                         user=current_user,
                     )
 
+                # Keep the answer-generation paper set aligned with the scoped
+                # evidence space so citations can't reference out-of-scope papers.
+                if scoped_paper_ids is not None:
+                    allowed_ids = set(scoped_paper_ids)
+                    all_papers = [
+                        paper for paper in all_papers if str(paper.id) in allowed_ids
+                    ]
+
                 chat_generator = operations.chat_with_papers(
                     question=request.user_query,
                     llm_provider=request.llm_provider,
@@ -242,6 +381,7 @@ async def chat_message_multipaper(
                     conversation_id=request.conversation_id,
                     current_user=current_user,
                     all_papers=all_papers,
+                    mentioned_highlights=mentioned_highlights,
                     db=db,
                 )
                 async for stream_chunk in _stream_chat_chunks(
@@ -280,7 +420,7 @@ async def chat_message_multipaper(
                     else None
                 )
 
-                # Save user message
+                # Save user message, with the @-mention scope snapshot attached.
                 message_crud.create(
                     db,
                     obj_in=MessageCreate(
@@ -288,6 +428,7 @@ async def chat_message_multipaper(
                         role="user",
                         content=request.user_query,
                         references=formatted_references,
+                        scope=scope_snapshot,
                     ),
                     user=current_user,
                 )
@@ -323,6 +464,31 @@ async def chat_message_multipaper(
                     db=db, conversation_id=request.conversation_id, user=current_user
                 )
 
+                # @-mention scoping usage: whether the client asked to scope,
+                # what actually resolved (by entity type), and the effective
+                # search-space size after resolution.
+                scope_items = scope_snapshot or []
+                mention_scope_props = {
+                    "requested_mention_scope": bool(
+                        request.mentioned_paper_ids
+                        or request.mentioned_project_ids
+                        or request.mentioned_highlight_ids
+                    ),
+                    "used_mention_scope": len(scope_items) > 0,
+                    "num_mentioned_papers": sum(
+                        1 for i in scope_items if i.get("kind") == "paper"
+                    ),
+                    "num_mentioned_projects": sum(
+                        1 for i in scope_items if i.get("kind") == "project"
+                    ),
+                    "num_mentioned_highlights": sum(
+                        1 for i in scope_items if i.get("kind") == "highlight"
+                    ),
+                    "num_scoped_papers": (
+                        len(scoped_paper_ids) if scoped_paper_ids is not None else 0
+                    ),
+                }
+
                 # Track chat message event
                 track_event(
                     "did_chat_message",
@@ -339,6 +505,7 @@ async def chat_message_multipaper(
                         ).total_seconds(),
                         "type": conversation.conversable_type,
                         "project_id": request.project_id,
+                        **mention_scope_props,
                     },
                     user_id=str(current_user.id),
                     db=db,

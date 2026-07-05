@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Search, FileText, FolderKanban, Command, Loader2, Highlighter, ChevronDown, ChevronUp } from "lucide-react";
+import { Search, FileText, FolderKanban, Command, Loader2, Highlighter, ChevronDown, ChevronUp, MessageSquareText } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { fetchFromApi } from "@/lib/api";
 import { PaperResult, SearchResults } from "@/lib/schema";
@@ -292,7 +292,10 @@ export function HomeSearch() {
                                         const matchingHighlights = paper.highlights?.filter(h =>
                                             textMatchesSearch(h.raw_text, query)
                                         ) || [];
-                                        const hasMatches = matchingHighlights.length > 0;
+                                        const matchingAnnotations = paper.annotations?.filter(a =>
+                                            textMatchesSearch(a.content, query)
+                                        ) || [];
+                                        const hasMatches = matchingHighlights.length > 0 || matchingAnnotations.length > 0;
                                         const isExpanded = expandedPaperId === paper.id;
 
                                         return (
@@ -314,11 +317,19 @@ export function HomeSearch() {
                                                         )}
                                                         {/* Match indicator */}
                                                         {hasMatches && (
-                                                            <div className="flex items-center gap-2 mt-1">
-                                                                <span className="text-xs text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
-                                                                    <Search className="h-3 w-3" />
-                                                                    <span>{matchingHighlights.length} highlight{matchingHighlights.length !== 1 ? 's' : ''}</span>
-                                                                </span>
+                                                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                                                {matchingHighlights.length > 0 && (
+                                                                    <span className="text-xs text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
+                                                                        <Highlighter className="h-3 w-3" />
+                                                                        <span>{matchingHighlights.length} highlight{matchingHighlights.length !== 1 ? 's' : ''}</span>
+                                                                    </span>
+                                                                )}
+                                                                {matchingAnnotations.length > 0 && (
+                                                                    <span className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                                                                        <MessageSquareText className="h-3 w-3" />
+                                                                        <span>{matchingAnnotations.length} note{matchingAnnotations.length !== 1 ? 's' : ''}</span>
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         )}
                                                     </div>
@@ -370,6 +381,30 @@ export function HomeSearch() {
                                                         {matchingHighlights.length > 3 && (
                                                             <p className="text-xs text-muted-foreground ml-5">
                                                                 +{matchingHighlights.length - 3} more
+                                                            </p>
+                                                        )}
+                                                        {matchingAnnotations.slice(0, 3).map((annotation) => (
+                                                            <button
+                                                                key={annotation.id}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setIsOpen(false);
+                                                                    setQuery("");
+                                                                    router.push(`/paper/${paper.id}?rsf=annotations`);
+                                                                }}
+                                                                className="w-full p-2 text-sm border-l-2 border-blue-400 bg-blue-50/50 dark:bg-blue-950/20 rounded-r text-left hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                                                            >
+                                                                <div className="flex items-start gap-2">
+                                                                    <MessageSquareText className="h-3 w-3 text-blue-600 mt-0.5 flex-shrink-0" />
+                                                                    <p className="line-clamp-2">
+                                                                        {highlightSearchTerm(annotation.content, query)}
+                                                                    </p>
+                                                                </div>
+                                                            </button>
+                                                        ))}
+                                                        {matchingAnnotations.length > 3 && (
+                                                            <p className="text-xs text-muted-foreground ml-5">
+                                                                +{matchingAnnotations.length - 3} more
                                                             </p>
                                                         )}
                                                     </div>

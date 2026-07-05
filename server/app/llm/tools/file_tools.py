@@ -12,6 +12,20 @@ from sqlalchemy.orm import Session
 
 logger = getLogger(__name__)
 
+
+def _ensure_paper_in_scope(
+    paper_id: str, restrict_to_paper_ids: Optional[List[str]]
+) -> None:
+    """Hard-fence a per-paper tool call to the @-mention scope when one is set.
+
+    The evidence loop already withholds out-of-scope papers from the model's
+    available-papers list, but this is a defense-in-depth check so a tool can
+    never operate on a paper outside the scoped set.
+    """
+    if restrict_to_paper_ids is not None and paper_id not in restrict_to_paper_ids:
+        raise ValueError("Paper is not in the scoped set for this conversation")
+
+
 # --------------------------------------------------------------
 # Function declarations for LLM tools related to file operations
 # --------------------------------------------------------------
@@ -111,10 +125,12 @@ def read_file(
     current_user: CurrentUser,
     db: Session,
     project_id: Optional[str] = None,
+    restrict_to_paper_ids: Optional[List[str]] = None,
 ) -> str:
     """
     Read the content of a file associated with a paper.
     """
+    _ensure_paper_in_scope(paper_id, restrict_to_paper_ids)
     paper: Optional[Paper] = None
     if project_id:
         paper = project_paper_crud.get_paper_by_project(
@@ -142,11 +158,13 @@ def search_file(
     current_user: CurrentUser,
     db: Session,
     project_id: Optional[str] = None,
+    restrict_to_paper_ids: Optional[List[str]] = None,
 ) -> list[str]:
     """
     Search for a specific query (as regex) in the file content of a paper.
     Returns matching lines with line numbers.
     """
+    _ensure_paper_in_scope(paper_id, restrict_to_paper_ids)
     paper: Optional[Paper] = None
     if project_id:
         paper = project_paper_crud.get_paper_by_project(
@@ -185,10 +203,14 @@ def search_all_files(
     current_user: CurrentUser,
     db: Session,
     project_id: Optional[str] = None,
+    restrict_to_paper_ids: Optional[List[str]] = None,
 ) -> Dict[str, list[str]]:
     """
     Search for a specific query in the file content of all papers using full-text search.
     Returns a list of matching lines with paper IDs and line numbers.
+
+    When restrict_to_paper_ids is provided (e.g. from @-mention scoping), the
+    search space is hard-limited to those papers.
     """
     start_time = time()
 
@@ -197,6 +219,16 @@ def search_all_files(
         paper_ids = project_paper_crud.get_project_paper_ids_by_project_id(
             db, project_id=uuid.UUID(project_id), user=current_user
         )
+        if not paper_ids:
+            return {}
+
+    if restrict_to_paper_ids is not None:
+        restrict_uuids = [uuid.UUID(pid) for pid in restrict_to_paper_ids]
+        if paper_ids is None:
+            paper_ids = restrict_uuids
+        else:
+            allowed = set(restrict_uuids)
+            paper_ids = [pid for pid in paper_ids if pid in allowed]
         if not paper_ids:
             return {}
 
@@ -228,10 +260,12 @@ def view_file(
     current_user: CurrentUser,
     db: Session,
     project_id: Optional[str] = None,
+    restrict_to_paper_ids: Optional[List[str]] = None,
 ) -> str:
     """
     View a specific range of lines from the file content of a paper.
     """
+    _ensure_paper_in_scope(paper_id, restrict_to_paper_ids)
     paper: Optional[Paper] = None
     if project_id:
         paper = project_paper_crud.get_paper_by_project(
@@ -268,10 +302,12 @@ def read_abstract(
     current_user: CurrentUser,
     db: Session,
     project_id: Optional[str] = None,
+    restrict_to_paper_ids: Optional[List[str]] = None,
 ) -> str:
     """
     Read the abstract of a paper.
     """
+    _ensure_paper_in_scope(paper_id, restrict_to_paper_ids)
     paper: Optional[Paper] = None
     if project_id:
         paper = project_paper_crud.get_paper_by_project(

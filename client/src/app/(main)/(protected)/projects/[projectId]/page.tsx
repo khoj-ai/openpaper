@@ -62,6 +62,11 @@ import {
 } from "@/components/ui/breadcrumb";
 import { useSubscription, isPaperUploadAtLimit, isChatCreditAtLimit } from "@/hooks/useSubscription";
 import { useProject, useProjectPapers, useProjectConversations } from "@/hooks/useProjects";
+import { MentionInput } from "@/components/chat/MentionInput";
+import {
+	MentionSelection,
+	EMPTY_MENTION_SELECTION,
+} from "@/components/chat/MentionAutocomplete";
 import { toast } from "sonner";
 import ConversationCard from "@/components/ConversationCard";
 import Artifacts from "@/components/Artifacts";
@@ -89,6 +94,7 @@ export default function ProjectPage() {
 	const [pdfUrl, setPdfUrl] = useState("");
 	const [isUploading, setIsUploading] = useState(false);
 	const [newQuery, setNewQuery] = useState("");
+	const [mentionSelection, setMentionSelection] = useState<MentionSelection>(EMPTY_MENTION_SELECTION);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [showEditAlert, setShowEditAlert] = useState(false);
 	const [currentTitle, setCurrentTitle] = useState("");
@@ -284,23 +290,19 @@ export default function ProjectPage() {
 				body: JSON.stringify({ title: "New Conversation" }),
 			});
 			localStorage.setItem(`pending-query-${newConversation.id}`, newQuery);
+			// Carry the @-mention scope (project chat is papers-only) to the new
+			// conversation so it's applied to the first message.
+			if (mentionSelection.paperIds.length > 0) {
+				localStorage.setItem(
+					`pending-mentions-${newConversation.id}`,
+					JSON.stringify(mentionSelection.paperIds),
+				);
+			}
 			router.push(`/projects/${projectId}/conversations/${newConversation.id}`);
 		} catch (err) {
 			setError("Failed to create a new conversation. Please try again.");
 			console.error(err);
 			setIsSubmitting(false);
-		}
-	};
-
-	const handleNewQuerySubmit = async (e: React.FormEvent) => {
-		e.preventDefault();
-		handleNewQuery();
-	};
-
-	const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-		if (e.key === 'Enter' && !e.shiftKey) {
-			e.preventDefault();
-			handleNewQuery();
 		}
 	};
 
@@ -585,26 +587,20 @@ export default function ProjectPage() {
 						<>
 							{papers.length > 0 ? (
 								<div className="mb-6">
-									<form onSubmit={handleNewQuerySubmit} className="relative">
-										<Textarea
-											placeholder={chatDisabled ? "Nice! You have used your chat credits for the week. Upgrade your plan to use more." : "Ask a question about your papers, analyze findings, or explore new ideas..."}
-											value={newQuery}
-											onChange={(e) => {
-												setNewQuery(e.target.value)
-											}}
-											onKeyDown={handleKeyDown}
-											className="min-h-[80px] resize-none pr-12 border-none dark:border-none focus-visible:ring-1 focus-visible:ring-blue-400/30 bg-secondary dark:bg-accent text-primary"
-											disabled={chatDisabled || isSubmitting}
-										/>
-										<Button
-											type="submit"
-											disabled={!newQuery.trim() || chatDisabled || isSubmitting}
-											size="sm"
-											className="absolute bottom-3 right-3 h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
-										>
-											{isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-										</Button>
-									</form>
+									<MentionInput
+										value={newQuery}
+										onValueChange={setNewQuery}
+										onSubmit={handleNewQuery}
+										papers={papers}
+										papersOnly
+										selection={mentionSelection}
+										onSelectionChange={setMentionSelection}
+										placeholder={chatDisabled ? "Nice! You have used your chat credits for the week. Upgrade your plan to use more." : "Ask a question about your papers, analyze findings, or explore new ideas..."}
+										disabled={chatDisabled || isSubmitting}
+										sendDisabled={!newQuery.trim()}
+										busy={isSubmitting}
+										autoFocus
+									/>
 								</div>
 							) : (
 								<div className="mb-6 text-center p-8 border-dashed border-2 border-gray-300 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800/50">

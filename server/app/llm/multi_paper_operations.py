@@ -46,6 +46,7 @@ class MultiPaperOperations(EvidenceOperations):
         evidence_gathered: EvidenceCollection,
         llm_provider: Optional[LLMProvider] = None,
         user_references: Optional[Sequence[str]] = None,
+        mentioned_highlights: Optional[List[dict]] = None,
         db: Session = Depends(get_db),
     ) -> AsyncGenerator[Union[str, dict], None]:
         """
@@ -92,6 +93,18 @@ class MultiPaperOperations(EvidenceOperations):
             ),
             TextContent(text=formatted_prompt),
         ]
+
+        # @-mentioned highlights are exact passages the user attached to ground
+        # this question. Inject them directly so the answer model always sees
+        # them, regardless of what evidence gathering happened to retrieve.
+        if mentioned_highlights:
+            message_content.insert(
+                0,
+                SupplementaryContent(
+                    content=json.dumps(mentioned_highlights, indent=2),
+                    label="mentioned_highlights",
+                ),
+            )
 
         # Surface any citation artifacts produced during evidence gathering as
         # first-party cards, and give the answer model the resolved data so it
