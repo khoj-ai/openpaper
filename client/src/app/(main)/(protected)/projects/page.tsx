@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ProjectCard } from "@/components/ProjectCard";
 import { Button } from "@/components/ui/button";
 import { Project } from "@/lib/schema";
-import { fetchFromApi } from "@/lib/api";
+import { useProjects } from "@/hooks/useProjects";
 import { PlusCircle, Target, BookOpen, FileText, Info, Search, Headphones, MessageCircle, Table, Users, X, Plus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -27,10 +27,8 @@ const FILTER_CONFIG: Record<ProjectFilter, { label: string; icon: React.ElementT
 };
 
 function ProjectsPage() {
-	const [projects, setProjects] = useState<Project[]>([]);
-	const [isLoading, setIsLoading] = useState(true);
+	const { projects, isLoading, error, refetch: getProjects } = useProjects(true);
 	const { user, loading: userLoading } = useAuth();
-	const [error, setError] = useState<string | null>(null);
 	const { subscription } = useSubscription();
 	const router = useRouter();
 	const searchParams = useSearchParams();
@@ -80,23 +78,6 @@ function ProjectsPage() {
 	}, [projects, searchQuery, activeFilters]);
 
 	const hasActiveFilters = searchQuery.trim() !== "" || activeFilters.size > 0;
-
-	const getProjects = async () => {
-		try {
-			const fetchedProjects = await fetchFromApi("/api/projects?detailed=true");
-			setProjects(fetchedProjects);
-		} catch (err) {
-			setError("Failed to fetch projects. Please try again.");
-			console.error(err);
-		} finally {
-			setIsLoading(false);
-		}
-	};
-
-	useEffect(() => {
-		if (userLoading || !user) return;
-		getProjects();
-	}, [userLoading, user]);
 
 	useEffect(() => {
 		const PROJECT_LIMIT_TOAST_KEY = "project_limit_toast_shown";
@@ -316,7 +297,7 @@ function ProjectsPage() {
 				</div>
 			) : error ? (
 				<div className="flex flex-col items-center justify-center py-12">
-					<p className="text-red-500 mb-4">{error}</p>
+					<p className="text-red-500 mb-4">Failed to fetch projects. Please try again.</p>
 					<Button onClick={getProjects} variant="outline">
 						Try Again
 					</Button>

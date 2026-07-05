@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
-import { fetchFromApi } from "@/lib/api";
 import { Project } from "@/lib/schema";
+import { useProjects } from "@/hooks/useProjects";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface ProjectsPreviewProps {
@@ -26,29 +26,19 @@ function ProjectCardSkeleton() {
 }
 
 export function ProjectsPreview({ limit = 4 }: ProjectsPreviewProps) {
-    const [projects, setProjects] = useState<Project[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const { projects: allProjects, isLoading } = useProjects(true);
 
-    useEffect(() => {
-        const fetchProjects = async () => {
-            try {
-                const response = await fetchFromApi("/api/projects?detailed=true&limit=3");
-                // Sort by updated_at and take top N
-                const sorted = (response || [])
-                    .sort((a: Project, b: Project) =>
+    // Sort by updated_at and take top N.
+    const projects = useMemo(
+        () =>
+            [...allProjects]
+                .sort(
+                    (a: Project, b: Project) =>
                         new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-                    )
-                    .slice(0, limit);
-                setProjects(sorted);
-            } catch (error) {
-                console.error("Error fetching projects:", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        fetchProjects();
-    }, [limit]);
+                )
+                .slice(0, limit),
+        [allProjects, limit]
+    );
 
     if (isLoading) {
         return (

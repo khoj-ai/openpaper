@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useProjects } from "@/hooks/useProjects";
 import { useRouter } from "next/navigation";
 import { fetchFromApi } from "@/lib/api";
 import {
@@ -37,7 +38,7 @@ export default function Home() {
 	const [jobUploadStatus, setJobUploadStatus] = useState<JobStatus | null>(null);
 
 	const [relevantPapers, setRelevantPapers] = useState<PaperItem[]>([]);
-	const [projects, setProjects] = useState<Project[]>([]);
+	const { projects, isLoading: isLoadingProjects, refetch: refetchProjects } = useProjects(true);
 	const [isLoadingData, setIsLoadingData] = useState(true);
 	const [showErrorAlert, setShowErrorAlert] = useState(false);
 	const [errorAlertMessage, setErrorAlertMessage] = useState(DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE);
@@ -283,16 +284,11 @@ export default function Home() {
 		const fetchData = async () => {
 			setIsLoadingData(true);
 			try {
-				const [papersResponse, projectsResponse] = await Promise.all([
-					fetchFromApi("/api/paper/relevant"),
-					fetchFromApi("/api/projects?detailed=true")
-				]);
+				const papersResponse = await fetchFromApi("/api/paper/relevant");
 				setRelevantPapers(papersResponse?.papers || []);
-				setProjects(projectsResponse || []);
 			} catch (error) {
 				console.error("Error fetching data:", error);
 				setRelevantPapers([]);
-				setProjects([]);
 			} finally {
 				setIsLoadingData(false);
 			}
@@ -304,12 +300,9 @@ export default function Home() {
 	const refreshData = async () => {
 		if (!user) return;
 		try {
-			const [papersResponse, projectsResponse] = await Promise.all([
-				fetchFromApi("/api/paper/relevant"),
-				fetchFromApi("/api/projects?detailed=true")
-			]);
+			const papersResponse = await fetchFromApi("/api/paper/relevant");
 			setRelevantPapers(papersResponse?.papers || []);
-			setProjects(projectsResponse || []);
+			refetchProjects();
 		} catch (error) {
 			console.error("Error refreshing data:", error);
 		}
@@ -420,7 +413,7 @@ export default function Home() {
 		return null;
 	}
 
-	if (isLoadingData) {
+	if (isLoadingData || isLoadingProjects) {
 		return null;
 	}
 
@@ -445,7 +438,7 @@ export default function Home() {
 				</header>
 
 				{/* Main Content */}
-				{!isLoadingData && !hasContent ? (
+				{!isLoadingData && !isLoadingProjects && !hasContent ? (
 					<HomeEmptyState
 						onUploadComplete={refreshData}
 						onUploadStart={handleUploadStart}

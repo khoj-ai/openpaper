@@ -13,6 +13,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from "sonner";
 import { fetchFromApi, getProjectsForPaper } from '@/lib/api';
+import { useProjects } from '@/hooks/useProjects';
 import { useSubscription, isProjectAtLimit } from '@/hooks/useSubscription';
 import { Button } from './ui/button';
 import { CreateProjectDialog } from '@/components/CreateProjectDialog';
@@ -36,7 +37,7 @@ interface PaperProjectsProps {
 
 export function PaperProjects({ id, view = 'full' }: PaperProjectsProps) {
     const [projects, setProjects] = useState<Project[]>([]);
-    const [allProjects, setAllProjects] = useState<Project[]>([]);
+    const { projects: allProjects, isLoading: isLoadingAllProjects } = useProjects(true);
     const [isLoadingProjects, setIsLoadingProjects] = useState(false);
     const [addingToProjectId, setAddingToProjectId] = useState<string | null>(null);
     const [isCreateProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
@@ -48,18 +49,15 @@ export function PaperProjects({ id, view = 'full' }: PaperProjectsProps) {
     useEffect(() => {
         if (id) {
             setIsLoadingProjects(true);
-            Promise.all([
-                getProjectsForPaper(id),
-                fetchFromApi("/api/projects?detailed=true"),
-            ]).then(([paperProjects, allProjs]) => {
-                setProjects(paperProjects || []);
-                setAllProjects(allProjs || []);
-            }).catch(err => {
-                console.error("Error fetching projects", err);
-                toast.error("Error fetching projects");
-            }).finally(() => {
-                setIsLoadingProjects(false);
-            });
+            getProjectsForPaper(id)
+                .then((paperProjects) => {
+                    setProjects(paperProjects || []);
+                }).catch(err => {
+                    console.error("Error fetching projects", err);
+                    toast.error("Error fetching projects");
+                }).finally(() => {
+                    setIsLoadingProjects(false);
+                });
         }
     }, [id]);
 
@@ -201,10 +199,10 @@ export function PaperProjects({ id, view = 'full' }: PaperProjectsProps) {
                     )}
                 </>
             )}
-            {view === 'full' && projectsToAdd.length > 0 && (
+            {view === 'full' && (projectsToAdd.length > 0 || isLoadingAllProjects) && (
                 <div className="pt-4 mt-4 border-t">
                     <h3 className="text-lg font-semibold mb-2">Add to Projects</h3>
-                    {isLoadingProjects ? (
+                    {(isLoadingProjects || isLoadingAllProjects) ? (
                         <div className="flex items-center justify-center py-4">
                             <Loader className="animate-spin mr-2 h-4 w-4" />
                         </div>
