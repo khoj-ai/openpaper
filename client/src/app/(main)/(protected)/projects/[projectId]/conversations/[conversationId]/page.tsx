@@ -58,7 +58,7 @@ function ProjectConversationPageContent() {
     const { user, loading: authLoading } = useAuth();
     const { project } = useProject(projectId);
     // Paper metadata only — file URLs are fetched lazily per-paper on demand.
-    const { papers: projectPapers, updatePaper } = useProjectPapers(projectId);
+    const { papers: projectPapers, isLoading: isPapersLoading, updatePaper } = useProjectPapers(projectId);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isOwner, setIsOwner] = useState<boolean>(true);
     const [mentionSelection, setMentionSelection] = useState<MentionSelection>(EMPTY_MENTION_SELECTION);
@@ -174,10 +174,17 @@ function ProjectConversationPageContent() {
         if (user) {
             const pendingQuery = localStorage.getItem(`pending-query-${conversationIdFromUrl}`);
             if (pendingQuery) {
-                setIsSessionLoading(false);
-                localStorage.removeItem(`pending-query-${conversationIdFromUrl}`);
                 // Apply any @-mention scope carried over from the project page.
                 const pendingMentionsRaw = localStorage.getItem(`pending-mentions-${conversationIdFromUrl}`);
+                // If mentions were carried over, wait for project papers to load so
+                // their titles resolve — otherwise they persist as "Untitled paper".
+                // Keep the localStorage keys until then; this effect re-runs when
+                // isPapersLoading flips to false.
+                if (pendingMentionsRaw && isPapersLoading) {
+                    return;
+                }
+                setIsSessionLoading(false);
+                localStorage.removeItem(`pending-query-${conversationIdFromUrl}`);
                 localStorage.removeItem(`pending-mentions-${conversationIdFromUrl}`);
                 let pendingMentions: MentionSelection | undefined;
                 if (pendingMentionsRaw) {
@@ -201,7 +208,7 @@ function ProjectConversationPageContent() {
             setIsCentered(true);
             setIsSessionLoading(false);
         }
-    }, [conversationIdFromUrl, user, fetchMessages, router, projectId, authLoading, isSessionLoading]);
+    }, [conversationIdFromUrl, user, fetchMessages, router, projectId, authLoading, isSessionLoading, isPapersLoading]);
 
     const refreshPaperUrl = useCallback(async (paperId: string): Promise<string | null> => {
         try {
