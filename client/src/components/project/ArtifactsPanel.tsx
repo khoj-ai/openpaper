@@ -408,7 +408,7 @@ export function ArtifactsPanel() {
                                 <AudioOverviewCard
                                     key={overview.id}
                                     overview={overview}
-                                    papers={papers}
+                                    onOpenTranscript={() => router.push(`/projects/${projectId}/audio/${overview.id}`)}
                                     isPlaying={playingAudioId === overview.id}
                                     isLoading={loadingAudioId === overview.id}
                                     isActivated={activatedAudioIds.includes(overview.id)}
