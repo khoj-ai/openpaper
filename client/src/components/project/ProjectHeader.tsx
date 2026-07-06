@@ -22,7 +22,9 @@ import {
 } from "@/components/ui/sheet";
 import { ProjectCollaborators } from "@/components/ProjectCollaborators";
 import { ProjectRail } from "@/components/project/ProjectRail";
+import { EditProjectButton } from "@/components/project/EditProjectDialog";
 import { useProjectWorkspace } from "@/components/project/ProjectWorkspaceProvider";
+import { ProjectRole } from "@/lib/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // Compact breadcrumb bar shared by every project route. Navigation lives on
@@ -69,7 +71,7 @@ export function ProjectHeader() {
                 <PanelLeft className="h-4 w-4" />
             </Button>
 
-            <Breadcrumb className="min-w-0 flex-1">
+            <Breadcrumb className="group/crumb min-w-0 flex-1">
                 <BreadcrumbList className="flex-nowrap">
                     <BreadcrumbItem>
                         <BreadcrumbLink asChild>
@@ -88,6 +90,9 @@ export function ProjectHeader() {
                             </BreadcrumbLink>
                         ) : (
                             <BreadcrumbPage className="truncate font-medium">{project?.title}</BreadcrumbPage>
+                        )}
+                        {project && project.role !== ProjectRole.Viewer && (
+                            <EditProjectButton className="ml-0.5 shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover/crumb:opacity-100" />
                         )}
                     </BreadcrumbItem>
                     {crumb && (

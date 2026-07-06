@@ -90,7 +90,14 @@ export function ProjectWorkspaceProvider({ projectId, children }: ProjectWorkspa
     const [activePaperId, setActivePaperId] = useState<string | null>(null);
     const [readerSearchTerm, setReaderSearchTerm] = useState<string | null>(null);
     const [crumb, setCrumb] = useState<string | null>(null);
-    const [rightPanel, setRightPanel] = useState<RightPanelMode>(null);
+    // Artifacts pane is open by default on desktop; like the rail, an explicit
+    // close is remembered across sessions. On mobile the pane is a full-screen
+    // overlay, so it never defaults open.
+    const [rightPanel, setRightPanel] = useState<RightPanelMode>(() => {
+        if (typeof window === "undefined") return null;
+        if (window.innerWidth < 768) return null;
+        return localStorage.getItem("project-artifacts-collapsed") === "true" ? null : "artifacts";
+    });
     // Desktop rail collapse, persisted across sessions.
     const [railCollapsed, setRailCollapsed] = useState<boolean>(() => {
         if (typeof window === "undefined") return false;
@@ -135,9 +142,11 @@ export function ProjectWorkspaceProvider({ projectId, children }: ProjectWorkspa
     const toggleArtifacts = useCallback(() => {
         setRightPanel((mode) => {
             if (mode === "artifacts") {
+                localStorage.setItem("project-artifacts-collapsed", "true");
                 // Fall back to the reader when paper tabs are still open.
                 return openPaperIds.length > 0 ? "reader" : null;
             }
+            localStorage.setItem("project-artifacts-collapsed", "false");
             return "artifacts";
         });
     }, [openPaperIds.length]);
@@ -145,6 +154,7 @@ export function ProjectWorkspaceProvider({ projectId, children }: ProjectWorkspa
     const closeArtifacts = useCallback(() => {
         setRightPanel((mode) => {
             if (mode !== "artifacts") return mode;
+            localStorage.setItem("project-artifacts-collapsed", "true");
             return openPaperIds.length > 0 ? "reader" : null;
         });
     }, [openPaperIds.length]);
