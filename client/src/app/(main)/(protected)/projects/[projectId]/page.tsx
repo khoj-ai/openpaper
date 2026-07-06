@@ -1,9 +1,8 @@
 "use client";
 
-import { ArrowRight, BookOpen, Library, MessageCircle, Pencil, Search, UploadCloud } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ArrowRight, BookOpen, Library, MessageCircle, Pencil, UploadCloud } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { toast } from "sonner";
 import { fetchFromApi } from "@/lib/api";
 import { ProjectRole } from "@/lib/schema";
@@ -27,13 +26,12 @@ import {
     MentionSelection,
     EMPTY_MENTION_SELECTION,
 } from "@/components/chat/MentionAutocomplete";
-import ConversationCard from "@/components/ConversationCard";
-import { ConversationListSkeleton } from "@/components/ConversationListSkeleton";
+import { AnimatedGradientText } from "@/components/magicui/animated-gradient-text";
 import { isChatCreditAtLimit, useSubscription } from "@/hooks/useSubscription";
 import { useProjectWorkspace } from "@/components/project/ProjectWorkspaceProvider";
 
-const CONVERSATIONS_SHOWN = 5;
-
+// Project home is the new-chat surface: a centered composer over the project's
+// papers. Navigation to existing chats lives in the workspace rail.
 export default function ProjectPage() {
     const router = useRouter();
     const {
@@ -46,9 +44,7 @@ export default function ProjectPage() {
         isPapersLoading,
         conversations,
         isConversationsLoading,
-        refetchConversations,
         setAddPapersOpen,
-        hasCollaborators,
     } = useProjectWorkspace();
 
     const [error, setError] = useState<string | null>(null);
@@ -58,17 +54,10 @@ export default function ProjectPage() {
     const [showEditAlert, setShowEditAlert] = useState(false);
     const [currentTitle, setCurrentTitle] = useState("");
     const [currentDescription, setCurrentDescription] = useState("");
-    const [conversationSearchQuery, setConversationSearchQuery] = useState("");
     const { subscription } = useSubscription();
 
     const chatDisabled = isChatCreditAtLimit(subscription);
     const isViewer = project?.role === ProjectRole.Viewer;
-
-    const filteredConversations = useMemo(() => {
-        if (!conversationSearchQuery.trim()) return conversations;
-        const q = conversationSearchQuery.toLowerCase();
-        return conversations.filter(c => c.title?.toLowerCase().includes(q));
-    }, [conversations, conversationSearchQuery]);
 
     useEffect(() => {
         const CHAT_CREDIT_TOAST_KEY = "chat_credit_limit_toast_shown";
@@ -82,18 +71,6 @@ export default function ProjectPage() {
             sessionStorage.setItem(CHAT_CREDIT_TOAST_KEY, "true");
         }
     }, [chatDisabled, router]);
-
-    const handleDeleteConversation = async (conversationId: string) => {
-        try {
-            await fetchFromApi(`/api/conversation/${conversationId}`, {
-                method: "DELETE",
-            });
-            refetchConversations();
-        } catch (err) {
-            setError("Failed to delete conversation. Please try again.");
-            console.error(err);
-        }
-    };
 
     const handleNewQuery = async () => {
         if (!newQuery.trim()) return;
@@ -157,15 +134,10 @@ export default function ProjectPage() {
 
     if (isInitialLoading) {
         return (
-            <div className="mx-auto w-full max-w-3xl space-y-6 overflow-y-auto px-4 py-6">
-                <Skeleton className="h-4 w-2/3" />
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-5 w-24" />
-                <div className="space-y-3">
-                    {[1, 2, 3].map((i) => (
-                        <Skeleton key={i} className="h-16 w-full" />
-                    ))}
-                </div>
+            <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center space-y-4 px-4">
+                <Skeleton className="mx-auto h-7 w-2/3" />
+                <Skeleton className="h-28 w-full" />
+                <Skeleton className="mx-auto h-4 w-40" />
             </div>
         );
     }
@@ -234,144 +206,84 @@ export default function ProjectPage() {
 
     return (
         <div className="flex-1 overflow-y-auto">
-            <div className="mx-auto w-full max-w-3xl px-4 py-6">
-                {/* Compact description — the title lives in the breadcrumb */}
-                <div className="group mb-5">
-                    {project.description ? (
-                        <p className="text-sm text-muted-foreground">
-                            {project.description}
-                            {!isViewer && (
-                                <button
-                                    onClick={handleEditClick}
-                                    className="ml-2 inline-flex align-middle opacity-0 transition-opacity group-hover:opacity-100"
-                                    aria-label="Edit project"
-                                >
-                                    <Pencil className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
-                                </button>
-                            )}
-                        </p>
-                    ) : !isViewer ? (
-                        <button
-                            className="cursor-pointer border-none bg-transparent p-0 text-left text-sm text-muted-foreground/60 transition-colors hover:text-muted-foreground"
-                            onClick={handleEditClick}
-                        >
-                            Add a description...
-                        </button>
-                    ) : null}
-                </div>
-
-                {/* Composer */}
-                {!isViewer && (
-                    papers.length > 0 ? (
-                        <div className="mb-8">
-                            <MentionInput
-                                value={newQuery}
-                                onValueChange={setNewQuery}
-                                onSubmit={handleNewQuery}
-                                papers={papers}
-                                papersOnly
-                                selection={mentionSelection}
-                                onSelectionChange={setMentionSelection}
-                                placeholder={chatDisabled ? "Nice! You have used your chat credits for the week. Upgrade your plan to use more." : "Ask a question about your papers, analyze findings, or explore new ideas..."}
-                                disabled={chatDisabled || isSubmitting}
-                                sendDisabled={!newQuery.trim()}
-                                busy={isSubmitting}
-                                autoFocus
-                            />
-                        </div>
-                    ) : (
-                        <div className="mb-8 rounded-xl border-2 border-dashed bg-muted/30 p-6 text-center">
-                            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted p-3">
-                                <MessageCircle className="h-6 w-6 text-muted-foreground" />
-                            </div>
-                            <h3 className="mb-1 text-sm font-semibold">Ready to Start Conversations</h3>
-                            <p className="text-sm text-muted-foreground">Add papers to your project to begin discussing and analyzing them.</p>
-                            <Button variant="outline" size="sm" className="mt-3" onClick={() => setAddPapersOpen(true)}>
-                                Add papers
-                            </Button>
-                        </div>
-                    )
-                )}
-
-                {/* Chats */}
-                <div>
-                    {isConversationsLoading ? (
-                        <>
-                            <h2 className="mb-3 text-lg font-semibold">Chats</h2>
-                            <ConversationListSkeleton count={3} />
-                        </>
-                    ) : conversations.length > 0 ? (
-                        <>
-                            <div className="mb-3 flex items-center justify-between">
-                                <h2 className="text-lg font-semibold">Chats</h2>
-                                {conversations.length > 3 && (
-                                    <div className="relative">
-                                        <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                        <Input
-                                            placeholder="Search chats..."
-                                            value={conversationSearchQuery}
-                                            onChange={(e) => setConversationSearchQuery(e.target.value)}
-                                            className="h-8 w-48 pl-9"
-                                        />
-                                    </div>
+            {/* min-h-full (not h-full) so tall content grows instead of clipping under justify-center */}
+            <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center px-4 py-8">
+                {!isViewer && papers.length > 0 ? (
+                    <>
+                        <div className="mb-6 text-center">
+                            <AnimatedGradientText
+                                className="text-2xl font-bold"
+                                colorFrom="#6366f1"
+                                colorTo="#3b82f6"
+                            >
+                                What would you like to discover in your papers?
+                            </AnimatedGradientText>
+                            {/* Compact description — the title lives in the breadcrumb */}
+                            <div className="group mt-2">
+                                {project.description ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        {project.description}
+                                        <button
+                                            onClick={handleEditClick}
+                                            className="ml-2 inline-flex align-middle opacity-0 transition-opacity group-hover:opacity-100"
+                                            aria-label="Edit project"
+                                        >
+                                            <Pencil className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                        </button>
+                                    </p>
+                                ) : (
+                                    <button
+                                        className="cursor-pointer border-none bg-transparent p-0 text-sm text-muted-foreground/60 transition-colors hover:text-muted-foreground"
+                                        onClick={handleEditClick}
+                                    >
+                                        Add a description...
+                                    </button>
                                 )}
                             </div>
-                            {conversationSearchQuery.trim() ? (
-                                filteredConversations.length > 0 ? (
-                                    filteredConversations.map((convo) => (
-                                        <ConversationCard
-                                            key={convo.id}
-                                            convo={convo}
-                                            showAvatar={hasCollaborators}
-                                            href={`/projects/${projectId}/conversations/${convo.id}`}
-                                            onDelete={handleDeleteConversation} />
-                                    ))
-                                ) : (
-                                    <div className="py-8 text-center text-muted-foreground">
-                                        <Search className="mx-auto mb-2 h-8 w-8 opacity-50" />
-                                        <p className="text-sm">No chats matching &ldquo;{conversationSearchQuery}&rdquo;</p>
-                                    </div>
-                                )
-                            ) : (
-                                <>
-                                    {conversations.slice(0, CONVERSATIONS_SHOWN).map((convo) => (
-                                        <ConversationCard
-                                            key={convo.id}
-                                            convo={convo}
-                                            showAvatar={hasCollaborators}
-                                            href={`/projects/${projectId}/conversations/${convo.id}`}
-                                            onDelete={handleDeleteConversation} />
-                                    ))}
-                                    {conversations.length > CONVERSATIONS_SHOWN && (
-                                        <div className="mt-2 text-left">
-                                            <Link href={`/projects/${projectId}/past`} className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-                                                View {conversations.length - CONVERSATIONS_SHOWN} more
-                                                <ArrowRight className="ml-1 inline-block h-4 w-4" />
-                                            </Link>
-                                        </div>
-                                    )}
-                                </>
-                            )}
-                        </>
-                    ) : (
-                        <div className="rounded-xl p-8 text-center">
-                            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 p-4 dark:bg-blue-900/30">
-                                <MessageCircle className="h-8 w-8 text-blue-400" />
-                            </div>
-                            <h3 className="mb-2 text-lg font-medium">
-                                {papers.length > 0
-                                    ? "Start a conversation"
-                                    : "Add papers to start"}
-                            </h3>
-                            <p className="mx-auto max-w-md text-sm text-muted-foreground">
-                                {papers.length > 0
-                                    ? "Ask a question about your papers to analyze findings, compare methodologies, or explore connections."
-                                    : "Add papers to your project to begin exploring and discussing them."
-                                }
-                            </p>
                         </div>
-                    )}
-                </div>
+                        <MentionInput
+                            value={newQuery}
+                            onValueChange={setNewQuery}
+                            onSubmit={handleNewQuery}
+                            papers={papers}
+                            papersOnly
+                            selection={mentionSelection}
+                            onSelectionChange={setMentionSelection}
+                            placeholder={chatDisabled ? "Nice! You have used your chat credits for the week. Upgrade your plan to use more." : "Ask a question about your papers, analyze findings, or explore new ideas..."}
+                            disabled={chatDisabled || isSubmitting}
+                            sendDisabled={!newQuery.trim()}
+                            busy={isSubmitting}
+                            autoFocus
+                        />
+                        <p className="mt-3 text-center text-xs text-muted-foreground">
+                            {papers.length} paper{papers.length === 1 ? "" : "s"} in context · pick up past chats from the sidebar
+                        </p>
+                    </>
+                ) : !isViewer ? (
+                    <div className="rounded-xl border-2 border-dashed bg-muted/30 p-8 text-center">
+                        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted p-3">
+                            <MessageCircle className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                        <h3 className="mb-1 text-sm font-semibold">Ready to Start Conversations</h3>
+                        <p className="text-sm text-muted-foreground">Add papers to your project to begin discussing and analyzing them.</p>
+                        <Button variant="outline" size="sm" className="mt-3" onClick={() => setAddPapersOpen(true)}>
+                            Add papers
+                        </Button>
+                    </div>
+                ) : (
+                    <div className="text-center">
+                        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 p-4 dark:bg-blue-900/30">
+                            <MessageCircle className="h-8 w-8 text-blue-400" />
+                        </div>
+                        <h3 className="mb-2 text-lg font-medium">{project.title}</h3>
+                        {project.description && (
+                            <p className="mx-auto mb-3 max-w-md text-sm text-muted-foreground">{project.description}</p>
+                        )}
+                        <p className="mx-auto max-w-md text-sm text-muted-foreground">
+                            You have view access — browse papers and pick up chats from the sidebar.
+                        </p>
+                    </div>
+                )}
             </div>
 
             <AlertDialog open={showEditAlert} onOpenChange={setShowEditAlert}>

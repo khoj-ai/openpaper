@@ -280,18 +280,17 @@ export function ProjectRail({ onNavigate }: ProjectRailProps) {
                                     </Link>
                                 );
                             })}
-                            {conversations.length > RAIL_CHAT_LIMIT && (
-                                <Link
-                                    href={`/projects/${projectId}/past`}
-                                    onClick={onNavigate}
-                                    className={cn(
-                                        "block rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-                                        pathname.endsWith("/past") && "bg-blue-50 font-medium dark:bg-blue-900/30",
-                                    )}
-                                >
-                                    View all {conversations.length}
-                                </Link>
-                            )}
+                            {/* Sole route to chat management (rename/delete on /past) — always visible */}
+                            <Link
+                                href={`/projects/${projectId}/past`}
+                                onClick={onNavigate}
+                                className={cn(
+                                    "block rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+                                    pathname.endsWith("/past") && "bg-blue-50 font-medium dark:bg-blue-900/30",
+                                )}
+                            >
+                                {conversations.length > RAIL_CHAT_LIMIT ? `View all ${conversations.length}` : "Manage chats"}
+                            </Link>
                         </>
                     ) : (
                         <p className="px-2 pt-1 text-xs text-muted-foreground">No chats yet.</p>

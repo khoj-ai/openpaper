@@ -15,6 +15,7 @@ export function ReaderPanel() {
         openPaperIds,
         activePaperId,
         readerSearchTerm,
+        rightPanel,
         activatePaper,
         closePaper,
         closeReader,
@@ -38,7 +39,15 @@ export function ReaderPanel() {
     }
 
     return (
-        <div className="fixed inset-0 z-40 flex flex-col bg-background md:static md:z-auto md:w-[46%] md:min-w-[420px] md:max-w-[760px] md:shrink-0 md:border-l">
+        // Kept mounted (CSS-hidden) while the artifacts pane has the slot, so
+        // PDF scroll position survives switching back.
+        <div
+            className={cn(
+                "flex-col bg-background",
+                rightPanel === "reader" ? "flex" : "hidden",
+                "fixed inset-0 z-40 md:static md:z-auto md:w-[46%] md:min-w-[420px] md:max-w-[760px] md:shrink-0 md:border-l",
+            )}
+        >
             {/* Tabs of open papers */}
             <div className="flex shrink-0 items-center gap-1 border-b bg-muted/30 px-2 py-1.5">
                 <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">

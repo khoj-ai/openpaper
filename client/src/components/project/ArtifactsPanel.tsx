@@ -81,10 +81,11 @@ function CreateTile({ icon, label, sub, isNew, disabled, onClick }: CreateTilePr
     );
 }
 
-// Slide-in drawer for artifacts: creation up top, pending + completed below.
-// Kept mounted while closed so in-progress polling and audio playback survive.
-export function ArtifactsDrawer() {
-    const { projectId, project, papers, artifactsOpen, setArtifactsOpen } = useProjectWorkspace();
+// Right-pane artifacts view: creation up top, pending + completed below.
+// Shares the right slot with the reader panel; kept mounted (CSS-hidden) while
+// inactive so in-progress polling and audio playback survive mode switches.
+export function ArtifactsPanel() {
+    const { projectId, project, papers, rightPanel, closeArtifacts } = useProjectWorkspace();
     const router = useRouter();
     const { subscription, refetch: refetchSubscription } = useSubscription();
     const atAudioLimit = subscription ? isAudioOverviewAtLimit(subscription) : false;
@@ -345,27 +346,19 @@ export function ArtifactsDrawer() {
 
     return (
         <>
-            {artifactsOpen && (
-                <div
-                    className="fixed inset-0 z-40 bg-black/30"
-                    onClick={() => setArtifactsOpen(false)}
-                    aria-hidden
-                />
-            )}
             <aside
                 className={cn(
-                    "fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l bg-background shadow-lg transition-transform duration-300 ease-in-out",
-                    artifactsOpen ? "translate-x-0" : "translate-x-full",
+                    "flex-col bg-background",
+                    rightPanel === "artifacts" ? "flex" : "hidden",
+                    "fixed inset-0 z-40 md:static md:z-auto md:w-[400px] md:shrink-0 md:border-l",
                 )}
-                aria-hidden={!artifactsOpen}
-                {...(!artifactsOpen && { inert: true })}
             >
                 <div className="flex h-11 shrink-0 items-center justify-between border-b px-4">
                     <div className="flex items-center gap-2">
                         <Sparkles className="h-4 w-4 text-blue-500" aria-hidden />
                         <h2 className="text-sm font-semibold">Artifacts</h2>
                     </div>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setArtifactsOpen(false)} aria-label="Close artifacts">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={closeArtifacts} aria-label="Close artifacts">
                         <X className="h-4 w-4" />
                     </Button>
                 </div>

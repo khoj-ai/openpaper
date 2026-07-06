@@ -9,7 +9,7 @@ import {
 import { ProjectHeader } from "@/components/project/ProjectHeader";
 import { ProjectRail } from "@/components/project/ProjectRail";
 import { ReaderPanel } from "@/components/project/ReaderPanel";
-import { ArtifactsDrawer } from "@/components/project/ArtifactsDrawer";
+import { ArtifactsPanel } from "@/components/project/ArtifactsPanel";
 import { AddPapersSheet } from "@/components/project/AddPapersSheet";
 import PdfUploadTracker from "@/components/PdfUploadTracker";
 
@@ -35,9 +35,10 @@ function WorkspaceShell({ children }: { children: ReactNode }) {
                     )}
                     {children}
                 </main>
+                {/* Right slot: reader and artifacts share it, one visible at a time */}
                 <ReaderPanel />
+                <ArtifactsPanel />
             </div>
-            <ArtifactsDrawer />
             <AddPapersSheet />
         </div>
     );

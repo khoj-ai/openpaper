@@ -21,6 +21,10 @@ import {
 export const PROJECT_PAPER_WARNING_LIMIT = 75;
 export const PROJECT_PAPER_HARD_LIMIT = 100;
 
+// What the right pane is currently showing: paper reader tabs, the artifacts
+// panel, or nothing (collapsed).
+export type RightPanelMode = "reader" | "artifacts" | null;
+
 interface ProjectWorkspaceValue {
     projectId: string;
     // Shared data — fetched once for all project routes (rail, header, pages).
@@ -48,8 +52,9 @@ interface ProjectWorkspaceValue {
     // Workspace chrome state.
     crumb: string | null;
     setCrumb: (crumb: string | null) => void;
-    artifactsOpen: boolean;
-    setArtifactsOpen: (open: boolean) => void;
+    rightPanel: RightPanelMode;
+    toggleArtifacts: () => void;
+    closeArtifacts: () => void;
     addPapersOpen: boolean;
     setAddPapersOpen: (open: boolean) => void;
     hasCollaborators: boolean;
@@ -83,7 +88,7 @@ export function ProjectWorkspaceProvider({ projectId, children }: ProjectWorkspa
     const [activePaperId, setActivePaperId] = useState<string | null>(null);
     const [readerSearchTerm, setReaderSearchTerm] = useState<string | null>(null);
     const [crumb, setCrumb] = useState<string | null>(null);
-    const [artifactsOpen, setArtifactsOpen] = useState(false);
+    const [rightPanel, setRightPanel] = useState<RightPanelMode>(null);
     const [addPapersOpen, setAddPapersOpen] = useState(false);
     const [hasCollaborators, setHasCollaborators] = useState(false);
     const [uploadJobs, setUploadJobs] = useState<MinimalJob[]>([]);
@@ -92,18 +97,23 @@ export function ProjectWorkspaceProvider({ projectId, children }: ProjectWorkspa
         setOpenPaperIds((prev) => (prev.includes(paper.id) ? prev : [...prev, paper.id]));
         setActivePaperId(paper.id);
         setReaderSearchTerm(searchTerm);
+        setRightPanel("reader");
     }, []);
 
     const activatePaper = useCallback((paperId: string) => {
         setActivePaperId(paperId);
         // A manual tab switch shouldn't replay a stale citation search.
         setReaderSearchTerm(null);
+        setRightPanel("reader");
     }, []);
 
     const closePaper = useCallback((paperId: string) => {
         setOpenPaperIds((prev) => {
             const next = prev.filter((id) => id !== paperId);
             setActivePaperId((active) => (active === paperId ? (next[next.length - 1] ?? null) : active));
+            if (next.length === 0) {
+                setRightPanel((mode) => (mode === "reader" ? null : mode));
+            }
             return next;
         });
     }, []);
@@ -112,7 +122,25 @@ export function ProjectWorkspaceProvider({ projectId, children }: ProjectWorkspa
         setOpenPaperIds([]);
         setActivePaperId(null);
         setReaderSearchTerm(null);
+        setRightPanel((mode) => (mode === "reader" ? null : mode));
     }, []);
+
+    const toggleArtifacts = useCallback(() => {
+        setRightPanel((mode) => {
+            if (mode === "artifacts") {
+                // Fall back to the reader when paper tabs are still open.
+                return openPaperIds.length > 0 ? "reader" : null;
+            }
+            return "artifacts";
+        });
+    }, [openPaperIds.length]);
+
+    const closeArtifacts = useCallback(() => {
+        setRightPanel((mode) => {
+            if (mode !== "artifacts") return mode;
+            return openPaperIds.length > 0 ? "reader" : null;
+        });
+    }, [openPaperIds.length]);
 
     const refreshPaperUrl = useCallback(async (paperId: string): Promise<string | null> => {
         try {
@@ -182,8 +210,9 @@ export function ProjectWorkspaceProvider({ projectId, children }: ProjectWorkspa
         refreshPaperUrl,
         crumb,
         setCrumb,
-        artifactsOpen,
-        setArtifactsOpen,
+        rightPanel,
+        toggleArtifacts,
+        closeArtifacts,
         addPapersOpen,
         setAddPapersOpen,
         hasCollaborators,
@@ -196,7 +225,7 @@ export function ProjectWorkspaceProvider({ projectId, children }: ProjectWorkspa
         conversations, isConversationsLoading, refetchConversations,
         openPaperIds, activePaperId, readerSearchTerm,
         openPaper, activatePaper, closePaper, closeReader, refreshPaperUrl,
-        crumb, artifactsOpen, addPapersOpen, hasCollaborators,
+        crumb, rightPanel, toggleArtifacts, closeArtifacts, addPapersOpen, hasCollaborators,
         uploadJobs, addUploadJobs,
     ]);
 

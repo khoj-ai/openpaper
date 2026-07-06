@@ -3,6 +3,7 @@
 import { PanelLeft, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
     Breadcrumb,
@@ -32,7 +33,8 @@ export function ProjectHeader() {
         project,
         isProjectLoading,
         crumb,
-        setArtifactsOpen,
+        rightPanel,
+        toggleArtifacts,
         setHasCollaborators,
     } = useProjectWorkspace();
     const [isMobileRailOpen, setIsMobileRailOpen] = useState(false);
@@ -92,7 +94,15 @@ export function ProjectHeader() {
                     setHasCollaborators={setHasCollaborators}
                     currentUserIsAdmin={project?.role === "admin"}
                 />
-                <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2.5 text-xs" onClick={() => setArtifactsOpen(true)}>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                        "h-7 gap-1.5 px-2.5 text-xs",
+                        rightPanel === "artifacts" && "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/30",
+                    )}
+                    onClick={toggleArtifacts}
+                >
                     <Sparkles className="h-3.5 w-3.5 text-blue-500" />
                     Artifacts
                 </Button>
