@@ -246,7 +246,7 @@ export const ConversationView = ({
 			<div
 				data-message-index={index}
 				className={`relative group prose dark:prose-invert max-w-full! transition-all duration-300 ease-in-out ${msg.role === "user"
-					? "text-lg w-fit animate-fade-in line-clamp-3 mt-6 bg-linear-to-r from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-600 px-2 py-2 rounded-xl border border-blue-100 dark:border-gray-600"
+					? "text-base w-fit animate-fade-in line-clamp-3 bg-linear-to-r from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-600 px-3 py-1.5 rounded-xl border border-blue-100 dark:border-gray-600"
 					: "w-full text-primary"
 					}`}
 			>
@@ -363,7 +363,7 @@ export const ConversationView = ({
 					className={`${isCentered ? "flex-0" : "flex-1"} w-full overflow-y-auto transition-all duration-300 ease-in-out`}
 					ref={messagesContainerRef}
 				>
-					<div className={`space-y-4 w-full transition-all duration-300 ease-in-out ${isPdfVisible ? 'p-2' : 'p-4'}`}>
+					<div className={`space-y-4 w-full transition-all duration-300 ease-in-out ${isPdfVisible ? 'p-2' : 'px-4 py-2'}`}>
 						{isSessionLoading ? (
 							<ChatHistorySkeleton />
 						) : (

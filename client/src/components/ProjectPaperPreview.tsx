@@ -98,28 +98,29 @@ export function ProjectPaperPreview({ paper, projectId, searchTerm }: ProjectPap
     return (
         <div className="border bg-card rounded-lg transition-all duration-300 ease-in-out min-w-0 overflow-hidden h-full w-full">
             <div className="h-full flex flex-col">
-                <div className="p-4 border-b">
-                    <h3 className="font-bold text-lg mb-2 pr-8">{paper.title}</h3>
-                    <div className="flex items-center gap-2 flex-wrap">
+                {/* Compact one-line header — the reader tab already shows the title */}
+                <div className="flex items-center gap-2 border-b px-3 py-1.5">
+                    <h3 className="min-w-0 flex-1 truncate text-sm font-medium" title={paper.title}>{paper.title}</h3>
+                    <div className="flex shrink-0 items-center gap-1">
                         <CitePaperButton paper={[paper]} minimalist={true} />
                         {paper.is_owner ? (
-                            <Button variant="outline" size="sm" className="h-8 px-3 text-xs" onClick={() => router.push(`/paper/${paper.id}`)}>
-                                <FilePlus2 className="h-4 w-4 mr-2" />
+                            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={() => router.push(`/paper/${paper.id}`)}>
+                                <FilePlus2 className="h-3.5 w-3.5 mr-1.5" />
                                 Open
                             </Button>
                         ) : isCheckingFork ? (
-                            <Button variant="outline" size="sm" className="h-8 px-3 text-xs" disabled>
-                                <FilePlus2 className="h-4 w-4 mr-2" />
+                            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" disabled>
+                                <FilePlus2 className="h-3.5 w-3.5 mr-1.5" />
                                 Checking...
                             </Button>
                         ) : forkedPaper ? (
-                            <Button variant="outline" size="sm" className="h-8 px-3 text-xs" onClick={() => router.push(`/paper/${forkedPaper.id}`)}>
-                                <FilePlus2 className="h-4 w-4 mr-2" />
+                            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={() => router.push(`/paper/${forkedPaper.id}`)}>
+                                <FilePlus2 className="h-3.5 w-3.5 mr-1.5" />
                                 Open
                             </Button>
                         ) : (
-                            <Button variant="outline" size="sm" className="h-8 px-3 text-xs" onClick={handleDuplicate}>
-                                <FilePlus2 className="h-4 w-4 mr-2" />
+                            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={handleDuplicate}>
+                                <FilePlus2 className="h-3.5 w-3.5 mr-1.5" />
                                 Add to My Library
                             </Button>
                         )}

@@ -47,6 +47,7 @@ export default function ProjectPastConversationsPage() {
                     conversations={conversations}
                     onDelete={handleDeleteConversation}
                     hrefGenerator={(conversation) => `/projects/${projectId}/conversations/${conversation.id}`}
+                    compact
                 />
             </div>
         </div>

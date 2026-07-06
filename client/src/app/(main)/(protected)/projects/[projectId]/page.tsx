@@ -45,6 +45,7 @@ export default function ProjectPage() {
         conversations,
         isConversationsLoading,
         setAddPapersOpen,
+        setChatScopeHandler,
     } = useProjectWorkspace();
 
     const [error, setError] = useState<string | null>(null);
@@ -71,6 +72,18 @@ export default function ProjectPage() {
             sessionStorage.setItem(CHAT_CREDIT_TOAST_KEY, "true");
         }
     }, [chatDisabled, router]);
+
+    // Let the reader panel @-scope the new-chat composer to the open paper.
+    useEffect(() => {
+        setChatScopeHandler((paper) => {
+            setMentionSelection((prev) =>
+                prev.paperIds.includes(paper.id)
+                    ? prev
+                    : { ...prev, paperIds: [...prev.paperIds, paper.id] },
+            );
+        });
+        return () => setChatScopeHandler(null);
+    }, [setChatScopeHandler]);
 
     const handleNewQuery = async () => {
         if (!newQuery.trim()) return;
