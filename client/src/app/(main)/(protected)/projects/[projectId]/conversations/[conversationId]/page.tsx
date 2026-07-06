@@ -1,26 +1,17 @@
 'use client';
 
 import { useSubscription, isChatCreditAtLimit } from '@/hooks/useSubscription';
-import { fetchFromApi, fetchStreamFromApi, getProjectPaperFileUrl } from '@/lib/api';
+import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
 import { useState, useEffect, FormEvent, useRef, useCallback, useMemo, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbLink,
-    BreadcrumbList,
-    BreadcrumbPage,
-    BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import {
     ChatMessage,
     CitationArtifact,
-    Conversation,
     MessageTrace,
     Reference,
 } from '@/lib/schema';
 import { useAuth } from '@/lib/auth';
-import { useProject, useProjectPapers } from '@/hooks/useProjects';
+import { useProjectWorkspace } from '@/components/project/ProjectWorkspaceProvider';
 import { PaperItem } from "@/lib/schema";
 import { toast } from "sonner";
 import { ConversationView } from '@/components/ConversationView';
@@ -56,9 +47,15 @@ function ProjectConversationPageContent() {
     const conversationIdFromUrl = params.conversationId as string;
 
     const { user, loading: authLoading } = useAuth();
-    const { project } = useProject(projectId);
-    // Paper metadata only — file URLs are fetched lazily per-paper on demand.
-    const { papers: projectPapers, isLoading: isPapersLoading, updatePaper } = useProjectPapers(projectId);
+    // Shared workspace data + reader panel — papers open beside the chat.
+    const {
+        papers: projectPapers,
+        isPapersLoading,
+        conversations,
+        openPaper,
+        refreshPaperUrl,
+        setCrumb,
+    } = useProjectWorkspace();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isOwner, setIsOwner] = useState<boolean>(true);
     const [mentionSelection, setMentionSelection] = useState<MentionSelection>(EMPTY_MENTION_SELECTION);
@@ -86,7 +83,6 @@ function ProjectConversationPageContent() {
     const [highlightedInfo, setHighlightedInfo] = useState<{ paperId: string; messageIndex: number } | null>(null);
     const [isCentered, setIsCentered] = useState(false);
     const [isSessionLoading, setIsSessionLoading] = useState(true);
-    const [conversationName, setConversationName] = useState<string>('');
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -95,18 +91,16 @@ function ProjectConversationPageContent() {
     const { subscription, refetch: refetchSubscription } = useSubscription();
     const chatCreditLimitReached = isChatCreditAtLimit(subscription);
 
+    const conversationName = useMemo(
+        () => conversations.find((c) => c.id === conversationIdFromUrl)?.title ?? '',
+        [conversations, conversationIdFromUrl],
+    );
+
+    // Surface the conversation title in the workspace breadcrumb.
     useEffect(() => {
-        if (projectId) {
-            fetchFromApi(`/api/projects/conversations/${projectId}`)
-                .then(data => {
-                    const conversation: Conversation = data.find((c: Conversation) => c.id === conversationIdFromUrl);
-                    if (conversation) {
-                        setConversationName(conversation.title);
-                    }
-                })
-                .catch(err => console.error("Failed to fetch conversation name", err));
-        }
-    }, [projectId, conversationIdFromUrl]);
+        setCrumb(conversationName || 'Chat');
+        return () => setCrumb(null);
+    }, [conversationName, setCrumb]);
 
     useEffect(() => {
         const CHAT_CREDIT_TOAST_KEY = "chat_credit_limit_toast_shown";
@@ -209,21 +203,6 @@ function ProjectConversationPageContent() {
             setIsSessionLoading(false);
         }
     }, [conversationIdFromUrl, user, fetchMessages, router, projectId, authLoading, isSessionLoading, isPapersLoading]);
-
-    const refreshPaperUrl = useCallback(async (paperId: string): Promise<string | null> => {
-        try {
-            const fileUrl = await getProjectPaperFileUrl(projectId, paperId);
-            if (fileUrl) {
-                // Update the papers state so future clicks use the fresh URL
-                updatePaper(paperId, { file_url: fileUrl });
-                return fileUrl;
-            }
-            return null;
-        } catch (error) {
-            console.error("Error refreshing paper URL:", error);
-            return null;
-        }
-    }, [projectId, updatePaper]);
 
     useEffect(() => {
         if (isStreaming) {
@@ -515,23 +494,8 @@ function ProjectConversationPageContent() {
 
 
     return (
-        <div className="mx-none w-full p-4 flex flex-col h-[calc(100vh-64px)]">
-            <Breadcrumb>
-                <BreadcrumbList>
-                    <BreadcrumbItem>
-                        <BreadcrumbLink href="/projects">Projects</BreadcrumbLink>
-                    </BreadcrumbItem>
-                    <BreadcrumbSeparator />
-                    <BreadcrumbItem>
-                        <BreadcrumbLink href={`/projects/${projectId}`}>{project?.title}</BreadcrumbLink>
-                    </BreadcrumbItem>
-                    <BreadcrumbSeparator />
-                    <BreadcrumbItem>
-                        <BreadcrumbPage>{conversationName}</BreadcrumbPage>
-                    </BreadcrumbItem>
-                </BreadcrumbList>
-            </Breadcrumb>
-            <div className="flex-1 min-h-0 pt-4">
+        <div className="flex min-h-0 w-full flex-1 flex-col p-2">
+            <div className="flex-1 min-h-0">
                 <ConversationView
                     messages={messages}
                     isOwner={isOwner}
@@ -557,6 +521,7 @@ function ProjectConversationPageContent() {
                     setHighlightedInfo={setHighlightedInfo}
                     authLoading={authLoading}
                     onRefreshPaperUrl={refreshPaperUrl}
+                    onOpenPaperExternal={openPaper}
                     mentionSelection={mentionSelection}
                     onMentionSelectionChange={setMentionSelection}
                     mentionPapersOnly

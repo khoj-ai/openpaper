@@ -62,6 +62,9 @@ interface ConversationViewProps {
 	setHighlightedInfo: (info: { paperId: string; messageIndex: number } | null) => void;
 	authLoading: boolean;
 	onRefreshPaperUrl?: (paperId: string) => Promise<string | null>;
+	// When provided, papers open in the caller's reader (e.g. the project
+	// workspace panel) instead of this view's private side-by-side PDF split.
+	onOpenPaperExternal?: (paper: PaperItem, searchText: string | null) => void;
 	// @-mention scoping (optional). When onMentionSelectionChange is provided,
 	// the input gains a Google-Docs-style "@" dropdown for scoping the chat to
 	// specific papers/projects.
@@ -98,6 +101,7 @@ export const ConversationView = ({
 	setHighlightedInfo,
 	authLoading,
 	onRefreshPaperUrl,
+	onOpenPaperExternal,
 	projects = [],
 	mentionSelection = EMPTY_MENTION_SELECTION,
 	onMentionSelectionChange,
@@ -155,6 +159,10 @@ export const ConversationView = ({
 	// Open a paper in the PDF panel. file_url is loaded lazily, so it may be
 	// absent on the paper — fetch a fresh one on demand when that's the case.
 	const openPaperPdf = useCallback(async (paper: PaperItem, searchText: string | null) => {
+		if (onOpenPaperExternal) {
+			onOpenPaperExternal(paper, searchText);
+			return;
+		}
 		setActivePaperId(paper.id);
 		setPdfTitle(paper.title);
 		setSearchTerm(searchText);
@@ -173,7 +181,7 @@ export const ConversationView = ({
 				setPdfUrl(freshUrl);
 			}
 		}
-	}, [onRefreshPaperUrl]);
+	}, [onRefreshPaperUrl, onOpenPaperExternal]);
 
 	const handleCitationClick = (key: string, messageIndex: number) => {
 		originalHandleCitationClick(key, messageIndex);
@@ -350,7 +358,7 @@ export const ConversationView = ({
 
 	return (
 		<div className="flex flex-row w-full h-full">
-			<div className={`flex flex-col h-full transition-all duration-500 ease-in-out ${isMobile ? (isPdfVisible ? 'hidden' : 'w-full') : (isPdfVisible ? 'w-1/3' : 'w-full md:w-1/2 mx-auto')}`}>
+			<div className={`flex flex-col h-full transition-all duration-500 ease-in-out ${isMobile ? (isPdfVisible ? 'hidden' : 'w-full') : onOpenPaperExternal ? 'w-full max-w-3xl mx-auto' : (isPdfVisible ? 'w-1/3' : 'w-full md:w-1/2 mx-auto')}`}>
 				<div
 					className={`${isCentered ? "flex-0" : "flex-1"} w-full overflow-y-auto transition-all duration-300 ease-in-out`}
 					ref={messagesContainerRef}

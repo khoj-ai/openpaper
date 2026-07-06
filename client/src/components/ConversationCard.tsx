@@ -3,6 +3,7 @@
 import { Conversation } from "@/lib/schema";
 import { formatDate, getInitials } from "@/lib/utils";
 import { ArrowRight, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import {
 	AlertDialog,
@@ -41,7 +42,8 @@ export default function ConversationCard({ convo, href, onDelete, showAvatar = t
 
 	return (
 		<>
-			<a
+			{/* Client-side Link keeps the project workspace mounted (reader tabs, uploads). */}
+			<Link
 				href={href}
 				className="block p-4 mb-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-all hover:bg-gray-50 dark:hover:bg-gray-800 animate-fade-in group"
 			>
@@ -79,7 +81,7 @@ export default function ConversationCard({ convo, href, onDelete, showAvatar = t
 						</div>
 					</div>
 				</div>
-			</a>
+			</Link>
 			<AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
 				<AlertDialogContent>
 					<AlertDialogHeader>
