@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowRight, BookOpen, Library, MessageCircle, Pencil, UploadCloud } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { fetchFromApi } from "@/lib/api";
@@ -45,7 +45,7 @@ export default function ProjectPage() {
         conversations,
         isConversationsLoading,
         setAddPapersOpen,
-        setChatScopeHandler,
+        openPaperIds,
     } = useProjectWorkspace();
 
     const [error, setError] = useState<string | null>(null);
@@ -73,17 +73,24 @@ export default function ProjectPage() {
         }
     }, [chatDisabled, router]);
 
-    // Let the reader panel @-scope the new-chat composer to the open paper.
+    // Chat scope mirrors the reader tabs: papers open in the reader join the
+    // @-mention scope; closing a tab removes them. Diffing against the previous
+    // tab set preserves mentions the user typed by hand.
+    const prevOpenPaperIdsRef = useRef<string[]>([]);
     useEffect(() => {
-        setChatScopeHandler((paper) => {
-            setMentionSelection((prev) =>
-                prev.paperIds.includes(paper.id)
-                    ? prev
-                    : { ...prev, paperIds: [...prev.paperIds, paper.id] },
-            );
-        });
-        return () => setChatScopeHandler(null);
-    }, [setChatScopeHandler]);
+        const prev = prevOpenPaperIdsRef.current;
+        const added = openPaperIds.filter((id) => !prev.includes(id));
+        const removed = prev.filter((id) => !openPaperIds.includes(id));
+        prevOpenPaperIdsRef.current = openPaperIds;
+        if (added.length === 0 && removed.length === 0) return;
+        setMentionSelection((sel) => ({
+            ...sel,
+            paperIds: [
+                ...sel.paperIds.filter((id) => !removed.includes(id)),
+                ...added.filter((id) => !sel.paperIds.includes(id)),
+            ],
+        }));
+    }, [openPaperIds]);
 
     const handleNewQuery = async () => {
         if (!newQuery.trim()) return;

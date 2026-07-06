@@ -7,7 +7,6 @@ import {
     useContext,
     useEffect,
     useMemo,
-    useRef,
     useState,
 } from "react";
 import { fetchFromApi, getProjectPaperFileUrl } from "@/lib/api";
@@ -58,11 +57,6 @@ interface ProjectWorkspaceValue {
     closeArtifacts: () => void;
     railCollapsed: boolean;
     toggleRail: () => void;
-    // Reader → chat scoping: the page owning a composer registers a handler;
-    // the reader panel calls it to @-scope the chat to the open paper.
-    hasChatScopeHandler: boolean;
-    setChatScopeHandler: (handler: ((paper: PaperItem) => void) | null) => void;
-    requestChatScope: (paper: PaperItem) => void;
     addPapersOpen: boolean;
     setAddPapersOpen: (open: boolean) => void;
     hasCollaborators: boolean;
@@ -163,18 +157,6 @@ export function ProjectWorkspaceProvider({ projectId, children }: ProjectWorkspa
         });
     }, []);
 
-    const chatScopeHandlerRef = useRef<((paper: PaperItem) => void) | null>(null);
-    const [hasChatScopeHandler, setHasChatScopeHandler] = useState(false);
-
-    const setChatScopeHandler = useCallback((handler: ((paper: PaperItem) => void) | null) => {
-        chatScopeHandlerRef.current = handler;
-        setHasChatScopeHandler(handler !== null);
-    }, []);
-
-    const requestChatScope = useCallback((paper: PaperItem) => {
-        chatScopeHandlerRef.current?.(paper);
-    }, []);
-
     const refreshPaperUrl = useCallback(async (paperId: string): Promise<string | null> => {
         try {
             const fileUrl = await getProjectPaperFileUrl(projectId, paperId);
@@ -248,9 +230,6 @@ export function ProjectWorkspaceProvider({ projectId, children }: ProjectWorkspa
         closeArtifacts,
         railCollapsed,
         toggleRail,
-        hasChatScopeHandler,
-        setChatScopeHandler,
-        requestChatScope,
         addPapersOpen,
         setAddPapersOpen,
         hasCollaborators,
@@ -263,8 +242,7 @@ export function ProjectWorkspaceProvider({ projectId, children }: ProjectWorkspa
         conversations, isConversationsLoading, refetchConversations,
         openPaperIds, activePaperId, readerSearchTerm,
         openPaper, activatePaper, closePaper, closeReader, refreshPaperUrl,
-        crumb, rightPanel, toggleArtifacts, closeArtifacts, railCollapsed, toggleRail,
-        hasChatScopeHandler, setChatScopeHandler, requestChatScope, addPapersOpen, hasCollaborators,
+        crumb, rightPanel, toggleArtifacts, closeArtifacts, railCollapsed, toggleRail, addPapersOpen, hasCollaborators,
         uploadJobs, addUploadJobs,
     ]);
 

@@ -53,6 +53,7 @@ function ProjectConversationPageContent() {
         isPapersLoading,
         conversations,
         openPaper,
+        openPaperIds,
         refreshPaperUrl,
         setCrumb,
     } = useProjectWorkspace();
@@ -101,6 +102,25 @@ function ProjectConversationPageContent() {
         setCrumb(conversationName || 'Chat');
         return () => setCrumb(null);
     }, [conversationName, setCrumb]);
+
+    // Chat scope mirrors the reader tabs: papers open in the reader join the
+    // @-mention scope; closing a tab removes them. Diffing against the previous
+    // tab set preserves mentions the user typed by hand.
+    const prevOpenPaperIdsRef = useRef<string[]>([]);
+    useEffect(() => {
+        const prev = prevOpenPaperIdsRef.current;
+        const added = openPaperIds.filter((id) => !prev.includes(id));
+        const removed = prev.filter((id) => !openPaperIds.includes(id));
+        prevOpenPaperIdsRef.current = openPaperIds;
+        if (added.length === 0 && removed.length === 0) return;
+        setMentionSelection((sel) => ({
+            ...sel,
+            paperIds: [
+                ...sel.paperIds.filter((id) => !removed.includes(id)),
+                ...added.filter((id) => !sel.paperIds.includes(id)),
+            ],
+        }));
+    }, [openPaperIds]);
 
     useEffect(() => {
         const CHAT_CREDIT_TOAST_KEY = "chat_credit_limit_toast_shown";
@@ -276,7 +296,9 @@ function ProjectConversationPageContent() {
                 : selectionToScopeItems(submittedMentions, papers, []),
         };
         setMessages(prev => [...prev, userMessage]);
-        setMentionSelection(EMPTY_MENTION_SELECTION);
+        // Reset to the reader-tab scope (not empty): papers open in the reader
+        // stay in scope until their tabs close; hand-typed mentions are one-shot.
+        setMentionSelection({ ...EMPTY_MENTION_SELECTION, paperIds: [...openPaperIds] });
 
         if (!message) {
             setCurrentMessage('');
@@ -483,7 +505,7 @@ function ProjectConversationPageContent() {
             setStatusMessage('');
             refetchSubscription();
         }
-    }, [currentMessage, isStreaming, conversationId, projectId, router, refetchSubscription, mentionSelection, papers]);
+    }, [currentMessage, isStreaming, conversationId, projectId, router, refetchSubscription, mentionSelection, papers, openPaperIds]);
 
     const [error, setError] = useState<string | null>(null);
 

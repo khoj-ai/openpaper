@@ -96,7 +96,8 @@ export function ProjectPaperPreview({ paper, projectId, searchTerm }: ProjectPap
     };
 
     return (
-        <div className="border bg-card rounded-lg transition-all duration-300 ease-in-out min-w-0 overflow-hidden h-full w-full">
+        // Flush container — the reader panel / dialog hosting this provides the frame.
+        <div className="bg-card transition-all duration-300 ease-in-out min-w-0 overflow-hidden h-full w-full">
             <div className="h-full flex flex-col">
                 {/* Compact one-line header — the reader tab already shows the title */}
                 <div className="flex items-center gap-2 border-b px-3 py-1.5">
