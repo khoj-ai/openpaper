@@ -35,6 +35,8 @@ export function ProjectHeader() {
         crumb,
         rightPanel,
         toggleArtifacts,
+        railCollapsed,
+        toggleRail,
         setHasCollaborators,
     } = useProjectWorkspace();
     const [isMobileRailOpen, setIsMobileRailOpen] = useState(false);
@@ -55,6 +57,17 @@ export function ProjectHeader() {
                     <ProjectRail onNavigate={() => setIsMobileRailOpen(false)} />
                 </SheetContent>
             </Sheet>
+            {/* Desktop: collapse/expand the rail */}
+            <Button
+                variant="ghost"
+                size="icon"
+                className="hidden h-7 w-7 md:inline-flex"
+                onClick={toggleRail}
+                aria-label={railCollapsed ? "Expand project navigation" : "Collapse project navigation"}
+                title={railCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+                <PanelLeft className="h-4 w-4" />
+            </Button>
 
             <Breadcrumb className="min-w-0 flex-1">
                 <BreadcrumbList className="flex-nowrap">

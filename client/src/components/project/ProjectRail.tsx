@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams, usePathname, useRouter } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import {
     ExternalLink,
     FileText,
@@ -130,7 +130,6 @@ function PaperRow({ paper, onNavigate }: { paper: PaperItem; onNavigate?: () => 
 // Persistent left navigation for the project workspace: papers on top,
 // chats below. Every project route is reachable from here.
 export function ProjectRail({ onNavigate }: ProjectRailProps) {
-    const router = useRouter();
     const pathname = usePathname();
     const params = useParams();
     const activeConversationId = params.conversationId as string | undefined;
@@ -223,23 +222,39 @@ export function ProjectRail({ onNavigate }: ProjectRailProps) {
 
             {/* Chats */}
             <div className="flex min-h-0 flex-1 flex-col border-t pt-2">
-                <SectionHeading label="Chats" count={conversations.length}>
-                    {!isViewer && (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6"
-                            onClick={() => {
-                                router.push(`/projects/${projectId}`);
-                                onNavigate?.();
-                            }}
-                            aria-label="New chat"
-                        >
-                            <Plus className="h-3.5 w-3.5" />
-                        </Button>
-                    )}
-                </SectionHeading>
+                <SectionHeading label="Chats" count={conversations.length} />
                 <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2">
+                    {/* Explicit path back to the project home (= the new-chat surface) */}
+                    {!isViewer && (
+                        <Link
+                            href={`/projects/${projectId}`}
+                            onClick={onNavigate}
+                            className={cn(
+                                "flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors",
+                                pathname === `/projects/${projectId}`
+                                    ? "bg-blue-50 dark:bg-blue-900/30"
+                                    : "hover:bg-accent",
+                            )}
+                        >
+                            <Plus
+                                className={cn(
+                                    "h-3.5 w-3.5 shrink-0",
+                                    pathname === `/projects/${projectId}` ? "text-blue-500" : "text-muted-foreground/70",
+                                )}
+                                aria-hidden
+                            />
+                            <span
+                                className={cn(
+                                    "truncate text-xs",
+                                    pathname === `/projects/${projectId}`
+                                        ? "font-medium text-blue-700 dark:text-blue-300"
+                                        : "text-foreground",
+                                )}
+                            >
+                                New chat
+                            </span>
+                        </Link>
+                    )}
                     {isConversationsLoading ? (
                         <div className="space-y-2 px-2 pt-1">
                             {[1, 2, 3].map((i) => (

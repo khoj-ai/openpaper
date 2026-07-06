@@ -7,6 +7,7 @@ import {
     useContext,
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from "react";
 import { fetchFromApi, getProjectPaperFileUrl } from "@/lib/api";
@@ -55,6 +56,13 @@ interface ProjectWorkspaceValue {
     rightPanel: RightPanelMode;
     toggleArtifacts: () => void;
     closeArtifacts: () => void;
+    railCollapsed: boolean;
+    toggleRail: () => void;
+    // Reader → chat scoping: the page owning a composer registers a handler;
+    // the reader panel calls it to @-scope the chat to the open paper.
+    hasChatScopeHandler: boolean;
+    setChatScopeHandler: (handler: ((paper: PaperItem) => void) | null) => void;
+    requestChatScope: (paper: PaperItem) => void;
     addPapersOpen: boolean;
     setAddPapersOpen: (open: boolean) => void;
     hasCollaborators: boolean;
@@ -89,6 +97,11 @@ export function ProjectWorkspaceProvider({ projectId, children }: ProjectWorkspa
     const [readerSearchTerm, setReaderSearchTerm] = useState<string | null>(null);
     const [crumb, setCrumb] = useState<string | null>(null);
     const [rightPanel, setRightPanel] = useState<RightPanelMode>(null);
+    // Desktop rail collapse, persisted across sessions.
+    const [railCollapsed, setRailCollapsed] = useState<boolean>(() => {
+        if (typeof window === "undefined") return false;
+        return localStorage.getItem("project-rail-collapsed") === "true";
+    });
     const [addPapersOpen, setAddPapersOpen] = useState(false);
     const [hasCollaborators, setHasCollaborators] = useState(false);
     const [uploadJobs, setUploadJobs] = useState<MinimalJob[]>([]);
@@ -141,6 +154,26 @@ export function ProjectWorkspaceProvider({ projectId, children }: ProjectWorkspa
             return openPaperIds.length > 0 ? "reader" : null;
         });
     }, [openPaperIds.length]);
+
+    const toggleRail = useCallback(() => {
+        setRailCollapsed((prev) => {
+            const next = !prev;
+            localStorage.setItem("project-rail-collapsed", String(next));
+            return next;
+        });
+    }, []);
+
+    const chatScopeHandlerRef = useRef<((paper: PaperItem) => void) | null>(null);
+    const [hasChatScopeHandler, setHasChatScopeHandler] = useState(false);
+
+    const setChatScopeHandler = useCallback((handler: ((paper: PaperItem) => void) | null) => {
+        chatScopeHandlerRef.current = handler;
+        setHasChatScopeHandler(handler !== null);
+    }, []);
+
+    const requestChatScope = useCallback((paper: PaperItem) => {
+        chatScopeHandlerRef.current?.(paper);
+    }, []);
 
     const refreshPaperUrl = useCallback(async (paperId: string): Promise<string | null> => {
         try {
@@ -213,6 +246,11 @@ export function ProjectWorkspaceProvider({ projectId, children }: ProjectWorkspa
         rightPanel,
         toggleArtifacts,
         closeArtifacts,
+        railCollapsed,
+        toggleRail,
+        hasChatScopeHandler,
+        setChatScopeHandler,
+        requestChatScope,
         addPapersOpen,
         setAddPapersOpen,
         hasCollaborators,
@@ -225,7 +263,8 @@ export function ProjectWorkspaceProvider({ projectId, children }: ProjectWorkspa
         conversations, isConversationsLoading, refetchConversations,
         openPaperIds, activePaperId, readerSearchTerm,
         openPaper, activatePaper, closePaper, closeReader, refreshPaperUrl,
-        crumb, rightPanel, toggleArtifacts, closeArtifacts, addPapersOpen, hasCollaborators,
+        crumb, rightPanel, toggleArtifacts, closeArtifacts, railCollapsed, toggleRail,
+        hasChatScopeHandler, setChatScopeHandler, requestChatScope, addPapersOpen, hasCollaborators,
         uploadJobs, addUploadJobs,
     ]);
 
