@@ -1,26 +1,13 @@
 "use client";
 
-import { ArrowRight, BookOpen, Library, MessageCircle, Pencil, UploadCloud } from "lucide-react";
+import { ArrowRight, BookOpen, Library, MessageCircle, UploadCloud } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { fetchFromApi } from "@/lib/api";
 import { ProjectRole } from "@/lib/schema";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { MentionInput } from "@/components/chat/MentionInput";
 import {
     MentionSelection,
@@ -39,7 +26,6 @@ export default function ProjectPage() {
         project,
         isProjectLoading,
         projectError,
-        refetchProject,
         papers,
         isPapersLoading,
         conversations,
@@ -52,9 +38,6 @@ export default function ProjectPage() {
     const [newQuery, setNewQuery] = useState("");
     const [mentionSelection, setMentionSelection] = useState<MentionSelection>(EMPTY_MENTION_SELECTION);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [showEditAlert, setShowEditAlert] = useState(false);
-    const [currentTitle, setCurrentTitle] = useState("");
-    const [currentDescription, setCurrentDescription] = useState("");
     const { subscription } = useSubscription();
 
     const chatDisabled = isChatCreditAtLimit(subscription);
@@ -116,37 +99,6 @@ export default function ProjectPage() {
             console.error(err);
             setIsSubmitting(false);
         }
-    };
-
-    const handleUpdateProject = async () => {
-        if (!project) return;
-        try {
-            const response = await fetchFromApi(`/api/projects/${project.id}`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    title: currentTitle,
-                    description: currentDescription,
-                }),
-            });
-            if (response) {
-                refetchProject();
-                setShowEditAlert(false);
-            } else {
-                console.error('Failed to update project');
-            }
-        } catch (error) {
-            console.error('An error occurred while updating the project:', error);
-        }
-    };
-
-    const handleEditClick = () => {
-        if (!project) return;
-        setCurrentTitle(project.title);
-        setCurrentDescription(project.description || '');
-        setShowEditAlert(true);
     };
 
     const isInitialLoading = isProjectLoading ||
@@ -236,30 +188,12 @@ export default function ProjectPage() {
                                 colorFrom="#6366f1"
                                 colorTo="#3b82f6"
                             >
-                                What would you like to discover in your papers?
+                                What would you like to discover in your project?
                             </AnimatedGradientText>
-                            {/* Compact description — the title lives in the breadcrumb */}
-                            <div className="group mt-2">
-                                {project.description ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        {project.description}
-                                        <button
-                                            onClick={handleEditClick}
-                                            className="ml-2 inline-flex align-middle opacity-0 transition-opacity group-hover:opacity-100"
-                                            aria-label="Edit project"
-                                        >
-                                            <Pencil className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
-                                        </button>
-                                    </p>
-                                ) : (
-                                    <button
-                                        className="cursor-pointer border-none bg-transparent p-0 text-sm text-muted-foreground/60 transition-colors hover:text-muted-foreground"
-                                        onClick={handleEditClick}
-                                    >
-                                        Add a description...
-                                    </button>
-                                )}
-                            </div>
+                            {/* Description shown as context only — editing lives in the header */}
+                            {project.description && (
+                                <p className="mt-2 text-sm text-muted-foreground">{project.description}</p>
+                            )}
                         </div>
                         <MentionInput
                             value={newQuery}
@@ -305,45 +239,6 @@ export default function ProjectPage() {
                     </div>
                 )}
             </div>
-
-            <AlertDialog open={showEditAlert} onOpenChange={setShowEditAlert}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Edit Project</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Update the title and description for your project.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="title" className="text-right">
-                                Title
-                            </Label>
-                            <Input
-                                id="title"
-                                value={currentTitle}
-                                onChange={(e) => setCurrentTitle(e.target.value)}
-                                className="col-span-3"
-                            />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="description" className="text-right">
-                                Description
-                            </Label>
-                            <Textarea
-                                id="description"
-                                value={currentDescription}
-                                onChange={(e) => setCurrentDescription(e.target.value)}
-                                className="col-span-3"
-                            />
-                        </div>
-                    </div>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleUpdateProject}>Save</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </div>
     );
 }
