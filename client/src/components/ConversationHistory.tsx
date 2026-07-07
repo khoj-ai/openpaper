@@ -10,6 +10,8 @@ interface ConversationHistoryProps {
   onDelete: (conversationId: string) => void;
   baseHref?: string;
   hrefGenerator?: (conversation: Conversation) => string;
+  // Render slim rows instead of boxed cards.
+  compact?: boolean;
 }
 
 export default function ConversationHistory({
@@ -17,6 +19,7 @@ export default function ConversationHistory({
   onDelete,
   baseHref,
   hrefGenerator,
+  compact = false,
 }: ConversationHistoryProps) {
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -41,7 +44,7 @@ export default function ConversationHistory({
           className="max-w-sm"
         />
       </div>
-      <div className="flex flex-col gap-3">
+      <div className={compact ? "flex flex-col" : "flex flex-col gap-3"}>
         {filteredConversations.length > 0 ? (
           filteredConversations.map((conversation) => (
             <ConversationCard
@@ -49,6 +52,7 @@ export default function ConversationHistory({
               convo={conversation}
               href={getHref(conversation)}
               onDelete={onDelete}
+              compact={compact}
             />
           ))
         ) : (

@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Project } from "@/lib/schema";
 import { useProjects } from "@/hooks/useProjects";
 import { PlusCircle, Target, BookOpen, FileText, Info, Search, Headphones, MessageCircle, Table, Users, X, Plus } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useSubscription, isProjectNearLimit, isProjectAtLimit, getProjectUsagePercentage } from "@/hooks/useSubscription";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -178,7 +177,8 @@ function ProjectsPage() {
 	);
 
 	return (
-		<div className="container mx-auto p-4">
+		// One centered column — the list, header, and controls share the same width.
+		<div className="mx-auto w-full max-w-4xl p-4">
 			{(nearProjectLimit || atProjectLimit) && subscription && showUsageAlert && (
 				<Alert variant={'default'} className="mb-4 border-muted">
 					<div className="flex justify-between items-start">
@@ -236,58 +236,52 @@ function ProjectsPage() {
 				</div>
 			</div>
 
-			{/* Search and Filters */}
+			{/* Search and Filters — one compact row */}
 			{projects.length > 0 && (
-				<div className="mb-4 space-y-3">
-					{/* Search Input */}
-					<div className="relative">
+				<div className="mb-4 flex flex-wrap items-center gap-2">
+					<div className="relative min-w-48 flex-1 sm:max-w-xs">
 						<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
 						<Input
 							type="text"
-							placeholder="Search projects by title or description..."
+							placeholder="Search projects..."
 							value={searchQuery}
 							onChange={(e) => setSearchQuery(e.target.value)}
-							className="pl-9 max-w-md"
+							className="h-8 pl-9"
 						/>
 					</div>
-
-					{/* Quick Filters */}
-					<div className="flex flex-wrap items-center gap-2">
-						<span className="text-sm text-muted-foreground mr-1">Filter:</span>
-						{(Object.keys(FILTER_CONFIG) as ProjectFilter[]).map((filterKey) => {
-							const config = FILTER_CONFIG[filterKey];
-							const Icon = config.icon;
-							const isActive = activeFilters.has(filterKey);
-							return (
-								<button
-									key={filterKey}
-									onClick={() => toggleFilter(filterKey)}
-									className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-										isActive
-											? "bg-primary text-primary-foreground"
-											: "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-									}`}
-								>
-									<Icon className="h-3.5 w-3.5" />
-									{config.label}
-								</button>
-							);
-						})}
-						{hasActiveFilters && (
-							<>
-								<button
-									onClick={clearAllFilters}
-									className="inline-flex items-center gap-1 px-2 py-1.5 rounded-full text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-								>
-									<X className="h-3.5 w-3.5" />
-									Clear
-								</button>
-								<span className="text-sm text-muted-foreground ml-2">
-									{filteredProjects.length} of {projects.length} project{projects.length !== 1 ? "s" : ""}
-								</span>
-							</>
-						)}
-					</div>
+					{(Object.keys(FILTER_CONFIG) as ProjectFilter[]).map((filterKey) => {
+						const config = FILTER_CONFIG[filterKey];
+						const Icon = config.icon;
+						const isActive = activeFilters.has(filterKey);
+						return (
+							<button
+								key={filterKey}
+								onClick={() => toggleFilter(filterKey)}
+								className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
+									isActive
+										? "bg-primary text-primary-foreground"
+										: "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+								}`}
+							>
+								<Icon className="h-3.5 w-3.5" />
+								{config.label}
+							</button>
+						);
+					})}
+					{hasActiveFilters && (
+						<>
+							<button
+								onClick={clearAllFilters}
+								className="inline-flex items-center gap-1 px-2 py-1.5 rounded-full text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+							>
+								<X className="h-3.5 w-3.5" />
+								Clear
+							</button>
+							<span className="text-xs text-muted-foreground">
+								{filteredProjects.length} of {projects.length} project{projects.length !== 1 ? "s" : ""}
+							</span>
+						</>
+					)}
 				</div>
 			)}
 			{isLoading ? (
@@ -321,26 +315,22 @@ function ProjectsPage() {
 					</Button>
 				</div>
 			) : (
-				<div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-					{/* New Project Card */}
+				<div className="flex flex-col divide-y divide-border/60">
+					{/* New Project row */}
 					{!hasActiveFilters && (
 						atProjectLimit ? (
-							<Card className="h-64 border-2 border-dashed border-border/50 bg-secondary/30 flex flex-col items-center justify-center text-muted-foreground cursor-not-allowed">
-								<div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
-									<Plus className="w-6 h-6" />
-								</div>
-								<span className="font-medium">New Project</span>
-								<span className="text-xs mt-1">Upgrade to create more</span>
-							</Card>
+							<div className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2.5 text-muted-foreground/60">
+								<Plus className="h-4 w-4" aria-hidden />
+								<span className="text-sm font-medium">New Project</span>
+								<span className="text-xs">Upgrade to create more</span>
+							</div>
 						) : (
-							<Link href="/projects/create">
-								<Card className="h-64 border-2 border-dashed border-border/50 hover:border-primary/50 bg-secondary/30 hover:bg-secondary/50 flex flex-col items-center justify-center text-muted-foreground hover:text-foreground transition-all duration-300 cursor-pointer group">
-									<div className="w-12 h-12 rounded-full bg-muted group-hover:bg-primary/10 flex items-center justify-center mb-3 transition-colors">
-										<Plus className="w-6 h-6 group-hover:text-primary transition-colors" />
-									</div>
-									<span className="font-medium">New Project</span>
-									<span className="text-xs mt-1 text-muted-foreground">Create a new research project</span>
-								</Card>
+							<Link
+								href="/projects/create"
+								className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+							>
+								<Plus className="h-4 w-4" aria-hidden />
+								<span className="text-sm font-medium">New Project</span>
 							</Link>
 						)
 					)}

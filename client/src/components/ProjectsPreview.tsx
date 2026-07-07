@@ -74,9 +74,9 @@ export function ProjectsPreview({ limit = 4 }: ProjectsPreviewProps) {
                 </Link>
             </div>
 
-            <div className="space-y-2">
+            <div className="flex flex-col divide-y divide-border/60">
                 {projects.map((project) => (
-                    <ProjectCard key={project.id} project={project} compact={true} />
+                    <ProjectCard key={project.id} project={project} />
                 ))}
             </div>
         </div>

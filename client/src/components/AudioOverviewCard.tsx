@@ -1,18 +1,11 @@
 "use client";
 
 import { Loader2, Pause, Play, Volume2, RotateCcw } from "lucide-react";
-import { AudioOverview, PaperItem } from "@/lib/schema";
-import {
-    Dialog,
-    DialogContent,
-    DialogTrigger,
-} from "@/components/ui/dialog";
-import { RichAudioOverview } from "./RichAudioOverview";
+import { AudioOverview } from "@/lib/schema";
 import { AudioProgress } from "@/hooks/useAudioPlayback";
 
 interface AudioOverviewCardProps {
     overview: AudioOverview;
-    papers: PaperItem[];
     isPlaying: boolean;
     isLoading: boolean;
     isActivated: boolean;
@@ -27,11 +20,12 @@ interface AudioOverviewCardProps {
     onSkipBackward: () => void;
     onSkipForward: () => void;
     formatTime: (time: number) => string;
+    // Opens the transcript view (center pane) — replaces the old dialog.
+    onOpenTranscript: () => void;
 }
 
 export default function AudioOverviewCard({
     overview,
-    papers,
     isPlaying,
     isLoading,
     isActivated,
@@ -46,6 +40,7 @@ export default function AudioOverviewCard({
     onSkipBackward,
     onSkipForward,
     formatTime,
+    onOpenTranscript,
 }: AudioOverviewCardProps) {
     return (
         <div className="w-full p-4 border rounded-lg bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
@@ -70,21 +65,12 @@ export default function AudioOverviewCard({
                         Created {new Date(overview.created_at).toLocaleDateString()}
                     </p>
                     {overview.transcript && (
-                        <Dialog>
-                            <DialogTrigger asChild>
-                                <button className="text-xs text-gray-600 dark:text-gray-300 line-clamp-2 text-left hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                                    {overview.transcript}
-                                </button>
-                            </DialogTrigger>
-                            <DialogContent className="!max-w-none w-[95vw] h-[90vh] p-0 overflow-hidden flex flex-col">
-                                <div className="flex-1 overflow-hidden">
-                                    <RichAudioOverview
-                                        audioOverview={overview}
-                                        papers={papers || []}
-                                    />
-                                </div>
-                            </DialogContent>
-                        </Dialog>
+                        <button
+                            onClick={onOpenTranscript}
+                            className="text-xs text-gray-600 dark:text-gray-300 line-clamp-2 text-left hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                        >
+                            {overview.transcript}
+                        </button>
                     )}
                 </div>
             </div>
