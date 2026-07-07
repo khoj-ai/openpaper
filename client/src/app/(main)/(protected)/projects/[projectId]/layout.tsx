@@ -21,7 +21,8 @@ function WorkspaceShell({ children }: { children: ReactNode }) {
     const { uploadJobs, refetchPapers, railCollapsed } = useProjectWorkspace();
 
     return (
-        <div className="flex h-[calc(100svh-3rem)] flex-col overflow-hidden">
+        // Full viewport height — the app-shell header hides itself on project routes.
+        <div className="flex h-svh flex-col overflow-hidden">
             <ProjectHeader />
             <div className="flex min-h-0 flex-1">
                 {!railCollapsed && (

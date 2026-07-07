@@ -1,9 +1,11 @@
 "use client";
 
-import { PanelLeft, Sparkles } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import {
     Breadcrumb,
@@ -45,11 +47,14 @@ export function ProjectHeader() {
 
     return (
         <div className="flex h-11 shrink-0 items-center gap-2 border-b px-3 md:px-4">
+            {/* App sidebar trigger — the app-shell header is hidden inside the workspace */}
+            <SidebarTrigger className="-ml-1 h-7 w-7" />
+            <Separator orientation="vertical" className="h-4" />
             {/* Mobile: papers + chats rail lives behind a toggle */}
             <Sheet open={isMobileRailOpen} onOpenChange={setIsMobileRailOpen}>
                 <SheetTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-7 w-7 md:hidden" aria-label="Open project navigation">
-                        <PanelLeft className="h-4 w-4" />
+                        <PanelLeftOpen className="h-4 w-4" />
                     </Button>
                 </SheetTrigger>
                 <SheetContent side="left" className="w-72 p-0">
@@ -68,7 +73,7 @@ export function ProjectHeader() {
                 aria-label={railCollapsed ? "Expand project navigation" : "Collapse project navigation"}
                 title={railCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
-                <PanelLeft className="h-4 w-4" />
+                {railCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
             </Button>
 
             <Breadcrumb className="group/crumb min-w-0 flex-1">
