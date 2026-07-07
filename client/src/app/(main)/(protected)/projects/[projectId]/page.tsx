@@ -30,7 +30,7 @@ export default function ProjectPage() {
         isPapersLoading,
         conversations,
         isConversationsLoading,
-        setAddPapersOpen,
+        openAddPapers,
         openPaperIds,
     } = useProjectWorkspace();
 
@@ -136,8 +136,9 @@ export default function ProjectPage() {
 
                     {!isViewer && (
                         <div className="mb-8 grid w-full grid-cols-1 gap-4 sm:grid-cols-2">
+                            {/* Deep-link straight to the chosen flow — no second chooser in the sheet */}
                             <button
-                                onClick={() => setAddPapersOpen(true)}
+                                onClick={() => openAddPapers("upload")}
                                 className="group flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors hover:bg-accent"
                             >
                                 <UploadCloud className="mb-3 h-10 w-10 text-muted-foreground transition-colors group-hover:text-blue-500" />
@@ -145,7 +146,7 @@ export default function ProjectPage() {
                                 <p className="mt-1 text-sm text-muted-foreground">Upload PDFs from your computer</p>
                             </button>
                             <button
-                                onClick={() => setAddPapersOpen(true)}
+                                onClick={() => openAddPapers("library")}
                                 className="group flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors hover:bg-accent"
                             >
                                 <Library className="mb-3 h-10 w-10 text-muted-foreground transition-colors group-hover:text-blue-500" />
@@ -182,17 +183,17 @@ export default function ProjectPage() {
             <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center px-4 py-8">
                 {!isViewer && papers.length > 0 ? (
                     <>
+                        {/* The project itself is the hero — title + description ground the user */}
                         <div className="mb-6 text-center">
                             <AnimatedGradientText
                                 className="text-2xl font-bold"
                                 colorFrom="#6366f1"
                                 colorTo="#3b82f6"
                             >
-                                What would you like to discover in your project?
+                                {project.title}
                             </AnimatedGradientText>
-                            {/* Description shown as context only — editing lives in the header */}
                             {project.description && (
-                                <p className="mt-2 text-sm text-muted-foreground">{project.description}</p>
+                                <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">{project.description}</p>
                             )}
                         </div>
                         <MentionInput
@@ -220,7 +221,7 @@ export default function ProjectPage() {
                         </div>
                         <h3 className="mb-1 text-sm font-semibold">Ready to Start Conversations</h3>
                         <p className="text-sm text-muted-foreground">Add papers to your project to begin discussing and analyzing them.</p>
-                        <Button variant="outline" size="sm" className="mt-3" onClick={() => setAddPapersOpen(true)}>
+                        <Button variant="outline" size="sm" className="mt-3" onClick={() => openAddPapers()}>
                             Add papers
                         </Button>
                     </div>

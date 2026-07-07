@@ -25,6 +25,10 @@ export const PROJECT_PAPER_HARD_LIMIT = 100;
 // panel, or nothing (collapsed).
 export type RightPanelMode = "reader" | "artifacts" | null;
 
+// Which view the add-papers sheet opens on. "initial" is the chooser;
+// callers that already know the user's intent deep-link to upload/library.
+export type AddPapersView = "initial" | "upload" | "library";
+
 interface ProjectWorkspaceValue {
     projectId: string;
     // Shared data — fetched once for all project routes (rail, header, pages).
@@ -59,6 +63,10 @@ interface ProjectWorkspaceValue {
     toggleRail: () => void;
     addPapersOpen: boolean;
     setAddPapersOpen: (open: boolean) => void;
+    addPapersInitialView: AddPapersView;
+    // Open the sheet on a specific view ("upload"/"library") when the caller
+    // already knows the user's intent; defaults to the chooser.
+    openAddPapers: (view?: AddPapersView) => void;
     hasCollaborators: boolean;
     setHasCollaborators: (has: boolean) => void;
     // In-flight PDF upload jobs surfaced by PdfUploadTracker in the layout.
@@ -104,6 +112,7 @@ export function ProjectWorkspaceProvider({ projectId, children }: ProjectWorkspa
         return localStorage.getItem("project-rail-collapsed") === "true";
     });
     const [addPapersOpen, setAddPapersOpen] = useState(false);
+    const [addPapersInitialView, setAddPapersInitialView] = useState<AddPapersView>("initial");
     const [hasCollaborators, setHasCollaborators] = useState(false);
     const [uploadJobs, setUploadJobs] = useState<MinimalJob[]>([]);
 
@@ -158,6 +167,11 @@ export function ProjectWorkspaceProvider({ projectId, children }: ProjectWorkspa
             return openPaperIds.length > 0 ? "reader" : null;
         });
     }, [openPaperIds.length]);
+
+    const openAddPapers = useCallback((view: AddPapersView = "initial") => {
+        setAddPapersInitialView(view);
+        setAddPapersOpen(true);
+    }, []);
 
     const toggleRail = useCallback(() => {
         setRailCollapsed((prev) => {
@@ -242,6 +256,8 @@ export function ProjectWorkspaceProvider({ projectId, children }: ProjectWorkspa
         toggleRail,
         addPapersOpen,
         setAddPapersOpen,
+        addPapersInitialView,
+        openAddPapers,
         hasCollaborators,
         setHasCollaborators,
         uploadJobs,
@@ -252,7 +268,8 @@ export function ProjectWorkspaceProvider({ projectId, children }: ProjectWorkspa
         conversations, isConversationsLoading, refetchConversations,
         openPaperIds, activePaperId, readerSearchTerm,
         openPaper, activatePaper, closePaper, closeReader, refreshPaperUrl,
-        crumb, rightPanel, toggleArtifacts, closeArtifacts, railCollapsed, toggleRail, addPapersOpen, hasCollaborators,
+        crumb, rightPanel, toggleArtifacts, closeArtifacts, railCollapsed, toggleRail,
+        addPapersOpen, addPapersInitialView, openAddPapers, hasCollaborators,
         uploadJobs, addUploadJobs,
     ]);
 

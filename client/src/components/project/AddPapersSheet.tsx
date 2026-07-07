@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
     AlertCircle,
@@ -51,11 +51,19 @@ export function AddPapersSheet() {
         refetchPapers,
         addPapersOpen,
         setAddPapersOpen,
+        addPapersInitialView,
         addUploadJobs,
     } = useProjectWorkspace();
     const { subscription } = useSubscription();
 
     const [view, setView] = useState<"initial" | "upload" | "library">("initial");
+
+    // Deep-link: land on the view the opener asked for (upload/library).
+    useEffect(() => {
+        if (addPapersOpen) {
+            setView(addPapersInitialView);
+        }
+    }, [addPapersOpen, addPapersInitialView]);
     const [isUrlDialogOpen, setIsUrlDialogOpen] = useState(false);
     const [pdfUrl, setPdfUrl] = useState("");
     const [isUploading, setIsUploading] = useState(false);

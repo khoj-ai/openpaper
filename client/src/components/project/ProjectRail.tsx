@@ -140,7 +140,7 @@ export function ProjectRail({ onNavigate }: ProjectRailProps) {
         isPapersLoading,
         conversations,
         isConversationsLoading,
-        setAddPapersOpen,
+        openAddPapers,
     } = useProjectWorkspace();
     const [paperSearchQuery, setPaperSearchQuery] = useState("");
 
@@ -170,7 +170,7 @@ export function ProjectRail({ onNavigate }: ProjectRailProps) {
                             variant="ghost"
                             size="icon"
                             className="h-6 w-6"
-                            onClick={() => setAddPapersOpen(true)}
+                            onClick={() => openAddPapers()}
                             aria-label="Add papers"
                         >
                             <Plus className="h-3.5 w-3.5" />
@@ -210,7 +210,7 @@ export function ProjectRail({ onNavigate }: ProjectRailProps) {
                                 <Button
                                     variant="link"
                                     className="h-auto p-0 text-xs"
-                                    onClick={() => setAddPapersOpen(true)}
+                                    onClick={() => openAddPapers()}
                                 >
                                     Add your first paper
                                 </Button>
