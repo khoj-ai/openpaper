@@ -1,48 +1,66 @@
 # ![Open Paper](https://raw.githubusercontent.com/sabaimran/openpaper/refs/heads/master/client/src/app/openpaper.svg) Open Paper
 
+**The fastest way to annotate and deeply understand research papers.**
 
-When reading lots of papers for research, it can be hard to keep track of your notes and annotations. When you need to go deeper into a specific topic or clarify something you don't understand, you may switch contexts many times to look up terms, concepts, related research.
+Open Paper is a workspace for reading research. Upload your papers, highlight and annotate them, take notes, and ask questions — with an AI assistant that grounds every answer in verifiable citations you can click to jump straight to the source.
 
-I wanted to build something for myself that helped me address some of these issues in one place.
-
-The Open Paper is a place to upload your paper, highlight, leave comments, take notes, and chat all in one place. Search through your existing corpus of annotated papers.
+Try it at **[openpaper.ai](https://openpaper.ai)**.
 
 ![The Open Paper](./demo.gif)
 
-## AI-powered copilot
+## Why Open Paper?
+
+Reading papers means constant context switching: looking up unfamiliar terms, chasing references, re-finding that one result you highlighted three papers ago. Open Paper brings all of that into one place, so you can stay in the flow of actually reading.
+
+## Features
+
+### Read with an AI assistant by your side
 
 ![ai copilot](https://assets.khoj.dev/op_chat_1.png)
 
-AI is very useful at helping us elicit an understanding of new information in large, complex documents and translating between complexity <-> simplicity. This is useful in a research context, where the true meaning behind an insight, methodology, or hypothesis may not be immediately apparent. We want to build better bridges between where we are and where we need to go.
+Your paper and the AI assistant sit side by side, so you never leave the document. As soon as you upload a PDF, you get an AI-generated brief and starter questions to ground yourself before diving in. Every response uses contextual citations — click one and you're taken to the exact passage in the paper it came from. Trust, but verify.
 
-As soon as you upload your PDF, you'll be taken to the page view, which shows you an AI-generated brief on the paper, and some good starter questions. You can use these to quickly ground yourself before diving in.
-
-The AI copilot uses a citations annotation protocol that pushes it to ground its responses in the context of the protocol, while making it easy for you to click and navigate to the exact location in the document where that context may have appeared. One of the challenges here was implementing it in an efficient way where the response could be grounded, but still streamed back to the user for speed. The lookup logic relies on string matching, so it currently is imperfect, but it works well enough for most cases.
-
-## Parallel Views
-
-![parallel view](https://assets.khoj.dev/op_parallel_1.jpeg)
-
-Many tools currently allow you to upload your raw documents and chat with them, but they typically don't show the document in a parallel view. For me, this is a necessary feature as I still need to actually read the document. I want to use an LLM to give me an overview, provide context, extract references, but I want it to do it grounded in the context of the file I'm currently reading. Moreover, I want to highlight, take notes, annotate, all in one place. The split view allows me to do that more easily.
-
-In context of your PDF, try highlighting a section of the text to see an inline menu that quickly lets you take deeper actions.
-
-## Knowledge Base Search
-
-Since you can upload many of your PDFs all in one place, you can also search for them in that centralized spot. Quickly find the paper you might be thinking of in context of your corpus.
-
-## Annotations
+### Highlight, annotate, and take notes
 
 ![annotations](https://assets.khoj.dev/op_annotations_1.jpeg)
 
-Highlights and annotations should help you quickly recall your insights in a given paper and navigate to the particular area of interest.
+Select any text to highlight it, attach a comment, or send it to the AI assistant for a deeper explanation. Notes live in context with your paper, with a markdown view when you want it. Your annotations help you recall insights quickly and jump back to the parts that mattered.
 
-## Notes
+### Organize papers into projects
 
-Takes notes directly in context with your paper. You can use the toggle at the top of the section to view them in markdown format.
+Group related papers into projects and unlock cross-paper insights. Ask questions that span your whole collection, generate artifacts, and keep verifiable citations throughout. Data tables let you define custom schemas to extract key fields across every paper in a project — each cell grounded in its source — and export to CSV when you're ready to analyze.
 
-## Run it Locally
+### Understand topics across your library
 
-This project uses a separate server & client to run the web application. While Open Paper is open-source, it is not optimized for self-hosting. Our main focus is to make the most useful AI-assisted assistant for research.
+Ask a research question and get a synthesized answer drawing on the papers in your library, so your accumulated reading actually compounds.
 
-For instructions on how to set up the project for local development, see [DEVELOPMENT.md](./DEVELOPMENT.md).
+### Discover new papers
+
+Search the open-access literature to find relevant papers, and pull them into your library with one click.
+
+### Import from Zotero
+
+Connect your Zotero account to import your existing library and keep it automatically in sync.
+
+### Listen on the go
+
+Generate audio overviews of your papers for when reading isn't an option.
+
+## Self-hosting
+
+Open Paper is open source, and you can run the full stack yourself. Fair warning: it's built primarily as a hosted service and isn't optimized for self-hosting, so expect some assembly (Postgres, S3-compatible storage, LLM API keys, background workers). The setup in [DEVELOPMENT.md](./DEVELOPMENT.md) is the best starting point.
+
+## Contributing
+
+Contributions are welcome! To get a local development environment running:
+
+- **[DEVELOPMENT.md](./DEVELOPMENT.md)** — full setup guide: prerequisites, environment variables, and how to start all three services.
+- **[server/README.md](./server/README.md)** — the FastAPI backend.
+- **[client/README.md](./client/README.md)** — the Next.js web app.
+- **[jobs/README.md](./jobs/README.md)** — the Celery worker for async processing (PDF parsing, Zotero sync, audio).
+
+Found a bug or have a feature idea? [Open an issue](https://github.com/khoj-ai/openpaper/issues).
+
+## License
+
+Open Paper is licensed under the [AGPL-3.0](./LICENSE).
