@@ -345,13 +345,13 @@ export function ProjectCollaborators({ projectId, currentUserIsAdmin, setHasColl
 				</div>
 			</TooltipProvider>
 
-			{/* Invite Button */}
+			{/* Invite Button — mobile reaches invites via the avatar stack's manage modal */}
 			{currentUserIsAdmin && (
 				<Button
 					variant="outline"
 					size="sm"
 					onClick={() => setIsInviteModalOpen(true)}
-					className="h-8"
+					className="hidden h-8 md:inline-flex"
 				>
 					<Plus className="h-4 w-4 mr-1" />
 					Invite
