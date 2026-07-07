@@ -22,12 +22,27 @@ import {
     SheetTitle,
     SheetTrigger,
 } from "@/components/ui/sheet";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ProjectCollaborators } from "@/components/ProjectCollaborators";
 import { ProjectRail } from "@/components/project/ProjectRail";
 import { EditProjectButton } from "@/components/project/EditProjectDialog";
 import { useProjectWorkspace } from "@/components/project/ProjectWorkspaceProvider";
 import { ProjectRole } from "@/lib/schema";
 import { Skeleton } from "@/components/ui/skeleton";
+
+// Wraps the project-name crumb: the description surfaces as a hover tooltip
+// instead of taking layout space anywhere.
+function TitleWithDescription({ description, children }: { description?: string; children: React.ReactNode }) {
+    if (!description) return <>{children}</>;
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>{children}</TooltipTrigger>
+            <TooltipContent side="bottom" align="start" className="max-w-sm">
+                {description}
+            </TooltipContent>
+        </Tooltip>
+    );
+}
 
 // Compact breadcrumb bar shared by every project route. Navigation lives on
 // the left (mobile rail toggle + breadcrumb); project-level actions on the right.
@@ -78,23 +93,28 @@ export function ProjectHeader() {
 
             <Breadcrumb className="group/crumb min-w-0 flex-1">
                 <BreadcrumbList className="flex-nowrap">
-                    <BreadcrumbItem>
+                    {/* Root crumb hidden on mobile — the project name is the anchor there */}
+                    <BreadcrumbItem className="hidden md:inline-flex">
                         <BreadcrumbLink asChild>
                             <Link href="/projects">Projects</Link>
                         </BreadcrumbLink>
                     </BreadcrumbItem>
-                    <BreadcrumbSeparator />
+                    <BreadcrumbSeparator className="hidden md:block" />
                     <BreadcrumbItem className="min-w-0">
                         {isProjectLoading && !project ? (
                             <Skeleton className="h-4 w-32" />
                         ) : crumb ? (
                             // Client-side Link keeps the workspace mounted, so open
                             // reader tabs survive breadcrumb navigation.
-                            <BreadcrumbLink asChild className="truncate">
-                                <Link href={`/projects/${projectId}`}>{project?.title}</Link>
-                            </BreadcrumbLink>
+                            <TitleWithDescription description={project?.description}>
+                                <BreadcrumbLink asChild className="truncate">
+                                    <Link href={`/projects/${projectId}`}>{project?.title}</Link>
+                                </BreadcrumbLink>
+                            </TitleWithDescription>
                         ) : (
-                            <BreadcrumbPage className="truncate font-medium">{project?.title}</BreadcrumbPage>
+                            <TitleWithDescription description={project?.description}>
+                                <BreadcrumbPage className="truncate font-medium">{project?.title}</BreadcrumbPage>
+                            </TitleWithDescription>
                         )}
                         {project && project.role !== ProjectRole.Viewer && (
                             <EditProjectButton className="ml-0.5 shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover/crumb:opacity-100" />
@@ -125,9 +145,10 @@ export function ProjectHeader() {
                         rightPanel === "artifacts" && "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/30",
                     )}
                     onClick={toggleArtifacts}
+                    aria-label="Toggle artifacts panel"
                 >
                     <Sparkles className="h-3.5 w-3.5 text-blue-500" />
-                    Artifacts
+                    <span className="hidden md:inline">Artifacts</span>
                 </Button>
             </div>
         </div>
