@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { Project, ProjectRole } from "@/lib/schema";
-import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, ArrowRight, FileText, MessageCircle, X, Users, Headphones, Table } from "lucide-react";
+import { MoreHorizontal, FileText, MessageCircle, X, Users, Headphones, Table } from "lucide-react";
 import { useState } from "react";
 import {
 	AlertDialog,
@@ -21,12 +20,12 @@ import { fetchFromApi } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 
-
-export function ProjectCard({ project, onProjectUpdate, onUnlink, compact = false }: {
+// A slim single-line project row: title · description · stats · updated · actions.
+// Used by the projects list and the home dashboard preview.
+export function ProjectCard({ project, onProjectUpdate, onUnlink }: {
 	project: Project;
 	onProjectUpdate?: () => void;
 	onUnlink?: () => void;
-	compact?: boolean;
 }) {
 	const [showDeleteAlert, setShowDeleteAlert] = useState(false);
 	const [showEditAlert, setShowEditAlert] = useState(false);
@@ -112,84 +111,64 @@ export function ProjectCard({ project, onProjectUpdate, onUnlink, compact = fals
 		}
 	};
 
-	const handleCardClick = (e: React.MouseEvent) => {
-		// Prevent navigation if dropdown is open or if clicking on dropdown area
-		if (isDropdownOpen) {
-			e.preventDefault();
-		}
-	};
+	const updatedAt = project.updated_at ? formatDate(project.updated_at) : null;
 
-	if (compact) {
-		const updatedAt = project.updated_at
-			? formatDate(project.updated_at)
-			: null;
-
-		return (
-			<>
-			<AlertDialog open={showUnlinkAlert} onOpenChange={setShowUnlinkAlert}>
-				<AlertDialogContent>
-					<AlertDialogHeader>
-						<AlertDialogTitle>Are you sure you want to unlink this paper?</AlertDialogTitle>
-						<AlertDialogDescription>
-							This action will remove this paper from the project. You can add it back later.
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel>Cancel</AlertDialogCancel>
-						<AlertDialogAction onClick={onUnlink}>Unlink</AlertDialogAction>
-					</AlertDialogFooter>
-				</AlertDialogContent>
-			</AlertDialog>
+	return (
+		<>
 			<Link
 				href={`/projects/${project.id}`}
-				className="group flex items-center gap-4 p-4 rounded-xl border border-border/50 bg-card hover:border-border hover:shadow-sm transition-all"
+				className="group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent"
+				onClick={(e) => {
+					if (isDropdownOpen) e.preventDefault();
+				}}
 			>
-				<div className="flex-1 min-w-0">
-					<h3 className="font-medium truncate group-hover:text-primary transition-colors">
-						{project.title}
-					</h3>
-					<div className="flex items-center gap-3 text-sm text-muted-foreground mt-0.5">
-						{project.num_papers !== undefined && (
-							<span className="flex items-center gap-1">
-								<FileText className="h-3.5 w-3.5" />
-								{project.num_papers} {project.num_papers === 1 ? "paper" : "papers"}
-							</span>
-						)}
-						{project.num_conversations !== undefined && project.num_conversations > 0 && (
-							<span className="flex items-center gap-1">
-								<MessageCircle className="h-3.5 w-3.5" />
-								{project.num_conversations}
-							</span>
-						)}
-						{project.num_roles !== undefined && project.num_roles > 1 && (
-							<span className="flex items-center gap-1">
-								<Users className="h-3.5 w-3.5" />
-								{project.num_roles}
-							</span>
-						)}
-						{(project.num_audio_overviews ?? 0) > 0 && (
-							<span className="flex items-center gap-1">
-								<Headphones className="h-3.5 w-3.5" />
-								{project.num_audio_overviews}
-							</span>
-						)}
-						{(project.num_data_tables ?? 0) > 0 && (
-							<span className="flex items-center gap-1">
-								<Table className="h-3.5 w-3.5" />
-								{project.num_data_tables}
-							</span>
-						)}
-					</div>
+				<div className="flex min-w-0 flex-1 items-baseline gap-3">
+					<h3 className="truncate text-sm font-medium">{project.title}</h3>
+					{project.description && (
+						<span className="hidden min-w-0 flex-1 truncate text-xs text-muted-foreground md:block">
+							{project.description}
+						</span>
+					)}
+				</div>
+
+				<div className="flex shrink-0 items-center gap-3 text-xs text-muted-foreground">
+					<span className="flex items-center gap-1">
+						<FileText className="h-3.5 w-3.5" aria-hidden />
+						{project.num_papers ?? 0}
+					</span>
+					{(project.num_conversations ?? 0) > 0 && (
+						<span className="flex items-center gap-1">
+							<MessageCircle className="h-3.5 w-3.5" aria-hidden />
+							{project.num_conversations}
+						</span>
+					)}
+					{(project.num_audio_overviews ?? 0) > 0 && (
+						<span className="flex items-center gap-1">
+							<Headphones className="h-3.5 w-3.5" aria-hidden />
+							{project.num_audio_overviews}
+						</span>
+					)}
+					{(project.num_data_tables ?? 0) > 0 && (
+						<span className="flex items-center gap-1">
+							<Table className="h-3.5 w-3.5" aria-hidden />
+							{project.num_data_tables}
+						</span>
+					)}
+					{(project.num_roles ?? 1) > 1 && (
+						<span className="flex items-center gap-1">
+							<Users className="h-3.5 w-3.5" aria-hidden />
+							{project.num_roles}
+						</span>
+					)}
 				</div>
 
 				{updatedAt && (
-					<span className="text-xs text-muted-foreground hidden sm:block">
+					<span className="hidden w-16 shrink-0 text-right text-xs text-muted-foreground sm:block">
 						{updatedAt}
 					</span>
 				)}
 
-				<ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-				{onUnlink && (
+				{onUnlink ? (
 					<Button
 						variant="ghost"
 						size="icon"
@@ -197,101 +176,27 @@ export function ProjectCard({ project, onProjectUpdate, onUnlink, compact = fals
 							e.preventDefault();
 							setShowUnlinkAlert(true);
 						}}
-						className="h-8 w-8 text-muted-foreground hover:text-foreground flex-shrink-0"
+						aria-label="Unlink paper from project"
+						className="h-6 w-6 shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
 					>
-						<X className="h-4 w-4" />
+						<X className="h-3.5 w-3.5" />
 					</Button>
-				)}
-			</Link>
-			</>
-		);
-	}
-
-	return (
-		<div className="relative group">
-			<Link href={`/projects/${project.id}`} className="block" onClick={handleCardClick}>
-				<Card className="h-64 transition-all duration-300 border-border/50 hover:border-border bg-secondary backdrop-blur-sm hover:shadow-xl hover:ring-1 hover:ring-border">
-					<CardHeader className="pb-3">
-						<CardTitle className="text-lg font-semibold text-foreground line-clamp-2 flex items-center">
-							{project.title}
-						</CardTitle>
-						{project.description && (
-							<CardDescription className="text-muted-foreground line-clamp-2 text-sm leading-relaxed">
-								{project.description}
-							</CardDescription>
-						)}
-					</CardHeader>
-					<CardFooter className="pt-0 mt-auto">
-						<div className="flex items-center justify-between w-full">
-							<div className="flex items-center gap-4 text-xs text-muted-foreground/70">
-								<span>Updated {formatDate(project.updated_at)}</span>
-								<div className="flex items-center gap-3">
-									<div className="flex items-center gap-1">
-										<FileText className="h-3 w-3" />
-										<span>{project.num_papers ?? 0}</span>
-									</div>
-									<div className="flex items-center gap-1">
-										<MessageCircle className="h-3 w-3" />
-										<span>{project.num_conversations ?? 0}</span>
-									</div>
-									{(project.num_audio_overviews ?? 0) > 0 && (
-										<div className="flex items-center gap-1">
-											<Headphones className="h-3 w-3" />
-											<span>{project.num_audio_overviews}</span>
-										</div>
-									)}
-									{(project.num_data_tables ?? 0) > 0 && (
-										<div className="flex items-center gap-1">
-											<Table className="h-3 w-3" />
-											<span>{project.num_data_tables}</span>
-										</div>
-									)}
-									{project.num_roles !== undefined && project.num_roles > 1 && (
-										<div className="flex items-center gap-1">
-											<Users className="h-3 w-3" />
-											<span>{project.num_roles ?? 0}</span>
-										</div>
-									)}
-								</div>
-							</div>
-							<ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-						</div>
-					</CardFooter>
-				</Card>
-			</Link>
-			{/* Hover-only dropdown menu */}
-			{onUnlink ? (
-				<div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-all duration-200 ease-in-out transform translate-y-1 group-hover:translate-y-0 z-20">
-					<Button
-						variant="ghost"
-						size="icon"
-						onClick={(e) => {
-							e.preventDefault();
-							setShowUnlinkAlert(true);
-						}}
-						className="h-8 w-8 bg-background/80 backdrop-blur-sm border-none hover:border-none shadow-none"
-					>
-						<X className="h-4 w-4" />
-					</Button>
-				</div>
-			) : (
-				<div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-all duration-200 ease-in-out transform translate-y-1 group-hover:translate-y-0 z-20">
+				) : onProjectUpdate ? (
 					<DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
 						<DropdownMenuTrigger asChild>
 							<Button
 								variant="ghost"
 								size="icon"
-								className="h-8 w-8 bg-background/80 backdrop-blur-sm border-none hover:border-none shadow-none"
+								onClick={(e) => e.preventDefault()}
+								aria-label="Project actions"
+								className="h-6 w-6 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 data-[state=open]:opacity-100"
 							>
-								<MoreHorizontal className="h-4 w-4" />
+								<MoreHorizontal className="h-3.5 w-3.5" />
 							</Button>
 						</DropdownMenuTrigger>
-						<DropdownMenuContent align="end" className="w-32">
+						<DropdownMenuContent align="end" className="w-32" onClick={(e) => e.stopPropagation()}>
 							{project.role === ProjectRole.Admin && (
-								<DropdownMenuItem
-									onClick={handleEditClick}
-									className="cursor-pointer"
-								>
+								<DropdownMenuItem onClick={handleEditClick} className="cursor-pointer">
 									Edit
 								</DropdownMenuItem>
 							)}
@@ -313,8 +218,8 @@ export function ProjectCard({ project, onProjectUpdate, onUnlink, compact = fals
 							)}
 						</DropdownMenuContent>
 					</DropdownMenu>
-				</div>
-			)}
+				) : null}
+			</Link>
 
 			<AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
 				<AlertDialogContent>
@@ -407,6 +312,6 @@ export function ProjectCard({ project, onProjectUpdate, onUnlink, compact = fals
 					</AlertDialogFooter>
 				</AlertDialogContent>
 			</AlertDialog>
-		</div>
+		</>
 	);
 }
