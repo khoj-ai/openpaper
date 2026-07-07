@@ -154,39 +154,58 @@ export function AddPapersSheet() {
         setPdfUrl("");
     };
 
+    const viewTitle =
+        view === "upload" ? "Upload Papers" : view === "library" ? "Add from Library" : "Add Papers";
+    const viewDescription =
+        view === "upload"
+            ? "Uploads go to your library and are added to this project."
+            : view === "library"
+                ? "Choose from papers already in your library."
+                : "Bring papers into this project.";
+
     return (
         <>
             <Sheet open={addPapersOpen} onOpenChange={handleOpenChange}>
                 <SheetContent className="sm:max-w-[90vw]! w-[90vw] overflow-y-auto">
-                    <SheetHeader className="px-6">
-                        <SheetTitle>Add Papers to Project</SheetTitle>
+                    <SheetHeader className="border-b px-6 pb-3">
+                        <div className="flex items-center gap-2">
+                            {view !== "initial" && (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="-ml-2 h-7 w-7"
+                                    onClick={() => setView("initial")}
+                                    aria-label="Back"
+                                >
+                                    <ArrowLeft className="h-4 w-4" />
+                                </Button>
+                            )}
+                            <SheetTitle>{viewTitle}</SheetTitle>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                            {viewDescription}{" "}
+                            <span className="text-muted-foreground/70">
+                                {currentPaperCount} / {PROJECT_PAPER_HARD_LIMIT} papers in this project.
+                            </span>
+                        </p>
                     </SheetHeader>
-                    <div className="mt-0 px-6">
-                        {/* Paper limit info */}
-                        <div className={`flex items-start gap-2 p-3 rounded-lg mt-4 ${isAtPaperHardLimit ? 'bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800' : isAtPaperWarningLimit ? 'bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800' : 'bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800'}`}>
-                            <Info className={`h-4 w-4 mt-0.5 flex-shrink-0 ${isAtPaperHardLimit ? 'text-red-500' : isAtPaperWarningLimit ? 'text-amber-500' : 'text-blue-500'}`} />
-                            <div className="text-sm">
-                                <p className={`font-medium ${isAtPaperHardLimit ? 'text-red-700 dark:text-red-300' : isAtPaperWarningLimit ? 'text-amber-700 dark:text-amber-300' : 'text-blue-700 dark:text-blue-300'}`}>
-                                    {currentPaperCount} / {PROJECT_PAPER_HARD_LIMIT} papers in this project
-                                </p>
+                    <div className="px-6">
+                        {/* Limit callout only when it actually matters */}
+                        {(isAtPaperHardLimit || isAtPaperWarningLimit) && (
+                            <div className={`mb-4 flex items-start gap-2 rounded-lg border p-3 text-sm ${isAtPaperHardLimit ? 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300' : 'bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'}`}>
+                                <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
                                 {isAtPaperHardLimit ? (
-                                    <p className="text-red-600 dark:text-red-400 mt-1">
-                                        You&apos;ve reached the maximum. Remove papers to add more.
-                                    </p>
-                                ) : isAtPaperWarningLimit ? (
-                                    <p className="text-amber-600 dark:text-amber-400 mt-1">
-                                        Large paper counts may impact response quality. For higher limits, contact <a href="mailto:saba@openpaper.ai" className="underline font-medium">saba@openpaper.ai</a>
-                                    </p>
+                                    <p>You&apos;ve reached the maximum of {PROJECT_PAPER_HARD_LIMIT} papers. Remove papers to add more.</p>
                                 ) : (
-                                    <p className="text-blue-600 dark:text-blue-400 mt-1">
-                                        You can add {remainingPaperSlots} more paper{remainingPaperSlots === 1 ? "" : "s"}.
+                                    <p>
+                                        {remainingPaperSlots} slot{remainingPaperSlots === 1 ? "" : "s"} left. Large paper counts may impact response quality — for higher limits, contact <a href="mailto:saba@openpaper.ai" className="font-medium underline">saba@openpaper.ai</a>
                                     </p>
                                 )}
                             </div>
-                        </div>
+                        )}
 
                         {view === "initial" && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <button
                                     onClick={() => setView("upload")}
                                     className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
@@ -228,12 +247,6 @@ export function AddPapersSheet() {
 
                         {view === "upload" && (
                             <div>
-                                <Button variant="ghost" onClick={() => setView("initial")} className="mb-4">
-                                    <ArrowLeft className="mr-2 h-4 w-4" />
-                                    Back
-                                </Button>
-                                <h3 className="text-lg font-semibold mb-2">Upload New Papers</h3>
-                                <p className="text-sm text-gray-500 mb-4">Upload papers to your library. They will be automatically added to this project.</p>
                                 <PdfDropzone onFileSelect={handleFileSelect} onUrlClick={() => setIsUrlDialogOpen(true)} disabled={isPaperUploadAtLimit(subscription) || isAtPaperHardLimit} />
                                 {isPaperUploadAtLimit(subscription) && (
                                     <Alert variant="destructive" className="mt-4">
@@ -253,14 +266,7 @@ export function AddPapersSheet() {
                         )}
 
                         {view === "library" && (
-                            <div>
-                                <Button variant="ghost" onClick={() => setView("initial")} className="mb-4">
-                                    <ArrowLeft className="mr-2 h-4 w-4" />
-                                    Back
-                                </Button>
-                                <h3 className="text-lg font-semibold mb-2">Add from Library</h3>
-                                <AddFromLibrary projectId={projectId} onPapersAdded={refetchPapers} projectPaperIds={papers.map(p => p.id)} onUploadClick={() => setView("upload")} remainingPaperSlots={remainingPaperSlots} paperHardLimit={PROJECT_PAPER_HARD_LIMIT} />
-                            </div>
+                            <AddFromLibrary projectId={projectId} onPapersAdded={refetchPapers} projectPaperIds={papers.map(p => p.id)} onUploadClick={() => setView("upload")} remainingPaperSlots={remainingPaperSlots} paperHardLimit={PROJECT_PAPER_HARD_LIMIT} />
                         )}
                     </div>
                 </SheetContent>
