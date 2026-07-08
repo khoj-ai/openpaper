@@ -22,6 +22,14 @@ function SettingsContent() {
 		}
 	}, [user?.name]);
 
+	// Content renders after the user loads, so the browser's native hash scroll
+	// fires too early — re-run it once the anchor target exists.
+	useEffect(() => {
+		if (!loading && user && window.location.hash === "#zotero") {
+			document.getElementById("zotero")?.scrollIntoView({ block: "start" });
+		}
+	}, [loading, user]);
+
 	const handleSave = async (e: React.FormEvent) => {
 		e.preventDefault();
 		const trimmed = name.trim();
@@ -94,7 +102,7 @@ function SettingsContent() {
 
 			<Separator />
 
-			<div className="space-y-4">
+			<div id="zotero" className="space-y-4 scroll-mt-6">
 				<div className="space-y-1">
 					<h2 className="text-lg font-medium">Integrations</h2>
 					<p className="text-sm text-muted-foreground">

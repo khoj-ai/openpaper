@@ -10,6 +10,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog"
 import { PdfDropzone } from "@/components/PdfDropzone"
+import { ZoteroUploadCta } from "@/components/zotero"
 import PdfUploadTracker from "@/components/PdfUploadTracker"
 import { MinimalJob } from "@/lib/schema"
 import { useState } from "react"
@@ -178,12 +179,15 @@ export function UploadModal({ open, onOpenChange, uploadLimit = DEFAULT_UPLOAD_L
                                 <p className="text-sm text-gray-600 dark:text-gray-400">Processing your papers...</p>
                             </div>
                         ) : (
-                            <PdfDropzone
-                                maxPapers={UPLOAD_LIMIT - jobs.length}
-                                disabled={jobs.length >= UPLOAD_LIMIT}
-                                onFileSelect={handleFileSelect}
-                                onUrlClick={onUrlClick}
-                            />
+                            <>
+                                <PdfDropzone
+                                    maxPapers={UPLOAD_LIMIT - jobs.length}
+                                    disabled={jobs.length >= UPLOAD_LIMIT}
+                                    onFileSelect={handleFileSelect}
+                                    onUrlClick={onUrlClick}
+                                />
+                                <ZoteroUploadCta className="max-w-lg mx-auto w-full" />
+                            </>
                         )}
                         {importError && (
                             <p className="text-red-500 text-sm mt-2">{importError}</p>

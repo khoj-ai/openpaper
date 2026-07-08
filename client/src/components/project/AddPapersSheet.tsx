@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/sheet";
 import AddFromLibrary from "@/components/AddFromLibrary";
 import { PdfDropzone } from "@/components/PdfDropzone";
+import { ZoteroUploadCta } from "@/components/zotero";
 import { isPaperUploadAtLimit, useSubscription } from "@/hooks/useSubscription";
 import {
     PROJECT_PAPER_HARD_LIMIT,
@@ -248,6 +249,7 @@ export function AddPapersSheet() {
                         {view === "upload" && (
                             <div>
                                 <PdfDropzone onFileSelect={handleFileSelect} onUrlClick={() => setIsUrlDialogOpen(true)} disabled={isPaperUploadAtLimit(subscription) || isAtPaperHardLimit} />
+                                <ZoteroUploadCta className="max-w-lg mx-auto w-full mt-6" />
                                 {isPaperUploadAtLimit(subscription) && (
                                     <Alert variant="destructive" className="mt-4">
                                         <AlertCircle className="h-4 w-4" />
