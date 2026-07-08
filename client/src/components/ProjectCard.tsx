@@ -117,7 +117,7 @@ export function ProjectCard({ project, onProjectUpdate, onUnlink }: {
 		<>
 			<Link
 				href={`/projects/${project.id}`}
-				className="group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent"
+				className="group flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-accent"
 				onClick={(e) => {
 					if (isDropdownOpen) e.preventDefault();
 				}}

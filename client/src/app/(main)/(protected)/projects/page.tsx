@@ -319,7 +319,7 @@ function ProjectsPage() {
 					{/* New Project row */}
 					{!hasActiveFilters && (
 						atProjectLimit ? (
-							<div className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2.5 text-muted-foreground/60">
+							<div className="flex cursor-not-allowed items-center gap-3 px-3 py-2.5 text-muted-foreground/60">
 								<Plus className="h-4 w-4" aria-hidden />
 								<span className="text-sm font-medium">New Project</span>
 								<span className="text-xs">Upgrade to create more</span>
@@ -327,7 +327,7 @@ function ProjectsPage() {
 						) : (
 							<Link
 								href="/projects/create"
-								className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+								className="flex items-center gap-3 px-3 py-2.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
 							>
 								<Plus className="h-4 w-4" aria-hidden />
 								<span className="text-sm font-medium">New Project</span>
