@@ -363,7 +363,7 @@ export interface PaperTag {
 
 export interface PaperProject {
     id: string;
-    title: string | null;
+    title: string;
 }
 
 export interface PaperItem {

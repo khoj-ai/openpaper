@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/command"
 import { Button } from "@/components/ui/button"
 import { ChevronsUpDown, Check } from "lucide-react"
-import { PaperItem, PaperProject } from "@/lib/schema";
+import { PaperItem } from "@/lib/schema";
 import { PaperStatusEnum } from "@/components/utils/PdfStatus";
 
 export type Filter = {
@@ -32,10 +32,6 @@ export type Filter = {
 
 export const NO_TAGS_FILTER_VALUE = "__NO_TAGS__";
 export const NO_PROJECT_FILTER_VALUE = "__NO_PROJECT__";
-
-// Project filters carry the project id, not its title: titles are nullable and
-// may collide with each other or with a tag of the same name.
-export const projectLabel = (project: PaperProject) => project.title || "Untitled project";
 
 export type Sort = {
     type: "publish_date"
@@ -56,7 +52,7 @@ export function PaperFiltering({ papers, onFilterChange, onSortChange, filters, 
     const tags = Array.from(new Set(papers.flatMap(p => p.tags?.map(t => t.name) || [])))
     const projects = Array.from(
         new Map(papers.flatMap(p => p.projects || []).map(project => [project.id, project])).values()
-    ).sort((a, b) => projectLabel(a).localeCompare(projectLabel(b)))
+    ).sort((a, b) => a.title.localeCompare(b.title))
 
     const handleSelectFilter = (filter: Filter) => {
         const newFilters = filters.some(f => f.type === filter.type && f.value === filter.value)
@@ -132,11 +128,11 @@ export function PaperFiltering({ papers, onFilterChange, onSortChange, filters, 
                                             {projects.map(project => (
                                                 <CommandItem
                                                     key={project.id}
-                                                    value={`${projectLabel(project)}-${project.id}`}
+                                                    value={`${project.title}-${project.id}`}
                                                     onSelect={() => handleSelectFilter({ type: "project", value: project.id })}
                                                 >
                                                     {isFilterActive({ type: "project", value: project.id }) && <Check className="mr-2 h-4 w-4" />}
-                                                    {projectLabel(project)}
+                                                    {project.title}
                                                 </CommandItem>
                                             ))}
                                         </CommandGroup>
