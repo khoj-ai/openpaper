@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from app.database.crud.base_crud import CRUDBase
@@ -13,6 +13,13 @@ from app.database.models import (
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+
+# In-progress upload jobs older than this are treated as dead — a worker that
+# died before writing a terminal status leaves a job stuck in PENDING/RUNNING
+# forever (there is no reaper). A real PDF upload+parse finishes in minutes, so
+# any in-progress job older than this window is filtered out of upload trackers.
+# Single source of truth for the "stale upload" threshold.
+STALE_UPLOAD_JOB_CUTOFF = timedelta(minutes=30)
 
 
 # Define Pydantic models for type safety
@@ -155,6 +162,10 @@ class PaperUploadJobCRUD(
         if not project_role:
             return []
 
+        # Filter out dead uploads so a phantom job doesn't resurface every time
+        # the project opens. See STALE_UPLOAD_JOB_CUTOFF.
+        stale_cutoff = datetime.now(timezone.utc) - STALE_UPLOAD_JOB_CUTOFF
+
         return (
             db.query(PaperUploadJob, Paper)
             .join(Paper, Paper.upload_job_id == PaperUploadJob.id)
@@ -162,6 +173,7 @@ class PaperUploadJobCRUD(
             .filter(
                 ProjectPaper.project_id == project_id,
                 PaperUploadJob.status.in_([JobStatus.PENDING, JobStatus.RUNNING]),
+                PaperUploadJob.created_at >= stale_cutoff,
             )
             .order_by(PaperUploadJob.created_at.asc())
             .all()
