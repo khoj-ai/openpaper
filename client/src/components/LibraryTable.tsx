@@ -23,7 +23,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { ArrowUpDown, CheckCheck, Trash2, X, ChevronDown, Tag } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { PaperPreview } from "./PaperPreview";
-import { PaperFiltering, Filter, Sort, NO_TAGS_FILTER_VALUE } from "@/components/PaperFiltering";
+import { PaperFiltering, Filter, Sort, NO_TAGS_FILTER_VALUE, NO_PROJECT_FILTER_VALUE, projectLabel } from "@/components/PaperFiltering";
 import { Badge } from "@/components/ui/badge";
 import { TagSelector } from "./TagSelector";
 import { toast } from "sonner";
@@ -61,6 +61,7 @@ export function LibraryTable({
 	const [selectedPaperForPreview, setSelectedPaperForPreview] = useState<PaperItem | null>(null);
 	const [taggingPopoverOpen, setTaggingPopoverOpen] = useState(false);
 	const [expandedTags, setExpandedTags] = useState<Set<string>>(new Set());
+	const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 	const tableContainerRef = useRef<HTMLDivElement>(null);
 
 	const maxHeight = 'calc(100vh - 16rem)';
@@ -91,7 +92,8 @@ export function LibraryTable({
 					paper.title?.toLowerCase().includes(term) ||
 					paper.authors?.join(', ').toLowerCase().includes(term) ||
 					paper.institutions?.join(', ').toLowerCase().includes(term) ||
-					paper.tags?.map(t => t.name).join(', ').toLowerCase().includes(term)
+					paper.tags?.map(t => t.name).join(', ').toLowerCase().includes(term) ||
+					paper.projects?.map(p => projectLabel(p)).join(', ').toLowerCase().includes(term)
 				);
 			});
 		}
@@ -107,6 +109,12 @@ export function LibraryTable({
 							return !paper.tags?.length;
 						}
 						return paper.tags?.some(t => t.name === filter.value);
+					}
+					if (filter.type === 'project') {
+						if (filter.value === NO_PROJECT_FILTER_VALUE) {
+							return !paper.projects?.length;
+						}
+						return paper.projects?.some(p => p.id === filter.value);
 					}
 					if (filter.type === 'status') {
 						return paper.status === filter.value;
@@ -235,11 +243,47 @@ export function LibraryTable({
 		});
 	};
 
+	const toggleExpandedProjects = (paperId: string) => {
+		setExpandedProjects(prev => {
+			const newSet = new Set(prev);
+			if (newSet.has(paperId)) {
+				newSet.delete(paperId);
+			} else {
+				newSet.add(paperId);
+			}
+			return newSet;
+		});
+	};
+
 	const handleTagClick = (tagName: string) => {
 		const newFilter: Filter = { type: 'tag', value: tagName };
 		if (!filters.some(f => f.type === 'tag' && f.value === tagName)) {
 			setFilters([...filters, newFilter]);
 		}
+	};
+
+	const addFilter = (filter: Filter) => {
+		if (!filters.some(f => f.type === filter.type && f.value === filter.value)) {
+			setFilters([...filters, filter]);
+		}
+	};
+
+	// Project filters store the project id, so resolve a display title for the chips.
+	const projectTitlesById = useMemo(() => {
+		const titles = new Map<string, string>();
+		for (const paper of papers || []) {
+			for (const project of paper.projects || []) {
+				titles.set(project.id, projectLabel(project));
+			}
+		}
+		return titles;
+	}, [papers]);
+
+	const filterLabel = (filter: Filter) => {
+		if (filter.value === NO_TAGS_FILTER_VALUE) return 'No tags';
+		if (filter.value === NO_PROJECT_FILTER_VALUE) return 'No project';
+		if (filter.type === 'project') return projectTitlesById.get(filter.value) ?? 'Unknown project';
+		return filter.value;
 	};
 
 	const handleRemoveTag = async (paperId: string, tagId: string) => {
@@ -274,7 +318,7 @@ export function LibraryTable({
 		);
 	}
 
-	const numCols = 6 + (selectable ? 1 : 0);
+	const numCols = 7 + (selectable ? 1 : 0);
 	const allAvailableSelected = availablePapers.length > 0 && selectedPapers.size === availablePapers.length;
 
 
@@ -393,12 +437,12 @@ export function LibraryTable({
 			<div className="flex flex-wrap gap-2 mb-4">
 				{filters.map(filter => (
 					<Badge key={`${filter.type}-${filter.value}`} variant="secondary" className="flex items-center gap-1">
-						{filter.type}: {filter.value === NO_TAGS_FILTER_VALUE ? 'No tags' : filter.value}
+						{filter.type}: {filterLabel(filter)}
 						<Button
 							variant="ghost"
 							size="sm"
 							className="h-4 w-4 p-0"
-							onClick={() => setFilters(filters.filter(f => f.value !== filter.value))}
+							onClick={() => setFilters(filters.filter(f => !(f.type === filter.type && f.value === filter.value)))}
 						>
 							<X className="h-3 w-3" />
 						</Button>
@@ -463,6 +507,14 @@ export function LibraryTable({
 											className="h-auto p-0 font-semibold hover:bg-transparent hover:text-primary"
 										>
 											Tags
+										</Button>
+									</TableHead>
+									<TableHead className="min-w-[10rem]">
+										<Button
+											variant="ghost"
+											className="h-auto p-0 font-semibold hover:bg-transparent hover:text-primary"
+										>
+											Projects
 										</Button>
 									</TableHead>
 									<TableHead className="min-w-[8rem]">
@@ -589,6 +641,41 @@ export function LibraryTable({
 													>
 														No tags
 													</span>
+													)}
+												</div>
+											</TableCell>
+											<TableCell className="py-4 pr-4">
+												<div className="text-xs leading-relaxed">
+													{paper.projects?.length ? (
+														<div className="flex flex-wrap gap-1 items-center">
+															{(expandedProjects.has(paper.id) ? paper.projects : paper.projects.slice(0, 2)).map((project) => (
+																<span
+																	key={project.id}
+																	onClick={(e) => { e.stopPropagation(); addFilter({ type: 'project', value: project.id }); }}
+																	className="inline-flex items-center px-2 py-1 bg-secondary text-secondary-foreground rounded-sm cursor-pointer hover:bg-secondary/80 transition-colors"
+																>
+																	{projectLabel(project)}
+																</span>
+															))}
+															{paper.projects.length > 2 && !expandedProjects.has(paper.id) && (
+																<button
+																	onClick={(e) => { e.stopPropagation(); toggleExpandedProjects(paper.id); }}
+																	className="text-muted-foreground text-xs hover:underline"
+																>
+																	+ {paper.projects.length - 2} more
+																</button>
+															)}
+														</div>
+													) : (
+														<span
+															className="text-muted-foreground cursor-pointer hover:underline"
+															onClick={(e) => {
+																e.stopPropagation();
+																addFilter({ type: 'project', value: NO_PROJECT_FILTER_VALUE });
+															}}
+														>
+															No project
+														</span>
 													)}
 												</div>
 											</TableCell>

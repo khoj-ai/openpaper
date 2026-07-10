@@ -22,15 +22,20 @@ import {
 } from "@/components/ui/command"
 import { Button } from "@/components/ui/button"
 import { ChevronsUpDown, Check } from "lucide-react"
-import { PaperItem } from "@/lib/schema";
+import { PaperItem, PaperProject } from "@/lib/schema";
 import { PaperStatusEnum } from "@/components/utils/PdfStatus";
 
 export type Filter = {
-    type: "author" | "status" | "tag"
+    type: "author" | "status" | "tag" | "project"
     value: string
 }
 
 export const NO_TAGS_FILTER_VALUE = "__NO_TAGS__";
+export const NO_PROJECT_FILTER_VALUE = "__NO_PROJECT__";
+
+// Project filters carry the project id, not its title: titles are nullable and
+// may collide with each other or with a tag of the same name.
+export const projectLabel = (project: PaperProject) => project.title || "Untitled project";
 
 export type Sort = {
     type: "publish_date"
@@ -49,6 +54,9 @@ interface PaperFilteringProps {
 export function PaperFiltering({ papers, onFilterChange, onSortChange, filters, sort, showSort = true }: PaperFilteringProps) {
     const authors = Array.from(new Set(papers.flatMap(p => p.authors || [])))
     const tags = Array.from(new Set(papers.flatMap(p => p.tags?.map(t => t.name) || [])))
+    const projects = Array.from(
+        new Map(papers.flatMap(p => p.projects || []).map(project => [project.id, project])).values()
+    ).sort((a, b) => projectLabel(a).localeCompare(projectLabel(b)))
 
     const handleSelectFilter = (filter: Filter) => {
         const newFilters = filters.some(f => f.type === filter.type && f.value === filter.value)
@@ -101,6 +109,41 @@ export function PaperFiltering({ papers, onFilterChange, onSortChange, filters, 
                     }
                     <DropdownMenuLabel>Filter by</DropdownMenuLabel>
                     <DropdownMenuGroup>
+                        <DropdownMenuSub>
+                            <DropdownMenuSubTrigger>Projects</DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent className="p-0">
+                                <Command>
+                                    <CommandInput
+                                        placeholder="Filter project..."
+                                        autoFocus={true}
+                                        className="h-9"
+                                    />
+                                    <CommandList>
+                                        <CommandEmpty>No projects found.</CommandEmpty>
+                                        <CommandGroup>
+                                            <CommandItem
+                                                value="No project"
+                                                onSelect={() => handleSelectFilter({ type: "project", value: NO_PROJECT_FILTER_VALUE })}
+                                                className="text-muted-foreground"
+                                            >
+                                                {isFilterActive({ type: "project", value: NO_PROJECT_FILTER_VALUE }) && <Check className="mr-2 h-4 w-4" />}
+                                                No project
+                                            </CommandItem>
+                                            {projects.map(project => (
+                                                <CommandItem
+                                                    key={project.id}
+                                                    value={`${projectLabel(project)}-${project.id}`}
+                                                    onSelect={() => handleSelectFilter({ type: "project", value: project.id })}
+                                                >
+                                                    {isFilterActive({ type: "project", value: project.id }) && <Check className="mr-2 h-4 w-4" />}
+                                                    {projectLabel(project)}
+                                                </CommandItem>
+                                            ))}
+                                        </CommandGroup>
+                                    </CommandList>
+                                </Command>
+                            </DropdownMenuSubContent>
+                        </DropdownMenuSub>
                         <DropdownMenuSub>
                             <DropdownMenuSubTrigger>Authors</DropdownMenuSubTrigger>
                             <DropdownMenuSubContent className="p-0">

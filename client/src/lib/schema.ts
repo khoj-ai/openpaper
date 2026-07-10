@@ -361,6 +361,11 @@ export interface PaperTag {
     color: string;
 }
 
+export interface PaperProject {
+    id: string;
+    title: string | null;
+}
+
 export interface PaperItem {
     id: string
     title: string
@@ -375,6 +380,7 @@ export interface PaperItem {
     file_url?: string
     size_in_kb?: number
     tags?: PaperTag[]
+    projects?: PaperProject[]
     is_owner?: boolean
     journal?: string
     doi?: string
