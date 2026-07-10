@@ -5,6 +5,9 @@ FROM node:24-slim as base
 # Set the working directory inside the container
 WORKDIR /app
 
+# posthog-cli loads CA certs from the system store, which node:slim doesn't ship
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+
 
 # Set as environment variable for build time
 # These are set early as they might be needed by package scripts during install
