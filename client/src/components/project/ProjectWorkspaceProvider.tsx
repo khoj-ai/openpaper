@@ -59,6 +59,10 @@ interface ProjectWorkspaceValue {
     rightPanel: RightPanelMode;
     toggleArtifacts: () => void;
     closeArtifacts: () => void;
+    // Transient collapse (e.g. on sending a chat message): hides the artifacts
+    // panel for now but, unlike closeArtifacts, does NOT persist the preference,
+    // so the panel returns to its default-open state next session.
+    collapseArtifacts: () => void;
     railCollapsed: boolean;
     toggleRail: () => void;
     addPapersOpen: boolean;
@@ -168,6 +172,15 @@ export function ProjectWorkspaceProvider({ projectId, children }: ProjectWorkspa
         });
     }, [openPaperIds.length]);
 
+    // Get the artifacts panel out of the way (e.g. when sending a chat message)
+    // without persisting a "collapsed" preference — next session it defaults open again.
+    const collapseArtifacts = useCallback(() => {
+        setRightPanel((mode) => {
+            if (mode !== "artifacts") return mode;
+            return openPaperIds.length > 0 ? "reader" : null;
+        });
+    }, [openPaperIds.length]);
+
     const openAddPapers = useCallback((view: AddPapersView = "initial") => {
         setAddPapersInitialView(view);
         setAddPapersOpen(true);
@@ -252,6 +265,7 @@ export function ProjectWorkspaceProvider({ projectId, children }: ProjectWorkspa
         rightPanel,
         toggleArtifacts,
         closeArtifacts,
+        collapseArtifacts,
         railCollapsed,
         toggleRail,
         addPapersOpen,
@@ -268,7 +282,7 @@ export function ProjectWorkspaceProvider({ projectId, children }: ProjectWorkspa
         conversations, isConversationsLoading, refetchConversations,
         openPaperIds, activePaperId, readerSearchTerm,
         openPaper, activatePaper, closePaper, closeReader, refreshPaperUrl,
-        crumb, rightPanel, toggleArtifacts, closeArtifacts, railCollapsed, toggleRail,
+        crumb, rightPanel, toggleArtifacts, closeArtifacts, collapseArtifacts, railCollapsed, toggleRail,
         addPapersOpen, addPapersInitialView, openAddPapers, hasCollaborators,
         uploadJobs, addUploadJobs,
     ]);

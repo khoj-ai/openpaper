@@ -56,6 +56,7 @@ function ProjectConversationPageContent() {
         openPaperIds,
         refreshPaperUrl,
         setCrumb,
+        collapseArtifacts,
     } = useProjectWorkspace();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isOwner, setIsOwner] = useState<boolean>(true);
@@ -286,6 +287,9 @@ function ProjectConversationPageContent() {
 
         if (!query.trim() || isStreaming || !conversationId) return;
 
+        // Get the artifacts panel out of the way so the reply is front-and-center.
+        collapseArtifacts();
+
         // Snapshot @-mention scope for this send, then clear it from the input.
         const submittedMentions = mentionsOverride ?? mentionSelection;
         const userMessage: ChatMessage = {
@@ -505,7 +509,7 @@ function ProjectConversationPageContent() {
             setStatusMessage('');
             refetchSubscription();
         }
-    }, [currentMessage, isStreaming, conversationId, projectId, router, refetchSubscription, mentionSelection, papers, openPaperIds]);
+    }, [currentMessage, isStreaming, conversationId, projectId, router, refetchSubscription, mentionSelection, papers, openPaperIds, collapseArtifacts]);
 
     const [error, setError] = useState<string | null>(null);
 
