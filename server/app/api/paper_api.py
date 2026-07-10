@@ -69,7 +69,9 @@ async def get_paper_ids(
     """
     Get all paper IDs
     """
-    papers: List[Paper] = paper_crud.get_multi_uploads_completed(db, user=current_user)
+    papers: List[Paper] = paper_crud.get_multi_uploads_completed(
+        db, user=current_user, include_projects=True
+    )
 
     # Bulk retrieve presigned URLs for all papers (optimized with parallelization)
     file_urls = {}
@@ -93,6 +95,11 @@ async def get_paper_ids(
             "publish_date": (str(paper.publish_date) if paper.publish_date else None),
             "file_url": file_urls.get(str(paper.id)),
             "tags": [{"id": str(tag.id), "name": tag.name, "color": tag.color} for tag in paper.tags],  # type: ignore
+            "projects": [
+                {"id": str(pp.project.id), "title": pp.project.title}
+                for pp in paper.project_papers  # type: ignore
+                if pp.project
+            ],
         }
         for paper in papers
     ]

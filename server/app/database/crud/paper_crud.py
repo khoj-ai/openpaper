@@ -18,6 +18,8 @@ from app.database.models import (
     PaperStatus,
     PaperTag,
     PaperUploadJob,
+    Project,
+    ProjectPaper,
     RoleType,
     User,
 )
@@ -285,33 +287,45 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
         skip: int = 0,
         limit: int = 500,
         status: Optional[PaperStatus] = None,
+        include_projects: bool = False,
     ) -> List[Paper]:
         """
         Get multiple papers that have completed uploads
         Completed uploads are those either with a null upload_job_id OR an upload_job with status 'completed'.
+
+        Pass include_projects to eagerly load each paper's project memberships.
         """
+        options = [
+            selectinload(Paper.tags),
+            # Library listings only need lightweight metadata. Without this,
+            # the query SELECT *'s heavy columns (raw_content, ts_vector,
+            # summary, summary_citations, page_offset_map) for every paper
+            # in the user's library. Both callers (/api/paper/all and
+            # /api/paper/active) serialize only the columns listed here.
+            load_only(
+                Paper.title,
+                Paper.created_at,
+                Paper.updated_at,
+                Paper.abstract,
+                Paper.authors,
+                Paper.institutions,
+                Paper.status,
+                Paper.preview_url,
+                Paper.size_in_kb,
+                Paper.publish_date,
+            ),
+        ]
+
+        if include_projects:
+            options.append(
+                selectinload(Paper.project_papers)
+                .selectinload(ProjectPaper.project)
+                .load_only(Project.title)
+            )
+
         return (
             db.query(Paper)
-            .options(
-                selectinload(Paper.tags),
-                # Library listings only need lightweight metadata. Without this,
-                # the query SELECT *'s heavy columns (raw_content, ts_vector,
-                # summary, summary_citations, page_offset_map) for every paper
-                # in the user's library. Both callers (/api/paper/all and
-                # /api/paper/active) serialize only the columns listed here.
-                load_only(
-                    Paper.title,
-                    Paper.created_at,
-                    Paper.updated_at,
-                    Paper.abstract,
-                    Paper.authors,
-                    Paper.institutions,
-                    Paper.status,
-                    Paper.preview_url,
-                    Paper.size_in_kb,
-                    Paper.publish_date,
-                ),
-            )
+            .options(*options)
             .outerjoin(PaperUploadJob, Paper.upload_job_id == PaperUploadJob.id)
             .filter(
                 Paper.user_id == user.id,
