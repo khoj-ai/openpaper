@@ -301,6 +301,7 @@ class JobsClient:
         db: Session,
         user: CurrentUser,
         project_id: Optional[UUID] = None,
+        original_filename: Optional[str] = None,
     ) -> str:
         """
         Upload a PDF file to S3 and submit a processing job.
@@ -363,11 +364,15 @@ class JobsClient:
                 db=db,
             )
 
-            # Create paper and project association in a single transaction
+            # Create paper and project association in a single transaction.
+            # Seed the title with the user's original filename so in-progress
+            # uploads have a human-readable label in the upload tracker; parsing
+            # overwrites it with the extracted title on completion.
             new_paper = PaperCreate(
                 file_url=file_url,
                 s3_object_key=s3_object_key,
                 upload_job_id=str(job_id),
+                title=original_filename,
             )
 
             created_paper = paper_crud.create(
