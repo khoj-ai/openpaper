@@ -31,7 +31,7 @@ class ProjectBase(BaseModel):
 
 
 class ProjectCreate(ProjectBase):
-    title: Optional[str] = None
+    title: str
     description: Optional[str] = None
 
 

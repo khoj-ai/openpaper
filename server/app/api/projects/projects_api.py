@@ -153,10 +153,17 @@ async def update_project(
 ) -> JSONResponse:
     """Update an existing project"""
     try:
+        updates = request.model_dump(exclude_unset=True)
+
+        # A project must always have a title, so an explicit null means
+        # "leave it alone" rather than "clear it".
+        if "title" in updates and updates["title"] is None:
+            del updates["title"]
+
         project = project_crud.update(
             db,
             id=uuid.UUID(project_id),
-            obj_in=ProjectUpdate(**request.model_dump(exclude_unset=True)),
+            obj_in=ProjectUpdate(**updates),
             user=current_user,
         )
 
