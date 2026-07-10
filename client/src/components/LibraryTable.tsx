@@ -20,10 +20,11 @@ import {
 	SheetContent,
 } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { ArrowUpDown, CheckCheck, Trash2, X, ChevronDown, Tag } from "lucide-react";
+import { ArrowUpDown, ArrowUpRight, CheckCheck, Trash2, X, ChevronDown, Tag } from "lucide-react";
+import Link from "next/link";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { PaperPreview } from "./PaperPreview";
-import { PaperFiltering, Filter, Sort, NO_TAGS_FILTER_VALUE, NO_PROJECT_FILTER_VALUE, projectLabel } from "@/components/PaperFiltering";
+import { PaperFiltering, Filter, Sort, NO_TAGS_FILTER_VALUE, NO_PROJECT_FILTER_VALUE } from "@/components/PaperFiltering";
 import { Badge } from "@/components/ui/badge";
 import { TagSelector } from "./TagSelector";
 import { toast } from "sonner";
@@ -93,7 +94,7 @@ export function LibraryTable({
 					paper.authors?.join(', ').toLowerCase().includes(term) ||
 					paper.institutions?.join(', ').toLowerCase().includes(term) ||
 					paper.tags?.map(t => t.name).join(', ').toLowerCase().includes(term) ||
-					paper.projects?.map(p => projectLabel(p)).join(', ').toLowerCase().includes(term)
+					paper.projects?.map(p => p.title).join(', ').toLowerCase().includes(term)
 				);
 			});
 		}
@@ -273,7 +274,7 @@ export function LibraryTable({
 		const titles = new Map<string, string>();
 		for (const paper of papers || []) {
 			for (const project of paper.projects || []) {
-				titles.set(project.id, projectLabel(project));
+				titles.set(project.id, project.title);
 			}
 		}
 		return titles;
@@ -628,20 +629,7 @@ export function LibraryTable({
 																</button>
 															)}
 														</div>
-													) : (
-														<span
-														className="text-muted-foreground cursor-pointer hover:underline"
-														onClick={(e) => {
-															e.stopPropagation();
-															const noTagsFilter: Filter = { type: 'tag', value: NO_TAGS_FILTER_VALUE };
-															if (!filters.some(f => f.type === 'tag' && f.value === NO_TAGS_FILTER_VALUE)) {
-																setFilters([...filters, noTagsFilter]);
-															}
-														}}
-													>
-														No tags
-													</span>
-													)}
+													) : null}
 												</div>
 											</TableCell>
 											<TableCell className="py-4 pr-4">
@@ -652,9 +640,17 @@ export function LibraryTable({
 																<span
 																	key={project.id}
 																	onClick={(e) => { e.stopPropagation(); addFilter({ type: 'project', value: project.id }); }}
-																	className="inline-flex items-center px-2 py-1 bg-secondary text-secondary-foreground rounded-sm cursor-pointer hover:bg-secondary/80 transition-colors"
+																	className="group relative inline-flex items-center px-2 py-1 bg-secondary text-secondary-foreground rounded-sm cursor-pointer hover:bg-secondary/80 transition-colors"
 																>
-																	{projectLabel(project)}
+																	{project.title}
+																	<Link
+																		href={`/projects/${project.id}`}
+																		onClick={(e) => e.stopPropagation()}
+																		aria-label={`Open project ${project.title}`}
+																		className="ml-1.5 -mr-1 p-0.5 bg-foreground/10 text-muted-foreground rounded-full opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+																	>
+																		<ArrowUpRight className="h-2.5 w-2.5" />
+																	</Link>
 																</span>
 															))}
 															{paper.projects.length > 2 && !expandedProjects.has(paper.id) && (
@@ -666,17 +662,7 @@ export function LibraryTable({
 																</button>
 															)}
 														</div>
-													) : (
-														<span
-															className="text-muted-foreground cursor-pointer hover:underline"
-															onClick={(e) => {
-																e.stopPropagation();
-																addFilter({ type: 'project', value: NO_PROJECT_FILTER_VALUE });
-															}}
-														>
-															No project
-														</span>
-													)}
+													) : null}
 												</div>
 											</TableCell>
 											<TableCell className="py-4 pr-4">
