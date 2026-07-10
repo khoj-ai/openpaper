@@ -328,6 +328,7 @@ async def upload_raw_file_microservice(
             db=db,
             user=current_user,
             project_id=project_id,
+            original_filename=filename,
         )
 
         # Update job with task_id

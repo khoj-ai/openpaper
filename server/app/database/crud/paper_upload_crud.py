@@ -123,15 +123,26 @@ class PaperUploadJobCRUD(
             .all()
         )
 
-    def get_pending_jobs(
+    def get_in_progress_jobs_for_user(
         self, db: Session, *, user: CurrentUser
-    ) -> list[PaperUploadJob]:
-        """Get all pending paper upload jobs for a specific user"""
+    ) -> list[tuple[PaperUploadJob, Paper]]:
+        """
+        Get a user's in-progress upload jobs across their whole library
+        (project uploads included), paired with their paper record so the
+        Library tracker can show a title. Mirrors get_in_progress_jobs_for_project
+        but is scoped to the user rather than a single project.
+
+        Dead jobs (worker died before writing a terminal status) are filtered
+        out via STALE_UPLOAD_JOB_CUTOFF so they don't resurface on every load.
+        """
+        stale_cutoff = datetime.now(timezone.utc) - STALE_UPLOAD_JOB_CUTOFF
         return (
-            db.query(PaperUploadJob)
+            db.query(PaperUploadJob, Paper)
+            .join(Paper, Paper.upload_job_id == PaperUploadJob.id)
             .filter(
                 PaperUploadJob.user_id == user.id,
-                PaperUploadJob.status == JobStatus.PENDING,
+                PaperUploadJob.status.in_([JobStatus.PENDING, JobStatus.RUNNING]),
+                PaperUploadJob.created_at >= stale_cutoff,
             )
             .order_by(PaperUploadJob.created_at.asc())
             .all()

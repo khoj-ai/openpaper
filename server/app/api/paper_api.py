@@ -12,6 +12,7 @@ from app.database.crud.paper_note_crud import (
     PaperNoteUpdate,
     paper_note_crud,
 )
+from app.database.crud.paper_upload_crud import paper_upload_job_crud
 from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
 from app.database.models import Paper, PaperStatus, ZoteroImportedItem
@@ -138,6 +139,47 @@ async def get_active_paper_ids(
         status_code=200,
         content={"papers": data},
     )
+
+
+@paper_router.get("/pending-jobs")
+async def get_user_pending_jobs(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+) -> JSONResponse:
+    """
+    Get the user's in-progress upload jobs across their whole library, so the
+    Library page can rehydrate the upload tracker after a refresh. Dead jobs are
+    filtered out server-side (see STALE_UPLOAD_JOB_CUTOFF).
+    """
+    try:
+        jobs = paper_upload_job_crud.get_in_progress_jobs_for_user(
+            db, user=current_user
+        )
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "jobs": [
+                    {
+                        "job_id": str(job.id),
+                        "status": job.status,
+                        "paper_id": str(paper.id),
+                        "title": paper.title,
+                        "started_at": (
+                            job.started_at.isoformat() if job.started_at else None
+                        ),
+                    }
+                    for job, paper in jobs
+                ]
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Error fetching pending upload jobs: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=400,
+            content={"message": "Failed to fetch pending upload jobs"},
+        )
 
 
 @paper_router.get("/{id}/file-url")
