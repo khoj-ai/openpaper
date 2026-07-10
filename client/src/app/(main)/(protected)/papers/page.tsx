@@ -1,8 +1,8 @@
 "use client"
 
 import { fetchFromApi } from "@/lib/api";
-import { useEffect, useState } from "react";
-import { PaperItem } from "@/lib/schema";
+import { useCallback, useEffect, useState } from "react";
+import { PaperItem, MinimalJob } from "@/lib/schema";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
@@ -28,6 +28,7 @@ import { useRouter } from "next/navigation";
 import { UploadModal } from "@/components/UploadModal";
 import { usePapers } from "@/hooks/usePapers";
 import { removeActivePaper } from "@/hooks/useActivePapers";
+import PdfUploadTracker from "@/components/PdfUploadTracker";
 
 const PageSkeleton = () => (
     <div className="w-full mx-auto p-4">
@@ -99,6 +100,26 @@ function PapersPageContent() {
     const [isUploadModalOpen, setUploadModalOpen] = useState(false);
     const [isUploadLimitDialogOpen, setUploadLimitDialogOpen] = useState(false);
     const [uploadLimitMessage, setUploadLimitMessage] = useState("");
+    // In-flight uploads across the user's whole library, rehydrated on load so
+    // the tracker survives a refresh. Dead jobs are filtered out server-side.
+    const [pendingJobs, setPendingJobs] = useState<MinimalJob[]>([]);
+
+    const refetchPendingJobs = useCallback(async () => {
+        try {
+            const response = await fetchFromApi("/api/paper/pending-jobs");
+            if (!response?.jobs?.length) return;
+            setPendingJobs(response.jobs.map((job: { job_id: string; title: string | null }) => ({
+                jobId: job.job_id,
+                fileName: job.title || "Uploading paper…",
+            })));
+        } catch (err) {
+            console.error("Failed to fetch pending upload jobs", err);
+        }
+    }, []);
+
+    useEffect(() => {
+        refetchPendingJobs();
+    }, [refetchPendingJobs]);
 
     // Check if upload is blocked due to subscription limits
     const isUploadBlocked = !subscriptionLoading && (isPaperUploadAtLimit(subscription) || isStorageAtLimit(subscription));
@@ -371,7 +392,16 @@ function PapersPageContent() {
                 onOpenChange={setCreateProjectDialogOpen}
                 onSubmit={handleCreateProjectSubmit}
             />
-            <UploadModal open={isUploadModalOpen} onOpenChange={setUploadModalOpen} onUploadComplete={() => { mutate(); }} />
+            <UploadModal
+                open={isUploadModalOpen}
+                onOpenChange={(open) => {
+                    setUploadModalOpen(open);
+                    // On close, let the Library tracker pick up any uploads still
+                    // in flight so it becomes the one canonical progress surface.
+                    if (!open) refetchPendingJobs();
+                }}
+                onUploadComplete={() => { mutate(); refetchPendingJobs(); }}
+            />
             <AlertDialog open={isUploadLimitDialogOpen} onOpenChange={setUploadLimitDialogOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
@@ -398,6 +428,7 @@ function PapersPageContent() {
                     </Button>
                 </div>
             </div>
+            <PdfUploadTracker initialJobs={pendingJobs} onComplete={() => mutate()} />
             <div className="flex-1 min-h-0">
                 {papers && papers.length === 0 ? (
                     <EmptyState />
