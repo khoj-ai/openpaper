@@ -115,7 +115,7 @@ const PdfUploadTracker: React.FC<PdfUploadTrackerProps> = ({ initialJobs, onComp
 	const hasFailures = failedCount > 0;
 
 	return (
-		<Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full mb-4">
+		<Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full min-w-0 mb-4">
 			<CollapsibleTrigger className="w-full">
 				<div className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
 					allDone
@@ -152,7 +152,7 @@ const PdfUploadTracker: React.FC<PdfUploadTrackerProps> = ({ initialJobs, onComp
 			<CollapsibleContent>
 				<div className="mt-2 border rounded-lg divide-y">
 					{jobs.map(job => (
-						<div key={job.jobId} className="flex items-center justify-between p-3 gap-4">
+						<div key={job.jobId} className="flex items-center justify-between p-3 gap-4 min-w-0">
 							<div className="flex-1 min-w-0 overflow-hidden">
 								{job.status === 'completed' && job.paperId ? (
 									<Link
