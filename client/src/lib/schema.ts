@@ -525,6 +525,7 @@ export interface SubscriptionLimits {
     data_tables_weekly: number;
     discover_searches_weekly: number;
     projects: number;
+    project_papers: number;
     model: string[];
 }
 

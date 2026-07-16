@@ -17,10 +17,6 @@ import {
     useProjectPapers,
 } from "@/hooks/useProjects";
 
-// Client-side paper limits per project
-export const PROJECT_PAPER_WARNING_LIMIT = 75;
-export const PROJECT_PAPER_HARD_LIMIT = 100;
-
 // What the right pane is currently showing: paper reader tabs, the artifacts
 // panel, or nothing (collapsed).
 export type RightPanelMode = "reader" | "artifacts" | null;

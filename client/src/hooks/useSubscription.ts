@@ -122,6 +122,25 @@ export const isProjectAtLimit = (subscription: SubscriptionData | null): boolean
     return getProjectUsagePercentage(subscription) >= 100;
 };
 
+export const getProjectPaperHardLimit = (subscription: SubscriptionData | null): number | null => {
+    return subscription?.limits.project_papers ?? null;
+};
+
+export const getProjectPaperUsagePercentage = (subscription: SubscriptionData | null, paperCount: number): number => {
+    if (!subscription) return 0;
+    const total = subscription.limits.project_papers;
+    if (total === 0) return 0;
+    return (paperCount / total) * 100;
+};
+
+export const isProjectPaperNearLimit = (subscription: SubscriptionData | null, paperCount: number, threshold: number = 75): boolean => {
+    return getProjectPaperUsagePercentage(subscription, paperCount) >= threshold;
+};
+
+export const isProjectPaperAtLimit = (subscription: SubscriptionData | null, paperCount: number): boolean => {
+    return getProjectPaperUsagePercentage(subscription, paperCount) >= 100;
+};
+
 // Data table usage helper functions
 export const getDataTableUsagePercentage = (subscription: SubscriptionData | null): number => {
     if (!subscription) return 0;

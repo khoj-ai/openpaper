@@ -35,12 +35,14 @@ import {
 import AddFromLibrary from "@/components/AddFromLibrary";
 import { PdfDropzone } from "@/components/PdfDropzone";
 import { ZoteroUploadCta } from "@/components/zotero";
-import { isPaperUploadAtLimit, useSubscription } from "@/hooks/useSubscription";
 import {
-    PROJECT_PAPER_HARD_LIMIT,
-    PROJECT_PAPER_WARNING_LIMIT,
-    useProjectWorkspace,
-} from "@/components/project/ProjectWorkspaceProvider";
+    getProjectPaperHardLimit,
+    isPaperUploadAtLimit,
+    isProjectPaperAtLimit,
+    isProjectPaperNearLimit,
+    useSubscription,
+} from "@/hooks/useSubscription";
+import { useProjectWorkspace } from "@/components/project/ProjectWorkspaceProvider";
 
 // The full "add papers to project" flow: choose upload vs. library, drop PDFs,
 // import from URL — with per-project and per-plan limit handling. Opened from
@@ -70,14 +72,17 @@ export function AddPapersSheet() {
     const [isUploading, setIsUploading] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
 
+    // Paper limits are plan-dependent. While the subscription loads the limit is
+    // unknown and nothing is gated; the limits apply once the plan is known.
+    const paperHardLimit = getProjectPaperHardLimit(subscription);
     const currentPaperCount = papers.length;
-    const isAtPaperWarningLimit = currentPaperCount >= PROJECT_PAPER_WARNING_LIMIT;
-    const isAtPaperHardLimit = currentPaperCount >= PROJECT_PAPER_HARD_LIMIT;
-    const remainingPaperSlots = Math.max(0, PROJECT_PAPER_HARD_LIMIT - currentPaperCount);
+    const isAtPaperWarningLimit = isProjectPaperNearLimit(subscription, currentPaperCount);
+    const isAtPaperHardLimit = isProjectPaperAtLimit(subscription, currentPaperCount);
+    const remainingPaperSlots = paperHardLimit === null ? null : Math.max(0, paperHardLimit - currentPaperCount);
 
     const handleOpenChange = (isOpen: boolean) => {
         if (isOpen && isAtPaperHardLimit) {
-            toast.error(`This project has reached the maximum of ${PROJECT_PAPER_HARD_LIMIT} papers. Remove some papers before adding more.`);
+            toast.error(`This project has reached the maximum of ${paperHardLimit} papers. Remove some papers before adding more.`);
             return;
         }
         setAddPapersOpen(isOpen);
@@ -88,15 +93,15 @@ export function AddPapersSheet() {
 
     const handleFileSelect = async (files: File[]) => {
         if (isAtPaperHardLimit) {
-            toast.error(`This project has reached the maximum of ${PROJECT_PAPER_HARD_LIMIT} papers. Remove some papers before adding more.`);
+            toast.error(`This project has reached the maximum of ${paperHardLimit} papers. Remove some papers before adding more.`);
             return;
         }
         if (isPaperUploadAtLimit(subscription)) {
             setUploadError("You have reached your paper upload limit. Please upgrade your plan to upload more papers.");
             return;
         }
-        if (files.length > remainingPaperSlots) {
-            toast.error(`You can only add ${remainingPaperSlots} more paper${remainingPaperSlots === 1 ? "" : "s"} to this project (limit: ${PROJECT_PAPER_HARD_LIMIT}).`);
+        if (remainingPaperSlots !== null && files.length > remainingPaperSlots) {
+            toast.error(`You can only add ${remainingPaperSlots} more paper${remainingPaperSlots === 1 ? "" : "s"} to this project (limit: ${paperHardLimit}).`);
             return;
         }
         setUploadError(null);
@@ -124,7 +129,7 @@ export function AddPapersSheet() {
 
     const handlePdfUrl = async (url: string) => {
         if (isAtPaperHardLimit) {
-            toast.error(`This project has reached the maximum of ${PROJECT_PAPER_HARD_LIMIT} papers. Remove some papers before adding more.`);
+            toast.error(`This project has reached the maximum of ${paperHardLimit} papers. Remove some papers before adding more.`);
             setIsUrlDialogOpen(false);
             return;
         }
@@ -185,9 +190,11 @@ export function AddPapersSheet() {
                         </div>
                         <p className="text-sm text-muted-foreground">
                             {viewDescription}{" "}
-                            <span className="text-muted-foreground/70">
-                                {currentPaperCount} / {PROJECT_PAPER_HARD_LIMIT} papers in this project.
-                            </span>
+                            {paperHardLimit !== null && (
+                                <span className="text-muted-foreground/70">
+                                    {currentPaperCount} / {paperHardLimit} papers in this project.
+                                </span>
+                            )}
                         </p>
                     </SheetHeader>
                     <div className="px-6">
@@ -196,7 +203,7 @@ export function AddPapersSheet() {
                             <div className={`mb-4 flex items-start gap-2 rounded-lg border p-3 text-sm ${isAtPaperHardLimit ? 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300' : 'bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'}`}>
                                 <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
                                 {isAtPaperHardLimit ? (
-                                    <p>You&apos;ve reached the maximum of {PROJECT_PAPER_HARD_LIMIT} papers. Remove papers to add more.</p>
+                                    <p>You&apos;ve reached the maximum of {paperHardLimit} papers. Remove papers to add more.</p>
                                 ) : (
                                     <p>
                                         {remainingPaperSlots} slot{remainingPaperSlots === 1 ? "" : "s"} left. Large paper counts may impact response quality — for higher limits, contact <a href="mailto:saba@openpaper.ai" className="font-medium underline">saba@openpaper.ai</a>
@@ -268,7 +275,7 @@ export function AddPapersSheet() {
                         )}
 
                         {view === "library" && (
-                            <AddFromLibrary projectId={projectId} onPapersAdded={refetchPapers} projectPaperIds={papers.map(p => p.id)} onUploadClick={() => setView("upload")} remainingPaperSlots={remainingPaperSlots} paperHardLimit={PROJECT_PAPER_HARD_LIMIT} />
+                            <AddFromLibrary projectId={projectId} onPapersAdded={refetchPapers} projectPaperIds={papers.map(p => p.id)} onUploadClick={() => setView("upload")} remainingPaperSlots={remainingPaperSlots ?? undefined} paperHardLimit={paperHardLimit ?? undefined} />
                         )}
                     </div>
                 </SheetContent>
