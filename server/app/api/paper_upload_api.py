@@ -34,6 +34,7 @@ from app.helpers.parser import validate_pdf_content, validate_url_and_fetch_pdf
 from app.helpers.pdf_jobs import jobs_client
 from app.helpers.subscription_limits import (
     can_user_access_knowledge_base,
+    can_user_add_papers_to_project,
     can_user_upload_paper,
 )
 from app.schemas.user import CurrentUser
@@ -148,7 +149,7 @@ async def upload_pdf_from_url(
     """
 
     # Check subscription limits before proceeding
-    err_message = await check_subscription_limits(current_user, db)
+    err_message = await check_subscription_limits(current_user, db, project_id)
     if err_message:
         return JSONResponse(
             status_code=403,
@@ -219,7 +220,7 @@ async def upload_pdf(
     Upload a PDF file
     """
     # Check subscription limits before proceeding
-    err_message = await check_subscription_limits(current_user, db)
+    err_message = await check_subscription_limits(current_user, db, project_id)
     if err_message:
         return JSONResponse(
             status_code=403,
@@ -286,10 +287,15 @@ async def upload_pdf(
 async def check_subscription_limits(
     current_user: CurrentUser,
     db: Session,
+    project_id: Optional[str] = None,
 ) -> Union[str, None]:
     """
     Check if the user can upload a new paper based on their subscription limits.
     Returns a JSONResponse with an error message if limits are exceeded.
+
+    When the upload targets a project, the project's paper cap is checked too —
+    an upload into a project is an association, and would otherwise slip past
+    the limit enforced on the add-to-project route.
     """
     can_upload, error_message = can_user_upload_paper(db, current_user)
     if not can_upload and error_message:
@@ -298,6 +304,13 @@ async def check_subscription_limits(
     can_access, error_message = can_user_access_knowledge_base(db, current_user)
     if not can_access and error_message:
         return error_message
+
+    if project_id:
+        can_add, error_message = can_user_add_papers_to_project(
+            db, current_user, project_id=UUID(project_id), paper_count=1
+        )
+        if not can_add and error_message:
+            return error_message
 
     return None
 

@@ -7,6 +7,7 @@ based on their subscription plan.
 """
 
 import logging
+import uuid
 from datetime import datetime, timezone
 from typing import Dict, Optional
 
@@ -16,6 +17,7 @@ from app.database.crud.message_crud import message_crud
 from app.database.crud.paper_crud import paper_crud
 from app.database.crud.projects.project_crud import project_crud
 from app.database.crud.projects.project_data_table_crud import data_table_job_crud
+from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.crud.subscription_crud import subscription_crud
 from app.database.models import SubscriptionPlan, SubscriptionStatus
 from app.database.telemetry import track_event
@@ -31,6 +33,7 @@ DATA_TABLES_KEY = "data_tables_weekly"
 AUDIO_OVERVIEWS_KEY = "audio_overviews_weekly"
 PROJECTS_KEY = "projects"
 DISCOVER_SEARCHES_KEY = "discover_searches_weekly"
+PROJECT_PAPERS_KEY = "project_papers"
 
 # Define subscription plan limits
 SUBSCRIPTION_LIMITS = {
@@ -42,6 +45,7 @@ SUBSCRIPTION_LIMITS = {
         PROJECTS_KEY: 2,
         DATA_TABLES_KEY: 2,
         DISCOVER_SEARCHES_KEY: 10,
+        PROJECT_PAPERS_KEY: 50,
     },
     SubscriptionPlan.RESEARCHER: {
         PAPER_UPLOAD_KEY: 500,
@@ -51,6 +55,7 @@ SUBSCRIPTION_LIMITS = {
         PROJECTS_KEY: 100,
         DATA_TABLES_KEY: 50,
         DISCOVER_SEARCHES_KEY: 100,
+        PROJECT_PAPERS_KEY: 120,
     },
 }
 
@@ -143,6 +148,56 @@ def can_user_upload_paper(db: Session, user: CurrentUser) -> tuple[bool, Optiona
         return (
             False,
             f"You have reached your paper upload limit ({int(paper_limit)} papers) for the {plan_name} plan. Please upgrade your subscription to upload more papers, or delete existing papers to free up space.",
+        )
+
+    return True, None
+
+
+def can_user_add_papers_to_project(
+    db: Session, user: CurrentUser, project_id: uuid.UUID, paper_count: int = 1
+) -> tuple[bool, Optional[str]]:
+    """
+    Check if `paper_count` more papers can be added to a project.
+
+    The cap is per-project, but the plan consulted is the acting user's, which
+    matches what the client gates on. On a shared project this means the limit
+    follows whoever is adding, not the project owner.
+
+    Returns:
+        tuple: (can_add: bool, error_message: Optional[str])
+    """
+    plan = get_user_subscription_plan(db, user)
+    limits = get_plan_limits(plan)
+    project_paper_limit = limits[PROJECT_PAPERS_KEY]
+
+    # Handle unlimited plans
+    if project_paper_limit == float("inf"):
+        return True, None
+
+    current_project_paper_count = project_paper_crud.get_paper_count_by_project_id(
+        db, project_id=project_id, user=user
+    )
+
+    if current_project_paper_count + paper_count > project_paper_limit:
+        track_event(
+            "action_blocked_limit_reached",
+            user_id=str(user.id),
+            properties={
+                "current_project_paper_count": current_project_paper_count,
+                "requested_paper_count": paper_count,
+                "project_paper_limit": project_paper_limit,
+                "type": "project_papers",
+                "plan": plan.value,
+            },
+            db=db,
+        )
+        plan_name = {
+            SubscriptionPlan.BASIC: "Basic",
+            SubscriptionPlan.RESEARCHER: "Researcher",
+        }.get(plan, "Basic")
+        return (
+            False,
+            f"This project has reached its limit of {int(project_paper_limit)} papers for the {plan_name} plan. Please upgrade your subscription or remove papers from this project to add more.",
         )
 
     return True, None

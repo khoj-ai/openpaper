@@ -243,6 +243,23 @@ class ProjectPaperCRUD(
         paper_ids = [pp.paper_id for pp in project_papers]
         return paper_ids
 
+    def get_paper_count_by_project_id(
+        self, db: Session, *, project_id: uuid.UUID, user: CurrentUser
+    ) -> int:
+        """Number of papers in a project. Returns 0 if the user has no access."""
+        project_role = (
+            db.query(ProjectRole)
+            .filter(
+                ProjectRole.project_id == project_id,
+                ProjectRole.user_id == user.id,
+            )
+            .first()
+        )
+        if not project_role:
+            return 0
+
+        return db.query(self.model).filter(self.model.project_id == project_id).count()
+
     def remove_by_paper_and_project(
         self,
         db: Session,

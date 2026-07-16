@@ -13,7 +13,10 @@ from app.database.database import get_db
 from app.database.models import Paper, ProjectPaper
 from app.database.telemetry import track_event
 from app.helpers.s3 import s3_service
-from app.helpers.subscription_limits import can_user_upload_paper
+from app.helpers.subscription_limits import (
+    can_user_add_papers_to_project,
+    can_user_upload_paper,
+)
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
@@ -179,6 +182,18 @@ async def add_paper_to_project(
 ) -> JSONResponse:
     """Add a paper to a project"""
     try:
+        can_add, error_message = can_user_add_papers_to_project(
+            db,
+            current_user,
+            project_id=uuid.UUID(project_id),
+            paper_count=len(request.paper_ids),
+        )
+        if not can_add:
+            return JSONResponse(
+                status_code=403,
+                content={"message": error_message},
+            )
+
         for paper_id in request.paper_ids:
             project_paper = project_paper_crud.create(
                 db,
