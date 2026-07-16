@@ -201,7 +201,7 @@ export function AddPapersSheet() {
                         {/* Limit callout only when it actually matters */}
                         {(isAtPaperHardLimit || isAtPaperWarningLimit) && (
                             <div className={`mb-4 flex items-start gap-2 rounded-lg border p-3 text-sm ${isAtPaperHardLimit ? 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300' : 'bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'}`}>
-                                <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                                <Info className="mt-0.5 h-4 w-4 shrink-0" />
                                 {isAtPaperHardLimit ? (
                                     <p>You&apos;ve reached the maximum of {paperHardLimit} papers. Remove papers to add more.</p>
                                 ) : (
