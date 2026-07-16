@@ -25,6 +25,7 @@ from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.crud.referral_crud import referral_crud
 from app.database.crud.subscription_crud import subscription_crud
 from app.database.crud.user_crud import user as user_crud
+from app.database.crud.zotero_crud import zotero_crud
 from app.database.crud.zotero_import_crud import zotero_import_crud
 from app.database.database import SessionLocal, engine, get_db
 from app.database.models import (
@@ -968,6 +969,16 @@ async def trigger_zotero_sync_all(request: Request, db: Session = Depends(get_db
             skipped.append(
                 {"user_id": str(user_id), "reason": "auto_sync_not_eligible"}
             )
+            continue
+
+        if not zotero_crud.get_by_user_id(db, user_id=user.id):
+            # The user disconnected Zotero but kept their imported papers, so
+            # their imported items still make them look "due for sync". This is
+            # an expected, benign state — skip quietly rather than erroring.
+            logger.info(
+                f"Skipping Zotero auto-sync for {user_id}: Zotero account not connected"
+            )
+            skipped.append({"user_id": str(user_id), "reason": "not_connected"})
             continue
 
         try:

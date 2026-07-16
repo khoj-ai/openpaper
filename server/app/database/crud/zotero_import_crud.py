@@ -4,6 +4,7 @@ from uuid import UUID
 
 from app.database.models import (
     Paper,
+    ZoteroConnection,
     ZoteroImportedItem,
     ZoteroImportSource,
     ZoteroImportStatus,
@@ -160,6 +161,14 @@ class CRUDZoteroImport:
 
         rows = (
             db.query(ZoteroImportedItem.user_id)
+            # Only users who still have a live Zotero connection are syncable.
+            # Imported items survive a disconnect (the papers stay in the
+            # library), so without this join we'd surface disconnected users as
+            # "due for sync" and fail on the missing connection.
+            .join(
+                ZoteroConnection,
+                ZoteroConnection.user_id == ZoteroImportedItem.user_id,
+            )
             .filter(
                 ZoteroImportedItem.status == ZoteroImportStatus.COMPLETED,
                 ZoteroImportedItem.import_source == ZoteroImportSource.PDF_ATTACHMENT,
