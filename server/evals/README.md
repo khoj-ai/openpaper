@@ -2,7 +2,7 @@
 
 Measures how well the OpenPaper chat-with-paper pipeline answers questions about research papers, compared against a baseline of sending the raw PDF directly to an LLM.
 
-For the full write-up of the benchmark design, methods, and results, see the **[ResearchQA paper](https://openpaper.ai/blog/benchmark)** (also kept locally as [`paper.md`](paper.md)). The dataset is published on HuggingFace at [`khoj-ai/ResearchQA`](https://huggingface.co/datasets/khoj-ai/ResearchQA).
+For the full write-up of the benchmark design, methods, and results, see the **ResearchQA paper** on [arXiv (2607.11074)](https://arxiv.org/abs/2607.11074) or the [blog version](https://openpaper.ai/blog/benchmark) (also kept locally as [`paper.md`](paper.md)). The dataset is published on HuggingFace at [`khoj-ai/ResearchQA`](https://huggingface.co/datasets/khoj-ai/ResearchQA).
 
 ## Why
 
@@ -81,3 +81,19 @@ Results are saved to `evals/results/` as `eval_{provider}.json` and `eval_{provi
 | Citation precision | Automated | Fraction of returned citations matching expected |
 | Citation recall | Automated | Fraction of expected citations found |
 | Citation accuracy | Automated | Do cited passages actually exist in the paper? |
+
+## Citation
+
+If you use ResearchQA, the evaluation harness, or the dataset, please cite:
+
+```bibtex
+@misc{imran2026researchqa,
+  title         = {ResearchQA: Benchmarking Citation-Grounded Question-Answering on Scientific Papers},
+  author        = {Imran, Saba and Solanky, Debanjum Singh},
+  year          = {2026},
+  eprint        = {2607.11074},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CL},
+  url           = {https://arxiv.org/abs/2607.11074}
+}
+```

@@ -20,6 +20,8 @@ Reading papers means constant context switching: looking up unfamiliar terms, ch
 
 Your paper and the AI assistant sit side by side, so you never leave the document. As soon as you upload a PDF, you get an AI-generated brief and starter questions to ground yourself before diving in. Every response uses contextual citations — click one and you're taken to the exact passage in the paper it came from. Trust, but verify.
 
+> **Curious how we verify our answers?** We built [ResearchQA](https://arxiv.org/abs/2607.11074), a citation-grounded benchmark for scientific QA, to measure exactly that. See the [evaluation suite](./server/evals/README.md) for the methods, metrics, and how to run it yourself.
+
 ### Highlight, annotate, and take notes
 
 ![annotations](https://assets.khoj.dev/op_annotations_1.jpeg)
