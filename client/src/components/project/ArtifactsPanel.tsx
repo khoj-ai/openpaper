@@ -509,6 +509,7 @@ export function ArtifactsPanel() {
                 open={isDataTableSchemaModalOpen}
                 onOpenChange={setDataTableSchemaModalOpen}
                 onSubmit={handleCreateDataTable}
+                projectId={projectId}
                 isCreating={isCreatingDataTable}
                 atLimit={atDataTableLimit}
             />
