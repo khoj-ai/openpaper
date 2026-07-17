@@ -2,7 +2,7 @@ import json
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import AsyncGenerator, List, Optional, Union
+from typing import AsyncGenerator, List, Optional, Union, cast
 
 from app.auth.dependencies import get_required_user
 from app.database.crud.artifact_crud import artifact_crud
@@ -16,7 +16,7 @@ from app.database.crud.projects.project_conversation_crud import (
 from app.database.crud.projects.project_crud import project_crud
 from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
-from app.database.models import ArtifactKind, ConversableType
+from app.database.models import Annotation, ArtifactKind, ConversableType
 from app.database.telemetry import track_event
 from app.llm.base import LLMProvider
 from app.llm.citation_handler import CitationHandler
@@ -211,9 +211,10 @@ def _resolve_mention_scope(
             }
             highlights_by_paper[paper_id_str] = group
 
+        highlight_annotations = cast(list[Annotation], highlight.annotations)
         annotation_contents = [
             annotation.content
-            for annotation in highlight.annotations
+            for annotation in highlight_annotations
             if annotation.content
         ]
 
