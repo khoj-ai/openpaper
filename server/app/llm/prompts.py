@@ -357,6 +357,30 @@ Columns being extracted: {column_labels}
 Title:
 """
 
+PROPOSE_DATA_TABLE_SCHEMA_SYSTEM_PROMPT = """
+You are an expert research assistant helping a user design a data table that extracts structured information from a collection of research papers. Given the user's description of what they want to compare or extract, propose a set of column labels for the table.
+
+Guidelines:
+- Propose between 2 and 8 columns.
+- Each column label should be concise (a few words) and specific enough to guide extraction. For example, prefer "Sample Size (n)" over "Size".
+- Only propose columns whose values can plausibly be extracted from the text of a research paper.
+- Tailor the columns to the user's request and the subject matter of the papers.
+- Respond only with the JSON object matching the schema.
+- The paper title and a link to the paper will automatically be provided for each row in the final output table, so do not propose columns for those.
+"""
+
+PROPOSE_DATA_TABLE_SCHEMA_USER_MESSAGE = """
+The user wants to build a data table over the following research papers:
+
+{paper_titles}
+
+Their description of what they want to extract or compare:
+
+{prompt}
+
+Propose the column labels for this data table. Be sure to include units in parentheses where appropriate.
+"""
+
 RENAME_CONVERSATION_USER_MESSAGE = """
 Given the following chat history, generate a new title for the conversation:
 

@@ -14,6 +14,7 @@ from app.database.database import get_db
 from app.database.models import JobStatus
 from app.helpers.pdf_jobs import jobs_client
 from app.helpers.subscription_limits import can_user_create_data_table_job
+from app.llm.operations import operations
 from app.schemas.responses import DataTableSchema, DocumentMapping
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends
@@ -33,6 +34,58 @@ projects_data_table_router = APIRouter()
 class CreateDataTableRequest(BaseModel):
     project_id: str
     columns: List[str]
+
+
+class ProposeDataTableSchemaRequest(BaseModel):
+    project_id: str
+    prompt: str
+
+
+@projects_data_table_router.post("/propose")
+async def propose_data_table_schema(
+    request: ProposeDataTableSchemaRequest,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+) -> JSONResponse:
+    """
+    Propose data table columns from a natural language description of what
+    the user wants to extract from the project's papers.
+    """
+    try:
+        prompt = request.prompt.strip()
+        if not prompt:
+            return JSONResponse(
+                status_code=400,
+                content={"message": "Prompt must not be empty"},
+            )
+
+        project_papers = project_paper_crud.get_all_papers_by_project_id(
+            db, project_id=uuid.UUID(request.project_id), user=current_user
+        )
+
+        paper_titles = [str(pp.title) for pp in project_papers if pp.title]
+
+        columns = operations.propose_data_table_schema(
+            prompt=prompt,
+            paper_titles=paper_titles,
+        )
+
+        if not columns:
+            return JSONResponse(
+                status_code=500,
+                content={"message": "Failed to propose data table schema"},
+            )
+
+        return JSONResponse(
+            status_code=200,
+            content={"columns": columns},
+        )
+    except Exception as e:
+        logger.error(f"Error proposing data table schema: {e}")
+        return JSONResponse(
+            status_code=400,
+            content={"message": f"Failed to propose data table schema: {str(e)}"},
+        )
 
 
 @projects_data_table_router.post("")
