@@ -468,6 +468,7 @@ class Conversation(Base):
     __table_args__ = (
         CheckConstraint(
             "(conversable_type = 'paper' AND conversable_id IS NOT NULL) OR "
+            "(conversable_type = 'project' AND conversable_id IS NOT NULL) OR "
             "(conversable_type = 'everything' AND conversable_id IS NULL)",
             name="check_conversable_consistency",
         ),
