@@ -363,7 +363,7 @@ You are an expert research assistant helping a user design a data table that ext
 Guidelines:
 - Propose 2-8 column labels that are relevant to the user's request and the subject matter of the papers. You may propose fewer than 2 or more than 8 if it is appropriate for the user's request.
 - Each column label should be concise (a few words) and specific enough to guide extraction. For example, prefer "Sample Size (n)" over "Size".
-- True/False or binary columns should be hinted with (True/False) in the label.
+- True/False or binary columns should be hinted with (boolean) in the label.
 - Include units in parentheses where appropriate (e.g., "Duration (days)").
 - Only propose columns whose values can plausibly be extracted from the text of a research paper.
 - Tailor the columns to the user's request and the subject matter of the papers.
