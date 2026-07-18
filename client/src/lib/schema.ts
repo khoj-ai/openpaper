@@ -58,6 +58,18 @@ export interface CitationArtifact {
     confidence?: number | null;
 }
 
+// A chat-generated artifact surfaced at the project level (artifacts panel),
+// with breadcrumbs back to the conversation/message that produced it.
+export interface ProjectChatArtifact {
+    id: string;
+    kind: 'citation';
+    payload: CitationArtifact;
+    message_id: string;
+    conversation_id: string;
+    conversation_title?: string | null;
+    created_at?: string | null;
+}
+
 export interface MessageTraceToolCall {
     name: string;
     args?: Record<string, unknown>;
