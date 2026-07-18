@@ -17,6 +17,7 @@ from app.api.paper_search_api import paper_search_router
 from app.api.paper_tag_api import paper_tag_router
 from app.api.paper_upload_api import paper_upload_router
 from app.api.project_audio_api import project_audio_router
+from app.api.projects.project_artifacts_api import project_artifacts_router
 from app.api.projects.project_conversations_api import project_conversations_router
 from app.api.projects.project_papers_api import project_papers_router
 from app.api.projects.projects_api import projects_router
@@ -25,10 +26,10 @@ from app.api.projects.projects_invitation_api import (
     router as projects_invitation_router,
 )
 from app.api.referral import referral_router
-from app.api.zotero_import_api import zotero_router
 from app.api.search_api import search_router
 from app.api.subscription import subscription_router
 from app.api.webhook_api import webhook_router
+from app.api.zotero_import_api import zotero_router
 from app.database.admin import setup_admin
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -81,6 +82,7 @@ app.include_router(paper_image_router, prefix="/api/paper/image")
 app.include_router(projects_data_table_router, prefix="/api/projects/tables")
 app.include_router(paper_upload_router, prefix="/api/paper/upload")
 app.include_router(project_audio_router, prefix="/api/projects/audio")
+app.include_router(project_artifacts_router, prefix="/api/projects/artifacts")
 app.include_router(paper_tag_router, prefix="/api/paper/tag")
 app.include_router(
     subscription_router, prefix="/api/subscription"

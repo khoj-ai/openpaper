@@ -4,7 +4,13 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 from app.database.crud.base_crud import CRUDBase
-from app.database.models import Artifact, ArtifactKind, Conversation, Message
+from app.database.models import (
+    Artifact,
+    ArtifactKind,
+    ConversableType,
+    Conversation,
+    Message,
+)
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -93,6 +99,37 @@ class ArtifactCRUD(CRUDBase[Artifact, ArtifactCreate, ArtifactUpdate]):
             q = q.filter(Artifact.scope_id == scope_id)
         else:
             q = q.filter(Artifact.scope_id.is_(None))
+        if kind is not None:
+            q = q.filter(Artifact.kind == kind.value)
+        return q.order_by(Artifact.created_at.desc()).offset(offset).limit(limit).all()
+
+    def list_for_project(
+        self,
+        db: Session,
+        *,
+        project_id: uuid.UUID,
+        kind: Optional[ArtifactKind] = None,
+        limit: int = 200,
+        offset: int = 0,
+    ) -> List[tuple[Artifact, uuid.UUID, Optional[str]]]:
+        """List artifacts across ALL members' conversations in a project.
+
+        Deliberately no user_id filter: project conversations are visible to
+        every member, so their artifacts are too. Callers MUST verify the
+        requester holds a role in the project before calling this.
+
+        Returns (artifact, conversation_id, conversation_title) so the panel
+        can attach a breadcrumb back to the source conversation.
+        """
+        q = (
+            db.query(Artifact, Conversation.id, Conversation.title)
+            .join(Message, Artifact.message_id == Message.id)
+            .join(Conversation, Message.conversation_id == Conversation.id)
+            .filter(
+                Artifact.scope_type == ConversableType.PROJECT.value,
+                Artifact.scope_id == project_id,
+            )
+        )
         if kind is not None:
             q = q.filter(Artifact.kind == kind.value)
         return q.order_by(Artifact.created_at.desc()).offset(offset).limit(limit).all()
