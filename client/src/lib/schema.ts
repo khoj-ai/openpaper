@@ -507,9 +507,34 @@ export interface DataTableJobStatusResponse extends JobStatusResponse {
     celery_error: string | null;
 }
 
+export interface DerivationInput {
+    alias: string;
+    column: string;
+    value: string;
+    citations: ReferenceCitation[];
+}
+
+// Shown work for a calculator-computed cell: the expression, each input with
+// its citations, and any warnings (missing inputs, failed computation).
+export interface CellDerivation {
+    expression: string;
+    inputs: DerivationInput[];
+    warnings: string[];
+}
+
 export interface DataTableCellValue {
     value: string;
     citations: ReferenceCitation[];
+    derivation?: CellDerivation | null;
+}
+
+// A column in a proposed data-table schema; derived columns are computed by
+// the calculator from primitive columns instead of extracted by the model.
+export interface ProposedDataTableColumn {
+    label: string;
+    kind: 'primitive' | 'derived';
+    expression: string;
+    inputs: { [alias: string]: string };
 }
 
 export interface DataTableRow {

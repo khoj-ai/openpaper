@@ -336,6 +336,14 @@ export function ArtifactsPanel() {
                 body: JSON.stringify({
                     project_id: projectId,
                     columns: columns.map(col => col.label),
+                    // Computed columns run through the calculator, not extraction.
+                    derived_columns: columns
+                        .filter(col => col.kind === 'derived' && col.expression && col.inputs)
+                        .map(col => ({
+                            label: col.label,
+                            expression: col.expression,
+                            inputs: col.inputs,
+                        })),
                 }),
             });
 

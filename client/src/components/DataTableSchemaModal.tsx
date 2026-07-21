@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { X, Plus, Table, Loader2, Sparkles, ListPlus } from "lucide-react";
+import { X, Plus, Table, Loader2, Sparkles, ListPlus, Calculator } from "lucide-react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,10 +18,16 @@ import {
 } from "@/components/ui/dialog";
 import Link from "next/link";
 import { fetchFromApi } from "@/lib/api";
+import { ProposedDataTableColumn } from "@/lib/schema";
 
 export interface FieldDefinition {
     id: string;
     label: string;
+    kind: 'primitive' | 'derived';
+    // For derived fields: the calculator expression over aliases, and the
+    // mapping of each alias to a primitive field label.
+    expression?: string;
+    inputs?: { [alias: string]: string };
 }
 
 interface DataTableSchemaModalProps {
@@ -49,13 +56,13 @@ export default function DataTableSchemaModal({
     const [prompt, setPrompt] = useState('');
     const [isProposing, setIsProposing] = useState(false);
     const [fields, setFields] = useState<FieldDefinition[]>([
-        { id: '1', label: '' }
+        { id: '1', label: '', kind: 'primitive' }
     ]);
 
     const resetState = () => {
         setMode('prompt');
         setPrompt('');
-        setFields([{ id: '1', label: '' }]);
+        setFields([{ id: '1', label: '', kind: 'primitive' }]);
     };
 
     const handleOpenChange = (nextOpen: boolean) => {
@@ -72,7 +79,7 @@ export default function DataTableSchemaModal({
 
         setIsProposing(true);
         try {
-            const response: { columns: string[] } = await fetchFromApi(`/api/projects/tables/propose`, {
+            const response: { columns: ProposedDataTableColumn[] } = await fetchFromApi(`/api/projects/tables/propose`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -87,9 +94,12 @@ export default function DataTableSchemaModal({
                 throw new Error("No columns returned");
             }
 
-            setFields(response.columns.map((label, index) => ({
+            setFields(response.columns.map((column, index) => ({
                 id: (index + 1).toString(),
-                label,
+                label: column.label,
+                kind: column.kind,
+                expression: column.expression || undefined,
+                inputs: column.kind === 'derived' ? column.inputs : undefined,
             })));
             setMode('augmented');
         } catch (err) {
@@ -102,23 +112,58 @@ export default function DataTableSchemaModal({
 
     const addField = () => {
         const newId = (Math.max(...fields.map(f => parseInt(f.id)), 0) + 1).toString();
-        setFields([...fields, { id: newId, label: '' }]);
+        setFields([...fields, { id: newId, label: '', kind: 'primitive' }]);
     };
 
     const removeField = (id: string) => {
-        if (fields.length > 1) {
-            setFields(fields.filter(field => field.id !== id));
-        }
+        const removed = fields.find(field => field.id === id);
+        const remaining = fields
+            .filter(field => field.id !== id)
+            // Removing a primitive invalidates any computed field that
+            // reads from it — drop those too rather than run them broken.
+            .filter(field =>
+                !(removed && field.kind === 'derived' && field.inputs &&
+                    Object.values(field.inputs).includes(removed.label))
+            );
+        // The cascade can empty the list; always leave something to edit.
+        setFields(remaining.length > 0 ? remaining : [{ id: '1', label: '', kind: 'primitive' }]);
     };
 
     const updateField = (id: string, value: string) => {
-        setFields(fields.map(field =>
-            field.id === id ? { ...field, label: value } : field
-        ));
+        const previous = fields.find(field => field.id === id);
+        setFields(fields.map(field => {
+            if (field.id === id) {
+                return { ...field, label: value };
+            }
+            // Keep computed-field input mappings pointing at the renamed field.
+            if (
+                previous && field.kind === 'derived' && field.inputs &&
+                Object.values(field.inputs).includes(previous.label)
+            ) {
+                const inputs = Object.fromEntries(
+                    Object.entries(field.inputs).map(([alias, column]) =>
+                        [alias, column === previous.label ? value : column]
+                    )
+                );
+                return { ...field, inputs };
+            }
+            return field;
+        }));
     };
 
     const handleSubmit = () => {
-        const validFields = fields.filter(field => field.label.trim() !== '');
+        const labeled = fields.filter(field => field.label.trim() !== '');
+        // A computed field is only submittable if every input still resolves
+        // to a primitive field in the final set (labels can have been cleared
+        // or edited out from under it).
+        const primitiveLabels = new Set(
+            labeled.filter(f => f.kind !== 'derived').map(f => f.label)
+        );
+        const validFields = labeled.filter(field =>
+            field.kind !== 'derived' ||
+            (field.expression && field.inputs &&
+                Object.values(field.inputs).every(column => primitiveLabels.has(column)))
+        );
         if (validFields.length === 0) {
             return;
         }
@@ -186,7 +231,7 @@ export default function DataTableSchemaModal({
                                     type="button"
                                     variant="ghost"
                                     onClick={() => {
-                                        setFields([{ id: '1', label: '' }]);
+                                        setFields([{ id: '1', label: '', kind: 'primitive' }]);
                                         setMode('manual');
                                     }}
                                     disabled={isProposing}
@@ -201,29 +246,47 @@ export default function DataTableSchemaModal({
                                 <>
                                     <div className="space-y-3">
                                         {fields.map((field, index) => (
-                                            <div key={field.id} className="flex gap-2 items-end">
-                                                <div className="flex-1">
-                                                    <Label htmlFor={`label-${field.id}`} className="text-sm font-medium">
-                                                        Field {index + 1}
-                                                    </Label>
-                                                    <Input
-                                                        id={`label-${field.id}`}
-                                                        placeholder="e.g., Author, Year, Sample Size, Key Finding..."
-                                                        value={field.label}
-                                                        onChange={(e) => updateField(field.id, e.target.value)}
-                                                        className="mt-1"
-                                                    />
+                                            <div key={field.id} className="space-y-1">
+                                                <div className="flex gap-2 items-end">
+                                                    <div className="flex-1">
+                                                        <Label htmlFor={`label-${field.id}`} className="text-sm font-medium flex items-center gap-2">
+                                                            Field {index + 1}
+                                                            {field.kind === 'derived' && (
+                                                                <Badge className="gap-1 px-1.5 py-0.5 text-[10px] bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/30">
+                                                                    <Calculator className="h-3 w-3" />
+                                                                    computed
+                                                                </Badge>
+                                                            )}
+                                                        </Label>
+                                                        <Input
+                                                            id={`label-${field.id}`}
+                                                            placeholder="e.g., Author, Year, Sample Size, Key Finding..."
+                                                            value={field.label}
+                                                            onChange={(e) => updateField(field.id, e.target.value)}
+                                                            className="mt-1"
+                                                        />
+                                                    </div>
+                                                    {fields.length > 1 && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => removeField(field.id)}
+                                                            className="shrink-0"
+                                                        >
+                                                            <X className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
                                                 </div>
-                                                {fields.length > 1 && (
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() => removeField(field.id)}
-                                                        className="shrink-0"
-                                                    >
-                                                        <X className="h-4 w-4" />
-                                                    </Button>
+                                                {field.kind === 'derived' && field.expression && (
+                                                    <div className="text-xs text-muted-foreground font-mono bg-muted/50 rounded px-2 py-1">
+                                                        = {field.expression}
+                                                        {field.inputs && Object.entries(field.inputs).map(([alias, column]) => (
+                                                            <div key={alias} className="pl-3 text-[11px]">
+                                                                {alias} ← {column}
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 )}
                                             </div>
                                         ))}

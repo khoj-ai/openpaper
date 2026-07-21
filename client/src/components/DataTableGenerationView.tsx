@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Download, Table as TableIcon } from "lucide-react";
+import { Download, Table as TableIcon, Calculator, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -74,18 +74,28 @@ export default function DataTableGenerationView({
     // Convert DataTableCitations to Citation format for ReferencePaperCards
     const citations = useMemo(() => {
         const result: Citation[] = [];
+        // Derivation inputs re-carry their primitive column's citations, so the
+        // same quote can surface several times per row — dedupe for the
+        // references section.
+        const seen = new Set<string>();
+        const addCitation = (paperId: string, citation: { index: number; text: string }) => {
+            const dedupeKey = `${paperId}::${citation.index}::${citation.text}`;
+            if (seen.has(dedupeKey)) return;
+            seen.add(dedupeKey);
+            result.push({
+                key: String(citation.index),
+                paper_id: paperId,
+                reference: citation.text
+            });
+        };
         rows.forEach((row) => {
             columns.forEach((columnName) => {
                 const cellValue = row.values?.[columnName];
-                if (cellValue && cellValue.citations.length > 0) {
-                    cellValue.citations.forEach((citation) => {
-                        result.push({
-                            key: String(citation.index),
-                            paper_id: row.paper_id,
-                            reference: citation.text
-                        });
-                    });
-                }
+                cellValue?.citations.forEach((citation) => addCitation(row.paper_id, citation));
+                // Derived cells cite through their derivation inputs.
+                cellValue?.derivation?.inputs.forEach((input) => {
+                    input.citations.forEach((citation) => addCitation(row.paper_id, citation));
+                });
             });
         });
         return result;
@@ -192,8 +202,59 @@ export default function DataTableGenerationView({
                                                 <td key={columnName} className="p-3 align-top">
                                                     {cellValue ? (
                                                         <div className="space-y-2">
-                                                            <div className="text-foreground">
+                                                            <div className="text-foreground flex items-center gap-1.5">
                                                                 {cellValue.value}
+                                                                {cellValue.derivation && (
+                                                                    <HoverCard openDelay={100} closeDelay={150}>
+                                                                        <HoverCardTrigger asChild>
+                                                                            <button
+                                                                                aria-label="Show how this value was computed"
+                                                                                className="inline-flex items-center px-1 py-0.5 rounded transition-colors bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/50"
+                                                                            >
+                                                                                <Calculator className="h-3.5 w-3.5" />
+                                                                            </button>
+                                                                        </HoverCardTrigger>
+                                                                        <HoverCardContent className="w-96 p-3 shadow-md bg-accent space-y-2">
+                                                                            <p className="text-xs font-semibold text-accent-foreground uppercase tracking-wide">
+                                                                                Computed value
+                                                                            </p>
+                                                                            <p className="text-sm font-mono text-accent-foreground">
+                                                                                = {cellValue.derivation.expression}
+                                                                            </p>
+                                                                            <div className="space-y-1.5">
+                                                                                {cellValue.derivation.inputs.map((input) => (
+                                                                                    <div key={input.alias} className="text-xs text-accent-foreground flex flex-wrap items-start gap-x-1.5 font-mono">
+                                                                                        <span className="font-semibold whitespace-nowrap">{input.alias} = {input.value}</span>
+                                                                                        <span className="text-muted-foreground">← {input.column}</span>
+                                                                                        {input.citations.map((citation, citationIdx) => (
+                                                                                            <button
+                                                                                                key={citationIdx}
+                                                                                                onClick={() => {
+                                                                                                    if (onCitationClick) {
+                                                                                                        onCitationClick(row.paper_id, citation.text);
+                                                                                                    }
+                                                                                                }}
+                                                                                                className="px-1 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50"
+                                                                                            >
+                                                                                                [{citation.index}]
+                                                                                            </button>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                            {cellValue.derivation.warnings.length > 0 && (
+                                                                                <div className="space-y-1 pt-1 border-t border-amber-200 dark:border-amber-800/40">
+                                                                                    {cellValue.derivation.warnings.map((warning, warningIdx) => (
+                                                                                        <p key={warningIdx} className="text-xs text-amber-700 dark:text-amber-400 flex items-start gap-1">
+                                                                                            <TriangleAlert className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                                                                                            {warning}
+                                                                                        </p>
+                                                                                    ))}
+                                                                                </div>
+                                                                            )}
+                                                                        </HoverCardContent>
+                                                                    </HoverCard>
+                                                                )}
                                                             </div>
                                                             {cellCitations.length > 0 && (
                                                                 <div className="flex flex-wrap gap-1">
