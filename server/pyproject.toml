@@ -41,6 +41,7 @@ dependencies = [
     "stripe>=12.3.0",
     "pypdf>=6.13.3",
     "exa-py>=1.0.0",
+    "e2b-code-interpreter>=1.0.0",
 ]
 
 [project.scripts]

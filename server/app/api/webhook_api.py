@@ -6,7 +6,7 @@ import logging
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, cast
 
 import stripe
 from app.database.crud.conversation_crud import ConversationCreate, conversation_crud
@@ -37,6 +37,7 @@ from app.database.models import (
 )
 from app.database.telemetry import track_event
 from app.helpers.advisory_locks import AdvisoryLock, AdvisoryLockNamespace
+from app.helpers.calculator import compute_derived_cells
 from app.helpers.email import (
     send_data_table_complete_email,
     send_referral_credit_available_email,
@@ -46,7 +47,11 @@ from app.helpers.s3 import s3_service
 from app.helpers.subscription_limits import can_user_auto_sync_zotero
 from app.llm.citation_handler import CitationHandler
 from app.llm.operations import operations
-from app.schemas.responses import DataTableResult, PaperMetadataExtraction
+from app.schemas.responses import (
+    DataTableResult,
+    DerivedColumnSpec,
+    PaperMetadataExtraction,
+)
 from app.schemas.user import CurrentUser
 from app.services.zotero_import import (
     apply_zotero_annotations,
@@ -54,7 +59,7 @@ from app.services.zotero_import import (
     sync_batch,
 )
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -726,6 +731,27 @@ def handle_data_table_processing_webhook(
             )
 
             # Post-Processing
+            # The jobs service extracts primitives only; derived columns are
+            # computed here from the job's stored column plan, so the persisted
+            # table is complete and every derived cell carries its derivation.
+            job = data_table_job_crud.get(db=db, id=uuid.UUID(job_id))
+            if job:
+                derived_specs = []
+                for entry in job.column_plan or []:
+                    try:
+                        derived_specs.append(DerivedColumnSpec.model_validate(entry))
+                    except ValidationError:
+                        logger.warning(
+                            f"Skipping invalid column_plan entry on job {job_id}: {entry}"
+                        )
+                if derived_specs:
+                    compute_derived_cells(result.rows, derived_specs)
+                # Restore the user's full ordered column list (extraction only
+                # saw the primitive subset).
+                if job.columns:
+                    job_columns = cast(list[str], job.columns)
+                    result.columns = job_columns.copy()
+
             # Augment the DataCellValue citations with the paper_id
             # The job only returns citation info without paper_id, but we can fill it in here
             for col in result.columns:
@@ -983,7 +1009,8 @@ async def trigger_zotero_sync_all(request: Request, db: Session = Depends(get_db
             )
             continue
 
-        if not zotero_crud.get_by_user_id(db, user_id=user.id):
+        user_uuid = cast(uuid.UUID, user.id)
+        if not zotero_crud.get_by_user_id(db, user_id=user_uuid):
             # The user disconnected Zotero but kept their imported papers, so
             # their imported items still make them look "due for sync". This is
             # an expected, benign state — skip quietly rather than erroring.

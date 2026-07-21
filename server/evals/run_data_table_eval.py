@@ -390,7 +390,7 @@ def grade_run(run_record: dict, manifest: dict, paper_texts: dict) -> dict:
 
 
 def summarize(results: dict, manifest: dict) -> dict:
-    """Aggregate graded runs into the KHO-305 'three worlds' classification."""
+    """Aggregate graded runs into 'three worlds' classification."""
     primitives: list[dict] = []
     derived: list[dict] = []
     derived_by_column: dict[str, list[str]] = {}

@@ -182,10 +182,12 @@ async def create_data_table(
 
         job_id = str(job.id)
 
+        # The jobs service only extracts primitives; derived columns are
+        # computed server-side from the job's column_plan when the webhook
+        # delivers the extracted dataset.
         data_table = DataTableSchema(
-            columns=request.columns,
+            columns=[c for c in request.columns if c not in derived_labels],
             papers=papers,
-            derived_columns=request.derived_columns,
         )
 
         # Submit the data table processing job

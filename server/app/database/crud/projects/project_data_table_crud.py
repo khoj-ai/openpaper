@@ -475,6 +475,9 @@ class DataTableResultCRUD(
             "title": result.title,
             "success": result.success,
             "columns": result.columns,
+            # Derived-column specs ({label, expression, inputs}) so the UI can
+            # mark computed columns and show their formulae at the header level.
+            "column_plan": (result.job.column_plan if result.job else None) or [],
             "row_failures": (
                 [str(pid) for pid in result.row_failures] if result.row_failures else []
             ),

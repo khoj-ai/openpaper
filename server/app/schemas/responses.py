@@ -128,13 +128,12 @@ class DerivedColumnSpec(BaseModel):
 
 
 class DataTableSchema(BaseModel):
+    """Extraction payload sent to the jobs service — primitive columns only;
+    derived columns never travel to the worker."""
+
     columns: List[str] = Field(description="List of column names in the data table.")
     papers: List[DocumentMapping] = Field(
         description="List of papers included in the data table."
-    )
-    derived_columns: List[DerivedColumnSpec] = Field(
-        default=[],
-        description="Columns computed from other columns by the calculator; excluded from LLM extraction.",
     )
 
 

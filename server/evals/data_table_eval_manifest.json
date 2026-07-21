@@ -1,5 +1,5 @@
 {
-	"description": "Golden set for the data-table extraction eval (KHO-308). Values hand-verified against the PDFs in seed_data/. 'primitive' columns are stated verbatim in the paper; 'derived' columns require arithmetic and are never stated as a number in the paper.",
+	"description": "Golden set for the data-table extraction eval. Values hand-verified against the PDFs in seed_data/. 'primitive' columns are stated verbatim in the paper; 'derived' columns require arithmetic and are never stated as a number in the paper.",
 	"papers": [
 		{
 			"key": "wei_cot",
