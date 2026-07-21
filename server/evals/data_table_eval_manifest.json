@@ -1,0 +1,158 @@
+{
+	"description": "Golden set for the data-table extraction eval (KHO-308). Values hand-verified against the PDFs in seed_data/. 'primitive' columns are stated verbatim in the paper; 'derived' columns require arithmetic and are never stated as a number in the paper.",
+	"papers": [
+		{
+			"key": "wei_cot",
+			"file": "chain_of_thought_for_reasoning.pdf",
+			"title": "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models",
+			"columns": [
+				{
+					"label": "GSM8K solve rate of PaLM 540B with standard prompting (%)",
+					"kind": "primitive",
+					"expected": 17.9,
+					"tolerance": 0.5,
+					"source": "Table 1, p.20 (17.9); Figure 2, p.2 rounds to 18"
+				},
+				{
+					"label": "GSM8K solve rate of PaLM 540B with chain-of-thought prompting (%)",
+					"kind": "primitive",
+					"expected": 56.9,
+					"tolerance": 0.5,
+					"source": "Table 1, p.20 (56.9); Figure 2, p.2 rounds to 57"
+				},
+				{
+					"label": "Sports understanding accuracy of PaLM 540B with chain-of-thought prompting (%)",
+					"kind": "primitive",
+					"expected": 95.4,
+					"tolerance": 0.1,
+					"source": "p.7 prose: 'outperforming an unaided sports enthusiast on sports understanding (95.4% vs 84%)'"
+				},
+				{
+					"label": "Sports understanding accuracy of the unaided sports enthusiast human baseline (%)",
+					"kind": "primitive",
+					"expected": 84,
+					"tolerance": 0.5,
+					"source": "p.7 prose (same sentence as above)"
+				},
+				{
+					"label": "Ratio of PaLM 540B GSM8K solve rate with chain-of-thought prompting to standard prompting",
+					"kind": "derived",
+					"expected": 3.18,
+					"tolerance": 0.05,
+					"formula": "56.9 / 17.9",
+					"note": "Paper says only 'performance more than doubled'; ratio never stated. Table 1 DOES print the additive delta (+39.0), which is why the delta is not usable as a derived column."
+				},
+				{
+					"label": "Percentage points by which PaLM 540B with chain-of-thought prompting outperforms the unaided sports enthusiast on sports understanding",
+					"kind": "derived",
+					"expected": 11.4,
+					"tolerance": 0.15,
+					"formula": "95.4 - 84",
+					"note": "Both operands in one sentence on p.7; difference never stated."
+				}
+			]
+		},
+		{
+			"key": "health_chatbots",
+			"file": "publicusegeneralhealthchatbots.pdf",
+			"title": "Public use of a generalist LLM chatbot for health queries",
+			"columns": [
+				{
+					"label": "Total number of conversations analyzed across intent categories",
+					"kind": "primitive",
+					"expected": 617827,
+					"tolerance": 1,
+					"source": "p.2: 'the sample contains N = 617,827 conversations across the remaining intent categories'"
+				},
+				{
+					"label": "Share of mobile conversations classified as Symptom Questions and Health Concerns (%)",
+					"kind": "primitive",
+					"expected": 15.9,
+					"tolerance": 0.1,
+					"source": "p.3: '15.9%, 95% CI 15.8-16.0, of conversations versus 6.9% ... on desktop'"
+				},
+				{
+					"label": "Share of desktop conversations classified as Symptom Questions and Health Concerns (%)",
+					"kind": "primitive",
+					"expected": 6.9,
+					"tolerance": 0.1,
+					"source": "p.3 (same sentence as above)"
+				},
+				{
+					"label": "Share of desktop conversations classified as Medical Paperwork (%)",
+					"kind": "primitive",
+					"expected": 15.7,
+					"tolerance": 0.1,
+					"source": "p.3: \"'Medical Paperwork' is 15.7%, 95% CI 15.6-15.8, versus 2.7%, 95% CI 2.7-2.8\""
+				},
+				{
+					"label": "Share of mobile conversations classified as Medical Paperwork (%)",
+					"kind": "primitive",
+					"expected": 2.7,
+					"tolerance": 0.1,
+					"source": "p.3 (same sentence as above)"
+				},
+				{
+					"label": "Difference in percentage points between mobile and desktop share of Symptom Questions and Health Concerns conversations",
+					"kind": "derived",
+					"expected": 9.0,
+					"tolerance": 0.15,
+					"formula": "15.9 - 6.9",
+					"note": "Never stated in the paper."
+				},
+				{
+					"label": "Ratio of desktop to mobile share of Medical Paperwork conversations",
+					"kind": "derived",
+					"expected": 5.81,
+					"tolerance": 0.1,
+					"formula": "15.7 / 2.7",
+					"note": "Never stated in the paper."
+				}
+			]
+		},
+		{
+			"key": "mafia",
+			"file": "mafia_llms_deception.pdf",
+			"title": "Finding deceivers in social context with large language models: the case of the Mafia game",
+			"columns": [
+				{
+					"label": "Total single-match accuracy of GPT-4 at identifying mafia players (%)",
+					"kind": "primitive",
+					"expected": 80.65,
+					"tolerance": 0.05,
+					"source": "Table 4, p.6, Total row; also p.4 prose"
+				},
+				{
+					"label": "Total single-match accuracy of GPT-4 without voting information (%)",
+					"kind": "primitive",
+					"expected": 64.52,
+					"tolerance": 0.05,
+					"source": "Table 7, p.9, 'w/o vote' column, single-match Total row"
+				},
+				{
+					"label": "Total single-match accuracy of GPT-3.5-turbo at identifying mafia players (%)",
+					"kind": "primitive",
+					"expected": 41.94,
+					"tolerance": 0.05,
+					"source": "Table 4, p.6, Total row; also p.4 prose"
+				},
+				{
+					"label": "Percentage-point drop in GPT-4 total single-match accuracy when voting information is removed",
+					"kind": "derived",
+					"expected": 16.13,
+					"tolerance": 0.1,
+					"formula": "80.65 - 64.52",
+					"note": "Paper says only that removing voting 'proved to decrease accuracy by a significant amount'; number never stated."
+				},
+				{
+					"label": "Percentage-point gap between GPT-4 and GPT-3.5-turbo total single-match accuracy",
+					"kind": "derived",
+					"expected": 38.71,
+					"tolerance": 0.1,
+					"formula": "80.65 - 41.94",
+					"note": "Prose characterizes this only as 'almost twice'/'more than 24% higher' style comparisons; the pp gap is never stated."
+				}
+			]
+		}
+	]
+}
