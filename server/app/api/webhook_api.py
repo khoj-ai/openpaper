@@ -688,12 +688,18 @@ class DataTableProcessingResultWebhookData(BaseModel):
 
 
 @webhook_router.post("/data-table-processing/{job_id}")
-async def handle_data_table_processing_webhook(
+def handle_data_table_processing_webhook(
     job_id: str,
     webhook_data: DataTableProcessingResultWebhookData,
     db: Session = Depends(get_db),
 ):
-    """Handle webhook from data table processing jobs service."""
+    """Handle webhook from data table processing jobs service.
+
+    Deliberately sync (no `async`): the body is synchronous end-to-end and
+    includes a blocking LLM call (`name_data_table`). As `async def` it ran on
+    the event loop and froze the whole server for the duration of that call —
+    FastAPI runs sync handlers in the threadpool instead.
+    """
 
     logger.info(
         f"Received data table processing webhook for job {job_id} with status {webhook_data.status}"
@@ -728,6 +734,12 @@ async def handle_data_table_processing_webhook(
                     if cell_value:
                         for citation in cell_value.citations:
                             citation.paper_id = row.paper_id
+                        # Derived cells carry citations on their derivation
+                        # inputs instead of on the cell itself.
+                        if cell_value.derivation:
+                            for derivation_input in cell_value.derivation.inputs:
+                                for citation in derivation_input.citations:
+                                    citation.paper_id = row.paper_id
 
             paper_titles = []
             for row in result.rows:

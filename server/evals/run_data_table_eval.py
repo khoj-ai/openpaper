@@ -1,8 +1,8 @@
 """
-End-to-end eval for the Data Table extraction flow (KHO-308).
+End-to-end eval for the Data Table extraction flow.
 
 Characterizes what the live extraction pipeline does with columns that
-require arithmetic (derived columns), per KHO-305. Seeds an eval user and
+require arithmetic (derived columns). Seeds an eval user and
 one project per manifest paper, then drives the REAL flow over HTTP:
 
     POST /api/projects/tables  ->  Celery (jobs worker)  ->  webhook  ->  result
@@ -149,7 +149,7 @@ def seed(db, current_user: CurrentUser, manifest: dict, results: dict) -> dict:
             db=db,
             obj_in=ProjectCreate(
                 title=f"DT Eval — {key}",
-                description="Seeded by evals.run_data_table_eval (KHO-308)",
+                description="Seeded by evals.run_data_table_eval",
             ),
             user=current_user,
         )
@@ -203,10 +203,19 @@ class ApiClient:
         self.session = requests.Session()
         self.session.headers["Authorization"] = f"Bearer {token}"
 
-    def create_job(self, project_id: str, columns: list[str]) -> dict:
+    def create_job(
+        self,
+        project_id: str,
+        columns: list[str],
+        derived_columns: Optional[list[dict]] = None,
+    ) -> dict:
         resp = self.session.post(
             f"{self.base_url}/api/projects/tables",
-            json={"project_id": project_id, "columns": columns},
+            json={
+                "project_id": project_id,
+                "columns": columns,
+                "derived_columns": derived_columns or [],
+            },
             timeout=60,
         )
         resp.raise_for_status()
@@ -244,10 +253,14 @@ class ApiClient:
 
 
 def run_extraction(
-    api: ApiClient, project_id: str, columns: list[str], label: str
+    api: ApiClient,
+    project_id: str,
+    columns: list[str],
+    label: str,
+    derived_columns: Optional[list[dict]] = None,
 ) -> dict:
     """Create one data table job and wait for its result."""
-    created = api.create_job(project_id, columns)
+    created = api.create_job(project_id, columns, derived_columns)
     job_id = created["id"]
     logger.info(f"[run] {label}: job {job_id} submitted")
 
@@ -328,6 +341,7 @@ def grade_cell(col_cfg: dict, cell: dict, paper_text_norm: str) -> dict:
     expected = col_cfg.get("expected")
     tolerance = col_cfg.get("tolerance", 0.05)
 
+    derivation = cell.get("derivation")
     graded: dict[str, Any] = {
         "label": col_cfg["label"],
         "kind": col_cfg["kind"],
@@ -340,6 +354,8 @@ def grade_cell(col_cfg: dict, cell: dict, paper_text_norm: str) -> dict:
             for c in citations
             if citation_in_paper(c.get("text", ""), paper_text_norm)
         ),
+        "has_derivation": bool(derivation),
+        "derivation_warnings": (derivation or {}).get("warnings", []),
     }
 
     if is_na(value):
@@ -415,6 +431,7 @@ def summarize(results: dict, manifest: dict) -> dict:
             "computed_correct": count(derived, "correct_number"),
             "computed_incorrect": count(derived, "incorrect_number"),
             "non_numeric": count(derived, "non_numeric"),
+            "with_derivation": sum(1 for c in derived if c.get("has_derivation")),
             "inconsistent_columns": inconsistent_columns,
         },
     }
@@ -422,6 +439,18 @@ def summarize(results: dict, manifest: dict) -> dict:
     d = summary["derived"]
     if d["total"] == 0:
         world = "no data"
+    elif d["with_derivation"] == d["total"]:
+        if d["computed_correct"] == d["total"]:
+            world = (
+                "Calculator: every derived cell was computed by the calculator "
+                "with a derivation block, and every value matches golden."
+            )
+        else:
+            world = (
+                "Calculator (with issues): all derived cells carry derivations "
+                f"but only {d['computed_correct']}/{d['total']} match golden — "
+                "inspect derivation warnings."
+            )
     elif inconsistent_columns:
         world = (
             "World 3: INCONSISTENT — same column, different outcomes across runs. "
@@ -455,7 +484,8 @@ def print_summary(summary: dict) -> None:
         f"Derived cells:   {d['total']} | N/A {d['na']} | "
         f"computed-correct {d['computed_correct']} | "
         f"computed-incorrect {d['computed_incorrect']} | "
-        f"non-numeric {d['non_numeric']}"
+        f"non-numeric {d['non_numeric']} | "
+        f"with-derivation {d['with_derivation']}"
     )
     if d["inconsistent_columns"]:
         print(f"Inconsistent derived columns: {', '.join(d['inconsistent_columns'])}")
@@ -516,10 +546,26 @@ def main():
                     logger.info(f"[run] {key} run {run_idx}: already done, skipping")
                     continue
                 columns = [c["label"] for c in paper_cfg["columns"]]
+                # Derived columns with an expression run through the calculator;
+                # without one (the pre-existing manifest) they go to extraction,
+                # which is itself the measurement.
+                derived_columns = [
+                    {
+                        "label": c["label"],
+                        "expression": c["expression"],
+                        "inputs": c["inputs"],
+                    }
+                    for c in paper_cfg["columns"]
+                    if c["kind"] == "derived" and c.get("expression")
+                ]
                 project_id = results["seed"][key]["project_id"]
                 try:
                     outcome = run_extraction(
-                        api, project_id, columns, f"{key} run {run_idx}"
+                        api,
+                        project_id,
+                        columns,
+                        f"{key} run {run_idx}",
+                        derived_columns,
                     )
                 except Exception as e:
                     logger.error(f"[run] {key} run {run_idx} failed: {e}")

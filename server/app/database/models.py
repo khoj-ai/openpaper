@@ -1115,6 +1115,9 @@ class DataTableExtractionJob(Base):
     )
 
     columns = Column(ARRAY(String), nullable=True)  # Columns to extract
+    # Derived-column specs ({label, expression, inputs}) computed by the
+    # calculator rather than extracted; subset of `columns` by label.
+    column_plan = Column(JSONB, nullable=True)
 
     task_id = Column(String, nullable=True)  # For tracking task in Celery
 

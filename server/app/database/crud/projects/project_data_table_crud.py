@@ -30,6 +30,9 @@ logger = logging.getLogger(__name__)
 class DataTableJobCreate(BaseModel):
     project_id: UUID
     columns: List[str]
+    # Derived-column specs ({label, expression, inputs}) for calculator-computed
+    # columns; empty for tables whose columns are all extracted.
+    column_plan: List[Dict[str, Any]] = []
     task_id: Optional[str] = None
 
 
@@ -108,6 +111,7 @@ class DataTableJobCRUD(
                 user_id=user.id,
                 project_id=obj_in.project_id,
                 columns=obj_in.columns,
+                column_plan=obj_in.column_plan,
                 task_id=obj_in.task_id,
                 status=JobStatus.PENDING,
             )

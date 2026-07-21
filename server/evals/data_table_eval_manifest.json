@@ -40,7 +40,12 @@
 					"expected": 3.18,
 					"tolerance": 0.05,
 					"formula": "56.9 / 17.9",
-					"note": "Paper says only 'performance more than doubled'; ratio never stated. Table 1 DOES print the additive delta (+39.0), which is why the delta is not usable as a derived column."
+					"note": "Paper says only 'performance more than doubled'; ratio never stated. Table 1 DOES print the additive delta (+39.0), which is why the delta is not usable as a derived column.",
+					"expression": "ratio(cot, std)",
+					"inputs": {
+						"cot": "GSM8K solve rate of PaLM 540B with chain-of-thought prompting (%)",
+						"std": "GSM8K solve rate of PaLM 540B with standard prompting (%)"
+					}
 				},
 				{
 					"label": "Percentage points by which PaLM 540B with chain-of-thought prompting outperforms the unaided sports enthusiast on sports understanding",
@@ -48,7 +53,12 @@
 					"expected": 11.4,
 					"tolerance": 0.15,
 					"formula": "95.4 - 84",
-					"note": "Both operands in one sentence on p.7; difference never stated."
+					"note": "Both operands in one sentence on p.7; difference never stated.",
+					"expression": "cot_sports - human_sports",
+					"inputs": {
+						"cot_sports": "Sports understanding accuracy of PaLM 540B with chain-of-thought prompting (%)",
+						"human_sports": "Sports understanding accuracy of the unaided sports enthusiast human baseline (%)"
+					}
 				}
 			]
 		},
@@ -98,7 +108,12 @@
 					"expected": 9.0,
 					"tolerance": 0.15,
 					"formula": "15.9 - 6.9",
-					"note": "Never stated in the paper."
+					"note": "Never stated in the paper.",
+					"expression": "mobile - desktop",
+					"inputs": {
+						"mobile": "Share of mobile conversations classified as Symptom Questions and Health Concerns (%)",
+						"desktop": "Share of desktop conversations classified as Symptom Questions and Health Concerns (%)"
+					}
 				},
 				{
 					"label": "Ratio of desktop to mobile share of Medical Paperwork conversations",
@@ -106,7 +121,12 @@
 					"expected": 5.81,
 					"tolerance": 0.1,
 					"formula": "15.7 / 2.7",
-					"note": "Never stated in the paper."
+					"note": "Never stated in the paper.",
+					"expression": "ratio(desktop_mp, mobile_mp)",
+					"inputs": {
+						"desktop_mp": "Share of desktop conversations classified as Medical Paperwork (%)",
+						"mobile_mp": "Share of mobile conversations classified as Medical Paperwork (%)"
+					}
 				}
 			]
 		},
@@ -142,7 +162,12 @@
 					"expected": 16.13,
 					"tolerance": 0.1,
 					"formula": "80.65 - 64.52",
-					"note": "Paper says only that removing voting 'proved to decrease accuracy by a significant amount'; number never stated."
+					"note": "Paper says only that removing voting 'proved to decrease accuracy by a significant amount'; number never stated.",
+					"expression": "orig - novote",
+					"inputs": {
+						"orig": "Total single-match accuracy of GPT-4 at identifying mafia players (%)",
+						"novote": "Total single-match accuracy of GPT-4 without voting information (%)"
+					}
 				},
 				{
 					"label": "Percentage-point gap between GPT-4 and GPT-3.5-turbo total single-match accuracy",
@@ -150,7 +175,12 @@
 					"expected": 38.71,
 					"tolerance": 0.1,
 					"formula": "80.65 - 41.94",
-					"note": "Prose characterizes this only as 'almost twice'/'more than 24% higher' style comparisons; the pp gap is never stated."
+					"note": "Prose characterizes this only as 'almost twice'/'more than 24% higher' style comparisons; the pp gap is never stated.",
+					"expression": "orig - gpt35",
+					"inputs": {
+						"orig": "Total single-match accuracy of GPT-4 at identifying mafia players (%)",
+						"gpt35": "Total single-match accuracy of GPT-3.5-turbo at identifying mafia players (%)"
+					}
 				}
 			]
 		}

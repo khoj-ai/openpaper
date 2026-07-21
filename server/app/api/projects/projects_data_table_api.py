@@ -15,7 +15,7 @@ from app.database.models import JobStatus
 from app.helpers.pdf_jobs import jobs_client
 from app.helpers.subscription_limits import can_user_create_data_table_job
 from app.llm.operations import operations
-from app.schemas.responses import DataTableSchema, DocumentMapping
+from app.schemas.responses import DataTableSchema, DerivedColumnSpec, DocumentMapping
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
@@ -34,6 +34,9 @@ projects_data_table_router = APIRouter()
 class CreateDataTableRequest(BaseModel):
     project_id: str
     columns: List[str]
+    # Columns computed by the calculator from other columns. Labels must also
+    # appear in `columns`; anything referencing unknown columns is rejected.
+    derived_columns: List[DerivedColumnSpec] = []
 
 
 class ProposeDataTableSchemaRequest(BaseModel):
@@ -78,7 +81,17 @@ async def propose_data_table_schema(
 
         return JSONResponse(
             status_code=200,
-            content={"columns": columns},
+            content={
+                "columns": [
+                    {
+                        "label": col.label,
+                        "kind": col.kind,
+                        "expression": col.expression,
+                        "inputs": {i.alias: i.column for i in col.inputs},
+                    }
+                    for col in columns
+                ]
+            },
         )
     except Exception as e:
         logger.error(f"Error proposing data table schema: {e}")
@@ -106,6 +119,33 @@ async def create_data_table(
                 content={"message": error_message},
             )
 
+        # Derived columns may only reference primitive columns in this table.
+        column_set = set(request.columns)
+        derived_labels = {spec.label for spec in request.derived_columns}
+        for spec in request.derived_columns:
+            if spec.label not in column_set:
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "message": f"Derived column '{spec.label}' is not in columns"
+                    },
+                )
+            if not spec.expression.strip() or not spec.inputs:
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "message": f"Derived column '{spec.label}' needs an expression and at least one input"
+                    },
+                )
+            for alias, input_column in spec.inputs.items():
+                if input_column not in column_set or input_column in derived_labels:
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "message": f"Derived column '{spec.label}' input '{alias}' must reference a primitive column in this table"
+                        },
+                    )
+
         papers: List[DocumentMapping] = []
 
         project_papers = project_paper_crud.get_all_papers_by_project_id(
@@ -127,6 +167,7 @@ async def create_data_table(
             obj_in=DataTableJobCreate(
                 project_id=uuid.UUID(request.project_id),
                 columns=request.columns,
+                column_plan=[spec.model_dump() for spec in request.derived_columns],
             ),
             user=current_user,
         )
@@ -144,6 +185,7 @@ async def create_data_table(
         data_table = DataTableSchema(
             columns=request.columns,
             papers=papers,
+            derived_columns=request.derived_columns,
         )
 
         # Submit the data table processing job

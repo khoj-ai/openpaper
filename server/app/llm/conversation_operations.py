@@ -24,11 +24,40 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 
-class DataTableSchemaProposal(BaseModel):
+class ProposedColumnInput(BaseModel):
     # Strict structured output (OpenAI/Cerebras) requires additionalProperties=false
+    # and all fields required — hence pair-list instead of dict, and no defaults.
     model_config = ConfigDict(extra="forbid")
 
-    columns: list[str] = Field(description="Column labels for the data table")
+    alias: str = Field(
+        description="Short snake_case identifier used in the expression, e.g. 'mean_t'"
+    )
+    column: str = Field(
+        description="Exact label of the primitive column this alias refers to"
+    )
+
+
+class ProposedColumn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str = Field(description="Column label")
+    kind: str = Field(
+        description="'primitive' if the value is stated in papers and extracted verbatim; 'derived' if it must be computed from other columns"
+    )
+    expression: str = Field(
+        description="For derived columns: arithmetic expression over the input aliases, e.g. 'cohens_d(mean_t, sd_t, n_t, mean_c, sd_c, n_c)' or '(a - b) / b * 100'. Empty string for primitive columns."
+    )
+    inputs: list[ProposedColumnInput] = Field(
+        description="For derived columns: the aliases used in the expression, each mapped to a primitive column label. Empty list for primitive columns."
+    )
+
+
+class DataTableSchemaProposal(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    columns: list[ProposedColumn] = Field(
+        description="Proposed columns for the data table"
+    )
 
 
 class ConversationOperations(BaseLLMClient):
@@ -146,16 +175,18 @@ class DataTableOperations(BaseLLMClient):
         self,
         prompt: str,
         paper_titles: list[str],
-    ) -> list[str] | None:
+    ) -> list[ProposedColumn] | None:
         """
-        Propose data table column labels from a natural language description.
+        Propose data table columns from a natural language description,
+        classifying each as primitive (extracted verbatim) or derived
+        (computed by the calculator from primitive columns).
 
         Args:
             prompt: The user's description of what they want to extract or compare
             paper_titles: List of paper titles in the project, used as context
 
         Returns:
-            A list of proposed column labels, or None if generation fails
+            A list of proposed columns, or None if generation fails
         """
         formatted_papers = "\n".join([f"- {title}" for title in paper_titles])
 
@@ -179,7 +210,7 @@ class DataTableOperations(BaseLLMClient):
         if response and response.text:
             try:
                 proposal = DataTableSchemaProposal.model_validate_json(response.text)
-                columns = [c.strip() for c in proposal.columns if c.strip()]
+                columns = self._sanitize_proposal(proposal.columns)
                 if columns:
                     return columns
             except ValidationError:
@@ -189,3 +220,53 @@ class DataTableOperations(BaseLLMClient):
 
         logger.error("Failed to propose a schema for the data table.")
         return None
+
+    @staticmethod
+    def _sanitize_proposal(columns: list[ProposedColumn]) -> list[ProposedColumn]:
+        """Drop empty labels and demote malformed derived columns.
+
+        A derived column is only usable if it has an expression and EVERY
+        input alias resolves to a proposed PRIMITIVE column (the create API
+        rejects derived-on-derived, so the same rule applies here); anything
+        else is demoted to primitive so the table still works.
+        """
+        primitive_labels = {
+            c.label.strip() for c in columns if c.label.strip() and c.kind != "derived"
+        }
+        sanitized: list[ProposedColumn] = []
+
+        for col in columns:
+            label = col.label.strip()
+            if not label:
+                continue
+
+            kind = col.kind if col.kind in ("primitive", "derived") else "primitive"
+            expression = col.expression.strip()
+            inputs = [
+                ProposedColumnInput(alias=i.alias.strip(), column=i.column.strip())
+                for i in col.inputs
+            ]
+
+            if kind == "derived" and (
+                not expression
+                or not inputs
+                # Any unresolvable input makes the whole expression
+                # uncomputable — demote rather than ship a dead column.
+                or any(not i.alias or i.column not in primitive_labels for i in inputs)
+            ):
+                logger.warning(
+                    f"Demoting malformed derived column proposal to primitive: {label}"
+                )
+                kind = "primitive"
+
+            if kind == "primitive":
+                expression = ""
+                inputs = []
+
+            sanitized.append(
+                ProposedColumn(
+                    label=label, kind=kind, expression=expression, inputs=inputs
+                )
+            )
+
+        return sanitized

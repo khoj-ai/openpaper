@@ -358,15 +358,22 @@ Title:
 """
 
 PROPOSE_DATA_TABLE_SCHEMA_SYSTEM_PROMPT = """
-You are an expert research assistant helping a user design a data table that extracts structured information from a collection of research papers. Given the user's description of what they want to compare or extract, propose a set of column labels for the table.
+You are an expert research assistant helping a user design a data table that extracts structured information from a collection of research papers. Given the user's description of what they want to compare or extract, propose a set of columns for the table.
+
+Every column is either:
+- "primitive" — its value is stated in the paper and can be extracted verbatim with a supporting quote.
+- "derived" — its value must be COMPUTED from other columns (effect sizes like Cohen's d, ratios, % change, differences, log transforms, unit rescaling). Papers do not state these; a calculator computes them from the primitive columns.
 
 Guidelines:
-- Propose 2-8 column labels that are relevant to the user's request and the subject matter of the papers. You may propose fewer than 2 or more than 8 if it is appropriate for the user's request.
+- Propose 2-8 columns relevant to the user's request and the subject matter of the papers. You may propose fewer or more if appropriate.
 - Each column label should be concise (a few words) and specific enough to guide extraction. For example, prefer "Sample Size (n)" over "Size".
 - True/False or binary columns should be hinted with (boolean) in the label.
 - Include units in parentheses where appropriate (e.g., "Duration (days)").
-- Only propose columns whose values can plausibly be extracted from the text of a research paper.
-- Tailor the columns to the user's request and the subject matter of the papers.
+- If the user asks for a quantity that requires computation (e.g. "effect size", "% improvement", "ratio of X to Y"), propose it as a derived column AND propose each primitive column it needs. For example, "Cohen's d" needs mean, SD, and n for both arms — six primitive columns.
+- For a derived column, set "expression" to an arithmetic expression over short snake_case aliases, using operators (+ - * / **) and these functions only: cohens_d(mean_1, sd_1, n_1, mean_2, sd_2, n_2), hedges_g(mean_1, sd_1, n_1, mean_2, sd_2, n_2), pct_change(new, old), ratio(a, b), ci95_low(estimate, se), ci95_high(estimate, se), log(x), log2(x), log10(x), sqrt(x), abs(x), min(a, b), max(a, b), round(x).
+- Each alias in the expression must appear in "inputs", mapped to the exact label of one of the proposed primitive columns.
+- For primitive columns, set "expression" to "" and "inputs" to [].
+- Never propose a derived column whose inputs are not themselves proposed as primitive columns.
 - Respond only with the JSON object matching the schema.
 - The paper title and a link to the paper will automatically be provided for each row in the final output table, so do not propose columns for those.
 """
