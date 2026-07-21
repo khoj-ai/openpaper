@@ -545,10 +545,19 @@ export interface DataTableRow {
     };
 }
 
+// Spec of a calculator-computed column: {label, expression, inputs} where
+// inputs maps expression aliases to primitive column labels.
+export interface DataTableDerivedColumn {
+    label: string;
+    expression: string;
+    inputs: { [alias: string]: string };
+}
+
 export interface DataTableResult {
     success: boolean;
     title: string;
     columns: string[];
+    column_plan?: DataTableDerivedColumn[];
     rows: DataTableRow[];
     row_failures: string[] | null;
     created_at: string | null;

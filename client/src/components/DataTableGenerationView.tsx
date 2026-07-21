@@ -68,6 +68,12 @@ export default function DataTableGenerationView({
 
     const { columns, rows, title } = dataTableResult;
 
+    // label -> spec for calculator-computed columns, for header badges.
+    const derivedColumns = useMemo(
+        () => new Map((dataTableResult.column_plan ?? []).map(spec => [spec.label, spec])),
+        [dataTableResult.column_plan]
+    );
+
     // Create a map of paper_id to paper for quick lookup
     const paperMap = new Map(papers.map(paper => [paper.id, paper]));
 
@@ -118,6 +124,20 @@ export default function DataTableGenerationView({
                 return [`"${paperTitle.replace(/"/g, '""')}"`, ...values].join(',');
             })
         ];
+
+        // Note computed columns below the data so exported tables don't
+        // present calculator output as extracted values.
+        if (derivedColumns.size > 0) {
+            csvRows.push('');
+            csvRows.push('"Computed columns (calculated from extracted values, not stated in papers):"');
+            derivedColumns.forEach((spec) => {
+                const inputs = Object.entries(spec.inputs)
+                    .map(([alias, column]) => `${alias} = ${column}`)
+                    .join('; ');
+                const note = `${spec.label} = ${spec.expression} (${inputs})`;
+                csvRows.push(`"${note.replace(/"/g, '""')}"`);
+            });
+        }
 
         const csvContent = csvRows.join('\n');
         // Prepend a UTF-8 BOM so Excel detects the encoding (preserving accented
@@ -170,11 +190,40 @@ export default function DataTableGenerationView({
                                 <th className="text-left p-3 font-medium min-w-[200px] sticky left-0 bg-muted/50 z-10">
                                     Paper
                                 </th>
-                                {columns.map((columnName) => (
-                                    <th key={columnName} className="text-left p-3 font-medium min-w-[200px]">
-                                        {columnName}
-                                    </th>
-                                ))}
+                                {columns.map((columnName) => {
+                                    const derivedSpec = derivedColumns.get(columnName);
+                                    return (
+                                        <th key={columnName} className="text-left p-3 font-medium min-w-[200px]">
+                                            <span className="inline-flex items-center gap-1.5">
+                                                {columnName}
+                                                {derivedSpec && (
+                                                    <HoverCard openDelay={100} closeDelay={150}>
+                                                        <HoverCardTrigger asChild>
+                                                            <span className="inline-flex items-center px-1 py-0.5 rounded cursor-default bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                                                                <Calculator className="h-3.5 w-3.5" />
+                                                            </span>
+                                                        </HoverCardTrigger>
+                                                        <HoverCardContent className="w-96 p-3 shadow-md bg-accent space-y-2">
+                                                            <p className="text-xs font-semibold text-accent-foreground uppercase tracking-wide">
+                                                                Computed column
+                                                            </p>
+                                                            <p className="text-sm font-mono text-accent-foreground">
+                                                                = {derivedSpec.expression}
+                                                            </p>
+                                                            <div className="space-y-1">
+                                                                {Object.entries(derivedSpec.inputs).map(([alias, column]) => (
+                                                                    <p key={alias} className="text-xs font-mono text-muted-foreground">
+                                                                        {alias} ← {column}
+                                                                    </p>
+                                                                ))}
+                                                            </div>
+                                                        </HoverCardContent>
+                                                    </HoverCard>
+                                                )}
+                                            </span>
+                                        </th>
+                                    );
+                                })}
                             </tr>
                         </thead>
                         <tbody>
