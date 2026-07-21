@@ -224,43 +224,16 @@ class DocumentMapping(BaseModel):
     s3_object_key: str
     id: str
 
-class DerivedColumnSpec(BaseModel):
-    """A column computed by the calculator from other (primitive) columns,
-    never by the extraction model."""
-    label: str = Field(description="Display label of the derived column")
-    expression: str = Field(
-        description="Arithmetic expression over input aliases, e.g. 'cohens_d(mean_t, sd_t, n_t, mean_c, sd_c, n_c)' or '(a - b) / b * 100'"
-    )
-    inputs: dict[str, str] = Field(
-        description="Mapping of expression alias -> primitive column label, e.g. {'mean_t': 'Mean change (treatment)'}"
-    )
-
 class DataTableSchema(BaseModel):
+    """Extraction request from the server. Contains primitive (extractable)
+    columns only — derived columns are computed server-side after this
+    service returns the extracted dataset."""
     columns: List[str] = Field(
         description="List of column names in the data table."
     )
     papers: List[DocumentMapping] = Field(
         description="List of papers included in the data table."
     )
-    derived_columns: List[DerivedColumnSpec] = Field(
-        default=[],
-        description="Columns computed from other columns by the calculator. Labels must also appear in 'columns'; they are excluded from LLM extraction."
-    )
-
-class DerivationInput(BaseModel):
-    """One input to a derived cell: the primitive column it came from, the
-    numeric value used, and the citations backing that value."""
-    alias: str
-    column: str
-    value: str
-    citations: List["ResponseCitation"] = []
-
-class CellDerivation(BaseModel):
-    """Shows the work for a calculator-computed cell. Every input resolves to
-    citations, so every derived number resolves to quotes transitively."""
-    expression: str
-    inputs: List[DerivationInput] = []
-    warnings: List[str] = []
 
 class DataTableCellValue(BaseModel):
     """Value for a single cell in the data table with supporting citations."""
@@ -268,10 +241,6 @@ class DataTableCellValue(BaseModel):
     citations: List[ResponseCitation] = Field(
         default=[],
         description="List of citations that support this specific value. These should be direct quotes or paraphrases from the paper."
-    )
-    derivation: Optional[CellDerivation] = Field(
-        default=None,
-        description="Present only on calculator-computed cells; never produced by extraction."
     )
 
 class DataTableRow(BaseModel):
