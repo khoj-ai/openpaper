@@ -30,6 +30,7 @@ dependencies = [
     "types-psutil>=7.0.0.20250601",
     "google-genai>=1.23.0",
     "posthog>=6.1.0",
+    "e2b-code-interpreter>=2.8",
 ]
 
 [project.scripts]

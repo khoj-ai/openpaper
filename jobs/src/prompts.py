@@ -40,7 +40,7 @@ EXTRACT_COLS_INSTRUCTION = """You are a data extraction assistant specializing i
 **Guidelines:**
 - Look in tables, figures, results sections, abstract, and supplementary materials
 - Maintain consistency in terminology
-- You may infer or calculate values not explicitly stated, if justified by citations
+- NEVER perform arithmetic or derive values that are not stated in the paper. If a column's value would require any calculation, conversion beyond the unit conversions described above, or inference from other numbers, use "N/A" — derived values are computed outside of extraction
 - If uncertain about a value, use "N/A" rather than guessing
 
 **Output Requirements:**

@@ -25,6 +25,7 @@ from src.schemas import (
     SummaryAndCitations,
     Highlights,
     DataTableCellValue,
+    ResponseCitation,
 )
 from src.utils import retry_llm_operation, time_it
 
@@ -742,10 +743,16 @@ class PaperOperations(AsyncLLMClient):
                 n_cols=len(columns)
             )
 
+            # The extraction model must only ever produce value + citations —
+            # DataTableCellValue also carries `derivation`, which belongs to the
+            # calculator, so it must not appear in the LLM's output schema.
+            class ExtractedCell(BaseModel):
+                value: str
+                citations: List[ResponseCitation] = []
+
             # Create the dynamic schema that matches DataTableRow structure.
-            # Each aliased column maps to a DataTableCellValue (value + citations).
             field_definitions: Dict[str, Any] = {
-                alias: (DataTableCellValue, Field(description=f"Value and citations for column: {col!r}"))
+                alias: (ExtractedCell, Field(description=f"Value and citations for column: {col!r}"))
                 for alias, col in aliases.items()
             }
 
@@ -766,7 +773,10 @@ class PaperOperations(AsyncLLMClient):
 
             # Map aliased fields back to the original column names.
             values_dict: Dict[str, DataTableCellValue] = {
-                col: getattr(values_instance, alias)
+                col: DataTableCellValue(
+                    value=getattr(values_instance, alias).value,
+                    citations=getattr(values_instance, alias).citations,
+                )
                 for alias, col in aliases.items()
             }
 

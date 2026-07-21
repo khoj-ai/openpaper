@@ -3,6 +3,7 @@ import logging
 import tempfile
 from typing import Callable, List, Tuple, Optional
 
+from src.calculator import compute_derived_cells
 from src.schemas import DataTableRow, DataTableSchema, DataTableResult, DataTableCellValue, DocumentMapping
 from src.s3_service import s3_service
 from src.llm_client import fast_llm_client
@@ -89,28 +90,53 @@ async def construct_data_table(
     """
     semaphore = asyncio.Semaphore(batch_size)
 
-    # Create tasks for all papers
-    tasks = [
-        _process_single_paper(
-            paper=p,
-            columns=data_table_schema.columns,
-            status_callback=status_callback,
-            semaphore=semaphore,
-        )
-        for p in data_table_schema.papers
+    # Derived columns are computed by the calculator, never by the extraction
+    # model — only primitive columns are sent for extraction.
+    derived_specs = [
+        spec
+        for spec in data_table_schema.derived_columns
+        if spec.label in data_table_schema.columns
+    ]
+    derived_labels = {spec.label for spec in derived_specs}
+    primitive_columns = [
+        col for col in data_table_schema.columns if col not in derived_labels
     ]
 
-    # Process all papers concurrently (semaphore controls max parallelism)
-    results = await asyncio.gather(*tasks)
-
-    # Separate rows and failures while maintaining order
     rows: List[DataTableRow] = []
     row_failures: List[str] = []
 
-    for row, failure_id in results:
-        rows.append(row)
-        if failure_id is not None:
-            row_failures.append(failure_id)
+    if primitive_columns:
+        # Create tasks for all papers
+        tasks = [
+            _process_single_paper(
+                paper=p,
+                columns=primitive_columns,
+                status_callback=status_callback,
+                semaphore=semaphore,
+            )
+            for p in data_table_schema.papers
+        ]
+
+        # Process all papers concurrently (semaphore controls max parallelism)
+        results = await asyncio.gather(*tasks)
+
+        # Separate rows and failures while maintaining order
+        for row, failure_id in results:
+            rows.append(row)
+            if failure_id is not None:
+                row_failures.append(failure_id)
+    else:
+        # Nothing to extract (every column is derived) — skip the per-paper
+        # PDF download + LLM fan-out and go straight to the calculator.
+        rows = [
+            DataTableRow(paper_id=p.id, values={}) for p in data_table_schema.papers
+        ]
+
+    if derived_specs:
+        status_callback("computing derived columns")
+        # One executor pass for every derived cell across all rows; sandboxed
+        # execution happens here, off the extraction path.
+        await asyncio.to_thread(compute_derived_cells, rows, derived_specs)
 
     error_msg = ""
     if row_failures:
