@@ -192,6 +192,13 @@
 						56.13,
 						33.0
 					],
+					"expected_keys": [
+						"GPT-4",
+						"GPT-3.5",
+						"multilabel",
+						"utterance",
+						"Random"
+					],
 					"tolerance": 0.05,
 					"source": "Table 4, p.6, Total row: GPT-4 80.65, GPT-3.5-turbo 41.94, BERT-multilabel 45.16, BERT-utterance 56.13, Random 33.00",
 					"note": "Label pins Table 4 to exclude the Table 7 ablation variants, which are also defensibly 'evaluated approaches'."

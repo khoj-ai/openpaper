@@ -371,25 +371,34 @@ def _parse_list_input(
     """
     entries = (cell.entries if cell else None) or []
     values: list = []
+    labels: list = []
     warnings: List[str] = []
     citations: list = []
     seen_citations = set()
 
     for entry in entries:
+        entry_key = getattr(entry, "key", None)
+        label = f"{entry_key}: {entry.value}" if entry_key else entry.value
         if numeric:
             parsed = parse_numeric(entry.value)
             if parsed is None:
-                warnings.append(f"non-numeric element '{entry.value}' excluded")
+                warnings.append(f"non-numeric element '{label}' excluded")
             else:
                 values.append(parsed)
+                labels.append(
+                    f"{entry_key}: {format_number(parsed)}"
+                    if entry_key
+                    else format_number(parsed)
+                )
                 # An element carrying several numbers means extraction packed
                 # more than one value into it — which one was meant is a guess.
                 if len(_NUMERIC_RE.findall(entry.value.replace(",", ""))) > 1:
                     warnings.append(
-                        f"element '{entry.value}' contains multiple numbers; used {format_number(parsed)}"
+                        f"element '{label}' contains multiple numbers; used {format_number(parsed)}"
                     )
         else:
             values.append(entry.value)
+            labels.append(label)
         # Many elements share a source (one table quoted once) — dedupe so the
         # derivation carries each supporting quote once, not once per element.
         for citation in entry.citations:
@@ -401,12 +410,9 @@ def _parse_list_input(
     if not values:
         return None, warnings, "N/A", citations
 
-    if numeric:
-        display = "[" + ", ".join(format_number(v) for v in values) + "]"
-    else:
-        shown = ", ".join(str(v) for v in values[:6])
-        suffix = f", … ({len(values)} total)" if len(values) > 6 else ""
-        display = f"[{shown}{suffix}]"
+    shown = ", ".join(str(label) for label in labels[:8])
+    suffix = f", … ({len(labels)} total)" if len(labels) > 8 else ""
+    display = f"[{shown}{suffix}]"
     return values, warnings, display, citations
 
 

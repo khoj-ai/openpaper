@@ -145,6 +145,7 @@ class CellEntry(BaseModel):
     """One element of a list-valued cell, individually cited."""
 
     value: str
+    key: Optional[str] = None
     citations: List[ResponseCitation] = []
 
 

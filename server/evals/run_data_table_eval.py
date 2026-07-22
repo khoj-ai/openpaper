@@ -350,6 +350,17 @@ def grade_list_cell(col_cfg: dict, cell: dict, paper_text_norm: str) -> dict:
         abs(a - b) <= tolerance for a, b in zip(sorted(numerics), sorted(expected))
     )
 
+    # When the manifest names the expected instance keys, every extracted
+    # entry must carry a key mentioning one of them (order-independent).
+    expected_keys = col_cfg.get("expected_keys")
+    keys = [(e.get("key") or "").strip() for e in entries]
+    keys_matched = None
+    if expected_keys is not None:
+        keys_matched = len(keys) == len(expected_keys) and all(
+            any(exp.lower() in k.lower() for k in keys) for exp in expected_keys
+        )
+        matched = matched and keys_matched
+
     entry_citations = [c for e in entries for c in (e.get("citations") or [])]
     graded: dict[str, Any] = {
         "label": col_cfg["label"],
@@ -357,6 +368,8 @@ def grade_list_cell(col_cfg: dict, cell: dict, paper_text_norm: str) -> dict:
         "value": cell.get("value", ""),
         "numeric": None,
         "elements": numerics,
+        "keys": keys,
+        "keys_matched": keys_matched,
         "expected": expected,
         "n_citations": len(entry_citations),
         "citations_found": sum(

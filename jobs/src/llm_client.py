@@ -744,7 +744,7 @@ class PaperOperations(AsyncLLMClient):
 
             cols_str = "\n".join(
                 f'- {alias}: "{col}"'
-                + (" [LIST: one entry per instance found in the paper]" if col in list_column_set else "")
+                + (" [LIST: one keyed entry per instance found in the paper]" if col in list_column_set else "")
                 for alias, col in aliases.items()
             )
             prompt = EXTRACT_COLS_INSTRUCTION.format(
@@ -759,11 +759,22 @@ class PaperOperations(AsyncLLMClient):
                 value: str
                 citations: List[ResponseCitation] = []
 
+            class ExtractedEntry(BaseModel):
+                key: str = Field(
+                    description=(
+                        "Label identifying which instance this entry belongs to "
+                        "(model name, dataset, condition, etc.). Empty string if "
+                        "the paper gives no such label."
+                    )
+                )
+                value: str
+                citations: List[ResponseCitation] = []
+
             # Create the dynamic schema that matches DataTableRow structure.
             # Scalar columns map to one cell; list columns to a list of cells.
             field_definitions: Dict[str, Any] = {
                 alias: (
-                    (List[ExtractedCell], Field(description=f"One entry per instance found for column: {col!r}"))
+                    (List[ExtractedEntry], Field(description=f"One keyed entry per instance found for column: {col!r}"))
                     if col in list_column_set
                     else (ExtractedCell, Field(description=f"Value and citations for column: {col!r}"))
                 )
@@ -791,12 +802,20 @@ class PaperOperations(AsyncLLMClient):
                 extracted = getattr(values_instance, alias)
                 if col in list_column_set:
                     entries = [
-                        CellEntry(value=e.value, citations=e.citations)
+                        CellEntry(
+                            value=e.value,
+                            key=e.key.strip() or None,
+                            citations=e.citations,
+                        )
                         for e in extracted
                         if e.value.strip() and e.value.strip().upper() != "N/A"
                     ]
                     values_dict[col] = DataTableCellValue(
-                        value="; ".join(e.value for e in entries) if entries else "N/A",
+                        value="; ".join(
+                            f"{e.key}: {e.value}" if e.key else e.value for e in entries
+                        )
+                        if entries
+                        else "N/A",
                         citations=[],
                         entries=entries,
                     )

@@ -250,11 +250,15 @@ class TestExecutorSelection(unittest.TestCase):
 
 
 def make_list_row(
-    paper_id: str, column: str, element_values: list[str]
+    paper_id: str,
+    column: str,
+    element_values: list[str],
+    keys: list[str] | None = None,
 ) -> DataTableRow:
     entries = [
         CellEntry(
             value=v,
+            key=keys[i] if keys else None,
             citations=[ResponseCitation(text=f"quote for {v}", index=i + 1)],
         )
         for i, v in enumerate(element_values)
@@ -302,6 +306,49 @@ class TestListColumnsAndAggregates(unittest.TestCase):
         self.assertEqual(self._compute(["2", "4", "6"], "count(xs)").value, "3")
         self.assertEqual(self._compute(["2", "4", "6"], "sum(xs)").value, "12")
         self.assertEqual(self._compute(["2", "4", "6"], "max(xs) - min(xs)").value, "4")
+
+    def test_keyed_entries_shown_in_display_and_bound_numerically(self):
+        rows = [
+            make_list_row(
+                "p1",
+                "scores",
+                ["80.65", "41.94"],
+                keys=["GPT-4", "GPT-3.5-turbo"],
+            )
+        ]
+        specs = [
+            DerivedColumnSpec(
+                label="agg", expression="median(xs)", inputs={"xs": "scores"}
+            )
+        ]
+        compute_derived_cells(rows, specs, {"scores"})
+        cell = rows[0].values["agg"]
+        # Keys never contaminate the numeric binding ("GPT-4" is not a 4)...
+        self.assertEqual(cell.value, "61.295")
+        self.assertEqual(cell.derivation.warnings, [])
+        # ...but the derivation display names each instance.
+        self.assertEqual(
+            cell.derivation.inputs[0].value, "[GPT-4: 80.65, GPT-3.5-turbo: 41.94]"
+        )
+
+    def test_non_numeric_keyed_entry_warning_names_the_key(self):
+        rows = [
+            make_list_row(
+                "p1", "scores", ["80.65", "not reported"], keys=["GPT-4", "Random"]
+            )
+        ]
+        specs = [
+            DerivedColumnSpec(
+                label="agg", expression="mean(xs)", inputs={"xs": "scores"}
+            )
+        ]
+        compute_derived_cells(rows, specs, {"scores"})
+        cell = rows[0].values["agg"]
+        self.assertEqual(cell.value, "80.65")
+        self.assertEqual(
+            cell.derivation.warnings,
+            ["scores: non-numeric element 'Random: not reported' excluded"],
+        )
 
     def test_count_is_structural_over_text_entries(self):
         # A names list has no numbers to parse — count counts every entry,
