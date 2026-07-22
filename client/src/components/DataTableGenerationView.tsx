@@ -86,6 +86,21 @@ export default function DataTableGenerationView({
         [dataTableResult.column_plan]
     );
 
+    // label -> aliases by which computed-column formulas refer to that column,
+    // mirroring the creation modal so `alias ← label` bindings stay legible in
+    // the final table.
+    const aliasesByLabel = useMemo(() => {
+        const map = new Map<string, string[]>();
+        (dataTableResult.column_plan ?? []).forEach(spec => {
+            Object.entries(spec.inputs ?? {}).forEach(([alias, column]) => {
+                const aliases = map.get(column) ?? [];
+                if (!aliases.includes(alias)) aliases.push(alias);
+                map.set(column, aliases);
+            });
+        });
+        return map;
+    }, [dataTableResult.column_plan]);
+
     // Create a map of paper_id to paper for quick lookup
     const paperMap = new Map(papers.map(paper => [paper.id, paper]));
 
@@ -214,12 +229,21 @@ export default function DataTableGenerationView({
                                                 {columnName}
                                                 {listColumns.has(columnName) && (
                                                     <span
-                                                        title="List column — one cited entry per instance found in the paper"
+                                                        title="List column — one cited entry per instance found in the paper. Entries are independent of other list columns: rows do not align across lists."
                                                         className="inline-flex items-center px-1 py-0.5 rounded cursor-default bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300"
                                                     >
                                                         <List className="h-3.5 w-3.5" />
                                                     </span>
                                                 )}
+                                                {(aliasesByLabel.get(columnName) ?? []).map(alias => (
+                                                    <code
+                                                        key={alias}
+                                                        title={`Computed column formulas refer to this column as '${alias}'`}
+                                                        className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono font-normal text-muted-foreground shrink-0"
+                                                    >
+                                                        {alias}
+                                                    </code>
+                                                ))}
                                                 {derivedSpec && (
                                                     <HoverCard openDelay={100} closeDelay={150}>
                                                         <HoverCardTrigger asChild>
