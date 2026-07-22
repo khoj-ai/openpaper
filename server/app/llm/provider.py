@@ -166,8 +166,8 @@ class GeminiProvider(BaseLLMProvider):
             raise ValueError("GEMINI_API_KEY environment variable is required")
 
         self._client = genai.Client(api_key=self.api_key)
-        self._default_model = "gemini-3.1-pro-preview"
-        self._fast_model = "gemini-3.5-flash"
+        self._default_model = "gemini-3.6-flash"
+        self._fast_model = "gemini-3.5-flash-lite"
 
     @property
     def client(self) -> genai.Client:
@@ -538,8 +538,8 @@ class OpenAIProvider(BaseLLMProvider):
         # For standard OpenAI, base_url should be None. For OpenAI-compatible
         # providers, pass a custom base_url when constructing this provider.
         self._client = openai.OpenAI(api_key=self.api_key, base_url=base_url)
-        self._default_model = default_model or "gpt-5.4"
-        self._fast_model = fast_model or "gpt-4.1"
+        self._default_model = default_model or "gpt-5.6-sol"
+        self._fast_model = fast_model or "gpt-5.6-luna"
         # Some OpenAI-compatible endpoints (e.g. Cerebras) reject `file` content
         # blocks. When False, FileContent for PDFs uses text_fallback inline.
         self.supports_pdf_input = supports_pdf_input
@@ -579,6 +579,12 @@ class OpenAIProvider(BaseLLMProvider):
 
         if tools:
             kwargs["tools"] = tools
+            # gpt-5.x reasoning models reject function tools on
+            # /v1/chat/completions unless reasoning is off (the alternative is
+            # migrating to /v1/responses). Cerebras models don't match the
+            # prefix and are unaffected.
+            if model.startswith("gpt-5"):
+                kwargs.setdefault("reasoning_effort", "none")
 
         # Apply structured output schema if provided
         if schema:
