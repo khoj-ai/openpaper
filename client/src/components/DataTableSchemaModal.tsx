@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { X, Plus, Table, Loader2, Sparkles, Info, List, ListPlus, Calculator } from "lucide-react";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { toast } from "sonner";
@@ -178,6 +178,23 @@ export default function DataTableSchemaModal({
     const canSubmit = fields.some(field => field.label.trim() !== '');
     const showFields = mode !== 'prompt';
 
+    // label -> aliases by which computed-field formulas refer to that field,
+    // so the `alias ← label` bindings shown under formulas have a visible
+    // landing spot on the referenced field itself.
+    const aliasesByLabel = useMemo(() => {
+        const map = new Map<string, string[]>();
+        fields.forEach(field => {
+            if (field.kind === 'derived' && field.inputs) {
+                Object.entries(field.inputs).forEach(([alias, column]) => {
+                    const aliases = map.get(column) ?? [];
+                    if (!aliases.includes(alias)) aliases.push(alias);
+                    map.set(column, aliases);
+                });
+            }
+        });
+        return map;
+    }, [fields]);
+
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -277,6 +294,15 @@ export default function DataTableSchemaModal({
                                                                     list
                                                                 </Badge>
                                                             )}
+                                                            {(aliasesByLabel.get(field.label) ?? []).map(alias => (
+                                                                <code
+                                                                    key={alias}
+                                                                    title={`Computed field formulas refer to this field as '${alias}'`}
+                                                                    className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono text-muted-foreground shrink-0"
+                                                                >
+                                                                    {alias}
+                                                                </code>
+                                                            ))}
                                                             {field.evidence && (
                                                                 <HoverCard openDelay={100} closeDelay={100}>
                                                                     <HoverCardTrigger asChild>
