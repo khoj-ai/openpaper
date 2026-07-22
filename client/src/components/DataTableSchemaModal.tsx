@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { X, Plus, Table, Loader2, Sparkles, List, ListPlus, Calculator } from "lucide-react";
+import { X, Plus, Table, Loader2, Sparkles, Info, List, ListPlus, Calculator } from "lucide-react";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,8 @@ export interface FieldDefinition {
     // mapping of each alias to a primitive/list field label.
     expression?: string;
     inputs?: { [alias: string]: string };
+    // Where the papers ground this field, per the propose agent's investigation.
+    evidence?: string;
 }
 
 interface DataTableSchemaModalProps {
@@ -100,6 +103,7 @@ export default function DataTableSchemaModal({
                 kind: column.kind,
                 expression: column.expression || undefined,
                 inputs: column.kind === 'derived' ? column.inputs : undefined,
+                evidence: column.evidence || undefined,
             })));
             setMode('augmented');
         } catch (err) {
@@ -227,24 +231,34 @@ export default function DataTableSchemaModal({
                             )}
 
                             {mode === 'prompt' && (
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    onClick={() => {
-                                        setFields([{ id: '1', label: '', kind: 'primitive' }]);
-                                        setMode('manual');
-                                    }}
-                                    disabled={isProposing}
-                                    className="w-full text-muted-foreground"
-                                >
-                                    <ListPlus className="mr-2 h-4 w-4" />
-                                    Enter fields manually instead
-                                </Button>
+                                <>
+                                    <div className="relative py-1">
+                                        <div className="absolute inset-0 flex items-center">
+                                            <span className="w-full border-t" />
+                                        </div>
+                                        <div className="relative flex justify-center">
+                                            <span className="bg-background px-2 text-xs uppercase text-muted-foreground">or</span>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="link"
+                                        onClick={() => {
+                                            setFields([{ id: '1', label: '', kind: 'primitive' }]);
+                                            setMode('manual');
+                                        }}
+                                        disabled={isProposing}
+                                        className="w-full text-muted-foreground hover:text-foreground"
+                                    >
+                                        <ListPlus className="mr-2 h-4 w-4" />
+                                        Enter fields manually instead
+                                    </Button>
+                                </>
                             )}
 
                             {showFields && (
                                 <>
-                                    <div className="space-y-3">
+                                    <div className={`space-y-3 ${isProposing ? 'opacity-60' : ''}`}>
                                         {fields.map((field, index) => (
                                             <div key={field.id} className="space-y-1">
                                                 <div className="flex gap-2 items-end">
@@ -252,16 +266,31 @@ export default function DataTableSchemaModal({
                                                         <Label htmlFor={`label-${field.id}`} className="text-sm font-medium flex items-center gap-2">
                                                             Field {index + 1}
                                                             {field.kind === 'derived' && (
-                                                                <Badge className="gap-1 px-1.5 py-0.5 text-[10px] bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/30">
+                                                                <Badge className="gap-1 px-1.5 py-0.5 text-[10px] shrink-0 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/30">
                                                                     <Calculator className="h-3 w-3" />
                                                                     computed
                                                                 </Badge>
                                                             )}
                                                             {field.kind === 'list' && (
-                                                                <Badge className="gap-1 px-1.5 py-0.5 text-[10px] bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/30">
+                                                                <Badge className="gap-1 px-1.5 py-0.5 text-[10px] shrink-0 bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/30">
                                                                     <List className="h-3 w-3" />
                                                                     list
                                                                 </Badge>
+                                                            )}
+                                                            {field.evidence && (
+                                                                <HoverCard openDelay={100} closeDelay={100}>
+                                                                    <HoverCardTrigger asChild>
+                                                                        <span className="shrink-0 text-muted-foreground hover:text-foreground cursor-default">
+                                                                            <Info className="h-3.5 w-3.5" />
+                                                                        </span>
+                                                                    </HoverCardTrigger>
+                                                                    <HoverCardContent className="w-96 p-3 shadow-md bg-accent">
+                                                                        <p className="text-xs font-semibold text-accent-foreground uppercase tracking-wide mb-1.5">
+                                                                            Why this field
+                                                                        </p>
+                                                                        <p className="text-xs text-accent-foreground">{field.evidence}</p>
+                                                                    </HoverCardContent>
+                                                                </HoverCard>
                                                             )}
                                                         </Label>
                                                         <Input
@@ -269,6 +298,7 @@ export default function DataTableSchemaModal({
                                                             placeholder="e.g., Author, Year, Sample Size, Key Finding..."
                                                             value={field.label}
                                                             onChange={(e) => updateField(field.id, e.target.value)}
+                                                            disabled={isProposing}
                                                             className="mt-1"
                                                         />
                                                     </div>
@@ -278,6 +308,7 @@ export default function DataTableSchemaModal({
                                                             variant="ghost"
                                                             size="icon"
                                                             onClick={() => removeField(field.id)}
+                                                            disabled={isProposing}
                                                             className="shrink-0"
                                                         >
                                                             <X className="h-4 w-4" />
@@ -302,6 +333,7 @@ export default function DataTableSchemaModal({
                                         type="button"
                                         variant="outline"
                                         onClick={addField}
+                                        disabled={isProposing}
                                         className="w-full"
                                     >
                                         <Plus className="mr-2 h-4 w-4" />
@@ -326,7 +358,7 @@ export default function DataTableSchemaModal({
                             {showFields && (
                                 <Button
                                     onClick={handleSubmit}
-                                    disabled={!canSubmit || isCreating}
+                                    disabled={!canSubmit || isCreating || isProposing}
                                 >
                                     {isCreating ? (
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />

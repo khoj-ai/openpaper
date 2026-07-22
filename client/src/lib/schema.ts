@@ -543,6 +543,8 @@ export interface ProposedDataTableColumn {
     kind: 'primitive' | 'list' | 'derived';
     expression: string;
     inputs: { [alias: string]: string };
+    // Where the papers ground this column, per the propose agent's investigation.
+    evidence?: string;
 }
 
 export interface DataTableRow {
