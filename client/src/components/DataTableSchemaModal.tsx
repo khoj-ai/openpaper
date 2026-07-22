@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, Plus, Table, Loader2, Sparkles, ListPlus, Calculator } from "lucide-react";
+import { X, Plus, Table, Loader2, Sparkles, List, ListPlus, Calculator } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,9 +23,9 @@ import { ProposedDataTableColumn } from "@/lib/schema";
 export interface FieldDefinition {
     id: string;
     label: string;
-    kind: 'primitive' | 'derived';
+    kind: 'primitive' | 'list' | 'derived';
     // For derived fields: the calculator expression over aliases, and the
-    // mapping of each alias to a primitive field label.
+    // mapping of each alias to a primitive/list field label.
     expression?: string;
     inputs?: { [alias: string]: string };
 }
@@ -255,6 +255,12 @@ export default function DataTableSchemaModal({
                                                                 <Badge className="gap-1 px-1.5 py-0.5 text-[10px] bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/30">
                                                                     <Calculator className="h-3 w-3" />
                                                                     computed
+                                                                </Badge>
+                                                            )}
+                                                            {field.kind === 'list' && (
+                                                                <Badge className="gap-1 px-1.5 py-0.5 text-[10px] bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/30">
+                                                                    <List className="h-3 w-3" />
+                                                                    list
                                                                 </Badge>
                                                             )}
                                                         </Label>

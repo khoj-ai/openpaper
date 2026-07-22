@@ -522,17 +522,25 @@ export interface CellDerivation {
     warnings: string[];
 }
 
+// One element of a list-valued cell, individually cited.
+export interface CellEntry {
+    value: string;
+    citations: ReferenceCitation[];
+}
+
 export interface DataTableCellValue {
     value: string;
     citations: ReferenceCitation[];
     derivation?: CellDerivation | null;
+    // Present only on list-valued cells; `value` holds the joined display form.
+    entries?: CellEntry[] | null;
 }
 
-// A column in a proposed data-table schema; derived columns are computed by
-// the calculator from primitive columns instead of extracted by the model.
+// A column in a proposed data-table schema; list columns extract one cited
+// entry per instance, derived columns are computed by the calculator.
 export interface ProposedDataTableColumn {
     label: string;
-    kind: 'primitive' | 'derived';
+    kind: 'primitive' | 'list' | 'derived';
     expression: string;
     inputs: { [alias: string]: string };
 }
@@ -545,12 +553,13 @@ export interface DataTableRow {
     };
 }
 
-// Spec of a calculator-computed column: {label, expression, inputs} where
-// inputs maps expression aliases to primitive column labels.
+// Entry in a table's column plan. kind "derived" entries carry expression +
+// inputs (aliases -> column labels); kind "list" entries mark list columns.
 export interface DataTableDerivedColumn {
     label: string;
-    expression: string;
-    inputs: { [alias: string]: string };
+    kind?: 'derived' | 'list';
+    expression?: string;
+    inputs?: { [alias: string]: string };
 }
 
 export interface DataTableResult {

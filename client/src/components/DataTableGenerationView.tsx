@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Download, Table as TableIcon, Calculator, TriangleAlert } from "lucide-react";
+import { Download, Table as TableIcon, Calculator, List, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -70,7 +70,19 @@ export default function DataTableGenerationView({
 
     // label -> spec for calculator-computed columns, for header badges.
     const derivedColumns = useMemo(
-        () => new Map((dataTableResult.column_plan ?? []).map(spec => [spec.label, spec])),
+        () => new Map(
+            (dataTableResult.column_plan ?? [])
+                .filter(spec => spec.expression)
+                .map(spec => [spec.label, spec])
+        ),
+        [dataTableResult.column_plan]
+    );
+    const listColumns = useMemo(
+        () => new Set(
+            (dataTableResult.column_plan ?? [])
+                .filter(spec => spec.kind === 'list')
+                .map(spec => spec.label)
+        ),
         [dataTableResult.column_plan]
     );
 
@@ -98,6 +110,10 @@ export default function DataTableGenerationView({
             columns.forEach((columnName) => {
                 const cellValue = row.values?.[columnName];
                 cellValue?.citations.forEach((citation) => addCitation(row.paper_id, citation));
+                // List cells cite through their per-element entries.
+                cellValue?.entries?.forEach((entry) => {
+                    entry.citations.forEach((citation) => addCitation(row.paper_id, citation));
+                });
                 // Derived cells cite through their derivation inputs.
                 cellValue?.derivation?.inputs.forEach((input) => {
                     input.citations.forEach((citation) => addCitation(row.paper_id, citation));
@@ -131,7 +147,7 @@ export default function DataTableGenerationView({
             csvRows.push('');
             csvRows.push('"Computed columns (calculated from extracted values, not stated in papers):"');
             derivedColumns.forEach((spec) => {
-                const inputs = Object.entries(spec.inputs)
+                const inputs = Object.entries(spec.inputs ?? {})
                     .map(([alias, column]) => `${alias} = ${column}`)
                     .join('; ');
                 const note = `${spec.label} = ${spec.expression} (${inputs})`;
@@ -196,6 +212,14 @@ export default function DataTableGenerationView({
                                         <th key={columnName} className="text-left p-3 font-medium min-w-[200px]">
                                             <span className="inline-flex items-center gap-1.5">
                                                 {columnName}
+                                                {listColumns.has(columnName) && (
+                                                    <span
+                                                        title="List column — one cited entry per instance found in the paper"
+                                                        className="inline-flex items-center px-1 py-0.5 rounded cursor-default bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300"
+                                                    >
+                                                        <List className="h-3.5 w-3.5" />
+                                                    </span>
+                                                )}
                                                 {derivedSpec && (
                                                     <HoverCard openDelay={100} closeDelay={150}>
                                                         <HoverCardTrigger asChild>
@@ -211,7 +235,7 @@ export default function DataTableGenerationView({
                                                                 = {derivedSpec.expression}
                                                             </p>
                                                             <div className="space-y-1">
-                                                                {Object.entries(derivedSpec.inputs).map(([alias, column]) => (
+                                                                {Object.entries(derivedSpec.inputs ?? {}).map(([alias, column]) => (
                                                                     <p key={alias} className="text-xs font-mono text-muted-foreground">
                                                                         {alias} ← {column}
                                                                     </p>
@@ -252,7 +276,32 @@ export default function DataTableGenerationView({
                                                     {cellValue ? (
                                                         <div className="space-y-2">
                                                             <div className="text-foreground flex items-center gap-1.5">
-                                                                {cellValue.value}
+                                                                {cellValue.entries && cellValue.entries.length > 0 ? (
+                                                                    <div className="space-y-1">
+                                                                        {cellValue.entries.map((entry, entryIdx) => (
+                                                                            <div key={entryIdx} className="flex items-center gap-1.5">
+                                                                                <span>{entry.value}</span>
+                                                                                {entry.citations.map((citation, citationIdx) => (
+                                                                                    <button
+                                                                                        key={citationIdx}
+                                                                                        title={citation.text}
+                                                                                        onClick={() => {
+                                                                                            if (onCitationClick) {
+                                                                                                onCitationClick(row.paper_id, citation.text);
+                                                                                            }
+                                                                                            setHighlightedPaper(row.paper_id);
+                                                                                        }}
+                                                                                        className="text-xs px-1 py-0.5 rounded transition-colors bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50"
+                                                                                    >
+                                                                                        [{citation.index}]
+                                                                                    </button>
+                                                                                ))}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : (
+                                                                    cellValue.value
+                                                                )}
                                                                 {cellValue.derivation && (
                                                                     <HoverCard openDelay={100} closeDelay={150}>
                                                                         <HoverCardTrigger asChild>
@@ -271,25 +320,36 @@ export default function DataTableGenerationView({
                                                                                 = {cellValue.derivation.expression}
                                                                             </p>
                                                                             <div className="space-y-1.5">
-                                                                                {cellValue.derivation.inputs.map((input) => (
-                                                                                    <div key={input.alias} className="text-xs text-accent-foreground flex flex-wrap items-start gap-x-1.5 font-mono">
-                                                                                        <span className="font-semibold whitespace-nowrap">{input.alias} = {input.value}</span>
-                                                                                        <span className="text-muted-foreground">← {input.column}</span>
-                                                                                        {input.citations.map((citation, citationIdx) => (
-                                                                                            <button
-                                                                                                key={citationIdx}
-                                                                                                onClick={() => {
-                                                                                                    if (onCitationClick) {
-                                                                                                        onCitationClick(row.paper_id, citation.text);
-                                                                                                    }
-                                                                                                }}
-                                                                                                className="px-1 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50"
-                                                                                            >
-                                                                                                [{citation.index}]
-                                                                                            </button>
-                                                                                        ))}
-                                                                                    </div>
-                                                                                ))}
+                                                                                {cellValue.derivation.inputs.map((input) => {
+                                                                                    // Elements of a list input often share one source
+                                                                                    // quote — show each supporting citation once.
+                                                                                    const uniqueCitations = input.citations.filter(
+                                                                                        (citation, idx) => input.citations.findIndex(
+                                                                                            c => c.index === citation.index && c.text === citation.text
+                                                                                        ) === idx
+                                                                                    );
+                                                                                    return (
+                                                                                        <div key={input.alias} className="text-xs text-accent-foreground font-mono">
+                                                                                            <div className="font-semibold">{input.alias} = {input.value}</div>
+                                                                                            <div className="text-muted-foreground flex flex-wrap items-center gap-1">
+                                                                                                <span>← {input.column}</span>
+                                                                                                {uniqueCitations.map((citation, citationIdx) => (
+                                                                                                    <button
+                                                                                                        key={citationIdx}
+                                                                                                        onClick={() => {
+                                                                                                            if (onCitationClick) {
+                                                                                                                onCitationClick(row.paper_id, citation.text);
+                                                                                                            }
+                                                                                                        }}
+                                                                                                        className="px-1 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50"
+                                                                                                    >
+                                                                                                        [{citation.index}]
+                                                                                                    </button>
+                                                                                                ))}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
                                                                             </div>
                                                                             {cellValue.derivation.warnings.length > 0 && (
                                                                                 <div className="space-y-1 pt-1 border-t border-amber-200 dark:border-amber-800/40">

@@ -344,6 +344,10 @@ export function ArtifactsPanel() {
                             expression: col.expression,
                             inputs: col.inputs,
                         })),
+                    // List columns extract one cited entry per instance found.
+                    list_columns: columns
+                        .filter(col => col.kind === 'list')
+                        .map(col => col.label),
                 }),
             });
 
