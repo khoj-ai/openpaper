@@ -336,30 +336,60 @@ def _execute(items: List[WorkItem]) -> List[Dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 
-def _parse_list_input(cell) -> Tuple[Optional[List[float]], List[str], str, list]:
-    """Parse a list-valued cell into numeric elements.
+def _aggregate_usage(expression: str) -> Dict[str, set]:
+    """Map each name used as an aggregate-function argument to the set of
+    aggregate functions it is passed to."""
+    usage: Dict[str, set] = {}
+    try:
+        tree = ast.parse(expression, mode="eval")
+    except SyntaxError:
+        return usage
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id in AGGREGATE_FUNCTIONS
+        ):
+            for arg in node.args:
+                if isinstance(arg, ast.Name):
+                    usage.setdefault(arg.id, set()).add(node.func.id)
+    return usage
 
-    Returns (numbers or None, warnings, display value, citations). Non-numeric
-    elements are excluded with a warning; an empty or absent list is missing.
+
+def _parse_list_input(
+    cell, numeric: bool = True
+) -> Tuple[Optional[list], List[str], str, list]:
+    """Parse a list-valued cell into aggregate inputs.
+
+    numeric=True (median/mean/sum/min/max): elements are parsed as numbers;
+    non-numeric elements are excluded with a warning.
+    numeric=False (alias used only in count()): counting is structural, not
+    numeric — every entry counts as itself, no parsing, no warnings.
+
+    Returns (values or None, warnings, display value, citations). An empty or
+    absent list is missing either way.
     """
     entries = (cell.entries if cell else None) or []
-    numbers: List[float] = []
+    values: list = []
     warnings: List[str] = []
     citations: list = []
     seen_citations = set()
 
     for entry in entries:
-        numeric = parse_numeric(entry.value)
-        if numeric is None:
-            warnings.append(f"non-numeric element '{entry.value}' excluded")
+        if numeric:
+            parsed = parse_numeric(entry.value)
+            if parsed is None:
+                warnings.append(f"non-numeric element '{entry.value}' excluded")
+            else:
+                values.append(parsed)
+                # An element carrying several numbers means extraction packed
+                # more than one value into it — which one was meant is a guess.
+                if len(_NUMERIC_RE.findall(entry.value.replace(",", ""))) > 1:
+                    warnings.append(
+                        f"element '{entry.value}' contains multiple numbers; used {format_number(parsed)}"
+                    )
         else:
-            numbers.append(numeric)
-            # An element carrying several numbers means extraction packed more
-            # than one value into it — which one was meant is a guess.
-            if len(_NUMERIC_RE.findall(entry.value.replace(",", ""))) > 1:
-                warnings.append(
-                    f"element '{entry.value}' contains multiple numbers; used {format_number(numeric)}"
-                )
+            values.append(entry.value)
         # Many elements share a source (one table quoted once) — dedupe so the
         # derivation carries each supporting quote once, not once per element.
         for citation in entry.citations:
@@ -368,11 +398,16 @@ def _parse_list_input(cell) -> Tuple[Optional[List[float]], List[str], str, list
                 seen_citations.add(key)
                 citations.append(citation)
 
-    if not numbers:
+    if not values:
         return None, warnings, "N/A", citations
 
-    display = "[" + ", ".join(format_number(n) for n in numbers) + "]"
-    return numbers, warnings, display, citations
+    if numeric:
+        display = "[" + ", ".join(format_number(v) for v in values) + "]"
+    else:
+        shown = ", ".join(str(v) for v in values[:6])
+        suffix = f", … ({len(values)} total)" if len(values) > 6 else ""
+        display = f"[{shown}{suffix}]"
+    return values, warnings, display, citations
 
 
 def compute_derived_cells(
@@ -401,6 +436,7 @@ def compute_derived_cells(
         aliases = list(spec.inputs.keys())
         list_aliases = [a for a, col in spec.inputs.items() if col in list_columns]
         validation_error = validate_expression(spec.expression, aliases, list_aliases)
+        aggregate_usage = _aggregate_usage(spec.expression)
         if validation_error:
             # Rejected expressions are the signal for when the whitelist stops
             # being enough.
@@ -419,13 +455,18 @@ def compute_derived_cells(
                 cell = row.values.get(column)
 
                 if column in list_columns:
-                    numbers, list_warnings, display, citations = _parse_list_input(cell)
+                    # An alias consumed only by count() binds structurally —
+                    # every entry counts, whether or not it parses as a number.
+                    needs_numbers = aggregate_usage.get(alias, set()) != {"count"}
+                    values, list_warnings, display, citations = _parse_list_input(
+                        cell, numeric=needs_numbers
+                    )
                     warnings.extend(f"{column}: {w}" for w in list_warnings)
-                    if numbers is None:
+                    if values is None:
                         has_missing_input = True
                         warnings.append(f"{column} not reported (needed as '{alias}')")
                     else:
-                        variables[alias] = numbers
+                        variables[alias] = values
                     inputs.append(
                         DerivationInput(
                             alias=alias,

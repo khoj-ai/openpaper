@@ -303,9 +303,30 @@ class TestListColumnsAndAggregates(unittest.TestCase):
         self.assertEqual(self._compute(["2", "4", "6"], "sum(xs)").value, "12")
         self.assertEqual(self._compute(["2", "4", "6"], "max(xs) - min(xs)").value, "4")
 
+    def test_count_is_structural_over_text_entries(self):
+        # A names list has no numbers to parse — count counts every entry,
+        # with no exclusions and no warnings ("Claude 3 Opus" is one model,
+        # not the number 3).
+        cell = self._compute(
+            ["Claude 3 Opus", "smaller Llama models", "GPT-4o"], "count(xs)"
+        )
+        self.assertEqual(cell.value, "3")
+        self.assertEqual(cell.derivation.warnings, [])
+
+    def test_mixed_count_and_numeric_aggregate_binds_numerically(self):
+        # When the same alias also feeds a numeric aggregate, the binding must
+        # be numeric for both — count then counts the usable numbers.
+        cell = self._compute(
+            ["80.65", "not reported", "33.00"], "median(xs) + count(xs)"
+        )
+        self.assertEqual(cell.value, str((80.65 + 33.0) / 2 + 2))
+        self.assertTrue(
+            any("non-numeric element" in w for w in cell.derivation.warnings)
+        )
+
     def test_non_numeric_element_excluded_with_warning(self):
-        cell = self._compute(["80.65", "not reported", "33.00"], "count(xs)")
-        self.assertEqual(cell.value, "2")
+        cell = self._compute(["80.65", "not reported", "33.00"], "median(xs)")
+        self.assertEqual(cell.value, "56.825")
         self.assertTrue(
             any("non-numeric element" in w for w in cell.derivation.warnings)
         )
