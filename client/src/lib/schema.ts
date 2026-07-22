@@ -525,6 +525,7 @@ export interface CellDerivation {
 // One element of a list-valued cell, individually cited.
 export interface CellEntry {
     value: string;
+    key?: string | null;
     citations: ReferenceCitation[];
 }
 

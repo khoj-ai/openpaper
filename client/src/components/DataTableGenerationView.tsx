@@ -149,7 +149,11 @@ export default function DataTableGenerationView({
                 const values = columns.map(columnName => {
                     const cellValue = row.values?.[columnName];
                     if (!cellValue) return '';
-                    const value = cellValue.value;
+                    const value = cellValue.entries?.length
+                        ? cellValue.entries
+                            .map((entry) => (entry.key ? `${entry.key}: ${entry.value}` : entry.value))
+                            .join('; ')
+                        : cellValue.value;
                     return `"${String(value).replace(/"/g, '""')}"`;
                 });
                 return [`"${paperTitle.replace(/"/g, '""')}"`, ...values].join(',');
@@ -304,7 +308,12 @@ export default function DataTableGenerationView({
                                                                     <div className="space-y-1">
                                                                         {cellValue.entries.map((entry, entryIdx) => (
                                                                             <div key={entryIdx} className="flex items-center gap-1.5">
-                                                                                <span>{entry.value}</span>
+                                                                                <span>
+                                                                                    {entry.key && (
+                                                                                        <span className="text-muted-foreground">{entry.key}: </span>
+                                                                                    )}
+                                                                                    {entry.value}
+                                                                                </span>
                                                                                 {entry.citations.map((citation, citationIdx) => (
                                                                                     <button
                                                                                         key={citationIdx}

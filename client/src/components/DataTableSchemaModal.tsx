@@ -242,7 +242,7 @@ export default function DataTableSchemaModal({
                                         )}
                                         {isProposing
                                             ? 'Suggesting fields...'
-                                            : mode === 'augmented' ? 'Suggest Again' : 'Suggest Fields'}
+                                            : mode === 'augmented' ? 'Regenerate' : 'Propose Fields'}
                                     </Button>
                                 </div>
                             )}
