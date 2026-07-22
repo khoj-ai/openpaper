@@ -48,14 +48,19 @@ class ProposeDataTableSchemaRequest(BaseModel):
 
 
 @projects_data_table_router.post("/propose")
-async def propose_data_table_schema(
+def propose_data_table_schema(
     request: ProposeDataTableSchemaRequest,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_required_user),
 ) -> JSONResponse:
     """
     Propose data table columns from a natural language description of what
-    the user wants to extract from the project's papers.
+    the user wants to extract from the project's papers. An agent investigates
+    the papers (search/read tools) so every proposed column is grounded in
+    what they actually report.
+
+    Deliberately sync (no `async`): the body runs a multi-turn LLM tool loop —
+    as `async def` it would block the event loop for its whole duration.
     """
     try:
         prompt = request.prompt.strip()
@@ -65,15 +70,16 @@ async def propose_data_table_schema(
                 content={"message": "Prompt must not be empty"},
             )
 
-        project_papers = project_paper_crud.get_all_papers_by_project_id(
+        project_papers = project_paper_crud.get_papers_metadata_by_project_id(
             db, project_id=uuid.UUID(request.project_id), user=current_user
         )
 
-        paper_titles = [str(pp.title) for pp in project_papers if pp.title]
-
         columns = operations.propose_data_table_schema(
             prompt=prompt,
-            paper_titles=paper_titles,
+            papers=[(str(pp.id), str(pp.title or "Untitled")) for pp in project_papers],
+            current_user=current_user,
+            db=db,
+            project_id=request.project_id,
         )
 
         if not columns:
@@ -91,6 +97,7 @@ async def propose_data_table_schema(
                         "kind": col.kind,
                         "expression": col.expression,
                         "inputs": {i.alias: i.column for i in col.inputs},
+                        "evidence": col.evidence,
                     }
                     for col in columns
                 ]

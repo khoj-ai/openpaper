@@ -210,7 +210,10 @@ def validate_expression(
     return None
 
 
-_NUMERIC_RE = re.compile(r"-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?")
+# The lookbehind stops a word-glued hyphen from reading as a minus sign and a
+# mid-token digit from starting a match: "gemini-3.1-pro" parses as 3.1 (not
+# -3.1), "v2.5" parses as nothing rather than a fragment.
+_NUMERIC_RE = re.compile(r"(?<![\w.])-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?")
 
 
 def parse_numeric(value: str) -> Optional[float]:
@@ -351,6 +354,12 @@ def _parse_list_input(cell) -> Tuple[Optional[List[float]], List[str], str, list
             warnings.append(f"non-numeric element '{entry.value}' excluded")
         else:
             numbers.append(numeric)
+            # An element carrying several numbers means extraction packed more
+            # than one value into it — which one was meant is a guess.
+            if len(_NUMERIC_RE.findall(entry.value.replace(",", ""))) > 1:
+                warnings.append(
+                    f"element '{entry.value}' contains multiple numbers; used {format_number(numeric)}"
+                )
         # Many elements share a source (one table quoted once) — dedupe so the
         # derivation carries each supporting quote once, not once per element.
         for citation in entry.citations:
