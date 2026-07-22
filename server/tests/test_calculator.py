@@ -77,6 +77,16 @@ class TestParseNumeric(unittest.TestCase):
     def test_negative(self):
         self.assertEqual(parse_numeric("-0.7"), -0.7)
 
+    def test_word_glued_hyphen_is_not_minus(self):
+        # "gemini-3.1-pro-preview: ..." must not parse as -3.1
+        self.assertEqual(parse_numeric("gemini-3.1-pro-preview: Prec: 0.723"), 3.1)
+        self.assertEqual(parse_numeric("gpt-oss-120b"), 120.0)
+
+    def test_true_negative_still_parses(self):
+        self.assertEqual(parse_numeric("-3.1"), -3.1)
+        self.assertEqual(parse_numeric("delta: -0.7"), -0.7)
+        self.assertEqual(parse_numeric("(-1.4)"), -1.4)
+
     def test_na(self):
         self.assertIsNone(parse_numeric("N/A"))
 
