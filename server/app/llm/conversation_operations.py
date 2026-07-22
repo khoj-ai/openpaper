@@ -304,15 +304,13 @@ class DataTableOperations(BaseLLMClient):
         seen_calls: set[str] = set()
 
         for turn in range(self.PROPOSE_MAX_TURNS):
-            # Cerebras: the modal is interactive and a multi-turn loop lives or
-            # dies on per-turn latency.
             response = self.generate_content(
                 contents=message_content,
                 system_prompt=PROPOSE_DATA_TABLE_SCHEMA_SYSTEM_PROMPT,
                 model_type=ModelType.FAST,
                 function_declarations=function_declarations,
                 tool_call_results=tool_call_results or None,
-                provider=LLMProvider.CEREBRAS,
+                provider=LLMProvider.OPENAI,
             )
 
             if not response or not response.tool_calls:
@@ -404,8 +402,8 @@ class DataTableOperations(BaseLLMClient):
                 )
 
         # Turn budget exhausted or prose answer: one final structured call,
-        # grounded in whatever the investigation produced. Cerebras handles the
-        # strict schema; the gathered tool results ride along as context.
+        # grounded in whatever the investigation produced. Strict schema output;
+        # the gathered tool results ride along as context.
         gathered = "\n\n".join(
             f"[{r.name}({r.args})]\n{r.result}" for r in tool_call_results
         )
@@ -420,7 +418,7 @@ class DataTableOperations(BaseLLMClient):
             system_prompt=PROPOSE_DATA_TABLE_SCHEMA_SYSTEM_PROMPT,
             model_type=ModelType.FAST,
             schema=DataTableSchemaProposal.model_json_schema(),
-            provider=LLMProvider.CEREBRAS,
+            provider=LLMProvider.OPENAI,
         )
 
         if response and response.text:
