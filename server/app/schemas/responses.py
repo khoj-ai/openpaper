@@ -217,6 +217,10 @@ class ToolCall(BaseModel):
     )
     name: str
     args: Dict[str, Any]
+    thought_signature: Optional[str] = Field(
+        default=None,
+        description="Base64 Gemini thought signature for this function call. Gemini 3 requires it to be round-tripped when the call is replayed in a later turn.",
+    )
 
 
 class ToolCallResult(BaseModel):
@@ -233,6 +237,10 @@ class ToolCallResult(BaseModel):
     )
     result: Any = Field(
         description="The result returned by the tool. Will be serialized to string for the API."
+    )
+    thought_signature: Optional[str] = Field(
+        default=None,
+        description="Base64 Gemini thought signature carried over from the originating ToolCall.",
     )
 
 

@@ -243,23 +243,43 @@ class GeminiProvider(BaseLLMProvider):
         if not response or (not response.text and not response.function_calls):
             self._raise_for_empty_response(response, model)
 
-        # Extract tool calls from Gemini response, generating IDs for tracking
+        # Extract tool calls from Gemini response, generating IDs for tracking.
+        # Walk the raw parts (not response.function_calls) so each call's
+        # thought_signature can be captured — Gemini 3 requires signatures to
+        # be round-tripped when the calls are replayed in a later turn.
         tool_calls = []
-        if response.function_calls:
+        response_parts = []
+        if response.candidates and response.candidates[0].content:
+            response_parts = response.candidates[0].content.parts or []
+        if response_parts:
+            import base64
             import uuid
 
-            for fn in response.function_calls:
+            for part in response_parts:
+                fn = getattr(part, "function_call", None)
+                if fn is None:
+                    continue
+                raw_signature = getattr(part, "thought_signature", None)
+                signature = (
+                    base64.b64encode(raw_signature).decode() if raw_signature else None
+                )
                 if fn.name and fn.args:
                     tool_calls.append(
                         ToolCall(
                             id=str(uuid.uuid4()),
                             name=fn.name,
                             args=dict(fn.args),
+                            thought_signature=signature,
                         )
                     )
                 elif fn.name == "STOP":
                     tool_calls.append(
-                        ToolCall(id=str(uuid.uuid4()), name="stop", args={})
+                        ToolCall(
+                            id=str(uuid.uuid4()),
+                            name="stop",
+                            args={},
+                            thought_signature=signature,
+                        )
                     )
 
         thinking = get_thought(response)
@@ -400,9 +420,18 @@ class GeminiProvider(BaseLLMProvider):
             function_call_parts = []
             function_response_parts = []
             for result in tool_call_results:
-                function_call_parts.append(
-                    Part.from_function_call(name=result.name, args=result.args or {})
+                call_part = Part.from_function_call(
+                    name=result.name, args=result.args or {}
                 )
+                # Replay the thought signature Gemini attached to the original
+                # call — Gemini 3 rejects replayed calls without it.
+                if result.thought_signature:
+                    import base64
+
+                    call_part.thought_signature = base64.b64decode(
+                        result.thought_signature
+                    )
+                function_call_parts.append(call_part)
 
                 # Serialize result to a format Gemini can handle
                 result_value = result.result
