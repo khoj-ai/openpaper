@@ -210,7 +210,11 @@ export function ArtifactsPanel() {
                 fetchDataTableJobs()
             ]);
             const hasPendingAudioJobs = audioJobs.some((job: AudioOverviewJob) => job.status === 'pending' || job.status === 'running');
-            const hasPendingDataTableJobs = dataTableJobs.some((job: DataTableJob) => job.status === 'pending' || job.status === 'running');
+            // A completed job whose result hasn't landed yet is still pending —
+            // stopping here would freeze the card in its pre-result state.
+            const hasPendingDataTableJobs = dataTableJobs.some((job: DataTableJob) =>
+                job.status === 'pending' || job.status === 'running' ||
+                (job.status === 'completed' && !job.result_id));
 
             if (!hasPendingAudioJobs && !hasPendingDataTableJobs) {
                 // No more pending jobs, stop polling and refresh overviews
@@ -231,7 +235,11 @@ export function ArtifactsPanel() {
                 fetchDataTableJobs()
             ]).then(([audioJobs, dataTableJobs]) => {
                 const hasPendingAudioJobs = audioJobs.some((job: AudioOverviewJob) => job.status === 'pending' || job.status === 'running');
-                const hasPendingDataTableJobs = dataTableJobs.some((job: DataTableJob) => job.status === 'pending' || job.status === 'running');
+                // A completed job whose result hasn't landed yet is still pending —
+            // stopping here would freeze the card in its pre-result state.
+            const hasPendingDataTableJobs = dataTableJobs.some((job: DataTableJob) =>
+                job.status === 'pending' || job.status === 'running' ||
+                (job.status === 'completed' && !job.result_id));
                 if (hasPendingAudioJobs || hasPendingDataTableJobs) {
                     startPolling();
                 }
