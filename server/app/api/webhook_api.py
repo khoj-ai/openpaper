@@ -717,17 +717,13 @@ def handle_data_table_processing_webhook(
 
     try:
         if status == "completed" and result.success:
-            # Processing was successful
+            # Processing was successful. NOTE: the job is only marked COMPLETED
+            # after the result and rows are fully persisted below — clients stop
+            # polling the moment they see COMPLETED, so flipping the status
+            # first leaves them stuck on a completed job with no result yet.
             logger.info(
                 f"Data table processing completed for job {job_id}, "
                 f"extracted {len(result.rows)} rows with columns: {result.columns}"
-            )
-
-            # Update job status to completed
-            data_table_job_crud.update_status(
-                db=db,
-                job_id=uuid.UUID(job_id),
-                status=JobStatus.COMPLETED,
             )
 
             # Post-Processing
@@ -753,7 +749,15 @@ def handle_data_table_processing_webhook(
                             f"Skipping invalid column_plan entry on job {job_id}: {entry}"
                         )
                 if derived_specs:
-                    compute_derived_cells(result.rows, derived_specs, list_columns)
+                    try:
+                        compute_derived_cells(result.rows, derived_specs, list_columns)
+                    except Exception as calc_error:
+                        # A calculator failure must not lose the extracted
+                        # table — persist primitives; derived cells stay empty.
+                        logger.error(
+                            f"Derived-column computation failed for job {job_id}: {calc_error}",
+                            exc_info=True,
+                        )
                 # Restore the user's full ordered column list (extraction only
                 # saw the primitive subset).
                 if job.columns:
@@ -826,6 +830,13 @@ def handle_data_table_processing_webhook(
                         f"Created {len(row_creates)} rows for data table result {table_result.id}"
                     )
 
+                # Result and rows are durably persisted — NOW the job is done.
+                data_table_job_crud.update_status(
+                    db=db,
+                    job_id=uuid.UUID(job_id),
+                    status=JobStatus.COMPLETED,
+                )
+
                 # Send email notification to user
                 job = data_table_job_crud.get_by_task_id(db=db, task_id=task_id)
                 if job and job.user and job.project:
@@ -846,6 +857,11 @@ def handle_data_table_processing_webhook(
                         )
             else:
                 logger.error(f"Failed to create data table result for job {job_id}")
+                data_table_job_crud.update_status(
+                    db=db,
+                    job_id=uuid.UUID(job_id),
+                    status=JobStatus.FAILED,
+                )
 
         else:
             # Processing failed
