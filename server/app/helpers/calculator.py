@@ -89,6 +89,25 @@ def log10(x):
 
 def sqrt(x):
     return math.sqrt(x)
+
+def median(xs):
+    """Median of a list of numbers."""
+    s = sorted(xs)
+    n = len(s)
+    if n == 0:
+        raise ValueError("median of empty list")
+    m = n // 2
+    return float(s[m]) if n % 2 else (s[m - 1] + s[m]) / 2
+
+def mean(xs):
+    """Arithmetic mean of a list of numbers."""
+    if not xs:
+        raise ValueError("mean of empty list")
+    return sum(xs) / len(xs)
+
+def count(xs):
+    """Number of elements in a list."""
+    return len(xs)
 '''
 
 WHITELISTED_FUNCTIONS = {
@@ -106,7 +125,16 @@ WHITELISTED_FUNCTIONS = {
     "min",
     "max",
     "round",
+    "median",
+    "mean",
+    "count",
+    "sum",
 }
+
+# Functions that accept a list-valued alias as an argument. A list alias may
+# ONLY appear as a direct argument to one of these — anywhere else in an
+# expression a list is a type error we can catch before execution.
+AGGREGATE_FUNCTIONS = {"median", "mean", "count", "sum", "min", "max"}
 
 _ALLOWED_NODES = (
     ast.Expression,
@@ -127,15 +155,36 @@ _ALLOWED_NODES = (
 )
 
 
-def validate_expression(expression: str, aliases: List[str]) -> Optional[str]:
+def validate_expression(
+    expression: str,
+    aliases: List[str],
+    list_aliases: Optional[List[str]] = None,
+) -> Optional[str]:
     """Validate an expression against the whitelist grammar.
+
+    `list_aliases` names the aliases bound to list-valued columns; those may
+    only appear as direct arguments to aggregate functions.
 
     Returns an error message, or None if the expression is valid.
     """
+    list_alias_set = set(list_aliases or [])
     try:
         tree = ast.parse(expression, mode="eval")
     except SyntaxError as e:
         return f"invalid expression syntax: {e.msg}"
+
+    # Names appearing as direct arguments to an aggregate call are the only
+    # positions where a list alias is legal.
+    aggregate_arg_names = set()
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id in AGGREGATE_FUNCTIONS
+        ):
+            for arg in node.args:
+                if isinstance(arg, ast.Name):
+                    aggregate_arg_names.add(id(arg))
 
     for node in ast.walk(tree):
         if not isinstance(node, _ALLOWED_NODES):
@@ -152,6 +201,11 @@ def validate_expression(expression: str, aliases: List[str]) -> Optional[str]:
         if isinstance(node, ast.Name):
             if node.id not in WHITELISTED_FUNCTIONS and node.id not in aliases:
                 return f"unknown name: {node.id}"
+            if node.id in list_alias_set and id(node) not in aggregate_arg_names:
+                return (
+                    f"list input '{node.id}' can only be used inside an aggregate "
+                    f"function ({', '.join(sorted(AGGREGATE_FUNCTIONS))})"
+                )
 
     return None
 
@@ -195,7 +249,7 @@ _RUN_ITEMS_SOURCE = """
 
 def run_items(items):
     funcs = {name: globals()[name] for name in _FUNCTION_NAMES if name in globals()}
-    funcs.update({"abs": abs, "min": min, "max": max, "round": round})
+    funcs.update({"abs": abs, "min": min, "max": max, "round": round, "sum": sum})
     results = []
     for item in items:
         env = {"__builtins__": {}}
@@ -279,11 +333,49 @@ def _execute(items: List[WorkItem]) -> List[Dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 
+def _parse_list_input(cell) -> Tuple[Optional[List[float]], List[str], str, list]:
+    """Parse a list-valued cell into numeric elements.
+
+    Returns (numbers or None, warnings, display value, citations). Non-numeric
+    elements are excluded with a warning; an empty or absent list is missing.
+    """
+    entries = (cell.entries if cell else None) or []
+    numbers: List[float] = []
+    warnings: List[str] = []
+    citations: list = []
+    seen_citations = set()
+
+    for entry in entries:
+        numeric = parse_numeric(entry.value)
+        if numeric is None:
+            warnings.append(f"non-numeric element '{entry.value}' excluded")
+        else:
+            numbers.append(numeric)
+        # Many elements share a source (one table quoted once) — dedupe so the
+        # derivation carries each supporting quote once, not once per element.
+        for citation in entry.citations:
+            key = (citation.index, citation.text)
+            if key not in seen_citations:
+                seen_citations.add(key)
+                citations.append(citation)
+
+    if not numbers:
+        return None, warnings, "N/A", citations
+
+    display = "[" + ", ".join(format_number(n) for n in numbers) + "]"
+    return numbers, warnings, display, citations
+
+
 def compute_derived_cells(
-    rows: List[DataTableRow], derived_columns: List[DerivedColumnSpec]
+    rows: List[DataTableRow],
+    derived_columns: List[DerivedColumnSpec],
+    list_columns: Optional[set] = None,
 ) -> None:
     """Compute every derived cell across all rows in one executor pass and
     attach {value, derivation} cells to the rows in place.
+
+    `list_columns` names the columns whose cells are list-valued; aliases bound
+    to them become list variables, legal only inside aggregate functions.
 
     A derived cell whose inputs are missing or non-numeric gets value "N/A"
     and a warning naming each unusable input — missingness must be explained,
@@ -292,12 +384,14 @@ def compute_derived_cells(
     if not derived_columns:
         return
 
+    list_columns = list_columns or set()
     items: List[WorkItem] = []
     derivations: Dict[Tuple[int, str], CellDerivation] = {}
 
     for spec in derived_columns:
         aliases = list(spec.inputs.keys())
-        validation_error = validate_expression(spec.expression, aliases)
+        list_aliases = [a for a, col in spec.inputs.items() if col in list_columns]
+        validation_error = validate_expression(spec.expression, aliases, list_aliases)
         if validation_error:
             # Rejected expressions are the signal for when the whitelist stops
             # being enough.
@@ -308,12 +402,31 @@ def compute_derived_cells(
 
         for row_idx, row in enumerate(rows):
             inputs: List[DerivationInput] = []
-            variables: Dict[str, float] = {}
+            variables: Dict[str, Any] = {}
             warnings: List[str] = []
             has_missing_input = False
 
             for alias, column in spec.inputs.items():
                 cell = row.values.get(column)
+
+                if column in list_columns:
+                    numbers, list_warnings, display, citations = _parse_list_input(cell)
+                    warnings.extend(f"{column}: {w}" for w in list_warnings)
+                    if numbers is None:
+                        has_missing_input = True
+                        warnings.append(f"{column} not reported (needed as '{alias}')")
+                    else:
+                        variables[alias] = numbers
+                    inputs.append(
+                        DerivationInput(
+                            alias=alias,
+                            column=column,
+                            value=display,
+                            citations=citations,
+                        )
+                    )
+                    continue
+
                 raw = cell.value if cell else ""
                 numeric = parse_numeric(raw) if raw else None
                 if numeric is None:

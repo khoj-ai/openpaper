@@ -234,6 +234,15 @@ class DataTableSchema(BaseModel):
     papers: List[DocumentMapping] = Field(
         description="List of papers included in the data table."
     )
+    list_columns: List[str] = Field(
+        default=[],
+        description="Subset of columns whose value is a per-paper collection: one entry per instance found in the paper, each individually cited."
+    )
+
+class CellEntry(BaseModel):
+    """One element of a list-valued cell, individually cited."""
+    value: str
+    citations: List[ResponseCitation] = []
 
 class DataTableCellValue(BaseModel):
     """Value for a single cell in the data table with supporting citations."""
@@ -241,6 +250,10 @@ class DataTableCellValue(BaseModel):
     citations: List[ResponseCitation] = Field(
         default=[],
         description="List of citations that support this specific value. These should be direct quotes or paraphrases from the paper."
+    )
+    entries: Optional[List[CellEntry]] = Field(
+        default=None,
+        description="Present only on list-valued cells: the individual elements, each with its own citations. `value` holds their joined display form."
     )
 
 class DataTableRow(BaseModel):

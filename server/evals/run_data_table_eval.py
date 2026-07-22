@@ -208,6 +208,7 @@ class ApiClient:
         project_id: str,
         columns: list[str],
         derived_columns: Optional[list[dict]] = None,
+        list_columns: Optional[list[str]] = None,
     ) -> dict:
         resp = self.session.post(
             f"{self.base_url}/api/projects/tables",
@@ -215,6 +216,7 @@ class ApiClient:
                 "project_id": project_id,
                 "columns": columns,
                 "derived_columns": derived_columns or [],
+                "list_columns": list_columns or [],
             },
             timeout=60,
         )
@@ -258,9 +260,10 @@ def run_extraction(
     columns: list[str],
     label: str,
     derived_columns: Optional[list[dict]] = None,
+    list_columns: Optional[list[str]] = None,
 ) -> dict:
     """Create one data table job and wait for its result."""
-    created = api.create_job(project_id, columns, derived_columns)
+    created = api.create_job(project_id, columns, derived_columns, list_columns)
     job_id = created["id"]
     logger.info(f"[run] {label}: job {job_id} submitted")
 
@@ -333,8 +336,51 @@ def citation_in_paper(citation_text: str, paper_text_norm: str) -> bool:
     return hits / len(shingles) >= 0.5
 
 
+def grade_list_cell(col_cfg: dict, cell: dict, paper_text_norm: str) -> dict:
+    """Grade a list-valued cell: extracted elements must match the expected
+    multiset within tolerance (order-independent)."""
+    entries = cell.get("entries") or []
+    numerics = [
+        n for n in (parse_numeric(e.get("value", "")) for e in entries) if n is not None
+    ]
+    expected = col_cfg.get("expected_elements") or []
+    tolerance = col_cfg.get("tolerance", 0.05)
+
+    matched = len(numerics) == len(expected) and all(
+        abs(a - b) <= tolerance for a, b in zip(sorted(numerics), sorted(expected))
+    )
+
+    entry_citations = [c for e in entries for c in (e.get("citations") or [])]
+    graded: dict[str, Any] = {
+        "label": col_cfg["label"],
+        "kind": "list",
+        "value": cell.get("value", ""),
+        "numeric": None,
+        "elements": numerics,
+        "expected": expected,
+        "n_citations": len(entry_citations),
+        "citations_found": sum(
+            1
+            for c in entry_citations
+            if citation_in_paper(c.get("text", ""), paper_text_norm)
+        ),
+        "has_derivation": False,
+        "derivation_warnings": [],
+    }
+    if not numerics:
+        graded["outcome"] = "na"
+    elif matched:
+        graded["outcome"] = "correct_number"
+    else:
+        graded["outcome"] = "incorrect_number"
+    return graded
+
+
 def grade_cell(col_cfg: dict, cell: dict, paper_text_norm: str) -> dict:
     """Grade one extracted cell against its golden config."""
+    if col_cfg["kind"] == "list":
+        return grade_list_cell(col_cfg, cell, paper_text_norm)
+
     value = cell.get("value", "")
     citations = cell.get("citations", []) or []
     numeric = parse_numeric(value)
@@ -398,7 +444,8 @@ def summarize(results: dict, manifest: dict) -> dict:
     for run_record in results["runs"]:
         grading = run_record.get("grading", {})
         for cell in grading.get("cells", []):
-            if cell["kind"] == "primitive":
+            # List cells are extraction outputs — grade them with primitives.
+            if cell["kind"] != "derived":
                 primitives.append(cell)
             else:
                 derived.append(cell)
@@ -558,6 +605,9 @@ def main():
                     for c in paper_cfg["columns"]
                     if c["kind"] == "derived" and c.get("expression")
                 ]
+                list_columns = [
+                    c["label"] for c in paper_cfg["columns"] if c["kind"] == "list"
+                ]
                 project_id = results["seed"][key]["project_id"]
                 try:
                     outcome = run_extraction(
@@ -566,6 +616,7 @@ def main():
                         columns,
                         f"{key} run {run_idx}",
                         derived_columns,
+                        list_columns,
                     )
                 except Exception as e:
                     logger.error(f"[run] {key} run {run_idx} failed: {e}")

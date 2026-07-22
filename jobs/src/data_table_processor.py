@@ -19,6 +19,7 @@ async def _process_single_paper(
     columns: List[str],
     status_callback: Callable[[str], None],
     semaphore: asyncio.Semaphore,
+    list_columns: Optional[List[str]] = None,
 ) -> Tuple[DataTableRow, Optional[str]]:
     """
     Process a single paper extraction with semaphore-controlled concurrency.
@@ -50,7 +51,8 @@ async def _process_single_paper(
                 paper_col_values: DataTableRow = await fast_llm_client.extract_data_table(
                     file_path=temp_file_path,
                     columns=columns,
-                    paper_id=paper_id
+                    paper_id=paper_id,
+                    list_columns=list_columns,
                 )
 
                 status_callback(f"extract for {paper.title} completed")
@@ -102,6 +104,7 @@ async def construct_data_table(
                 columns=data_table_schema.columns,
                 status_callback=status_callback,
                 semaphore=semaphore,
+                list_columns=data_table_schema.list_columns,
             )
             for p in data_table_schema.papers
         ]

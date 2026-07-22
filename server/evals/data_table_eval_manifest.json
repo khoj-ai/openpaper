@@ -181,6 +181,30 @@
 						"orig": "Total single-match accuracy of GPT-4 at identifying mafia players (%)",
 						"gpt35": "Total single-match accuracy of GPT-3.5-turbo at identifying mafia players (%)"
 					}
+				},
+				{
+					"label": "Total single-match accuracy of each evaluated approach (%) (list)",
+					"kind": "list",
+					"expected_elements": [
+						80.65,
+						41.94,
+						45.16,
+						56.13,
+						33.0
+					],
+					"tolerance": 0.05,
+					"source": "Table 4, p.6, Total row: GPT-4 80.65, GPT-3.5-turbo 41.94, BERT-multilabel 45.16, BERT-utterance 56.13, Random 33.00"
+				},
+				{
+					"label": "Median total single-match accuracy across evaluated approaches (%)",
+					"kind": "derived",
+					"expected": 45.16,
+					"tolerance": 0.05,
+					"expression": "median(accs)",
+					"inputs": {
+						"accs": "Total single-match accuracy of each evaluated approach (%) (list)"
+					},
+					"note": "Never stated in the paper; median of the five Table 4 Total-row accuracies."
 				}
 			]
 		}

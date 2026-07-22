@@ -9,6 +9,7 @@ from app.helpers.calculator import (
     validate_expression,
 )
 from app.schemas.responses import (
+    CellEntry,
     DataTableCellValue,
     DataTableRow,
     DerivedColumnSpec,
@@ -236,6 +237,124 @@ class TestExecutorSelection(unittest.TestCase):
         ]
         with self.assertRaises(RuntimeError):
             compute_derived_cells(rows, specs)
+
+
+def make_list_row(
+    paper_id: str, column: str, element_values: list[str]
+) -> DataTableRow:
+    entries = [
+        CellEntry(
+            value=v,
+            citations=[ResponseCitation(text=f"quote for {v}", index=i + 1)],
+        )
+        for i, v in enumerate(element_values)
+    ]
+    return DataTableRow(
+        paper_id=paper_id,
+        values={
+            column: DataTableCellValue(
+                value="; ".join(element_values), citations=[], entries=entries
+            )
+        },
+    )
+
+
+@mock.patch.dict(os.environ, {"CALCULATOR_EXECUTOR": "local"})
+class TestListColumnsAndAggregates(unittest.TestCase):
+    def _compute(self, element_values, expression, label="agg"):
+        rows = [make_list_row("p1", "scores", element_values)]
+        specs = [
+            DerivedColumnSpec(
+                label=label, expression=expression, inputs={"xs": "scores"}
+            )
+        ]
+        compute_derived_cells(rows, specs, {"scores"})
+        return rows[0].values[label]
+
+    def test_median_odd(self):
+        cell = self._compute(
+            ["80.65", "41.94", "45.16", "56.13", "33.00"], "median(xs)"
+        )
+        self.assertEqual(cell.value, "45.16")
+        self.assertEqual(cell.derivation.warnings, [])
+        self.assertEqual(
+            cell.derivation.inputs[0].value, "[80.65, 41.94, 45.16, 56.13, 33]"
+        )
+        # element citations propagate to the derivation input
+        self.assertEqual(len(cell.derivation.inputs[0].citations), 5)
+
+    def test_median_even(self):
+        cell = self._compute(["1", "2", "3", "4"], "median(xs)")
+        self.assertEqual(cell.value, "2.5")
+
+    def test_mean_count_sum(self):
+        self.assertEqual(self._compute(["2", "4", "6"], "mean(xs)").value, "4")
+        self.assertEqual(self._compute(["2", "4", "6"], "count(xs)").value, "3")
+        self.assertEqual(self._compute(["2", "4", "6"], "sum(xs)").value, "12")
+        self.assertEqual(self._compute(["2", "4", "6"], "max(xs) - min(xs)").value, "4")
+
+    def test_non_numeric_element_excluded_with_warning(self):
+        cell = self._compute(["80.65", "not reported", "33.00"], "count(xs)")
+        self.assertEqual(cell.value, "2")
+        self.assertTrue(
+            any("non-numeric element" in w for w in cell.derivation.warnings)
+        )
+
+    def test_empty_list_is_missing(self):
+        rows = [
+            DataTableRow(
+                paper_id="p1",
+                values={
+                    "scores": DataTableCellValue(value="N/A", citations=[], entries=[])
+                },
+            )
+        ]
+        specs = [
+            DerivedColumnSpec(
+                label="agg", expression="median(xs)", inputs={"xs": "scores"}
+            )
+        ]
+        compute_derived_cells(rows, specs, {"scores"})
+        cell = rows[0].values["agg"]
+        self.assertEqual(cell.value, "N/A")
+        self.assertTrue(any("not reported" in w for w in cell.derivation.warnings))
+
+    def test_list_alias_outside_aggregate_rejected(self):
+        cell = self._compute(["1", "2"], "xs + 1")
+        self.assertEqual(cell.value, "N/A")
+        self.assertTrue(
+            any("invalid expression" in w for w in cell.derivation.warnings)
+        )
+
+    def test_scalar_and_list_mixed(self):
+        rows = [make_list_row("p1", "scores", ["10", "20", "30"])]
+        rows[0].values["baseline"] = DataTableCellValue(
+            value="15",
+            citations=[ResponseCitation(text="baseline is 15", index=9)],
+        )
+        specs = [
+            DerivedColumnSpec(
+                label="mean vs baseline",
+                expression="mean(xs) - b",
+                inputs={"xs": "scores", "b": "baseline"},
+            )
+        ]
+        compute_derived_cells(rows, specs, {"scores"})
+        self.assertEqual(rows[0].values["mean vs baseline"].value, "5")
+
+
+class TestValidateListAliases(unittest.TestCase):
+    def test_list_alias_in_aggregate_ok(self):
+        self.assertIsNone(validate_expression("median(xs) - a", ["xs", "a"], ["xs"]))
+
+    def test_list_alias_in_scalar_function_rejected(self):
+        self.assertIn(
+            "aggregate",
+            validate_expression("ratio(xs, a)", ["xs", "a"], ["xs"]),
+        )
+
+    def test_list_alias_bare_rejected(self):
+        self.assertIn("aggregate", validate_expression("xs * 2", ["xs"], ["xs"]))
 
 
 class TestFormatNumber(unittest.TestCase):

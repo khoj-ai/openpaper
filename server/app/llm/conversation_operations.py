@@ -42,7 +42,7 @@ class ProposedColumn(BaseModel):
 
     label: str = Field(description="Column label")
     kind: str = Field(
-        description="'primitive' if the value is stated in papers and extracted verbatim; 'derived' if it must be computed from other columns"
+        description="'primitive' if the value is a single value stated in papers and extracted verbatim; 'list' if it is a collection of stated values (one entry per instance in the paper, e.g. one score per evaluated model); 'derived' if it must be computed from other columns"
     )
     expression: str = Field(
         description="For derived columns: arithmetic expression over the input aliases, e.g. 'cohens_d(mean_t, sd_t, n_t, mean_c, sd_c, n_c)' or '(a - b) / b * 100'. Empty string for primitive columns."
@@ -240,7 +240,11 @@ class DataTableOperations(BaseLLMClient):
             if not label:
                 continue
 
-            kind = col.kind if col.kind in ("primitive", "derived") else "primitive"
+            kind = (
+                col.kind
+                if col.kind in ("primitive", "list", "derived")
+                else "primitive"
+            )
             expression = col.expression.strip()
             inputs = [
                 ProposedColumnInput(alias=i.alias.strip(), column=i.column.strip())
@@ -259,7 +263,7 @@ class DataTableOperations(BaseLLMClient):
                 )
                 kind = "primitive"
 
-            if kind == "primitive":
+            if kind != "derived":
                 expression = ""
                 inputs = []
 

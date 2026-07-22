@@ -135,6 +135,17 @@ class DataTableSchema(BaseModel):
     papers: List[DocumentMapping] = Field(
         description="List of papers included in the data table."
     )
+    list_columns: List[str] = Field(
+        default=[],
+        description="Subset of columns whose value is a per-paper collection (one entry per instance found) rather than a single scalar.",
+    )
+
+
+class CellEntry(BaseModel):
+    """One element of a list-valued cell, individually cited."""
+
+    value: str
+    citations: List[ResponseCitation] = []
 
 
 class DerivationInput(BaseModel):
@@ -165,6 +176,10 @@ class DataTableCellValue(BaseModel):
     derivation: Optional[CellDerivation] = Field(
         default=None,
         description="Present only on calculator-computed cells.",
+    )
+    entries: Optional[List[CellEntry]] = Field(
+        default=None,
+        description="Present only on list-valued cells: the individual elements, each with its own citations. `value` holds their joined display form.",
     )
 
 

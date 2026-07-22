@@ -737,7 +737,15 @@ def handle_data_table_processing_webhook(
             job = data_table_job_crud.get(db=db, id=uuid.UUID(job_id))
             if job:
                 derived_specs = []
+                list_columns: set[str] = set()
                 for entry in job.column_plan or []:
+                    # Entries are {label, kind, ...}: kind "list" marks a
+                    # list-valued primitive; "derived" (the default, for rows
+                    # written before kinds existed) carries expression+inputs.
+                    if entry.get("kind") == "list":
+                        if entry.get("label"):
+                            list_columns.add(entry["label"])
+                        continue
                     try:
                         derived_specs.append(DerivedColumnSpec.model_validate(entry))
                     except ValidationError:
@@ -745,7 +753,7 @@ def handle_data_table_processing_webhook(
                             f"Skipping invalid column_plan entry on job {job_id}: {entry}"
                         )
                 if derived_specs:
-                    compute_derived_cells(result.rows, derived_specs)
+                    compute_derived_cells(result.rows, derived_specs, list_columns)
                 # Restore the user's full ordered column list (extraction only
                 # saw the primitive subset).
                 if job.columns:
@@ -766,6 +774,10 @@ def handle_data_table_processing_webhook(
                             for derivation_input in cell_value.derivation.inputs:
                                 for citation in derivation_input.citations:
                                     citation.paper_id = row.paper_id
+                        # List cells carry per-element citations.
+                        for entry in cell_value.entries or []:
+                            for citation in entry.citations:
+                                citation.paper_id = row.paper_id
 
             paper_titles = []
             for row in result.rows:

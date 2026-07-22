@@ -37,6 +37,9 @@ class CreateDataTableRequest(BaseModel):
     # Columns computed by the calculator from other columns. Labels must also
     # appear in `columns`; anything referencing unknown columns is rejected.
     derived_columns: List[DerivedColumnSpec] = []
+    # Columns whose value is a per-paper collection (one cited entry per
+    # instance found) rather than a scalar. Subset of `columns`.
+    list_columns: List[str] = []
 
 
 class ProposeDataTableSchemaRequest(BaseModel):
@@ -122,6 +125,21 @@ async def create_data_table(
         # Derived columns may only reference primitive columns in this table.
         column_set = set(request.columns)
         derived_labels = {spec.label for spec in request.derived_columns}
+        list_labels = {label for label in request.list_columns}
+        if list_labels - column_set:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "message": f"List columns not in columns: {', '.join(sorted(list_labels - column_set))}"
+                },
+            )
+        if list_labels & derived_labels:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "message": f"Columns cannot be both list and derived: {', '.join(sorted(list_labels & derived_labels))}"
+                },
+            )
         for spec in request.derived_columns:
             if spec.label not in column_set:
                 return JSONResponse(
@@ -167,7 +185,16 @@ async def create_data_table(
             obj_in=DataTableJobCreate(
                 project_id=uuid.UUID(request.project_id),
                 columns=request.columns,
-                column_plan=[spec.model_dump() for spec in request.derived_columns],
+                column_plan=(
+                    [
+                        {**spec.model_dump(), "kind": "derived"}
+                        for spec in request.derived_columns
+                    ]
+                    + [
+                        {"label": label, "kind": "list"}
+                        for label in request.list_columns
+                    ]
+                ),
             ),
             user=current_user,
         )
@@ -188,6 +215,7 @@ async def create_data_table(
         data_table = DataTableSchema(
             columns=[c for c in request.columns if c not in derived_labels],
             papers=papers,
+            list_columns=request.list_columns,
         )
 
         # Submit the data table processing job
