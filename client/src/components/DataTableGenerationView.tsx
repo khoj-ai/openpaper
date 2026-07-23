@@ -413,13 +413,7 @@ export default function DataTableGenerationView({
                                                                                         if (onCitationClick) {
                                                                                             onCitationClick(row.paper_id, citation.text);
                                                                                         }
-                                                                                        // Also highlight the paper card and scroll to it
                                                                                         setHighlightedPaper(row.paper_id);
-                                                                                        const cardId = `datatable-reference-paper-card-${row.paper_id}`;
-                                                                                        const refElement = document.getElementById(cardId);
-                                                                                        if (refElement) {
-                                                                                            refElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                                                                        }
                                                                                     }}
                                                                                     className="text-xs px-1.5 py-0.5 rounded transition-colors bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50"
                                                                                 >
