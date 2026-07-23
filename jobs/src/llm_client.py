@@ -49,8 +49,8 @@ def _format_api_error(e: Exception) -> Any:
 
 
 # Constants
-DEFAULT_CHAT_MODEL = "gemini-3.1-pro-preview"
-FAST_CHAT_MODEL = "gemini-3-flash-preview"
+DEFAULT_CHAT_MODEL = "gemini-3.6-flash"
+FAST_CHAT_MODEL = "gemini-3.5-flash-lite"
 CACHE_TTL_SECONDS = 3600
 
 # Gemini rejects caches below 1024 tokens. Below this many characters the content
