@@ -157,6 +157,21 @@ class BaseLLMProvider(ABC):
         pass
 
 
+def _strip_additional_properties(schema: Any) -> Any:
+    """Gemini's schema converter rejects `additionalProperties`, which pydantic
+    emits for models configured with extra="forbid" (required by OpenAI/Cerebras
+    strict mode). Strip it so one schema serves every provider."""
+    if isinstance(schema, dict):
+        return {
+            k: _strip_additional_properties(v)
+            for k, v in schema.items()
+            if k != "additionalProperties"
+        }
+    if isinstance(schema, list):
+        return [_strip_additional_properties(item) for item in schema]
+    return schema
+
+
 class GeminiProvider(BaseLLMProvider):
     """Gemini LLM provider implementation"""
 
@@ -208,7 +223,7 @@ class GeminiProvider(BaseLLMProvider):
         # Apply structured output schema if provided
         if schema:
             config.response_mime_type = "application/json"
-            config.response_schema = schema
+            config.response_schema = _strip_additional_properties(schema)
 
         if tools:
             config.tools = [tools]
@@ -415,44 +430,69 @@ class GeminiProvider(BaseLLMProvider):
 
         # Add tool call results if present (multi-turn function calling).
         # Gemini requires the function-response turn to come immediately after a
-        # model turn containing the matching function calls, so reconstruct both.
+        # model turn containing the matching function calls, and validates the
+        # replayed turn structure — so results accumulated over several model
+        # turns must be replayed as several turns, not merged into one. Gemini
+        # attaches a thought signature to the FIRST function-call part of each
+        # model turn (parallel calls in the same turn carry none), so a
+        # signature marks a turn boundary.
         if tool_call_results:
-            function_call_parts = []
-            function_response_parts = []
+            turns: List[List[ToolCallResult]] = []
             for result in tool_call_results:
-                call_part = Part.from_function_call(
-                    name=result.name, args=result.args or {}
-                )
-                # Replay the thought signature Gemini attached to the original
-                # call — Gemini 3 rejects replayed calls without it.
-                if result.thought_signature:
-                    import base64
+                if result.thought_signature or not turns:
+                    turns.append([result])
+                else:
+                    turns[-1].append(result)
 
-                    call_part.thought_signature = base64.b64decode(
-                        result.thought_signature
+            for turn in turns:
+                function_call_parts = []
+                function_response_parts = []
+                for result in turn:
+                    call_part = Part.from_function_call(
+                        name=result.name, args=result.args or {}
                     )
-                function_call_parts.append(call_part)
+                    # Replay the thought signature Gemini attached to the
+                    # original call — Gemini 3 rejects replayed calls without
+                    # one. Some models (e.g. flash-lite) emit calls with no
+                    # signature yet still validate on replay; the docs
+                    # prescribe this sentinel for that case.
+                    if result.thought_signature:
+                        import base64
 
-                # Serialize result to a format Gemini can handle
-                result_value = result.result
-                if isinstance(result_value, (dict, list)):
-                    import json
+                        call_part.thought_signature = base64.b64decode(
+                            result.thought_signature
+                        )
+                    else:
+                        logger.debug(
+                            f"Replaying tool call {result.name} without a captured "
+                            "thought signature; using validation-bypass sentinel"
+                        )
+                        call_part.thought_signature = (
+                            b"context_engineering_is_the_way_to_go"
+                        )
+                    function_call_parts.append(call_part)
 
-                    result_value = json.dumps(result_value)
-                elif not isinstance(result_value, str):
-                    result_value = str(result_value)
+                    # Serialize result to a format Gemini can handle
+                    result_value = result.result
+                    if isinstance(result_value, (dict, list)):
+                        import json
 
-                function_response_parts.append(
-                    Part.from_function_response(
-                        name=result.name,
-                        response={"result": result_value},
+                        result_value = json.dumps(result_value)
+                    elif not isinstance(result_value, str):
+                        result_value = str(result_value)
+
+                    function_response_parts.append(
+                        Part.from_function_response(
+                            name=result.name,
+                            response={"result": result_value},
+                        )
                     )
-                )
 
-            # Model turn with the function calls, then user turn with responses.
-            if function_response_parts:
-                messages.append(Content(role="model", parts=function_call_parts))
-                messages.append(Content(role="user", parts=function_response_parts))
+                # Model turn with the function calls, then user turn with
+                # responses.
+                if function_response_parts:
+                    messages.append(Content(role="model", parts=function_call_parts))
+                    messages.append(Content(role="user", parts=function_response_parts))
 
         return messages  # type: ignore
 

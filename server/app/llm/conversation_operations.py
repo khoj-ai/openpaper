@@ -310,7 +310,7 @@ class DataTableOperations(BaseLLMClient):
                 model_type=ModelType.FAST,
                 function_declarations=function_declarations,
                 tool_call_results=tool_call_results or None,
-                provider=LLMProvider.OPENAI,
+                provider=LLMProvider.GEMINI,
             )
 
             if not response or not response.tool_calls:
@@ -418,7 +418,7 @@ class DataTableOperations(BaseLLMClient):
             system_prompt=PROPOSE_DATA_TABLE_SCHEMA_SYSTEM_PROMPT,
             model_type=ModelType.FAST,
             schema=DataTableSchemaProposal.model_json_schema(),
-            provider=LLMProvider.OPENAI,
+            provider=LLMProvider.GEMINI,
         )
 
         if response and response.text:
