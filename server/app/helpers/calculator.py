@@ -15,16 +15,15 @@ statistical functions in STAT_FUNCTIONS_SOURCE. Nothing else parses. The
 whitelist is a provenance measure (a formula we can display beats generated
 code we can't audit); the sandbox is the security measure.
 
-Execution substrate is selected by environment:
-- E2B sandbox (default when an E2B API key is configured): the same function
-  library and the validated expressions run inside an isolated sandbox, one
-  sandbox session per compute call.
-- Local (fallback, and used by tests): the expressions are evaluated in-process
-  with an empty-builtins namespace. Safe because validation already restricts
-  the language to arithmetic over aliases.
-
-Set CALCULATOR_EXECUTOR=local|e2b to override. E2B key is read from
-E2B_DEV_API_KEY or E2B_API_KEY.
+Execution substrate:
+- E2B sandbox (required): the same function library and the validated
+  expressions run inside an isolated sandbox, one sandbox session per compute
+  call. A missing API key (E2B_DEV_API_KEY or E2B_API_KEY) is a hard error;
+  if two successive E2B attempts fail at runtime, execution falls back to
+  local so an availability blip doesn't fail the job.
+- Local (explicit opt-out via CALCULATOR_EXECUTOR=local; used by tests): the
+  expressions are evaluated in-process with an empty-builtins namespace. Safe
+  because validation already restricts the language to arithmetic over aliases.
 """
 
 import ast
@@ -305,29 +304,38 @@ def _run_e2b(items: List[WorkItem], api_key: str) -> List[Dict[str, Any]]:
 def _execute(items: List[WorkItem]) -> List[Dict[str, Any]]:
     """Run work items on the configured executor.
 
-    Explicitly requesting the sandbox without credentials is a hard error —
-    silently degrading to in-process eval would void the sandbox guarantee.
-    E2B *runtime* failures still fall back to local: the expressions were
-    already AST-validated, and availability blips shouldn't fail jobs.
+    The E2B sandbox is required: a missing API key is a hard error. Runtime is
+    more forgiving than configuration — if two successive E2B attempts fail,
+    the (already AST-validated) expressions run locally so an availability blip
+    doesn't fail the job. CALCULATOR_EXECUTOR=local opts out explicitly
+    (tests, offline dev).
     """
     if not items:
         return []
 
     executor = os.getenv("CALCULATOR_EXECUTOR", "").lower()
-    api_key = os.getenv("E2B_DEV_API_KEY") or os.getenv("E2B_API_KEY")
+    if executor == "local":
+        return _run_local(items)
 
-    if executor == "e2b" and not api_key:
+    api_key = os.getenv("E2B_DEV_API_KEY") or os.getenv("E2B_API_KEY")
+    if not api_key:
         raise RuntimeError(
-            "CALCULATOR_EXECUTOR=e2b but no E2B_DEV_API_KEY/E2B_API_KEY is set"
+            "E2B API key is required for the calculator: set E2B_DEV_API_KEY or "
+            "E2B_API_KEY (or set CALCULATOR_EXECUTOR=local to explicitly opt out "
+            "of the sandbox)"
         )
 
-    if api_key and executor != "local":
+    last_error: Optional[Exception] = None
+    for attempt in range(2):
         try:
             return _run_e2b(items, api_key)
         except Exception as e:
-            logger.error(
-                f"E2B executor failed, falling back to local: {e}", exc_info=True
-            )
+            last_error = e
+            logger.warning(f"E2B executor attempt {attempt + 1}/2 failed: {e}")
+    logger.error(
+        f"E2B executor failed twice, falling back to local: {last_error}",
+        exc_info=last_error,
+    )
     return _run_local(items)
 
 

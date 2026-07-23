@@ -248,6 +248,74 @@ class TestExecutorSelection(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             compute_derived_cells(rows, specs)
 
+    @mock.patch.dict(
+        os.environ,
+        {"CALCULATOR_EXECUTOR": "", "E2B_DEV_API_KEY": "fake-key", "E2B_API_KEY": ""},
+    )
+    def test_e2b_retries_once_then_falls_back_to_local(self):
+        rows = [make_row("p1", {"a": "1", "b": "2"})]
+        specs = [
+            DerivedColumnSpec(
+                label="total", expression="a + b", inputs={"a": "a", "b": "b"}
+            )
+        ]
+        with mock.patch(
+            "app.helpers.calculator._run_e2b",
+            side_effect=RuntimeError("sandbox unavailable"),
+        ) as run_e2b:
+            compute_derived_cells(rows, specs)
+        self.assertEqual(run_e2b.call_count, 2)
+        # After two E2B failures the local executor still produced the value.
+        self.assertEqual(rows[0].values["total"].value, "3")
+
+    @mock.patch.dict(
+        os.environ,
+        {"CALCULATOR_EXECUTOR": "", "E2B_DEV_API_KEY": "fake-key", "E2B_API_KEY": ""},
+    )
+    def test_e2b_second_attempt_success_does_not_fall_back(self):
+        from app.helpers.calculator import _run_local as real_run_local
+
+        rows = [make_row("p1", {"a": "1", "b": "2"})]
+        specs = [
+            DerivedColumnSpec(
+                label="total", expression="a + b", inputs={"a": "a", "b": "b"}
+            )
+        ]
+        calls = {"n": 0}
+
+        # First attempt blips, second succeeds (stand in for E2B with the
+        # local runner — same RUNNER_SOURCE, same results).
+        def flaky_e2b(items, api_key):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise RuntimeError("blip")
+            return real_run_local(items)
+
+        with (
+            mock.patch("app.helpers.calculator._run_e2b", side_effect=flaky_e2b),
+            mock.patch("app.helpers.calculator._run_local") as run_local,
+        ):
+            compute_derived_cells(rows, specs)
+        self.assertEqual(calls["n"], 2)
+        run_local.assert_not_called()
+        self.assertEqual(rows[0].values["total"].value, "3")
+
+    @mock.patch.dict(
+        os.environ,
+        {"CALCULATOR_EXECUTOR": "", "E2B_DEV_API_KEY": "", "E2B_API_KEY": ""},
+    )
+    def test_default_without_key_raises(self):
+        # The sandbox is required: without a key, the default configuration
+        # must fail loudly rather than silently running in-process.
+        rows = [make_row("p1", {"a": "1", "b": "2"})]
+        specs = [
+            DerivedColumnSpec(
+                label="sum", expression="a + b", inputs={"a": "a", "b": "b"}
+            )
+        ]
+        with self.assertRaises(RuntimeError):
+            compute_derived_cells(rows, specs)
+
 
 def make_list_row(
     paper_id: str,
