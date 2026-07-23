@@ -123,7 +123,7 @@ export default function DataTableGenerationJobCard({ job, projectId }: DataTable
     };
 
     const CardContent = () => (
-        <div className="w-full p-4 border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+        <div className="w-full p-4 rounded-lg cursor-pointer bg-gray-50 dark:bg-gray-800/40 hover:bg-gray-100 dark:hover:bg-gray-800/70 transition-colors">
             <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
                     {currentStatus === JobStatus.COMPLETED ? <Table className="w-5 h-5 text-blue-600 dark:text-blue-400" /> : getStatusIcon(currentStatus)}
@@ -186,7 +186,7 @@ export default function DataTableGenerationJobCard({ job, projectId }: DataTable
 
                     {/* Expanded details */}
                     {isExpanded && (
-                        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
+                        <div className="mt-3 space-y-2">
                             {error && (
                                 <p className="text-xs text-red-500">{error}</p>
                             )}

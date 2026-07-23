@@ -493,7 +493,7 @@ export function ArtifactsPanel() {
                                 />
                             ))}
                             {chatArtifactGroups.map((group) => (
-                                <div key={group.messageId} className="rounded-lg border p-3">
+                                <div key={group.messageId} className="rounded-lg bg-muted/40 p-3">
                                     <div className="flex items-center justify-between gap-2">
                                         <Link
                                             href={`/projects/${projectId}/conversations/${group.conversationId}`}

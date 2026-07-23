@@ -43,7 +43,7 @@ export default function AudioOverviewCard({
     onOpenTranscript,
 }: AudioOverviewCardProps) {
     return (
-        <div className="w-full p-4 border rounded-lg bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+        <div className="w-full p-4 rounded-lg bg-gray-50 dark:bg-gray-800/40 hover:bg-gray-100 dark:hover:bg-gray-800/70 transition-colors">
             <div className="flex items-start gap-3 mb-3">
                 <button
                     onClick={onPlayPause}
