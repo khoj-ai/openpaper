@@ -144,19 +144,9 @@ function ProjectConversationPageContent() {
             const citation = message.references?.citations?.find(c => String(c.key) === key);
             if (!citation || !citation.paper_id) return prevHighlight;
 
-            const newHighlight = { paperId: citation.paper_id, messageIndex };
-
-            // Scroll to element
-            setTimeout(() => {
-                const elementId = message.id ? `${message.id}-reference-paper-card-${citation.paper_id}` : `${messageIndex}-reference-paper-card-${citation.paper_id}`;
-                const element = document.getElementById(elementId);
-
-                if (element) {
-                    element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            }, 0);
-
-            return newHighlight;
+            // No scroll on click — the reference opens in the side panel, and
+            // jumping the chat to the references section is jarring.
+            return { paperId: citation.paper_id, messageIndex };
         });
     }, [messages]);
 

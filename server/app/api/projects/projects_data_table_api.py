@@ -15,7 +15,7 @@ from app.database.models import JobStatus
 from app.helpers.pdf_jobs import jobs_client
 from app.helpers.subscription_limits import can_user_create_data_table_job
 from app.llm.operations import operations
-from app.schemas.responses import DataTableSchema, DocumentMapping
+from app.schemas.responses import DataTableSchema, DerivedColumnSpec, DocumentMapping
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
@@ -34,6 +34,12 @@ projects_data_table_router = APIRouter()
 class CreateDataTableRequest(BaseModel):
     project_id: str
     columns: List[str]
+    # Columns computed by the calculator from other columns. Labels must also
+    # appear in `columns`; anything referencing unknown columns is rejected.
+    derived_columns: List[DerivedColumnSpec] = []
+    # Columns whose value is a per-paper collection (one cited entry per
+    # instance found) rather than a scalar. Subset of `columns`.
+    list_columns: List[str] = []
 
 
 class ProposeDataTableSchemaRequest(BaseModel):
@@ -42,14 +48,19 @@ class ProposeDataTableSchemaRequest(BaseModel):
 
 
 @projects_data_table_router.post("/propose")
-async def propose_data_table_schema(
+def propose_data_table_schema(
     request: ProposeDataTableSchemaRequest,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_required_user),
 ) -> JSONResponse:
     """
     Propose data table columns from a natural language description of what
-    the user wants to extract from the project's papers.
+    the user wants to extract from the project's papers. An agent investigates
+    the papers (search/read tools) so every proposed column is grounded in
+    what they actually report.
+
+    Deliberately sync (no `async`): the body runs a multi-turn LLM tool loop —
+    as `async def` it would block the event loop for its whole duration.
     """
     try:
         prompt = request.prompt.strip()
@@ -59,15 +70,16 @@ async def propose_data_table_schema(
                 content={"message": "Prompt must not be empty"},
             )
 
-        project_papers = project_paper_crud.get_all_papers_by_project_id(
+        project_papers = project_paper_crud.get_papers_metadata_by_project_id(
             db, project_id=uuid.UUID(request.project_id), user=current_user
         )
 
-        paper_titles = [str(pp.title) for pp in project_papers if pp.title]
-
         columns = operations.propose_data_table_schema(
             prompt=prompt,
-            paper_titles=paper_titles,
+            papers=[(str(pp.id), str(pp.title or "Untitled")) for pp in project_papers],
+            current_user=current_user,
+            db=db,
+            project_id=request.project_id,
         )
 
         if not columns:
@@ -78,7 +90,18 @@ async def propose_data_table_schema(
 
         return JSONResponse(
             status_code=200,
-            content={"columns": columns},
+            content={
+                "columns": [
+                    {
+                        "label": col.label,
+                        "kind": col.kind,
+                        "expression": col.expression,
+                        "inputs": {i.alias: i.column for i in col.inputs},
+                        "evidence": col.evidence,
+                    }
+                    for col in columns
+                ]
+            },
         )
     except Exception as e:
         logger.error(f"Error proposing data table schema: {e}")
@@ -106,6 +129,48 @@ async def create_data_table(
                 content={"message": error_message},
             )
 
+        # Derived columns may only reference primitive columns in this table.
+        column_set = set(request.columns)
+        derived_labels = {spec.label for spec in request.derived_columns}
+        list_labels = {label for label in request.list_columns}
+        if list_labels - column_set:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "message": f"List columns not in columns: {', '.join(sorted(list_labels - column_set))}"
+                },
+            )
+        if list_labels & derived_labels:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "message": f"Columns cannot be both list and derived: {', '.join(sorted(list_labels & derived_labels))}"
+                },
+            )
+        for spec in request.derived_columns:
+            if spec.label not in column_set:
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "message": f"Derived column '{spec.label}' is not in columns"
+                    },
+                )
+            if not spec.expression.strip() or not spec.inputs:
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "message": f"Derived column '{spec.label}' needs an expression and at least one input"
+                    },
+                )
+            for alias, input_column in spec.inputs.items():
+                if input_column not in column_set or input_column in derived_labels:
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "message": f"Derived column '{spec.label}' input '{alias}' must reference a primitive column in this table"
+                        },
+                    )
+
         papers: List[DocumentMapping] = []
 
         project_papers = project_paper_crud.get_all_papers_by_project_id(
@@ -127,6 +192,16 @@ async def create_data_table(
             obj_in=DataTableJobCreate(
                 project_id=uuid.UUID(request.project_id),
                 columns=request.columns,
+                column_plan=(
+                    [
+                        {**spec.model_dump(), "kind": "derived"}
+                        for spec in request.derived_columns
+                    ]
+                    + [
+                        {"label": label, "kind": "list"}
+                        for label in request.list_columns
+                    ]
+                ),
             ),
             user=current_user,
         )
@@ -141,9 +216,13 @@ async def create_data_table(
 
         job_id = str(job.id)
 
+        # The jobs service only extracts primitives; derived columns are
+        # computed server-side from the job's column_plan when the webhook
+        # delivers the extracted dataset.
         data_table = DataTableSchema(
-            columns=request.columns,
+            columns=[c for c in request.columns if c not in derived_labels],
             papers=papers,
+            list_columns=request.list_columns,
         )
 
         # Submit the data table processing job

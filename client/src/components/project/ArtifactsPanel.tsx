@@ -210,7 +210,11 @@ export function ArtifactsPanel() {
                 fetchDataTableJobs()
             ]);
             const hasPendingAudioJobs = audioJobs.some((job: AudioOverviewJob) => job.status === 'pending' || job.status === 'running');
-            const hasPendingDataTableJobs = dataTableJobs.some((job: DataTableJob) => job.status === 'pending' || job.status === 'running');
+            // A completed job whose result hasn't landed yet is still pending —
+            // stopping here would freeze the card in its pre-result state.
+            const hasPendingDataTableJobs = dataTableJobs.some((job: DataTableJob) =>
+                job.status === 'pending' || job.status === 'running' ||
+                (job.status === 'completed' && !job.result_id));
 
             if (!hasPendingAudioJobs && !hasPendingDataTableJobs) {
                 // No more pending jobs, stop polling and refresh overviews
@@ -231,7 +235,11 @@ export function ArtifactsPanel() {
                 fetchDataTableJobs()
             ]).then(([audioJobs, dataTableJobs]) => {
                 const hasPendingAudioJobs = audioJobs.some((job: AudioOverviewJob) => job.status === 'pending' || job.status === 'running');
-                const hasPendingDataTableJobs = dataTableJobs.some((job: DataTableJob) => job.status === 'pending' || job.status === 'running');
+                // A completed job whose result hasn't landed yet is still pending —
+            // stopping here would freeze the card in its pre-result state.
+            const hasPendingDataTableJobs = dataTableJobs.some((job: DataTableJob) =>
+                job.status === 'pending' || job.status === 'running' ||
+                (job.status === 'completed' && !job.result_id));
                 if (hasPendingAudioJobs || hasPendingDataTableJobs) {
                     startPolling();
                 }
@@ -336,6 +344,18 @@ export function ArtifactsPanel() {
                 body: JSON.stringify({
                     project_id: projectId,
                     columns: columns.map(col => col.label),
+                    // Computed columns run through the calculator, not extraction.
+                    derived_columns: columns
+                        .filter(col => col.kind === 'derived' && col.expression && col.inputs)
+                        .map(col => ({
+                            label: col.label,
+                            expression: col.expression,
+                            inputs: col.inputs,
+                        })),
+                    // List columns extract one cited entry per instance found.
+                    list_columns: columns
+                        .filter(col => col.kind === 'list')
+                        .map(col => col.label),
                 }),
             });
 
@@ -473,7 +493,7 @@ export function ArtifactsPanel() {
                                 />
                             ))}
                             {chatArtifactGroups.map((group) => (
-                                <div key={group.messageId} className="rounded-lg border p-3">
+                                <div key={group.messageId} className="rounded-lg bg-muted/40 p-3">
                                     <div className="flex items-center justify-between gap-2">
                                         <Link
                                             href={`/projects/${projectId}/conversations/${group.conversationId}`}

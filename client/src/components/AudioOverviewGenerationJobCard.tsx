@@ -62,7 +62,7 @@ const getStatusColor = (status: string) => {
 export default function AudioOverviewGenerationJobCard({ job }: AudioOverviewGenerationJobCardProps) {
 
     return (
-        <div className="w-full p-4 border rounded-lg bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
+        <div className="w-full p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20">
             <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
                     {getStatusIcon(job.status)}

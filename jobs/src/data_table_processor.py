@@ -19,6 +19,7 @@ async def _process_single_paper(
     columns: List[str],
     status_callback: Callable[[str], None],
     semaphore: asyncio.Semaphore,
+    list_columns: Optional[List[str]] = None,
 ) -> Tuple[DataTableRow, Optional[str]]:
     """
     Process a single paper extraction with semaphore-controlled concurrency.
@@ -50,7 +51,8 @@ async def _process_single_paper(
                 paper_col_values: DataTableRow = await fast_llm_client.extract_data_table(
                     file_path=temp_file_path,
                     columns=columns,
-                    paper_id=paper_id
+                    paper_id=paper_id,
+                    list_columns=list_columns,
                 )
 
                 status_callback(f"extract for {paper.title} completed")
@@ -89,28 +91,38 @@ async def construct_data_table(
     """
     semaphore = asyncio.Semaphore(batch_size)
 
-    # Create tasks for all papers
-    tasks = [
-        _process_single_paper(
-            paper=p,
-            columns=data_table_schema.columns,
-            status_callback=status_callback,
-            semaphore=semaphore,
-        )
-        for p in data_table_schema.papers
-    ]
-
-    # Process all papers concurrently (semaphore controls max parallelism)
-    results = await asyncio.gather(*tasks)
-
-    # Separate rows and failures while maintaining order
     rows: List[DataTableRow] = []
     row_failures: List[str] = []
 
-    for row, failure_id in results:
-        rows.append(row)
-        if failure_id is not None:
-            row_failures.append(failure_id)
+    # A table whose columns are all derived arrives with no columns to
+    # extract — skip the per-paper PDF download + LLM fan-out entirely.
+    if data_table_schema.columns:
+        # Create tasks for all papers
+        tasks = [
+            _process_single_paper(
+                paper=p,
+                columns=data_table_schema.columns,
+                status_callback=status_callback,
+                semaphore=semaphore,
+                list_columns=data_table_schema.list_columns,
+            )
+            for p in data_table_schema.papers
+        ]
+
+        # Process all papers concurrently (semaphore controls max parallelism)
+        results = await asyncio.gather(*tasks)
+
+        # Separate rows and failures while maintaining order
+        for row, failure_id in results:
+            rows.append(row)
+            if failure_id is not None:
+                row_failures.append(failure_id)
+    else:
+        # Nothing to extract (every column is derived, computed server-side) —
+        # return an empty row per paper so ordering is preserved.
+        rows = [
+            DataTableRow(paper_id=p.id, values={}) for p in data_table_schema.papers
+        ]
 
     error_msg = ""
     if row_failures:

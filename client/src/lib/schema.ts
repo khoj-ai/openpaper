@@ -507,9 +507,45 @@ export interface DataTableJobStatusResponse extends JobStatusResponse {
     celery_error: string | null;
 }
 
+export interface DerivationInput {
+    alias: string;
+    column: string;
+    value: string;
+    citations: ReferenceCitation[];
+}
+
+// Shown work for a calculator-computed cell: the expression, each input with
+// its citations, and any warnings (missing inputs, failed computation).
+export interface CellDerivation {
+    expression: string;
+    inputs: DerivationInput[];
+    warnings: string[];
+}
+
+// One element of a list-valued cell, individually cited.
+export interface CellEntry {
+    value: string;
+    key?: string | null;
+    citations: ReferenceCitation[];
+}
+
 export interface DataTableCellValue {
     value: string;
     citations: ReferenceCitation[];
+    derivation?: CellDerivation | null;
+    // Present only on list-valued cells; `value` holds the joined display form.
+    entries?: CellEntry[] | null;
+}
+
+// A column in a proposed data-table schema; list columns extract one cited
+// entry per instance, derived columns are computed by the calculator.
+export interface ProposedDataTableColumn {
+    label: string;
+    kind: 'primitive' | 'list' | 'derived';
+    expression: string;
+    inputs: { [alias: string]: string };
+    // Where the papers ground this column, per the propose agent's investigation.
+    evidence?: string;
 }
 
 export interface DataTableRow {
@@ -520,10 +556,20 @@ export interface DataTableRow {
     };
 }
 
+// Entry in a table's column plan. kind "derived" entries carry expression +
+// inputs (aliases -> column labels); kind "list" entries mark list columns.
+export interface DataTableDerivedColumn {
+    label: string;
+    kind?: 'derived' | 'list';
+    expression?: string;
+    inputs?: { [alias: string]: string };
+}
+
 export interface DataTableResult {
     success: boolean;
     title: string;
     columns: string[];
+    column_plan?: DataTableDerivedColumn[];
     rows: DataTableRow[];
     row_failures: string[] | null;
     created_at: string | null;

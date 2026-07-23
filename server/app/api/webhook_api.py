@@ -6,7 +6,7 @@ import logging
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, cast
 
 import stripe
 from app.database.crud.conversation_crud import ConversationCreate, conversation_crud
@@ -37,6 +37,7 @@ from app.database.models import (
 )
 from app.database.telemetry import track_event
 from app.helpers.advisory_locks import AdvisoryLock, AdvisoryLockNamespace
+from app.helpers.calculator import compute_derived_cells
 from app.helpers.email import (
     send_data_table_complete_email,
     send_referral_credit_available_email,
@@ -46,7 +47,11 @@ from app.helpers.s3 import s3_service
 from app.helpers.subscription_limits import can_user_auto_sync_zotero
 from app.llm.citation_handler import CitationHandler
 from app.llm.operations import operations
-from app.schemas.responses import DataTableResult, PaperMetadataExtraction
+from app.schemas.responses import (
+    DataTableResult,
+    DerivedColumnSpec,
+    PaperMetadataExtraction,
+)
 from app.schemas.user import CurrentUser
 from app.services.zotero_import import (
     apply_zotero_annotations,
@@ -54,7 +59,7 @@ from app.services.zotero_import import (
     sync_batch,
 )
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -688,12 +693,18 @@ class DataTableProcessingResultWebhookData(BaseModel):
 
 
 @webhook_router.post("/data-table-processing/{job_id}")
-async def handle_data_table_processing_webhook(
+def handle_data_table_processing_webhook(
     job_id: str,
     webhook_data: DataTableProcessingResultWebhookData,
     db: Session = Depends(get_db),
 ):
-    """Handle webhook from data table processing jobs service."""
+    """Handle webhook from data table processing jobs service.
+
+    Deliberately sync (no `async`): the body is synchronous end-to-end and
+    includes a blocking LLM call (`name_data_table`). As `async def` it ran on
+    the event loop and froze the whole server for the duration of that call —
+    FastAPI runs sync handlers in the threadpool instead.
+    """
 
     logger.info(
         f"Received data table processing webhook for job {job_id} with status {webhook_data.status}"
@@ -706,20 +717,53 @@ async def handle_data_table_processing_webhook(
 
     try:
         if status == "completed" and result.success:
-            # Processing was successful
+            # Processing was successful. NOTE: the job is only marked COMPLETED
+            # after the result and rows are fully persisted below — clients stop
+            # polling the moment they see COMPLETED, so flipping the status
+            # first leaves them stuck on a completed job with no result yet.
             logger.info(
                 f"Data table processing completed for job {job_id}, "
                 f"extracted {len(result.rows)} rows with columns: {result.columns}"
             )
 
-            # Update job status to completed
-            data_table_job_crud.update_status(
-                db=db,
-                job_id=uuid.UUID(job_id),
-                status=JobStatus.COMPLETED,
-            )
-
             # Post-Processing
+            # The jobs service extracts primitives only; derived columns are
+            # computed here from the job's stored column plan, so the persisted
+            # table is complete and every derived cell carries its derivation.
+            job = data_table_job_crud.get(db=db, id=uuid.UUID(job_id))
+            if job:
+                derived_specs = []
+                list_columns: set[str] = set()
+                for entry in job.column_plan or []:
+                    # Entries are {label, kind, ...}: kind "list" marks a
+                    # list-valued primitive; "derived" (the default, for rows
+                    # written before kinds existed) carries expression+inputs.
+                    if entry.get("kind") == "list":
+                        if entry.get("label"):
+                            list_columns.add(entry["label"])
+                        continue
+                    try:
+                        derived_specs.append(DerivedColumnSpec.model_validate(entry))
+                    except ValidationError:
+                        logger.warning(
+                            f"Skipping invalid column_plan entry on job {job_id}: {entry}"
+                        )
+                if derived_specs:
+                    try:
+                        compute_derived_cells(result.rows, derived_specs, list_columns)
+                    except Exception as calc_error:
+                        # A calculator failure must not lose the extracted
+                        # table — persist primitives; derived cells stay empty.
+                        logger.error(
+                            f"Derived-column computation failed for job {job_id}: {calc_error}",
+                            exc_info=True,
+                        )
+                # Restore the user's full ordered column list (extraction only
+                # saw the primitive subset).
+                if job.columns:
+                    job_columns = cast(list[str], job.columns)
+                    result.columns = job_columns.copy()
+
             # Augment the DataCellValue citations with the paper_id
             # The job only returns citation info without paper_id, but we can fill it in here
             for col in result.columns:
@@ -728,6 +772,16 @@ async def handle_data_table_processing_webhook(
                     if cell_value:
                         for citation in cell_value.citations:
                             citation.paper_id = row.paper_id
+                        # Derived cells carry citations on their derivation
+                        # inputs instead of on the cell itself.
+                        if cell_value.derivation:
+                            for derivation_input in cell_value.derivation.inputs:
+                                for citation in derivation_input.citations:
+                                    citation.paper_id = row.paper_id
+                        # List cells carry per-element citations.
+                        for entry in cell_value.entries or []:
+                            for citation in entry.citations:
+                                citation.paper_id = row.paper_id
 
             paper_titles = []
             for row in result.rows:
@@ -776,6 +830,13 @@ async def handle_data_table_processing_webhook(
                         f"Created {len(row_creates)} rows for data table result {table_result.id}"
                     )
 
+                # Result and rows are durably persisted — NOW the job is done.
+                data_table_job_crud.update_status(
+                    db=db,
+                    job_id=uuid.UUID(job_id),
+                    status=JobStatus.COMPLETED,
+                )
+
                 # Send email notification to user
                 job = data_table_job_crud.get_by_task_id(db=db, task_id=task_id)
                 if job and job.user and job.project:
@@ -796,6 +857,11 @@ async def handle_data_table_processing_webhook(
                         )
             else:
                 logger.error(f"Failed to create data table result for job {job_id}")
+                data_table_job_crud.update_status(
+                    db=db,
+                    job_id=uuid.UUID(job_id),
+                    status=JobStatus.FAILED,
+                )
 
         else:
             # Processing failed
@@ -971,7 +1037,8 @@ async def trigger_zotero_sync_all(request: Request, db: Session = Depends(get_db
             )
             continue
 
-        if not zotero_crud.get_by_user_id(db, user_id=user.id):
+        user_uuid = cast(uuid.UUID, user.id)
+        if not zotero_crud.get_by_user_id(db, user_id=user_uuid):
             # The user disconnected Zotero but kept their imported papers, so
             # their imported items still make them look "due for sync". This is
             # an expected, benign state — skip quietly rather than erroring.

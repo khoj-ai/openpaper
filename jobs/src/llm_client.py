@@ -24,7 +24,9 @@ from src.schemas import (
     InstitutionsKeywords,
     SummaryAndCitations,
     Highlights,
+    CellEntry,
     DataTableCellValue,
+    ResponseCitation,
 )
 from src.utils import retry_llm_operation, time_it
 
@@ -47,8 +49,8 @@ def _format_api_error(e: Exception) -> Any:
 
 
 # Constants
-DEFAULT_CHAT_MODEL = "gemini-3.1-pro-preview"
-FAST_CHAT_MODEL = "gemini-3-flash-preview"
+DEFAULT_CHAT_MODEL = "gemini-3.6-flash"
+FAST_CHAT_MODEL = "gemini-3.5-flash-lite"
 CACHE_TTL_SECONDS = 3600
 
 # Gemini rejects caches below 1024 tokens. Below this many characters the content
@@ -717,6 +719,7 @@ class PaperOperations(AsyncLLMClient):
         columns: List[str],
         file_path: str,
         paper_id: str,
+        list_columns: Optional[List[str]] = None,
     ) -> DataTableRow:
         """
         Extract structured data table from paper content.
@@ -724,11 +727,14 @@ class PaperOperations(AsyncLLMClient):
         Args:
             columns: List of column names for the data table
             file_path: The file path to the PDF
+            list_columns: Subset of columns extracted as collections (one
+                cited entry per instance found) rather than single values
         Returns:
             str: JSON string representing the data table
         """
         # Create a fresh client with longer timeout since we're sending full PDFs
         client = self._create_client(timeout=self.PDF_TIMEOUT)
+        list_column_set = set(list_columns or [])
 
         try:
             # Map each column to a safe field name. User-supplied column names can contain
@@ -736,16 +742,42 @@ class PaperOperations(AsyncLLMClient):
             # fragile JSON property names that the model struggles to generate correctly.
             aliases: Dict[str, str] = {f"col_{i}": col for i, col in enumerate(columns)}
 
-            cols_str = "\n".join(f'- {alias}: "{col}"' for alias, col in aliases.items())
+            cols_str = "\n".join(
+                f'- {alias}: "{col}"'
+                + (" [LIST: one keyed entry per instance found in the paper]" if col in list_column_set else "")
+                for alias, col in aliases.items()
+            )
             prompt = EXTRACT_COLS_INSTRUCTION.format(
                 cols_str=cols_str,
                 n_cols=len(columns)
             )
 
+            # The extraction model must only ever produce value + citations —
+            # DataTableCellValue also carries fields the calculator owns
+            # (entries), which must not appear in the LLM's output schema.
+            class ExtractedCell(BaseModel):
+                value: str
+                citations: List[ResponseCitation] = []
+
+            class ExtractedEntry(BaseModel):
+                key: str = Field(
+                    description=(
+                        "Label identifying which instance this entry belongs to "
+                        "(model name, dataset, condition, etc.). Empty string if "
+                        "the paper gives no such label."
+                    )
+                )
+                value: str
+                citations: List[ResponseCitation] = []
+
             # Create the dynamic schema that matches DataTableRow structure.
-            # Each aliased column maps to a DataTableCellValue (value + citations).
+            # Scalar columns map to one cell; list columns to a list of cells.
             field_definitions: Dict[str, Any] = {
-                alias: (DataTableCellValue, Field(description=f"Value and citations for column: {col!r}"))
+                alias: (
+                    (List[ExtractedEntry], Field(description=f"One keyed entry per instance found for column: {col!r}"))
+                    if col in list_column_set
+                    else (ExtractedCell, Field(description=f"Value and citations for column: {col!r}"))
+                )
                 for alias, col in aliases.items()
             }
 
@@ -765,10 +797,32 @@ class PaperOperations(AsyncLLMClient):
             )
 
             # Map aliased fields back to the original column names.
-            values_dict: Dict[str, DataTableCellValue] = {
-                col: getattr(values_instance, alias)
-                for alias, col in aliases.items()
-            }
+            values_dict: Dict[str, DataTableCellValue] = {}
+            for alias, col in aliases.items():
+                extracted = getattr(values_instance, alias)
+                if col in list_column_set:
+                    entries = [
+                        CellEntry(
+                            value=e.value,
+                            key=e.key.strip() or None,
+                            citations=e.citations,
+                        )
+                        for e in extracted
+                        if e.value.strip() and e.value.strip().upper() != "N/A"
+                    ]
+                    values_dict[col] = DataTableCellValue(
+                        value="; ".join(
+                            f"{e.key}: {e.value}" if e.key else e.value for e in entries
+                        )
+                        if entries
+                        else "N/A",
+                        citations=[],
+                        entries=entries,
+                    )
+                else:
+                    values_dict[col] = DataTableCellValue(
+                        value=extracted.value, citations=extracted.citations
+                    )
 
             # Create and return the DataTableRow
             return DataTableRow(

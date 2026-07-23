@@ -162,6 +162,7 @@ class EvidenceCollection(BaseModel):
                 name=tool_call.name,
                 args=tool_call.args,
                 result=result,
+                thought_signature=tool_call.thought_signature,
             )
         )
 

@@ -1,0 +1,518 @@
+import os
+import unittest
+from unittest import mock
+
+from app.helpers.calculator import (
+    compute_derived_cells,
+    format_number,
+    parse_numeric,
+    validate_expression,
+)
+from app.schemas.responses import (
+    CellEntry,
+    DataTableCellValue,
+    DataTableRow,
+    DerivedColumnSpec,
+    ResponseCitation,
+)
+
+
+def make_row(paper_id: str, values: dict[str, str]) -> DataTableRow:
+    return DataTableRow(
+        paper_id=paper_id,
+        values={
+            col: DataTableCellValue(
+                value=val,
+                citations=[ResponseCitation(text=f"quote for {col}", index=1)],
+            )
+            for col, val in values.items()
+        },
+    )
+
+
+class TestValidateExpression(unittest.TestCase):
+    def test_valid_arithmetic(self):
+        self.assertIsNone(validate_expression("(a - b) / b * 100", ["a", "b"]))
+
+    def test_valid_function_call(self):
+        self.assertIsNone(
+            validate_expression(
+                "cohens_d(m1, s1, n1, m2, s2, n2)",
+                ["m1", "s1", "n1", "m2", "s2", "n2"],
+            )
+        )
+
+    def test_unknown_name_rejected(self):
+        self.assertIn("unknown name", validate_expression("a + secret", ["a"]))
+
+    def test_unknown_function_rejected(self):
+        self.assertIn("unknown function", validate_expression("open('x')", []))
+
+    def test_attribute_access_rejected(self):
+        self.assertIn("disallowed", validate_expression("a.__class__", ["a"]))
+
+    def test_string_literal_rejected(self):
+        self.assertIn("non-numeric literal", validate_expression("'x' * 3", []))
+
+    def test_comprehension_rejected(self):
+        self.assertIn("disallowed", validate_expression("[i for i in (1,2)]", []))
+
+    def test_syntax_error(self):
+        self.assertIn("syntax", validate_expression("a +", ["a"]))
+
+
+class TestParseNumeric(unittest.TestCase):
+    def test_plain(self):
+        self.assertEqual(parse_numeric("56.9"), 56.9)
+
+    def test_percent(self):
+        self.assertEqual(parse_numeric("56.9%"), 56.9)
+
+    def test_thousands_separator(self):
+        self.assertEqual(parse_numeric("4,326"), 4326.0)
+
+    def test_units(self):
+        self.assertEqual(parse_numeric("5.2 ms"), 5.2)
+
+    def test_negative(self):
+        self.assertEqual(parse_numeric("-0.7"), -0.7)
+
+    def test_word_glued_hyphen_is_not_minus(self):
+        # "gemini-3.1-pro-preview: ..." must not parse as -3.1
+        self.assertEqual(parse_numeric("gemini-3.1-pro-preview: Prec: 0.723"), 3.1)
+        self.assertEqual(parse_numeric("gpt-oss-120b"), 120.0)
+
+    def test_true_negative_still_parses(self):
+        self.assertEqual(parse_numeric("-3.1"), -3.1)
+        self.assertEqual(parse_numeric("delta: -0.7"), -0.7)
+        self.assertEqual(parse_numeric("(-1.4)"), -1.4)
+
+    def test_na(self):
+        self.assertIsNone(parse_numeric("N/A"))
+
+    def test_empty(self):
+        self.assertIsNone(parse_numeric(""))
+
+
+@mock.patch.dict(os.environ, {"CALCULATOR_EXECUTOR": "local"})
+class TestComputeDerivedCells(unittest.TestCase):
+    def test_ratio_computed_with_derivation(self):
+        rows = [make_row("p1", {"CoT (%)": "56.9", "Standard (%)": "17.9"})]
+        specs = [
+            DerivedColumnSpec(
+                label="CoT/Standard ratio",
+                expression="ratio(cot, std)",
+                inputs={"cot": "CoT (%)", "std": "Standard (%)"},
+            )
+        ]
+        compute_derived_cells(rows, specs)
+
+        cell = rows[0].values["CoT/Standard ratio"]
+        self.assertAlmostEqual(float(cell.value), 56.9 / 17.9, places=4)
+        self.assertIsNotNone(cell.derivation)
+        self.assertEqual(cell.derivation.expression, "ratio(cot, std)")
+        self.assertEqual(len(cell.derivation.inputs), 2)
+        self.assertEqual(cell.derivation.warnings, [])
+        # inputs carry through the primitive citations
+        by_alias = {i.alias: i for i in cell.derivation.inputs}
+        self.assertEqual(by_alias["cot"].column, "CoT (%)")
+        self.assertEqual(by_alias["cot"].value, "56.9")
+        self.assertEqual(len(by_alias["cot"].citations), 1)
+
+    def test_cohens_d(self):
+        rows = [
+            make_row(
+                "p1",
+                {
+                    "mean_t": "4.8",
+                    "sd_t": "2.1",
+                    "n_t": "60",
+                    "mean_c": "1.2",
+                    "sd_c": "2.3",
+                    "n_c": "58",
+                },
+            )
+        ]
+        specs = [
+            DerivedColumnSpec(
+                label="Cohen's d",
+                expression="cohens_d(m1, s1, na, m2, s2, nb)",
+                inputs={
+                    "m1": "mean_t",
+                    "s1": "sd_t",
+                    "na": "n_t",
+                    "m2": "mean_c",
+                    "s2": "sd_c",
+                    "nb": "n_c",
+                },
+            )
+        ]
+        compute_derived_cells(rows, specs)
+        # hand-computed: pooled_sd = sqrt((59*2.1^2 + 57*2.3^2)/116) = 2.2007...
+        value = float(rows[0].values["Cohen's d"].value)
+        self.assertAlmostEqual(value, 1.6358, places=3)
+
+    def test_missing_input_yields_na_with_warning(self):
+        rows = [make_row("p1", {"a": "10", "b": "N/A"})]
+        specs = [
+            DerivedColumnSpec(
+                label="diff", expression="a - b", inputs={"a": "a", "b": "b"}
+            )
+        ]
+        compute_derived_cells(rows, specs)
+
+        cell = rows[0].values["diff"]
+        self.assertEqual(cell.value, "N/A")
+        self.assertEqual(len(cell.derivation.warnings), 1)
+        self.assertIn("b not reported", cell.derivation.warnings[0])
+
+    def test_division_by_zero_yields_na_with_warning(self):
+        rows = [make_row("p1", {"a": "10", "b": "0"})]
+        specs = [
+            DerivedColumnSpec(
+                label="ratio", expression="a / b", inputs={"a": "a", "b": "b"}
+            )
+        ]
+        compute_derived_cells(rows, specs)
+
+        cell = rows[0].values["ratio"]
+        self.assertEqual(cell.value, "N/A")
+        self.assertTrue(
+            any("computation failed" in w for w in cell.derivation.warnings)
+        )
+
+    def test_invalid_expression_yields_na_not_execution(self):
+        rows = [make_row("p1", {"a": "10"})]
+        specs = [
+            DerivedColumnSpec(
+                label="evil",
+                expression="__import__('os').system('true')",
+                inputs={"a": "a"},
+            )
+        ]
+        compute_derived_cells(rows, specs)
+
+        cell = rows[0].values["evil"]
+        self.assertEqual(cell.value, "N/A")
+        self.assertTrue(
+            any("invalid expression" in w for w in cell.derivation.warnings)
+        )
+
+    def test_multiple_rows(self):
+        rows = [
+            make_row("p1", {"x": "10", "y": "5"}),
+            make_row("p2", {"x": "9", "y": "3"}),
+            make_row("p3", {"x": "N/A", "y": "3"}),
+        ]
+        specs = [
+            DerivedColumnSpec(
+                label="x/y", expression="x / y", inputs={"x": "x", "y": "y"}
+            )
+        ]
+        compute_derived_cells(rows, specs)
+        self.assertEqual(rows[0].values["x/y"].value, "2")
+        self.assertEqual(rows[1].values["x/y"].value, "3")
+        self.assertEqual(rows[2].values["x/y"].value, "N/A")
+
+    def test_no_derived_columns_is_noop(self):
+        rows = [make_row("p1", {"a": "1"})]
+        compute_derived_cells(rows, [])
+        self.assertEqual(set(rows[0].values.keys()), {"a"})
+
+    def test_ambiguous_input_computes_with_warning(self):
+        rows = [make_row("p1", {"a": "95% CI 15.8-16.0", "b": "5"})]
+        specs = [
+            DerivedColumnSpec(
+                label="sum", expression="a + b", inputs={"a": "a", "b": "b"}
+            )
+        ]
+        compute_derived_cells(rows, specs)
+
+        cell = rows[0].values["sum"]
+        self.assertEqual(cell.value, "100")  # first number (95) + 5
+        self.assertTrue(any("multiple numbers" in w for w in cell.derivation.warnings))
+
+
+class TestExecutorSelection(unittest.TestCase):
+    @mock.patch.dict(
+        os.environ,
+        {"CALCULATOR_EXECUTOR": "e2b", "E2B_DEV_API_KEY": "", "E2B_API_KEY": ""},
+    )
+    def test_explicit_e2b_without_key_raises(self):
+        rows = [make_row("p1", {"a": "1", "b": "2"})]
+        specs = [
+            DerivedColumnSpec(
+                label="sum", expression="a + b", inputs={"a": "a", "b": "b"}
+            )
+        ]
+        with self.assertRaises(RuntimeError):
+            compute_derived_cells(rows, specs)
+
+    @mock.patch.dict(
+        os.environ,
+        {"CALCULATOR_EXECUTOR": "", "E2B_DEV_API_KEY": "fake-key", "E2B_API_KEY": ""},
+    )
+    def test_e2b_retries_once_then_falls_back_to_local(self):
+        rows = [make_row("p1", {"a": "1", "b": "2"})]
+        specs = [
+            DerivedColumnSpec(
+                label="total", expression="a + b", inputs={"a": "a", "b": "b"}
+            )
+        ]
+        with mock.patch(
+            "app.helpers.calculator._run_e2b",
+            side_effect=RuntimeError("sandbox unavailable"),
+        ) as run_e2b:
+            compute_derived_cells(rows, specs)
+        self.assertEqual(run_e2b.call_count, 2)
+        # After two E2B failures the local executor still produced the value.
+        self.assertEqual(rows[0].values["total"].value, "3")
+
+    @mock.patch.dict(
+        os.environ,
+        {"CALCULATOR_EXECUTOR": "", "E2B_DEV_API_KEY": "fake-key", "E2B_API_KEY": ""},
+    )
+    def test_e2b_second_attempt_success_does_not_fall_back(self):
+        from app.helpers.calculator import _run_local as real_run_local
+
+        rows = [make_row("p1", {"a": "1", "b": "2"})]
+        specs = [
+            DerivedColumnSpec(
+                label="total", expression="a + b", inputs={"a": "a", "b": "b"}
+            )
+        ]
+        calls = {"n": 0}
+
+        # First attempt blips, second succeeds (stand in for E2B with the
+        # local runner — same RUNNER_SOURCE, same results).
+        def flaky_e2b(items, api_key):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise RuntimeError("blip")
+            return real_run_local(items)
+
+        with (
+            mock.patch("app.helpers.calculator._run_e2b", side_effect=flaky_e2b),
+            mock.patch("app.helpers.calculator._run_local") as run_local,
+        ):
+            compute_derived_cells(rows, specs)
+        self.assertEqual(calls["n"], 2)
+        run_local.assert_not_called()
+        self.assertEqual(rows[0].values["total"].value, "3")
+
+    @mock.patch.dict(
+        os.environ,
+        {"CALCULATOR_EXECUTOR": "", "E2B_DEV_API_KEY": "", "E2B_API_KEY": ""},
+    )
+    def test_default_without_key_raises(self):
+        # The sandbox is required: without a key, the default configuration
+        # must fail loudly rather than silently running in-process.
+        rows = [make_row("p1", {"a": "1", "b": "2"})]
+        specs = [
+            DerivedColumnSpec(
+                label="sum", expression="a + b", inputs={"a": "a", "b": "b"}
+            )
+        ]
+        with self.assertRaises(RuntimeError):
+            compute_derived_cells(rows, specs)
+
+
+def make_list_row(
+    paper_id: str,
+    column: str,
+    element_values: list[str],
+    keys: list[str] | None = None,
+) -> DataTableRow:
+    entries = [
+        CellEntry(
+            value=v,
+            key=keys[i] if keys else None,
+            citations=[ResponseCitation(text=f"quote for {v}", index=i + 1)],
+        )
+        for i, v in enumerate(element_values)
+    ]
+    return DataTableRow(
+        paper_id=paper_id,
+        values={
+            column: DataTableCellValue(
+                value="; ".join(element_values), citations=[], entries=entries
+            )
+        },
+    )
+
+
+@mock.patch.dict(os.environ, {"CALCULATOR_EXECUTOR": "local"})
+class TestListColumnsAndAggregates(unittest.TestCase):
+    def _compute(self, element_values, expression, label="agg"):
+        rows = [make_list_row("p1", "scores", element_values)]
+        specs = [
+            DerivedColumnSpec(
+                label=label, expression=expression, inputs={"xs": "scores"}
+            )
+        ]
+        compute_derived_cells(rows, specs, {"scores"})
+        return rows[0].values[label]
+
+    def test_median_odd(self):
+        cell = self._compute(
+            ["80.65", "41.94", "45.16", "56.13", "33.00"], "median(xs)"
+        )
+        self.assertEqual(cell.value, "45.16")
+        self.assertEqual(cell.derivation.warnings, [])
+        self.assertEqual(
+            cell.derivation.inputs[0].value, "[80.65, 41.94, 45.16, 56.13, 33]"
+        )
+        # element citations propagate to the derivation input
+        self.assertEqual(len(cell.derivation.inputs[0].citations), 5)
+
+    def test_median_even(self):
+        cell = self._compute(["1", "2", "3", "4"], "median(xs)")
+        self.assertEqual(cell.value, "2.5")
+
+    def test_mean_count_sum(self):
+        self.assertEqual(self._compute(["2", "4", "6"], "mean(xs)").value, "4")
+        self.assertEqual(self._compute(["2", "4", "6"], "count(xs)").value, "3")
+        self.assertEqual(self._compute(["2", "4", "6"], "sum(xs)").value, "12")
+        self.assertEqual(self._compute(["2", "4", "6"], "max(xs) - min(xs)").value, "4")
+
+    def test_keyed_entries_shown_in_display_and_bound_numerically(self):
+        rows = [
+            make_list_row(
+                "p1",
+                "scores",
+                ["80.65", "41.94"],
+                keys=["GPT-4", "GPT-3.5-turbo"],
+            )
+        ]
+        specs = [
+            DerivedColumnSpec(
+                label="agg", expression="median(xs)", inputs={"xs": "scores"}
+            )
+        ]
+        compute_derived_cells(rows, specs, {"scores"})
+        cell = rows[0].values["agg"]
+        # Keys never contaminate the numeric binding ("GPT-4" is not a 4)...
+        self.assertEqual(cell.value, "61.295")
+        self.assertEqual(cell.derivation.warnings, [])
+        # ...but the derivation display names each instance.
+        self.assertEqual(
+            cell.derivation.inputs[0].value, "[GPT-4: 80.65, GPT-3.5-turbo: 41.94]"
+        )
+
+    def test_non_numeric_keyed_entry_warning_names_the_key(self):
+        rows = [
+            make_list_row(
+                "p1", "scores", ["80.65", "not reported"], keys=["GPT-4", "Random"]
+            )
+        ]
+        specs = [
+            DerivedColumnSpec(
+                label="agg", expression="mean(xs)", inputs={"xs": "scores"}
+            )
+        ]
+        compute_derived_cells(rows, specs, {"scores"})
+        cell = rows[0].values["agg"]
+        self.assertEqual(cell.value, "80.65")
+        self.assertEqual(
+            cell.derivation.warnings,
+            ["scores: non-numeric element 'Random: not reported' excluded"],
+        )
+
+    def test_count_is_structural_over_text_entries(self):
+        # A names list has no numbers to parse — count counts every entry,
+        # with no exclusions and no warnings ("Claude 3 Opus" is one model,
+        # not the number 3).
+        cell = self._compute(
+            ["Claude 3 Opus", "smaller Llama models", "GPT-4o"], "count(xs)"
+        )
+        self.assertEqual(cell.value, "3")
+        self.assertEqual(cell.derivation.warnings, [])
+
+    def test_mixed_count_and_numeric_aggregate_binds_numerically(self):
+        # When the same alias also feeds a numeric aggregate, the binding must
+        # be numeric for both — count then counts the usable numbers.
+        cell = self._compute(
+            ["80.65", "not reported", "33.00"], "median(xs) + count(xs)"
+        )
+        self.assertEqual(cell.value, str((80.65 + 33.0) / 2 + 2))
+        self.assertTrue(
+            any("non-numeric element" in w for w in cell.derivation.warnings)
+        )
+
+    def test_non_numeric_element_excluded_with_warning(self):
+        cell = self._compute(["80.65", "not reported", "33.00"], "median(xs)")
+        self.assertEqual(cell.value, "56.825")
+        self.assertTrue(
+            any("non-numeric element" in w for w in cell.derivation.warnings)
+        )
+
+    def test_empty_list_is_missing(self):
+        rows = [
+            DataTableRow(
+                paper_id="p1",
+                values={
+                    "scores": DataTableCellValue(value="N/A", citations=[], entries=[])
+                },
+            )
+        ]
+        specs = [
+            DerivedColumnSpec(
+                label="agg", expression="median(xs)", inputs={"xs": "scores"}
+            )
+        ]
+        compute_derived_cells(rows, specs, {"scores"})
+        cell = rows[0].values["agg"]
+        self.assertEqual(cell.value, "N/A")
+        self.assertTrue(any("not reported" in w for w in cell.derivation.warnings))
+
+    def test_list_alias_outside_aggregate_rejected(self):
+        cell = self._compute(["1", "2"], "xs + 1")
+        self.assertEqual(cell.value, "N/A")
+        self.assertTrue(
+            any("invalid expression" in w for w in cell.derivation.warnings)
+        )
+
+    def test_scalar_and_list_mixed(self):
+        rows = [make_list_row("p1", "scores", ["10", "20", "30"])]
+        rows[0].values["baseline"] = DataTableCellValue(
+            value="15",
+            citations=[ResponseCitation(text="baseline is 15", index=9)],
+        )
+        specs = [
+            DerivedColumnSpec(
+                label="mean vs baseline",
+                expression="mean(xs) - b",
+                inputs={"xs": "scores", "b": "baseline"},
+            )
+        ]
+        compute_derived_cells(rows, specs, {"scores"})
+        self.assertEqual(rows[0].values["mean vs baseline"].value, "5")
+
+
+class TestValidateListAliases(unittest.TestCase):
+    def test_list_alias_in_aggregate_ok(self):
+        self.assertIsNone(validate_expression("median(xs) - a", ["xs", "a"], ["xs"]))
+
+    def test_list_alias_in_scalar_function_rejected(self):
+        self.assertIn(
+            "aggregate",
+            validate_expression("ratio(xs, a)", ["xs", "a"], ["xs"]),
+        )
+
+    def test_list_alias_bare_rejected(self):
+        self.assertIn("aggregate", validate_expression("xs * 2", ["xs"], ["xs"]))
+
+
+class TestFormatNumber(unittest.TestCase):
+    def test_trims(self):
+        self.assertEqual(format_number(3.179888268156425), "3.17989")
+
+    def test_integer(self):
+        self.assertEqual(format_number(2.0), "2")
+
+    def test_nan(self):
+        self.assertEqual(format_number(float("nan")), "N/A")
+
+
+if __name__ == "__main__":
+    unittest.main()

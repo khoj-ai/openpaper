@@ -114,11 +114,56 @@ class DocumentMapping(BaseModel):
     id: str
 
 
+class DerivedColumnSpec(BaseModel):
+    """A column computed by the calculator from other (primitive) columns,
+    never by the extraction model. Mirrors jobs/src/schemas.py."""
+
+    label: str = Field(description="Display label of the derived column")
+    expression: str = Field(
+        description="Arithmetic expression over input aliases, e.g. 'cohens_d(mean_t, sd_t, n_t, mean_c, sd_c, n_c)'"
+    )
+    inputs: dict[str, str] = Field(
+        description="Mapping of expression alias -> primitive column label"
+    )
+
+
 class DataTableSchema(BaseModel):
+    """Extraction payload sent to the jobs service — primitive columns only;
+    derived columns never travel to the worker."""
+
     columns: List[str] = Field(description="List of column names in the data table.")
     papers: List[DocumentMapping] = Field(
         description="List of papers included in the data table."
     )
+    list_columns: List[str] = Field(
+        default=[],
+        description="Subset of columns whose value is a per-paper collection (one entry per instance found) rather than a single scalar.",
+    )
+
+
+class CellEntry(BaseModel):
+    """One element of a list-valued cell, individually cited."""
+
+    value: str
+    key: Optional[str] = None
+    citations: List[ResponseCitation] = []
+
+
+class DerivationInput(BaseModel):
+    """One input to a derived cell, carrying the citations of the primitive it came from."""
+
+    alias: str
+    column: str
+    value: str
+    citations: List[ResponseCitation] = []
+
+
+class CellDerivation(BaseModel):
+    """The shown work for a calculator-computed cell."""
+
+    expression: str
+    inputs: List[DerivationInput] = []
+    warnings: List[str] = []
 
 
 class DataTableCellValue(BaseModel):
@@ -128,6 +173,14 @@ class DataTableCellValue(BaseModel):
     citations: List[ResponseCitation] = Field(
         default=[],
         description="List of citations that support this specific value. These should be direct quotes or paraphrases from the paper.",
+    )
+    derivation: Optional[CellDerivation] = Field(
+        default=None,
+        description="Present only on calculator-computed cells.",
+    )
+    entries: Optional[List[CellEntry]] = Field(
+        default=None,
+        description="Present only on list-valued cells: the individual elements, each with its own citations. `value` holds their joined display form.",
     )
 
 
@@ -165,6 +218,10 @@ class ToolCall(BaseModel):
     )
     name: str
     args: Dict[str, Any]
+    thought_signature: Optional[str] = Field(
+        default=None,
+        description="Base64 Gemini thought signature for this function call. Gemini 3 requires it to be round-tripped when the call is replayed in a later turn.",
+    )
 
 
 class ToolCallResult(BaseModel):
@@ -181,6 +238,10 @@ class ToolCallResult(BaseModel):
     )
     result: Any = Field(
         description="The result returned by the tool. Will be serialized to string for the API."
+    )
+    thought_signature: Optional[str] = Field(
+        default=None,
+        description="Base64 Gemini thought signature carried over from the originating ToolCall.",
     )
 
 

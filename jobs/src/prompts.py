@@ -28,7 +28,9 @@ EXTRACT_COLS_INSTRUCTION = """You are a data extraction assistant specializing i
 6. For numerical data, include units if specified (e.g., "5.2 ms" not just "5.2")
 7. Occasionally, a column label will propose a unit in parentheses (e.g., "Latency (ms)"). When it does, report the value in that unit, converting from the paper's unit if necessary, and omit the unit from the value itself
 8. A column label may indicate a boolean column with "(boolean)" or "(True/False)". For those, the value must be exactly "True" or "False", or "N/A" if the paper doesn't support either
-9. Preserve formatting for citations, formulas, or special notation
+9. Columns marked [LIST] are collections: extract EVERY instance the paper reports (e.g. one entry per evaluated model, per study arm, per dataset), in the order they appear, each entry with its own key, value, and supporting citations. If the paper reports none, return an empty list. Never aggregate or summarize the entries
+10. Each [LIST] entry has a key and a value. The key is the label identifying WHICH instance the entry belongs to, exactly as the paper names it (the model name, dataset, condition, study arm, etc.); use an empty string only when the paper genuinely provides no such label. The value must be a SINGLE bare value — one number (with unit if any) or one short phrase. Never pack the key or multiple metrics into the value (key "GPT-4" with value "80.65", never value "GPT-4: 80.65" or "Prec: 0.72, Acc: 0.84"). If the column does not specify WHICH of several reported metrics per instance is meant, return an empty list rather than guessing
+11. Preserve formatting for citations, formulas, or special notation
 
 **Citation Requirements:**
 - For each column value, include >=1 direct quote or paraphrase that supports that specific value
@@ -40,7 +42,7 @@ EXTRACT_COLS_INSTRUCTION = """You are a data extraction assistant specializing i
 **Guidelines:**
 - Look in tables, figures, results sections, abstract, and supplementary materials
 - Maintain consistency in terminology
-- You may infer or calculate values not explicitly stated, if justified by citations
+- NEVER perform arithmetic or derive values that are not stated in the paper. If a column's value would require any calculation, conversion beyond the unit conversions described above, or inference from other numbers, use "N/A" — derived values are computed outside of extraction
 - If uncertain about a value, use "N/A" rather than guessing
 
 **Output Requirements:**

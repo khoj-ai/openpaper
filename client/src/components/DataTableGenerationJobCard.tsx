@@ -50,6 +50,16 @@ const getStatusText = (status: JobStatus) => {
     }
 };
 
+const formatDuration = (start?: string | null, end?: string | null) => {
+    if (!start || !end) return null;
+    const ms = new Date(end).getTime() - new Date(start).getTime();
+    if (!Number.isFinite(ms) || ms <= 0) return null;
+    const mins = Math.round(ms / 60000);
+    if (mins < 1) return 'under a minute';
+    if (mins < 60) return `${mins} min`;
+    return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+};
+
 const getStatusColor = (status: JobStatus) => {
     switch (status) {
         case JobStatus.PENDING:
@@ -113,7 +123,7 @@ export default function DataTableGenerationJobCard({ job, projectId }: DataTable
     };
 
     const CardContent = () => (
-        <div className="w-full p-4 border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+        <div className="w-full p-4 rounded-lg cursor-pointer bg-gray-50 dark:bg-gray-800/40 hover:bg-gray-100 dark:hover:bg-gray-800/70 transition-colors">
             <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
                     {currentStatus === JobStatus.COMPLETED ? <Table className="w-5 h-5 text-blue-600 dark:text-blue-400" /> : getStatusIcon(currentStatus)}
@@ -176,78 +186,49 @@ export default function DataTableGenerationJobCard({ job, projectId }: DataTable
 
                     {/* Expanded details */}
                     {isExpanded && (
-                        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
+                        <div className="mt-3 space-y-2">
                             {error && (
                                 <p className="text-xs text-red-500">{error}</p>
                             )}
 
                             {liveData && (
                                 <>
-                                    <div className="grid grid-cols-2 gap-2 text-xs">
-                                        <div>
-                                            <span className="text-gray-500 dark:text-gray-400">Status:</span>
-                                            <span className={`ml-1 font-medium ${getStatusColor(liveData.status)}`}>
-                                                {getStatusText(liveData.status)}
-                                            </span>
-                                        </div>
-                                        {liveData.celery_status && currentStatus !== JobStatus.COMPLETED && currentStatus !== JobStatus.FAILED && (
-                                            <div>
-                                                <span className="text-gray-500 dark:text-gray-400">Task Status:</span>
-                                                <span className="ml-1 font-medium text-gray-700 dark:text-gray-300">
-                                                    {liveData.celery_status}
-                                                </span>
-                                            </div>
-                                        )}
-                                        {liveData.task_id && (
-                                            <div>
-                                                <span className="text-gray-500 dark:text-gray-400">Task ID:</span>
-                                                <span className="ml-1 font-mono text-gray-700 dark:text-gray-300 truncate">
-                                                    {liveData.task_id.slice(0, 8)}...
-                                                </span>
-                                            </div>
-                                        )}
+                                    <p className="text-xs">
+                                        <span className={`font-medium ${getStatusColor(liveData.status)}`}>
+                                            {getStatusText(liveData.status)}
+                                        </span>
                                         {liveData.completed_at && (
-                                            <div>
-                                                <span className="text-gray-500 dark:text-gray-400">Completed:</span>
-                                                <span className="ml-1 text-gray-700 dark:text-gray-300">
-                                                    {formatDateTime(liveData.completed_at)}
-                                                </span>
-                                            </div>
+                                            <span className="text-gray-500 dark:text-gray-400">
+                                                {' '}{formatDateTime(liveData.completed_at)}
+                                                {formatDuration(job.created_at, liveData.completed_at) &&
+                                                    ` · took ${formatDuration(job.created_at, liveData.completed_at)}`}
+                                            </span>
                                         )}
-                                    </div>
+                                    </p>
 
-                                    {liveData.celery_progress_message && (
-                                        <div className="text-xs">
-                                            <span className="text-gray-500 dark:text-gray-400">Progress:</span>
-                                            <p className="mt-1 text-gray-700 dark:text-gray-300 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
-                                                {liveData.celery_progress_message}
-                                            </p>
-                                        </div>
+                                    {liveData.celery_progress_message && currentStatus !== JobStatus.COMPLETED && (
+                                        <p className="text-xs text-gray-700 dark:text-gray-300 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
+                                            {liveData.celery_progress_message}
+                                        </p>
                                     )}
 
                                     {liveData.columns && liveData.columns.length > 0 && (
-                                        <div className="text-xs">
-                                            <span className="text-gray-500 dark:text-gray-400">Columns:</span>
-                                            <div className="mt-1 flex flex-wrap gap-1">
-                                                {liveData.columns.map((col, idx) => (
-                                                    <span
-                                                        key={idx}
-                                                        className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-gray-700 dark:text-gray-300"
-                                                    >
-                                                        {col}
-                                                    </span>
-                                                ))}
-                                            </div>
+                                        <div className="flex flex-wrap gap-1 text-xs">
+                                            {liveData.columns.map((col, idx) => (
+                                                <span
+                                                    key={idx}
+                                                    className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-gray-700 dark:text-gray-300"
+                                                >
+                                                    {col}
+                                                </span>
+                                            ))}
                                         </div>
                                     )}
 
                                     {liveData.error_message && (
-                                        <div className="text-xs">
-                                            <span className="text-red-500 dark:text-red-400">Error:</span>
-                                            <p className="mt-1 text-red-600 dark:text-red-300 bg-red-50 dark:bg-red-900/20 p-2 rounded">
-                                                {liveData.error_message}
-                                            </p>
-                                        </div>
+                                        <p className="text-xs text-red-600 dark:text-red-300 bg-red-50 dark:bg-red-900/20 p-2 rounded">
+                                            {liveData.error_message}
+                                        </p>
                                     )}
 
                                     {isCompleted && job.result_id && (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Download, Table as TableIcon } from "lucide-react";
+import { Download, Table as TableIcon, Calculator, List, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -68,24 +68,71 @@ export default function DataTableGenerationView({
 
     const { columns, rows, title } = dataTableResult;
 
+    // label -> spec for calculator-computed columns, for header badges.
+    const derivedColumns = useMemo(
+        () => new Map(
+            (dataTableResult.column_plan ?? [])
+                .filter(spec => spec.expression)
+                .map(spec => [spec.label, spec])
+        ),
+        [dataTableResult.column_plan]
+    );
+    const listColumns = useMemo(
+        () => new Set(
+            (dataTableResult.column_plan ?? [])
+                .filter(spec => spec.kind === 'list')
+                .map(spec => spec.label)
+        ),
+        [dataTableResult.column_plan]
+    );
+
+    // label -> aliases by which computed-column formulas refer to that column,
+    // mirroring the creation modal so `alias ← label` bindings stay legible in
+    // the final table.
+    const aliasesByLabel = useMemo(() => {
+        const map = new Map<string, string[]>();
+        (dataTableResult.column_plan ?? []).forEach(spec => {
+            Object.entries(spec.inputs ?? {}).forEach(([alias, column]) => {
+                const aliases = map.get(column) ?? [];
+                if (!aliases.includes(alias)) aliases.push(alias);
+                map.set(column, aliases);
+            });
+        });
+        return map;
+    }, [dataTableResult.column_plan]);
+
     // Create a map of paper_id to paper for quick lookup
     const paperMap = new Map(papers.map(paper => [paper.id, paper]));
 
     // Convert DataTableCitations to Citation format for ReferencePaperCards
     const citations = useMemo(() => {
         const result: Citation[] = [];
+        // Derivation inputs re-carry their primitive column's citations, so the
+        // same quote can surface several times per row — dedupe for the
+        // references section.
+        const seen = new Set<string>();
+        const addCitation = (paperId: string, citation: { index: number; text: string }) => {
+            const dedupeKey = `${paperId}::${citation.index}::${citation.text}`;
+            if (seen.has(dedupeKey)) return;
+            seen.add(dedupeKey);
+            result.push({
+                key: String(citation.index),
+                paper_id: paperId,
+                reference: citation.text
+            });
+        };
         rows.forEach((row) => {
             columns.forEach((columnName) => {
                 const cellValue = row.values?.[columnName];
-                if (cellValue && cellValue.citations.length > 0) {
-                    cellValue.citations.forEach((citation) => {
-                        result.push({
-                            key: String(citation.index),
-                            paper_id: row.paper_id,
-                            reference: citation.text
-                        });
-                    });
-                }
+                cellValue?.citations.forEach((citation) => addCitation(row.paper_id, citation));
+                // List cells cite through their per-element entries.
+                cellValue?.entries?.forEach((entry) => {
+                    entry.citations.forEach((citation) => addCitation(row.paper_id, citation));
+                });
+                // Derived cells cite through their derivation inputs.
+                cellValue?.derivation?.inputs.forEach((input) => {
+                    input.citations.forEach((citation) => addCitation(row.paper_id, citation));
+                });
             });
         });
         return result;
@@ -102,12 +149,30 @@ export default function DataTableGenerationView({
                 const values = columns.map(columnName => {
                     const cellValue = row.values?.[columnName];
                     if (!cellValue) return '';
-                    const value = cellValue.value;
+                    const value = cellValue.entries?.length
+                        ? cellValue.entries
+                            .map((entry) => (entry.key ? `${entry.key}: ${entry.value}` : entry.value))
+                            .join('; ')
+                        : cellValue.value;
                     return `"${String(value).replace(/"/g, '""')}"`;
                 });
                 return [`"${paperTitle.replace(/"/g, '""')}"`, ...values].join(',');
             })
         ];
+
+        // Note computed columns below the data so exported tables don't
+        // present calculator output as extracted values.
+        if (derivedColumns.size > 0) {
+            csvRows.push('');
+            csvRows.push('"Computed columns (calculated from extracted values, not stated in papers):"');
+            derivedColumns.forEach((spec) => {
+                const inputs = Object.entries(spec.inputs ?? {})
+                    .map(([alias, column]) => `${alias} = ${column}`)
+                    .join('; ');
+                const note = `${spec.label} = ${spec.expression} (${inputs})`;
+                csvRows.push(`"${note.replace(/"/g, '""')}"`);
+            });
+        }
 
         const csvContent = csvRows.join('\n');
         // Prepend a UTF-8 BOM so Excel detects the encoding (preserving accented
@@ -160,11 +225,57 @@ export default function DataTableGenerationView({
                                 <th className="text-left p-3 font-medium min-w-[200px] sticky left-0 bg-muted/50 z-10">
                                     Paper
                                 </th>
-                                {columns.map((columnName) => (
-                                    <th key={columnName} className="text-left p-3 font-medium min-w-[200px]">
-                                        {columnName}
-                                    </th>
-                                ))}
+                                {columns.map((columnName) => {
+                                    const derivedSpec = derivedColumns.get(columnName);
+                                    return (
+                                        <th key={columnName} className="text-left p-3 font-medium min-w-[200px]">
+                                            <span className="inline-flex items-center gap-1.5">
+                                                {columnName}
+                                                {listColumns.has(columnName) && (
+                                                    <span
+                                                        title="List column — one cited entry per instance found in the paper. Entries are independent of other list columns: rows do not align across lists."
+                                                        className="inline-flex items-center px-1 py-0.5 rounded cursor-default bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300"
+                                                    >
+                                                        <List className="h-3.5 w-3.5" />
+                                                    </span>
+                                                )}
+                                                {(aliasesByLabel.get(columnName) ?? []).map(alias => (
+                                                    <code
+                                                        key={alias}
+                                                        title={`Computed column formulas refer to this column as '${alias}'`}
+                                                        className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono font-normal text-muted-foreground shrink-0"
+                                                    >
+                                                        {alias}
+                                                    </code>
+                                                ))}
+                                                {derivedSpec && (
+                                                    <HoverCard openDelay={100} closeDelay={150}>
+                                                        <HoverCardTrigger asChild>
+                                                            <span className="inline-flex items-center px-1 py-0.5 rounded cursor-default bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                                                                <Calculator className="h-3.5 w-3.5" />
+                                                            </span>
+                                                        </HoverCardTrigger>
+                                                        <HoverCardContent className="w-96 p-3 shadow-md bg-accent space-y-2">
+                                                            <p className="text-xs font-semibold text-accent-foreground uppercase tracking-wide">
+                                                                Computed column
+                                                            </p>
+                                                            <p className="text-sm font-mono text-accent-foreground">
+                                                                = {derivedSpec.expression}
+                                                            </p>
+                                                            <div className="space-y-1">
+                                                                {Object.entries(derivedSpec.inputs ?? {}).map(([alias, column]) => (
+                                                                    <p key={alias} className="text-xs font-mono text-muted-foreground">
+                                                                        {alias} ← {column}
+                                                                    </p>
+                                                                ))}
+                                                            </div>
+                                                        </HoverCardContent>
+                                                    </HoverCard>
+                                                )}
+                                            </span>
+                                        </th>
+                                    );
+                                })}
                             </tr>
                         </thead>
                         <tbody>
@@ -192,8 +303,100 @@ export default function DataTableGenerationView({
                                                 <td key={columnName} className="p-3 align-top">
                                                     {cellValue ? (
                                                         <div className="space-y-2">
-                                                            <div className="text-foreground">
-                                                                {cellValue.value}
+                                                            <div className="text-foreground flex items-center gap-1.5">
+                                                                {cellValue.entries && cellValue.entries.length > 0 ? (
+                                                                    <div className="space-y-1">
+                                                                        {cellValue.entries.map((entry, entryIdx) => (
+                                                                            <div key={entryIdx} className="flex items-center gap-1.5">
+                                                                                <span>
+                                                                                    {entry.key && (
+                                                                                        <span className="text-muted-foreground">{entry.key}: </span>
+                                                                                    )}
+                                                                                    {entry.value}
+                                                                                </span>
+                                                                                {entry.citations.map((citation, citationIdx) => (
+                                                                                    <button
+                                                                                        key={citationIdx}
+                                                                                        title={citation.text}
+                                                                                        onClick={() => {
+                                                                                            if (onCitationClick) {
+                                                                                                onCitationClick(row.paper_id, citation.text);
+                                                                                            }
+                                                                                            setHighlightedPaper(row.paper_id);
+                                                                                        }}
+                                                                                        className="text-xs px-1 py-0.5 rounded transition-colors bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50"
+                                                                                    >
+                                                                                        [{citation.index}]
+                                                                                    </button>
+                                                                                ))}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : (
+                                                                    cellValue.value
+                                                                )}
+                                                                {cellValue.derivation && (
+                                                                    <HoverCard openDelay={100} closeDelay={150}>
+                                                                        <HoverCardTrigger asChild>
+                                                                            <button
+                                                                                aria-label="Show how this value was computed"
+                                                                                className="inline-flex items-center px-1 py-0.5 rounded transition-colors bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/50"
+                                                                            >
+                                                                                <Calculator className="h-3.5 w-3.5" />
+                                                                            </button>
+                                                                        </HoverCardTrigger>
+                                                                        <HoverCardContent className="w-96 p-3 shadow-md bg-accent space-y-2">
+                                                                            <p className="text-xs font-semibold text-accent-foreground uppercase tracking-wide">
+                                                                                Computed value
+                                                                            </p>
+                                                                            <p className="text-sm font-mono text-accent-foreground">
+                                                                                = {cellValue.derivation.expression}
+                                                                            </p>
+                                                                            <div className="space-y-1.5">
+                                                                                {cellValue.derivation.inputs.map((input) => {
+                                                                                    // Elements of a list input often share one source
+                                                                                    // quote — show each supporting citation once.
+                                                                                    const uniqueCitations = input.citations.filter(
+                                                                                        (citation, idx) => input.citations.findIndex(
+                                                                                            c => c.index === citation.index && c.text === citation.text
+                                                                                        ) === idx
+                                                                                    );
+                                                                                    return (
+                                                                                        <div key={input.alias} className="text-xs text-accent-foreground font-mono">
+                                                                                            <div className="font-semibold">{input.alias} = {input.value}</div>
+                                                                                            <div className="text-muted-foreground flex flex-wrap items-center gap-1">
+                                                                                                <span>← {input.column}</span>
+                                                                                                {uniqueCitations.map((citation, citationIdx) => (
+                                                                                                    <button
+                                                                                                        key={citationIdx}
+                                                                                                        onClick={() => {
+                                                                                                            if (onCitationClick) {
+                                                                                                                onCitationClick(row.paper_id, citation.text);
+                                                                                                            }
+                                                                                                        }}
+                                                                                                        className="px-1 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50"
+                                                                                                    >
+                                                                                                        [{citation.index}]
+                                                                                                    </button>
+                                                                                                ))}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                            {cellValue.derivation.warnings.length > 0 && (
+                                                                                <div className="space-y-1 pt-1 border-t border-amber-200 dark:border-amber-800/40">
+                                                                                    {cellValue.derivation.warnings.map((warning, warningIdx) => (
+                                                                                        <p key={warningIdx} className="text-xs text-amber-700 dark:text-amber-400 flex items-start gap-1">
+                                                                                            <TriangleAlert className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                                                                                            {warning}
+                                                                                        </p>
+                                                                                    ))}
+                                                                                </div>
+                                                                            )}
+                                                                        </HoverCardContent>
+                                                                    </HoverCard>
+                                                                )}
                                                             </div>
                                                             {cellCitations.length > 0 && (
                                                                 <div className="flex flex-wrap gap-1">
@@ -210,13 +413,7 @@ export default function DataTableGenerationView({
                                                                                         if (onCitationClick) {
                                                                                             onCitationClick(row.paper_id, citation.text);
                                                                                         }
-                                                                                        // Also highlight the paper card and scroll to it
                                                                                         setHighlightedPaper(row.paper_id);
-                                                                                        const cardId = `datatable-reference-paper-card-${row.paper_id}`;
-                                                                                        const refElement = document.getElementById(cardId);
-                                                                                        if (refElement) {
-                                                                                            refElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                                                                        }
                                                                                     }}
                                                                                     className="text-xs px-1.5 py-0.5 rounded transition-colors bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50"
                                                                                 >
