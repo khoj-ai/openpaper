@@ -344,12 +344,13 @@ export function ArtifactsPanel() {
                 body: JSON.stringify({
                     project_id: projectId,
                     columns: columns.map(col => col.label),
-                    // Computed columns run through the calculator, not extraction.
-                    derived_columns: columns
-                        .filter(col => col.kind === 'derived' && col.expression && col.inputs)
+                    // Computed columns run through the compute agent after
+                    // extraction, never through the extraction model.
+                    computed_columns: columns
+                        .filter(col => col.kind === 'computed' && col.spec && col.inputs?.length)
                         .map(col => ({
                             label: col.label,
-                            expression: col.expression,
+                            spec: col.spec,
                             inputs: col.inputs,
                         })),
                     // List columns extract one cited entry per instance found.

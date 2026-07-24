@@ -538,12 +538,15 @@ export interface DataTableCellValue {
 }
 
 // A column in a proposed data-table schema; list columns extract one cited
-// entry per instance, derived columns are computed by the calculator.
+// entry per instance, computed columns are produced by the sandboxed compute
+// agent after extraction.
 export interface ProposedDataTableColumn {
     label: string;
-    kind: 'primitive' | 'list' | 'derived';
-    expression: string;
-    inputs: { [alias: string]: string };
+    kind: 'primitive' | 'list' | 'computed';
+    // For computed columns: natural-language description of the computation.
+    spec: string;
+    // For computed columns: labels of the proposed columns the computation reads.
+    inputs: string[];
     // Where the papers ground this column, per the propose agent's investigation.
     evidence?: string;
 }
@@ -556,20 +559,36 @@ export interface DataTableRow {
     };
 }
 
-// Entry in a table's column plan. kind "derived" entries carry expression +
-// inputs (aliases -> column labels); kind "list" entries mark list columns.
-export interface DataTableDerivedColumn {
+// Entry in a table's column plan. kind "computed" entries carry a
+// natural-language spec + input column labels; legacy "derived"
+// entries carry a calculator expression + alias->column inputs; kind "list"
+// entries mark list columns.
+export interface DataTablePlanColumn {
     label: string;
-    kind?: 'derived' | 'list';
+    kind?: 'computed' | 'derived' | 'list';
+    spec?: string;
     expression?: string;
-    inputs?: { [alias: string]: string };
+    inputs?: string[] | { [alias: string]: string };
+}
+
+// Provenance of the compute agent's run: the exact table snapshot the script
+// ran against, the script, and its output — backs the "view code" panel.
+export interface ComputeProvenance {
+    version?: number;
+    specs?: { label: string; spec: string; inputs: string[] }[];
+    inputs_snapshot?: unknown;
+    script?: string;
+    stdout?: string;
+    warnings?: string[];
+    attempts?: number;
 }
 
 export interface DataTableResult {
     success: boolean;
     title: string;
     columns: string[];
-    column_plan?: DataTableDerivedColumn[];
+    column_plan?: DataTablePlanColumn[];
+    compute_provenance?: ComputeProvenance | null;
     rows: DataTableRow[];
     row_failures: string[] | null;
     created_at: string | null;

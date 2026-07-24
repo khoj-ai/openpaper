@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { Download, Table as TableIcon, Calculator, List, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { PaperItem, DataTableResult, Citation } from "@/lib/schema";
 import ReferencePaperCards from "@/components/ReferencePaperCards";
@@ -68,7 +68,7 @@ export default function DataTableGenerationView({
 
     const { columns, rows, title } = dataTableResult;
 
-    // label -> spec for calculator-computed columns, for header badges.
+    // label -> plan entry for legacy calculator columns (formula badges).
     const derivedColumns = useMemo(
         () => new Map(
             (dataTableResult.column_plan ?? [])
@@ -77,6 +77,17 @@ export default function DataTableGenerationView({
         ),
         [dataTableResult.column_plan]
     );
+    // label -> plan entry for compute-agent columns ("view code" badges).
+    const computedColumns = useMemo(
+        () => new Map(
+            (dataTableResult.column_plan ?? [])
+                .filter(spec => spec.kind === 'computed')
+                .map(spec => [spec.label, spec])
+        ),
+        [dataTableResult.column_plan]
+    );
+    const computeProvenance = dataTableResult.compute_provenance;
+    const [codeDialogOpen, setCodeDialogOpen] = useState(false);
     const listColumns = useMemo(
         () => new Set(
             (dataTableResult.column_plan ?? [])
@@ -86,12 +97,12 @@ export default function DataTableGenerationView({
         [dataTableResult.column_plan]
     );
 
-    // label -> aliases by which computed-column formulas refer to that column,
-    // mirroring the creation modal so `alias ← label` bindings stay legible in
-    // the final table.
+    // label -> aliases by which legacy calculator formulas refer to that
+    // column, so `alias ← label` bindings stay legible in the final table.
     const aliasesByLabel = useMemo(() => {
         const map = new Map<string, string[]>();
         (dataTableResult.column_plan ?? []).forEach(spec => {
+            if (spec.kind === 'computed' || Array.isArray(spec.inputs)) return;
             Object.entries(spec.inputs ?? {}).forEach(([alias, column]) => {
                 const aliases = map.get(column) ?? [];
                 if (!aliases.includes(alias)) aliases.push(alias);
@@ -161,8 +172,8 @@ export default function DataTableGenerationView({
         ];
 
         // Note computed columns below the data so exported tables don't
-        // present calculator output as extracted values.
-        if (derivedColumns.size > 0) {
+        // present computed output as extracted values.
+        if (derivedColumns.size > 0 || computedColumns.size > 0) {
             csvRows.push('');
             csvRows.push('"Computed columns (calculated from extracted values, not stated in papers):"');
             derivedColumns.forEach((spec) => {
@@ -170,6 +181,11 @@ export default function DataTableGenerationView({
                     .map(([alias, column]) => `${alias} = ${column}`)
                     .join('; ');
                 const note = `${spec.label} = ${spec.expression} (${inputs})`;
+                csvRows.push(`"${note.replace(/"/g, '""')}"`);
+            });
+            computedColumns.forEach((spec) => {
+                const inputs = Array.isArray(spec.inputs) ? spec.inputs.join('; ') : '';
+                const note = `${spec.label}: ${spec.spec ?? ''}${inputs ? ` (from: ${inputs})` : ''}`;
                 csvRows.push(`"${note.replace(/"/g, '""')}"`);
             });
         }
@@ -227,6 +243,7 @@ export default function DataTableGenerationView({
                                 </th>
                                 {columns.map((columnName) => {
                                     const derivedSpec = derivedColumns.get(columnName);
+                                    const computedSpec = computedColumns.get(columnName);
                                     return (
                                         <th key={columnName} className="text-left p-3 font-medium min-w-[200px]">
                                             <span className="inline-flex items-center gap-1.5">
@@ -263,12 +280,44 @@ export default function DataTableGenerationView({
                                                                 = {derivedSpec.expression}
                                                             </p>
                                                             <div className="space-y-1">
-                                                                {Object.entries(derivedSpec.inputs ?? {}).map(([alias, column]) => (
+                                                                {!Array.isArray(derivedSpec.inputs) && Object.entries(derivedSpec.inputs ?? {}).map(([alias, column]) => (
                                                                     <p key={alias} className="text-xs font-mono text-muted-foreground">
                                                                         {alias} ← {column}
                                                                     </p>
                                                                 ))}
                                                             </div>
+                                                        </HoverCardContent>
+                                                    </HoverCard>
+                                                )}
+                                                {computedSpec && (
+                                                    <HoverCard openDelay={100} closeDelay={150}>
+                                                        <HoverCardTrigger asChild>
+                                                            <button
+                                                                type="button"
+                                                                aria-label={`Computed column${computeProvenance?.script ? ' — view the code that produced it' : ''}`}
+                                                                onClick={() => computeProvenance?.script && setCodeDialogOpen(true)}
+                                                                className={`inline-flex items-center px-1 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 ${computeProvenance?.script ? 'cursor-pointer hover:bg-purple-200 dark:hover:bg-purple-900/60' : 'cursor-default'}`}
+                                                            >
+                                                                <Calculator className="h-3.5 w-3.5" />
+                                                            </button>
+                                                        </HoverCardTrigger>
+                                                        <HoverCardContent className="w-96 p-3 shadow-md bg-accent space-y-2">
+                                                            <p className="text-xs font-semibold text-accent-foreground uppercase tracking-wide">
+                                                                Computed column
+                                                            </p>
+                                                            <p className="text-sm text-accent-foreground">
+                                                                {computedSpec.spec}
+                                                            </p>
+                                                            {Array.isArray(computedSpec.inputs) && computedSpec.inputs.length > 0 && (
+                                                                <p className="text-xs text-muted-foreground">
+                                                                    from: {computedSpec.inputs.join(', ')}
+                                                                </p>
+                                                            )}
+                                                            {computeProvenance?.script && (
+                                                                <p className="text-xs text-muted-foreground">
+                                                                    Click the badge to view the code that produced these values.
+                                                                </p>
+                                                            )}
                                                         </HoverCardContent>
                                                     </HoverCard>
                                                 )}
@@ -442,6 +491,54 @@ export default function DataTableGenerationView({
                     </table>
                 </div>
             </div>
+
+            {/* Compute-agent provenance: the script that produced the computed
+                columns, with its output — the "shown work" for those values. */}
+            {computeProvenance?.script && (
+                <Dialog open={codeDialogOpen} onOpenChange={setCodeDialogOpen}>
+                    <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+                        <DialogHeader>
+                            <DialogTitle>How the computed columns were calculated</DialogTitle>
+                            <DialogDescription>
+                                This script ran in a sandbox against the extracted table values —
+                                only the columns listed as inputs. Its output filled the computed columns.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 text-sm">
+                            {(computeProvenance.specs ?? []).map((spec) => (
+                                <div key={spec.label} className="text-xs text-muted-foreground">
+                                    <span className="font-medium text-foreground">{spec.label}</span>
+                                    {' — '}{spec.spec}
+                                    {spec.inputs.length > 0 && <> (from: {spec.inputs.join(', ')})</>}
+                                </div>
+                            ))}
+                            <pre className="bg-muted/50 rounded-md p-3 text-xs overflow-x-auto whitespace-pre">
+                                {computeProvenance.script}
+                            </pre>
+                            {computeProvenance.stdout && (
+                                <div>
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+                                        Script output
+                                    </p>
+                                    <pre className="bg-muted/50 rounded-md p-3 text-xs overflow-x-auto whitespace-pre">
+                                        {computeProvenance.stdout}
+                                    </pre>
+                                </div>
+                            )}
+                            {(computeProvenance.warnings ?? []).length > 0 && (
+                                <div className="text-xs text-amber-700 dark:text-amber-300 space-y-1">
+                                    {(computeProvenance.warnings ?? []).map((warning, idx) => (
+                                        <p key={idx} className="flex gap-1.5">
+                                            <TriangleAlert className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                                            {warning}
+                                        </p>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
 
             {/* References Section */}
             {citations.length > 0 && (
