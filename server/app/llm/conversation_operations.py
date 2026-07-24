@@ -10,8 +10,10 @@ from app.llm.base import BaseLLMClient, ModelType
 from app.llm.prompts import (
     NAME_DATA_TABLE_SYSTEM_PROMPT,
     NAME_DATA_TABLE_USER_MESSAGE,
-    PROPOSE_DATA_TABLE_SCHEMA_SYSTEM_PROMPT,
-    PROPOSE_DATA_TABLE_SCHEMA_USER_MESSAGE,
+    PROPOSE_DATA_TABLE_INVESTIGATION_SYSTEM_PROMPT,
+    PROPOSE_DATA_TABLE_INVESTIGATION_USER_MESSAGE,
+    PROPOSE_DATA_TABLE_SCHEMA_FINAL_SYSTEM_PROMPT,
+    PROPOSE_DATA_TABLE_SCHEMA_FINAL_USER_MESSAGE,
     RENAME_CONVERSATION_SYSTEM_PROMPT,
     RENAME_CONVERSATION_USER_MESSAGE,
 )
@@ -35,34 +37,23 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 
-class ProposedColumnInput(BaseModel):
-    # Strict structured output (OpenAI/Cerebras) requires additionalProperties=false
-    # and all fields required — hence pair-list instead of dict, and no defaults.
-    model_config = ConfigDict(extra="forbid")
-
-    alias: str = Field(
-        description="Short snake_case identifier used in the expression, e.g. 'mean_t'"
-    )
-    column: str = Field(
-        description="Exact label of the primitive column this alias refers to"
-    )
-
-
 class ProposedColumn(BaseModel):
+    # Strict structured output (OpenAI/Cerebras) requires additionalProperties=false
+    # and all fields required — hence no defaults.
     model_config = ConfigDict(extra="forbid")
 
     label: str = Field(description="Column label")
     kind: str = Field(
-        description="'primitive' if the value is a single value stated in papers and extracted verbatim; 'list' if it is a collection of stated values (one entry per instance in the paper, e.g. one score per evaluated model); 'derived' if it must be computed from other columns"
+        description="'primitive' if the value is a single value stated in papers and extracted verbatim; 'list' if it is a collection of stated values (one entry per instance in the paper, e.g. one score per evaluated model); 'computed' if it must be computed from other columns"
     )
-    expression: str = Field(
-        description="For derived columns: arithmetic expression over the input aliases, e.g. 'cohens_d(mean_t, sd_t, n_t, mean_c, sd_c, n_c)' or '(a - b) / b * 100'. Empty string for primitive columns."
+    spec: str = Field(
+        description="For computed columns: a precise natural-language description of the computation over the input columns, e.g. 'Cohen's d between the treatment and control arms using their means, SDs, and sample sizes'. Empty string for other columns."
     )
-    inputs: list[ProposedColumnInput] = Field(
-        description="For derived columns: the aliases used in the expression, each mapped to a primitive column label. Empty list for primitive columns."
+    inputs: list[str] = Field(
+        description="For computed columns: the exact labels of the proposed columns the computation reads. Empty list for other columns."
     )
     evidence: str = Field(
-        description="Where the papers ground this column: which papers/tables/sections report it and roughly how widely. Empty string for derived columns (their grounding is their inputs)."
+        description="Where the papers ground this column: which papers/tables/sections report it and roughly how widely. Empty string for computed columns (their grounding is their inputs)."
     )
 
 
@@ -72,60 +63,6 @@ class DataTableSchemaProposal(BaseModel):
     columns: list[ProposedColumn] = Field(
         description="Proposed columns for the data table"
     )
-
-
-# Terminal tool for the propose agent: calling it IS submitting the proposal.
-# Hand-written JSON schema (not model_json_schema) because the Gemini function
-# converter rejects the strict additionalProperties pydantic emits.
-propose_columns_function = {
-    "name": "propose_columns",
-    "description": "Submit the final proposed columns for the data table. Call this exactly once, after investigating the papers enough to ground every column in what they actually report.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "columns": {
-                "type": "array",
-                "description": "The proposed columns, in display order",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "label": {
-                            "type": "string",
-                            "description": "Column label, concise and specific; include units in parentheses where appropriate; suffix list columns with '(list)'",
-                        },
-                        "kind": {
-                            "type": "string",
-                            "enum": ["primitive", "list", "derived"],
-                            "description": "primitive = single stated value extracted verbatim; list = one cited entry per instance in the paper; derived = computed from other columns by the calculator",
-                        },
-                        "expression": {
-                            "type": "string",
-                            "description": "Derived columns only: arithmetic expression over input aliases (whitelisted functions and + - * / ** operators). Empty string otherwise.",
-                        },
-                        "inputs": {
-                            "type": "array",
-                            "description": "Derived columns only: each alias used in the expression, mapped to a primitive or list column label. Empty otherwise.",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "alias": {"type": "string"},
-                                    "column": {"type": "string"},
-                                },
-                                "required": ["alias", "column"],
-                            },
-                        },
-                        "evidence": {
-                            "type": "string",
-                            "description": "Where the papers ground this column (papers/tables/sections that report it, and roughly how widely). 1-2 sentences. Refer to papers by their title, NEVER by their ID. Empty string for derived columns.",
-                        },
-                    },
-                    "required": ["label", "kind", "expression", "inputs", "evidence"],
-                },
-            }
-        },
-        "required": ["columns"],
-    },
-}
 
 
 class ConversationOperations(BaseLLMClient):
@@ -255,13 +192,16 @@ class DataTableOperations(BaseLLMClient):
         project_id: str,
     ) -> list[ProposedColumn] | None:
         """
-        Propose data table columns from a natural language description, by
-        letting an agent investigate the project's papers (search/read tools)
-        and then submit a grounded proposal via the propose_columns tool.
+        Propose data table columns from a natural language description, in two
+        phases with distinct responsibilities: an investigator agent gathers
+        grounding from the project's papers (search/read tools, closing with a
+        findings report), then a separate schema-constrained synthesis call —
+        the only place columns are authored — turns those findings into the
+        proposal.
 
-        The agent explores freely but the deliverable is fixed: the same
-        structured ProposedColumn contract, now with per-column evidence. It
-        proposes columns only — values always come from the extraction pass.
+        The deliverable is fixed either way: the structured ProposedColumn
+        contract with per-column evidence. This flow proposes columns only —
+        values always come from the extraction pass.
 
         Args:
             prompt: The user's description of what they want to extract or compare
@@ -281,7 +221,6 @@ class DataTableOperations(BaseLLMClient):
             search_all_files_function,
             search_file_function,
             view_file_function,
-            propose_columns_function,
         ]
         function_maps = {
             "read_abstract": read_abstract,
@@ -292,7 +231,7 @@ class DataTableOperations(BaseLLMClient):
 
         message_content = [
             TextContent(
-                text=PROPOSE_DATA_TABLE_SCHEMA_USER_MESSAGE.format(
+                text=PROPOSE_DATA_TABLE_INVESTIGATION_USER_MESSAGE.format(
                     paper_roster=paper_roster,
                     prompt=prompt,
                 )
@@ -302,11 +241,17 @@ class DataTableOperations(BaseLLMClient):
         tool_call_results: list[ToolCallResult] = []
         total_result_chars = 0
         seen_calls: set[str] = set()
+        # The investigator's closing prose report — its hand-off to the
+        # synthesis call, alongside the raw tool results.
+        investigation_report = ""
 
         for turn in range(self.PROPOSE_MAX_TURNS):
             response = self.generate_content(
                 contents=message_content,
-                system_prompt=PROPOSE_DATA_TABLE_SCHEMA_SYSTEM_PROMPT,
+                system_prompt=PROPOSE_DATA_TABLE_INVESTIGATION_SYSTEM_PROMPT.format(
+                    n_round=turn + 1,
+                    max_rounds=self.PROPOSE_MAX_TURNS,
+                ),
                 model_type=ModelType.FAST,
                 function_declarations=function_declarations,
                 tool_call_results=tool_call_results or None,
@@ -314,29 +259,9 @@ class DataTableOperations(BaseLLMClient):
             )
 
             if not response or not response.tool_calls:
-                # The agent answered in prose (or not at all) — force a
-                # structured proposal from what it has gathered so far.
-                logger.warning(
-                    "Propose agent returned no tool call; forcing final proposal."
-                )
-                break
-
-            proposal_call = next(
-                (c for c in response.tool_calls if c.name == "propose_columns"),
-                None,
-            )
-            if proposal_call:
-                try:
-                    proposal = DataTableSchemaProposal.model_validate(
-                        proposal_call.args
-                    )
-                    columns = self._sanitize_proposal(proposal.columns)
-                    if columns:
-                        return columns
-                except ValidationError:
-                    logger.warning(
-                        f"Invalid propose_columns args: {proposal_call.args}"
-                    )
+                # No more tool calls: the investigation is over, and any prose
+                # is the investigator's findings report.
+                investigation_report = (response.text or "").strip() if response else ""
                 break
 
             for call in response.tool_calls:
@@ -373,7 +298,7 @@ class DataTableOperations(BaseLLMClient):
                             name=call.name,
                             args=call.args,
                             thought_signature=call.thought_signature,
-                            result="Error: investigation budget exhausted — call propose_columns now with what you have",
+                            result="Error: investigation budget exhausted — stop calling tools and reply with your findings report",
                         )
                     )
                     continue
@@ -401,21 +326,31 @@ class DataTableOperations(BaseLLMClient):
                     )
                 )
 
-        # Turn budget exhausted or prose answer: one final structured call,
-        # grounded in whatever the investigation produced. Strict schema output;
-        # the gathered tool results ride along as context.
+        # Synthesis: the only place columns are authored. Strict schema output,
+        # grounded in the investigator's report plus the raw tool results.
         gathered = "\n\n".join(
             f"[{r.name}({r.args})]\n{r.result}" for r in tool_call_results
         )
-        final_prompt = (
-            message_content[0].text
-            + "\n\nFindings from your investigation of the papers:\n\n"
-            + (gathered or "(no investigation results)")
-            + "\n\nRespond only with the JSON proposal."
+        findings = "\n\n".join(
+            part
+            for part in (
+                (
+                    f"Investigator's report:\n{investigation_report}"
+                    if investigation_report
+                    else ""
+                ),
+                f"Raw tool results:\n\n{gathered}" if gathered else "",
+            )
+            if part
+        )
+        final_prompt = PROPOSE_DATA_TABLE_SCHEMA_FINAL_USER_MESSAGE.format(
+            paper_roster=paper_roster,
+            prompt=prompt,
+            findings=findings or "(no investigation results)",
         )
         response = self.generate_content(
             contents=[TextContent(text=final_prompt)],
-            system_prompt=PROPOSE_DATA_TABLE_SCHEMA_SYSTEM_PROMPT,
+            system_prompt=PROPOSE_DATA_TABLE_SCHEMA_FINAL_SYSTEM_PROMPT,
             model_type=ModelType.FAST,
             schema=DataTableSchemaProposal.model_json_schema(),
             provider=LLMProvider.GEMINI,
@@ -437,15 +372,15 @@ class DataTableOperations(BaseLLMClient):
 
     @staticmethod
     def _sanitize_proposal(columns: list[ProposedColumn]) -> list[ProposedColumn]:
-        """Drop empty labels and demote malformed derived columns.
+        """Drop empty labels and demote malformed computed columns.
 
-        A derived column is only usable if it has an expression and EVERY
-        input alias resolves to a proposed PRIMITIVE column (the create API
-        rejects derived-on-derived, so the same rule applies here); anything
-        else is demoted to primitive so the table still works.
+        A computed column is only usable if it has a spec and EVERY input
+        resolves to a proposed EXTRACTED column (the create API rejects
+        computed-on-computed, so the same rule applies here); anything else
+        is demoted to primitive so the table still works.
         """
-        primitive_labels = {
-            c.label.strip() for c in columns if c.label.strip() and c.kind != "derived"
+        extracted_labels = {
+            c.label.strip() for c in columns if c.label.strip() and c.kind != "computed"
         }
         sanitized: list[ProposedColumn] = []
 
@@ -456,36 +391,33 @@ class DataTableOperations(BaseLLMClient):
 
             kind = (
                 col.kind
-                if col.kind in ("primitive", "list", "derived")
+                if col.kind in ("primitive", "list", "computed")
                 else "primitive"
             )
-            expression = col.expression.strip()
-            inputs = [
-                ProposedColumnInput(alias=i.alias.strip(), column=i.column.strip())
-                for i in col.inputs
-            ]
+            spec = col.spec.strip()
+            inputs = [i.strip() for i in col.inputs if i.strip()]
 
-            if kind == "derived" and (
-                not expression
+            if kind == "computed" and (
+                not spec
                 or not inputs
-                # Any unresolvable input makes the whole expression
-                # uncomputable — demote rather than ship a dead column.
-                or any(not i.alias or i.column not in primitive_labels for i in inputs)
+                # Any unresolvable input makes the computation ungrounded —
+                # demote rather than ship a dead column.
+                or any(i not in extracted_labels for i in inputs)
             ):
                 logger.warning(
-                    f"Demoting malformed derived column proposal to primitive: {label}"
+                    f"Demoting malformed computed column proposal to primitive: {label}"
                 )
                 kind = "primitive"
 
-            if kind != "derived":
-                expression = ""
+            if kind != "computed":
+                spec = ""
                 inputs = []
 
             sanitized.append(
                 ProposedColumn(
                     label=label,
                     kind=kind,
-                    expression=expression,
+                    spec=spec,
                     inputs=inputs,
                     evidence=col.evidence.strip(),
                 )

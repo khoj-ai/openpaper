@@ -2,7 +2,9 @@
 End-to-end eval for the Data Table extraction flow.
 
 Characterizes what the live extraction pipeline does with columns that
-require arithmetic (derived columns). Seeds an eval user and
+require arithmetic (computed columns, produced by the compute agent
+from natural-language specs) and with gap cases where the paper does not
+report a value at all. Seeds an eval user and
 one project per manifest paper, then drives the REAL flow over HTTP:
 
     POST /api/projects/tables  ->  Celery (jobs worker)  ->  webhook  ->  result
@@ -207,7 +209,7 @@ class ApiClient:
         self,
         project_id: str,
         columns: list[str],
-        derived_columns: Optional[list[dict]] = None,
+        computed_columns: Optional[list[dict]] = None,
         list_columns: Optional[list[str]] = None,
     ) -> dict:
         resp = self.session.post(
@@ -215,7 +217,7 @@ class ApiClient:
             json={
                 "project_id": project_id,
                 "columns": columns,
-                "derived_columns": derived_columns or [],
+                "computed_columns": computed_columns or [],
                 "list_columns": list_columns or [],
             },
             timeout=60,
@@ -259,11 +261,11 @@ def run_extraction(
     project_id: str,
     columns: list[str],
     label: str,
-    derived_columns: Optional[list[dict]] = None,
+    computed_columns: Optional[list[dict]] = None,
     list_columns: Optional[list[str]] = None,
 ) -> dict:
     """Create one data table job and wait for its result."""
-    created = api.create_job(project_id, columns, derived_columns, list_columns)
+    created = api.create_job(project_id, columns, computed_columns, list_columns)
     job_id = created["id"]
     logger.info(f"[run] {label}: job {job_id} submitted")
 
@@ -389,8 +391,15 @@ def grade_list_cell(col_cfg: dict, cell: dict, paper_text_norm: str) -> dict:
     return graded
 
 
-def grade_cell(col_cfg: dict, cell: dict, paper_text_norm: str) -> dict:
-    """Grade one extracted cell against its golden config."""
+def grade_cell(
+    col_cfg: dict, cell: dict, paper_text_norm: str, has_provenance: bool = False
+) -> dict:
+    """Grade one extracted cell against its golden config.
+
+    `has_provenance` says whether the table carries a compute-agent provenance
+    record (script + snapshot) — computed cells show their work there, not in
+    a per-cell derivation block like the legacy calculator did.
+    """
     if col_cfg["kind"] == "list":
         return grade_list_cell(col_cfg, cell, paper_text_norm)
 
@@ -398,6 +407,7 @@ def grade_cell(col_cfg: dict, cell: dict, paper_text_norm: str) -> dict:
     citations = cell.get("citations", []) or []
     numeric = parse_numeric(value)
     expected = col_cfg.get("expected")
+    expect_na = bool(col_cfg.get("expect_na"))
     tolerance = col_cfg.get("tolerance", 0.05)
 
     derivation = cell.get("derivation")
@@ -407,17 +417,23 @@ def grade_cell(col_cfg: dict, cell: dict, paper_text_norm: str) -> dict:
         "value": value,
         "numeric": numeric,
         "expected": expected,
+        "expect_na": expect_na,
         "n_citations": len(citations),
         "citations_found": sum(
             1
             for c in citations
             if citation_in_paper(c.get("text", ""), paper_text_norm)
         ),
-        "has_derivation": bool(derivation),
+        "has_derivation": bool(derivation)
+        or (col_cfg["kind"] == "computed" and has_provenance),
         "derivation_warnings": (derivation or {}).get("warnings", []),
     }
 
-    if is_na(value):
+    if expect_na:
+        # Gap case: the paper does not report this value. Emptiness is the
+        # correct answer; any number here was fabricated or imputed.
+        graded["outcome"] = "correct_na" if is_na(value) else "fabricated"
+    elif is_na(value):
         graded["outcome"] = "na"
     elif numeric is None:
         graded["outcome"] = "non_numeric"
@@ -439,37 +455,50 @@ def grade_run(run_record: dict, manifest: dict, paper_texts: dict) -> dict:
 
     values = rows[0].get("values", {})
     paper_text_norm = paper_texts[paper_cfg["key"]]
+    provenance = run_record["result"].get("compute_provenance") or {}
+    has_provenance = bool(provenance.get("script"))
 
     graded_cells = []
     for col_cfg in paper_cfg["columns"]:
         cell = values.get(col_cfg["label"], {})
-        graded_cells.append(grade_cell(col_cfg, cell, paper_text_norm))
+        graded_cells.append(grade_cell(col_cfg, cell, paper_text_norm, has_provenance))
 
-    return {"cells": graded_cells}
+    return {
+        "cells": graded_cells,
+        "has_provenance": has_provenance,
+        "provenance_warnings": provenance.get("warnings", []),
+        "compute_attempts": provenance.get("attempts"),
+    }
 
 
 def summarize(results: dict, manifest: dict) -> dict:
-    """Aggregate graded runs into 'three worlds' classification."""
+    """Aggregate graded runs: extraction quality, compute-agent quality, and
+    the gap cases (does missingness stay missing, or get imputed?)."""
     primitives: list[dict] = []
-    derived: list[dict] = []
-    derived_by_column: dict[str, list[str]] = {}
+    computed: list[dict] = []
+    gaps: list[dict] = []
+    computed_by_column: dict[str, list[str]] = {}
 
     for run_record in results["runs"]:
         grading = run_record.get("grading", {})
         for cell in grading.get("cells", []):
+            if cell.get("expect_na"):
+                gaps.append(cell)
+                continue
             # List cells are extraction outputs — grade them with primitives.
-            if cell["kind"] != "derived":
+            # "derived" is the legacy calculator kind, kept for old results.
+            if cell["kind"] not in ("computed", "derived"):
                 primitives.append(cell)
             else:
-                derived.append(cell)
+                computed.append(cell)
                 col_key = f"{run_record['paper_key']}::{cell['label']}"
-                derived_by_column.setdefault(col_key, []).append(cell["outcome"])
+                computed_by_column.setdefault(col_key, []).append(cell["outcome"])
 
     def count(cells: list[dict], outcome: str) -> int:
         return sum(1 for c in cells if c["outcome"] == outcome)
 
     inconsistent_columns = [
-        col for col, outcomes in derived_by_column.items() if len(set(outcomes)) > 1
+        col for col, outcomes in computed_by_column.items() if len(set(outcomes)) > 1
     ]
 
     summary = {
@@ -485,43 +514,55 @@ def summarize(results: dict, manifest: dict) -> dict:
                 else None
             ),
         },
-        "derived": {
-            "total": len(derived),
-            "na": count(derived, "na"),
-            "computed_correct": count(derived, "correct_number"),
-            "computed_incorrect": count(derived, "incorrect_number"),
-            "non_numeric": count(derived, "non_numeric"),
-            "with_derivation": sum(1 for c in derived if c.get("has_derivation")),
+        "computed": {
+            "total": len(computed),
+            "na": count(computed, "na"),
+            "computed_correct": count(computed, "correct_number"),
+            "computed_incorrect": count(computed, "incorrect_number"),
+            "non_numeric": count(computed, "non_numeric"),
+            "with_provenance": sum(1 for c in computed if c.get("has_derivation")),
             "inconsistent_columns": inconsistent_columns,
+        },
+        "gaps": {
+            "total": len(gaps),
+            "correct_na": count(gaps, "correct_na"),
+            "fabricated": count(gaps, "fabricated"),
         },
     }
 
-    d = summary["derived"]
+    d = summary["computed"]
+    g = summary["gaps"]
     if d["total"] == 0:
         world = "no data"
-    elif d["with_derivation"] == d["total"]:
-        if d["computed_correct"] == d["total"]:
+    elif d["with_provenance"] == d["total"]:
+        if d["computed_correct"] == d["total"] and g["fabricated"] == 0:
             world = (
-                "Calculator: every derived cell was computed by the calculator "
-                "with a derivation block, and every value matches golden."
+                "Compute agent: every computed cell came from a provenance-backed "
+                "script, every value matches golden, and every gap stayed empty."
+            )
+        elif g["fabricated"] > 0:
+            world = (
+                f"Compute agent (GAP FAILURES): {g['fabricated']}/{g['total']} gap "
+                "cells got a number the paper never states — silent imputation is "
+                "the failure mode the gap cases exist to catch."
             )
         else:
             world = (
-                "Calculator (with issues): all derived cells carry derivations "
+                "Compute agent (with issues): all computed cells carry provenance "
                 f"but only {d['computed_correct']}/{d['total']} match golden — "
-                "inspect derivation warnings."
+                "read the persisted script and warnings."
             )
     elif inconsistent_columns:
         world = (
             "World 3: INCONSISTENT — same column, different outcomes across runs. "
-            "Strongest case for a deterministic calculator."
+            "Strongest case for deterministic, provenance-backed compute."
         )
     elif d["na"] == d["total"]:
         world = "World 1: model refuses (N/A) — feature gap real, no bad data shipped."
     else:
         world = (
-            "World 2: model computes derived values in-head — unflagged derived "
-            "numbers are shipping in customer tables."
+            "World 2: computed values shipped without provenance — check that the "
+            "compute agent ran (E2B key, agent errors in server logs)."
         )
     summary["world"] = world
     return summary
@@ -531,7 +572,7 @@ def print_summary(summary: dict) -> None:
     print("\n" + "=" * 70)
     print("DATA TABLE EXTRACTION EVAL — SUMMARY")
     print("=" * 70)
-    p, d = summary["primitives"], summary["derived"]
+    p, d, g = summary["primitives"], summary["computed"], summary["gaps"]
     print(f"Runs graded: {summary['n_runs']}")
     print(
         f"Primitive cells: {p['total']} | correct {p['correct']} | "
@@ -541,14 +582,19 @@ def print_summary(summary: dict) -> None:
         else "Primitive cells: none"
     )
     print(
-        f"Derived cells:   {d['total']} | N/A {d['na']} | "
+        f"Computed cells:  {d['total']} | N/A {d['na']} | "
         f"computed-correct {d['computed_correct']} | "
         f"computed-incorrect {d['computed_incorrect']} | "
         f"non-numeric {d['non_numeric']} | "
-        f"with-derivation {d['with_derivation']}"
+        f"with-provenance {d['with_provenance']}"
     )
+    if g["total"]:
+        print(
+            f"Gap cells:       {g['total']} | stayed-empty {g['correct_na']} | "
+            f"fabricated {g['fabricated']}"
+        )
     if d["inconsistent_columns"]:
-        print(f"Inconsistent derived columns: {', '.join(d['inconsistent_columns'])}")
+        print(f"Inconsistent computed columns: {', '.join(d['inconsistent_columns'])}")
     print(f"\n>>> {summary['world']}")
     print("=" * 70)
 
@@ -606,17 +652,17 @@ def main():
                     logger.info(f"[run] {key} run {run_idx}: already done, skipping")
                     continue
                 columns = [c["label"] for c in paper_cfg["columns"]]
-                # Derived columns with an expression run through the calculator;
-                # without one (the pre-existing manifest) they go to extraction,
-                # which is itself the measurement.
-                derived_columns = [
+                # Computed columns run through the compute agent:
+                # the spec travels as natural language, the agent writes and
+                # runs the script server-side.
+                computed_columns = [
                     {
                         "label": c["label"],
-                        "expression": c["expression"],
+                        "spec": c["spec"],
                         "inputs": c["inputs"],
                     }
                     for c in paper_cfg["columns"]
-                    if c["kind"] == "derived" and c.get("expression")
+                    if c["kind"] == "computed"
                 ]
                 list_columns = [
                     c["label"] for c in paper_cfg["columns"] if c["kind"] == "list"
@@ -628,7 +674,7 @@ def main():
                         project_id,
                         columns,
                         f"{key} run {run_idx}",
-                        derived_columns,
+                        computed_columns,
                         list_columns,
                     )
                 except Exception as e:

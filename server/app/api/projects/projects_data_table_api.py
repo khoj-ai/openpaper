@@ -15,7 +15,7 @@ from app.database.models import JobStatus
 from app.helpers.pdf_jobs import jobs_client
 from app.helpers.subscription_limits import can_user_create_data_table_job
 from app.llm.operations import operations
-from app.schemas.responses import DataTableSchema, DerivedColumnSpec, DocumentMapping
+from app.schemas.responses import ComputedColumnSpec, DataTableSchema, DocumentMapping
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
@@ -34,9 +34,10 @@ projects_data_table_router = APIRouter()
 class CreateDataTableRequest(BaseModel):
     project_id: str
     columns: List[str]
-    # Columns computed by the calculator from other columns. Labels must also
-    # appear in `columns`; anything referencing unknown columns is rejected.
-    derived_columns: List[DerivedColumnSpec] = []
+    # Columns computed by the sandboxed compute agent from other columns.
+    # Labels must also appear in `columns`; specs referencing
+    # unknown columns are rejected.
+    computed_columns: List[ComputedColumnSpec] = []
     # Columns whose value is a per-paper collection (one cited entry per
     # instance found) rather than a scalar. Subset of `columns`.
     list_columns: List[str] = []
@@ -95,8 +96,8 @@ def propose_data_table_schema(
                     {
                         "label": col.label,
                         "kind": col.kind,
-                        "expression": col.expression,
-                        "inputs": {i.alias: i.column for i in col.inputs},
+                        "spec": col.spec,
+                        "inputs": col.inputs,
                         "evidence": col.evidence,
                     }
                     for col in columns
@@ -129,9 +130,11 @@ async def create_data_table(
                 content={"message": error_message},
             )
 
-        # Derived columns may only reference primitive columns in this table.
+        # Computed columns may only read extracted (non-computed) columns in
+        # this table — that input binding is what keeps their provenance
+        # inspectable.
         column_set = set(request.columns)
-        derived_labels = {spec.label for spec in request.derived_columns}
+        computed_labels = {spec.label for spec in request.computed_columns}
         list_labels = {label for label in request.list_columns}
         if list_labels - column_set:
             return JSONResponse(
@@ -140,34 +143,34 @@ async def create_data_table(
                     "message": f"List columns not in columns: {', '.join(sorted(list_labels - column_set))}"
                 },
             )
-        if list_labels & derived_labels:
+        if list_labels & computed_labels:
             return JSONResponse(
                 status_code=400,
                 content={
-                    "message": f"Columns cannot be both list and derived: {', '.join(sorted(list_labels & derived_labels))}"
+                    "message": f"Columns cannot be both list and computed: {', '.join(sorted(list_labels & computed_labels))}"
                 },
             )
-        for spec in request.derived_columns:
+        for spec in request.computed_columns:
             if spec.label not in column_set:
                 return JSONResponse(
                     status_code=400,
                     content={
-                        "message": f"Derived column '{spec.label}' is not in columns"
+                        "message": f"Computed column '{spec.label}' is not in columns"
                     },
                 )
-            if not spec.expression.strip() or not spec.inputs:
+            if not spec.spec.strip() or not spec.inputs:
                 return JSONResponse(
                     status_code=400,
                     content={
-                        "message": f"Derived column '{spec.label}' needs an expression and at least one input"
+                        "message": f"Computed column '{spec.label}' needs a description and at least one input column"
                     },
                 )
-            for alias, input_column in spec.inputs.items():
-                if input_column not in column_set or input_column in derived_labels:
+            for input_column in spec.inputs:
+                if input_column not in column_set or input_column in computed_labels:
                     return JSONResponse(
                         status_code=400,
                         content={
-                            "message": f"Derived column '{spec.label}' input '{alias}' must reference a primitive column in this table"
+                            "message": f"Computed column '{spec.label}' input '{input_column}' must reference an extracted column in this table"
                         },
                     )
 
@@ -194,8 +197,8 @@ async def create_data_table(
                 columns=request.columns,
                 column_plan=(
                     [
-                        {**spec.model_dump(), "kind": "derived"}
-                        for spec in request.derived_columns
+                        {**spec.model_dump(), "kind": "computed"}
+                        for spec in request.computed_columns
                     ]
                     + [
                         {"label": label, "kind": "list"}
@@ -216,11 +219,11 @@ async def create_data_table(
 
         job_id = str(job.id)
 
-        # The jobs service only extracts primitives; derived columns are
-        # computed server-side from the job's column_plan when the webhook
-        # delivers the extracted dataset.
+        # The jobs service only extracts primitives; computed columns are
+        # produced server-side by the compute agent from the job's column_plan
+        # when the webhook delivers the extracted dataset.
         data_table = DataTableSchema(
-            columns=[c for c in request.columns if c not in derived_labels],
+            columns=[c for c in request.columns if c not in computed_labels],
             papers=papers,
             list_columns=request.list_columns,
         )

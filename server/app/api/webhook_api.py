@@ -37,7 +37,7 @@ from app.database.models import (
 )
 from app.database.telemetry import track_event
 from app.helpers.advisory_locks import AdvisoryLock, AdvisoryLockNamespace
-from app.helpers.calculator import compute_derived_cells
+from app.helpers.compute_agent import run_computed_columns
 from app.helpers.email import (
     send_data_table_complete_email,
     send_referral_credit_available_email,
@@ -48,8 +48,8 @@ from app.helpers.subscription_limits import can_user_auto_sync_zotero
 from app.llm.citation_handler import CitationHandler
 from app.llm.operations import operations
 from app.schemas.responses import (
+    ComputedColumnSpec,
     DataTableResult,
-    DerivedColumnSpec,
     PaperMetadataExtraction,
 )
 from app.schemas.user import CurrentUser
@@ -731,31 +731,45 @@ def handle_data_table_processing_webhook(
             # computed here from the job's stored column plan, so the persisted
             # table is complete and every derived cell carries its derivation.
             job = data_table_job_crud.get(db=db, id=uuid.UUID(job_id))
+            compute_provenance = None
             if job:
-                derived_specs = []
-                list_columns: set[str] = set()
+                computed_specs = []
                 for entry in job.column_plan or []:
                     # Entries are {label, kind, ...}: kind "list" marks a
-                    # list-valued primitive; "derived" (the default, for rows
-                    # written before kinds existed) carries expression+inputs.
+                    # list-valued primitive; "computed" carries spec+inputs
+                    # for the compute agent. Kind "derived" (the retired
+                    # calculator grammar) can only appear on jobs created
+                    # before the compute agent shipped — skip it, the rest of
+                    # the table still persists.
                     if entry.get("kind") == "list":
-                        if entry.get("label"):
-                            list_columns.add(entry["label"])
+                        continue
+                    if entry.get("kind") != "computed":
+                        logger.warning(
+                            f"Skipping unsupported column_plan entry on job {job_id}: {entry}"
+                        )
                         continue
                     try:
-                        derived_specs.append(DerivedColumnSpec.model_validate(entry))
+                        computed_specs.append(ComputedColumnSpec.model_validate(entry))
                     except ValidationError:
                         logger.warning(
                             f"Skipping invalid column_plan entry on job {job_id}: {entry}"
                         )
-                if derived_specs:
+                if computed_specs:
+                    paper_titles = {}
+                    for row in result.rows:
+                        paper = paper_crud.get(db=db, id=uuid.UUID(row.paper_id))
+                        paper_titles[row.paper_id] = (
+                            str(paper.title or "") if paper else ""
+                        )
                     try:
-                        compute_derived_cells(result.rows, derived_specs, list_columns)
-                    except Exception as calc_error:
-                        # A calculator failure must not lose the extracted
-                        # table — persist primitives; derived cells stay empty.
+                        compute_provenance = run_computed_columns(
+                            result.rows, computed_specs, paper_titles
+                        )
+                    except Exception as compute_error:
+                        # A compute-agent failure must not lose the extracted
+                        # table — persist primitives; computed cells stay empty.
                         logger.error(
-                            f"Derived-column computation failed for job {job_id}: {calc_error}",
+                            f"Computed-column agent failed for job {job_id}: {compute_error}",
                             exc_info=True,
                         )
                 # Restore the user's full ordered column list (extraction only
@@ -772,12 +786,6 @@ def handle_data_table_processing_webhook(
                     if cell_value:
                         for citation in cell_value.citations:
                             citation.paper_id = row.paper_id
-                        # Derived cells carry citations on their derivation
-                        # inputs instead of on the cell itself.
-                        if cell_value.derivation:
-                            for derivation_input in cell_value.derivation.inputs:
-                                for citation in derivation_input.citations:
-                                    citation.paper_id = row.paper_id
                         # List cells carry per-element citations.
                         for entry in cell_value.entries or []:
                             for citation in entry.citations:
@@ -808,6 +816,7 @@ def handle_data_table_processing_webhook(
                     success=result.success,
                     columns=result.columns,
                     row_failures=[uuid.UUID(pid) for pid in result.row_failures],
+                    compute_provenance=compute_provenance,
                 ),
             )
 

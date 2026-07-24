@@ -30,8 +30,9 @@ logger = logging.getLogger(__name__)
 class DataTableJobCreate(BaseModel):
     project_id: UUID
     columns: List[str]
-    # Derived-column specs ({label, expression, inputs}) for calculator-computed
-    # columns; empty for tables whose columns are all extracted.
+    # Non-extracted column entries (kind "computed" and "list" — see the
+    # model's comment for shapes); empty for tables whose columns are all
+    # extracted scalars.
     column_plan: List[Dict[str, Any]] = []
     task_id: Optional[str] = None
 
@@ -55,6 +56,9 @@ class DataTableResultCreate(BaseModel):
     success: bool
     columns: List[str]
     row_failures: List[UUID] = []
+    # Compute-agent provenance (inputs snapshot, script, stdout, warnings) for
+    # tables with computed columns; None otherwise.
+    compute_provenance: Optional[Dict[str, Any]] = None
 
 
 class DataTableResultUpdate(BaseModel):
@@ -395,6 +399,7 @@ class DataTableResultCRUD(
                 success=obj_in.success,
                 columns=obj_in.columns,
                 row_failures=obj_in.row_failures,
+                compute_provenance=obj_in.compute_provenance,
             )
             db.add(db_obj)
             db.commit()
@@ -475,9 +480,13 @@ class DataTableResultCRUD(
             "title": result.title,
             "success": result.success,
             "columns": result.columns,
-            # Derived-column specs ({label, expression, inputs}) so the UI can
-            # mark computed columns and show their formulae at the header level.
+            # Column plan entries so the UI can mark computed/list columns at
+            # the header level: kind "computed" ({label, spec, inputs}), legacy
+            # "derived" ({label, expression, inputs}), and "list" ({label}).
             "column_plan": (result.job.column_plan if result.job else None) or [],
+            # Compute-agent provenance backs the "view code" panel on computed
+            # columns: the exact inputs snapshot, script, stdout, and warnings.
+            "compute_provenance": result.compute_provenance,
             "row_failures": (
                 [str(pid) for pid in result.row_failures] if result.row_failures else []
             ),

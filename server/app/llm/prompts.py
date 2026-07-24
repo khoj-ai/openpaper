@@ -357,40 +357,62 @@ Columns being extracted: {column_labels}
 Title:
 """
 
-PROPOSE_DATA_TABLE_SCHEMA_SYSTEM_PROMPT = """
-You are an expert research assistant helping a user design a data table that extracts structured information from a collection of research papers. Given the user's description of what they want to compare or extract, investigate the papers and then propose a set of columns for the table.
-
-You have tools to investigate the papers before proposing. USE THEM — a column grounded in what the papers actually report beats a plausible-sounding guess:
-- Start broad: search_all_files with terms from the user's request (and synonyms) to see which papers report what, or read_abstract on a few representative papers to orient.
-- Go deep only where needed: search_file / view_file to check exactly how a candidate field is reported (its name, unit, whether it's one value per paper or one per model/arm/dataset, and whether several submetrics exist).
-- If the user's term is ambiguous (e.g. "score" when papers report several metrics per model), your investigation must resolve WHICH concrete field(s) to propose — propose precisely-named columns for the most relevant one(s), never a vague column.
-- Budget your investigation: you have a limited number of tool calls, so make each search count. When you have enough grounding, stop investigating.
-- When done, call propose_columns EXACTLY ONCE with the full proposal. Every column must include a 1-2 sentence evidence note saying where the papers ground it (which papers/tables/sections report it, and roughly how widely). Refer to papers by their title — never by their ID. Do not answer in prose.
-
+# Column-authoring rules for the final synthesis call — the only phase that
+# builds the schema. The investigation phase gets a condensed awareness of the
+# column model instead (it gathers grounding; it never authors columns).
+_PROPOSE_COLUMN_RULES = """
 Every column is one of:
 - "primitive" — a single value stated in the paper, extracted verbatim with a supporting quote.
 - "list" — a COLLECTION of stated values: one entry per instance in the paper (e.g. the score of each evaluated model, the sample size of each study arm). Each entry is KEYED: it carries the instance's label (the model name, dataset, condition...) alongside its value, extracted verbatim with its own quote. Hint list columns with "(list)" at the end of the label.
-- "derived" — a value that must be COMPUTED from other columns (effect sizes like Cohen's d, ratios, % change, differences, aggregates like medians or means over a list column). Papers may not state these; a calculator computes them from the primitive/list columns.
+- "computed" — a value that must be COMPUTED from other columns (effect sizes like Cohen's d, ratios, % change, differences, aggregates like medians or means over a list column, per-group summaries, chained computations). Papers may not state these; after extraction, a sandboxed script computes them from the primitive/list columns.
 
 Guidelines:
 - Propose 2-8 columns relevant to the user's request and the subject matter of the papers. You may propose fewer or more if appropriate.
 - Each column label should be concise (a few words) and specific enough to guide extraction. For example, prefer "Sample Size (n)" over "Size".
 - True/False or binary columns should be hinted with (boolean) in the label.
 - Include units in parentheses where appropriate (e.g., "Duration (days)").
-- If the user asks for a quantity that requires computation (e.g. "effect size", "% improvement", "ratio of X to Y"), propose it as a derived column AND propose each primitive column it needs. For example, "Cohen's d" needs mean, SD, and n for both arms — six primitive columns.
-- If the user asks for an AGGREGATE over things within a paper (median/average/max/count of scores, models, arms, datasets...), do NOT propose the aggregate as a primitive — papers rarely state it. Propose a list column of the underlying values plus a derived column applying the aggregate. Example: "median model score" becomes a list column of per-model scores and a derived column with expression "median(scores)" and inputs mapping "scores" to the list column.
-- A list column label must pin down exactly ONE value per instance. Papers often report several metrics per instance (accuracy, precision, latency...), and a generic label like "Score of each model (list)" is unanswerable — name the specific metric using the papers' own terminology from your investigation, e.g. "Factual accuracy of each model tested (list)". If the user's request doesn't say which metric and your investigation shows several candidates, prefer proposing separate list+aggregate pairs for the most relevant metric(s) with precise labels over one vague column.
+- If the user asks for a quantity that requires computation (e.g. "effect size", "% improvement", "ratio of X to Y"), propose it as a computed column AND propose each primitive column it needs. For example, "Cohen's d" needs mean, SD, and n for both arms — six primitive columns.
+- If the user asks for an AGGREGATE over things within a paper (median, average, max, count, spread/range, standard deviation, or any other summary of scores, models, arms, datasets...), do NOT propose the aggregate as a primitive — papers rarely state it. Propose a list column of the underlying values plus a computed column applying the aggregate. Example: "median model score" becomes a list column of per-model scores and a computed column whose spec is "the median of the per-model scores" with the list column as its input. Multi-step computations are fine in one computed column (e.g. "the average score per model across benchmarks, then the average of those per-model averages") — do not split a chain into intermediate computed columns unless the user wants the intermediates shown.
+- A list column label must pin down exactly ONE value per instance. Papers often report several metrics per instance (accuracy, precision, latency...), and a generic label like "Score of each model (list)" is unanswerable — name the specific metric using the papers' own terminology from the findings, e.g. "Factual accuracy of each model tested (list)". If the user's request doesn't say which metric and the findings show several candidates, prefer proposing separate list+aggregate pairs for the most relevant metric(s) with precise labels over one vague column.
 - List columns are INDEPENDENT of each other: their entries are extracted separately and do NOT align row-by-row. NEVER propose parallel list columns meant to be read together (e.g. "Metric name (list)" alongside "Metric value (list)", or instance names in one list and their scores in another) — the pairing will be meaningless, and it is redundant: every list entry already carries its instance's name as its key. A column listing only names/labels of instances is rarely needed either — propose the list of the VALUES you care about, keyed by instance, instead (a bare names list is fine only when the names themselves are the point, e.g. which models were tested, or a count of them). When a paper reports a matrix (several metrics for each of several instances), propose one list column per relevant metric, each pinned to that single metric.
-- For a derived column, set "expression" to an arithmetic expression over short snake_case aliases, using operators (+ - * / **) and these functions only: cohens_d(mean_1, sd_1, n_1, mean_2, sd_2, n_2), hedges_g(mean_1, sd_1, n_1, mean_2, sd_2, n_2), pct_change(new, old), ratio(a, b), ci95_low(estimate, se), ci95_high(estimate, se), log(x), log2(x), log10(x), sqrt(x), abs(x), round(x), and — over a list alias — median(xs), mean(xs), count(xs), sum(xs), min(xs), max(xs).
-- An alias bound to a list column may only be used inside those aggregate functions.
-- Each alias in the expression must appear in "inputs", mapped to the exact label of one of the proposed primitive or list columns.
-- For primitive and list columns, set "expression" to "" and "inputs" to [].
-- Never propose a derived column whose inputs are not themselves proposed as primitive or list columns.
-- Respond only with the JSON object matching the schema.
+- If a column's value is obtained by computing over other proposed columns (a difference, ratio, spread, average, count...), its kind MUST be "computed" — never propose it as primitive or list, and never describe a computation in the "evidence" field. The description of HOW it is computed belongs in "spec", and only computed columns have one.
+- For a computed column, set "spec" to a precise natural-language description of the computation — precise enough that a script could be written from it without guessing (name the operation, the inputs, and any grouping, e.g. "Cohen's d between the treatment and control arms from their means, SDs, and sample sizes" or "the average of the per-model scores"). Say what should happen when inputs are missing only if the user expressed a preference; otherwise missing inputs yield an empty cell.
+- Set "inputs" to the exact labels of the proposed primitive or list columns the computation reads. The script will only see those columns.
+- For primitive and list columns, set "spec" to "" and "inputs" to [].
+- Never propose a computed column whose inputs are not themselves proposed as primitive or list columns.
+- Every primitive and list column must include a 1-2 sentence evidence note saying where the papers ground it (which papers/tables/sections report it, and roughly how widely). Refer to papers by their title — never by their ID. Computed columns leave evidence empty (their grounding is their inputs).
 - The paper title and a link to the paper will automatically be provided for each row in the final output table, so do not propose columns for those.
 """
 
-PROPOSE_DATA_TABLE_SCHEMA_USER_MESSAGE = """
+PROPOSE_DATA_TABLE_INVESTIGATION_SYSTEM_PROMPT = """
+You are a research investigator gathering the grounding needed to design a data table over a collection of research papers. You do NOT design the table — you will hand off to another assistant that will author the final columns from your findings. Your only job is to investigate the papers and report what they actually contain.
+
+The schema that will be built from your findings can express three kinds of column, which tells you what information is worth gathering:
+- primitive: a single value stated in a paper (needs: the exact field name/terminology, its unit, and where it is reported).
+- list: one value per instance within a paper — per model, arm, dataset, condition (needs: what the instances are, how the paper labels them, which specific metric is reported per instance, and whether several submetrics exist).
+- computed: a quantity calculated from other columns after extraction — differences, ratios, aggregates, spreads (needs: whether the underlying inputs are actually reported, not whether the computed result is).
+
+Investigate with your tools — findings grounded in what the papers actually report beat plausible-sounding guesses:
+- Start broad: search_all_files with terms from the user's request (and synonyms) to see which papers report what, or read_abstract on a few representative papers to orient.
+- Go deep only where needed: search_file / view_file to check exactly how a candidate field is reported (its name, unit, whether it's one value per paper or one per model/arm/dataset, and whether several submetrics exist).
+- If the user's term is ambiguous (e.g. "score" when papers report several metrics per model), resolve WHICH concrete field(s) the papers report — record the papers' own terminology for the most relevant one(s), never leave it vague.
+- Budget your investigation: you are on round {n_round} of {max_rounds}, so make each search count. On the final round you MUST reply with your findings report instead of calling tools — there are no further rounds in which to see their results.
+
+When you have enough grounding, stop calling tools and reply with a concise findings report: for each candidate field, the papers' exact terminology, units, whether it is one value per paper or one per instance (and how instances are labeled), which papers/tables/sections report it (refer to papers by title, never by ID), and anything the user asked about that the papers do NOT report. Report findings only — do not propose columns.
+"""
+
+
+PROPOSE_DATA_TABLE_SCHEMA_FINAL_SYSTEM_PROMPT = (
+    """
+You are an expert research assistant finalizing the design of a data table that extracts structured information from a collection of research papers. The papers were already investigated; the user message carries the user's request and the findings from that investigation. Produce the final set of columns for the table.
+
+- Ground every column in the findings. If the findings are thin or empty, propose conservative columns that follow directly from the user's request and the paper titles, rather than guessing at specifics the papers may not report.
+- Respond only with the JSON object matching the schema — no prose.
+"""
+    + _PROPOSE_COLUMN_RULES
+)
+
+PROPOSE_DATA_TABLE_INVESTIGATION_USER_MESSAGE = """
 The user wants to build a data table over the following research papers:
 
 {paper_roster}
@@ -399,7 +421,23 @@ Their description of what they want to extract or compare:
 
 {prompt}
 
-Investigate the papers with your tools as needed, then call propose_columns exactly once with the final columns. Be sure to include units in parentheses where appropriate.
+Investigate the papers with your tools, then reply with your findings report.
+"""
+
+PROPOSE_DATA_TABLE_SCHEMA_FINAL_USER_MESSAGE = """
+The user wants to build a data table over the following research papers:
+
+{paper_roster}
+
+Their description of what they want to extract or compare:
+
+{prompt}
+
+Findings from the investigation of the papers:
+
+{findings}
+
+Respond only with the JSON proposal. Be sure to include units in parentheses where appropriate.
 """
 
 RENAME_CONVERSATION_USER_MESSAGE = """
