@@ -134,7 +134,7 @@ class ComputedColumnSpec(BaseModel):
 
 class DataTableSchema(BaseModel):
     """Extraction payload sent to the jobs service — primitive columns only;
-    derived columns never travel to the worker."""
+    computed columns never travel to the worker."""
 
     columns: List[str] = Field(description="List of column names in the data table.")
     papers: List[DocumentMapping] = Field(
