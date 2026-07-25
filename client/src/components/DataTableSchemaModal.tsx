@@ -24,11 +24,11 @@ import { ProposedDataTableColumn } from "@/lib/schema";
 export interface FieldDefinition {
     id: string;
     label: string;
-    kind: 'primitive' | 'list' | 'derived';
-    // For derived fields: the calculator expression over aliases, and the
-    // mapping of each alias to a primitive/list field label.
-    expression?: string;
-    inputs?: { [alias: string]: string };
+    kind: 'primitive' | 'list' | 'computed';
+    // For computed fields: the natural-language description of the computation
+    // and the labels of the extracted fields it reads.
+    spec?: string;
+    inputs?: string[];
     // Where the papers ground this field, per the propose agent's investigation.
     evidence?: string;
 }
@@ -101,8 +101,8 @@ export default function DataTableSchemaModal({
                 id: (index + 1).toString(),
                 label: column.label,
                 kind: column.kind,
-                expression: column.expression || undefined,
-                inputs: column.kind === 'derived' ? column.inputs : undefined,
+                spec: column.spec || undefined,
+                inputs: column.kind === 'computed' ? column.inputs : undefined,
                 evidence: column.evidence || undefined,
             })));
             setMode('augmented');
@@ -123,11 +123,11 @@ export default function DataTableSchemaModal({
         const removed = fields.find(field => field.id === id);
         const remaining = fields
             .filter(field => field.id !== id)
-            // Removing a primitive invalidates any computed field that
-            // reads from it — drop those too rather than run them broken.
+            // Removing a field invalidates any computed field that reads
+            // from it — drop those too rather than run them broken.
             .filter(field =>
-                !(removed && field.kind === 'derived' && field.inputs &&
-                    Object.values(field.inputs).includes(removed.label))
+                !(removed && field.kind === 'computed' &&
+                    field.inputs?.includes(removed.label))
             );
         // The cascade can empty the list; always leave something to edit.
         setFields(remaining.length > 0 ? remaining : [{ id: '1', label: '', kind: 'primitive' }]);
@@ -139,15 +139,13 @@ export default function DataTableSchemaModal({
             if (field.id === id) {
                 return { ...field, label: value };
             }
-            // Keep computed-field input mappings pointing at the renamed field.
+            // Keep computed-field inputs pointing at the renamed field.
             if (
-                previous && field.kind === 'derived' && field.inputs &&
-                Object.values(field.inputs).includes(previous.label)
+                previous && field.kind === 'computed' &&
+                field.inputs?.includes(previous.label)
             ) {
-                const inputs = Object.fromEntries(
-                    Object.entries(field.inputs).map(([alias, column]) =>
-                        [alias, column === previous.label ? value : column]
-                    )
+                const inputs = field.inputs.map(column =>
+                    column === previous.label ? value : column
                 );
                 return { ...field, inputs };
             }
@@ -158,15 +156,15 @@ export default function DataTableSchemaModal({
     const handleSubmit = () => {
         const labeled = fields.filter(field => field.label.trim() !== '');
         // A computed field is only submittable if every input still resolves
-        // to a primitive field in the final set (labels can have been cleared
+        // to an extracted field in the final set (labels can have been cleared
         // or edited out from under it).
-        const primitiveLabels = new Set(
-            labeled.filter(f => f.kind !== 'derived').map(f => f.label)
+        const extractedLabels = new Set(
+            labeled.filter(f => f.kind !== 'computed').map(f => f.label)
         );
         const validFields = labeled.filter(field =>
-            field.kind !== 'derived' ||
-            (field.expression && field.inputs &&
-                Object.values(field.inputs).every(column => primitiveLabels.has(column)))
+            field.kind !== 'computed' ||
+            (field.spec && field.inputs && field.inputs.length > 0 &&
+                field.inputs.every(column => extractedLabels.has(column)))
         );
         if (validFields.length === 0) {
             return;
@@ -178,17 +176,16 @@ export default function DataTableSchemaModal({
     const canSubmit = fields.some(field => field.label.trim() !== '');
     const showFields = mode !== 'prompt';
 
-    // label -> aliases by which computed-field formulas refer to that field,
-    // so the `alias ← label` bindings shown under formulas have a visible
-    // landing spot on the referenced field itself.
-    const aliasesByLabel = useMemo(() => {
+    // label -> computed-field labels that read it, so a field being fed into
+    // a computation has a visible marker on the field itself.
+    const readByLabel = useMemo(() => {
         const map = new Map<string, string[]>();
         fields.forEach(field => {
-            if (field.kind === 'derived' && field.inputs) {
-                Object.entries(field.inputs).forEach(([alias, column]) => {
-                    const aliases = map.get(column) ?? [];
-                    if (!aliases.includes(alias)) aliases.push(alias);
-                    map.set(column, aliases);
+            if (field.kind === 'computed' && field.inputs) {
+                field.inputs.forEach(column => {
+                    const readers = map.get(column) ?? [];
+                    if (!readers.includes(field.label)) readers.push(field.label);
+                    map.set(column, readers);
                 });
             }
         });
@@ -282,7 +279,7 @@ export default function DataTableSchemaModal({
                                                     <div className="flex-1">
                                                         <Label htmlFor={`label-${field.id}`} className="text-sm font-medium flex items-center gap-2">
                                                             Field {index + 1}
-                                                            {field.kind === 'derived' && (
+                                                            {field.kind === 'computed' && (
                                                                 <Badge className="gap-1 px-1.5 py-0.5 text-[10px] shrink-0 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/30">
                                                                     <Calculator className="h-3 w-3" />
                                                                     computed
@@ -294,15 +291,14 @@ export default function DataTableSchemaModal({
                                                                     list
                                                                 </Badge>
                                                             )}
-                                                            {(aliasesByLabel.get(field.label) ?? []).map(alias => (
-                                                                <code
-                                                                    key={alias}
-                                                                    title={`Computed field formulas refer to this field as '${alias}'`}
-                                                                    className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono text-muted-foreground shrink-0"
+                                                            {(readByLabel.get(field.label) ?? []).length > 0 && (
+                                                                <span
+                                                                    title={`Read by computed field(s): ${(readByLabel.get(field.label) ?? []).join(', ')}`}
+                                                                    className="px-1 py-0.5 rounded bg-muted text-[10px] text-muted-foreground shrink-0"
                                                                 >
-                                                                    {alias}
-                                                                </code>
-                                                            ))}
+                                                                    input
+                                                                </span>
+                                                            )}
                                                             {field.evidence && (
                                                                 <HoverCard openDelay={100} closeDelay={100}>
                                                                     <HoverCardTrigger asChild>
@@ -341,14 +337,14 @@ export default function DataTableSchemaModal({
                                                         </Button>
                                                     )}
                                                 </div>
-                                                {field.kind === 'derived' && field.expression && (
-                                                    <div className="text-xs text-muted-foreground font-mono bg-muted/50 rounded px-2 py-1">
-                                                        = {field.expression}
-                                                        {field.inputs && Object.entries(field.inputs).map(([alias, column]) => (
-                                                            <div key={alias} className="pl-3 text-[11px]">
-                                                                {alias} ← {column}
+                                                {field.kind === 'computed' && field.spec && (
+                                                    <div className="text-xs text-muted-foreground bg-muted/50 rounded px-2 py-1">
+                                                        {field.spec}
+                                                        {field.inputs && field.inputs.length > 0 && (
+                                                            <div className="pl-3 text-[11px]">
+                                                                reads: {field.inputs.join(', ')}
                                                             </div>
-                                                        ))}
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>

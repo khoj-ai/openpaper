@@ -114,22 +114,27 @@ class DocumentMapping(BaseModel):
     id: str
 
 
-class DerivedColumnSpec(BaseModel):
-    """A column computed by the calculator from other (primitive) columns,
-    never by the extraction model. Mirrors jobs/src/schemas.py."""
+class ComputedColumnSpec(BaseModel):
+    """A column computed by the sandboxed compute agent from other (extracted)
+    columns, never by the extraction model.
 
-    label: str = Field(description="Display label of the derived column")
-    expression: str = Field(
-        description="Arithmetic expression over input aliases, e.g. 'cohens_d(mean_t, sd_t, n_t, mean_c, sd_c, n_c)'"
+    `spec` is a natural-language description of the computation; the agent
+    turns it into a script. `inputs` names the columns the script may read —
+    the script receives only those, which is what keeps the provenance of a
+    computed value inspectable."""
+
+    label: str = Field(description="Display label of the computed column")
+    spec: str = Field(
+        description="Natural-language description of the computation, e.g. 'the average of the per-model scores, then averaged across models'"
     )
-    inputs: dict[str, str] = Field(
-        description="Mapping of expression alias -> primitive column label"
+    inputs: list[str] = Field(
+        description="Labels of the extracted columns the computation reads"
     )
 
 
 class DataTableSchema(BaseModel):
     """Extraction payload sent to the jobs service — primitive columns only;
-    derived columns never travel to the worker."""
+    computed columns never travel to the worker."""
 
     columns: List[str] = Field(description="List of column names in the data table.")
     papers: List[DocumentMapping] = Field(
@@ -150,7 +155,9 @@ class CellEntry(BaseModel):
 
 
 class DerivationInput(BaseModel):
-    """One input to a derived cell, carrying the citations of the primitive it came from."""
+    """One input to a legacy CellDerivation, carrying the citations of the
+    primitive it came from. Only appears in stored rows written by the
+    retired expression calculator."""
 
     alias: str
     column: str
@@ -159,7 +166,9 @@ class DerivationInput(BaseModel):
 
 
 class CellDerivation(BaseModel):
-    """The shown work for a calculator-computed cell."""
+    """The shown work for a cell computed by the retired expression
+    calculator. Never produced anymore; kept because stored rows from those
+    tables carry this shape and the UI still renders it."""
 
     expression: str
     inputs: List[DerivationInput] = []
@@ -176,7 +185,7 @@ class DataTableCellValue(BaseModel):
     )
     derivation: Optional[CellDerivation] = Field(
         default=None,
-        description="Present only on calculator-computed cells.",
+        description="Legacy: present only on cells of tables computed by the retired expression calculator.",
     )
     entries: Optional[List[CellEntry]] = Field(
         default=None,

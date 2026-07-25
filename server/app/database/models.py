@@ -1115,8 +1115,13 @@ class DataTableExtractionJob(Base):
     )
 
     columns = Column(ARRAY(String), nullable=True)  # Columns to extract
-    # Derived-column specs ({label, expression, inputs}) computed by the
-    # calculator rather than extracted; subset of `columns` by label.
+    # Non-extracted column entries, subset of `columns` by label:
+    #   {"label", "kind": "computed", "spec", "inputs": [column labels]}
+    #     — produced by the compute agent after extraction
+    #   {"label", "kind": "list"} — list-valued extraction column
+    # (The retired expression calculator's {"kind": "derived", "expression",
+    # "inputs": {alias: label}} shape was rewritten to "computed" by
+    # app/scripts/migrate_derived_columns_to_computed.)
     column_plan = Column(JSONB, nullable=True)
 
     task_id = Column(String, nullable=True)  # For tracking task in Celery
@@ -1160,6 +1165,22 @@ class DataTableExtractionResult(Base):
     row_failures = Column(
         ARRAY(UUID(as_uuid=True)), nullable=True, default=[]
     )  # List of paper IDs that failed
+    # Compute-agent provenance for computed columns — everything needed to
+    # review or re-run the computation without re-extraction:
+    #   {
+    #     "version": 1,
+    #     "specs": [{"label", "spec", "inputs": [column labels]}],
+    #     "inputs_snapshot": {"rows": [{"paper_id", "paper_title",
+    #         "cells": {column: {"value", "entries"?: [{"key", "value"}]}}}]},
+    #         # the exact JSON the script read — input columns only, no citations
+    #     "script": "...",   # final Python source that ran in the sandbox
+    #     "stdout": "...",   # its captured output, shown in the "view code" UI
+    #     "warnings": [...], # script-reported + server-side (e.g. unknown ids)
+    #     "attempts": 1,     # generation attempts incl. error-repair rounds
+    #   }
+    # Null for tables without computed columns (and old calculator tables,
+    # whose derivations live on the cells).
+    compute_provenance = Column(JSONB, nullable=True)
 
     job = relationship("DataTableExtractionJob", back_populates="result")
     rows = relationship(
