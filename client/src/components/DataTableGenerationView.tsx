@@ -4,6 +4,12 @@ import { useState, useMemo } from "react";
 import { Download, Table as TableIcon, Calculator, List, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useIsDarkMode } from "@/hooks/useDarkMode";
+import { PrismLight as SyntaxHighlighter } from "react-syntax-highlighter";
+import python from "react-syntax-highlighter/dist/esm/languages/prism/python";
+import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
+
+SyntaxHighlighter.registerLanguage("python", python);
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { PaperItem, DataTableResult, Citation } from "@/lib/schema";
 import ReferencePaperCards from "@/components/ReferencePaperCards";
@@ -65,6 +71,7 @@ export default function DataTableGenerationView({
     projectId,
 }: DataTableGenerationViewProps) {
     const [highlightedPaper, setHighlightedPaper] = useState<string | null>(null);
+    const { darkMode } = useIsDarkMode();
 
     const { columns, rows, title } = dataTableResult;
 
@@ -496,7 +503,7 @@ export default function DataTableGenerationView({
                 columns, with its output — the "shown work" for those values. */}
             {computeProvenance?.script && (
                 <Dialog open={codeDialogOpen} onOpenChange={setCodeDialogOpen}>
-                    <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+                    <DialogContent className="sm:max-w-[min(64rem,95vw)] max-h-[85vh] overflow-y-auto">
                         <DialogHeader>
                             <DialogTitle>How the computed columns were calculated</DialogTitle>
                             <DialogDescription>
@@ -512,15 +519,24 @@ export default function DataTableGenerationView({
                                     {spec.inputs.length > 0 && <> (from: {spec.inputs.join(', ')})</>}
                                 </div>
                             ))}
-                            <pre className="bg-muted/50 rounded-md p-3 text-xs overflow-x-auto whitespace-pre">
+                            <SyntaxHighlighter
+                                language="python"
+                                style={darkMode ? oneDark : oneLight}
+                                wrapLongLines
+                                customStyle={{
+                                    margin: 0,
+                                    borderRadius: '0.375rem',
+                                    fontSize: '0.75rem',
+                                }}
+                            >
                                 {computeProvenance.script}
-                            </pre>
+                            </SyntaxHighlighter>
                             {computeProvenance.stdout && (
                                 <div>
                                     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">
                                         Script output
                                     </p>
-                                    <pre className="bg-muted/50 rounded-md p-3 text-xs overflow-x-auto whitespace-pre">
+                                    <pre className="bg-muted/50 rounded-md p-3 text-xs whitespace-pre-wrap break-words">
                                         {computeProvenance.stdout}
                                     </pre>
                                 </div>
