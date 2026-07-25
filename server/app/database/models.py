@@ -1115,13 +1115,11 @@ class DataTableExtractionJob(Base):
     )
 
     columns = Column(ARRAY(String), nullable=True)  # Columns to extract
-    # Non-extracted column entries, subset of `columns` by label:
+    # Sparse subset of `columns` by label — only columns needing special
+    # handling get an entry; plain primitive columns appear in `columns` alone:
     #   {"label", "kind": "computed", "spec", "inputs": [column labels]}
     #     — produced by the compute agent after extraction
     #   {"label", "kind": "list"} — list-valued extraction column
-    # (The retired expression calculator's {"kind": "derived", "expression",
-    # "inputs": {alias: label}} shape was rewritten to "computed" by
-    # app/scripts/migrate_derived_columns_to_computed.)
     column_plan = Column(JSONB, nullable=True)
 
     task_id = Column(String, nullable=True)  # For tracking task in Celery
@@ -1178,8 +1176,7 @@ class DataTableExtractionResult(Base):
     #     "warnings": [...], # script-reported + server-side (e.g. unknown ids)
     #     "attempts": 1,     # generation attempts incl. error-repair rounds
     #   }
-    # Null for tables without computed columns (and old calculator tables,
-    # whose derivations live on the cells).
+    # Null for tables without computed columns.
     compute_provenance = Column(JSONB, nullable=True)
 
     job = relationship("DataTableExtractionJob", back_populates="result")

@@ -507,23 +507,6 @@ export interface DataTableJobStatusResponse extends JobStatusResponse {
     celery_error: string | null;
 }
 
-export interface DerivationInput {
-    alias: string;
-    column: string;
-    value: string;
-    citations: ReferenceCitation[];
-}
-
-// Legacy: shown work for a cell computed by the retired expression
-// calculator — the expression, each input with its citations, and any
-// warnings. Never produced anymore, but stored rows from those tables carry
-// it and still render.
-export interface CellDerivation {
-    expression: string;
-    inputs: DerivationInput[];
-    warnings: string[];
-}
-
 // One element of a list-valued cell, individually cited.
 export interface CellEntry {
     value: string;
@@ -534,8 +517,6 @@ export interface CellEntry {
 export interface DataTableCellValue {
     value: string;
     citations: ReferenceCitation[];
-    // Legacy: only on stored cells written by the retired expression calculator.
-    derivation?: CellDerivation | null;
     // Present only on list-valued cells; `value` holds the joined display form.
     entries?: CellEntry[] | null;
 }
@@ -564,15 +545,12 @@ export interface DataTableRow {
 
 // Entry in a table's column plan. kind "computed" entries carry a
 // natural-language spec + input column labels; kind "list" entries mark list
-// columns. The "derived"/expression leg is the retired expression
-// calculator's shape — stored plans were migrated to "computed", so it only
-// exists as a defensive fallback for unmigrated databases.
+// columns.
 export interface DataTablePlanColumn {
     label: string;
-    kind?: 'computed' | 'derived' | 'list';
+    kind?: 'computed' | 'list';
     spec?: string;
-    expression?: string;
-    inputs?: string[] | { [alias: string]: string };
+    inputs?: string[];
 }
 
 // Provenance of the compute agent's run: the exact table snapshot the script

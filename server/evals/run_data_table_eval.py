@@ -379,8 +379,7 @@ def grade_list_cell(col_cfg: dict, cell: dict, paper_text_norm: str) -> dict:
             for c in entry_citations
             if citation_in_paper(c.get("text", ""), paper_text_norm)
         ),
-        "has_derivation": False,
-        "derivation_warnings": [],
+        "has_provenance": False,
     }
     if not numerics:
         graded["outcome"] = "na"
@@ -397,8 +396,8 @@ def grade_cell(
     """Grade one extracted cell against its golden config.
 
     `has_provenance` says whether the table carries a compute-agent provenance
-    record (script + snapshot) — computed cells show their work there, not in
-    a per-cell derivation block like the legacy calculator did.
+    record (script + snapshot) — that record is where computed cells show
+    their work.
     """
     if col_cfg["kind"] == "list":
         return grade_list_cell(col_cfg, cell, paper_text_norm)
@@ -410,7 +409,6 @@ def grade_cell(
     expect_na = bool(col_cfg.get("expect_na"))
     tolerance = col_cfg.get("tolerance", 0.05)
 
-    derivation = cell.get("derivation")
     graded: dict[str, Any] = {
         "label": col_cfg["label"],
         "kind": col_cfg["kind"],
@@ -424,9 +422,7 @@ def grade_cell(
             for c in citations
             if citation_in_paper(c.get("text", ""), paper_text_norm)
         ),
-        "has_derivation": bool(derivation)
-        or (col_cfg["kind"] == "computed" and has_provenance),
-        "derivation_warnings": (derivation or {}).get("warnings", []),
+        "has_provenance": col_cfg["kind"] == "computed" and has_provenance,
     }
 
     if expect_na:
@@ -486,8 +482,7 @@ def summarize(results: dict, manifest: dict) -> dict:
                 gaps.append(cell)
                 continue
             # List cells are extraction outputs — grade them with primitives.
-            # "derived" is the legacy calculator kind, kept for old results.
-            if cell["kind"] not in ("computed", "derived"):
+            if cell["kind"] != "computed":
                 primitives.append(cell)
             else:
                 computed.append(cell)
@@ -520,7 +515,7 @@ def summarize(results: dict, manifest: dict) -> dict:
             "computed_correct": count(computed, "correct_number"),
             "computed_incorrect": count(computed, "incorrect_number"),
             "non_numeric": count(computed, "non_numeric"),
-            "with_provenance": sum(1 for c in computed if c.get("has_derivation")),
+            "with_provenance": sum(1 for c in computed if c.get("has_provenance")),
             "inconsistent_columns": inconsistent_columns,
         },
         "gaps": {

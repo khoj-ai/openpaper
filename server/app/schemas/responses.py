@@ -154,27 +154,6 @@ class CellEntry(BaseModel):
     citations: List[ResponseCitation] = []
 
 
-class DerivationInput(BaseModel):
-    """One input to a legacy CellDerivation, carrying the citations of the
-    primitive it came from. Only appears in stored rows written by the
-    retired expression calculator."""
-
-    alias: str
-    column: str
-    value: str
-    citations: List[ResponseCitation] = []
-
-
-class CellDerivation(BaseModel):
-    """The shown work for a cell computed by the retired expression
-    calculator. Never produced anymore; kept because stored rows from those
-    tables carry this shape and the UI still renders it."""
-
-    expression: str
-    inputs: List[DerivationInput] = []
-    warnings: List[str] = []
-
-
 class DataTableCellValue(BaseModel):
     """Value for a single cell in the data table with supporting citations."""
 
@@ -182,10 +161,6 @@ class DataTableCellValue(BaseModel):
     citations: List[ResponseCitation] = Field(
         default=[],
         description="List of citations that support this specific value. These should be direct quotes or paraphrases from the paper.",
-    )
-    derivation: Optional[CellDerivation] = Field(
-        default=None,
-        description="Legacy: present only on cells of tables computed by the retired expression calculator.",
     )
     entries: Optional[List[CellEntry]] = Field(
         default=None,

@@ -16,15 +16,13 @@ Two walls keep this auditable:
   inputs, so "what did this number come from" has a bounded answer even
   though the code is free-form.
 
-Provenance is the trust mechanism (replacing the legacy calculator's
-expression whitelist): the exact snapshot, the final script, and its stdout are
-persisted with the table, so every computed value is reproducible and the
-program that made it is reviewable in the UI.
+Provenance is the trust mechanism: the exact snapshot, the final script, and
+its stdout are persisted with the table, so every computed value is
+reproducible and the program that made it is reviewable in the UI.
 
-Unlike the legacy calculator there is NO local execution path: the script is
-model-authored code and only ever runs inside the sandbox. If E2B is
-unavailable the computed columns fail (the extracted table persists without
-them) — they never run on the server.
+There is NO local execution path: the script is model-authored code and only
+ever runs inside the sandbox. If E2B is unavailable the computed columns fail
+(the extracted table persists without them) — they never run on the server.
 """
 
 import json

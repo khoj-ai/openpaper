@@ -75,17 +75,6 @@ export default function DataTableGenerationView({
 
     const { columns, rows, title } = dataTableResult;
 
-    // label -> plan entry for the retired expression calculator's columns
-    // (formula badges). Stored plans were migrated to "computed", so this is
-    // only non-empty against an unmigrated database.
-    const derivedColumns = useMemo(
-        () => new Map(
-            (dataTableResult.column_plan ?? [])
-                .filter(spec => spec.expression)
-                .map(spec => [spec.label, spec])
-        ),
-        [dataTableResult.column_plan]
-    );
     // label -> plan entry for compute-agent columns ("view code" badges).
     const computedColumns = useMemo(
         () => new Map(
@@ -105,22 +94,6 @@ export default function DataTableGenerationView({
         ),
         [dataTableResult.column_plan]
     );
-
-    // label -> aliases by which retired-calculator formulas refer to that
-    // column, so `alias ← label` bindings stay legible when an unmigrated
-    // plan renders.
-    const aliasesByLabel = useMemo(() => {
-        const map = new Map<string, string[]>();
-        (dataTableResult.column_plan ?? []).forEach(spec => {
-            if (spec.kind === 'computed' || Array.isArray(spec.inputs)) return;
-            Object.entries(spec.inputs ?? {}).forEach(([alias, column]) => {
-                const aliases = map.get(column) ?? [];
-                if (!aliases.includes(alias)) aliases.push(alias);
-                map.set(column, aliases);
-            });
-        });
-        return map;
-    }, [dataTableResult.column_plan]);
 
     // Create a map of paper_id to paper for quick lookup
     const paperMap = new Map(papers.map(paper => [paper.id, paper]));
@@ -178,18 +151,11 @@ export default function DataTableGenerationView({
 
         // Note computed columns below the data so exported tables don't
         // present computed output as extracted values.
-        if (derivedColumns.size > 0 || computedColumns.size > 0) {
+        if (computedColumns.size > 0) {
             csvRows.push('');
             csvRows.push('"Computed columns (calculated from extracted values, not stated in papers):"');
-            derivedColumns.forEach((spec) => {
-                const inputs = Object.entries(spec.inputs ?? {})
-                    .map(([alias, column]) => `${alias} = ${column}`)
-                    .join('; ');
-                const note = `${spec.label} = ${spec.expression} (${inputs})`;
-                csvRows.push(`"${note.replace(/"/g, '""')}"`);
-            });
             computedColumns.forEach((spec) => {
-                const inputs = Array.isArray(spec.inputs) ? spec.inputs.join('; ') : '';
+                const inputs = (spec.inputs ?? []).join('; ');
                 const note = `${spec.label}: ${spec.spec ?? ''}${inputs ? ` (from: ${inputs})` : ''}`;
                 csvRows.push(`"${note.replace(/"/g, '""')}"`);
             });
@@ -247,7 +213,6 @@ export default function DataTableGenerationView({
                                     Paper
                                 </th>
                                 {columns.map((columnName) => {
-                                    const derivedSpec = derivedColumns.get(columnName);
                                     const computedSpec = computedColumns.get(columnName);
                                     return (
                                         <th key={columnName} className="text-left p-3 font-medium min-w-[200px]">
@@ -260,39 +225,6 @@ export default function DataTableGenerationView({
                                                     >
                                                         <List className="h-3.5 w-3.5" />
                                                     </span>
-                                                )}
-                                                {(aliasesByLabel.get(columnName) ?? []).map(alias => (
-                                                    <code
-                                                        key={alias}
-                                                        title={`Computed column formulas refer to this column as '${alias}'`}
-                                                        className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono font-normal text-muted-foreground shrink-0"
-                                                    >
-                                                        {alias}
-                                                    </code>
-                                                ))}
-                                                {derivedSpec && (
-                                                    <HoverCard openDelay={100} closeDelay={150}>
-                                                        <HoverCardTrigger asChild>
-                                                            <span className="inline-flex items-center px-1 py-0.5 rounded cursor-default bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
-                                                                <Calculator className="h-3.5 w-3.5" />
-                                                            </span>
-                                                        </HoverCardTrigger>
-                                                        <HoverCardContent className="w-96 p-3 shadow-md bg-accent space-y-2">
-                                                            <p className="text-xs font-semibold text-accent-foreground uppercase tracking-wide">
-                                                                Computed column
-                                                            </p>
-                                                            <p className="text-sm font-mono text-accent-foreground">
-                                                                = {derivedSpec.expression}
-                                                            </p>
-                                                            <div className="space-y-1">
-                                                                {!Array.isArray(derivedSpec.inputs) && Object.entries(derivedSpec.inputs ?? {}).map(([alias, column]) => (
-                                                                    <p key={alias} className="text-xs font-mono text-muted-foreground">
-                                                                        {alias} ← {column}
-                                                                    </p>
-                                                                ))}
-                                                            </div>
-                                                        </HoverCardContent>
-                                                    </HoverCard>
                                                 )}
                                                 {computedSpec && (
                                                     <HoverCard openDelay={100} closeDelay={150}>
@@ -388,68 +320,6 @@ export default function DataTableGenerationView({
                                                                     </div>
                                                                 ) : (
                                                                     cellValue.value
-                                                                )}
-                                                                {cellValue.derivation && (
-                                                                    <HoverCard openDelay={100} closeDelay={150}>
-                                                                        <HoverCardTrigger asChild>
-                                                                            <button
-                                                                                aria-label="Show how this value was computed"
-                                                                                className="inline-flex items-center px-1 py-0.5 rounded transition-colors bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/50"
-                                                                            >
-                                                                                <Calculator className="h-3.5 w-3.5" />
-                                                                            </button>
-                                                                        </HoverCardTrigger>
-                                                                        <HoverCardContent className="w-96 p-3 shadow-md bg-accent space-y-2">
-                                                                            <p className="text-xs font-semibold text-accent-foreground uppercase tracking-wide">
-                                                                                Computed value
-                                                                            </p>
-                                                                            <p className="text-sm font-mono text-accent-foreground">
-                                                                                = {cellValue.derivation.expression}
-                                                                            </p>
-                                                                            <div className="space-y-1.5">
-                                                                                {cellValue.derivation.inputs.map((input) => {
-                                                                                    // Elements of a list input often share one source
-                                                                                    // quote — show each supporting citation once.
-                                                                                    const uniqueCitations = input.citations.filter(
-                                                                                        (citation, idx) => input.citations.findIndex(
-                                                                                            c => c.index === citation.index && c.text === citation.text
-                                                                                        ) === idx
-                                                                                    );
-                                                                                    return (
-                                                                                        <div key={input.alias} className="text-xs text-accent-foreground font-mono">
-                                                                                            <div className="font-semibold">{input.alias} = {input.value}</div>
-                                                                                            <div className="text-muted-foreground flex flex-wrap items-center gap-1">
-                                                                                                <span>← {input.column}</span>
-                                                                                                {uniqueCitations.map((citation, citationIdx) => (
-                                                                                                    <button
-                                                                                                        key={citationIdx}
-                                                                                                        onClick={() => {
-                                                                                                            if (onCitationClick) {
-                                                                                                                onCitationClick(row.paper_id, citation.text);
-                                                                                                            }
-                                                                                                        }}
-                                                                                                        className="px-1 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50"
-                                                                                                    >
-                                                                                                        [{citation.index}]
-                                                                                                    </button>
-                                                                                                ))}
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    );
-                                                                                })}
-                                                                            </div>
-                                                                            {cellValue.derivation.warnings.length > 0 && (
-                                                                                <div className="space-y-1 pt-1 border-t border-amber-200 dark:border-amber-800/40">
-                                                                                    {cellValue.derivation.warnings.map((warning, warningIdx) => (
-                                                                                        <p key={warningIdx} className="text-xs text-amber-700 dark:text-amber-400 flex items-start gap-1">
-                                                                                            <TriangleAlert className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                                                                                            {warning}
-                                                                                        </p>
-                                                                                    ))}
-                                                                                </div>
-                                                                            )}
-                                                                        </HoverCardContent>
-                                                                    </HoverCard>
                                                                 )}
                                                             </div>
                                                             {cellCitations.length > 0 && (
