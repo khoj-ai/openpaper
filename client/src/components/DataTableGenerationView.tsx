@@ -75,7 +75,9 @@ export default function DataTableGenerationView({
 
     const { columns, rows, title } = dataTableResult;
 
-    // label -> plan entry for legacy calculator columns (formula badges).
+    // label -> plan entry for the retired expression calculator's columns
+    // (formula badges). Stored plans were migrated to "computed", so this is
+    // only non-empty against an unmigrated database.
     const derivedColumns = useMemo(
         () => new Map(
             (dataTableResult.column_plan ?? [])
@@ -104,8 +106,9 @@ export default function DataTableGenerationView({
         [dataTableResult.column_plan]
     );
 
-    // label -> aliases by which legacy calculator formulas refer to that
-    // column, so `alias ← label` bindings stay legible in the final table.
+    // label -> aliases by which retired-calculator formulas refer to that
+    // column, so `alias ← label` bindings stay legible when an unmigrated
+    // plan renders.
     const aliasesByLabel = useMemo(() => {
         const map = new Map<string, string[]>();
         (dataTableResult.column_plan ?? []).forEach(spec => {
@@ -125,9 +128,8 @@ export default function DataTableGenerationView({
     // Convert DataTableCitations to Citation format for ReferencePaperCards
     const citations = useMemo(() => {
         const result: Citation[] = [];
-        // Derivation inputs re-carry their primitive column's citations, so the
-        // same quote can surface several times per row — dedupe for the
-        // references section.
+        // The same quote can back several cells in a row (e.g. one sentence
+        // reporting two columns' values) — dedupe for the references section.
         const seen = new Set<string>();
         const addCitation = (paperId: string, citation: { index: number; text: string }) => {
             const dedupeKey = `${paperId}::${citation.index}::${citation.text}`;
@@ -146,10 +148,6 @@ export default function DataTableGenerationView({
                 // List cells cite through their per-element entries.
                 cellValue?.entries?.forEach((entry) => {
                     entry.citations.forEach((citation) => addCitation(row.paper_id, citation));
-                });
-                // Derived cells cite through their derivation inputs.
-                cellValue?.derivation?.inputs.forEach((input) => {
-                    input.citations.forEach((citation) => addCitation(row.paper_id, citation));
                 });
             });
         });

@@ -1119,8 +1119,9 @@ class DataTableExtractionJob(Base):
     #   {"label", "kind": "computed", "spec", "inputs": [column labels]}
     #     — produced by the compute agent after extraction
     #   {"label", "kind": "list"} — list-valued extraction column
-    #   {"label", "kind": "derived", "expression", "inputs": {alias: label}}
-    #     — retired expression calculator; old rows only, skipped if seen
+    # (The retired expression calculator's {"kind": "derived", "expression",
+    # "inputs": {alias: label}} shape was rewritten to "computed" by
+    # app/scripts/migrate_derived_columns_to_computed.)
     column_plan = Column(JSONB, nullable=True)
 
     task_id = Column(String, nullable=True)  # For tracking task in Celery

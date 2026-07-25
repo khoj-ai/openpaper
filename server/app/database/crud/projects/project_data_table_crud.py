@@ -481,8 +481,8 @@ class DataTableResultCRUD(
             "success": result.success,
             "columns": result.columns,
             # Column plan entries so the UI can mark computed/list columns at
-            # the header level: kind "computed" ({label, spec, inputs}), legacy
-            # "derived" ({label, expression, inputs}), and "list" ({label}).
+            # the header level: kind "computed" ({label, spec, inputs}) and
+            # "list" ({label}).
             "column_plan": (result.job.column_plan if result.job else None) or [],
             # Compute-agent provenance backs the "view code" panel on computed
             # columns: the exact inputs snapshot, script, stdout, and warnings.

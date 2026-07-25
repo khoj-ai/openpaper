@@ -727,9 +727,10 @@ def handle_data_table_processing_webhook(
             )
 
             # Post-Processing
-            # The jobs service extracts primitives only; derived columns are
-            # computed here from the job's stored column plan, so the persisted
-            # table is complete and every derived cell carries its derivation.
+            # The jobs service extracts primitives only; computed columns are
+            # produced here by the compute agent from the job's stored column
+            # plan, and the run's provenance (inputs snapshot, script, stdout)
+            # is persisted with the result.
             job = data_table_job_crud.get(db=db, id=uuid.UUID(job_id))
             compute_provenance = None
             if job:
@@ -737,10 +738,10 @@ def handle_data_table_processing_webhook(
                 for entry in job.column_plan or []:
                     # Entries are {label, kind, ...}: kind "list" marks a
                     # list-valued primitive; "computed" carries spec+inputs
-                    # for the compute agent. Kind "derived" (the retired
-                    # calculator grammar) can only appear on jobs created
-                    # before the compute agent shipped — skip it, the rest of
-                    # the table still persists.
+                    # for the compute agent. Any other kind is unknown
+                    # (legacy "derived" plans were rewritten to computed by
+                    # app/scripts/migrate_derived_columns_to_computed) — skip
+                    # it defensively, the rest of the table still persists.
                     if entry.get("kind") == "list":
                         continue
                     if entry.get("kind") != "computed":

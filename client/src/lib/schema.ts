@@ -514,8 +514,10 @@ export interface DerivationInput {
     citations: ReferenceCitation[];
 }
 
-// Shown work for a calculator-computed cell: the expression, each input with
-// its citations, and any warnings (missing inputs, failed computation).
+// Legacy: shown work for a cell computed by the retired expression
+// calculator — the expression, each input with its citations, and any
+// warnings. Never produced anymore, but stored rows from those tables carry
+// it and still render.
 export interface CellDerivation {
     expression: string;
     inputs: DerivationInput[];
@@ -532,6 +534,7 @@ export interface CellEntry {
 export interface DataTableCellValue {
     value: string;
     citations: ReferenceCitation[];
+    // Legacy: only on stored cells written by the retired expression calculator.
     derivation?: CellDerivation | null;
     // Present only on list-valued cells; `value` holds the joined display form.
     entries?: CellEntry[] | null;
@@ -560,9 +563,10 @@ export interface DataTableRow {
 }
 
 // Entry in a table's column plan. kind "computed" entries carry a
-// natural-language spec + input column labels; legacy "derived"
-// entries carry a calculator expression + alias->column inputs; kind "list"
-// entries mark list columns.
+// natural-language spec + input column labels; kind "list" entries mark list
+// columns. The "derived"/expression leg is the retired expression
+// calculator's shape — stored plans were migrated to "computed", so it only
+// exists as a defensive fallback for unmigrated databases.
 export interface DataTablePlanColumn {
     label: string;
     kind?: 'computed' | 'derived' | 'list';

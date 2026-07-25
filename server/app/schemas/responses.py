@@ -155,7 +155,9 @@ class CellEntry(BaseModel):
 
 
 class DerivationInput(BaseModel):
-    """One input to a derived cell, carrying the citations of the primitive it came from."""
+    """One input to a legacy CellDerivation, carrying the citations of the
+    primitive it came from. Only appears in stored rows written by the
+    retired expression calculator."""
 
     alias: str
     column: str
