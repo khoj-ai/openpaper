@@ -9,6 +9,7 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Dict, Any, TypeVar, Coroutine
 import requests
+from langfuse import get_client, observe
 
 from src.schemas import DataTableSchema
 from src.data_table_processor import construct_data_table
@@ -81,6 +82,12 @@ def run_async_safely(coro: Coroutine[Any, Any, T]) -> T:
 
 
 @celery_app.task(bind=True, name="upload_and_process_file")
+@observe(
+    name="process-uploaded-pdf",
+    as_type="span",
+    capture_input=False,
+    capture_output=False,
+)
 def upload_and_process_file(
     self,
     s3_object_key: str,
@@ -96,6 +103,13 @@ def upload_and_process_file(
     are produced. Used by the Zotero import path.
     """
     task_id = self.request.id
+    get_client().update_current_span(
+        input={
+            "s3_object_key": s3_object_key,
+            "skip_metadata_extraction": skip_metadata_extraction,
+        },
+        metadata={"celery_task_id": task_id},
+    )
 
     def write_to_status(new_status: str):
         """Helper to update task status."""
@@ -154,6 +168,9 @@ def upload_and_process_file(
             webhook_payload["webhook_error"] = str(e)
 
         logger.info(f"Task {task_id} completed successfully")
+        get_client().update_current_span(
+            output={"status": webhook_payload["status"]}
+        )
         return webhook_payload
 
     except Exception as exc:

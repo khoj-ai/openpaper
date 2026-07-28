@@ -19,6 +19,7 @@ from app.llm.provider import (
     ToolCallResult,
 )
 from app.llm.utils import retry_llm_operation
+from langfuse import get_client, observe
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +101,12 @@ class BaseLLMClient:
         else:
             raise ValueError(f"Unsupported model type: {model_type}")
 
+    @observe(
+        name="generate-content",
+        as_type="span",
+        capture_input=False,
+        capture_output=False,
+    )
     @retry_llm_operation(max_retries=3, delay=1.0)
     def generate_content(
         self,
@@ -124,6 +131,20 @@ class BaseLLMClient:
         start_time = time.time()
         model = self._get_model_for_type(model_type, provider)
         target_provider = provider or self.default_provider
+        langfuse = get_client()
+        langfuse.update_current_span(
+            input={
+                "contents": contents,
+                "system_prompt": system_prompt,
+                "history_length": len(history or []),
+                "tool_result_count": len(tool_call_results or []),
+            },
+            metadata={
+                "provider": target_provider.value,
+                "model": model,
+                "model_type": model_type.value,
+            },
+        )
 
         try:
             response = self._get_provider(provider).generate_content(
@@ -156,6 +177,13 @@ class BaseLLMClient:
 
             logger.info(
                 f"Generated content using {target_provider.value}/{model} in {duration_ms:.2f}ms"
+            )
+
+            langfuse.update_current_span(
+                output={
+                    "text": response.text,
+                    "tool_call_count": len(response.tool_calls),
+                }
             )
 
             return response

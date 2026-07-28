@@ -42,6 +42,9 @@ dependencies = [
     "pypdf>=6.13.3",
     "exa-py>=1.0.0",
     "e2b-code-interpreter>=1.0.0",
+    "langfuse>=4.7.0",
+    "openinference-instrumentation-google-genai>=0.1.10",
+    "openinference-instrumentation-anthropic>=1.0.6",
 ]
 
 [project.scripts]

@@ -166,6 +166,9 @@ The following environment variables are required to run the Jobs Service:
 | `CELERY_BROKER_URL`     | The URL for the Celery message broker (RabbitMQ).   | Yes      |
 | `CELERY_RESULT_BACKEND` | The URL for the Celery result backend (Redis).   | Yes      |
 | `LLM_API_KEY`           | The API key for the LLM service.                 | Yes      |
+| `LANGFUSE_PUBLIC_KEY`   | Langfuse public key for optional LLM tracing.    | No       |
+| `LANGFUSE_SECRET_KEY`   | Langfuse secret key for optional LLM tracing.    | No       |
+| `LANGFUSE_BASE_URL`     | Langfuse Cloud region or self-hosted base URL.   | No       |
 
 ### Running Locally
 

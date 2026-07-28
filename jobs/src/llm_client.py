@@ -9,6 +9,18 @@ import io
 import asyncio
 import random
 import httpx
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from src.observability import configure_langfuse
+
+configure_langfuse()
+
+from openinference.instrumentation.google_genai import GoogleGenAIInstrumentor
+
+GoogleGenAIInstrumentor().instrument()
+
 from google import genai
 from google.genai import types
 from google.genai.errors import APIError, ClientError, ServerError
