@@ -2,6 +2,16 @@ import logging
 import os
 
 import uvicorn  # type: ignore
+from dotenv import load_dotenv
+
+# Load configuration before importing providers. Langfuse must initialize after
+# its credentials are available and before clients that it instruments.
+load_dotenv()
+
+from app.observability import configure_langfuse
+
+configure_langfuse()
+
 from app.api.annotation_api import annotation_router
 from app.api.api import router
 from app.api.auth_api import auth_router
@@ -31,7 +41,6 @@ from app.api.subscription import subscription_router
 from app.api.webhook_api import webhook_router
 from app.api.zotero_import_api import zotero_router
 from app.database.admin import setup_admin
-from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -41,8 +50,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-
-load_dotenv()
 
 app = FastAPI(
     title="Open Paper",

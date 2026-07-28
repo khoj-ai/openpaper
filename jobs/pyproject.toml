@@ -30,6 +30,8 @@ dependencies = [
     "types-psutil>=7.0.0.20250601",
     "google-genai>=1.23.0",
     "posthog>=6.1.0",
+    "langfuse>=4.7.0",
+    "openinference-instrumentation-google-genai>=0.1.10",
 ]
 
 [project.scripts]

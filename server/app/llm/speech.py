@@ -7,6 +7,8 @@ from typing import List, Literal, Tuple
 
 import openai
 from app.helpers.s3 import s3_service
+from langfuse.openai import AzureOpenAI as LangfuseAzureOpenAI
+from langfuse.openai import OpenAI as LangfuseOpenAI
 
 # Maximum characters per chunk for TTS generation
 MAX_CHUNK_SIZE = 10000
@@ -221,7 +223,7 @@ class OpenAISpeaker:
         if not endpoint:
             raise ValueError("AZURE_OPENAI_ENDPOINT environment variable is required")
 
-        self.client = openai.AzureOpenAI(
+        self.client = LangfuseAzureOpenAI(
             api_key=self.api_key,
             azure_endpoint=endpoint,
             api_version=version,
@@ -367,9 +369,7 @@ speaker = OpenAISpeaker() if os.getenv("AZURE_OPENAI_API_KEY") else None
 Code sample
 
 from pathlib import Path
-from openai import OpenAI
-
-client = OpenAI()
+client = LangfuseOpenAI()
 speech_file_path = Path(__file__).parent / "speech.mp3"
 
 with client.audio.speech.with_streaming_response.create(
