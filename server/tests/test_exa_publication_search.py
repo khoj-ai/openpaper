@@ -32,6 +32,7 @@ def publication_payload(**overrides) -> dict:
                     "abstract": "Foundation models are almost universally based on the Transformer.",
                     "date": "2023-12-01",
                     "doi": "10.48550/arxiv.2312.00752",
+                    "type": "preprint",
                     "authors": [{"name": "Albert Gu"}, {"name": "Tri Dao"}],
                 },
             }
@@ -50,6 +51,19 @@ class TestParsePublicationResult(unittest.TestCase):
         self.assertEqual(result.authors, ["Albert Gu", "Tri Dao"])
         self.assertEqual(result.published_date, "2023-12-01T00:00:00.000Z")
         self.assertEqual(result.highlight_scores, [0.9])
+        self.assertEqual(result.publication_type, "preprint")
+
+    def test_publication_type_absent_without_entity(self) -> None:
+        result = _parse_publication_result(publication_payload(entities=[]))
+
+        assert result is not None
+        self.assertIsNone(result.publication_type)
+
+    def test_publication_type_serialized_for_client(self) -> None:
+        payload = _parse_publication_result(publication_payload())
+
+        assert payload is not None
+        self.assertEqual(payload.to_dict()["publication_type"], "preprint")
 
     def test_prefers_abstract_over_scraped_text(self) -> None:
         result = _parse_publication_result(publication_payload())
