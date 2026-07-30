@@ -81,6 +81,8 @@ class ExaResult:
     favicon: Optional[str] = None
     summary: Optional[str] = None
     cited_by_count: Optional[int] = None
+    # "preprint", "article", "review", ... — only the publications index supplies it.
+    publication_type: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {
@@ -94,6 +96,7 @@ class ExaResult:
             "favicon": self.favicon,
             "summary": self.summary,
             "cited_by_count": self.cited_by_count,
+            "publication_type": self.publication_type,
         }
 
 
@@ -262,6 +265,7 @@ def _parse_publication_result(raw: dict) -> Optional[ExaResult]:
         cited_by_count=(
             int(citation_count) if isinstance(citation_count, (int, float)) else None
         ),
+        publication_type=(properties.get("type") or None),
     )
 
 
