@@ -98,6 +98,11 @@ async def run_discover_pipeline(
     elif year_filter == "last_5_years":
         start_date = (datetime.now() - timedelta(days=5 * 365)).strftime("%Y-%m-%d")
 
+    # Exa's publications index returns better-formed scholarly metadata and covers
+    # venues our domain allowlist omits, but it honors neither domain nor date
+    # filters. Use it only when the search asks for neither.
+    use_publication_index = not exa_domains and not start_date
+
     # Step 2: Search each subquery
     for subquery in subqueries:
         try:
@@ -115,6 +120,7 @@ async def run_discover_pipeline(
                     num_results=10,
                     domains=exa_domains,
                     start_published_date=start_date,
+                    use_publication_index=use_publication_index,
                 )
 
             yield {
