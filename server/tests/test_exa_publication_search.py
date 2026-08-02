@@ -3,11 +3,18 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 from app.helpers import discover as discover_module
+from app.helpers import openalex_search as openalex_module
 from app.helpers.discover import run_discover_pipeline
 from app.helpers.exa_search import (
+    ExaResult,
     _is_retryable_exa_error,
     _parse_publication_result,
     search_exa,
+)
+from app.helpers.openalex_search import (
+    OpenAlexWorkMetadata,
+    fetch_metadata_by_doi,
+    normalize_openalex_doi,
 )
 
 
@@ -64,6 +71,14 @@ class TestParsePublicationResult(unittest.TestCase):
 
         assert payload is not None
         self.assertEqual(payload.to_dict()["publication_type"], "preprint")
+
+    def test_venue_is_left_for_openalex_to_supply(self) -> None:
+        """Exa exposes no venue on publication entities; it arrives via hydration."""
+        result = _parse_publication_result(publication_payload())
+
+        assert result is not None
+        self.assertIsNone(result.source)
+        self.assertIn("source", result.to_dict())
 
     def test_prefers_abstract_over_scraped_text(self) -> None:
         result = _parse_publication_result(publication_payload())
@@ -130,6 +145,185 @@ class TestParsePublicationResult(unittest.TestCase):
 
         assert result is not None
         self.assertIsNone(result.cited_by_count)
+
+
+class TestExtractDoi(unittest.TestCase):
+    def test_prefers_entity_doi(self) -> None:
+        result = _parse_publication_result(publication_payload())
+
+        assert result is not None
+        self.assertEqual(result.doi, "10.48550/arxiv.2312.00752")
+
+    def test_recovers_doi_from_doi_org_url(self) -> None:
+        payload = publication_payload(url="https://doi.org/10.1038/s41467-023-40601-6")
+        payload["entities"][0]["properties"].pop("doi")
+
+        result = _parse_publication_result(payload)
+
+        assert result is not None
+        self.assertEqual(result.doi, "10.1038/s41467-023-40601-6")
+
+    def test_ignores_non_doi_urls(self) -> None:
+        payload = publication_payload(url="https://www.nature.com/articles/s41467-1")
+        payload["entities"][0]["properties"].pop("doi")
+
+        result = _parse_publication_result(payload)
+
+        assert result is not None
+        self.assertIsNone(result.doi)
+
+    def test_normalizes_case(self) -> None:
+        payload = publication_payload()
+        payload["entities"][0]["properties"]["doi"] = "10.1038/S41467-ABC"
+
+        result = _parse_publication_result(payload)
+
+        assert result is not None
+        self.assertEqual(result.doi, "10.1038/s41467-abc")
+
+
+class TestNormalizeOpenAlexDoi(unittest.TestCase):
+    def test_strips_url_and_scheme_prefixes(self) -> None:
+        for value in (
+            "https://doi.org/10.1038/abc",
+            "http://doi.org/10.1038/abc",
+            "doi:10.1038/abc",
+            "10.1038/ABC",
+            "  10.1038/abc  ",
+        ):
+            self.assertEqual(normalize_openalex_doi(value), "10.1038/abc")
+
+    def test_empty(self) -> None:
+        self.assertIsNone(normalize_openalex_doi(None))
+        self.assertIsNone(normalize_openalex_doi(""))
+
+
+class TestHydrateFromOpenAlex(unittest.TestCase):
+    def _result(self, **kwargs) -> ExaResult:
+        defaults = dict(
+            title="A paper", url="https://doi.org/10.1038/abc", doi="10.1038/abc"
+        )
+        defaults.update(kwargs)
+        return ExaResult(**defaults)
+
+    @patch.object(discover_module, "fetch_metadata_by_doi")
+    def test_fills_missing_fields(self, mock_fetch) -> None:
+        mock_fetch.return_value = {
+            "10.1038/abc": OpenAlexWorkMetadata(
+                source="Nature Communications",
+                cited_by_count=116,
+                institutions=["ETH Zurich"],
+            )
+        }
+
+        [result] = discover_module._hydrate_from_openalex([self._result()])
+
+        self.assertEqual(result.source, "Nature Communications")
+        self.assertEqual(result.cited_by_count, 116)
+        self.assertEqual(result.institutions, ["ETH Zurich"])
+
+    @patch.object(discover_module, "fetch_metadata_by_doi")
+    def test_does_not_overwrite_values_exa_supplied(self, mock_fetch) -> None:
+        mock_fetch.return_value = {
+            "10.1038/abc": OpenAlexWorkMetadata(source="Wrong", cited_by_count=1)
+        }
+
+        [result] = discover_module._hydrate_from_openalex(
+            [self._result(source="Nature", cited_by_count=999)]
+        )
+
+        self.assertEqual(result.source, "Nature")
+        self.assertEqual(result.cited_by_count, 999)
+
+    @patch.object(discover_module, "fetch_metadata_by_doi")
+    def test_zero_citations_is_not_treated_as_missing(self, mock_fetch) -> None:
+        """0 is a real citation count and must not be overwritten by OpenAlex."""
+        mock_fetch.return_value = {
+            "10.1038/abc": OpenAlexWorkMetadata(cited_by_count=42)
+        }
+
+        [result] = discover_module._hydrate_from_openalex(
+            [self._result(cited_by_count=0)]
+        )
+
+        self.assertEqual(result.cited_by_count, 0)
+
+    @patch.object(discover_module, "fetch_metadata_by_doi")
+    def test_skips_lookup_when_no_dois(self, mock_fetch) -> None:
+        results = discover_module._hydrate_from_openalex([self._result(doi=None)])
+
+        mock_fetch.assert_not_called()
+        self.assertIsNone(results[0].source)
+
+    @patch.object(discover_module, "fetch_metadata_by_doi")
+    def test_unmatched_doi_leaves_result_untouched(self, mock_fetch) -> None:
+        mock_fetch.return_value = {}
+
+        [result] = discover_module._hydrate_from_openalex([self._result()])
+
+        self.assertIsNone(result.source)
+        self.assertEqual(result.institutions, [])
+
+
+class TestFetchMetadataByDoi(unittest.TestCase):
+    @patch.object(openalex_module, "_request_with_retry")
+    def test_lookup_is_bounded_so_a_stall_cannot_hold_the_stream(
+        self, mock_request
+    ) -> None:
+        """Enrichment must fail fast; the shared defaults would allow a ~30s stall."""
+        mock_request.return_value = MagicMock(json=lambda: {"results": []})
+
+        fetch_metadata_by_doi(["10.1038/abc"])
+
+        kwargs = mock_request.call_args.kwargs
+        self.assertEqual(kwargs["max_retries"], 1)
+        self.assertLessEqual(kwargs["timeout"], 5)
+
+    @patch.object(openalex_module, "_request_with_retry")
+    def test_network_failure_degrades_to_no_metadata(self, mock_request) -> None:
+        mock_request.side_effect = RuntimeError("openalex unreachable")
+
+        self.assertEqual(fetch_metadata_by_doi(["10.1038/abc"]), {})
+
+    @patch.object(openalex_module, "_request_with_retry")
+    def test_batches_large_doi_sets(self, mock_request) -> None:
+        mock_request.return_value = MagicMock(json=lambda: {"results": []})
+
+        fetch_metadata_by_doi([f"10.1000/{i}" for i in range(95)])
+
+        self.assertEqual(mock_request.call_count, 3)
+
+    @patch.object(openalex_module, "_request_with_retry")
+    def test_no_request_without_dois(self, mock_request) -> None:
+        self.assertEqual(fetch_metadata_by_doi([None, "", "  "]), {})
+        mock_request.assert_not_called()
+
+    @patch.object(openalex_module, "_request_with_retry")
+    def test_maps_venue_citations_and_institutions(self, mock_request) -> None:
+        mock_request.return_value = MagicMock(
+            json=lambda: {
+                "results": [
+                    {
+                        "doi": "https://doi.org/10.1038/ABC",
+                        "cited_by_count": 116,
+                        "primary_location": {
+                            "source": {"display_name": "Nature Communications"}
+                        },
+                        "authorships": [
+                            {"institutions": [{"display_name": "ETH Zurich"}]},
+                            {"institutions": [{"display_name": "ETH Zurich"}]},
+                        ],
+                    }
+                ]
+            }
+        )
+
+        metadata = fetch_metadata_by_doi(["10.1038/abc"])
+
+        self.assertEqual(metadata["10.1038/abc"].source, "Nature Communications")
+        self.assertEqual(metadata["10.1038/abc"].cited_by_count, 116)
+        # Repeated affiliations collapse to one entry.
+        self.assertEqual(metadata["10.1038/abc"].institutions, ["ETH Zurich"])
 
 
 class TestSearchExaDispatch(unittest.TestCase):

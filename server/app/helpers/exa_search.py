@@ -6,6 +6,7 @@ import re
 import time
 from dataclasses import dataclass, field
 from typing import Optional
+from urllib.parse import unquote, urlparse
 
 import httpx
 from exa_py import Exa
@@ -28,6 +29,10 @@ EXA_REQUEST_TIMEOUT = 60.0
 EXA_MAX_RETRIES = 2
 EXA_RETRY_BASE_DELAY = 1.0
 _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+
+# Publication entities expose a DOI directly on some results and only as a
+# doi.org link on others; either is enough to look the work up in OpenAlex.
+_DOI_PATTERN = re.compile(r"(10\.\d{4,9}/[^\s\"'<>]+)", re.IGNORECASE)
 
 SUMMARY_PROMPT = "You're reviewing academic literature. Describe the background and results in 2-3 sentences. The reader already knows this is a research paper, so skip meta-commentary and focus on the actual content and findings. Do not start with 'This paper' or similar phrases. Just summarize the key points."
 
@@ -83,6 +88,12 @@ class ExaResult:
     cited_by_count: Optional[int] = None
     # "preprint", "article", "review", ... — only the publications index supplies it.
     publication_type: Optional[str] = None
+    # Journal or repository name. Named to match OpenAlexResult so the client
+    # renders both sources through the same field. Exa does not supply it —
+    # see hydrate_results_from_openalex.
+    source: Optional[str] = None
+    institutions: list[str] = field(default_factory=list)
+    doi: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {
@@ -97,6 +108,9 @@ class ExaResult:
             "summary": self.summary,
             "cited_by_count": self.cited_by_count,
             "publication_type": self.publication_type,
+            "source": self.source,
+            "institutions": self.institutions,
+            "doi": self.doi,
         }
 
 
@@ -224,6 +238,19 @@ def _search_web_index(
     return results
 
 
+def _extract_doi(raw: dict, properties: dict) -> Optional[str]:
+    """The result's DOI, taken from the entity or recovered from a doi.org link."""
+    if properties.get("doi"):
+        return str(properties["doi"]).strip().lower() or None
+
+    url = raw.get("url") or ""
+    if "doi.org" not in urlparse(url).netloc:
+        return None
+
+    match = _DOI_PATTERN.search(unquote(url))
+    return match.group(1).lower().rstrip(".") if match else None
+
+
 def _publication_authors(properties: dict) -> list[str]:
     """Pull author names out of a publication entity's structured author list."""
     names = []
@@ -266,6 +293,7 @@ def _parse_publication_result(raw: dict) -> Optional[ExaResult]:
             int(citation_count) if isinstance(citation_count, (int, float)) else None
         ),
         publication_type=(properties.get("type") or None),
+        doi=_extract_doi(raw, properties),
     )
 
 

@@ -5,8 +5,12 @@ import logging
 from datetime import datetime, timedelta
 from typing import AsyncGenerator, List, Optional
 
-from app.helpers.exa_search import search_exa
-from app.helpers.openalex_search import search_openalex
+from app.helpers.exa_search import ExaResult, search_exa
+from app.helpers.openalex_search import (
+    fetch_metadata_by_doi,
+    normalize_openalex_doi,
+    search_openalex,
+)
 from app.llm.base import BaseLLMClient, ModelType
 from app.llm.provider import LLMProvider
 from app.schemas.discover import DISCOVER_SOURCES
@@ -58,6 +62,34 @@ def _get_domains_for_sources(sources: list[str]) -> Optional[list[str]]:
             if source_domains:
                 domains.extend(source_domains)
     return domains if domains else None
+
+
+def _hydrate_from_openalex(results: list[ExaResult]) -> list[ExaResult]:
+    """Fill in the publication metadata Exa does not return.
+
+    Exa's publications index exposes no venue, and supplies citation counts and
+    institutions only sporadically. OpenAlex has all three, and both sources
+    identify works by DOI, so one batched lookup covers a whole result set. Only
+    empty fields are filled — Exa's own values win where it has them.
+    """
+    dois = [r.doi for r in results if r.doi]
+    if not dois:
+        return results
+
+    metadata = fetch_metadata_by_doi(dois)
+
+    for result in results:
+        entry = metadata.get(normalize_openalex_doi(result.doi) or "")
+        if not entry:
+            continue
+        if not result.source:
+            result.source = entry.source
+        if result.cited_by_count is None:
+            result.cited_by_count = entry.cited_by_count
+        if not result.institutions:
+            result.institutions = entry.institutions
+
+    return results
 
 
 async def run_discover_pipeline(
@@ -122,6 +154,8 @@ async def run_discover_pipeline(
                     start_published_date=start_date,
                     use_publication_index=use_publication_index,
                 )
+                if use_publication_index:
+                    results = _hydrate_from_openalex(results)
 
             yield {
                 "type": "results",

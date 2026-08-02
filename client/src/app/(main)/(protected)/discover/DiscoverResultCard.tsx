@@ -119,9 +119,11 @@ export default function DiscoverResultCard({ result }: DiscoverResultCardProps) 
                             </span>
                         )}
                         {metadata.map((item, idx) => (
+                            // Separator trails its item so a wrapped line never opens with a
+                            // stray dot — these rows wrap often once a venue is present.
                             <span key={item.key} className="flex items-center gap-x-2">
-                                {idx > 0 && <span aria-hidden="true">&middot;</span>}
                                 <span>{item.node}</span>
+                                {idx < metadata.length - 1 && <span aria-hidden="true">&middot;</span>}
                             </span>
                         ))}
                     </div>

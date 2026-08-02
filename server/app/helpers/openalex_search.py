@@ -4,10 +4,26 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Optional
+from urllib.parse import urlencode
 
-from app.helpers.paper_search import OpenAlexFilter, search_open_alex
+from app.helpers.paper_search import (
+    OpenAlexFilter,
+    _request_with_retry,
+    _with_openalex_auth,
+    search_open_alex,
+)
 
 logger = logging.getLogger(__name__)
+
+# OpenAlex accepts up to 50 values in an OR filter; leave headroom under that.
+OPENALEX_DOI_BATCH_SIZE = 40
+
+# This lookup only enriches results that are already displayable, and it sits in
+# the middle of a streaming response, so it must fail fast rather than retry.
+# The shared defaults (3 attempts, 10s each) could stall a chunk for ~30s; these
+# cap the worst case near the p99 of a healthy call, which measures under 0.7s.
+OPENALEX_HYDRATION_TIMEOUT = 5
+OPENALEX_HYDRATION_ATTEMPTS = 1
 
 
 @dataclass
@@ -38,6 +54,88 @@ class OpenAlexResult:
             "source": self.source,
             "institutions": self.institutions,
         }
+
+
+@dataclass
+class OpenAlexWorkMetadata:
+    """The subset of an OpenAlex work used to fill gaps in another source's results."""
+
+    source: Optional[str] = None
+    cited_by_count: Optional[int] = None
+    institutions: list[str] = field(default_factory=list)
+
+
+def normalize_openalex_doi(doi: Optional[str]) -> Optional[str]:
+    """Reduce a DOI to the bare, lowercased form OpenAlex filters on."""
+    if not doi:
+        return None
+    cleaned = doi.strip().lower()
+    for prefix in ("https://doi.org/", "http://doi.org/", "doi:"):
+        if cleaned.startswith(prefix):
+            cleaned = cleaned[len(prefix) :]
+    return cleaned or None
+
+
+def fetch_metadata_by_doi(dois: list[str]) -> dict[str, OpenAlexWorkMetadata]:
+    """Look up works by DOI, batched into as few requests as possible.
+
+    Returns a mapping keyed by normalized DOI, omitting anything OpenAlex has no
+    record of. Never raises: this enriches results that are already displayable,
+    so a failed lookup degrades to missing metadata rather than a failed search.
+    """
+    unique_dois = sorted({d for d in (normalize_openalex_doi(x) for x in dois) if d})
+    if not unique_dois:
+        return {}
+
+    metadata: dict[str, OpenAlexWorkMetadata] = {}
+
+    for start in range(0, len(unique_dois), OPENALEX_DOI_BATCH_SIZE):
+        batch = unique_dois[start : start + OPENALEX_DOI_BATCH_SIZE]
+        params = urlencode(
+            {
+                "filter": f"doi:{'|'.join(batch)}",
+                "per-page": OPENALEX_DOI_BATCH_SIZE + 10,
+                "select": "doi,primary_location,cited_by_count,authorships",
+            }
+        )
+        url = _with_openalex_auth(f"https://api.openalex.org/works?{params}")
+
+        try:
+            response = _request_with_retry(
+                url,
+                max_retries=OPENALEX_HYDRATION_ATTEMPTS,
+                timeout=OPENALEX_HYDRATION_TIMEOUT,
+            )
+            works = response.json().get("results", [])
+        except Exception as e:
+            logger.warning(
+                f"OpenAlex DOI lookup failed for {len(batch)} DOIs: {e}. "
+                "Continuing without the enriched metadata."
+            )
+            continue
+
+        for work in works:
+            doi = normalize_openalex_doi(work.get("doi"))
+            if not doi:
+                continue
+
+            primary_location = work.get("primary_location") or {}
+            work_source = primary_location.get("source") or {}
+
+            institutions: set[str] = set()
+            for authorship in work.get("authorships") or []:
+                for institution in authorship.get("institutions") or []:
+                    name = institution.get("display_name")
+                    if name:
+                        institutions.add(name)
+
+            metadata[doi] = OpenAlexWorkMetadata(
+                source=work_source.get("display_name"),
+                cited_by_count=work.get("cited_by_count"),
+                institutions=sorted(institutions),
+            )
+
+    return metadata
 
 
 def search_openalex(
