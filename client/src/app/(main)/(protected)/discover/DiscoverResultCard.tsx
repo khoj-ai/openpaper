@@ -1,7 +1,7 @@
 "use client"
 
 import { ExternalLink } from "lucide-react"
-import type { ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 
 export interface DiscoverResult {
     title: string
@@ -73,6 +73,10 @@ export default function DiscoverResultCard({ result }: DiscoverResultCardProps) 
         ? new Date(result.published_date).getFullYear()
         : null
 
+    // Some publishers 404 or 403 the favicon URL the search index reports
+    // (Springer and Wiley both do), which leaves a broken image in the title row.
+    const [faviconFailed, setFaviconFailed] = useState(false)
+
     const authorsDisplay = formatAuthors(result.authors)
     const institutionsDisplay = formatInstitutions(result.institutions)
     const publicationTypeLabel = formatPublicationType(result.publication_type)
@@ -100,11 +104,12 @@ export default function DiscoverResultCard({ result }: DiscoverResultCardProps) 
                     rel="noopener noreferrer"
                     className="font-medium text-sm hover:underline flex items-start gap-1.5"
                 >
-                    {result.favicon && (
+                    {result.favicon && !faviconFailed && (
                         <img
                             src={result.favicon}
                             alt=""
                             className="h-4 w-4 mt-0.5 flex-shrink-0 rounded-sm"
+                            onError={() => setFaviconFailed(true)}
                         />
                     )}
                     <span className="flex-1">{result.title}</span>
