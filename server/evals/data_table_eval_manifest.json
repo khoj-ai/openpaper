@@ -1,268 +1,331 @@
 {
-	"description": "Golden set for the data-table extraction eval. Values hand-verified against the PDFs in seed_data/. 'primitive' columns are stated verbatim in the paper; 'computed' columns require arithmetic and are never stated as a number in the paper — the compute agent produces them from a natural-language spec. Columns with expect_na are gap cases: the paper does not report the value, so a numeric answer is a fabrication/imputation failure.",
-	"papers": [
-		{
-			"key": "wei_cot",
-			"file": "chain_of_thought_for_reasoning.pdf",
-			"title": "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models",
-			"columns": [
-				{
-					"label": "GSM8K solve rate of PaLM 540B with standard prompting (%)",
-					"kind": "primitive",
-					"expected": 17.9,
-					"tolerance": 0.5,
-					"source": "Table 2, p.21 (17.9); Figure 2, p.2 rounds to 18"
-				},
-				{
-					"label": "GSM8K solve rate of PaLM 540B with chain-of-thought prompting (%)",
-					"kind": "primitive",
-					"expected": 56.9,
-					"tolerance": 0.5,
-					"source": "Table 2, p.21 (56.9); Figure 2, p.2 rounds to 57"
-				},
-				{
-					"label": "Sports understanding accuracy of PaLM 540B with chain-of-thought prompting (%)",
-					"kind": "primitive",
-					"expected": 95.4,
-					"tolerance": 0.1,
-					"source": "p.7 prose: 'outperforming an unaided sports enthusiast on sports understanding (95.4% vs 84%)'"
-				},
-				{
-					"label": "Sports understanding accuracy of the unaided sports enthusiast human baseline (%)",
-					"kind": "primitive",
-					"expected": 84,
-					"tolerance": 0.5,
-					"source": "p.7 prose (same sentence as above)"
-				},
-				{
-					"label": "GSM8K solve rate with chain-of-thought prompting of the largest model in each model family in Table 2 (%) (list)",
-					"kind": "list",
-					"expected_elements": [4.4, 14.3, 46.9, 63.1, 56.9],
-					"expected_keys": ["UL2", "LaMDA", "GPT", "Codex", "PaLM"],
-					"tolerance": 0.05,
-					"source": "Table 2, p.21, CoT column of GSM8K: UL2 20B 4.4, LaMDA 137B 14.3, GPT-3 175B 46.9, Codex 63.1, PaLM 540B 56.9",
-					"note": "Feeds the double-derived computed column: per-model average across benchmarks, then average across models."
-				},
-				{
-					"label": "MAWPS solve rate with chain-of-thought prompting of the largest model in each model family in Table 2 (%) (list)",
-					"kind": "list",
-					"expected_elements": [19.1, 57.9, 87.1, 92.6, 93.3],
-					"expected_keys": ["UL2", "LaMDA", "GPT", "Codex", "PaLM"],
-					"tolerance": 0.05,
-					"source": "Table 2, p.21, CoT column of MAWPS: UL2 20B 19.1, LaMDA 137B 57.9, GPT-3 175B 87.1, Codex 92.6, PaLM 540B 93.3"
-				},
-				{
-					"label": "Average chain-of-thought solve rate across GSM8K and MAWPS, averaged across the largest model of each family (%)",
-					"kind": "computed",
-					"expected": 53.56,
-					"tolerance": 0.1,
-					"formula": "mean over models of mean(gsm8k_cot, mawps_cot) = mean(11.75, 36.1, 67.0, 77.85, 75.1)",
-					"note": "The double-derived case: per-model aggregation across two keyed lists, then aggregation across models. Never stated in the paper.",
-					"spec": "For each model family's largest model, average its GSM8K and MAWPS chain-of-thought solve rates (matching entries across the two lists by model); then average those per-model averages.",
-					"inputs": [
-						"GSM8K solve rate with chain-of-thought prompting of the largest model in each model family in Table 2 (%) (list)",
-						"MAWPS solve rate with chain-of-thought prompting of the largest model in each model family in Table 2 (%) (list)"
-					]
-				},
-				{
-					"label": "Ratio of PaLM 540B GSM8K solve rate with chain-of-thought prompting to standard prompting",
-					"kind": "computed",
-					"expected": 3.18,
-					"tolerance": 0.05,
-					"formula": "56.9 / 17.9",
-					"note": "Paper says only 'performance more than doubled'; ratio never stated. Table 2 DOES print the additive delta (+39.0), which is why the delta is not usable as a computed column.",
-					"spec": "The GSM8K solve rate of PaLM 540B with chain-of-thought prompting divided by its solve rate with standard prompting.",
-					"inputs": [
-						"GSM8K solve rate of PaLM 540B with chain-of-thought prompting (%)",
-						"GSM8K solve rate of PaLM 540B with standard prompting (%)"
-					]
-				},
-				{
-					"label": "Percentage points by which PaLM 540B with chain-of-thought prompting outperforms the unaided sports enthusiast on sports understanding",
-					"kind": "computed",
-					"expected": 11.4,
-					"tolerance": 0.15,
-					"formula": "95.4 - 84",
-					"note": "Both operands in one sentence on p.7; difference never stated.",
-					"spec": "The sports understanding accuracy of PaLM 540B with chain-of-thought prompting minus the accuracy of the unaided sports enthusiast human baseline, in percentage points.",
-					"inputs": [
-						"Sports understanding accuracy of PaLM 540B with chain-of-thought prompting (%)",
-						"Sports understanding accuracy of the unaided sports enthusiast human baseline (%)"
-					]
-				}
-			]
-		},
-		{
-			"key": "health_chatbots",
-			"file": "publicusegeneralhealthchatbots.pdf",
-			"title": "Public use of a generalist LLM chatbot for health queries",
-			"columns": [
-				{
-					"label": "Total number of conversations analyzed across intent categories",
-					"kind": "primitive",
-					"expected": 617827,
-					"tolerance": 1,
-					"source": "p.2: 'the sample contains N = 617,827 conversations across the remaining intent categories'"
-				},
-				{
-					"label": "Share of mobile conversations classified as Symptom Questions and Health Concerns (%)",
-					"kind": "primitive",
-					"expected": 15.9,
-					"tolerance": 0.1,
-					"source": "p.3: '15.9%, 95% CI 15.8-16.0, of conversations versus 6.9% ... on desktop'"
-				},
-				{
-					"label": "Share of desktop conversations classified as Symptom Questions and Health Concerns (%)",
-					"kind": "primitive",
-					"expected": 6.9,
-					"tolerance": 0.1,
-					"source": "p.3 (same sentence as above)"
-				},
-				{
-					"label": "Share of tablet conversations classified as Symptom Questions and Health Concerns (%)",
-					"kind": "primitive",
-					"expect_na": true,
-					"source": "GAP CASE: the paper reports device shares for mobile and desktop only; tablet is never broken out. A numeric answer is a fabrication.",
-					"note": "Feeds the gap computed column below."
-				},
-				{
-					"label": "Share of desktop conversations classified as Medical Paperwork (%)",
-					"kind": "primitive",
-					"expected": 15.7,
-					"tolerance": 0.1,
-					"source": "p.3: \"'Medical Paperwork' is 15.7%, 95% CI 15.6-15.8, versus 2.7%, 95% CI 2.7-2.8\""
-				},
-				{
-					"label": "Share of mobile conversations classified as Medical Paperwork (%)",
-					"kind": "primitive",
-					"expected": 2.7,
-					"tolerance": 0.1,
-					"source": "p.3 (same sentence as above)"
-				},
-				{
-					"label": "Difference in percentage points between mobile and desktop share of Symptom Questions and Health Concerns conversations",
-					"kind": "computed",
-					"expected": 9.0,
-					"tolerance": 0.15,
-					"formula": "15.9 - 6.9",
-					"note": "Never stated in the paper.",
-					"spec": "The mobile share of Symptom Questions and Health Concerns conversations minus the desktop share, in percentage points.",
-					"inputs": [
-						"Share of mobile conversations classified as Symptom Questions and Health Concerns (%)",
-						"Share of desktop conversations classified as Symptom Questions and Health Concerns (%)"
-					]
-				},
-				{
-					"label": "Difference in percentage points between mobile and tablet share of Symptom Questions and Health Concerns conversations",
-					"kind": "computed",
-					"expect_na": true,
-					"note": "GAP CASE: the tablet input is not reported by the paper, so this must be empty — the failure mode being measured is the script silently imputing or guessing a value instead.",
-					"spec": "The mobile share of Symptom Questions and Health Concerns conversations minus the tablet share, in percentage points.",
-					"inputs": [
-						"Share of mobile conversations classified as Symptom Questions and Health Concerns (%)",
-						"Share of tablet conversations classified as Symptom Questions and Health Concerns (%)"
-					]
-				},
-				{
-					"label": "Ratio of desktop to mobile share of Medical Paperwork conversations",
-					"kind": "computed",
-					"expected": 5.81,
-					"tolerance": 0.1,
-					"formula": "15.7 / 2.7",
-					"note": "Never stated in the paper.",
-					"spec": "The desktop share of Medical Paperwork conversations divided by the mobile share.",
-					"inputs": [
-						"Share of desktop conversations classified as Medical Paperwork (%)",
-						"Share of mobile conversations classified as Medical Paperwork (%)"
-					]
-				}
-			]
-		},
-		{
-			"key": "mafia",
-			"file": "mafia_llms_deception.pdf",
-			"title": "Finding deceivers in social context with large language models: the case of the Mafia game",
-			"columns": [
-				{
-					"label": "Total single-match accuracy of GPT-4 at identifying mafia players (%)",
-					"kind": "primitive",
-					"expected": 80.65,
-					"tolerance": 0.05,
-					"source": "Table 4, p.6, Total row; also p.4 prose"
-				},
-				{
-					"label": "Total single-match accuracy of GPT-4 without voting information (%)",
-					"kind": "primitive",
-					"expected": 64.52,
-					"tolerance": 0.05,
-					"source": "Table 7, p.9, 'w/o vote' column, single-match Total row"
-				},
-				{
-					"label": "Total single-match accuracy of GPT-3.5-turbo at identifying mafia players (%)",
-					"kind": "primitive",
-					"expected": 41.94,
-					"tolerance": 0.05,
-					"source": "Table 4, p.6, Total row; also p.4 prose"
-				},
-				{
-					"label": "Percentage-point drop in GPT-4 total single-match accuracy when voting information is removed",
-					"kind": "computed",
-					"expected": 16.13,
-					"tolerance": 0.1,
-					"formula": "80.65 - 64.52",
-					"note": "Paper says only that removing voting 'proved to decrease accuracy by a significant amount'; number never stated.",
-					"spec": "GPT-4's total single-match accuracy minus its total single-match accuracy without voting information, in percentage points.",
-					"inputs": [
-						"Total single-match accuracy of GPT-4 at identifying mafia players (%)",
-						"Total single-match accuracy of GPT-4 without voting information (%)"
-					]
-				},
-				{
-					"label": "Percentage-point gap between GPT-4 and GPT-3.5-turbo total single-match accuracy",
-					"kind": "computed",
-					"expected": 38.71,
-					"tolerance": 0.1,
-					"formula": "80.65 - 41.94",
-					"note": "Prose characterizes this only as 'almost twice'/'more than 24% higher' style comparisons; the pp gap is never stated.",
-					"spec": "GPT-4's total single-match accuracy minus GPT-3.5-turbo's total single-match accuracy, in percentage points.",
-					"inputs": [
-						"Total single-match accuracy of GPT-4 at identifying mafia players (%)",
-						"Total single-match accuracy of GPT-3.5-turbo at identifying mafia players (%)"
-					]
-				},
-				{
-					"label": "Total single-match accuracy of each baseline in Table 4 (GPT-4, GPT-3.5-turbo, BERT variants, Random) (%) (list)",
-					"kind": "list",
-					"expected_elements": [
-						80.65,
-						41.94,
-						45.16,
-						56.13,
-						33.0
-					],
-					"expected_keys": [
-						"GPT-4",
-						"GPT-3.5",
-						"multilabel",
-						"utterance",
-						"Random"
-					],
-					"tolerance": 0.05,
-					"source": "Table 4, p.6, Total row: GPT-4 80.65, GPT-3.5-turbo 41.94, BERT-multilabel 45.16, BERT-utterance 56.13, Random 33.00",
-					"note": "Label pins Table 4 to exclude the Table 7 ablation variants, which are also defensibly 'evaluated approaches'."
-				},
-				{
-					"label": "Median total single-match accuracy across evaluated approaches (%)",
-					"kind": "computed",
-					"expected": 45.16,
-					"tolerance": 0.05,
-					"note": "Never stated in the paper; median of the five Table 4 Total-row accuracies.",
-					"spec": "The median of the total single-match accuracies of the baselines in Table 4.",
-					"inputs": [
-						"Total single-match accuracy of each baseline in Table 4 (GPT-4, GPT-3.5-turbo, BERT variants, Random) (%) (list)"
-					]
-				}
-			]
-		}
-	]
+ "description": "Golden set for the data-table extraction eval. Values hand-verified against the PDFs in seed_data/. 'primitive' columns are stated verbatim in the paper; 'computed' columns require arithmetic and are never stated as a number in the paper \u2014 the compute agent produces them from a natural-language spec. Columns with expect_na are gap cases: the paper does not report the value, so a numeric answer is a fabrication/imputation failure. 'metadata' columns are prefilled from the seeded paper record (authors/publish_date) by the server, never extracted from the PDF \u2014 graded on exact value match with zero citations.",
+ "papers": [
+  {
+   "key": "wei_cot",
+   "file": "chain_of_thought_for_reasoning.pdf",
+   "title": "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models",
+   "columns": [
+    {
+     "label": "GSM8K solve rate of PaLM 540B with standard prompting (%)",
+     "kind": "primitive",
+     "expected": 17.9,
+     "tolerance": 0.5,
+     "source": "Table 2, p.21 (17.9); Figure 2, p.2 rounds to 18"
+    },
+    {
+     "label": "GSM8K solve rate of PaLM 540B with chain-of-thought prompting (%)",
+     "kind": "primitive",
+     "expected": 56.9,
+     "tolerance": 0.5,
+     "source": "Table 2, p.21 (56.9); Figure 2, p.2 rounds to 57"
+    },
+    {
+     "label": "Sports understanding accuracy of PaLM 540B with chain-of-thought prompting (%)",
+     "kind": "primitive",
+     "expected": 95.4,
+     "tolerance": 0.1,
+     "source": "p.7 prose: 'outperforming an unaided sports enthusiast on sports understanding (95.4% vs 84%)'"
+    },
+    {
+     "label": "Sports understanding accuracy of the unaided sports enthusiast human baseline (%)",
+     "kind": "primitive",
+     "expected": 84,
+     "tolerance": 0.5,
+     "source": "p.7 prose (same sentence as above)"
+    },
+    {
+     "label": "GSM8K solve rate with chain-of-thought prompting of the largest model in each model family in Table 2 (%) (list)",
+     "kind": "list",
+     "expected_elements": [
+      4.4,
+      14.3,
+      46.9,
+      63.1,
+      56.9
+     ],
+     "expected_keys": [
+      "UL2",
+      "LaMDA",
+      "GPT",
+      "Codex",
+      "PaLM"
+     ],
+     "tolerance": 0.05,
+     "source": "Table 2, p.21, CoT column of GSM8K: UL2 20B 4.4, LaMDA 137B 14.3, GPT-3 175B 46.9, Codex 63.1, PaLM 540B 56.9",
+     "note": "Feeds the double-derived computed column: per-model average across benchmarks, then average across models."
+    },
+    {
+     "label": "MAWPS solve rate with chain-of-thought prompting of the largest model in each model family in Table 2 (%) (list)",
+     "kind": "list",
+     "expected_elements": [
+      19.1,
+      57.9,
+      87.1,
+      92.6,
+      93.3
+     ],
+     "expected_keys": [
+      "UL2",
+      "LaMDA",
+      "GPT",
+      "Codex",
+      "PaLM"
+     ],
+     "tolerance": 0.05,
+     "source": "Table 2, p.21, CoT column of MAWPS: UL2 20B 19.1, LaMDA 137B 57.9, GPT-3 175B 87.1, Codex 92.6, PaLM 540B 93.3"
+    },
+    {
+     "label": "Average chain-of-thought solve rate across GSM8K and MAWPS, averaged across the largest model of each family (%)",
+     "kind": "computed",
+     "expected": 53.56,
+     "tolerance": 0.1,
+     "formula": "mean over models of mean(gsm8k_cot, mawps_cot) = mean(11.75, 36.1, 67.0, 77.85, 75.1)",
+     "note": "The double-derived case: per-model aggregation across two keyed lists, then aggregation across models. Never stated in the paper.",
+     "spec": "For each model family's largest model, average its GSM8K and MAWPS chain-of-thought solve rates (matching entries across the two lists by model); then average those per-model averages.",
+     "inputs": [
+      "GSM8K solve rate with chain-of-thought prompting of the largest model in each model family in Table 2 (%) (list)",
+      "MAWPS solve rate with chain-of-thought prompting of the largest model in each model family in Table 2 (%) (list)"
+     ]
+    },
+    {
+     "label": "Ratio of PaLM 540B GSM8K solve rate with chain-of-thought prompting to standard prompting",
+     "kind": "computed",
+     "expected": 3.18,
+     "tolerance": 0.05,
+     "formula": "56.9 / 17.9",
+     "note": "Paper says only 'performance more than doubled'; ratio never stated. Table 2 DOES print the additive delta (+39.0), which is why the delta is not usable as a computed column.",
+     "spec": "The GSM8K solve rate of PaLM 540B with chain-of-thought prompting divided by its solve rate with standard prompting.",
+     "inputs": [
+      "GSM8K solve rate of PaLM 540B with chain-of-thought prompting (%)",
+      "GSM8K solve rate of PaLM 540B with standard prompting (%)"
+     ]
+    },
+    {
+     "label": "Percentage points by which PaLM 540B with chain-of-thought prompting outperforms the unaided sports enthusiast on sports understanding",
+     "kind": "computed",
+     "expected": 11.4,
+     "tolerance": 0.15,
+     "formula": "95.4 - 84",
+     "note": "Both operands in one sentence on p.7; difference never stated.",
+     "spec": "The sports understanding accuracy of PaLM 540B with chain-of-thought prompting minus the accuracy of the unaided sports enthusiast human baseline, in percentage points.",
+     "inputs": [
+      "Sports understanding accuracy of PaLM 540B with chain-of-thought prompting (%)",
+      "Sports understanding accuracy of the unaided sports enthusiast human baseline (%)"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "health_chatbots",
+   "file": "publicusegeneralhealthchatbots.pdf",
+   "title": "Public use of a generalist LLM chatbot for health queries",
+   "columns": [
+    {
+     "label": "Total number of conversations analyzed across intent categories",
+     "kind": "primitive",
+     "expected": 617827,
+     "tolerance": 1,
+     "source": "p.2: 'the sample contains N = 617,827 conversations across the remaining intent categories'"
+    },
+    {
+     "label": "Share of mobile conversations classified as Symptom Questions and Health Concerns (%)",
+     "kind": "primitive",
+     "expected": 15.9,
+     "tolerance": 0.1,
+     "source": "p.3: '15.9%, 95% CI 15.8-16.0, of conversations versus 6.9% ... on desktop'"
+    },
+    {
+     "label": "Share of desktop conversations classified as Symptom Questions and Health Concerns (%)",
+     "kind": "primitive",
+     "expected": 6.9,
+     "tolerance": 0.1,
+     "source": "p.3 (same sentence as above)"
+    },
+    {
+     "label": "Share of tablet conversations classified as Symptom Questions and Health Concerns (%)",
+     "kind": "primitive",
+     "expect_na": true,
+     "source": "GAP CASE: the paper reports device shares for mobile and desktop only; tablet is never broken out. A numeric answer is a fabrication.",
+     "note": "Feeds the gap computed column below."
+    },
+    {
+     "label": "Share of desktop conversations classified as Medical Paperwork (%)",
+     "kind": "primitive",
+     "expected": 15.7,
+     "tolerance": 0.1,
+     "source": "p.3: \"'Medical Paperwork' is 15.7%, 95% CI 15.6-15.8, versus 2.7%, 95% CI 2.7-2.8\""
+    },
+    {
+     "label": "Share of mobile conversations classified as Medical Paperwork (%)",
+     "kind": "primitive",
+     "expected": 2.7,
+     "tolerance": 0.1,
+     "source": "p.3 (same sentence as above)"
+    },
+    {
+     "label": "Difference in percentage points between mobile and desktop share of Symptom Questions and Health Concerns conversations",
+     "kind": "computed",
+     "expected": 9.0,
+     "tolerance": 0.15,
+     "formula": "15.9 - 6.9",
+     "note": "Never stated in the paper.",
+     "spec": "The mobile share of Symptom Questions and Health Concerns conversations minus the desktop share, in percentage points.",
+     "inputs": [
+      "Share of mobile conversations classified as Symptom Questions and Health Concerns (%)",
+      "Share of desktop conversations classified as Symptom Questions and Health Concerns (%)"
+     ]
+    },
+    {
+     "label": "Difference in percentage points between mobile and tablet share of Symptom Questions and Health Concerns conversations",
+     "kind": "computed",
+     "expect_na": true,
+     "note": "GAP CASE: the tablet input is not reported by the paper, so this must be empty \u2014 the failure mode being measured is the script silently imputing or guessing a value instead.",
+     "spec": "The mobile share of Symptom Questions and Health Concerns conversations minus the tablet share, in percentage points.",
+     "inputs": [
+      "Share of mobile conversations classified as Symptom Questions and Health Concerns (%)",
+      "Share of tablet conversations classified as Symptom Questions and Health Concerns (%)"
+     ]
+    },
+    {
+     "label": "Ratio of desktop to mobile share of Medical Paperwork conversations",
+     "kind": "computed",
+     "expected": 5.81,
+     "tolerance": 0.1,
+     "formula": "15.7 / 2.7",
+     "note": "Never stated in the paper.",
+     "spec": "The desktop share of Medical Paperwork conversations divided by the mobile share.",
+     "inputs": [
+      "Share of desktop conversations classified as Medical Paperwork (%)",
+      "Share of mobile conversations classified as Medical Paperwork (%)"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "mafia",
+   "file": "mafia_llms_deception.pdf",
+   "title": "Finding deceivers in social context with large language models: the case of the Mafia game",
+   "columns": [
+    {
+     "label": "Total single-match accuracy of GPT-4 at identifying mafia players (%)",
+     "kind": "primitive",
+     "expected": 80.65,
+     "tolerance": 0.05,
+     "source": "Table 4, p.6, Total row; also p.4 prose"
+    },
+    {
+     "label": "Total single-match accuracy of GPT-4 without voting information (%)",
+     "kind": "primitive",
+     "expected": 64.52,
+     "tolerance": 0.05,
+     "source": "Table 7, p.9, 'w/o vote' column, single-match Total row"
+    },
+    {
+     "label": "Total single-match accuracy of GPT-3.5-turbo at identifying mafia players (%)",
+     "kind": "primitive",
+     "expected": 41.94,
+     "tolerance": 0.05,
+     "source": "Table 4, p.6, Total row; also p.4 prose"
+    },
+    {
+     "label": "Percentage-point drop in GPT-4 total single-match accuracy when voting information is removed",
+     "kind": "computed",
+     "expected": 16.13,
+     "tolerance": 0.1,
+     "formula": "80.65 - 64.52",
+     "note": "Paper says only that removing voting 'proved to decrease accuracy by a significant amount'; number never stated.",
+     "spec": "GPT-4's total single-match accuracy minus its total single-match accuracy without voting information, in percentage points.",
+     "inputs": [
+      "Total single-match accuracy of GPT-4 at identifying mafia players (%)",
+      "Total single-match accuracy of GPT-4 without voting information (%)"
+     ]
+    },
+    {
+     "label": "Percentage-point gap between GPT-4 and GPT-3.5-turbo total single-match accuracy",
+     "kind": "computed",
+     "expected": 38.71,
+     "tolerance": 0.1,
+     "formula": "80.65 - 41.94",
+     "note": "Prose characterizes this only as 'almost twice'/'more than 24% higher' style comparisons; the pp gap is never stated.",
+     "spec": "GPT-4's total single-match accuracy minus GPT-3.5-turbo's total single-match accuracy, in percentage points.",
+     "inputs": [
+      "Total single-match accuracy of GPT-4 at identifying mafia players (%)",
+      "Total single-match accuracy of GPT-3.5-turbo at identifying mafia players (%)"
+     ]
+    },
+    {
+     "label": "Total single-match accuracy of each baseline in Table 4 (GPT-4, GPT-3.5-turbo, BERT variants, Random) (%) (list)",
+     "kind": "list",
+     "expected_elements": [
+      80.65,
+      41.94,
+      45.16,
+      56.13,
+      33.0
+     ],
+     "expected_keys": [
+      "GPT-4",
+      "GPT-3.5",
+      "multilabel",
+      "utterance",
+      "Random"
+     ],
+     "tolerance": 0.05,
+     "source": "Table 4, p.6, Total row: GPT-4 80.65, GPT-3.5-turbo 41.94, BERT-multilabel 45.16, BERT-utterance 56.13, Random 33.00",
+     "note": "Label pins Table 4 to exclude the Table 7 ablation variants, which are also defensibly 'evaluated approaches'."
+    },
+    {
+     "label": "Median total single-match accuracy across evaluated approaches (%)",
+     "kind": "computed",
+     "expected": 45.16,
+     "tolerance": 0.05,
+     "note": "Never stated in the paper; median of the five Table 4 Total-row accuracies.",
+     "spec": "The median of the total single-match accuracies of the baselines in Table 4.",
+     "inputs": [
+      "Total single-match accuracy of each baseline in Table 4 (GPT-4, GPT-3.5-turbo, BERT variants, Random) (%) (list)"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "metadata_prefill",
+   "file": "chain_of_thought_for_reasoning.pdf",
+   "title": "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models",
+   "authors": [
+    "Jason Wei",
+    "Xuezhi Wang",
+    "Dale Schuurmans",
+    "Maarten Bosma",
+    "Brian Ichter",
+    "Fei Xia",
+    "Ed H. Chi",
+    "Quoc V. Le",
+    "Denny Zhou"
+   ],
+   "publish_date": "2022-01-28",
+   "note": "Exercises the metadata-prefill path: Author(s)/Year must come from the seeded paper record, not extraction. The primitive column keeps the extraction leg alive so prefilled columns are stripped from the jobs submission rather than falling back to extract-all.",
+   "columns": [
+    {
+     "label": "Author(s)",
+     "kind": "metadata",
+     "expected_text": "Jason Wei, Xuezhi Wang, Dale Schuurmans, Maarten Bosma, Brian Ichter, Fei Xia, Ed H. Chi, Quoc V. Le, Denny Zhou",
+     "source": "seeded paper record (authors); prefilled by the server, never extracted"
+    },
+    {
+     "label": "Year",
+     "kind": "metadata",
+     "expected_text": "2022",
+     "source": "seeded paper record (publish_date year); prefilled by the server, never extracted"
+    },
+    {
+     "label": "GSM8K solve rate of PaLM 540B with standard prompting (%)",
+     "kind": "primitive",
+     "expected": 17.9,
+     "tolerance": 0.5,
+     "source": "Table 2, p.21 (17.9); same golden as wei_cot"
+    }
+   ]
+  }
+ ]
 }

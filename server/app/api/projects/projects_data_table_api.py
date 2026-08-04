@@ -12,6 +12,7 @@ from app.database.crud.projects.project_data_table_crud import (
 from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
 from app.database.models import JobStatus
+from app.helpers.metadata_columns import match_metadata_field, metadata_cell_value
 from app.helpers.pdf_jobs import jobs_client
 from app.helpers.subscription_limits import can_user_create_data_table_job
 from app.llm.operations import operations
@@ -189,6 +190,44 @@ async def create_data_table(
                 )
             )
 
+        # Metadata-like columns (authors, year, journal, ...) are answered from
+        # the stored paper records rather than by the extraction model. Columns
+        # the library fully covers skip extraction entirely; partially covered
+        # ones are still extracted, and stored values win where they exist when
+        # the webhook assembles the table.
+        metadata_plan: List[dict] = []
+        prefilled_labels: set[str] = set()
+        for label in request.columns:
+            if label in computed_labels or label in list_labels:
+                continue
+            field = match_metadata_field(label)
+            if not field:
+                continue
+            covered = all(
+                metadata_cell_value(pp, field) is not None for pp in project_papers
+            )
+            metadata_plan.append(
+                {
+                    "label": label,
+                    "kind": "metadata",
+                    "field": field,
+                    "extract": not covered,
+                }
+            )
+            if covered:
+                prefilled_labels.add(label)
+
+        # The worker requires at least one column, so if prefill would strip
+        # them all, extract the metadata columns too — stored values still win.
+        if not [
+            c
+            for c in request.columns
+            if c not in computed_labels and c not in prefilled_labels
+        ]:
+            for entry in metadata_plan:
+                entry["extract"] = True
+            prefilled_labels.clear()
+
         # Create the job in the database first
         job = data_table_job_crud.create(
             db=db,
@@ -204,6 +243,7 @@ async def create_data_table(
                         {"label": label, "kind": "list"}
                         for label in request.list_columns
                     ]
+                    + metadata_plan
                 ),
             ),
             user=current_user,
@@ -220,10 +260,15 @@ async def create_data_table(
         job_id = str(job.id)
 
         # The jobs service only extracts primitives; computed columns are
-        # produced server-side by the compute agent from the job's column_plan
-        # when the webhook delivers the extracted dataset.
+        # produced server-side by the compute agent, and fully-covered
+        # metadata columns are filled from stored paper records, both when
+        # the webhook delivers the extracted dataset.
         data_table = DataTableSchema(
-            columns=[c for c in request.columns if c not in computed_labels],
+            columns=[
+                c
+                for c in request.columns
+                if c not in computed_labels and c not in prefilled_labels
+            ],
             papers=papers,
             list_columns=request.list_columns,
         )
