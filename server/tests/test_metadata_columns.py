@@ -18,6 +18,8 @@ def make_paper(**overrides) -> SimpleNamespace:
         journal="Journal of Computing",
         doi="10.1000/xyz123",
         title="On Computable Numbers",
+        abstract="We investigate computable numbers.",
+        publisher="Cambridge University Press",
     )
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
@@ -37,6 +39,8 @@ class TestMatchMetadataField(unittest.TestCase):
             ("Journal", "journal"),
             ("DOI", "doi"),
             ("Paper Title", "title"),
+            ("Abstract", "abstract"),
+            ("Publisher", "publisher"),
         ]:
             self.assertEqual(match_metadata_field(label), field, label)
 
@@ -66,6 +70,13 @@ class TestMetadataCellValue(unittest.TestCase):
         self.assertEqual(metadata_cell_value(paper, "journal"), "Journal of Computing")
         self.assertEqual(metadata_cell_value(paper, "doi"), "10.1000/xyz123")
         self.assertEqual(metadata_cell_value(paper, "title"), "On Computable Numbers")
+        self.assertEqual(
+            metadata_cell_value(paper, "abstract"),
+            "We investigate computable numbers.",
+        )
+        self.assertEqual(
+            metadata_cell_value(paper, "publisher"), "Cambridge University Press"
+        )
 
     def test_missing_values_return_none(self):
         paper = make_paper(

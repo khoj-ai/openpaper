@@ -47,6 +47,8 @@ _FIELD_SYNONYMS = {
     "journal": ("journal", "journalname", "journaltitle"),
     "doi": ("doi", "doinumber", "digitalobjectidentifier"),
     "title": ("title", "papertitle", "articletitle", "studytitle"),
+    "abstract": ("abstract", "paperabstract", "articleabstract"),
+    "publisher": ("publisher", "publishername"),
 }
 
 _LABEL_TO_FIELD = {

@@ -382,7 +382,7 @@ Guidelines:
 - Never propose a computed column whose inputs are not themselves proposed as primitive or list columns.
 - Every primitive and list column must include a 1-2 sentence evidence note saying where the papers ground it (which papers/tables/sections report it, and roughly how widely). Refer to papers by their title — never by their ID. Computed columns leave evidence empty (their grounding is their inputs).
 - The paper title and a link to the paper will automatically be provided for each row in the final output table, so do not propose columns for those.
-- Bibliographic metadata — authors, publication year/date, institutions, journal, and DOI — is stored with each paper in the library and is filled into the table from those records, not extracted from the PDFs. When such a column serves the user's goal (e.g. a literature-review matrix), propose it freely as a primitive column with evidence "from stored paper metadata"; never spend investigation effort confirming it in the papers.
+- Bibliographic metadata — authors, publication year/date, institutions, journal, publisher, DOI, and abstract — is stored with each paper in the library and is filled into the table from those records, not extracted from the PDFs. When such a column serves the user's goal (e.g. a literature-review matrix), propose it freely as a primitive column with evidence "from stored paper metadata"; never spend investigation effort confirming it in the papers.
 """
 
 PROPOSE_DATA_TABLE_INVESTIGATION_SYSTEM_PROMPT = """
@@ -393,7 +393,7 @@ The schema that will be built from your findings can express three kinds of colu
 - list: one value per instance within a paper — per model, arm, dataset, condition (needs: what the instances are, how the paper labels them, which specific metric is reported per instance, and whether several submetrics exist).
 - computed: a quantity calculated from other columns after extraction — differences, ratios, aggregates, spreads (needs: whether the underlying inputs are actually reported, not whether the computed result is).
 
-Bibliographic metadata (authors, publication year/date, institutions, journal, DOI) is stored with every paper and auto-filled from those records — never spend searches confirming it in the papers.
+Bibliographic metadata (authors, publication year/date, institutions, journal, publisher, DOI, abstract) is stored with every paper and auto-filled from those records — never spend searches confirming it in the papers.
 
 Investigate with your tools — findings grounded in what the papers actually report beat plausible-sounding guesses:
 - Start broad: search_all_files with terms from the user's request (and synonyms) to see which papers report what, or read_abstract on a few representative papers to orient.
