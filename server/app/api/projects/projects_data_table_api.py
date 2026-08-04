@@ -12,7 +12,7 @@ from app.database.crud.projects.project_data_table_crud import (
 from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
 from app.database.models import JobStatus
-from app.helpers.metadata_columns import match_metadata_field, metadata_cell_value
+from app.helpers.metadata_columns import plan_metadata_columns
 from app.helpers.pdf_jobs import jobs_client
 from app.helpers.subscription_limits import can_user_create_data_table_job
 from app.llm.operations import operations
@@ -195,38 +195,12 @@ async def create_data_table(
         # the library fully covers skip extraction entirely; partially covered
         # ones are still extracted, and stored values win where they exist when
         # the webhook assembles the table.
-        metadata_plan: List[dict] = []
-        prefilled_labels: set[str] = set()
-        for label in request.columns:
-            if label in computed_labels or label in list_labels:
-                continue
-            field = match_metadata_field(label)
-            if not field:
-                continue
-            covered = all(
-                metadata_cell_value(pp, field) is not None for pp in project_papers
-            )
-            metadata_plan.append(
-                {
-                    "label": label,
-                    "kind": "metadata",
-                    "field": field,
-                    "extract": not covered,
-                }
-            )
-            if covered:
-                prefilled_labels.add(label)
-
-        # The worker requires at least one column, so if prefill would strip
-        # them all, extract the metadata columns too — stored values still win.
-        if not [
-            c
-            for c in request.columns
-            if c not in computed_labels and c not in prefilled_labels
-        ]:
-            for entry in metadata_plan:
-                entry["extract"] = True
-            prefilled_labels.clear()
+        metadata_plan, prefilled_labels = plan_metadata_columns(
+            columns=request.columns,
+            papers=project_papers,
+            computed_labels=computed_labels,
+            list_labels=list_labels,
+        )
 
         # Create the job in the database first
         job = data_table_job_crud.create(

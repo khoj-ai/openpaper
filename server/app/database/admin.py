@@ -223,25 +223,74 @@ class MessageAdmin(ModelView, model=Message):
 class DataTableExtractionJobAdmin(ModelView, model=DataTableExtractionJob):
     column_list = [
         DataTableExtractionJob.id,
+        "user",
+        DataTableExtractionJob.user_id,
         DataTableExtractionJob.project_id,
         DataTableExtractionJob.status,
+        DataTableExtractionJob.error_message,
         DataTableExtractionJob.created_at,
     ]
+    # "user.email" searches through the relationship, so pasting a reporter's
+    # email surfaces their jobs directly.
     column_searchable_list = [
+        DataTableExtractionJob.id,
+        DataTableExtractionJob.user_id,
+        "user.email",
         DataTableExtractionJob.project_id,
         DataTableExtractionJob.status,
     ]
+    column_sortable_list = [
+        DataTableExtractionJob.created_at,
+        DataTableExtractionJob.status,
+    ]
+    column_default_sort = (DataTableExtractionJob.created_at, True)
+
+    @action(
+        name="rerun_jobs",
+        label="Re-run selected jobs",
+        confirmation_message="Re-run the selected data table jobs? Their "
+        "existing results are deleted and rebuilt by the extraction pipeline "
+        "(metadata columns are re-classified against current paper records).",
+        add_in_detail=True,
+        add_in_list=True,
+    )
+    async def action_rerun_jobs(self, request: StarletteRequest):
+        from app.helpers.data_table_resubmit import resubmit_data_table_job
+
+        pks = request.query_params.get("pks", "")
+        pk_list = [pk.strip() for pk in pks.split(",") if pk.strip()]
+
+        async with aget_db() as db:
+            for pk in pk_list:
+                job = db.query(DataTableExtractionJob).get(pk)
+                if not job:
+                    continue
+                try:
+                    resubmit_data_table_job(db, job)
+                except Exception as e:
+                    logger.error(f"Admin re-run failed for data table job {pk}: {e}")
+                    db.rollback()
+
+        referer = request.headers.get(
+            "referer", "/admin/data-table-extraction-job/list"
+        )
+        return StarletteRedirect(referer)
 
 
 class DataTableExtractionResultAdmin(ModelView, model=DataTableExtractionResult):
     column_list = [
         DataTableExtractionResult.id,
+        DataTableExtractionResult.job_id,
+        DataTableExtractionResult.title,
         DataTableExtractionResult.success,
         DataTableExtractionResult.created_at,
     ]
     column_searchable_list = [
-        DataTableExtractionResult.success,
+        DataTableExtractionResult.id,
+        DataTableExtractionResult.job_id,
+        DataTableExtractionResult.title,
     ]
+    column_default_sort = (DataTableExtractionResult.created_at, True)
 
 
 class DataTableRowAdmin(ModelView, model=DataTableRow):

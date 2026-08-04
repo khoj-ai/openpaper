@@ -6,6 +6,7 @@ from app.helpers.metadata_columns import (
     fill_metadata_cells,
     match_metadata_field,
     metadata_cell_value,
+    plan_metadata_columns,
 )
 from app.schemas.responses import DataTableCellValue, DataTableRow, ResponseCitation
 
@@ -92,6 +93,56 @@ class TestMetadataCellValue(unittest.TestCase):
         ]:
             self.assertIsNone(metadata_cell_value(paper, field), field)
         self.assertIsNone(metadata_cell_value(None, "authors"))
+
+
+class TestPlanMetadataColumns(unittest.TestCase):
+    COLUMNS = ["Author(s)", "Year", "Sample Size (n)"]
+
+    def test_fully_covered_columns_are_prefilled(self):
+        plan, prefilled = plan_metadata_columns(
+            self.COLUMNS, [make_paper(), make_paper()], set(), set()
+        )
+        self.assertEqual(prefilled, {"Author(s)", "Year"})
+        self.assertEqual(
+            plan,
+            [
+                {
+                    "label": "Author(s)",
+                    "kind": "metadata",
+                    "field": "authors",
+                    "extract": False,
+                },
+                {
+                    "label": "Year",
+                    "kind": "metadata",
+                    "field": "year",
+                    "extract": False,
+                },
+            ],
+        )
+
+    def test_partial_coverage_keeps_extraction(self):
+        papers = [make_paper(), make_paper(publish_date=None)]
+        plan, prefilled = plan_metadata_columns(self.COLUMNS, papers, set(), set())
+        self.assertEqual(prefilled, {"Author(s)"})
+        year_entry = next(e for e in plan if e["label"] == "Year")
+        self.assertTrue(year_entry["extract"])
+
+    def test_computed_and_list_columns_are_excluded(self):
+        plan, prefilled = plan_metadata_columns(
+            self.COLUMNS, [make_paper()], {"Year"}, {"Author(s)"}
+        )
+        self.assertEqual(plan, [])
+        self.assertEqual(prefilled, set())
+
+    def test_all_metadata_table_falls_back_to_extraction(self):
+        # Stripping every extraction column would leave the worker nothing —
+        # everything extracts instead, and stored values still win later.
+        plan, prefilled = plan_metadata_columns(
+            ["Author(s)", "Year"], [make_paper()], set(), set()
+        )
+        self.assertEqual(prefilled, set())
+        self.assertTrue(all(e["extract"] for e in plan))
 
 
 class TestFillMetadataCells(unittest.TestCase):
