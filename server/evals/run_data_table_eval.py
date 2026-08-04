@@ -141,6 +141,11 @@ def seed(db, current_user: CurrentUser, manifest: dict, results: dict) -> dict:
                 s3_object_key=object_key,
                 raw_content=raw_content,
                 title=paper_cfg["title"],
+                # Optional seeded bibliographic metadata — the golden values
+                # for 'metadata' columns, which are prefilled from the paper
+                # record rather than extracted.
+                authors=paper_cfg.get("authors"),
+                publish_date=paper_cfg.get("publish_date"),
             ),
             user=current_user,
         )
@@ -402,6 +407,30 @@ def grade_cell(
     if col_cfg["kind"] == "list":
         return grade_list_cell(col_cfg, cell, paper_text_norm)
 
+    if col_cfg["kind"] == "metadata":
+        # Prefilled from the seeded paper record: the value must match the
+        # seed exactly AND carry zero citations — citations mean the cell
+        # came from extraction, i.e. the prefill path did not run.
+        value = (cell.get("value") or "").strip()
+        citations = cell.get("citations", []) or []
+        expected_text = col_cfg["expected_text"]
+        graded = {
+            "label": col_cfg["label"],
+            "kind": "metadata",
+            "value": value,
+            "expected": expected_text,
+            "n_citations": len(citations),
+        }
+        if is_na(value):
+            graded["outcome"] = "na"
+        elif value != expected_text:
+            graded["outcome"] = "incorrect_prefill"
+        elif citations:
+            graded["outcome"] = "extracted_not_prefilled"
+        else:
+            graded["outcome"] = "correct_prefill"
+        return graded
+
     value = cell.get("value", "")
     citations = cell.get("citations", []) or []
     numeric = parse_numeric(value)
@@ -473,6 +502,7 @@ def summarize(results: dict, manifest: dict) -> dict:
     primitives: list[dict] = []
     computed: list[dict] = []
     gaps: list[dict] = []
+    metadata: list[dict] = []
     computed_by_column: dict[str, list[str]] = {}
 
     for run_record in results["runs"]:
@@ -481,8 +511,12 @@ def summarize(results: dict, manifest: dict) -> dict:
             if cell.get("expect_na"):
                 gaps.append(cell)
                 continue
+            # Prefilled cells never carry citations, so they are scored
+            # separately rather than dragging down the primitive citation rate.
+            if cell["kind"] == "metadata":
+                metadata.append(cell)
             # List cells are extraction outputs — grade them with primitives.
-            if cell["kind"] != "computed":
+            elif cell["kind"] != "computed":
                 primitives.append(cell)
             else:
                 computed.append(cell)
@@ -522,6 +556,13 @@ def summarize(results: dict, manifest: dict) -> dict:
             "total": len(gaps),
             "correct_na": count(gaps, "correct_na"),
             "fabricated": count(gaps, "fabricated"),
+        },
+        "metadata": {
+            "total": len(metadata),
+            "correct_prefill": count(metadata, "correct_prefill"),
+            "incorrect_prefill": count(metadata, "incorrect_prefill"),
+            "extracted_not_prefilled": count(metadata, "extracted_not_prefilled"),
+            "na": count(metadata, "na"),
         },
     }
 
@@ -587,6 +628,13 @@ def print_summary(summary: dict) -> None:
         print(
             f"Gap cells:       {g['total']} | stayed-empty {g['correct_na']} | "
             f"fabricated {g['fabricated']}"
+        )
+    md = summary.get("metadata", {})
+    if md.get("total"):
+        print(
+            f"Metadata cells:  {md['total']} | prefilled-correct {md['correct_prefill']} | "
+            f"incorrect {md['incorrect_prefill']} | "
+            f"extracted-not-prefilled {md['extracted_not_prefilled']} | N/A {md['na']}"
         )
     if d["inconsistent_columns"]:
         print(f"Inconsistent computed columns: {', '.join(d['inconsistent_columns'])}")
