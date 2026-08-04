@@ -1,0 +1,115 @@
+export const metadata = {
+    title: "Data Tables, Now With Math",
+    description: "Data Tables can now calculate derived values, fill in the metadata already in your library, and make stronger evidence-backed suggestions for quantitative literature reviews.",
+    date: "08-04-2026",
+    image: "https://assets.khoj.dev/blue_bubbles_abstract.png",
+}
+
+Literature reviews often begin as reading problems and end as arithmetic problems.
+
+You start by asking what a paper found. A few papers later, you need to know how results compare: Which intervention had the larger effect? What was the average score across models? How much did a metric change from baseline? Which studies used the same outcome measure?
+
+Those are reasonable questions. But they ask for more than a pile of paper summaries. They ask for a small, inspectable dataset — one that stays connected to the papers it came from.
+
+We've been improving Data Tables around exactly that workflow. The big changes are computation, automatic bibliographic metadata, and a more careful path from your question to the final cells.
+
+## From extraction to calculation
+
+Data Tables have always been useful for facts a paper states directly: sample size, study design, outcome, accuracy, limitation. Those values remain extracted from the paper and cited back to the source text.
+
+Now a table can also include **computed columns**: values derived from fields already in the table.
+
+Say you're reviewing experiments that report a baseline accuracy and a final accuracy. You can ask for:
+
+| Extracted from each paper | Computed in the table |
+| --- | --- |
+| Baseline accuracy | Absolute improvement |
+| Final accuracy | Percent improvement |
+| Per-model F1 score | Mean F1 across models |
+| Treatment and control summaries | Effect size |
+
+The important distinction is that Open Paper does not ask the extraction model to *invent* a derived result as though it appeared verbatim in a PDF. It first extracts the inputs, with citations. Then it calculates the derived column from those inputs.
+
+That means you can use tables for work that is genuinely quantitative — not just a prettier way to collect prose.
+
+## The calculation should be inspectable too
+
+Derived values are helpful only if you can see how they were made.
+
+For each computed column, the table shows what it is calculating and which fields it reads. The calculation runs in a sandbox on only those declared inputs. You can also open the code that produced the results, along with its input snapshot, output, and any warnings.
+
+This is deliberately a little more rigorous than a magic “calculate” button. A computed number isn't a quote from a paper, so it shouldn't pretend to have one. Its evidence is the cited source values *and* the transparent transformation between them.
+
+If a necessary input is missing or unclear, the system leaves the computed value blank and flags the issue rather than filling in a plausible-looking number. In a review, an honest gap is usually more useful than a quietly invented estimate.
+
+## Metadata should not need to be re-read from a PDF
+
+Tables for literature reviews nearly always need context: authors, year, journal, DOI, institution, and so on.
+
+Open Paper already stores this information with the papers in your library. When a column asks for recognized bibliographic metadata, Data Tables can now prefill it from that stored record instead of spending extraction effort looking for it in the PDF.
+
+That has a few practical benefits:
+
+- Your review matrix gets its useful context automatically.
+- The extraction model can focus on the study-specific evidence only the paper can answer.
+- A paper being a poor topical match doesn't make it mysteriously lose its publication year or author list.
+
+Where library metadata is available, it takes precedence. Where it isn't, the extraction flow can still look for the value in the paper. The result is less busywork and a more consistent table.
+
+## A better question produces a better table
+
+We also changed how table schemas are proposed.
+
+Instead of treating a prompt like “compare outcomes across these studies” as an invitation to guess at generic columns, Open Paper first investigates the papers in your project. It looks for the terminology, units, tables, sections, and level of detail the papers actually report before suggesting fields for you to review.
+
+That matters a lot for quantitative work. “Score” might mean accuracy, AUROC, F1, or a clinical rating scale. “Sample size” might mean the whole cohort, a treatment arm, or a per-dataset evaluation count. A vague column can produce superficially tidy results that aren't comparable.
+
+The new schema suggestions make these distinctions explicit. They can propose:
+
+- **Single-value fields** for facts reported once per paper.
+- **List fields** for repeated values, such as a metric for each model, dataset, or study arm. Each item keeps its own label and citation.
+- **Computed fields** when the quantity needs arithmetic rather than another round of extraction.
+
+You still get to edit the proposed schema. The point is to begin with something grounded in the collection you actually have, not a template that happens to sound academic.
+
+## More careful about what the papers don't say
+
+The less glamorous part of this work has been hardening answer quality.
+
+Research papers are inconsistent. Tables are dense. A number may be missing, reported only for a subgroup, or easy to confuse with a nearby metric. We've added evaluation cases around those failure modes and tightened the extraction and computation contracts around them.
+
+In particular, the system is designed to preserve the difference between:
+
+- a value the paper states, which needs a supporting citation;
+- a value calculated from stated inputs, which needs visible provenance; and
+- a value the paper does not report, which should stay missing.
+
+That third category is crucial. An incomplete table is not a failed literature review. It can be a finding: perhaps only a subset of studies report dropout, calibration, adverse events, or a particular effect-size input. Seeing that pattern clearly is often more valuable than having every cell filled.
+
+## A compact example: reviewing intervention studies
+
+Imagine you have a project of clinical intervention papers and want to understand outcomes across trials. You could ask for a table that includes:
+
+| Column | Type | Why it helps |
+| --- | --- | --- |
+| Authors | Prefilled metadata | Quickly identify and cite each study |
+| Publication year | Prefilled metadata | See how evidence changes over time |
+| Trial arms (list) | Extracted | Keep each intervention and comparator distinct |
+| Sample size by arm (list) | Extracted | Preserve the study's actual groups |
+| Primary outcome | Extracted | Avoid comparing unlike measures by accident |
+| Outcome at follow-up | Extracted | Keep the reported values connected to evidence |
+| Difference between arms | Computed | Make the comparison explicit and reproducible |
+
+From there, you can sort, export, or use Project chat to ask a synthesis question across the papers. More importantly, you can audit each step: back to the source text for extracted values, and back to the calculation for derived ones.
+
+## Evidence that can bear weight
+
+The goal is not to automate away judgment. A good literature review still depends on decisions about inclusion, comparability, confounding, and interpretation.
+
+But those decisions get easier when the underlying evidence is organized well. Data Tables now help turn a collection of PDFs into a research object you can reason over: bibliographic context already in place, reported values tied to citations, calculations shown rather than hidden, and gaps left visible.
+
+That's what we mean by grounded quantitative research. Not just answers that sound right — evidence you can inspect, compare, and carry into the argument you eventually write.
+
+---
+
+Ready to try it? Add papers to a [Project](/projects), create a Data Table, and describe the comparison you want to make. Start with the question you would put in your review — the table can help you discover the fields the papers can actually support.

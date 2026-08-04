@@ -78,6 +78,7 @@ export function generateStaticParams() {
         { slug: 'change_december' },
         { slug: 'quiet_week' },
         { slug: 'data_tables' },
+        { slug: 'data_tables_quantitative_research' },
         { slug: 'citation_manager' },
         { slug: 'why_open_source' },
         { slug: 'systematic_review' },
