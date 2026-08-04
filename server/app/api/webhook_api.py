@@ -42,6 +42,7 @@ from app.helpers.email import (
     send_data_table_complete_email,
     send_referral_credit_available_email,
 )
+from app.helpers.metadata_columns import fill_metadata_cells
 from app.helpers.metadata_hydration import hydrate_paper_metadata
 from app.helpers.s3 import s3_service
 from app.helpers.subscription_limits import can_user_auto_sync_zotero
@@ -733,14 +734,28 @@ def handle_data_table_processing_webhook(
             # is persisted with the result.
             job = data_table_job_crud.get(db=db, id=uuid.UUID(job_id))
             compute_provenance = None
+            papers_by_id = {
+                row.paper_id: paper_crud.get(db=db, id=uuid.UUID(row.paper_id))
+                for row in result.rows
+            }
             if job:
+                # Metadata columns are filled from the stored paper records —
+                # before the compute agent runs, so computed columns can read
+                # them. Stored values overwrite extracted ones; cells whose
+                # paper lacks the value keep whatever extraction returned.
+                fill_metadata_cells(
+                    result.rows,
+                    [e for e in job.column_plan or [] if e.get("kind") == "metadata"],
+                    papers_by_id,
+                )
                 computed_specs = []
                 for entry in job.column_plan or []:
                     # Entries are {label, kind, ...}: kind "list" marks a
-                    # list-valued primitive; "computed" carries spec+inputs
-                    # for the compute agent. Any other kind is unknown — skip
-                    # it defensively, the rest of the table still persists.
-                    if entry.get("kind") == "list":
+                    # list-valued primitive; "metadata" was handled above;
+                    # "computed" carries spec+inputs for the compute agent.
+                    # Any other kind is unknown — skip it defensively, the
+                    # rest of the table still persists.
+                    if entry.get("kind") in ("list", "metadata"):
                         continue
                     if entry.get("kind") != "computed":
                         logger.warning(
@@ -754,12 +769,12 @@ def handle_data_table_processing_webhook(
                             f"Skipping invalid column_plan entry on job {job_id}: {entry}"
                         )
                 if computed_specs:
-                    paper_titles = {}
-                    for row in result.rows:
-                        paper = paper_crud.get(db=db, id=uuid.UUID(row.paper_id))
-                        paper_titles[row.paper_id] = (
-                            str(paper.title or "") if paper else ""
+                    paper_titles = {
+                        row.paper_id: str(
+                            getattr(papers_by_id.get(row.paper_id), "title", "") or ""
                         )
+                        for row in result.rows
+                    }
                     try:
                         compute_provenance = run_computed_columns(
                             result.rows, computed_specs, paper_titles
@@ -792,7 +807,7 @@ def handle_data_table_processing_webhook(
 
             paper_titles = []
             for row in result.rows:
-                paper = paper_crud.get(db=db, id=uuid.UUID(row.paper_id))
+                paper = papers_by_id.get(row.paper_id)
                 if paper and paper.title:
                     paper_titles.append(paper.title)
                 else:
