@@ -20,6 +20,12 @@ def _mask_pii(data: Any, **_: Any) -> Any:
     """Redact common PII before a trace leaves this process."""
     value = data
     if isinstance(value, str):
+        # Base64 data URIs (PDF/image payloads) hold encoded binary, so the
+        # regexes can't find real PII in them — but "redacting" incidental
+        # digit runs corrupts the encoding and Langfuse then fails to parse
+        # the media. Pass them through untouched.
+        if value.startswith("data:") and ";base64," in value[:100]:
+            return value
         return _PHONE.sub("[PHONE_REDACTED]", _EMAIL.sub("[EMAIL_REDACTED]", value))
     if isinstance(value, dict):
         return {key: _mask_pii(item) for key, item in value.items()}
