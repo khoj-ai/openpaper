@@ -356,16 +356,30 @@ def periodic_zotero_sync(self):
     # Celery's task-success log runs the return value through a bounded saferepr,
     # which collapses nested lists to "[...]" — so per-user sync errors never show
     # up there. Log them explicitly here where they won't be truncated.
+    users_with_errors = 0
+    total_errors = 0
     for user_result in result.get("results", []):
         user_errors = user_result.get("errors") or []
         if user_errors:
+            users_with_errors += 1
+            total_errors += len(user_errors)
             logger.warning(
                 "Zotero sync errors for user %s: %s",
                 user_result.get("user_id"),
                 json.dumps(user_errors),
             )
 
-    return result
+    # Nothing consumes this task's return value; it only feeds the result
+    # backend and the bounded "succeeded" log line, where the full nested
+    # payload gets elided anyway. Return a compact digest so that line is
+    # complete — the details live in the warnings above and the server's logs.
+    return {
+        "synced_users": result.get("synced_users", 0),
+        "total_users": result.get("total_users", 0),
+        "skipped_users": result.get("skipped_users", 0),
+        "users_with_errors": users_with_errors,
+        "total_errors": total_errors,
+    }
 
 
 @celery_app.task(
