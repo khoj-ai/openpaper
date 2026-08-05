@@ -1,9 +1,6 @@
-import logging
 import os
 
 from firecrawl import FirecrawlApp
-
-logger = logging.getLogger(__name__)
 
 FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
 if not FIRECRAWL_API_KEY:
@@ -30,5 +27,6 @@ def scrape_web_page(url: str) -> str:
             return document.markdown
         raise Exception(f"Failed to scrape {url}: no markdown content returned")
     except Exception as e:
-        logger.error(f"Error scraping {url}: {str(e)}")
+        # Scrape failures are expected (anti-bot walls, dead links) and the
+        # caller logs them at warning; don't also log at error here.
         raise Exception(f"Error scraping {url}: {str(e)}")
