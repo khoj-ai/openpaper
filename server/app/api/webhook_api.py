@@ -342,7 +342,12 @@ class PdfProcessingWebhookData(BaseModel):
 
     task_id: str
     status: str
-    result: PDFProcessingResult
+    # The worker's task-level exception handler (e.g. the S3 download failing
+    # before processing starts) sends result=None with the reason in `error`;
+    # requiring a result here made FastAPI 422 those webhooks, so the job was
+    # never marked failed and stayed stuck in "processing".
+    result: Optional[PDFProcessingResult] = None
+    error: Optional[str] = None
 
 
 @webhook_router.post("/paper-processing/{job_id}")
@@ -412,7 +417,7 @@ async def handle_paper_processing_webhook(
             )
             return {"status": "webhook ignored - job already completed"}
 
-        if status == "completed" and result.success:
+        if status == "completed" and result is not None and result.success:
             # Zotero imports run the worker with LLM metadata extraction skipped,
             # so they have no `metadata` to apply. Zotero's authoritative metadata
             # was already set at submit time; here we only fill the deterministic
@@ -637,13 +642,18 @@ async def handle_paper_processing_webhook(
                 )
 
         else:
-            # Processing failed.
-            error_message = result.error if result.error else "Unknown error"
+            # Processing failed. A task-level worker failure carries no result
+            # object; its reason arrives in the payload's top-level error field.
+            error_message = (
+                (result.error if result else None)
+                or webhook_data.error
+                or "Unknown error"
+            )
 
             # Best-effort salvage for Zotero imports: Zotero already supplied the
             # metadata, so keep the paper with whatever deterministic outputs the
             # worker did produce instead of discarding it.
-            if zotero_import:
+            if zotero_import and result is not None:
                 salvaged = _finalize_zotero_import(
                     db=db,
                     job_id=job_id,
