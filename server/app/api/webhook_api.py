@@ -189,7 +189,12 @@ def handle_failed_upload(
         )
         return
 
-    logger.error(f"PDF processing failed for job {job_id}: {reason}")
+    # Info, not error: severity is decided where the failure originates. The
+    # jobs service logs worker failures (warning for expected content
+    # rejections like scanned PDFs, error with traceback otherwise), and
+    # server-side callers log their own reason at error before calling this.
+    # This line just records that cleanup ran.
+    logger.info(f"PDF processing failed for job {job_id}: {reason}")
 
     # Clean up the paper record that was created during upload
     existing_paper = paper_crud.get_by_upload_job_id(
