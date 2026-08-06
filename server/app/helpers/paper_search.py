@@ -285,6 +285,12 @@ def search_open_alex(
     # Construct the search URL
     base_url = "https://api.openalex.org/works"
 
+    # OpenAlex treats "?" and "*" as wildcards, which its default stemmed
+    # search rejects with a 400 — so a paper title ending in a question mark
+    # fails outright. They carry no meaning for our searches; drop them.
+    if search_term:
+        search_term = search_term.replace("?", " ").replace("*", " ")
+
     params = {"search": quote(search_term) if search_term else "", "page": page}
     if filter:
         params["filter"] = quote(construct_open_alex_filter_url(filter))
