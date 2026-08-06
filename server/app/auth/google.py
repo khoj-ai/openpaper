@@ -78,7 +78,10 @@ class GoogleAuthClient:
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
-            logger.error(f"Error getting token from Google: {e}")
+            error_body = e.response.text if e.response is not None else None
+            logger.error(
+                f"Error getting token from Google: {e} (response: {error_body})"
+            )
             return None
 
     def get_user_info(self, access_token: str) -> Optional[OAuthUserInfo]:
@@ -107,7 +110,10 @@ class GoogleAuthClient:
                 locale=user_data.get("locale"),
             )
         except requests.exceptions.RequestException as e:
-            logger.error(f"Error getting user info from Google: {e}")
+            error_body = e.response.text if e.response is not None else None
+            logger.error(
+                f"Error getting user info from Google: {e} (response: {error_body})"
+            )
             return None
         except KeyError as e:
             logger.error(f"Missing field in Google user info response: {e}")
