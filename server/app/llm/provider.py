@@ -52,7 +52,6 @@ logger = logging.getLogger(__name__)
 class LLMProvider(Enum):
     GEMINI = "gemini"
     OPENAI = "openai"
-    CEREBRAS = "cerebras"
     ANTHROPIC = "anthropic"
 
 
@@ -160,7 +159,7 @@ class BaseLLMProvider(ABC):
 
 def _strip_additional_properties(schema: Any) -> Any:
     """Gemini's schema converter rejects `additionalProperties`, which pydantic
-    emits for models configured with extra="forbid" (required by OpenAI/Cerebras
+    emits for models configured with extra="forbid" (required by OpenAI
     strict mode). Strip it so one schema serves every provider."""
     if isinstance(schema, dict):
         return {
@@ -581,8 +580,8 @@ class OpenAIProvider(BaseLLMProvider):
         self._client = LangfuseOpenAI(api_key=self.api_key, base_url=base_url)
         self._default_model = default_model or "gpt-5.6-sol"
         self._fast_model = fast_model or "gpt-5.6-luna"
-        # Some OpenAI-compatible endpoints (e.g. Cerebras) reject `file` content
-        # blocks. When False, FileContent for PDFs uses text_fallback inline.
+        # Some OpenAI-compatible endpoints reject `file` content blocks.
+        # When False, FileContent for PDFs uses text_fallback inline.
         self.supports_pdf_input = supports_pdf_input
 
     @property
@@ -622,7 +621,7 @@ class OpenAIProvider(BaseLLMProvider):
             kwargs["tools"] = tools
             # gpt-5.x reasoning models reject function tools on
             # /v1/chat/completions unless reasoning is off (the alternative is
-            # migrating to /v1/responses). Cerebras models don't match the
+            # migrating to /v1/responses). Other models don't match the
             # prefix and are unaffected.
             if model.startswith("gpt-5"):
                 kwargs.setdefault("reasoning_effort", "none")
@@ -732,7 +731,7 @@ class OpenAIProvider(BaseLLMProvider):
                                 }
                             )
                         else:
-                            # Text-only OpenAI-compatible provider (e.g. Cerebras).
+                            # Text-only OpenAI-compatible provider.
                             # The caller must supply a pre-extracted text
                             # alternative on FileContent.text_fallback.
                             if item.text_fallback is None:
@@ -812,8 +811,8 @@ class OpenAIProvider(BaseLLMProvider):
             # First, add an assistant message with the tool calls
             # This reconstructs what the model "said" when it made the tool calls
             # Reassign synthetic, guaranteed-unique ids paired by position with
-            # the tool messages below. The model/provider (e.g. Cerebras) can
-            # recycle a tool_call id across turns, and OpenAI rejects duplicate
+            # the tool messages below. Some models/providers can recycle a
+            # tool_call id across turns, and OpenAI rejects duplicate
             # tool_call.id values in the request, so we don't trust result.id here.
             tool_calls_for_assistant: List[ChatCompletionMessageToolCallParam] = []
             for i, result in enumerate(tool_call_results):

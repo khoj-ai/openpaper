@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 
 class ProposedColumn(BaseModel):
-    # Strict structured output (OpenAI/Cerebras) requires additionalProperties=false
+    # Strict structured output (OpenAI) requires additionalProperties=false
     # and all fields required — hence no defaults.
     model_config = ConfigDict(extra="forbid")
 

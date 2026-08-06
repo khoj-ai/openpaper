@@ -1749,7 +1749,7 @@ def main():
         "--provider",
         type=str,
         default=None,
-        help="LLM provider: gemini, openai, cerebras, anthropic (default: gemini)",
+        help="LLM provider: gemini, openai, anthropic (default: gemini)",
     )
     parser.add_argument(
         "--skip-setup",

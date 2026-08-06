@@ -107,7 +107,7 @@ async def _stream_chat_chunks(
 @message_router.get("/models")
 async def get_available_models() -> dict:
     return {
-        "models": operations.get_chat_model_options(exclude=[LLMProvider.CEREBRAS]),
+        "models": operations.get_chat_model_options(),
         "default": operations.default_provider.value,
     }
 
@@ -316,7 +316,7 @@ async def chat_message_multipaper(
                     conversation_id=request.conversation_id,
                     question=request.user_query,
                     current_user=current_user,
-                    llm_provider=LLMProvider.CEREBRAS,
+                    llm_provider=LLMProvider.GEMINI,
                     user_references=request.user_references,
                     db=db,
                     project_id=request.project_id,

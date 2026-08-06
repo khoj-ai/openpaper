@@ -341,7 +341,7 @@ class MultiPaperOperations(EvidenceOperations):
         async for result in self.gather_evidence(
             question=f"{summary_request}",
             current_user=current_user,
-            llm_provider=LLMProvider.CEREBRAS,
+            llm_provider=LLMProvider.GEMINI,
             project_id=project_id,
             db=db,
         ):

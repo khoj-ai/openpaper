@@ -12,7 +12,7 @@ never clobbered.
 Usage:
     python -m app.scripts.backfill_paper_metadata [--limit N] [--dry-run]
 
-This calls external APIs (Exa, Firecrawl, Cerebras) for every candidate paper
+This calls external APIs (Exa, Firecrawl, Gemini) for every candidate paper
 and is therefore not cheap — use --limit to bound the run, and prefer running
 during off-hours.
 """

@@ -1,5 +1,4 @@
 import logging
-import os
 import time
 from enum import Enum
 from typing import Any, Dict, Iterator, List, Optional
@@ -66,14 +65,6 @@ class BaseLLMClient:
                 self._providers[provider] = GeminiProvider()
             elif provider == LLMProvider.OPENAI:
                 self._providers[provider] = OpenAIProvider()
-            elif provider == LLMProvider.CEREBRAS:
-                self._providers[provider] = OpenAIProvider(
-                    api_key=os.getenv("CEREBRAS_API_KEY"),
-                    base_url=os.getenv("CEREBRAS_BASE_URL"),
-                    default_model="gpt-oss-120b",
-                    fast_model="zai-glm-4.7",
-                    supports_pdf_input=False,
-                )
             elif provider == LLMProvider.ANTHROPIC:
                 self._providers[provider] = AnthropicProvider()
             else:
