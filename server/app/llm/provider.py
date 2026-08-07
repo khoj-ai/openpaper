@@ -157,18 +157,28 @@ class BaseLLMProvider(ABC):
         pass
 
 
-def _strip_additional_properties(schema: Any) -> Any:
+def _sanitize_schema_for_gemini(schema: Any) -> Any:
     """Gemini's schema converter rejects `additionalProperties`, which pydantic
     emits for models configured with extra="forbid" (required by OpenAI
-    strict mode). Strip it so one schema serves every provider."""
+    strict mode), and list-valued types like ["string", "null"], the JSON
+    Schema nullable encoding that OpenAI strict mode requires. Strip the
+    former and rewrite the latter to Gemini's `nullable` flag so one schema
+    serves every provider."""
     if isinstance(schema, dict):
-        return {
-            k: _strip_additional_properties(v)
-            for k, v in schema.items()
-            if k != "additionalProperties"
-        }
+        result: Dict[str, Any] = {}
+        for k, v in schema.items():
+            if k == "additionalProperties":
+                continue
+            if k == "type" and isinstance(v, list):
+                non_null = [t for t in v if t != "null"]
+                result["type"] = non_null[0] if non_null else "null"
+                if "null" in v:
+                    result["nullable"] = True
+                continue
+            result[k] = _sanitize_schema_for_gemini(v)
+        return result
     if isinstance(schema, list):
-        return [_strip_additional_properties(item) for item in schema]
+        return [_sanitize_schema_for_gemini(item) for item in schema]
     return schema
 
 
@@ -223,7 +233,7 @@ class GeminiProvider(BaseLLMProvider):
         # Apply structured output schema if provided
         if schema:
             config.response_mime_type = "application/json"
-            config.response_schema = _strip_additional_properties(schema)
+            config.response_schema = _sanitize_schema_for_gemini(schema)
 
         if tools:
             config.tools = [tools]
