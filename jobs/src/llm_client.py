@@ -138,6 +138,19 @@ class AsyncLLMClient:
             http_options=types.HttpOptions(timeout=timeout),
         )
 
+    async def _close_client(self, client: genai.Client) -> None:
+        """Close the async transport before the task's event loop goes away.
+
+        The SDK's AsyncClient.__del__ schedules aclose() at GC time, which in
+        a Celery worker lands on a *later* task's loop and dies with "Event
+        loop is closed". Closing explicitly keeps cleanup on the loop that
+        owns the connections.
+        """
+        try:
+            await client.aio.aclose()
+        except Exception as e:
+            logger.debug(f"Error closing genai client: {e}")
+
     async def create_cache(self, cache_content: str, client: genai.Client, model: Optional[str] = None) -> str:
         """Create a cache entry for the given content.
 
@@ -725,6 +738,8 @@ class PaperOperations(AsyncLLMClient):
                 if status_callback:
                     status_callback(f"Error during metadata extraction: {e}")
                 raise ValueError(f"Failed to extract metadata: {str(e)}")
+            finally:
+                await self._close_client(client)
 
     async def extract_data_table(
         self,
@@ -844,6 +859,8 @@ class PaperOperations(AsyncLLMClient):
         except Exception as e:
             logger.error(f"Error extracting data table: {str(e)}", exc_info=True)
             raise ValueError(f"Failed to extract DT for paper {paper_id}: {str(e)}")
+        finally:
+            await self._close_client(client)
 
 
 # Create a single instance to use throughout the application
