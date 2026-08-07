@@ -65,7 +65,8 @@ def retry_llm_operation(max_retries: int = 3, delay: float = 1.0):
             # If we reach here, all retries failed
             if last_exception is not None:
                 logger.error(
-                    f"Final failure after {max_retries} retries for {func.__name__}: {str(last_exception)}"
+                    f"Final failure after {max_retries} retries for {func.__name__}: {str(last_exception)}",
+                    exc_info=last_exception,
                 )
                 raise last_exception
 
@@ -96,7 +97,8 @@ def retry_llm_operation(max_retries: int = 3, delay: float = 1.0):
             # If we reach here, all retries failed
             if last_exception is not None:
                 logger.error(
-                    f"Final failure after {max_retries} retries for {func.__name__}: {str(last_exception)}"
+                    f"Final failure after {max_retries} retries for {func.__name__}: {str(last_exception)}",
+                    exc_info=last_exception,
                 )
                 raise last_exception
 

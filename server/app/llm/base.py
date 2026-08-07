@@ -195,7 +195,8 @@ class BaseLLMClient:
             )
 
             logger.error(
-                f"Error generating content with {target_provider.value}/{model}: {e}"
+                f"Error generating content with {target_provider.value}/{model}: {e}",
+                exc_info=True,
             )
             raise
 
