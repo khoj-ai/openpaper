@@ -2,6 +2,7 @@ import logging
 import tempfile
 import os
 import asyncio
+import zlib
 from datetime import datetime, timezone
 from typing import Callable, Optional
 
@@ -41,6 +42,15 @@ class ExcessivePDFTextError(UnprocessablePDFError):
 # roughly 250 tokens — well under Gemini's 1024-token cache floor, and far above
 # the few-hundred-character outputs that failed parses produce.
 MIN_EXTRACTED_TEXT_CHARS = 1000
+
+# Minimum information content, measured as zlib-compressed size. The raw char
+# floor is defeated by scans whose only text layer is per-page boilerplate
+# (e.g. a ProQuest copyright watermark repeated on 150 pages: ~16k raw chars
+# but ~160 compressed bytes). Genuine prose can't compress below ~0.55 at
+# small sizes — even a paper barely over the raw floor carries 650+ compressed
+# bytes — while repeated boilerplate stays in the low hundreds, so 600 sits
+# safely between the two.
+MIN_COMPRESSED_TEXT_BYTES = 600
 
 # Upper bound on text we send to the LLM. Gemini 3.1 Pro's input window is
 # 1,048,576 tokens; we budget conservatively at ~3.5 chars/token and reserve
@@ -136,6 +146,15 @@ async def process_pdf_file(
                 raise InsufficientPDFTextError(
                     f"Failed to extract usable text from PDF: only {extracted_chars} "
                     f"characters found (minimum {MIN_EXTRACTED_TEXT_CHARS})"
+                )
+
+            compressed_bytes = len(zlib.compress(pdf_text.encode("utf-8", "ignore")))
+            if compressed_bytes < MIN_COMPRESSED_TEXT_BYTES:
+                raise InsufficientPDFTextError(
+                    f"PDF appears to be a scan with no extractable text: {extracted_chars} "
+                    f"characters found, but they are mostly repeated boilerplate "
+                    f"({compressed_bytes} bytes of unique content, minimum "
+                    f"{MIN_COMPRESSED_TEXT_BYTES})"
                 )
 
             # Cap what we send to the LLM at the model's context window. We keep the
