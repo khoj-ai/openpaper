@@ -52,8 +52,6 @@ class PaperOperations(BaseLLMClient):
         if not paper:
             raise ValueError(f"Paper with ID {paper_id} not found.")
 
-        audio_overview_schema = AudioOverviewForLLM.model_json_schema()
-
         # Word count targets for audio durations at ~150 words/min
         # short: ~3 min, medium: ~7 min, long: ~14 min
         word_count_map = {
@@ -65,7 +63,6 @@ class PaperOperations(BaseLLMClient):
         formatted_prompt = GENERATE_NARRATIVE_SUMMARY.format(
             additional_instructions=additional_instructions,
             length=word_count_map.get(str(length), word_count_map["medium"]),
-            schema=audio_overview_schema,
         )
 
         signed_url = s3_service.get_cached_presigned_url(

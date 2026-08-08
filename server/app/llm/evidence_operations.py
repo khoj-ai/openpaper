@@ -526,7 +526,6 @@ class EvidenceOperations(BaseLLMClient):
         formatted_prompt = TOOL_RESULT_COMPACTION_PROMPT.format(
             question=original_question,
             tool_results=json.dumps(tool_results_for_compaction, indent=2),
-            schema=ToolResultCompactionResponse.model_json_schema(),
         )
 
         message_content = [TextContent(text=formatted_prompt)]
@@ -659,7 +658,6 @@ class EvidenceOperations(BaseLLMClient):
         formatted_prompt = EVIDENCE_COMPACTION_PROMPT.format(
             question=original_question,
             evidence=json.dumps(evidence_for_compaction, indent=2),
-            schema=EvidenceSummaryResponse.model_json_schema(),
         )
 
         message_content = [TextContent(text=formatted_prompt)]

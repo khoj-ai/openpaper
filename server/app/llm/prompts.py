@@ -14,9 +14,6 @@ Include any citations or references to specific sections of the paper, reproduci
 Citations should be formatted as [^1], [^2], etc., where each number corresponds to the idx of the list of citations you will provide at the end of the summary.
 
 {additional_instructions}
-
-Response Schema:
-{schema}
 """
 
 GENERATE_MULTI_PAPER_NARRATIVE_SUMMARY = """
@@ -41,9 +38,6 @@ Create a narrative summary that:
 6. Is approximately {length} words long (this is important - aim to hit this target)
 
 The summary should be engaging, informative, and suitable for audio narration.
-
-Return your response as a JSON object matching this exact schema:
-{schema}
 """
 
 # See note about Github Flavored Markdown and footnotes: https://github.blog/changelog/2021-09-30-footnotes-now-supported-in-markdown-fields/
@@ -213,9 +207,6 @@ For each tool call result, provide a concise summary that:
 1. Preserves key findings, data points, and quotes that are relevant to the question
 2. Removes redundant or irrelevant information
 3. Maintains enough context to understand where the information came from
-
-Your output must be a JSON object following this schema:
-{schema}
 """
 
 EVIDENCE_COMPACTION_PROMPT = """Summarize the relevant evidence from each paper for this question.
@@ -243,9 +234,6 @@ Your summary might be:
   And citations would map: marker 0 → snippet 0, marker 2 → snippet 2, marker 1 → snippet 1
 
 IMPORTANT: Each [@n] marker must reference a valid snippet index from that paper's snippets.
-
-Output JSON schema:
-{schema}
 """
 
 KEYWORD_EXTRACTION_PROMPT = """Extract 3-5 key search terms from this question that would be most useful for searching academic papers. Focus on:

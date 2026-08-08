@@ -372,16 +372,12 @@ class MultiPaperOperations(EvidenceOperations):
             for paper in all_papers
         }
 
-        # Generate the narrative summary
-        audio_overview_schema = AudioOverviewForLLM.model_json_schema()
-
         formatted_prompt = GENERATE_MULTI_PAPER_NARRATIVE_SUMMARY.format(
             summary_request=summary_request,
             evidence_gathered=evidence_collection.get_evidence_dict(),
             length=word_count_map.get(str(length), word_count_map["medium"]),
             paper_metadata=paper_metadata,
             additional_instructions=additional_instructions or "",
-            schema=audio_overview_schema,
         )
 
         message_content = [TextContent(text=formatted_prompt)]
