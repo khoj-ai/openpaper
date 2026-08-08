@@ -390,6 +390,7 @@ class MultiPaperOperations(EvidenceOperations):
             contents=message_content,
             model_type=ModelType.DEFAULT,
             provider=LLMProvider.GEMINI,
+            schema=AudioOverviewForLLM,
         )
 
         try:

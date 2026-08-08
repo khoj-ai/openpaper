@@ -536,6 +536,7 @@ class EvidenceOperations(BaseLLMClient):
             contents=message_content,
             model_type=ModelType.DEFAULT,
             provider=llm_provider,
+            schema=ToolResultCompactionResponse,
         )
 
         try:
@@ -668,6 +669,7 @@ class EvidenceOperations(BaseLLMClient):
             contents=message_content,
             model_type=ModelType.FAST,
             provider=llm_provider,
+            schema=EvidenceSummaryResponse,
         )
 
         all_compacted: Dict[str, List[str]] = {}

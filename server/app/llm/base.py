@@ -1,7 +1,7 @@
 import logging
 import time
 from enum import Enum
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Optional, Union
 
 from app.database.models import Message
 from app.database.telemetry import track_event
@@ -19,6 +19,7 @@ from app.llm.provider import (
 )
 from app.llm.utils import retry_llm_operation
 from langfuse import get_client, observe
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -109,19 +110,30 @@ class BaseLLMClient:
         model_type: ModelType = ModelType.DEFAULT,
         provider: Optional[LLMProvider] = None,
         enable_thinking: bool = True,
-        schema: Optional[Dict] = None,
+        schema: Optional[Union[Dict, type[BaseModel]]] = None,
         **kwargs,
     ) -> LLMResponse:
         """Generate content using the specified provider. Automatically retries on transient errors.
 
         Args:
-            schema: Optional JSON schema dict for structured output. When provided,
-                the LLM response will be constrained to match this schema via
-                the provider's native structured output support.
+            schema: Optional structured-output schema — a JSON schema dict, or a
+                pydantic model class. When provided, the LLM response will be
+                constrained to match this schema via the provider's native
+                structured output support.
         """
         start_time = time.time()
         model = self._get_model_for_type(model_type, provider)
         target_provider = provider or self.default_provider
+
+        # Gemini's SDK accepts a pydantic class directly (and handles nested
+        # models, which its Schema type can't express as a dict via $refs);
+        # the other providers need a plain JSON schema dict.
+        if (
+            schema is not None
+            and not isinstance(schema, dict)
+            and target_provider != LLMProvider.GEMINI
+        ):
+            schema = schema.model_json_schema()
         langfuse = get_client()
         langfuse.update_current_span(
             input={

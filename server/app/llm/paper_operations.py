@@ -96,6 +96,7 @@ class PaperOperations(BaseLLMClient):
         # Generate narrative summary using the LLM
         response = self.generate_content(
             contents=message_content,
+            schema=AudioOverviewForLLM,
         )
 
         try:
