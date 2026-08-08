@@ -354,25 +354,96 @@ async def chat_message_multipaper(
                     yield f"{json_response}{END_DELIMITER}"
                     return
 
-                yield f"{json.dumps({'type': 'status', 'content': 'Generating response...'})}{END_DELIMITER}"
-
                 if request.project_id:
                     all_papers = project_paper_crud.get_all_papers_by_project_id(
                         db, project_id=uuid.UUID(request.project_id), user=current_user
                     )
                 else:
                     all_papers = paper_crud.get_all_available_papers(
-                        db,
-                        user=current_user,
+                        db, user=current_user
                     )
-
-                # Keep the answer-generation paper set aligned with the scoped
-                # evidence space so citations can't reference out-of-scope papers.
                 if scoped_paper_ids is not None:
                     allowed_ids = set(scoped_paper_ids)
                     all_papers = [
                         paper for paper in all_papers if str(paper.id) in allowed_ids
                     ]
+
+                # Chart requests are first-class chat artifacts. They run from
+                # the gathered, scoped evidence and do not pause for a second
+                # confirmation step; the artifact composer is the deliberate
+                # pre-generation editing surface.
+                if operations.is_chart_request(request.user_query):
+                    yield f"{json.dumps({'type': 'status', 'content': 'Building a cited chart...'})}{END_DELIMITER}"
+                    chart_findings = json.dumps(evidence_collection.get_evidence_dict())
+                    chart_evidence = evidence_collection.get_evidence_dict()
+                    # Project charts use the same field-aware investigation
+                    # harness as the artifact composer. Everything-mode chat
+                    # keeps the existing scoped evidence path because it has
+                    # no project-bound field-investigation scope.
+                    if request.project_id:
+                        investigation = operations.investigate_chart_fields(
+                            prompt=request.user_query,
+                            papers=[
+                                (str(paper.id), str(paper.title or "Untitled"))
+                                for paper in all_papers
+                            ],
+                            current_user=current_user,
+                            db=db,
+                            project_id=request.project_id,
+                        )
+                        chart_findings = investigation.findings
+                        chart_evidence = investigation.evidence
+                    chart_plan = operations.propose_chart_plan(
+                        request.user_query,
+                        [
+                            (str(paper.id), str(paper.title or "Untitled"))
+                            for paper in all_papers
+                        ],
+                        chart_findings,
+                    )
+                    if chart_plan:
+                        if request.project_id:
+                            investigation = operations.investigate_chart_fields(
+                                prompt=request.user_query,
+                                papers=[
+                                    (str(paper.id), str(paper.title or "Untitled"))
+                                    for paper in all_papers
+                                ],
+                                current_user=current_user,
+                                db=db,
+                                project_id=request.project_id,
+                                plan=chart_plan,
+                            )
+                            chart_evidence = investigation.evidence
+                        chart = operations.build_chart_artifact(
+                            prompt=request.user_query,
+                            plan=chart_plan,
+                            evidence=chart_evidence,
+                            papers=[
+                                (str(paper.id), str(paper.title or "Untitled"))
+                                for paper in all_papers
+                            ],
+                        )
+                        if chart:
+                            if operations.is_chart_ready(chart):
+                                payload = chart.model_dump()
+                                artifacts_collected.append(payload)
+                                yield f"{json.dumps({'type': 'artifact', 'content': payload})}{END_DELIMITER}"
+                            else:
+                                failure = (
+                                    operations.chart_failure_message(chart) + "\n\n"
+                                )
+                                content_chunks.append(failure)
+                                yield f"{json.dumps({'type': 'content', 'content': failure})}{END_DELIMITER}"
+                    else:
+                        failure = (
+                            "I couldn't determine a chart shape supported by the selected papers. "
+                            "Try narrowing the paper scope or use **Artifacts → Chart** to choose the axes first.\n\n"
+                        )
+                        content_chunks.append(failure)
+                        yield f"{json.dumps({'type': 'content', 'content': failure})}{END_DELIMITER}"
+
+                yield f"{json.dumps({'type': 'status', 'content': 'Generating response...'})}{END_DELIMITER}"
 
                 chat_generator = operations.chat_with_papers(
                     question=request.user_query,
@@ -454,7 +525,14 @@ async def chat_message_multipaper(
                         message=assistant_message,
                         conversation=conversation,
                         items=[
-                            (ArtifactKind.CITATION, payload)
+                            (
+                                (
+                                    ArtifactKind.CHART
+                                    if payload.get("kind") == "chart"
+                                    else ArtifactKind.CITATION
+                                ),
+                                payload,
+                            )
                             for payload in artifacts_collected
                         ],
                         user=current_user,

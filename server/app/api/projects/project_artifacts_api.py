@@ -24,7 +24,7 @@ async def get_project_artifacts(
     current_user: CurrentUser = Depends(get_required_user),
 ):
     """
-    Get chat-generated artifacts (citations) for a project.
+    Get chat-generated artifacts for a project.
 
     Project conversations are visible to every member, so their artifacts are
     too: any role in the project (admin/editor/viewer) grants read access.
@@ -38,7 +38,7 @@ async def get_project_artifacts(
     rows = artifact_crud.list_for_project(
         db,
         project_id=uuid.UUID(project_id),
-        kind=ArtifactKind.CITATION,
+        kind=None,
     )
 
     artifacts = [

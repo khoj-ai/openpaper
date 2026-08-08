@@ -28,6 +28,7 @@ from app.api.paper_tag_api import paper_tag_router
 from app.api.paper_upload_api import paper_upload_router
 from app.api.project_audio_api import project_audio_router
 from app.api.projects.project_artifacts_api import project_artifacts_router
+from app.api.projects.project_charts_api import project_charts_router
 from app.api.projects.project_conversations_api import project_conversations_router
 from app.api.projects.project_papers_api import project_papers_router
 from app.api.projects.projects_api import projects_router
@@ -90,6 +91,7 @@ app.include_router(projects_data_table_router, prefix="/api/projects/tables")
 app.include_router(paper_upload_router, prefix="/api/paper/upload")
 app.include_router(project_audio_router, prefix="/api/projects/audio")
 app.include_router(project_artifacts_router, prefix="/api/projects/artifacts")
+app.include_router(project_charts_router, prefix="/api/projects/charts")
 app.include_router(paper_tag_router, prefix="/api/paper/tag")
 app.include_router(
     subscription_router, prefix="/api/subscription"

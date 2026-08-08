@@ -483,6 +483,7 @@ class ArtifactKind(str, Enum):
     """
 
     CITATION = "citation"
+    CHART = "chart"
 
 
 class Artifact(Base):

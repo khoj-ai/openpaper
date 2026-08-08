@@ -1,6 +1,6 @@
 import logging
 import uuid
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 from app.database.crud.conversation_crud import ConversationUpdate, conversation_crud
 from app.database.crud.message_crud import message_crud
@@ -63,6 +63,13 @@ class DataTableSchemaProposal(BaseModel):
     columns: list[ProposedColumn] = Field(
         description="Proposed columns for the data table"
     )
+
+
+class FieldInvestigation(BaseModel):
+    """The reusable, evidence-preserving output of a field investigation."""
+
+    findings: str
+    evidence: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class ConversationOperations(BaseLLMClient):
@@ -182,6 +189,145 @@ class DataTableOperations(BaseLLMClient):
     PROPOSE_MAX_TURNS = 6
     PROPOSE_TOOL_RESULT_CHARS = 8_000
     PROPOSE_TOOL_BUDGET_CHARS = 60_000
+
+    def investigate_fields(
+        self,
+        *,
+        prompt: str,
+        papers: list[tuple[str, str]],
+        current_user: CurrentUser,
+        db: Session,
+        project_id: str,
+        system_prompt: str,
+        user_message: str,
+    ) -> FieldInvestigation:
+        """Run the Data Table's bounded, tool-using shape-finding harness.
+
+        Besides the investigator report, retain the source passages by paper so
+        downstream artifact builders can validate exact quotes instead of
+        receiving only a prose hand-off.
+        """
+        paper_ids = [paper_id for paper_id, _ in papers]
+        function_declarations = [
+            read_abstract_function,
+            search_all_files_function,
+            search_file_function,
+            view_file_function,
+        ]
+        function_maps = {
+            "read_abstract": read_abstract,
+            "search_all_files": search_all_files,
+            "search_file": search_file,
+            "view_file": view_file,
+        }
+        tool_call_results: list[ToolCallResult] = []
+        evidence: dict[str, list[str]] = {}
+        total_result_chars = 0
+        seen_calls: set[str] = set()
+        investigation_report = ""
+
+        for turn in range(self.PROPOSE_MAX_TURNS):
+            response = self.generate_content(
+                contents=[TextContent(text=user_message)],
+                system_prompt=system_prompt.format(
+                    n_round=turn + 1,
+                    max_rounds=self.PROPOSE_MAX_TURNS,
+                ),
+                model_type=ModelType.FAST,
+                function_declarations=function_declarations,
+                tool_call_results=tool_call_results or None,
+                provider=LLMProvider.GEMINI,
+            )
+            if not response or not response.tool_calls:
+                investigation_report = (response.text or "").strip() if response else ""
+                break
+
+            for call in response.tool_calls:
+                if call.name not in function_maps:
+                    tool_call_results.append(
+                        ToolCallResult(
+                            id=call.id,
+                            name=call.name,
+                            args=call.args,
+                            thought_signature=call.thought_signature,
+                            result=f"Error: unknown tool {call.name}",
+                        )
+                    )
+                    continue
+                call_key = f"{call.name}:{call.args}"
+                if call_key in seen_calls:
+                    tool_call_results.append(
+                        ToolCallResult(
+                            id=call.id,
+                            name=call.name,
+                            args=call.args,
+                            thought_signature=call.thought_signature,
+                            result="Error: this exact call was already made — use its earlier result",
+                        )
+                    )
+                    continue
+                seen_calls.add(call_key)
+                if total_result_chars >= self.PROPOSE_TOOL_BUDGET_CHARS:
+                    tool_call_results.append(
+                        ToolCallResult(
+                            id=call.id,
+                            name=call.name,
+                            args=call.args,
+                            thought_signature=call.thought_signature,
+                            result="Error: investigation budget exhausted — stop calling tools and reply with your findings report",
+                        )
+                    )
+                    continue
+
+                try:
+                    raw: Any = function_maps[call.name](
+                        **call.args,
+                        current_user=current_user,
+                        db=db,
+                        project_id=project_id,
+                        restrict_to_paper_ids=paper_ids,
+                    )
+                    result = str(raw)[: self.PROPOSE_TOOL_RESULT_CHARS]
+                    total_result_chars += len(result)
+                    if call.name == "search_all_files" and isinstance(raw, dict):
+                        for paper_id, lines in raw.items():
+                            evidence.setdefault(str(paper_id), []).extend(
+                                map(str, lines)
+                            )
+                    elif call.args.get("paper_id") and isinstance(raw, (str, list)):
+                        evidence.setdefault(str(call.args["paper_id"]), []).extend(
+                            [raw] if isinstance(raw, str) else map(str, raw)
+                        )
+                except Exception as exc:
+                    result = f"Error: {exc}"
+
+                tool_call_results.append(
+                    ToolCallResult(
+                        id=call.id,
+                        name=call.name,
+                        args=call.args,
+                        result=result,
+                        thought_signature=call.thought_signature,
+                    )
+                )
+
+        gathered = "\n\n".join(
+            f"[{result.name}({result.args})]\n{result.result}"
+            for result in tool_call_results
+        )
+        findings = "\n\n".join(
+            part
+            for part in (
+                (
+                    f"Investigator's report:\n{investigation_report}"
+                    if investigation_report
+                    else ""
+                ),
+                f"Raw tool results:\n\n{gathered}" if gathered else "",
+            )
+            if part
+        )
+        return FieldInvestigation(findings=findings, evidence=evidence)
 
     def propose_data_table_schema(
         self,
