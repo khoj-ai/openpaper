@@ -58,12 +58,54 @@ export interface CitationArtifact {
     confidence?: number | null;
 }
 
+export interface ChartField {
+    key: string;
+    label: string;
+    unit?: string | null;
+}
+
+export interface ChartPlan {
+    title: string;
+    chart_type: 'bar' | 'line' | 'scatter';
+    x: ChartField;
+    y: ChartField;
+    series?: ChartField | null;
+    fields: ChartField[];
+    calculation?: { label: string; spec: string; inputs: string[] } | null;
+}
+
+export interface ChartValue {
+    value: string;
+    quote: string;
+    line_number?: string | null;
+}
+
+export interface ChartArtifact {
+    kind: 'chart';
+    plan: ChartPlan;
+    records: Array<{
+        paper_id: string;
+        paper_title: string;
+        values: Record<string, ChartValue>;
+        exclusion_reason?: string | null;
+    }>;
+    coverage: {
+        searched_paper_ids: string[];
+        included_paper_ids: string[];
+        excluded: Record<string, string>;
+    };
+    computation?: { script?: string; warnings?: string[] } | null;
+    warnings: string[];
+}
+
+export type ChatArtifact = CitationArtifact | ChartArtifact;
+
 // A chat-generated artifact surfaced at the project level (artifacts panel),
 // with breadcrumbs back to the conversation/message that produced it.
 export interface ProjectChatArtifact {
     id: string;
-    kind: 'citation';
-    payload: CitationArtifact;
+    kind: 'citation' | 'chart';
+    payload: ChatArtifact;
     message_id: string;
     conversation_id: string;
     conversation_title?: string | null;
@@ -116,7 +158,7 @@ export interface ChatMessage {
     references?: Reference;
     // First-party artifacts (e.g. citations) produced for this turn. Set for
     // both freshly-streamed and persisted/reloaded messages.
-    artifacts?: CitationArtifact[];
+    artifacts?: ChatArtifact[];
     // Agent trajectory (tool calls + per-citation subagent steps) for this turn.
     trace?: MessageTrace;
     // @-mention context attached to this (user) turn.

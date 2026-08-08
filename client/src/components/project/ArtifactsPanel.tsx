@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, MessageSquare, Sparkles, Table, Volume2, X } from "lucide-react";
+import { BarChart3, Loader2, MessageSquare, Sparkles, Table, Volume2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -10,7 +10,7 @@ import { fetchFromApi } from "@/lib/api";
 import {
     AudioOverview,
     AudioOverviewJob,
-    CitationArtifact,
+    ChatArtifact,
     DataTableJob,
     ProjectChatArtifact,
     ProjectRole,
@@ -35,7 +35,8 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import AudioOverviewCard from "@/components/AudioOverviewCard";
-import { CitationArtifactCard } from "@/components/CitationArtifactCard";
+import { ChatArtifactCards } from "@/components/ChatArtifactCards";
+import { ChartComposerDialog } from "@/components/project/ChartComposerDialog";
 import AudioOverviewGenerationJobCard from "@/components/AudioOverviewGenerationJobCard";
 import DataTableGenerationJobCard from "@/components/DataTableGenerationJobCard";
 import DataTableSchemaModal, { FieldDefinition } from "@/components/DataTableSchemaModal";
@@ -124,6 +125,7 @@ export function ArtifactsPanel() {
     const [isCreatingDataTable, setIsCreatingDataTable] = useState(false);
     const [dataTableJobs, setDataTableJobs] = useState<DataTableJob[]>([]);
     const [chatArtifacts, setChatArtifacts] = useState<ProjectChatArtifact[]>([]);
+    const [isChartComposerOpen, setChartComposerOpen] = useState(false);
 
     const fetchChatArtifacts = useCallback(async () => {
         try {
@@ -134,15 +136,15 @@ export function ArtifactsPanel() {
         }
     }, [projectId]);
 
-    // Citations arrive one row per artifact; bundle them per assistant message
-    // so each chat turn renders as a single citation card, as it did in chat.
+    // Chat artifacts arrive one row per payload; bundle them by message so the
+    // project panel preserves the same grouping as the conversation.
     const chatArtifactGroups = useMemo(() => {
         const groups: {
             messageId: string;
             conversationId: string;
             conversationTitle: string | null;
             createdAt: string | null;
-            artifacts: CitationArtifact[];
+            artifacts: ChatArtifact[];
         }[] = [];
         const byMessage = new Map<string, (typeof groups)[number]>();
         for (const artifact of chatArtifacts) {
@@ -449,6 +451,14 @@ export function ArtifactsPanel() {
                                     disabled={papers.length === 0}
                                     onClick={() => setDataTableSchemaModalOpen(true)}
                                 />
+                                <CreateTile
+                                    icon={<BarChart3 className="h-4 w-4" />}
+                                    label="Chart"
+                                    sub="Turn cited findings into a visual"
+                                    isNew
+                                    disabled={papers.length === 0}
+                                    onClick={() => setChartComposerOpen(true)}
+                                />
                             </div>
                             {papers.length === 0 && (
                                 <p className="mt-2 text-xs text-muted-foreground">Add papers to your project to create artifacts.</p>
@@ -511,7 +521,7 @@ export function ArtifactsPanel() {
                                             </span>
                                         )}
                                     </div>
-                                    <CitationArtifactCard artifacts={group.artifacts} />
+                                    <ChatArtifactCards artifacts={group.artifacts} />
                                 </div>
                             ))}
                             {artifactCount === 0 && (
@@ -601,6 +611,13 @@ export function ArtifactsPanel() {
                 projectId={projectId}
                 isCreating={isCreatingDataTable}
                 atLimit={atDataTableLimit}
+            />
+            <ChartComposerDialog
+                open={isChartComposerOpen}
+                onOpenChange={setChartComposerOpen}
+                projectId={projectId}
+                papers={papers}
+                onCreated={fetchChatArtifacts}
             />
         </>
     );

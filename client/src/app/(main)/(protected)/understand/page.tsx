@@ -18,7 +18,7 @@ import { toast } from "sonner";
 
 import {
     ChatMessage,
-    CitationArtifact,
+    ChatArtifact,
     MessageTrace,
     Reference,
 } from '@/lib/schema';
@@ -76,7 +76,7 @@ function UnderstandPageContent() {
     const [conversationId, setConversationId] = useState<string | null>(null);
     const [streamingChunks, setStreamingChunks] = useState<string[]>([]);
     const [streamingReferences, setStreamingReferences] = useState<Reference | undefined>(undefined);
-    const [streamingArtifacts, setStreamingArtifacts] = useState<CitationArtifact[]>([]);
+    const [streamingArtifacts, setStreamingArtifacts] = useState<ChatArtifact[]>([]);
     const [currentLoadingMessageIndex, setCurrentLoadingMessageIndex] = useState(0);
     const [displayedText, setDisplayedText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
@@ -297,7 +297,7 @@ function UnderstandPageContent() {
             const decoder = new TextDecoder();
             let accumulatedContent = '';
             let references: Reference | undefined = undefined;
-            const artifacts: CitationArtifact[] = [];
+            const artifacts: ChatArtifact[] = [];
             let trace: MessageTrace | undefined = undefined;
             let buffer = '';
 
@@ -334,8 +334,8 @@ function UnderstandPageContent() {
                                 references = chunkContent;
                                 setStreamingReferences(chunkContent);
                             } else if (chunkType === 'artifact') {
-                                artifacts.push(chunkContent as CitationArtifact);
-                                setStreamingArtifacts(prev => [...prev, chunkContent as CitationArtifact]);
+                                artifacts.push(chunkContent as ChatArtifact);
+                                setStreamingArtifacts(prev => [...prev, chunkContent as ChatArtifact]);
                             } else if (chunkType === 'trace') {
                                 trace = chunkContent as MessageTrace;
                             } else if (chunkType === 'status') {

@@ -19,7 +19,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { ChatMessageActions } from "@/components/ChatMessageActions";
-import { ChatMessage, Reference, PaperItem, CitationArtifact, Project } from "@/lib/schema";
+import { ChatMessage, Reference, PaperItem, ChatArtifact, Project } from "@/lib/schema";
 import { MentionInput } from "@/components/chat/MentionInput";
 import {
 	MentionContextBar,
@@ -28,7 +28,7 @@ import {
 	scopeItemsToEntities,
 } from "@/components/chat/MentionAutocomplete";
 import ReferencePaperCards from "@/components/ReferencePaperCards";
-import { CitationArtifactCard } from "@/components/CitationArtifactCard";
+import { ChatArtifactCards } from "@/components/ChatArtifactCards";
 import { MessageTraceViewer } from "@/components/MessageTraceViewer";
 import Link from "next/link";
 import { TopicBubbles } from "@/components/TopicBubbles";
@@ -44,7 +44,7 @@ interface ConversationViewProps {
 	isStreaming: boolean;
 	streamingChunks: string[];
 	streamingReferences?: Reference;
-	streamingArtifacts?: CitationArtifact[];
+	streamingArtifacts?: ChatArtifact[];
 	statusMessage: string;
 	error: string | null;
 	isSessionLoading: boolean;
@@ -297,7 +297,7 @@ export const ConversationView = ({
 					{msg.content}
 				</Markdown>
 				{msg.artifacts && msg.artifacts.length > 0 && (
-					<CitationArtifactCard artifacts={msg.artifacts} />
+					<ChatArtifactCards artifacts={msg.artifacts} />
 				)}
 				{msg.references && msg.references["citations"]?.length > 0 ? (
 					<div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
@@ -476,7 +476,7 @@ export const ConversationView = ({
 									}}
 								/>
 								{streamingArtifacts && streamingArtifacts.length > 0 && (
-									<CitationArtifactCard artifacts={streamingArtifacts} />
+									<ChatArtifactCards artifacts={streamingArtifacts} />
 								)}
 								<ChatMessageActions
 									message={streamingChunks.join("")}
