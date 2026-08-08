@@ -1,7 +1,6 @@
 """
 Celery tasks for Open Paper jobs
 """
-import json
 import logging
 import psutil
 import os
@@ -351,35 +350,14 @@ def periodic_zotero_sync(self):
     )
     resp.raise_for_status()
     result = resp.json()
-    logger.info(f"Periodic Zotero sync complete: {result.get('synced_users', 0)} users synced")
 
-    # Celery's task-success log runs the return value through a bounded saferepr,
-    # which collapses nested lists to "[...]" — so per-user sync errors never show
-    # up there. Log them explicitly here where they won't be truncated.
-    users_with_errors = 0
-    total_errors = 0
-    for user_result in result.get("results", []):
-        user_errors = user_result.get("errors") or []
-        if user_errors:
-            users_with_errors += 1
-            total_errors += len(user_errors)
-            logger.warning(
-                "Zotero sync errors for user %s: %s",
-                user_result.get("user_id"),
-                json.dumps(user_errors),
-            )
-
-    # Nothing consumes this task's return value; it only feeds the result
-    # backend and the bounded "succeeded" log line, where the full nested
-    # payload gets elided anyway. Return a compact digest so that line is
-    # complete — the details live in the warnings above and the server's logs.
-    return {
-        "synced_users": result.get("synced_users", 0),
-        "total_users": result.get("total_users", 0),
-        "skipped_users": result.get("skipped_users", 0),
-        "users_with_errors": users_with_errors,
-        "total_errors": total_errors,
-    }
+    # Fire-and-forget: the server dispatches the per-user syncing to a
+    # background task and responds immediately (syncing every due user takes
+    # longer than the load balancer allows). Outcomes — per-user errors and
+    # the final summary — are logged server-side.
+    total_users = result.get("total_users", 0)
+    logger.info(f"Periodic Zotero sync dispatched for {total_users} users")
+    return {"total_users": total_users}
 
 
 @celery_app.task(

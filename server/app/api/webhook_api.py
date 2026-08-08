@@ -1036,11 +1036,20 @@ async def settle_referral(referral_id: str, db: Session = Depends(get_db)):
 
 
 @webhook_router.post("/internal/zotero-sync-all")
-async def trigger_zotero_sync_all(request: Request, db: Session = Depends(get_db)):
+async def trigger_zotero_sync_all(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     """
     Internal endpoint called by the Celery Beat periodic task to sync new Zotero
     annotations for all users whose items haven't been synced in the past 24 hours.
     Auth: shared secret via Authorization header (JOBS_INTERNAL_SECRET env var).
+
+    Dispatch-and-return: syncing every due user can take minutes — far past the
+    load balancer's timeout — so the response only reports how many users were
+    dispatched. The per-user work runs as a background task, and its outcomes
+    (per-user errors, final summary) are logged here on the server.
     """
     secret = os.getenv("JOBS_INTERNAL_SECRET", "")
     if secret and request.headers.get("Authorization") != f"Bearer {secret}":
@@ -1057,79 +1066,90 @@ async def trigger_zotero_sync_all(request: Request, db: Session = Depends(get_db
         f"Periodic Zotero sync: found {len(user_ids)} users due for sync (threshold={threshold_hours:.4f}h)"
     )
 
+    background_tasks.add_task(_run_zotero_sync_all, user_ids)
+
+    return {
+        "status": "accepted",
+        "total_users": len(user_ids),
+    }
+
+
+async def _run_zotero_sync_all(user_ids: list[uuid.UUID]) -> None:
+    """Sync each due user's Zotero library, logging per-user failures.
+
+    Runs after the triggering request has returned, so it needs its own DB
+    session (the request-scoped one is closed before background tasks run).
+    """
+    db = SessionLocal()
     results = []
     skipped = []
-    for user_id in user_ids:
-        user = user_crud.get(db, id=user_id)
-        if not user:
-            logger.info(f"Skipping Zotero auto-sync for {user_id}: user not found")
-            skipped.append({"user_id": str(user_id), "reason": "user_not_found"})
-            continue
+    try:
+        for user_id in user_ids:
+            user = user_crud.get(db, id=user_id)
+            if not user:
+                logger.info(f"Skipping Zotero auto-sync for {user_id}: user not found")
+                skipped.append({"user_id": str(user_id), "reason": "user_not_found"})
+                continue
 
-        if not can_user_auto_sync_zotero(db, user):
-            logger.info(
-                f"Skipping Zotero auto-sync for {user_id}: not eligible for auto-sync (basic plan)"
-            )
-            skipped.append(
-                {"user_id": str(user_id), "reason": "auto_sync_not_eligible"}
-            )
-            continue
-
-        user_uuid = cast(uuid.UUID, user.id)
-        if not zotero_crud.get_by_user_id(db, user_id=user_uuid):
-            # The user disconnected Zotero but kept their imported papers, so
-            # their imported items still make them look "due for sync". This is
-            # an expected, benign state — skip quietly rather than erroring.
-            logger.info(
-                f"Skipping Zotero auto-sync for {user_id}: Zotero account not connected"
-            )
-            skipped.append({"user_id": str(user_id), "reason": "not_connected"})
-            continue
-
-        try:
-            result = await sync_batch(db, user=user, limit=50)
-            results.append({"user_id": str(user_id), **result})
-            if result.get("new_annotations_count", 0) > 0:
-                track_event(
-                    "zotero_auto_sync",
-                    user_id=str(user_id),
-                    properties={
-                        "papers": result.get("synced_papers_count", 0),
-                        "annotations": result.get("new_annotations_count", 0),
-                    },
-                    db=db,
+            if not can_user_auto_sync_zotero(db, user):
+                logger.info(
+                    f"Skipping Zotero auto-sync for {user_id}: not eligible for auto-sync (basic plan)"
                 )
+                skipped.append(
+                    {"user_id": str(user_id), "reason": "auto_sync_not_eligible"}
+                )
+                continue
 
-            # Auto-import is a best-effort secondary step. A failure here
-            # shouldn't fail the user's sync (which already succeeded above), but
-            # we still log it so the error is visible rather than swallowed.
+            user_uuid = cast(uuid.UUID, user.id)
+            if not zotero_crud.get_by_user_id(db, user_id=user_uuid):
+                # The user disconnected Zotero but kept their imported papers, so
+                # their imported items still make them look "due for sync". This is
+                # an expected, benign state — skip quietly rather than erroring.
+                logger.info(
+                    f"Skipping Zotero auto-sync for {user_id}: Zotero account not connected"
+                )
+                skipped.append({"user_id": str(user_id), "reason": "not_connected"})
+                continue
+
             try:
-                import_result = await auto_import_new_papers(db, user=user)
-                if import_result.get("auto_imported_count", 0) > 0:
+                result = await sync_batch(db, user=user, limit=50)
+                results.append({"user_id": str(user_id), **result})
+                if result.get("new_annotations_count", 0) > 0:
                     track_event(
-                        "zotero_auto_import_new_papers",
+                        "zotero_auto_sync",
                         user_id=str(user_id),
-                        properties={"count": import_result["auto_imported_count"]},
+                        properties={
+                            "papers": result.get("synced_papers_count", 0),
+                            "annotations": result.get("new_annotations_count", 0),
+                        },
                         db=db,
                     )
-            except Exception as e:
-                logger.error(
-                    f"Auto-import of new papers failed for user {user_id}: {e}",
-                    exc_info=True,
-                )
-        except Exception as e:
-            logger.error(f"Auto-sync failed for user {user_id}: {e}", exc_info=True)
-            results.append({"user_id": str(user_id), "error": str(e)})
 
-    synced_users = len([r for r in results if "error" not in r])
-    logger.info(
-        f"Periodic Zotero sync complete: {synced_users}/{len(user_ids)} users synced "
-        f"successfully, {len(skipped)} skipped"
-    )
-    return {
-        "synced_users": synced_users,
-        "total_users": len(user_ids),
-        "skipped_users": len(skipped),
-        "results": results,
-        "skipped": skipped,
-    }
+                # Auto-import is a best-effort secondary step. A failure here
+                # shouldn't fail the user's sync (which already succeeded above), but
+                # we still log it so the error is visible rather than swallowed.
+                try:
+                    import_result = await auto_import_new_papers(db, user=user)
+                    if import_result.get("auto_imported_count", 0) > 0:
+                        track_event(
+                            "zotero_auto_import_new_papers",
+                            user_id=str(user_id),
+                            properties={"count": import_result["auto_imported_count"]},
+                            db=db,
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"Auto-import of new papers failed for user {user_id}: {e}",
+                        exc_info=True,
+                    )
+            except Exception as e:
+                logger.error(f"Auto-sync failed for user {user_id}: {e}", exc_info=True)
+                results.append({"user_id": str(user_id), "error": str(e)})
+
+        synced_users = len([r for r in results if "error" not in r])
+        logger.info(
+            f"Periodic Zotero sync complete: {synced_users}/{len(user_ids)} users synced "
+            f"successfully, {len(skipped)} skipped"
+        )
+    finally:
+        db.close()
