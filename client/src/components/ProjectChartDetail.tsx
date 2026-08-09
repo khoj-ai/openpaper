@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, X } from "lucide-react";
 import { ChartArtifact } from "@/lib/schema";
 import { fetchFromApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -58,9 +58,9 @@ export function ProjectChartDetail({ artifactId }: { artifactId: string }) {
 
     return <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-4xl px-6 py-8">
-            <Button variant="ghost" className="mb-5 -ml-3" onClick={() => router.push(`/projects/${projectId}`)}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to project
+            <Button variant="ghost" size="sm" className="mb-5 -ml-2 text-muted-foreground" onClick={() => router.push(`/projects/${projectId}`)}>
+                <X className="mr-1.5 h-4 w-4" />
+                Close
             </Button>
             <ChartArtifactCard artifact={artifact} onOpenPaper={openChartPaper} display="full" />
         </div>
