@@ -79,3 +79,4 @@ class ChartArtifactPayload(BaseModel):
     coverage: ChartCoverage
     computation: Optional[dict] = None
     warnings: List[str] = Field(default_factory=list)
+    investigation_trace: Optional[dict] = None

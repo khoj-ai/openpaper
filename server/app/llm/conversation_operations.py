@@ -70,6 +70,7 @@ class FieldInvestigation(BaseModel):
 
     findings: str
     evidence: dict[str, list[str]] = Field(default_factory=dict)
+    trace: dict[str, Any] = Field(default_factory=dict)
 
 
 class ConversationOperations(BaseLLMClient):
@@ -327,7 +328,20 @@ class DataTableOperations(BaseLLMClient):
             )
             if part
         )
-        return FieldInvestigation(findings=findings, evidence=evidence)
+        return FieldInvestigation(
+            findings=findings,
+            evidence=evidence,
+            trace={
+                "status_messages": [
+                    f"Investigated {len(papers)} selected paper{'s' if len(papers) != 1 else ''}",
+                    "Collected source passages for chart extraction",
+                ],
+                "tool_calls": [
+                    {"name": result.name, "args": result.args}
+                    for result in tool_call_results
+                ],
+            },
+        )
 
     def propose_data_table_schema(
         self,

@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 class ArtifactCreate(BaseModel):
     kind: ArtifactKind
     payload: Dict[str, Any]
-    message_id: uuid.UUID
+    message_id: Optional[uuid.UUID] = None
     scope_type: str  # ConversableType value
     scope_id: Optional[uuid.UUID] = None
 
@@ -50,6 +50,28 @@ class ArtifactCRUD(CRUDBase[Artifact, ArtifactCreate, ArtifactUpdate]):
             scope_id=conversation.conversable_id,  # type: ignore[arg-type]
         )
         return self.create(db, obj_in=obj_in, user=user)
+
+    def create_for_scope(
+        self,
+        db: Session,
+        *,
+        kind: ArtifactKind,
+        payload: Dict[str, Any],
+        scope_type: str,
+        scope_id: Optional[uuid.UUID],
+        user: CurrentUser,
+    ) -> Optional[Artifact]:
+        """Create an artifact that is not backed by a chat message."""
+        return self.create(
+            db,
+            obj_in=ArtifactCreate(
+                kind=kind,
+                payload=payload,
+                scope_type=scope_type,
+                scope_id=scope_id,
+            ),
+            user=user,
+        )
 
     def bulk_create_for_message(
         self,
@@ -123,8 +145,8 @@ class ArtifactCRUD(CRUDBase[Artifact, ArtifactCreate, ArtifactUpdate]):
         """
         q = (
             db.query(Artifact, Conversation.id, Conversation.title)
-            .join(Message, Artifact.message_id == Message.id)
-            .join(Conversation, Message.conversation_id == Conversation.id)
+            .outerjoin(Message, Artifact.message_id == Message.id)
+            .outerjoin(Conversation, Message.conversation_id == Conversation.id)
             .filter(
                 Artifact.scope_type == ConversableType.PROJECT.value,
                 Artifact.scope_id == project_id,

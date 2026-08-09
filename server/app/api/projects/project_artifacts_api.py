@@ -46,11 +46,14 @@ async def get_project_artifacts(
             "id": str(artifact.id),
             "kind": artifact.kind,
             "payload": artifact.payload,
-            "message_id": str(artifact.message_id),
-            "conversation_id": str(conversation_id),
+            "message_id": str(artifact.message_id) if artifact.message_id else None,
+            "conversation_id": str(conversation_id) if conversation_id else None,
             "conversation_title": conversation_title,
             "created_at": (
                 artifact.created_at.isoformat() if artifact.created_at else None
+            ),
+            "updated_at": (
+                artifact.updated_at.isoformat() if artifact.updated_at else None
             ),
         }
         for artifact, conversation_id, conversation_title in rows

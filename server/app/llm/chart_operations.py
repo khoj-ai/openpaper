@@ -97,7 +97,7 @@ class ChartOperations:
     @staticmethod
     def is_chart_ready(payload: ChartArtifactPayload) -> bool:
         """A chart needs at least two grounded points to support a comparison."""
-        return len(payload.coverage.included_paper_ids) >= 2
+        return sum(1 for record in payload.records if not record.exclusion_reason) >= 2
 
     @staticmethod
     def chart_failure_message(payload: ChartArtifactPayload) -> str:
@@ -303,9 +303,11 @@ class ChartOperations:
         payload.records = valid_records
         payload.coverage = ChartCoverage(
             searched_paper_ids=paper_ids,
-            included_paper_ids=[
-                r.paper_id for r in valid_records if not r.exclusion_reason
-            ],
+            included_paper_ids=list(
+                dict.fromkeys(
+                    r.paper_id for r in valid_records if not r.exclusion_reason
+                )
+            ),
             excluded=excluded,
         )
 

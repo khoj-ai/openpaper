@@ -509,11 +509,13 @@ class Artifact(Base):
     kind = Column(String, nullable=False)  # ArtifactKind value
     payload = Column(JSONB, nullable=False)
 
-    # Provenance: which assistant message produced this artifact.
+    # Provenance: which assistant message produced this artifact. Artifact-native
+    # jobs (for example charts) have no synthetic chat message, so this is
+    # intentionally optional.
     message_id = Column(
         UUID(as_uuid=True),
         ForeignKey("messages.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
 
     # Scope — denormalized from the originating conversation so panel queries
@@ -532,6 +534,42 @@ class Artifact(Base):
             "created_at",
         ),
         Index("ix_artifacts_message_id", "message_id"),
+    )
+
+
+class ChartGenerationJob(Base):
+    """An artifact-native, pollable chart-generation request."""
+
+    __tablename__ = "chart_generation_jobs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    project_id = Column(
+        UUID(as_uuid=True), ForeignKey("project.id", ondelete="CASCADE"), nullable=False
+    )
+    prompt = Column(Text, nullable=False)
+    paper_ids = Column(JSONB, nullable=False, default=list)
+    plan = Column(JSONB, nullable=False)
+    status = Column(String, nullable=False, default=JobStatus.PENDING)
+    status_message = Column(String, nullable=True)
+    error_message = Column(Text, nullable=True)
+    trace = Column(JSONB, nullable=True)
+    artifact_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("artifacts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    user = relationship("User")
+    project = relationship("Project")
+    artifact = relationship("Artifact", foreign_keys=[artifact_id])
+
+    __table_args__ = (
+        Index("ix_chart_generation_jobs_project_created", "project_id", "created_at"),
     )
 
 
