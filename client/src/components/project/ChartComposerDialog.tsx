@@ -56,7 +56,7 @@ export function ChartComposerDialog({ open, onOpenChange, projectId, papers, onC
                 method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ project_id: projectId, prompt, paper_ids: paperIds, plan }),
             });
-            toast.success("Chart created.");
+            toast.success("Chart generation started.");
             onOpenChange(false);
             setPlan(null);
             await onCreated();

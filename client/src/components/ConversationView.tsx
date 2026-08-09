@@ -183,6 +183,11 @@ export const ConversationView = ({
 		}
 	}, [onRefreshPaperUrl, onOpenPaperExternal]);
 
+	const openArtifactPaper = useCallback((paperId: string, searchText?: string) => {
+		const paper = papers.find((candidate) => candidate.id === paperId);
+		if (paper) openPaperPdf(paper, searchText ?? null);
+	}, [openPaperPdf, papers]);
+
 	const handleCitationClick = (key: string, messageIndex: number) => {
 		originalHandleCitationClick(key, messageIndex);
 		const message = messages[messageIndex];
@@ -297,7 +302,7 @@ export const ConversationView = ({
 					{msg.content}
 				</Markdown>
 				{msg.artifacts && msg.artifacts.length > 0 && (
-					<ChatArtifactCards artifacts={msg.artifacts} />
+					<ChatArtifactCards artifacts={msg.artifacts} onOpenPaper={openArtifactPaper} />
 				)}
 				{msg.references && msg.references["citations"]?.length > 0 ? (
 					<div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
@@ -476,7 +481,7 @@ export const ConversationView = ({
 									}}
 								/>
 								{streamingArtifacts && streamingArtifacts.length > 0 && (
-									<ChatArtifactCards artifacts={streamingArtifacts} />
+									<ChatArtifactCards artifacts={streamingArtifacts} onOpenPaper={openArtifactPaper} />
 								)}
 								<ChatMessageActions
 									message={streamingChunks.join("")}

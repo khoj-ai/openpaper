@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { BarChart3, ChevronDown, ChevronUp, Sigma } from "lucide-react";
+import Link from "next/link";
 import { ChartArtifact } from "@/lib/schema";
+import { MessageTraceViewer } from "@/components/MessageTraceViewer";
 
 function numeric(value?: string): number | null {
     if (!value) return null;
@@ -10,7 +12,21 @@ function numeric(value?: string): number | null {
     return match ? Number(match[0]) : null;
 }
 
-export function ChartArtifactCard({ artifact }: { artifact: ChartArtifact }) {
+function ChartPaperLink({ paperId, searchTerm, onOpenPaper, className, children }: {
+    paperId: string;
+    searchTerm?: string;
+    onOpenPaper: (paperId: string, searchTerm?: string) => void;
+    className?: string;
+    children: React.ReactNode;
+}) {
+    return <button type="button" onClick={() => onOpenPaper(paperId, searchTerm)} className={className}>{children}</button>;
+}
+
+export function ChartArtifactCard({ artifact, onOpenPaper, chatHref }: {
+    artifact: ChartArtifact;
+    onOpenPaper: (paperId: string, searchTerm?: string) => void;
+    chatHref?: string;
+}) {
     const [open, setOpen] = useState(() => Object.keys(artifact.coverage.excluded).length > 0);
     const points = useMemo(() => artifact.records
         .filter(record => !record.exclusion_reason)
@@ -35,13 +51,13 @@ export function ChartArtifactCard({ artifact }: { artifact: ChartArtifact }) {
         : 48 + index * (250 / Math.max(points.length - 1, 1));
 
     return (
-        <section className="mt-3 overflow-hidden rounded-lg border bg-card p-3 text-card-foreground">
+        <section className="not-prose mt-3 overflow-hidden rounded-lg border bg-card p-3 text-card-foreground">
             <div className="flex items-start gap-2">
                 <BarChart3 className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
                 <div className="min-w-0 flex-1">
-                    <h3 className="text-sm font-semibold">{artifact.plan.title}</h3>
+                    {chatHref ? <Link href={chatHref} className="m-0 text-sm font-semibold hover:underline">{artifact.plan.title}</Link> : <h3 className="m-0 text-sm font-semibold">{artifact.plan.title}</h3>}
                     <p className="text-xs text-muted-foreground">
-                        {artifact.plan.chart_type} · {artifact.coverage.included_paper_ids.length} of {artifact.coverage.searched_paper_ids.length} papers charted
+                        {artifact.plan.chart_type} · {points.length} data point{points.length === 1 ? "" : "s"} from {artifact.coverage.included_paper_ids.length} of {artifact.coverage.searched_paper_ids.length} papers
                     </p>
                 </div>
             </div>
@@ -73,12 +89,13 @@ export function ChartArtifactCard({ artifact }: { artifact: ChartArtifact }) {
             {open && <div className="mt-2 space-y-2 border-t pt-2 text-xs">
                 {artifact.plan.calculation && <p className="flex gap-1 text-muted-foreground"><Sigma className="h-3.5 w-3.5 shrink-0" />{artifact.plan.calculation.spec}</p>}
                 {artifact.computation?.script && <details className="rounded bg-muted/60 p-2"><summary className="cursor-pointer font-medium">View calculation code</summary><pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-[10px]">{artifact.computation.script}</pre></details>}
+                {artifact.investigation_trace && <MessageTraceViewer trace={artifact.investigation_trace} />}
                 {artifact.records.map(record => record.exclusion_reason ? (
-                    <p key={record.paper_id} className="text-muted-foreground">{record.paper_title}: {record.exclusion_reason}</p>
+                    <p key={record.paper_id} className="text-muted-foreground"><ChartPaperLink paperId={record.paper_id} onOpenPaper={onOpenPaper} className="text-left font-medium text-foreground hover:underline">{record.paper_title}</ChartPaperLink>: {record.exclusion_reason}</p>
                 ) : (
                     <div key={record.paper_id} className="rounded bg-muted/60 p-2">
-                        <p className="font-medium">{record.paper_title}</p>
-                        {Object.entries(record.values).map(([key, value]) => <p key={key} className="mt-1 text-muted-foreground"><span className="font-medium text-foreground">{key}: {value.value}</span> — “{value.quote}”{value.line_number ? ` (line ${value.line_number})` : ""}</p>)}
+                        <ChartPaperLink paperId={record.paper_id} onOpenPaper={onOpenPaper} className="text-left font-medium hover:underline">{record.paper_title}</ChartPaperLink>
+                        {Object.entries(record.values).map(([key, value]) => <p key={key} className="mt-1 text-muted-foreground"><ChartPaperLink paperId={record.paper_id} searchTerm={value.quote} onOpenPaper={onOpenPaper} className="text-left hover:text-foreground hover:underline"><span className="font-medium text-foreground">{key}: {value.value}</span> — “{value.quote}”{value.line_number ? ` (line ${value.line_number})` : ""}</ChartPaperLink></p>)}
                     </div>
                 ))}
                 {artifact.warnings.map(warning => <p key={warning} className="text-amber-700 dark:text-amber-300">{warning}</p>)}

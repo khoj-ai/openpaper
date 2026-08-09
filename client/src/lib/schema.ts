@@ -96,6 +96,7 @@ export interface ChartArtifact {
     };
     computation?: { script?: string; warnings?: string[] } | null;
     warnings: string[];
+    investigation_trace?: MessageTrace | null;
 }
 
 export type ChatArtifact = CitationArtifact | ChartArtifact;
@@ -106,10 +107,26 @@ export interface ProjectChatArtifact {
     id: string;
     kind: 'citation' | 'chart';
     payload: ChatArtifact;
-    message_id: string;
-    conversation_id: string;
+    message_id?: string | null;
+    conversation_id?: string | null;
     conversation_title?: string | null;
     created_at?: string | null;
+    updated_at?: string | null;
+}
+
+export interface ChartGenerationJob {
+    id: string;
+    project_id: string;
+    status: JobStatus;
+    status_message?: string | null;
+    error_message?: string | null;
+    trace?: MessageTrace | null;
+    created_at?: string | null;
+    updated_at?: string | null;
+    started_at?: string | null;
+    completed_at?: string | null;
+    artifact_id?: string | null;
+    artifact?: ChartArtifact | null;
 }
 
 export interface MessageTraceToolCall {
@@ -463,6 +480,7 @@ export interface AudioOverviewJob extends JobStatusResponse {
     conversable_id: string;
     conversable_type: string;
     status_message: string | null;
+    updated_at?: string | null;
 }
 
 export interface Project {
