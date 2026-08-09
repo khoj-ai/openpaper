@@ -109,14 +109,14 @@ export default function AudioOverviewCard({
                         <div className="flex items-center space-x-2">
                             <button
                                 onClick={onSkipBackward}
-                                className="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                                className="p-1 text-muted-foreground hover:text-foreground transition-colors"
                                 title="Skip back 10s"
                             >
                                 <RotateCcw className="w-4 h-4" />
                             </button>
                             <button
                                 onClick={onSkipForward}
-                                className="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                                className="p-1 text-muted-foreground hover:text-foreground transition-colors"
                                 title="Skip forward 10s"
                             >
                                 <RotateCcw className="w-4 h-4 scale-x-[-1]" />
@@ -126,7 +126,7 @@ export default function AudioOverviewCard({
                         <div className="flex items-center space-x-3">
                             {/* Volume Control */}
                             <div className="flex items-center space-x-1">
-                                <Volume2 className="w-3 h-3 text-gray-500 dark:text-gray-400" />
+                                <Volume2 className="w-3 h-3 text-muted-foreground" />
                                 <input
                                     type="range"
                                     min="0"
@@ -134,7 +134,7 @@ export default function AudioOverviewCard({
                                     step="0.01"
                                     value={volume}
                                     onChange={(e) => onVolumeChange(Number(e.target.value))}
-                                    className="w-16 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                                    className="w-16 h-1 bg-muted rounded-lg appearance-none cursor-pointer"
                                 />
                             </div>
 
@@ -146,8 +146,8 @@ export default function AudioOverviewCard({
                                         onClick={() => onSpeedChange(speedOption)}
                                         className={`px-2 py-1 text-xs rounded ${
                                             speed === speedOption
-                                                ? 'bg-blue-600 text-white'
-                                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                                                ? 'bg-foreground text-background'
+                                                : 'bg-muted text-muted-foreground hover:text-foreground'
                                         } transition-colors`}
                                     >
                                         {speedOption}x

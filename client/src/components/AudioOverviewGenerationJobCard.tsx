@@ -11,17 +11,17 @@ interface AudioOverviewGenerationJobCardProps {
 const getStatusIcon = (status: string) => {
     switch (status) {
         case 'pending':
-            return <Clock className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />;
+            return <Clock className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />;
         case 'running':
-            return <Loader2 className="w-5 h-5 text-blue-600 dark:text-blue-400 animate-spin" />;
+            return <Loader2 className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-spin" />;
         case 'completed':
-            return <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />;
+            return <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />;
         case 'failed':
-            return <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />;
+            return <XCircle className="w-4 h-4 text-red-600 dark:text-red-400" />;
         case 'cancelled':
-            return <AlertCircle className="w-5 h-5 text-gray-600 dark:text-gray-400" />;
+            return <AlertCircle className="w-4 h-4 text-muted-foreground" />;
         default:
-            return <Clock className="w-5 h-5 text-gray-600 dark:text-gray-400" />;
+            return <Clock className="w-4 h-4 text-muted-foreground" />;
     }
 };
 
@@ -53,9 +53,9 @@ const getStatusColor = (status: string) => {
         case 'failed':
             return 'text-red-600 dark:text-red-400';
         case 'cancelled':
-            return 'text-gray-600 dark:text-gray-400';
+            return 'text-muted-foreground';
         default:
-            return 'text-gray-600 dark:text-gray-400';
+            return 'text-muted-foreground';
     }
 };
 
