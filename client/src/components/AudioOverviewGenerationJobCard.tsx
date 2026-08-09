@@ -62,19 +62,19 @@ const getStatusColor = (status: string) => {
 export default function AudioOverviewGenerationJobCard({ job }: AudioOverviewGenerationJobCardProps) {
 
     return (
-        <div className="w-full p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20">
-            <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+        <div className="w-full rounded-lg border bg-card p-3 text-card-foreground">
+            <div className="flex items-start gap-2">
+                <div className="mt-0.5 flex-shrink-0">
                     {getStatusIcon(job.status)}
                 </div>
                 <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                    <h3 className="text-sm font-semibold mb-1">
                         Creating Audio Overview
                     </h3>
                     <p className={`text-xs font-medium mb-1 ${getStatusColor(job.status)}`}>
                         {job.status_message || getStatusText(job.status)}
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <p className="text-xs text-muted-foreground">
                         {job.completed_at ? (
                             <span>Completed at {formatDateTime(job.completed_at)}</span>
                         ) : (
@@ -83,10 +83,10 @@ export default function AudioOverviewGenerationJobCard({ job }: AudioOverviewGen
                     </p>
                     {job.status === 'running' && (
                         <div className="mt-2">
-                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1">
-                                <div className="bg-blue-600 h-1 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+                            <div className="w-full bg-muted rounded-full h-1">
+                                <div className="bg-blue-500 h-1 rounded-full animate-pulse" style={{ width: '60%' }}></div>
                             </div>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            <p className="text-xs text-muted-foreground mt-1">
                                 This may take a few minutes...
                             </p>
                         </div>

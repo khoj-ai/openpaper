@@ -43,31 +43,34 @@ export default function AudioOverviewCard({
     onOpenTranscript,
 }: AudioOverviewCardProps) {
     return (
-        <div className="w-full p-4 rounded-lg bg-gray-50 dark:bg-gray-800/40 hover:bg-gray-100 dark:hover:bg-gray-800/70 transition-colors">
-            <div className="flex items-start gap-3 mb-3">
+        <div className="w-full rounded-lg border bg-card p-3 text-card-foreground">
+            <div className="flex items-start gap-2 mb-3">
+                {/* The play control keeps a filled shape because it is the one
+                    thing here you act on; the accent rides the icon, not a block. */}
                 <button
                     onClick={onPlayPause}
-                    className="flex-shrink-0 p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
+                    className="flex-shrink-0 rounded-md bg-muted p-1.5 transition-colors hover:bg-accent"
+                    aria-label={isPlaying ? "Pause audio overview" : "Play audio overview"}
                 >
                     {isLoading ? (
-                        <Loader2 className="w-5 h-5 text-blue-600 dark:text-blue-400 animate-spin" />
+                        <Loader2 className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-spin" />
                     ) : isPlaying ? (
-                        <Pause className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                        <Pause className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                     ) : (
-                        <Play className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                        <Play className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                     )}
                 </button>
                 <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                    <h3 className="text-sm font-semibold mb-1">
                         {overview.title || 'Audio Overview'}
                     </h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    <p className="text-xs text-muted-foreground mb-2">
                         Created {new Date(overview.created_at).toLocaleDateString()}
                     </p>
                     {overview.transcript && (
                         <button
                             onClick={onOpenTranscript}
-                            className="text-xs text-gray-600 dark:text-gray-300 line-clamp-2 text-left hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                            className="text-xs text-muted-foreground line-clamp-2 text-left hover:text-foreground transition-colors"
                         >
                             {overview.transcript}
                         </button>
@@ -79,12 +82,12 @@ export default function AudioOverviewCard({
                 <>
                     {/* Progress Bar */}
                     <div className="mb-3">
-                        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                             <span>{progress ? formatTime(progress.currentTime) : '0:00'}</span>
                             <span>{progress ? formatTime(progress.duration) : '0:00'}</span>
                         </div>
                         <div className="relative">
-                            <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                            <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                                 <div
                                     className="h-full bg-blue-500 transition-all duration-100"
                                     style={{ width: `${progressPercentage}%` }}
