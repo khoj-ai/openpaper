@@ -376,6 +376,7 @@ async def chat_message_multipaper(
                     yield f"{json.dumps({'type': 'status', 'content': 'Building a cited chart...'})}{END_DELIMITER}"
                     chart_findings = json.dumps(evidence_collection.get_evidence_dict())
                     chart_evidence = evidence_collection.get_evidence_dict()
+                    chart_trace: dict = {"status_messages": []}
                     # Project charts use the same field-aware investigation
                     # harness as the artifact composer. Everything-mode chat
                     # keeps the existing scoped evidence path because it has
@@ -393,6 +394,7 @@ async def chat_message_multipaper(
                         )
                         chart_findings = investigation.findings
                         chart_evidence = investigation.evidence
+                        chart_trace = investigation.trace
                     chart_plan = operations.propose_chart_plan(
                         request.user_query,
                         [
@@ -407,16 +409,21 @@ async def chat_message_multipaper(
                             # sweep for the confirmed plan's fields, rather than
                             # running a second agent whose evidence would
                             # replace the first's.
-                            chart_evidence = operations.sweep_plan_evidence(
-                                plan=chart_plan,
-                                papers=[
-                                    (str(paper.id), str(paper.title or "Untitled"))
-                                    for paper in all_papers
-                                ],
-                                evidence=chart_evidence,
-                                current_user=current_user,
-                                db=db,
-                                project_id=request.project_id,
+                            chart_evidence, sweep_steps = (
+                                operations.sweep_plan_evidence(
+                                    plan=chart_plan,
+                                    papers=[
+                                        (str(paper.id), str(paper.title or "Untitled"))
+                                        for paper in all_papers
+                                    ],
+                                    evidence=chart_evidence,
+                                    current_user=current_user,
+                                    db=db,
+                                    project_id=request.project_id,
+                                )
+                            )
+                            chart_trace.setdefault("status_messages", []).extend(
+                                sweep_steps
                             )
                         chart = operations.build_chart_artifact(
                             prompt=request.user_query,
@@ -428,6 +435,13 @@ async def chat_message_multipaper(
                             ],
                         )
                         if chart:
+                            chart.investigation_trace = {
+                                **chart_trace,
+                                "status_messages": [
+                                    *chart_trace.get("status_messages", []),
+                                    *chart.extraction_steps,
+                                ],
+                            }
                             if operations.is_chart_ready(chart):
                                 payload = chart.model_dump()
                                 artifacts_collected.append(payload)

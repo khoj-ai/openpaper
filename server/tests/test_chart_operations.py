@@ -735,6 +735,83 @@ class TestExtractionIsPerPaper(unittest.TestCase):
         self.assertLess(largest, 60_000, "extraction context must be bounded per call")
 
 
+class TestTraceIsSpecific(unittest.TestCase):
+    """The trace is how a reader audits an absence, so it has to say what was
+    actually searched and found — not name the phases it went through."""
+
+    def test_investigation_steps_name_the_query_and_the_hit_count(self):
+        class Harness(DataTableOperations):
+            def __init__(self):
+                self.responses = [
+                    SimpleNamespace(
+                        tool_calls=[
+                            SimpleNamespace(
+                                name="search_all_files",
+                                args={"query": "benchmark|examples"},
+                                id="call-1",
+                                thought_signature=None,
+                            )
+                        ],
+                        text="",
+                    ),
+                    SimpleNamespace(tool_calls=[], text="Reported per benchmark."),
+                ]
+
+            def generate_content(self, **_kwargs):
+                return self.responses.pop(0)
+
+        with patch(
+            "app.llm.conversation_operations.search_all_files",
+            return_value={
+                "paper-1": ["7: Benchmark A uses 100 examples", "9: and 200 more"]
+            },
+        ):
+            investigation = Harness().investigate_fields(
+                prompt="chart examples by benchmark",
+                papers=[("paper-1", "Paper one"), ("paper-2", "Paper two")],
+                current_user=SimpleNamespace(),
+                db=SimpleNamespace(),
+                project_id="project-1",
+                system_prompt="round {n_round}/{max_rounds}",
+                user_message="Investigate chart fields",
+            )
+
+        steps = investigation.trace["status_messages"]
+        self.assertTrue(any("benchmark|examples" in step for step in steps))
+        self.assertTrue(any("2 matching lines in 1 paper" in step for step in steps))
+        self.assertTrue(
+            any("Gathered passages from 1 of 2 papers" in step for step in steps)
+        )
+
+    def test_extraction_steps_report_points_per_paper(self):
+        artifact = StubChartOperations(
+            records_json(
+                record(
+                    "one",
+                    "?",
+                    benchmark=("A", "accuracy was 91%"),
+                    score=("91", "accuracy was 91%"),
+                ),
+            )
+        ).build_chart_artifact(
+            prompt="chart scores",
+            plan=simple_plan(),
+            evidence={
+                "one": ["12: accuracy was 91%"],
+                "two": ["12: nothing relevant here"],
+            },
+            papers=[("one", "Paper one"), ("two", "Paper two")],
+        )
+
+        assert artifact is not None
+        steps = artifact.extraction_steps
+        self.assertTrue(any("2 papers with evidence" in step for step in steps))
+        self.assertTrue(any('"Paper one" — 1 point' in step for step in steps))
+        self.assertTrue(
+            any("1 searched paper reported no usable value" in step for step in steps)
+        )
+
+
 class TestInvestigationHarness(unittest.TestCase):
     def test_investigation_retains_per_paper_source_passages(self):
         class Harness(DataTableOperations):
@@ -829,7 +906,7 @@ class TestInvestigationHarness(unittest.TestCase):
             "app.llm.chart_operations.read_abstract",
             return_value="Abstract:\n\nWe study retrieval.",
         ):
-            evidence = ChartOperations.sweep_plan_evidence(
+            evidence, _ = ChartOperations.sweep_plan_evidence(
                 plan=simple_plan(),
                 papers=[("paper-1", "Paper one")],
                 evidence={},
@@ -845,7 +922,7 @@ class TestInvestigationHarness(unittest.TestCase):
             "app.llm.chart_operations.search_file",
             return_value=["7: Benchmark A uses 100 examples"],
         ):
-            evidence = ChartOperations.sweep_plan_evidence(
+            evidence, _ = ChartOperations.sweep_plan_evidence(
                 plan=simple_plan(),
                 papers=[("paper-1", "Paper one")],
                 evidence={"paper-1": ["7: Benchmark A uses 100 examples"]},

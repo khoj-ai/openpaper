@@ -86,7 +86,13 @@ def generate_chart(
             )
             return
 
-        artifact.investigation_trace = investigation.trace
+        artifact.investigation_trace = {
+            **investigation.trace,
+            "status_messages": [
+                *investigation.trace.get("status_messages", []),
+                *artifact.extraction_steps,
+            ],
+        }
         created = artifact_crud.create_for_scope(
             db,
             kind=ArtifactKind.CHART,

@@ -221,11 +221,19 @@ class DataTableOperations(BaseLLMClient):
             "search_file": search_file,
             "view_file": view_file,
         }
+        paper_titles = dict(papers)
         tool_call_results: list[ToolCallResult] = []
         evidence: dict[str, list[str]] = {}
         total_result_chars = 0
         seen_calls: set[str] = set()
         investigation_report = ""
+        # What the agent actually did, in order. Generic phase labels ("Collected
+        # source passages") tell a reader nothing about why a paper is missing;
+        # the search terms and hit counts do.
+        steps: list[str] = []
+
+        def title_of(paper_id: str) -> str:
+            return paper_titles.get(str(paper_id), str(paper_id))
 
         for turn in range(self.PROPOSE_MAX_TURNS):
             response = self.generate_content(
@@ -291,16 +299,36 @@ class DataTableOperations(BaseLLMClient):
                     result = str(raw)[: self.PROPOSE_TOOL_RESULT_CHARS]
                     total_result_chars += len(result)
                     if call.name == "search_all_files" and isinstance(raw, dict):
+                        hits = 0
                         for paper_id, lines in raw.items():
                             evidence.setdefault(str(paper_id), []).extend(
                                 map(str, lines)
                             )
-                    elif call.args.get("paper_id") and isinstance(raw, (str, list)):
-                        evidence.setdefault(str(call.args["paper_id"]), []).extend(
-                            [raw] if isinstance(raw, str) else map(str, raw)
+                            hits += len(lines)
+                        steps.append(
+                            f'Searched every paper for "{call.args.get("query", "")}" — '
+                            f"{hits} matching line{'s' if hits != 1 else ''} in {len(raw)} paper{'s' if len(raw) != 1 else ''}"
                         )
+                    elif call.args.get("paper_id") and isinstance(raw, (str, list)):
+                        lines = [raw] if isinstance(raw, str) else [str(x) for x in raw]
+                        evidence.setdefault(str(call.args["paper_id"]), []).extend(
+                            lines
+                        )
+                        target = title_of(call.args["paper_id"])
+                        if call.name == "search_file":
+                            steps.append(
+                                f'Searched "{target}" for "{call.args.get("query", "")}" — '
+                                f"{len(lines)} matching line{'s' if len(lines) != 1 else ''}"
+                            )
+                        elif call.name == "view_file":
+                            steps.append(
+                                f'Read "{target}" lines {call.args.get("range_start")}–{call.args.get("range_end")}'
+                            )
+                        else:
+                            steps.append(f'Read the abstract of "{target}"')
                 except Exception as exc:
                     result = f"Error: {exc}"
+                    steps.append(f"{call.name} failed: {exc}")
 
                 tool_call_results.append(
                     ToolCallResult(
@@ -328,14 +356,22 @@ class DataTableOperations(BaseLLMClient):
             )
             if part
         )
+        covered = sum(1 for lines in evidence.values() if lines)
+        status_messages = [
+            f"Searching {len(papers)} selected paper{'s' if len(papers) != 1 else ''}",
+            *steps,
+            f"Gathered passages from {covered} of {len(papers)} paper{'s' if len(papers) != 1 else ''}",
+        ]
+        if investigation_report:
+            summary = " ".join(investigation_report.split())
+            status_messages.append(
+                f"Investigator's read: {summary[:400]}{'…' if len(summary) > 400 else ''}"
+            )
         return FieldInvestigation(
             findings=findings,
             evidence=evidence,
             trace={
-                "status_messages": [
-                    f"Investigated {len(papers)} selected paper{'s' if len(papers) != 1 else ''}",
-                    "Collected source passages for chart extraction",
-                ],
+                "status_messages": status_messages,
                 "tool_calls": [
                     {"name": result.name, "args": result.args}
                     for result in tool_call_results

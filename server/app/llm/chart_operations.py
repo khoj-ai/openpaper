@@ -343,7 +343,7 @@ class ChartOperations:
         current_user: CurrentUser,
         db: Session,
         project_id: str,
-    ) -> dict[str, list[str]]:
+    ) -> tuple[dict[str, list[str]], list[str]]:
         """Give every selected paper a floor of plan-relevant evidence.
 
         The investigator agent decides where to look, which means coverage is
@@ -355,8 +355,11 @@ class ChartOperations:
         """
         query = _sweep_query(plan)
         if not query:
-            return evidence
+            return evidence, []
         paper_ids = [paper_id for paper_id, _ in papers]
+        matched = 0
+        fell_back = 0
+        unreadable = 0
         for paper_id in paper_ids:
             found: list[str] = []
             try:
@@ -375,7 +378,9 @@ class ChartOperations:
                 logger.warning(
                     "Chart sweep could not search paper %s", paper_id, exc_info=True
                 )
-            if not found and not evidence.get(paper_id):
+            if found:
+                matched += 1
+            elif not evidence.get(paper_id):
                 # Nothing matched and the agent never read this paper: keep the
                 # abstract so "we looked" is backed by something quotable.
                 try:
@@ -390,7 +395,9 @@ class ChartOperations:
                             )
                         )
                     ]
+                    fell_back += 1
                 except Exception:
+                    unreadable += 1
                     logger.warning(
                         "Chart sweep could not read abstract for paper %s",
                         paper_id,
@@ -404,7 +411,20 @@ class ChartOperations:
                 if _normalize(line) not in seen:
                     existing.append(line)
                     seen.add(_normalize(line))
-        return evidence
+        steps = [
+            f'Swept all {len(paper_ids)} paper{"s" if len(paper_ids) != 1 else ""} '
+            f'for the plan\'s own terms ("{query}")',
+            f"{matched} paper{'s' if matched != 1 else ''} matched those terms",
+        ]
+        if fell_back:
+            steps.append(
+                f"{fell_back} paper{'s' if fell_back != 1 else ''} matched nothing; kept the abstract as evidence of the search"
+            )
+        if unreadable:
+            steps.append(
+                f"{unreadable} paper{'s' if unreadable != 1 else ''} had no readable text"
+            )
+        return evidence, steps
 
     def investigate_chart_fields(
         self,
@@ -441,7 +461,7 @@ class ChartOperations:
             ),
         )
         if plan:
-            investigation.evidence = self.sweep_plan_evidence(
+            investigation.evidence, steps = self.sweep_plan_evidence(
                 plan=plan,
                 papers=papers,
                 evidence=investigation.evidence,
@@ -449,9 +469,7 @@ class ChartOperations:
                 db=db,
                 project_id=project_id,
             )
-            investigation.trace.setdefault("status_messages", []).append(
-                f"Swept all {len(papers)} paper{'s' if len(papers) != 1 else ''} for the confirmed chart fields"
-            )
+            investigation.trace.setdefault("status_messages", []).extend(steps)
         return investigation
 
     def propose_chart_plan(
@@ -687,6 +705,30 @@ class ChartOperations:
             included_paper_ids=included_paper_ids,
             excluded=excluded,
         )
+
+        plotted = Counter(
+            record.paper_id for record in payload.records if not record.exclusion_reason
+        )
+        payload.extraction_steps = [
+            f"Extracted from {len(targets)} paper{'s' if len(targets) != 1 else ''} "
+            f"with evidence, one call each",
+            *(
+                f'"{paper_titles[paper_id]}" — {plotted[paper_id]} point'
+                f"{'s' if plotted[paper_id] != 1 else ''}"
+                for paper_id in paper_ids
+                if plotted.get(paper_id)
+            ),
+        ]
+        if excluded_records:
+            payload.extraction_steps.append(
+                f"Dropped {len(excluded_records)} extracted point"
+                f"{'s' if len(excluded_records) != 1 else ''} whose quote was not in the gathered passages"
+            )
+        silent = len(targets) - len(plotted)
+        if silent > 0:
+            payload.extraction_steps.append(
+                f"{silent} searched paper{'s' if silent != 1 else ''} reported no usable value"
+            )
         return payload
 
     @staticmethod

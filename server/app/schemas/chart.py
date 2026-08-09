@@ -86,4 +86,8 @@ class ChartArtifactPayload(BaseModel):
     coverage: ChartCoverage
     computation: Optional[dict] = None
     warnings: List[str] = Field(default_factory=list)
+    extraction_steps: List[str] = Field(
+        default_factory=list,
+        description="What extraction did, per paper; callers merge these into the trace",
+    )
     investigation_trace: Optional[dict] = None
