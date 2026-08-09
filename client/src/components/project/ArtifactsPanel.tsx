@@ -73,6 +73,7 @@ type ArtifactListItem =
             conversationTitle: string | null;
             timestamp: string | null;
             artifacts: ChatArtifact[];
+            chartDetailHrefs: string[];
         };
     };
 
@@ -171,6 +172,7 @@ export function ArtifactsPanel() {
             conversationTitle: string | null;
             timestamp: string | null;
             artifacts: ChatArtifact[];
+            chartDetailHrefs: string[];
         }[] = [];
         const byMessage = new Map<string, (typeof groups)[number]>();
         for (const artifact of chatArtifacts) {
@@ -186,6 +188,7 @@ export function ArtifactsPanel() {
                     conversationTitle: artifact.conversation_title ?? null,
                     timestamp: artifactTimestamp,
                     artifacts: [],
+                    chartDetailHrefs: [],
                 };
                 byMessage.set(artifact.message_id, group);
                 groups.push(group);
@@ -193,6 +196,9 @@ export function ArtifactsPanel() {
                 group.timestamp = artifactTimestamp;
             }
             group.artifacts.push(artifact.payload);
+            if (artifact.kind === "chart") {
+                group.chartDetailHrefs.push(`/projects/${projectId}/charts/${artifact.id}`);
+            }
         }
         return groups;
     }, [chatArtifacts]);
@@ -590,7 +596,7 @@ export function ArtifactsPanel() {
                                             </span>
                                         )}
                                     </div>
-                                    <ChatArtifactCards artifacts={group.artifacts} onOpenPaper={handleOpenChartPaper} chatHref={`/projects/${projectId}/conversations/${group.conversationId}`} />
+                                    <ChatArtifactCards artifacts={group.artifacts} onOpenPaper={handleOpenChartPaper} chatHref={`/projects/${projectId}/conversations/${group.conversationId}`} chartDetailHrefs={group.chartDetailHrefs} />
                                 </div>;
                             })}
                             {artifactCount === 0 && (

@@ -22,12 +22,14 @@ function ChartPaperLink({ paperId, searchTerm, onOpenPaper, className, children 
     return <button type="button" onClick={() => onOpenPaper(paperId, searchTerm)} className={className}>{children}</button>;
 }
 
-export function ChartArtifactCard({ artifact, onOpenPaper, chatHref }: {
+export function ChartArtifactCard({ artifact, onOpenPaper, chatHref, detailHref, display = "compact" }: {
     artifact: ChartArtifact;
     onOpenPaper: (paperId: string, searchTerm?: string) => void;
     chatHref?: string;
+    detailHref?: string;
+    display?: "compact" | "full";
 }) {
-    const [open, setOpen] = useState(() => Object.keys(artifact.coverage.excluded).length > 0);
+    const [open, setOpen] = useState(false);
     const points = useMemo(() => artifact.records
         .filter(record => !record.exclusion_reason)
         .map(record => ({
@@ -51,7 +53,7 @@ export function ChartArtifactCard({ artifact, onOpenPaper, chatHref }: {
         : 48 + index * (250 / Math.max(points.length - 1, 1));
 
     return (
-        <section className="not-prose mt-3 overflow-hidden rounded-lg border bg-card p-3 text-card-foreground">
+        <section className={`not-prose text-card-foreground ${display === "compact" ? "mt-3 overflow-hidden rounded-lg border bg-card p-3" : ""}`}>
             <div className="flex items-start gap-2">
                 <BarChart3 className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
                 <div className="min-w-0 flex-1">
@@ -62,7 +64,7 @@ export function ChartArtifactCard({ artifact, onOpenPaper, chatHref }: {
                 </div>
             </div>
             {points.length > 0 ? (
-                <svg viewBox="0 0 320 180" className="mt-3 h-44 w-full" role="img" aria-label={artifact.plan.title}>
+                <svg viewBox="0 0 320 180" className={`mt-3 w-full ${display === "compact" ? "h-44" : "h-auto"}`} role="img" aria-label={artifact.plan.title}>
                     <line x1="34" y1="148" x2="310" y2="148" className="stroke-border" />
                     <line x1="34" y1="20" x2="34" y2="148" className="stroke-border" />
                     <text x="4" y="28" className="fill-muted-foreground text-[9px]">{maxY.toPrecision(3)}</text>
@@ -82,6 +84,7 @@ export function ChartArtifactCard({ artifact, onOpenPaper, chatHref }: {
                     {points.map((point, index) => <text key={`${point.record.paper_id}-label`} x={xFor(point, index)} y="164" textAnchor="middle" className="fill-muted-foreground text-[8px]">{point.x.slice(0, 10)}</text>)}
                 </svg>
             ) : <p className="mt-3 text-xs text-muted-foreground">No directly quoted values could be plotted.</p>}
+            {detailHref && display === "compact" && <Link href={detailHref} className="mt-3 inline-flex text-xs font-medium text-blue-700 hover:underline dark:text-blue-300">Open full chart</Link>}
             <button type="button" onClick={() => setOpen(value => !value)} className="mt-2 flex items-center gap-1 text-xs font-medium text-blue-700 hover:underline dark:text-blue-300">
                 {open ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                 {open ? "Hide sources and coverage" : "Show sources and coverage"}
