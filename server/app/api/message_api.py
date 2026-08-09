@@ -403,18 +403,21 @@ async def chat_message_multipaper(
                     )
                     if chart_plan:
                         if request.project_id:
-                            investigation = operations.investigate_chart_fields(
-                                prompt=request.user_query,
+                            # Top up the one investigation with a deterministic
+                            # sweep for the confirmed plan's fields, rather than
+                            # running a second agent whose evidence would
+                            # replace the first's.
+                            chart_evidence = operations.sweep_plan_evidence(
+                                plan=chart_plan,
                                 papers=[
                                     (str(paper.id), str(paper.title or "Untitled"))
                                     for paper in all_papers
                                 ],
+                                evidence=chart_evidence,
                                 current_user=current_user,
                                 db=db,
                                 project_id=request.project_id,
-                                plan=chart_plan,
                             )
-                            chart_evidence = investigation.evidence
                         chart = operations.build_chart_artifact(
                             prompt=request.user_query,
                             plan=chart_plan,

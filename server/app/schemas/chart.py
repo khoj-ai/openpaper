@@ -43,6 +43,14 @@ class ChartValue(BaseModel):
 
 
 class ChartRecord(BaseModel):
+    """One plotted point.
+
+    A paper reporting several benchmarks contributes several records, so the
+    point — not the paper — is the unit of identity. `record_id` defaults to
+    empty for artifacts stored before the distinction existed.
+    """
+
+    record_id: str = Field(default="")
     paper_id: str
     paper_title: str
     values: Dict[str, ChartValue] = Field(default_factory=dict)
