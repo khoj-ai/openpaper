@@ -84,6 +84,10 @@ export interface ChartArtifact {
     kind: 'chart';
     plan: ChartPlan;
     records: Array<{
+        // One plotted point, not one paper: a paper reporting several
+        // benchmarks contributes several records. Empty on artifacts stored
+        // before the distinction existed.
+        record_id?: string;
         paper_id: string;
         paper_title: string;
         values: Record<string, ChartValue>;
