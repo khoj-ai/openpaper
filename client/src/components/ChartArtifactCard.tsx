@@ -72,16 +72,16 @@ export function ChartArtifactCard({ artifact, onOpenPaper, chatHref, detailHref,
                     {artifact.plan.chart_type === "bar" && points.map((point, index) => {
                         const width = Math.max(12, 240 / points.length - 8);
                         const x = 43 + index * (250 / points.length);
-                        return <rect key={point.record.paper_id} x={x} y={yFor(point.y)} width={width} height={148 - yFor(point.y)} rx="2" className="fill-blue-500" />;
+                        return <rect key={point.record.record_id} x={x} y={yFor(point.y)} width={width} height={148 - yFor(point.y)} rx="2" className="fill-blue-500" />;
                     })}
                     {artifact.plan.chart_type !== "bar" && points.map((point, index) => {
                         const x = xFor(point, index);
-                        return <g key={point.record.paper_id}>
+                        return <g key={point.record.record_id}>
                             {artifact.plan.chart_type === "line" && index > 0 && <line x1={xFor(points[index - 1], index - 1)} y1={yFor(points[index - 1].y)} x2={x} y2={yFor(point.y)} className="stroke-blue-500" strokeWidth="2" />}
                             <circle cx={x} cy={yFor(point.y)} r="4" className="fill-blue-500" />
                         </g>;
                     })}
-                    {points.map((point, index) => <text key={`${point.record.paper_id}-label`} x={xFor(point, index)} y="164" textAnchor="middle" className="fill-muted-foreground text-[8px]">{point.x.slice(0, 10)}</text>)}
+                    {points.map((point, index) => <text key={`${point.record.record_id}-label`} x={xFor(point, index)} y="164" textAnchor="middle" className="fill-muted-foreground text-[8px]">{point.x.slice(0, 10)}</text>)}
                 </svg>
             ) : <p className="mt-3 text-xs text-muted-foreground">No directly quoted values could be plotted.</p>}
             {detailHref && display === "compact" && <Link href={detailHref} className="mt-3 inline-flex text-xs font-medium text-blue-700 hover:underline dark:text-blue-300">Open full chart</Link>}
@@ -94,9 +94,9 @@ export function ChartArtifactCard({ artifact, onOpenPaper, chatHref, detailHref,
                 {artifact.computation?.script && <details className="rounded bg-muted/60 p-2"><summary className="cursor-pointer font-medium">View calculation code</summary><pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-[10px]">{artifact.computation.script}</pre></details>}
                 {artifact.investigation_trace && <MessageTraceViewer trace={artifact.investigation_trace} />}
                 {artifact.records.map(record => record.exclusion_reason ? (
-                    <p key={record.paper_id} className="text-muted-foreground"><ChartPaperLink paperId={record.paper_id} onOpenPaper={onOpenPaper} className="text-left font-medium text-foreground hover:underline">{record.paper_title}</ChartPaperLink>: {record.exclusion_reason}</p>
+                    <p key={record.record_id} className="text-muted-foreground"><ChartPaperLink paperId={record.paper_id} onOpenPaper={onOpenPaper} className="text-left font-medium text-foreground hover:underline">{record.paper_title}</ChartPaperLink>: {record.exclusion_reason}</p>
                 ) : (
-                    <div key={record.paper_id} className="rounded bg-muted/60 p-2">
+                    <div key={record.record_id} className="rounded bg-muted/60 p-2">
                         <ChartPaperLink paperId={record.paper_id} onOpenPaper={onOpenPaper} className="text-left font-medium hover:underline">{record.paper_title}</ChartPaperLink>
                         {Object.entries(record.values).map(([key, value]) => <p key={key} className="mt-1 text-muted-foreground"><ChartPaperLink paperId={record.paper_id} searchTerm={value.quote} onOpenPaper={onOpenPaper} className="text-left hover:text-foreground hover:underline"><span className="font-medium text-foreground">{key}: {value.value}</span> — “{value.quote}”{value.line_number ? ` (line ${value.line_number})` : ""}</ChartPaperLink></p>)}
                     </div>
