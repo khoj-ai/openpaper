@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ChartArtifact } from "@/lib/schema";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useIsDarkMode } from "@/hooks/useDarkMode";
 
 export interface ChartPoint {
     recordId: string;
@@ -10,6 +11,7 @@ export interface ChartPoint {
     paperTitle: string;
     label: string;
     value: number;
+    series?: string;
     x: number | null;
     cells: Array<{ key: string; value: string; quote: string; lineNumber?: string | null }>;
 }
@@ -18,6 +20,28 @@ export function numeric(raw?: string): number | null {
     if (!raw) return null;
     const match = raw.replace(/,/g, "").match(/-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?/);
     return match ? Number(match[0]) : null;
+}
+
+/** Categorical slots, validated for CVD separation and lightness against both
+ * theme surfaces. Assigned in fixed order and never cycled or generated: a
+ * ninth series folds into the table rather than inventing a hue. Contrast for
+ * the lighter slots sits under 3:1, which the row labels and the table view
+ * relieve — identity is never carried by color alone here. */
+export const SERIES_COLORS_LIGHT = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"];
+export const SERIES_COLORS_DARK = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"];
+
+export function seriesPalette(dark: boolean): string[] {
+    return dark ? SERIES_COLORS_DARK : SERIES_COLORS_LIGHT;
+}
+
+/** Stable series order: colour follows the entity, not its rank, so filtering
+ * or re-sorting never repaints the survivors. */
+export function seriesKeys(points: ChartPoint[]): string[] {
+    const seen: string[] = [];
+    for (const point of points) {
+        if (point.series && !seen.includes(point.series)) seen.push(point.series);
+    }
+    return seen.sort((a, b) => a.localeCompare(b));
 }
 
 /** Compact form for marks and ticks, where width is scarce. */
@@ -42,7 +66,9 @@ export function chartPoints(artifact: ChartArtifact): ChartPoint[] {
         const value = numeric(record.values[artifact.plan.y.key]?.value);
         if (value === null) continue;
         const label = record.values[artifact.plan.x.key]?.value ?? "";
+        const seriesKey = artifact.plan.series?.key;
         points.push({
+            series: seriesKey ? record.values[seriesKey]?.value : undefined,
             recordId: record.record_id,
             paperId: record.paper_id,
             paperTitle: record.paper_title,
@@ -107,11 +133,12 @@ function Tooltip({ point, yLabel, xLabel, top }: {
  * Horizontal rather than vertical because the categories are entity names
  * pulled out of papers — "TAU-bench Airline", "menstrual cycles" — which
  * collide on a shared x-axis long before the plot runs out of room. */
-function CategoricalPlot({ points, log, yLabel, xLabel, onOpenPaper }: {
+function CategoricalPlot({ points, log, yLabel, xLabel, colorFor, onOpenPaper }: {
     points: ChartPoint[];
     log: boolean;
     yLabel: string;
     xLabel: string;
+    colorFor: (point: ChartPoint) => string;
     onOpenPaper: (paperId: string, searchTerm?: string) => void;
 }) {
     const [active, setActive] = useState<number | null>(null);
@@ -147,22 +174,28 @@ function CategoricalPlot({ points, log, yLabel, xLabel, onOpenPaper }: {
                             onBlur={() => setActive(null)}
                             onClick={() => onOpenPaper(point.paperId, point.cells[0]?.quote)}
                         >
-                            <span className="w-[30%] shrink-0 truncate text-[11px] text-muted-foreground" title={point.label}>
+                            {/* The series rides the label as text, so identity
+                                never depends on telling two hues apart. */}
+                            <span
+                                className="w-[30%] shrink-0 truncate text-[11px] text-muted-foreground"
+                                title={point.series ? `${point.label} · ${point.series}` : point.label}
+                            >
                                 {point.label}
+                                {point.series && <span className="opacity-70"> · {point.series}</span>}
                             </span>
                             <span className="relative h-4 flex-1">
                                 {log ? (
                                     <>
                                         <span className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-border" />
                                         <span
-                                            className="absolute top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-blue-500"
-                                            style={{ left: `calc(${fraction(point.value) * 100}% - 4px)` }}
+                                            className="absolute top-1/2 h-2 w-2 -translate-y-1/2 rounded-full"
+                                            style={{ left: `calc(${fraction(point.value) * 100}% - 4px)`, backgroundColor: colorFor(point) }}
                                         />
                                     </>
                                 ) : (
                                     <span
-                                        className="absolute inset-y-0 left-0 rounded-r bg-blue-500"
-                                        style={{ width: `max(${fraction(point.value) * 100}%, 2px)` }}
+                                        className="absolute inset-y-0 left-0 rounded-r"
+                                        style={{ width: `max(${fraction(point.value) * 100}%, 2px)`, backgroundColor: colorFor(point) }}
                                     />
                                 )}
                             </span>
@@ -206,12 +239,13 @@ function CategoricalPlot({ points, log, yLabel, xLabel, onOpenPaper }: {
 }
 
 /** XY form, for the genuinely numeric x of a scatter or line plan. */
-function XYPlot({ points, chartType, log, yLabel, xLabel }: {
+function XYPlot({ points, chartType, log, yLabel, xLabel, colorFor }: {
     points: ChartPoint[];
     chartType: "line" | "scatter";
     log: boolean;
     yLabel: string;
     xLabel: string;
+    colorFor: (point: ChartPoint) => string;
 }) {
     const [active, setActive] = useState<number | null>(null);
     const ordered = useMemo(
@@ -259,7 +293,8 @@ function XYPlot({ points, chartType, log, yLabel, xLabel }: {
                             cx={xFor(point.x ?? 0)}
                             cy={yFor(point.value)}
                             r={active === index ? 6 : 4}
-                            className="fill-blue-500 stroke-card"
+                            fill={colorFor(point)}
+                            className="stroke-card"
                             strokeWidth="2"
                         />
                         {/* Hit target well past the mark, per the 24px minimum. */}
@@ -320,6 +355,13 @@ export function ChartFigure({ artifact, view, log, onToggleLog, onOpenPaper, dis
     display?: "compact" | "full";
 }) {
     const { points: all, isXY, canLog } = view;
+    const dark = useIsDarkMode().darkMode;
+    const groups = useMemo(() => seriesKeys(all), [all]);
+    const palette = seriesPalette(dark);
+    const colorFor = (point: ChartPoint) => {
+        const index = point.series ? groups.indexOf(point.series) : 0;
+        return palette[(index < 0 ? 0 : index) % palette.length];
+    };
     if (all.length === 0) return null;
     // The panel card is a preview, not a workspace: show the leaders and let
     // the title carry the reader to the full chart rather than stacking 20 rows
@@ -330,6 +372,19 @@ export function ChartFigure({ artifact, view, log, onToggleLog, onOpenPaper, dis
 
     return (
         <figure className="m-0">
+            {groups.length > 1 && (
+                <ul className="m-0 mt-2 flex list-none flex-wrap gap-x-3 gap-y-1 p-0 text-[11px] text-muted-foreground">
+                    {groups.map((group, index) => (
+                        <li key={group} className="flex items-center gap-1">
+                            <span
+                                className="h-2 w-2 shrink-0 rounded-sm"
+                                style={{ backgroundColor: palette[index % palette.length] }}
+                            />
+                            {group}
+                        </li>
+                    ))}
+                </ul>
+            )}
             {isXY ? (
                 <XYPlot
                     points={points}
@@ -337,6 +392,7 @@ export function ChartFigure({ artifact, view, log, onToggleLog, onOpenPaper, dis
                     log={log}
                     yLabel={yLabel}
                     xLabel={artifact.plan.x.label}
+                    colorFor={colorFor}
                 />
             ) : (
                 <CategoricalPlot
@@ -344,6 +400,7 @@ export function ChartFigure({ artifact, view, log, onToggleLog, onOpenPaper, dis
                     log={log}
                     yLabel={yLabel}
                     xLabel={artifact.plan.x.label}
+                    colorFor={colorFor}
                     onOpenPaper={onOpenPaper}
                 />
             )}
