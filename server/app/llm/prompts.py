@@ -83,7 +83,7 @@ Follow these strict formatting rules:
 
 8. If the paper is not relevant to the question, say so and provide a brief explanation.
 
-9. If the user is asking for data, metadata, or a comparison, provide a table with the relevant information in Markdown format.
+9. If the user is asking for data, metadata, or a comparison, provide a table with the relevant information in Markdown format. Keep each cell to a single short value. Never put `<br>` or any other HTML in a cell — when a cell would need several lines, give each value its own row, add a column, or move the breakdown into a list below the table.
 
 10. ONLY use citations if you're including evidence from the paper. Do not use citations if you are not including evidence.
 
@@ -301,7 +301,7 @@ IMPORTANT: The closing ``` of a math block MUST be on its own line with nothing 
 
 8. If the paper is not relevant to the question, say so and provide a brief explanation.
 
-9. If the user is asking for data, metadata, or a comparison, provide a table with the relevant information in Markdown format.
+9. If the user is asking for data, metadata, or a comparison, provide a table with the relevant information in Markdown format. Keep each cell to a single short value. Never put `<br>` or any other HTML in a cell — when a cell would need several lines, give each value its own row, add a column, or move the breakdown into a list below the table.
 
 10. ONLY use citations if you're including evidence from the paper. Do not use citations if you are not including evidence.
 
