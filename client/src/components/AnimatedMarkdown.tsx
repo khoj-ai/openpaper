@@ -7,6 +7,15 @@ import remarkMath from 'remark-math';
 import Markdown, { Components } from 'react-markdown';
 import { PluggableList } from 'unified';
 import { Copy, Check, Download } from 'lucide-react';
+import { cellText, splitOnBreakTags } from '@/lib/markdownBreaks';
+
+function TableCell({ children, ...props }: React.TdHTMLAttributes<HTMLTableCellElement>) {
+    return <td {...props}>{splitOnBreakTags(children, 'td')}</td>;
+}
+
+function TableHeaderCell({ children, ...props }: React.ThHTMLAttributes<HTMLTableCellElement>) {
+    return <th {...props}>{splitOnBreakTags(children, 'th')}</th>;
+}
 
 
 // Define a simple CSS-in-JS for the blinking cursor animation
@@ -29,7 +38,7 @@ function extractTableData(tableElement: HTMLTableElement): string {
         thead.querySelectorAll('tr').forEach(tr => {
             const cells: string[] = [];
             tr.querySelectorAll('th, td').forEach(cell => {
-                cells.push((cell.textContent || '').trim());
+                cells.push(cellText(cell));
             });
             if (cells.length > 0) rows.push(cells);
         });
@@ -41,7 +50,7 @@ function extractTableData(tableElement: HTMLTableElement): string {
         tbody.querySelectorAll('tr').forEach(tr => {
             const cells: string[] = [];
             tr.querySelectorAll('th, td').forEach(cell => {
-                cells.push((cell.textContent || '').trim());
+                cells.push(cellText(cell));
             });
             if (cells.length > 0) rows.push(cells);
         });
@@ -52,7 +61,7 @@ function extractTableData(tableElement: HTMLTableElement): string {
         tableElement.querySelectorAll('tr').forEach(tr => {
             const cells: string[] = [];
             tr.querySelectorAll('th, td').forEach(cell => {
-                cells.push((cell.textContent || '').trim());
+                cells.push(cellText(cell));
             });
             if (cells.length > 0) rows.push(cells);
         });
@@ -69,11 +78,12 @@ function tableDataToCsv(tableElement: HTMLTableElement): string {
         const cells: string[] = [];
         tr.querySelectorAll('th, td').forEach(cell => {
             // Escape quotes and wrap in quotes if contains comma, quote, or newline
-            let cellText = (cell.textContent || '').trim();
-            if (cellText.includes('"') || cellText.includes(',') || cellText.includes('\n')) {
-                cellText = '"' + cellText.replace(/"/g, '""') + '"';
+            // A multi-line cell keeps its newlines; CSV quoting below covers them.
+            let text = cellText(cell);
+            if (text.includes('"') || text.includes(',') || text.includes('\n')) {
+                text = '"' + text.replace(/"/g, '""') + '"';
             }
-            cells.push(cellText);
+            cells.push(text);
         });
         if (cells.length > 0) rows.push(cells);
     };
@@ -181,6 +191,8 @@ interface AnimatedMarkdownProps {
 // Default components with copyable table
 const defaultComponents: Components = {
     table: CopyableTable,
+    td: TableCell,
+    th: TableHeaderCell,
 };
 
 export function AnimatedMarkdown({
