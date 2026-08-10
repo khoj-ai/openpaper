@@ -49,6 +49,30 @@ def _append_status(messages: Optional[List[str]], message: str) -> None:
         messages.append(message)
 
 
+def _recent_exchange(
+    db: Session, conversation_id: str, current_user: CurrentUser, turns: int = 4
+) -> str:
+    """The last few turns, for requests that refer back to them.
+
+    "Chart this relationship" names nothing on its own; without the turn that
+    established the relationship, a planner has to invent a subject.
+    """
+    try:
+        messages = message_crud.get_conversation_messages(
+            db,
+            conversation_id=uuid.UUID(conversation_id),
+            current_user=current_user,
+            page=1,
+            page_size=turns,
+        )
+    except Exception:
+        logger.warning("Could not load history for the chart plan", exc_info=True)
+        return ""
+    return "\n\n".join(
+        f"{message.role}: {str(message.content or '')[:1500]}" for message in messages
+    )
+
+
 async def _stream_chat_chunks(
     chunk_generator: AsyncGenerator[Union[dict, str], None],
     content_chunks: List[str],
@@ -374,89 +398,58 @@ async def chat_message_multipaper(
                 # pre-generation editing surface.
                 if operations.is_chart_request(request.user_query):
                     yield f"{json.dumps({'type': 'status', 'content': 'Building a cited chart...'})}{END_DELIMITER}"
-                    chart_findings = json.dumps(evidence_collection.get_evidence_dict())
-                    chart_evidence = evidence_collection.get_evidence_dict()
-                    chart_trace: dict = {"status_messages": []}
-                    # Project charts use the same field-aware investigation
-                    # harness as the artifact composer. Everything-mode chat
-                    # keeps the existing scoped evidence path because it has
-                    # no project-bound field-investigation scope.
+                    roster = [
+                        (str(paper.id), str(paper.title or "Untitled"))
+                        for paper in all_papers
+                    ]
+                    chart = None
                     if request.project_id:
-                        investigation = operations.investigate_chart_fields(
+                        # Same entry point the artifact composer uses, so a
+                        # request that charts in one surface charts in the
+                        # other. The chat's own gathered passages go in as
+                        # prior evidence, and recent turns let a follow-up like
+                        # "chart that relationship" resolve.
+                        chart, _ = operations.create_chart_artifact(
                             prompt=request.user_query,
-                            papers=[
-                                (str(paper.id), str(paper.title or "Untitled"))
-                                for paper in all_papers
-                            ],
+                            papers=roster,
                             current_user=current_user,
                             db=db,
                             project_id=request.project_id,
+                            history=_recent_exchange(
+                                db, request.conversation_id, current_user
+                            ),
+                            prior_evidence=evidence_collection.get_evidence_dict(),
                         )
-                        chart_findings = investigation.findings
-                        chart_evidence = investigation.evidence
-                        chart_trace = investigation.trace
-                    chart_plan = operations.propose_chart_plan(
-                        request.user_query,
-                        [
-                            (str(paper.id), str(paper.title or "Untitled"))
-                            for paper in all_papers
-                        ],
-                        chart_findings,
-                    )
-                    if chart_plan:
-                        if request.project_id:
-                            # Top up the one investigation with a deterministic
-                            # sweep for the confirmed plan's fields, rather than
-                            # running a second agent whose evidence would
-                            # replace the first's.
-                            chart_evidence, sweep_steps = (
-                                operations.sweep_plan_evidence(
-                                    plan=chart_plan,
-                                    papers=[
-                                        (str(paper.id), str(paper.title or "Untitled"))
-                                        for paper in all_papers
-                                    ],
-                                    evidence=chart_evidence,
-                                    current_user=current_user,
-                                    db=db,
-                                    project_id=request.project_id,
-                                )
-                            )
-                            chart_trace.setdefault("status_messages", []).extend(
-                                sweep_steps
-                            )
-                        chart = operations.build_chart_artifact(
-                            prompt=request.user_query,
-                            plan=chart_plan,
-                            evidence=chart_evidence,
-                            papers=[
-                                (str(paper.id), str(paper.title or "Untitled"))
-                                for paper in all_papers
-                            ],
+                    else:
+                        # Everything-mode chat has no project to investigate
+                        # within, so it plans from the scoped evidence it
+                        # already gathered.
+                        chart_plan = operations.propose_chart_plan(
+                            request.user_query,
+                            roster,
+                            json.dumps(evidence_collection.get_evidence_dict()),
+                            history=_recent_exchange(
+                                db, request.conversation_id, current_user
+                            ),
                         )
-                        if chart:
-                            chart.investigation_trace = {
-                                **chart_trace,
-                                "status_messages": [
-                                    *chart_trace.get("status_messages", []),
-                                    *chart.extraction_steps,
-                                ],
-                            }
-                            if operations.is_chart_ready(chart):
-                                payload = chart.model_dump()
-                                artifacts_collected.append(payload)
-                                yield f"{json.dumps({'type': 'artifact', 'content': payload})}{END_DELIMITER}"
-                            else:
-                                failure = (
-                                    operations.chart_failure_message(chart) + "\n\n"
-                                )
-                                content_chunks.append(failure)
-                                yield f"{json.dumps({'type': 'content', 'content': failure})}{END_DELIMITER}"
+                        if chart_plan:
+                            chart = operations.build_chart_artifact(
+                                prompt=request.user_query,
+                                plan=chart_plan,
+                                evidence=evidence_collection.get_evidence_dict(),
+                                papers=roster,
+                            )
+                    if chart and operations.is_chart_ready(chart):
+                        payload = chart.model_dump()
+                        artifacts_collected.append(payload)
+                        yield f"{json.dumps({'type': 'artifact', 'content': payload})}{END_DELIMITER}"
                     else:
                         failure = (
-                            "I couldn't determine a chart shape supported by the selected papers. "
-                            "Try narrowing the paper scope or use **Artifacts → Chart** to choose the axes first.\n\n"
-                        )
+                            operations.chart_failure_message(chart)
+                            if chart
+                            else "I couldn't determine a chart shape supported by these papers. "
+                            "Use **Artifacts → Chart** to choose the axes yourself."
+                        ) + "\n\n"
                         content_chunks.append(failure)
                         yield f"{json.dumps({'type': 'content', 'content': failure})}{END_DELIMITER}"
 

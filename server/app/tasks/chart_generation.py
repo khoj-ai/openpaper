@@ -51,7 +51,7 @@ def generate_chart(
 
         plan = ChartPlan.model_validate(job.plan)
         roster = [(str(paper.id), str(paper.title or "Untitled")) for paper in papers]
-        investigation = operations.investigate_chart_fields(
+        artifact, trace = operations.create_chart_artifact(
             prompt=job.prompt,
             papers=roster,
             current_user=user,
@@ -63,13 +63,7 @@ def generate_chart(
             db,
             job_id=job_id,
             status_message="Extracting directly quoted chart values",
-            trace=investigation.trace,
-        )
-        artifact = operations.build_chart_artifact(
-            prompt=job.prompt,
-            plan=plan,
-            evidence=investigation.evidence,
-            papers=roster,
+            trace=trace,
         )
         if not artifact or not operations.is_chart_ready(artifact):
             message = (
@@ -86,13 +80,6 @@ def generate_chart(
             )
             return
 
-        artifact.investigation_trace = {
-            **investigation.trace,
-            "status_messages": [
-                *investigation.trace.get("status_messages", []),
-                *artifact.extraction_steps,
-            ],
-        }
         created = artifact_crud.create_for_scope(
             db,
             kind=ArtifactKind.CHART,

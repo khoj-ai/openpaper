@@ -36,6 +36,16 @@ class ChartPlan(BaseModel):
     calculation: Optional[ChartCalculation] = None
 
 
+class ChartPlanCandidates(BaseModel):
+    """Several plans to choose between by measured corpus coverage.
+
+    Asking for one plan makes the model commit to a field name before anyone
+    knows how many papers report it, which is how a chart ends up with one bar.
+    """
+
+    candidates: List[ChartPlan] = Field(default_factory=list)
+
+
 class ChartValue(BaseModel):
     value: str
     quote: str = Field(description="Exact supporting quote from the paper")

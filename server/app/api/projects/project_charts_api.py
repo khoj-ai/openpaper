@@ -69,6 +69,9 @@ def propose_chart(
         prompt,
         [(str(paper.id), str(paper.title or "Untitled")) for paper in papers],
         investigation.findings,
+        current_user=current_user,
+        db=db,
+        project_id=request.project_id,
     )
     if not plan:
         return JSONResponse(
