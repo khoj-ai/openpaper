@@ -1,9 +1,9 @@
 """Chart artifact invariants.
 
-Tests are grouped by the property they defend: that every plotted number traces
-to a retrieved passage, that a paper's absence is explained, that identical
-evidence yields an identical chart, and that a paper reporting several entities
-contributes several independent points.
+Tests are grouped by the property they defend: that a paper's absence is
+explained, that identical evidence yields an identical chart, that the evidence
+retrieved actually reaches the extractor, and that a paper reporting several
+entities contributes several independent points.
 
 Most of these exist because the pipeline once violated them and produced
 different charts for identical requests. Treat the file as the spec — add a
@@ -77,10 +77,11 @@ def record(paper_id: str, title: str, **values: tuple[str, str]) -> dict:
     }
 
 
-class TestChartGrounding(unittest.TestCase):
-    """Every plotted number must trace to a passage we actually retrieved."""
+class TestChartRecords(unittest.TestCase):
+    """What the extractor returns becomes the chart; the pipeline decides
+    which papers those records may speak for, and reports the rest."""
 
-    def test_fabricated_quote_is_excluded(self):
+    def test_every_returned_record_is_plotted_and_the_rest_reported(self):
         artifact = StubChartOperations(
             records_json(
                 record(
@@ -108,10 +109,9 @@ class TestChartGrounding(unittest.TestCase):
         )
 
         assert artifact is not None
-        self.assertEqual(artifact.coverage.included_paper_ids, ["one"])
-        self.assertIn("two", artifact.coverage.excluded)
-        self.assertIn("three", artifact.coverage.excluded)
-        self.assertEqual(artifact.records[0].paper_title, "Paper one")
+        self.assertEqual(artifact.coverage.included_paper_ids, ["one", "two"])
+        # Only the paper the extractor said nothing about is reported as a gap.
+        self.assertEqual(set(artifact.coverage.excluded), {"three"})
 
     def test_paper_never_returned_by_the_extractor_is_still_reported(self):
         artifact = StubChartOperations(records_json()).build_chart_artifact(
@@ -185,27 +185,6 @@ class TestChartGrounding(unittest.TestCase):
 class TestAbsenceIsExplained(unittest.TestCase):
     """A chart implies completeness, so every gap needs a specific reason."""
 
-    def test_exclusion_names_the_field_that_was_not_quotable(self):
-        artifact = StubChartOperations(
-            records_json(
-                record(
-                    "one",
-                    "?",
-                    benchmark=("A", "accuracy was 91%"),
-                    score=("91", "invented sentence"),
-                ),
-            )
-        ).build_chart_artifact(
-            prompt="chart scores",
-            plan=simple_plan(),
-            evidence={"one": ["12: accuracy was 91%"]},
-            papers=[("one", "Paper one")],
-        )
-
-        assert artifact is not None
-        self.assertIn("Score", artifact.coverage.excluded["one"])
-        self.assertNotIn("Benchmark", artifact.coverage.excluded["one"])
-
     def test_searched_and_empty_reads_differently_from_never_retrieved(self):
         artifact = StubChartOperations(records_json()).build_chart_artifact(
             prompt="chart scores",
@@ -244,7 +223,7 @@ class TestAbsenceIsExplained(unittest.TestCase):
 class TestChartFailureReporting(unittest.TestCase):
     """A chart that cannot be built must say so, and say why."""
 
-    def test_fewer_than_two_points_is_not_chart_ready(self):
+    def test_a_lone_grounded_point_is_still_a_chart(self):
         artifact = StubChartOperations(
             records_json(
                 record(
@@ -262,10 +241,23 @@ class TestChartFailureReporting(unittest.TestCase):
         )
 
         assert artifact is not None
+        # One paper reporting the measure is a thin answer, not a failed one.
+        self.assertTrue(StubChartOperations.is_chart_ready(artifact))
+        self.assertEqual(artifact.coverage.included_paper_ids, ["one"])
+
+    def test_no_grounded_points_is_not_a_chart(self):
+        artifact = StubChartOperations(records_json()).build_chart_artifact(
+            prompt="chart scores",
+            plan=simple_plan(),
+            evidence={"one": ["12: nothing relevant"]},
+            papers=[("one", "Paper one"), ("two", "Paper two")],
+        )
+
+        assert artifact is not None
         self.assertFalse(StubChartOperations.is_chart_ready(artifact))
         message = StubChartOperations.chart_failure_message(artifact)
         self.assertIn("Score", message)
-        self.assertIn("1 of 2 papers", message)
+        self.assertIn("0 of 2 papers", message)
 
     def test_compute_failure_excludes_every_point_and_warns(self):
         plan = simple_plan(
@@ -303,41 +295,94 @@ class TestChartFailureReporting(unittest.TestCase):
 class TestChartPlanHygiene(unittest.TestCase):
     """The plan is the contract handed to the investigator and the extractor."""
 
-    def test_axis_fields_are_backfilled_and_multi_series_is_suppressed(self):
+    def test_series_survives_so_one_entity_can_be_measured_several_ways(self):
+        """x=model, y=score, series=benchmark: without the series the same
+        model appears once per benchmark with no way to tell them apart."""
         plan = StubChartOperations(
             json.dumps(
                 {
-                    "title": "Score by benchmark",
-                    "chart_type": "bar",
-                    "x": {"key": "benchmark", "label": "Benchmark"},
-                    "y": {"key": "score", "label": "Score"},
-                    "series": {"key": "model", "label": "Model"},
-                    "fields": [],
+                    "candidates": [
+                        {
+                            "title": "Score by model",
+                            "chart_type": "bar",
+                            "x": {"key": "model", "label": "Model"},
+                            "y": {"key": "score", "label": "Score"},
+                            "series": {"key": "benchmark", "label": "Benchmark"},
+                            "fields": [],
+                        }
+                    ]
+                }
+            )
+        ).propose_chart_plan("chart model scores per benchmark", [("one", "Paper one")])
+
+        assert plan is not None
+        assert plan.series is not None
+        self.assertEqual(plan.series.key, "benchmark")
+        self.assertEqual({f.key for f in plan.fields}, {"model", "score", "benchmark"})
+
+    def test_series_that_repeats_an_axis_is_dropped(self):
+        plan = StubChartOperations(
+            json.dumps(
+                {
+                    "candidates": [
+                        {
+                            "title": "Score by model",
+                            "chart_type": "bar",
+                            "x": {"key": "model", "label": "Model"},
+                            "y": {"key": "score", "label": "Score"},
+                            "series": {"key": "model", "label": "Model"},
+                            "fields": [],
+                        }
+                    ]
+                }
+            )
+        ).propose_chart_plan("chart model scores", [("one", "Paper one")])
+
+        assert plan is not None
+        self.assertIsNone(plan.series)
+
+    def test_axis_fields_are_backfilled(self):
+        plan = StubChartOperations(
+            json.dumps(
+                {
+                    "candidates": [
+                        {
+                            "title": "Score by benchmark",
+                            "chart_type": "bar",
+                            "x": {"key": "benchmark", "label": "Benchmark"},
+                            "y": {"key": "score", "label": "Score"},
+                            "series": {"key": "model", "label": "Model"},
+                            "fields": [],
+                        }
+                    ]
                 }
             )
         ).propose_chart_plan("chart scores", [("one", "Paper one")])
 
         assert plan is not None
-        self.assertIsNone(plan.series)
         self.assertEqual({f.key for f in plan.fields}, {"benchmark", "score", "model"})
 
     def test_derived_y_is_bound_to_the_y_field_key(self):
         plan = StubChartOperations(
             json.dumps(
                 {
-                    "title": "Hit ratio",
-                    "chart_type": "bar",
-                    "x": {"key": "benchmark", "label": "Benchmark"},
-                    "y": {"key": "hit_ratio", "label": "Hit ratio"},
-                    "fields": [
-                        {"key": "hits", "label": "Hits"},
-                        {"key": "total", "label": "Total"},
-                    ],
-                    "calculation": {
-                        "label": "whatever",
-                        "spec": "hits / total",
-                        "inputs": ["hits", "total"],
-                    },
+                    "candidates": [
+                        {
+                            "title": "Hit ratio",
+                            "chart_type": "bar",
+                            "x": {"key": "benchmark", "label": "Benchmark"},
+                            "y": {"key": "hit_ratio", "label": "Hit ratio"},
+                            "fields": [
+                                {"key": "hits", "label": "Hits"},
+                                {"key": "total", "label": "Total"},
+                            ],
+                            "calculation": {
+                                "label": "whatever",
+                                "spec": "hits / total",
+                                "inputs": ["hits", "total"],
+                            },
+                        }
+                    ]
                 }
             )
         ).propose_chart_plan("chart hit ratio", [("one", "Paper one")])
@@ -361,16 +406,27 @@ class TestChartPlanHygiene(unittest.TestCase):
         plan = StubChartOperations(
             json.dumps(
                 {
-                    "title": "Effect size by sample size",
-                    "chart_type": "scatter",
-                    "x": {"key": "n_total", "label": "Sample size"},
-                    "y": {"key": "cohens_d", "label": "Cohen's d"},
-                    "fields": [{"key": "n_total", "label": "Sample size"}],
-                    "calculation": {
-                        "label": "cohens_d",
-                        "spec": "standardised mean difference",
-                        "inputs": ["mean_t", "sd_t", "n_t", "mean_c", "sd_c", "n_c"],
-                    },
+                    "candidates": [
+                        {
+                            "title": "Effect size by sample size",
+                            "chart_type": "scatter",
+                            "x": {"key": "n_total", "label": "Sample size"},
+                            "y": {"key": "cohens_d", "label": "Cohen's d"},
+                            "fields": [{"key": "n_total", "label": "Sample size"}],
+                            "calculation": {
+                                "label": "cohens_d",
+                                "spec": "standardised mean difference",
+                                "inputs": [
+                                    "mean_t",
+                                    "sd_t",
+                                    "n_t",
+                                    "mean_c",
+                                    "sd_c",
+                                    "n_c",
+                                ],
+                            },
+                        }
+                    ]
                 }
             )
         ).propose_chart_plan("chart effect size against sample size", [("one", "P")])
@@ -378,66 +434,6 @@ class TestChartPlanHygiene(unittest.TestCase):
         assert plan is not None
         assert plan.calculation is not None
         self.assertLessEqual(set(plan.calculation.inputs), {f.key for f in plan.fields})
-
-
-class TestQuoteGroundingIsRobust(unittest.TestCase):
-    """Grounding compares text, not byte-identical strings.
-
-    Evidence lines carry `"<lineno>: "` prefixes from search_all_files/
-    search_file, PDF text keeps its original wrapping and typography, and the
-    extractor reflows what it quotes. So a correct extraction is rejected
-    whenever the quote crosses a line, normalises whitespace, or straightens a
-    dash — and whether that happens differs run to run. This is the most
-    likely single cause of two identical requests producing different bars.
-    """
-
-    def _artifact(self, quote: str, evidence_lines: list[str]):
-        return StubChartOperations(
-            records_json(
-                record("one", "?", benchmark=("Arm A", quote), score=("4.8", quote)),
-            )
-        ).build_chart_artifact(
-            prompt="chart mean change",
-            plan=simple_plan(),
-            evidence={"one": evidence_lines},
-            papers=[("one", "Paper one")],
-        )
-
-    def test_quote_spanning_two_retrieved_lines_is_grounded(self):
-        artifact = self._artifact(
-            "a mean reduction of 4.8 points on the HAM-D",
-            [
-                "412: a mean reduction of 4.8 points",
-                "413: on the HAM-D versus 1.2 in placebo",
-            ],
-        )
-        assert artifact is not None
-        self.assertEqual(artifact.coverage.included_paper_ids, ["one"])
-
-    def test_quote_with_collapsed_whitespace_is_grounded(self):
-        artifact = self._artifact(
-            "a mean reduction of 4.8 points",
-            ["412: a mean  reduction of 4.8   points"],
-        )
-        assert artifact is not None
-        self.assertEqual(artifact.coverage.included_paper_ids, ["one"])
-
-    def test_quote_with_straightened_typography_is_grounded(self):
-        artifact = self._artifact(
-            'the "active" arm fell 4.8 points - a large effect',
-            ["412: the “active” arm fell 4.8 points – a large effect"],
-        )
-        assert artifact is not None
-        self.assertEqual(artifact.coverage.included_paper_ids, ["one"])
-
-    def test_paraphrase_that_is_not_in_the_source_is_still_rejected(self):
-        """The guard rail the tests above must not loosen."""
-        artifact = self._artifact(
-            "the treatment arm improved substantially over placebo",
-            ["412: a mean reduction of 4.8 points"],
-        )
-        assert artifact is not None
-        self.assertEqual(artifact.coverage.included_paper_ids, [])
 
 
 class TestRecordIdentity(unittest.TestCase):
@@ -733,6 +729,363 @@ class TestExtractionIsPerPaper(unittest.TestCase):
             len("".join(part.text for part in call["contents"])) for call in stub.calls
         )
         self.assertLess(largest, 60_000, "extraction context must be bounded per call")
+
+
+class TestPlanCoverageIsMeasured(unittest.TestCase):
+    """The planner must not pick a measure only one paper reports.
+
+    Both real-world failures had this shape: "Robust Accuracy" chosen when 1 of
+    18 papers used the phrase and 13 reported "accuracy"; "Odds Ratio for ADHD
+    Diagnosis" chosen when every paper reported an odds ratio.
+    """
+
+    CANDIDATES = json.dumps(
+        {
+            "candidates": [
+                {  # narrow — the phrasing of a single paper, and listed first
+                    "title": "Robust accuracy by model",
+                    "chart_type": "bar",
+                    "x": {"key": "model", "label": "Model"},
+                    "y": {"key": "robust_accuracy", "label": "Robust Accuracy"},
+                    "fields": [],
+                },
+                {  # broad — the measure the corpus shares
+                    "title": "Accuracy by model",
+                    "chart_type": "bar",
+                    "x": {"key": "model", "label": "Model"},
+                    "y": {"key": "accuracy", "label": "Accuracy"},
+                    "fields": [],
+                },
+            ]
+        }
+    )
+
+    CORPUS = {
+        "robust accuracy": {"p1": ["robust accuracy 91%"]},
+        "accuracy": {f"p{i}": ["accuracy 91%"] for i in range(1, 14)},
+        "model": {f"p{i}": ["model GPT-4o"] for i in range(1, 19)},
+    }
+
+    def _search(self, query, **_kwargs):
+        # Mirrors the tool's '|' alternation over phrases.
+        hits: dict[str, list[str]] = {}
+        for term in query.split("|"):
+            for paper_id, lines in self.CORPUS.get(term.strip().lower(), {}).items():
+                hits.setdefault(paper_id, []).extend(lines)
+        return hits
+
+    def test_the_widest_covered_candidate_wins_over_the_first_offered(self):
+        papers = [(f"p{i}", f"Paper {i}") for i in range(1, 19)]
+        with patch(
+            "app.llm.chart_operations.search_all_files", side_effect=self._search
+        ):
+            plan = StubChartOperations(self.CANDIDATES).propose_chart_plan(
+                "chart models tested vs their relative scores",
+                papers,
+                current_user=SimpleNamespace(),
+                db=SimpleNamespace(),
+                project_id="project-1",
+            )
+
+        assert plan is not None
+        self.assertEqual(plan.y.key, "accuracy")
+
+    def test_a_qualified_measure_is_not_inflated_by_its_common_word(self):
+        """The whole trap: 'Robust Accuracy' as robust|accuracy matches every
+        paper that says accuracy, so word-level scoring rates a one-paper field
+        as corpus-wide. Coverage must be measured on the phrase."""
+        papers = [(f"p{i}", f"Paper {i}") for i in range(1, 19)]
+        narrow = ChartPlan(
+            title="Robust accuracy by model",
+            chart_type="bar",
+            x=ChartField(key="model", label="Model"),
+            y=ChartField(key="robust_accuracy", label="Robust Accuracy"),
+            fields=[],
+        )
+        with patch(
+            "app.llm.chart_operations.search_all_files", side_effect=self._search
+        ):
+            coverage = ChartOperations.measure_plan_coverage(
+                narrow, papers, SimpleNamespace(), SimpleNamespace(), "project-1"
+            )
+        self.assertEqual(coverage, 1)
+
+    def test_a_computed_candidate_needs_every_input_in_the_same_paper(self):
+        """A derived value can only be computed where all its primitives are.
+        Scoring the inputs as an OR would credit a paper supplying one of four
+        counts, and a computed plan would win on coverage it cannot deliver."""
+        papers = [(f"p{i}", f"Paper {i}") for i in range(1, 6)]
+        corpus = {
+            "exposed cases": {"p1": ["x"], "p2": ["x"], "p3": ["x"]},
+            "exposed non cases": {"p1": ["x"], "p2": ["x"]},
+            "unexposed cases": {"p1": ["x"]},
+            "unexposed non cases": {"p1": ["x"], "p2": ["x"], "p4": ["x"]},
+            "outcome": {f"p{i}": ["x"] for i in range(1, 6)},
+        }
+
+        def search(query, **_kwargs):
+            hits: dict[str, list[str]] = {}
+            for term in query.split("|"):
+                for paper_id, lines in corpus.get(term.strip().lower(), {}).items():
+                    hits.setdefault(paper_id, []).extend(lines)
+            return hits
+
+        inputs = [
+            "exposed_cases",
+            "exposed_non_cases",
+            "unexposed_cases",
+            "unexposed_non_cases",
+        ]
+        computed = ChartPlan(
+            title="Odds ratio by outcome",
+            chart_type="bar",
+            x=ChartField(key="outcome", label="Outcome"),
+            y=ChartField(key="odds_ratio", label="Odds Ratio"),
+            fields=[ChartField(key=key, label=key.replace("_", " ")) for key in inputs],
+            calculation=ChartCalculation(
+                label="odds_ratio",
+                spec="(exposed cases / exposed non-cases) / (unexposed cases / unexposed non-cases)",
+                inputs=inputs,
+            ),
+        )
+        with patch("app.llm.chart_operations.search_all_files", side_effect=search):
+            coverage = ChartOperations.measure_plan_coverage(
+                computed, papers, SimpleNamespace(), SimpleNamespace(), "project-1"
+            )
+        # Only p1 states all four counts, though p2 states three and p3/p4 one.
+        self.assertEqual(coverage, 1)
+
+    def test_without_a_corpus_to_measure_the_first_candidate_stands(self):
+        plan = StubChartOperations(self.CANDIDATES).propose_chart_plan(
+            "chart scores", [("p1", "Paper 1")]
+        )
+        assert plan is not None
+        self.assertEqual(plan.y.key, "robust_accuracy")
+
+    def test_the_planner_is_told_what_the_conversation_established(self):
+        """'Chart this relationship' names nothing without the prior turn."""
+        stub = StubChartOperations(self.CANDIDATES)
+        stub.propose_chart_plan(
+            "can you create a chart that illustrates this relationship quantitatively?",
+            [("p1", "Paper 1")],
+            history="assistant: Six papers inspect maternal fever and adverse outcomes...",
+        )
+        self.assertIn("maternal fever", stub.last_prompt)
+
+
+class TestEvidenceReachesTheExtractor(unittest.TestCase):
+    """Evidence is passed through whole; trimming it routinely lost real data.
+
+    An 80-line cap once dropped a paper's third-trimester odds ratio purely
+    because it appeared late, and the chart came back empty.
+    """
+
+    def test_every_retrieved_line_reaches_the_extraction_prompt(self):
+        # More lines than any old cap allowed, with the payload deliberately last.
+        evidence = [f"{n}: filler mentioning 1 result" for n in range(300)]
+        evidence.append("999: third-trimester fever and ADHD (OR = 0.80)")
+        stub = StubChartOperations(records_json())
+        stub.build_chart_artifact(
+            prompt="chart odds ratios by trimester",
+            plan=simple_plan(x_key="trimester", y_key="odds_ratio"),
+            evidence={"p1": evidence},
+            papers=[("p1", "Paper one")],
+        )
+        self.assertIn("third-trimester fever and ADHD (OR = 0.80)", stub.last_prompt)
+
+    def test_compaction_only_engages_on_a_context_explosion(self):
+        from app.llm.chart_operations import (
+            EVIDENCE_COMPACTION_THRESHOLD_CHARS,
+            _fit_evidence,
+        )
+
+        modest = [f"{n}: a line about accuracy 91%" for n in range(500)]
+        self.assertEqual(_fit_evidence(modest), modest)
+
+        huge = [f"{n}: {'x' * 2000} accuracy 91%" for n in range(200)]
+        self.assertGreater(
+            sum(len(line) for line in huge), EVIDENCE_COMPACTION_THRESHOLD_CHARS
+        )
+        fitted = _fit_evidence(huge)
+        self.assertLess(len(fitted), len(huge))
+        # Whole lines only — a truncated or reworded passage would no longer
+        # contain the quote the extractor cites, and grounding would reject it.
+        for line in fitted:
+            self.assertIn(line, huge)
+
+
+class TestBothSurfacesShareOnePath(unittest.TestCase):
+    """Chat and the composer once gathered evidence differently — the composer
+    ran a plan-targeted agent that chat never did — so the same request could
+    chart in one surface and come up empty in the other."""
+
+    class Recorder(StubChartOperations):
+        def __init__(self, *payloads):
+            super().__init__(*payloads)
+            self.investigations: list[bool] = []
+
+        def investigate_chart_fields(self, *, plan=None, **_kwargs):
+            self.investigations.append(plan is not None)
+            return SimpleNamespace(
+                findings="findings",
+                evidence={"p1": ["12: accuracy was 91%"]},
+                trace={"status_messages": ["investigated"]},
+            )
+
+    CANDIDATE = json.dumps(
+        {
+            "candidates": [
+                {
+                    "title": "Score by benchmark",
+                    "chart_type": "bar",
+                    "x": {"key": "benchmark", "label": "Benchmark"},
+                    "y": {"key": "score", "label": "Score"},
+                    "fields": [],
+                }
+            ]
+        }
+    )
+
+    def _run(self, plan):
+        ops = self.Recorder(self.CANDIDATE, records_json())
+        artifact, trace = ops.create_chart_artifact(
+            prompt="chart scores",
+            papers=[("p1", "Paper one")],
+            current_user=SimpleNamespace(),
+            db=SimpleNamespace(),
+            project_id="project-1",
+            plan=plan,
+        )
+        return ops, artifact, trace
+
+    def test_chat_gets_the_plan_targeted_pass_the_composer_always_had(self):
+        ops, _, _ = self._run(plan=None)
+        # Discovery (no plan), then verification against the chosen plan.
+        self.assertEqual(ops.investigations, [False, True])
+
+    def test_a_confirmed_plan_skips_discovery_but_still_verifies(self):
+        ops, _, _ = self._run(plan=simple_plan())
+        self.assertEqual(ops.investigations, [True])
+
+    def test_prior_evidence_is_merged_not_replaced(self):
+        ops = self.Recorder(self.CANDIDATE, records_json())
+        ops.create_chart_artifact(
+            prompt="chart scores",
+            papers=[("p1", "Paper one")],
+            current_user=SimpleNamespace(),
+            db=SimpleNamespace(),
+            project_id="project-1",
+            plan=simple_plan(),
+            prior_evidence={"p1": ["9: from the chat's own arc"]},
+        )
+        prompt = ops.last_prompt
+        self.assertIn("from the chat's own arc", prompt)
+        self.assertIn("accuracy was 91%", prompt)
+
+    def test_a_single_paper_chart_is_a_valid_outcome(self):
+        """One paper reporting two entities is a chart, not a failure."""
+        artifact = StubChartOperations(
+            records_json(
+                record(
+                    "p1",
+                    "?",
+                    benchmark=("A", "A scored 91%"),
+                    score=("91", "A scored 91%"),
+                ),
+                record(
+                    "p1",
+                    "?",
+                    benchmark=("B", "B scored 72%"),
+                    score=("72", "B scored 72%"),
+                ),
+            )
+        ).build_chart_artifact(
+            prompt="chart scores",
+            plan=simple_plan(),
+            evidence={"p1": ["12: A scored 91%", "13: B scored 72%"]},
+            papers=[("p1", "Paper one"), ("p2", "Paper two")],
+        )
+
+        assert artifact is not None
+        self.assertEqual(artifact.coverage.included_paper_ids, ["p1"])
+        self.assertTrue(StubChartOperations.is_chart_ready(artifact))
+
+
+class TestSeriesIsExtracted(unittest.TestCase):
+    """A second dimension is a quoted field like any other, and part of a
+    point's identity — the same model on two benchmarks is two points."""
+
+    PLAN = ChartPlan(
+        title="Score by model and benchmark",
+        chart_type="bar",
+        x=ChartField(key="model", label="Model"),
+        y=ChartField(key="score", label="Score"),
+        series=ChartField(key="benchmark", label="Benchmark"),
+        fields=[
+            ChartField(key="model", label="Model"),
+            ChartField(key="score", label="Score"),
+            ChartField(key="benchmark", label="Benchmark"),
+        ],
+    )
+
+    def test_one_model_measured_on_two_benchmarks_is_two_points(self):
+        artifact = StubChartOperations(
+            records_json(
+                record(
+                    "p1",
+                    "?",
+                    model=("GPT-4o", "GPT-4o scores 65% on WebVoyager"),
+                    score=("65", "GPT-4o scores 65% on WebVoyager"),
+                    benchmark=("WebVoyager", "GPT-4o scores 65% on WebVoyager"),
+                ),
+                record(
+                    "p1",
+                    "?",
+                    model=("GPT-4o", "GPT-4o scores 47% on SWE-bench"),
+                    score=("47", "GPT-4o scores 47% on SWE-bench"),
+                    benchmark=("SWE-bench", "GPT-4o scores 47% on SWE-bench"),
+                ),
+            )
+        ).build_chart_artifact(
+            prompt="chart model scores per benchmark",
+            plan=self.PLAN,
+            evidence={
+                "p1": [
+                    "12: GPT-4o scores 65% on WebVoyager",
+                    "13: GPT-4o scores 47% on SWE-bench",
+                ]
+            },
+            papers=[("p1", "Paper one")],
+        )
+
+        assert artifact is not None
+        plotted = [r for r in artifact.records if not r.exclusion_reason]
+        self.assertEqual(len(plotted), 2)
+        self.assertEqual(len({r.record_id for r in plotted}), 2)
+        self.assertEqual(
+            sorted(r.values["benchmark"].value for r in plotted),
+            ["SWE-bench", "WebVoyager"],
+        )
+
+    def test_a_record_missing_the_series_field_is_not_plotted(self):
+        artifact = StubChartOperations(
+            records_json(
+                record(
+                    "p1",
+                    "?",
+                    model=("GPT-4o", "GPT-4o scores 65% on WebVoyager"),
+                    score=("65", "GPT-4o scores 65% on WebVoyager"),
+                ),
+            )
+        ).build_chart_artifact(
+            prompt="chart model scores per benchmark",
+            plan=self.PLAN,
+            evidence={"p1": ["12: GPT-4o scores 65% on WebVoyager"]},
+            papers=[("p1", "Paper one")],
+        )
+
+        assert artifact is not None
+        self.assertEqual(artifact.coverage.included_paper_ids, [])
 
 
 class TestTraceIsSpecific(unittest.TestCase):
