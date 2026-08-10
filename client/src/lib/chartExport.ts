@@ -9,7 +9,7 @@
  */
 
 import { ChartArtifact } from "@/lib/schema";
-import { ChartPoint, compactNumber } from "@/components/ChartFigure";
+import { ChartPoint, compactNumber, seriesKeys, seriesPalette } from "@/components/ChartFigure";
 
 const SCALE = 2;
 const WIDTH = 920;
@@ -18,6 +18,7 @@ const ROW = 30;
 const LABEL_COLUMN = 0.28;
 const VALUE_COLUMN = 92;
 const MARK = "#3b82f6";
+const LEGEND_BAND = 22;
 
 interface Palette {
     background: string;
@@ -61,10 +62,17 @@ export interface ChartExportOptions {
 }
 
 export function drawChart({ artifact, points, log, isXY, dark }: ChartExportOptions): HTMLCanvasElement {
-    const palette = dark ? DARK : LIGHT;
+    const theme = dark ? DARK : LIGHT;
+    const groups = seriesKeys(points);
+    const palette = seriesPalette(dark);
+    const colorFor = (point: ChartPoint) => {
+        const index = point.series ? groups.indexOf(point.series) : -1;
+        return index < 0 ? MARK : palette[index % palette.length];
+    };
+    const legendBand = groups.length > 1 ? LEGEND_BAND : 0;
     const plotHeight = isXY ? 300 : points.length * ROW;
     const tickBand = log && !isXY ? 22 : 0;
-    const height = PAD + 58 + plotHeight + tickBand + 26 + PAD;
+    const height = PAD + 58 + legendBand + plotHeight + tickBand + 26 + PAD;
 
     const canvas = document.createElement("canvas");
     canvas.width = WIDTH * SCALE;
@@ -74,29 +82,43 @@ export function drawChart({ artifact, points, log, isXY, dark }: ChartExportOpti
     ctx.scale(SCALE, SCALE);
     ctx.textBaseline = "middle";
 
-    ctx.fillStyle = palette.background;
+    ctx.fillStyle = theme.background;
     ctx.fillRect(0, 0, WIDTH, height);
 
     const yLabel = artifact.plan.y.unit
         ? `${artifact.plan.y.label} (${artifact.plan.y.unit})`
         : artifact.plan.y.label;
 
-    ctx.fillStyle = palette.ink;
+    ctx.fillStyle = theme.ink;
     ctx.font = font(19, 600);
     ctx.textAlign = "left";
     ctx.fillText(truncate(ctx, artifact.plan.title, WIDTH - PAD * 2), PAD, PAD + 10);
 
-    ctx.fillStyle = palette.muted;
+    ctx.fillStyle = theme.muted;
     ctx.font = font(12);
     const subtitle = `${artifact.plan.chart_type} · ${points.length} data point${points.length === 1 ? "" : "s"} from ${artifact.coverage.included_paper_ids.length} of ${artifact.coverage.searched_paper_ids.length} papers`;
     ctx.fillText(subtitle, PAD, PAD + 34);
 
-    const top = PAD + 58;
+    // A legend is always present for two or more series.
+    if (groups.length > 1) {
+        let cursor = PAD;
+        ctx.font = font(11);
+        ctx.textAlign = "left";
+        groups.forEach((group, index) => {
+            ctx.fillStyle = palette[index % palette.length];
+            ctx.fillRect(cursor, PAD + 52, 8, 8);
+            ctx.fillStyle = theme.muted;
+            ctx.fillText(group, cursor + 12, PAD + 56);
+            cursor += 12 + ctx.measureText(group).width + 16;
+        });
+    }
+
+    const top = PAD + 58 + legendBand;
 
     if (isXY) {
-        drawXY(ctx, points, log, palette, top, plotHeight, artifact.plan.chart_type === "line");
+        drawXY(ctx, points, log, theme, top, plotHeight, artifact.plan.chart_type === "line", colorFor);
     } else {
-        drawCategorical(ctx, points, log, palette, top);
+        drawCategorical(ctx, points, log, theme, top, colorFor);
     }
 
     if (log && !isXY) {
@@ -105,7 +127,7 @@ export function drawChart({ artifact, points, log, isXY, dark }: ChartExportOpti
         const trackLeft = PAD + (WIDTH - PAD * 2) * LABEL_COLUMN + 12;
         const trackRight = WIDTH - PAD - VALUE_COLUMN;
         const span = Math.log10(ticks[ticks.length - 1]) - Math.log10(ticks[0]);
-        ctx.fillStyle = palette.muted;
+        ctx.fillStyle = theme.muted;
         ctx.font = font(10);
         ctx.textAlign = "center";
         for (const tick of ticks) {
@@ -114,7 +136,7 @@ export function drawChart({ artifact, points, log, isXY, dark }: ChartExportOpti
         }
     }
 
-    ctx.fillStyle = palette.muted;
+    ctx.fillStyle = theme.muted;
     ctx.font = font(11);
     ctx.textAlign = "left";
     ctx.fillText(`${yLabel}${log ? " · log scale" : ""}`, PAD, top + plotHeight + tickBand + 14);
@@ -130,6 +152,7 @@ function drawCategorical(
     log: boolean,
     palette: Palette,
     top: number,
+    colorFor: (point: ChartPoint) => string,
 ): void {
     const labelWidth = (WIDTH - PAD * 2) * LABEL_COLUMN;
     const trackLeft = PAD + labelWidth + 12;
@@ -155,7 +178,8 @@ function drawCategorical(
         ctx.fillStyle = palette.muted;
         ctx.font = font(12);
         ctx.textAlign = "left";
-        ctx.fillText(truncate(ctx, point.label, labelWidth), PAD, centre);
+        const rowLabel = point.series ? `${point.label} · ${point.series}` : point.label;
+        ctx.fillText(truncate(ctx, rowLabel, labelWidth), PAD, centre);
 
         if (log) {
             ctx.strokeStyle = palette.border;
@@ -164,14 +188,14 @@ function drawCategorical(
             ctx.moveTo(trackLeft, centre);
             ctx.lineTo(trackRight, centre);
             ctx.stroke();
-            ctx.fillStyle = MARK;
+            ctx.fillStyle = colorFor(point);
             ctx.beginPath();
             ctx.arc(trackLeft + trackWidth * fraction(point.value), centre, 5, 0, Math.PI * 2);
             ctx.fill();
         } else {
             // 4px rounded data-end, square against the baseline.
             const width = Math.max(trackWidth * fraction(point.value), 2);
-            ctx.fillStyle = MARK;
+            ctx.fillStyle = colorFor(point);
             if (typeof ctx.roundRect === "function") {
                 ctx.beginPath();
                 ctx.roundRect(trackLeft, centre - 8, width, 16, [0, 4, 4, 0]);
@@ -196,6 +220,7 @@ function drawXY(
     top: number,
     plotHeight: number,
     line: boolean,
+    colorFor: (point: ChartPoint) => string,
 ): void {
     const left = PAD + 52;
     const right = WIDTH - PAD;
@@ -246,7 +271,7 @@ function drawXY(
     }
 
     for (const point of ordered) {
-        ctx.fillStyle = MARK;
+        ctx.fillStyle = colorFor(point);
         ctx.beginPath();
         ctx.arc(xFor(point.x ?? 0), yFor(point.value), 5, 0, Math.PI * 2);
         ctx.fill();
