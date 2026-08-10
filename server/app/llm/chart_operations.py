@@ -30,12 +30,13 @@ from app.helpers.compute_agent import ComputeAgentError, run_computed_columns
 from app.llm.base import ModelType
 from app.llm.conversation_operations import FieldInvestigation
 from app.llm.provider import LLMProvider, TextContent
-from app.llm.tools.file_tools import read_abstract, search_file
+from app.llm.tools.file_tools import read_abstract, search_all_files, search_file
 from app.schemas.chart import (
     ChartArtifactPayload,
     ChartCoverage,
     ChartField,
     ChartPlan,
+    ChartPlanCandidates,
     ChartRecord,
     ChartValue,
 )
@@ -52,11 +53,18 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 
-# Per-paper evidence handed to one extraction call. The same capped list backs
-# the prompt and the grounding check, so the extractor is never rejected for
-# quoting a passage it was actually shown.
-EVIDENCE_LINES_PER_PAPER = 80
-EVIDENCE_CHARS_PER_PAPER = 20_000
+# One extraction call carries one paper, so its evidence goes to the model
+# whole. Routinely trimming it did more harm than good: an 80-line cap was
+# silently dropping the very odds ratios a chart was asked for, because they
+# happened to appear late in the paper.
+#
+# This mirrors the chat's threshold-gated compaction
+# (CONTENT_LIMIT_EVIDENCE_GATHERING) with one deliberate difference. Chat
+# compacts by summarizing, which would be fatal here: a rewritten passage no
+# longer contains the quote the extractor cites, so grounding would reject its
+# own evidence, and a mangled number would still render a chart. When this
+# does engage it SELECTS whole retrieved lines and never rewrites one.
+EVIDENCE_COMPACTION_THRESHOLD_CHARS = 150_000
 EXTRACTION_WORKERS = 5
 
 # Terms in the plan-driven sweep. Enough to cover an axis and its primitives,
@@ -109,29 +117,106 @@ SWEEP_STOPWORDS = frozenset(
 
 
 PLAN_PROMPT = """
-You design a small, defensible research chart. Given a user request and a paper
-roster, return only the JSON ChartPlan schema. Use bar, line, or scatter. V1
-supports one series only, so leave `series` null. Make the x/y fields concrete
-and include units when known. `fields` must list every
-primitive the extractor needs. If y requires arithmetic, put the derived y in
-`calculation` and list its primitive input keys in fields. Do not invent paper
-findings or values. Keep the plan small enough to chart from a handful of
-papers.
+You propose candidate charts over a body of literature. Return only the JSON
+ChartPlanCandidates schema: 2 to 4 distinct candidate plans, best first.
+
+Rank candidates by BREADTH — how much of the corpus reports that measure —
+but only among candidates that genuinely answer the request. Breadth breaks
+ties; it never picks the question. A chart drawn from a single paper is a fine
+outcome when that is where the evidence is.
+
+- EVERY candidate must answer the request that was actually made. Breadth is
+  about how a measure is PHRASED, never about what is being measured.
+  - Phrasing qualifiers narrow a measure to one paper's vocabulary and should
+    be stripped: "Robust Accuracy" -> "Accuracy", "Adjusted odds ratio (aOR)"
+    -> "Odds ratio".
+  - Subject qualifiers say what is being measured — the outcome, population,
+    condition, or cohort the user named. NEVER strip or swap these. If the user
+    asked about autism, every candidate is about autism; a better-covered
+    chart about ADHD is a different question and is not an option.
+  If the corpus barely reports the subject the user asked about, still propose
+  it. A chart that comes back thin is a true answer; a well-covered chart about
+  something else is a false one.
+- Make the candidates genuinely different — a broad measure, a narrower one, a
+  different pairing entirely — so the widest-covered one can be chosen.
+- Use bar, line, or scatter. x is usually the named entity a value belongs to
+  (model, benchmark, dataset, arm, condition); y is the measure. Use bar when
+  the x entities are categorical, line when they are ordered, and scatter
+  when they are continuous. Pick the chart type that best fits the data.
+- Set `series` when the same x is measured under several conditions, so that
+  each point can be told apart — e.g. x=model, y=score, series=benchmark, where
+  one model is scored on several benchmarks. Leave `series` null otherwise.
+- `fields` must list every primitive the extractor needs. Never invent paper
+  findings or values.
+
+Papers rarely STATE a derived quantity, so do not assume one is reported. When
+the requested measure is an effect size, an odds/risk ratio, a percentage
+change, a normalized score, a rate, or an aggregate, propose BOTH:
+  - a direct candidate naming the measure as papers might report it, and
+  - a computed candidate whose `calculation` derives it from primitives papers
+    do report — a 2x2 table's counts, per-arm means/SDs/n, a numerator and a
+    denominator, an unadjusted figure.
+A paper that never prints "adjusted odds ratio" may still print the counts an
+odds ratio is computed from, and that chart covers the corpus while the direct
+one covers one paper.
+
+For a computed candidate:
+- `calculation.spec` is a precise natural-language description of the
+  computation, exact enough to write a script from without guessing — name the
+  operation, its inputs, and any grouping.
+- `calculation.inputs` lists the exact keys it reads, and every one of them must
+  also appear in `fields` as a primitive the extractor can quote.
+- Derived values multiply missingness: each extra input is another value a
+  paper must state, so prefer the derivation with the fewest primitives.
+- Arithmetic over commensurable numbers only. Converting between different
+  instruments or scales is inference, not arithmetic — if a candidate needs it,
+  say so in the spec so it is disclosed on the chart.
 """.strip()
 
 
-CHART_INVESTIGATION_PROMPT = """
-You are a research investigator preparing a chart over selected papers. You do
-NOT design the chart or invent numbers. Your job is to discover which concrete,
-compatible fields the papers report and retain source passages for a later
-extractor.
+CHART_DISCOVERY_PROMPT = """
+You are a research investigator surveying what quantitative data a body of
+literature reports, so a chart can be planned over it. You do NOT design the
+chart or invent numbers.
 
-Start with search_all_files using the request's terms and corpus-specific
-synonyms. For example, "data points" may be reported as examples, instances,
-samples, records, training set size, or observations. Then use search_file and
-view_file on promising papers to verify that the x and y values describe the
-same named entity (benchmark, dataset, model, arm, condition) and are not two
-unpaired lists.
+Your job is BREADTH: find the measures that recur across MANY papers, not the
+most precise measure in any one paper. A chart built on a term only one paper
+uses is a chart with one bar.
+
+Use search_all_files repeatedly with the request's terms AND corpus-specific
+synonyms — "data points" may appear as examples, instances, samples, records,
+training set size, or observations; "score" as accuracy, success rate, F1, pass
+rate, win rate. Search the broad word before the qualified phrase ("accuracy"
+before "robust accuracy"), because the broad one tells you how much of the
+corpus is reachable. Use search_file and view_file to see how a promising
+measure is actually reported.
+
+On the final round, reply with findings only:
+- Each candidate measure, the number of papers reporting it, and the exact
+  wording papers use. Say which are broad and which are one-paper terms.
+- The named entity each measure is attached to (model, benchmark, dataset, arm,
+  condition), and whether one paper reports several of them.
+- Whether a second dimension separates repeated entities (the same model scored
+  on several benchmarks).
+- Measures that are genuinely absent — and for each, what IS reported that
+  could produce it: raw counts, numerators and denominators, per-arm means,
+  SDs and sample sizes, unadjusted figures. A measure the corpus can COMPUTE is
+  worth more than one only a single paper states outright.
+Never call a field absent because one broad search failed.
+You are on round {n_round} of {max_rounds}.
+""".strip()
+
+
+CHART_VERIFICATION_PROMPT = """
+You are a research investigator preparing a chart over selected papers against
+a confirmed plan. You do NOT redesign the chart or invent numbers. Your job is
+to retain source passages for a later extractor.
+
+Start with search_all_files using the plan's field terms and corpus-specific
+synonyms. Then use search_file and view_file on promising papers to verify that
+the x and y values describe the same named entity (benchmark, dataset, model,
+arm, condition) and are not two unpaired lists. A paper reporting several
+entities should yield several pairs — collect them all.
 
 On the final round, reply with findings only: exact terminology, units, the
 entity that pairs the values, candidate papers with both fields, and fields
@@ -148,14 +233,27 @@ Rules:
 - Copy values only when directly supported by the supplied evidence.
 - Every value MUST include an exact quote from that evidence; use the source
   line number when available.
+- The quote must support the measure AS THE PLAN DEFINES IT, subject included.
+  A quote is not enough on its own: if the plan's y is an odds ratio for autism
+  and this paper reports an odds ratio for a different outcome, a different
+  population, or a different condition, that number does NOT belong on this
+  chart — return no record for it. Being quotable is not the same as being the
+  thing that was asked for.
+- The x value must name its entity completely enough to stand alone as an axis
+  label. Take the whole name, not the fragment the sentence happened to start
+  with: "first trimester", never "first"; "SWE-bench Verified", never "SWE".
+  Two papers describing the same entity should produce the same label.
 - Do not calculate values. For a derived y, return only its primitive inputs;
   the application calculates the derived value later.
 - Return a record ONLY when it contains every field needed to plot a point.
 - The evidence below is from ONE paper. Use its paper_id on every record.
-- That paper may produce multiple records when it reports multiple named
-  benchmarks/datasets/models; each record must pair its values to that same
-  entity. Return an empty records array when the paper does not report the
-  required fields — a missing paper is a fine outcome, an invented one is not.
+- Return a record for EVERY distinct entity the evidence supports, not only the
+  first or the most prominent. A paper reporting the measure for three
+  trimesters, five models, or four benchmarks yields three, five, or four
+  records; each pairs its values to that one entity. Read all of the evidence
+  before answering — later passages are as eligible as the opening ones.
+- Return an empty records array when the paper does not report the required
+  fields — a missing paper is a fine outcome, an invented one is not.
 - Do not return exclusion records or coverage; the application creates those
   deterministically.
 """.strip()
@@ -202,78 +300,77 @@ def _condense(text: str) -> str:
     return _NON_ALNUM_RE.sub("", text)
 
 
-def _cap_evidence(lines: list[str]) -> list[str]:
-    """Bound one paper's evidence for a single extraction call.
+def _fit_evidence(lines: list[str], topic: Optional[re.Pattern] = None) -> list[str]:
+    """One paper's evidence, whole unless it would explode the context.
 
-    Lines carrying digits come first because chart primitives are numbers, but
-    original order is preserved within that preference so the same evidence
-    always yields the same prompt.
+    Below the threshold this is a pass-through — the extractor sees everything
+    retrieved, which is the point. Above it, lines are kept or dropped entire,
+    ranked by how likely each is to BE the payload: naming one of the plan's
+    fields AND carrying a number beats carrying a number alone. No line is ever
+    truncated or reworded, so every passage the extractor can quote is still
+    verbatim source text and grounding still recognises it.
     """
     ordered = [str(line) for line in lines]
-    preference = sorted(
-        range(len(ordered)),
-        key=lambda index: (0 if _NUMERIC_RE.search(ordered[index]) else 1, index),
-    )
+    if sum(len(line) for line in ordered) <= EVIDENCE_COMPACTION_THRESHOLD_CHARS:
+        return ordered
+
+    def rank(index: int) -> int:
+        line = ordered[index]
+        numeric = bool(_NUMERIC_RE.search(line))
+        on_topic = bool(topic.search(line)) if topic else False
+        if on_topic and numeric:
+            return 0
+        if numeric:
+            return 1
+        return 2 if on_topic else 3
+
+    preference = sorted(range(len(ordered)), key=lambda index: (rank(index), index))
     kept: list[tuple[int, str]] = []
-    budget = EVIDENCE_CHARS_PER_PAPER
+    budget = EVIDENCE_COMPACTION_THRESHOLD_CHARS
     for index in preference:
-        if len(kept) >= EVIDENCE_LINES_PER_PAPER or budget <= 0:
-            break
-        clipped = ordered[index][:budget]
-        kept.append((index, clipped))
-        budget -= len(clipped)
+        line = ordered[index]
+        if len(line) > budget:
+            continue
+        kept.append((index, line))
+        budget -= len(line)
+    logger.info(
+        "Chart evidence compacted: %d of %d retrieved lines kept for one paper",
+        len(kept),
+        len(ordered),
+    )
     # Restore retrieval order so the extractor reads passages as they appear.
     return [line for _, line in sorted(kept)]
 
 
-def _evidence_source(lines: list[str]) -> tuple[str, str]:
-    """Flatten retrieved passages into one haystack for grounding checks.
-
-    Retrieval returns `"<lineno>: <text>"` fragments and `view_file` prepends a
-    header; a quote that crossed a line break in the PDF has to ground against
-    the running text, so prefixes are stripped, end-of-line hyphenation is
-    repaired, and fragments are joined. Returns the normalized text and its
-    letters-and-digits-only condensation.
-    """
-    pieces: list[str] = []
-    for raw in lines:
-        for line in str(raw).splitlines():
-            if _VIEW_HEADER_RE.match(line):
-                continue
-            stripped = _LINE_PREFIX_RE.sub("", line).strip()
-            if stripped:
-                pieces.append(stripped)
-    joined = ""
-    for piece in pieces:
-        if not joined:
-            joined = piece
-        elif joined.endswith("-"):
-            joined = joined[:-1] + piece
-        else:
-            joined = f"{joined} {piece}"
-    normalized = _normalize(joined)
-    return normalized, _condense(normalized)
-
-
-def _is_grounded(quote: str, source: str, condensed_source: str) -> bool:
-    """Is this quote actually present in what we retrieved?
-
-    Two passes. The first compares normalized running text. The second ignores
-    spacing and punctuation entirely, because column breaks and hyphenation
-    disagree far more often than the extractor invents text — and removing
-    punctuation cannot turn a paraphrase into a match.
-    """
-    normalized = _normalize(quote)
-    condensed = _condense(normalized)
-    if len(condensed) < 4:
-        return False
-    if normalized in source:
-        return True
-    return condensed in condensed_source
-
-
 def _slug(value: str) -> str:
     return _condense(_normalize(value))[:48]
+
+
+def _field_phrases(fields: list[ChartField]) -> str:
+    """Search the measure as a whole phrase, not as loose words.
+
+    Word-level alternation is what hides a narrow field: "Robust Accuracy"
+    becomes robust|accuracy and matches every paper that says "accuracy", so a
+    one-paper measure scores like a corpus-wide one. The phrase does not.
+    """
+    phrases: list[str] = []
+    for field in fields:
+        for text in (field.label, field.key.replace("_", " ")):
+            cleaned = " ".join(text.split()).strip()
+            if cleaned and cleaned.lower() not in {p.lower() for p in phrases}:
+                phrases.append(cleaned)
+    return "|".join(phrases)
+
+
+def _field_terms(fields: list[ChartField]) -> str:
+    terms: set[str] = set()
+    for field in fields:
+        for source in (field.label, field.key.replace("_", " ")):
+            for word in _WORD_RE.findall(source):
+                lowered = word.lower()
+                if lowered not in SWEEP_STOPWORDS:
+                    terms.add(lowered)
+    return "|".join(sorted(terms)[:SWEEP_MAX_TERMS])
 
 
 def _sweep_query(plan: ChartPlan) -> str:
@@ -312,8 +409,14 @@ class ChartOperations:
 
     @staticmethod
     def is_chart_ready(payload: ChartArtifactPayload) -> bool:
-        """A chart needs at least two grounded points to support a comparison."""
-        return sum(1 for record in payload.records if not record.exclusion_reason) >= 2
+        """Any grounded point is a chart.
+
+        Requiring two threw away real findings: a corpus where exactly one
+        paper reports the measure produced no chart at all, which reads as "we
+        found nothing" when the truth is "we found one thing". The coverage
+        line says how thin it is and the not-charted list says why.
+        """
+        return any(not record.exclusion_reason for record in payload.records)
 
     @staticmethod
     def chart_failure_message(payload: ChartArtifactPayload) -> str:
@@ -326,12 +429,16 @@ class ChartOperations:
             )
             or "no directly quoted values were found"
         )
+        # The scope is rarely the problem — an axis named after one paper's
+        # vocabulary is. Telling the user to narrow the scope sends them the
+        # wrong way, so name the axis and point at broadening it.
         return (
             "I couldn't create a chart from this scope. I interpreted the request as "
             f"**{payload.plan.y.label}** against **{payload.plan.x.label}**, but found "
             f"only {len(payload.coverage.included_paper_ids)} of "
             f"{len(payload.coverage.searched_paper_ids)} papers with the required directly quoted values. "
-            f"Why: {reasons}. Try narrowing the paper scope or use **Artifacts → Chart** to adjust the axes before generation."
+            f"Why: {reasons}. **{payload.plan.y.label}** may be too specific for this "
+            "project — a broader measure these papers share would cover more of them. "
         )
 
     @staticmethod
@@ -454,7 +561,7 @@ class ChartOperations:
             current_user=current_user,
             db=db,
             project_id=project_id,
-            system_prompt=CHART_INVESTIGATION_PROMPT,
+            system_prompt=CHART_VERIFICATION_PROMPT if plan else CHART_DISCOVERY_PROMPT,
             user_message=(
                 f"User chart request:\n{prompt}\n\nSelected papers:\n{roster}{plan_text}\n\n"
                 "Investigate with the available tools, then report your findings."
@@ -472,28 +579,211 @@ class ChartOperations:
             investigation.trace.setdefault("status_messages", []).extend(steps)
         return investigation
 
+    @staticmethod
+    def measure_plan_coverage(
+        plan: ChartPlan,
+        papers: list[tuple[str, str]],
+        current_user: CurrentUser,
+        db: Session,
+        project_id: str,
+    ) -> int:
+        """How many papers could actually supply a point for this plan?
+
+        The measure is searched as a phrase and the entity as loose terms,
+        because the measure is the discriminating half: papers that report a
+        score almost always name what was scored, but "robust accuracy" is a
+        different field from "accuracy" and only the phrase can tell them apart.
+        """
+        paper_ids = [paper_id for paper_id, _ in papers]
+
+        def hits(query: str) -> set[str]:
+            if not query:
+                return set(paper_ids)
+            try:
+                found = search_all_files(
+                    query=query,
+                    current_user=current_user,
+                    db=db,
+                    project_id=project_id,
+                    restrict_to_paper_ids=paper_ids,
+                )
+            except Exception:
+                logger.warning("Coverage probe failed for %r", query, exc_info=True)
+                return set()
+            return {str(paper_id) for paper_id in found}
+
+        if plan.calculation:
+            inputs = [
+                field
+                for field in plan.fields
+                if field.key in set(plan.calculation.inputs)
+            ] or [plan.y]
+            # Every input must be present in the SAME paper — a derived value
+            # needs all of its primitives. Scoring the inputs as an OR would
+            # credit a paper that supplies one of four counts, and a computed
+            # candidate would win on a number it cannot deliver.
+            measure_hits: Optional[set[str]] = None
+            for field in inputs:
+                found = hits(_field_phrases([field]))
+                measure_hits = found if measure_hits is None else measure_hits & found
+            measure_hits = measure_hits or set()
+        else:
+            measure_hits = hits(_field_phrases([plan.y]))
+        return len(measure_hits & hits(_field_terms([plan.x])))
+
+    def create_chart_artifact(
+        self,
+        *,
+        prompt: str,
+        papers: list[tuple[str, str]],
+        current_user: CurrentUser,
+        db: Session,
+        project_id: str,
+        plan: Optional[ChartPlan] = None,
+        history: str = "",
+        prior_evidence: Optional[dict[str, list[str]]] = None,
+    ) -> tuple[Optional[ChartArtifactPayload], dict]:
+        """The one path from a request to a chart, for chat and the composer.
+
+        Chat and the artifact panel used to gather evidence differently — the
+        panel ran a plan-targeted agent that chat never did — so the same
+        request could chart in one surface and come up empty in the other.
+        Both now run the same steps in the same order:
+
+          discover (unless a plan is confirmed) -> plan -> verify against the
+          plan -> extract per paper.
+
+        `plan` is supplied by the composer, which already proposed one for the
+        user to edit; chat proposes its own. `prior_evidence` carries the chat's
+        own gathered passages in, and `history` lets a follow-up like "chart
+        that relationship" resolve. Returns the artifact and the merged trace.
+        """
+        evidence: dict[str, list[str]] = {
+            paper_id: list(lines) for paper_id, lines in (prior_evidence or {}).items()
+        }
+        status: list[str] = []
+
+        def absorb(investigation: FieldInvestigation) -> None:
+            for paper_id, lines in investigation.evidence.items():
+                existing = evidence.setdefault(paper_id, [])
+                seen = {_normalize(line) for line in existing}
+                for line in lines:
+                    if _normalize(line) not in seen:
+                        existing.append(line)
+                        seen.add(_normalize(line))
+            status.extend(investigation.trace.get("status_messages", []))
+
+        if plan is None:
+            absorb(
+                self.investigate_chart_fields(
+                    prompt=prompt,
+                    papers=papers,
+                    current_user=current_user,
+                    db=db,
+                    project_id=project_id,
+                )
+            )
+            plan = self.propose_chart_plan(
+                prompt,
+                papers,
+                "\n\n".join(status),
+                history=history,
+                current_user=current_user,
+                db=db,
+                project_id=project_id,
+            )
+            if plan is None:
+                return None, {"status_messages": status}
+
+        # The plan-targeted pass: an agent reading for these exact fields finds
+        # pairs that a term sweep alone misses, and it runs the sweep too.
+        absorb(
+            self.investigate_chart_fields(
+                prompt=prompt,
+                papers=papers,
+                current_user=current_user,
+                db=db,
+                project_id=project_id,
+                plan=plan,
+            )
+        )
+        artifact = self.build_chart_artifact(
+            prompt=prompt, plan=plan, evidence=evidence, papers=papers
+        )
+        if artifact is not None:
+            status.extend(artifact.extraction_steps)
+            artifact.investigation_trace = {"status_messages": status}
+        return artifact, {"status_messages": status}
+
     def propose_chart_plan(
         self,
         prompt: str,
         papers: list[tuple[str, str]],
         findings: str = "",
+        history: str = "",
+        current_user: Optional[CurrentUser] = None,
+        db: Optional[Session] = None,
+        project_id: Optional[str] = None,
     ) -> Optional[ChartPlan]:
+        """Propose several plans, then choose the one the corpus can fill.
+
+        Coverage is measured, not trusted to the model: a plan naming a measure
+        one paper uses is indistinguishable, in the model's output, from one
+        naming a measure every paper uses.
+        """
         roster = "\n".join(f"- [{paper_id}] {title}" for paper_id, title in papers)
+        conversation = (
+            f"\n\nEarlier in this conversation (the request may refer back to it):\n{history}"
+            if history
+            else ""
+        )
         response = self.generate_content(
             contents=[
                 TextContent(
-                    text=f"User request:\n{prompt}\n\nPapers:\n{roster}\n\nInvestigator findings:\n{findings}"
+                    text=f"User request:\n{prompt}{conversation}\n\nPapers:\n{roster}\n\nInvestigator findings:\n{findings}"
                 )
             ],
             system_prompt=PLAN_PROMPT,
             model_type=ModelType.FAST,
-            schema=ChartPlan.model_json_schema(),
+            schema=ChartPlanCandidates.model_json_schema(),
             provider=LLMProvider.GEMINI,
         )
         if not response or not response.text:
             return None
         try:
-            plan = ChartPlan.model_validate_json(response.text)
+            candidates = ChartPlanCandidates.model_validate_json(
+                response.text
+            ).candidates
+        except Exception:
+            logger.exception("Failed to parse chart plan candidates")
+            return None
+        plans = [self._normalize_plan(candidate) for candidate in candidates]
+        plans = [plan for plan in plans if plan]
+        if not plans:
+            return None
+        if current_user is None or db is None or project_id is None:
+            return plans[0]
+        scored = [
+            (
+                self.measure_plan_coverage(plan, papers, current_user, db, project_id),
+                -index,
+                plan,
+            )
+            for index, plan in enumerate(plans)
+        ]
+        coverage, _, best = max(scored)
+        logger.info(
+            "Chart plan chosen by coverage: %r covers %d/%d papers (candidates: %s)",
+            best.y.label,
+            coverage,
+            len(papers),
+            ", ".join(f"{p.y.label}={c}" for c, _, p in scored),
+        )
+        return best
+
+    @staticmethod
+    def _normalize_plan(plan: ChartPlan) -> Optional[ChartPlan]:
+        try:
             keys = {field.key for field in plan.fields}
             if plan.x.key not in keys:
                 plan.fields.append(plan.x)
@@ -503,9 +793,10 @@ class ChartOperations:
                 field.key for field in plan.fields
             }:
                 plan.fields.append(plan.series)
-            # Multi-series rendering waits on the dedicated accessible palette
-            # work; keeping the schema flexible does not enable it prematurely.
-            plan.series = None
+            # A series must not duplicate an axis, or every point carries its
+            # own group and the legend becomes noise.
+            if plan.series and plan.series.key in {plan.x.key, plan.y.key}:
+                plan.series = None
             if plan.calculation:
                 # The renderer reads y by its field key, so use that same key
                 # for the sandbox output while retaining the display label on y.
@@ -537,6 +828,7 @@ class ChartOperations:
         paper_titles = dict(papers)
         required_keys = sorted(
             {plan.x.key}
+            | ({plan.series.key} if plan.series else set())
             | set(plan.calculation.inputs if plan.calculation else [plan.y.key])
         )
         # A generic Dict[str, ChartValue] lets Gemini emit `{}`. Build the
@@ -557,18 +849,16 @@ class ChartOperations:
             records=(list[point_record_model], Field(default_factory=list)),
         )
         extraction_schema = extraction_model.model_json_schema()
-        field_labels = {field.key: field.label for field in plan.fields}
-        field_labels.setdefault(plan.x.key, plan.x.label)
-        field_labels.setdefault(plan.y.key, plan.y.label)
 
+        topic_terms = _field_terms([plan.x, plan.y, *plan.fields])
+        topic = re.compile(topic_terms, re.IGNORECASE) if topic_terms else None
         capped = {
-            paper_id: _cap_evidence(evidence.get(paper_id) or [])
+            paper_id: _fit_evidence(evidence.get(paper_id) or [], topic)
             for paper_id in paper_ids
         }
         targets = [paper_id for paper_id in paper_ids if capped[paper_id]]
 
         included: list[ChartRecord] = []
-        excluded_records: list[ChartRecord] = []
         seen_record_ids: set[str] = set()
         papers_attempted: set[str] = set()
 
@@ -626,15 +916,20 @@ class ChartOperations:
 
         for paper_id in targets:
             papers_attempted.add(paper_id)
-            source, condensed_source = _evidence_source(capped[paper_id])
             for extracted in results.get(paper_id, []):
                 # A record attributed to another paper is not evidence about
                 # this one; the per-paper call has no business emitting it.
                 if extracted.paper_id != paper_id:
                     continue
                 values = {key: getattr(extracted.values, key) for key in required_keys}
+                series_value = (
+                    values[plan.series.key].value
+                    if plan.series and plan.series.key in values
+                    else ""
+                )
                 record = ChartRecord(
-                    record_id=f"{paper_id}#{_slug(values[plan.x.key].value)}",
+                    record_id=f"{paper_id}#{_slug(values[plan.x.key].value)}"
+                    + (f"#{_slug(series_value)}" if series_value else ""),
                     paper_id=paper_id,
                     paper_title=paper_titles[paper_id],
                     values=values,
@@ -642,27 +937,13 @@ class ChartOperations:
                 if record.record_id in seen_record_ids:
                     continue
                 seen_record_ids.add(record.record_id)
-                ungrounded = [
-                    key
-                    for key, value in values.items()
-                    if not _is_grounded(value.quote, source, condensed_source)
-                ]
-                if ungrounded:
-                    labels = ", ".join(
-                        field_labels.get(key, key) for key in sorted(ungrounded)
-                    )
-                    record.exclusion_reason = (
-                        f"No directly quoted value for {labels} in this paper"
-                    )
-                    excluded_records.append(record)
-                else:
-                    included.append(record)
+                included.append(record)
 
         included.sort(key=_point_sort_key(plan))
 
         payload = ChartArtifactPayload(
             plan=plan,
-            records=included + excluded_records,
+            records=list(included),
             coverage=ChartCoverage(),
         )
         if plan.calculation:
@@ -719,11 +1000,6 @@ class ChartOperations:
                 if plotted.get(paper_id)
             ),
         ]
-        if excluded_records:
-            payload.extraction_steps.append(
-                f"Dropped {len(excluded_records)} extracted point"
-                f"{'s' if len(excluded_records) != 1 else ''} whose quote was not in the gathered passages"
-            )
         silent = len(targets) - len(plotted)
         if silent > 0:
             payload.extraction_steps.append(
