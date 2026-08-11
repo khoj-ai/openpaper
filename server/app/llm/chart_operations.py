@@ -17,6 +17,7 @@ cited:
   bad response can't take the whole chart down with it.
 """
 
+import hashlib
 import json
 import logging
 import re
@@ -344,6 +345,19 @@ def _fit_evidence(lines: list[str], topic: Optional[re.Pattern] = None) -> list[
 
 def _slug(value: str) -> str:
     return _condense(_normalize(value))[:48]
+
+
+def _values_digest(values: dict[str, ChartValue]) -> str:
+    """A stable fingerprint of one extracted point.
+
+    Hashing the content rather than counting emissions keeps identity
+    independent of the order the model happened to return records in, so the
+    same evidence yields the same record ids on every run.
+    """
+    material = "|".join(
+        f"{key}={_condense(_normalize(values[key].value))}" for key in sorted(values)
+    )
+    return hashlib.sha1(material.encode("utf-8")).hexdigest()[:8]
 
 
 def _field_phrases(fields: list[ChartField]) -> str:
@@ -929,11 +943,16 @@ class ChartOperations:
                 )
                 record = ChartRecord(
                     record_id=f"{paper_id}#{_slug(values[plan.x.key].value)}"
-                    + (f"#{_slug(series_value)}" if series_value else ""),
+                    + (f"#{_slug(series_value)}" if series_value else "")
+                    + f"#{_values_digest(values)}",
                     paper_id=paper_id,
                     paper_title=paper_titles[paper_id],
                     values=values,
                 )
+                # Identity is the whole extracted point, not its x label. One
+                # paper reporting two different values at the same x — two
+                # subgroups, two cohorts — contributes two points; only a point
+                # the model emitted twice is a duplicate.
                 if record.record_id in seen_record_ids:
                     continue
                 seen_record_ids.add(record.record_id)
@@ -948,6 +967,7 @@ class ChartOperations:
         )
         if plan.calculation:
             self._compute_derived_y(payload, paper_titles)
+        payload.series_by_paper = _papers_collide_on_x(payload.records, plan)
 
         included_paper_ids = list(
             dict.fromkeys(
@@ -1082,20 +1102,48 @@ class ChartOperations:
                     record.exclusion_reason = "The chart calculation failed; cited primitive values remain available"
 
 
+def _papers_collide_on_x(records: list[ChartRecord], plan: ChartPlan) -> bool:
+    """Does the study distinguish points that x alone cannot?
+
+    A literature chart's commonest shape is several papers reporting the same
+    measure for the same entity. Nothing quoted from the text separates those
+    points — the paper does — so the encoding is decided here from the records
+    rather than guessed by the planner. When every x belongs to one paper the
+    study adds a legend that disambiguates nothing, so it stays off.
+    """
+    seen: dict[tuple[str, str], str] = {}
+    for record in records:
+        if record.exclusion_reason or plan.x.key not in record.values:
+            continue
+        series = (
+            record.values[plan.series.key].value
+            if plan.series and plan.series.key in record.values
+            else ""
+        )
+        group = (_slug(record.values[plan.x.key].value), _slug(series))
+        owner = seen.setdefault(group, record.paper_id)
+        if owner != record.paper_id:
+            return True
+    return False
+
+
 def _point_sort_key(plan: ChartPlan):
     """Order points by x so a chart is a function of its evidence.
 
     Model emission order is arbitrary, so two runs finding identical points
     would still draw them in different positions. Numeric x sorts ascending
-    (which line charts need regardless); everything else sorts by label.
+    (which line charts need regardless); everything else sorts by label. Points
+    sharing an x then sort by paper, which keeps a study's points together
+    instead of interleaving them by roster position.
     """
 
     def key(record: ChartRecord):
         raw = record.values[plan.x.key].value if plan.x.key in record.values else ""
         cleaned = _normalize(raw).replace(",", "")
+        tail = (cleaned, record.paper_title, record.record_id)
         match = re.search(r"-?\d+(?:\.\d+)?", cleaned)
         if match:
-            return (0, float(match.group()), cleaned, record.record_id)
-        return (1, 0.0, cleaned, record.record_id)
+            return (0, float(match.group()), *tail)
+        return (1, 0.0, *tail)
 
     return key

@@ -1088,6 +1088,215 @@ class TestSeriesIsExtracted(unittest.TestCase):
         self.assertEqual(artifact.coverage.included_paper_ids, [])
 
 
+class TestPaperCanBeTheSeries(unittest.TestCase):
+    """Several papers reporting the same entity is the commonest shape a
+    literature chart takes, and nothing quoted from the text separates those
+    points — the study does. Without that encoding the plot draws repeated
+    identical labels and the reader cannot tell which number came from where.
+    """
+
+    BENCH_PLAN = ChartPlan(
+        title="Score by model and benchmark",
+        chart_type="bar",
+        x=ChartField(key="model", label="Model"),
+        y=ChartField(key="score", label="Score"),
+        series=ChartField(key="benchmark", label="Benchmark"),
+        fields=[
+            ChartField(key="model", label="Model"),
+            ChartField(key="score", label="Score"),
+            ChartField(key="benchmark", label="Benchmark"),
+        ],
+    )
+
+    def test_two_papers_reporting_one_entity_makes_the_study_the_series(self):
+        artifact = StubChartOperations(
+            records_json(
+                record(
+                    "p1",
+                    "?",
+                    benchmark=("AssistantBench", "AssistantBench accuracy was 33%"),
+                    score=("33", "AssistantBench accuracy was 33%"),
+                )
+            ),
+            records_json(
+                record(
+                    "p2",
+                    "?",
+                    benchmark=("AssistantBench", "we measured 41% on AssistantBench"),
+                    score=("41", "we measured 41% on AssistantBench"),
+                )
+            ),
+        ).build_chart_artifact(
+            prompt="chart benchmark accuracy",
+            plan=simple_plan(),
+            evidence={
+                "p1": ["AssistantBench accuracy was 33%"],
+                "p2": ["we measured 41% on AssistantBench"],
+            },
+            papers=[("p1", "Paper one"), ("p2", "Paper two")],
+        )
+
+        assert artifact is not None
+        self.assertTrue(
+            artifact.series_by_paper,
+            "two papers share an x, so only the study tells the points apart",
+        )
+
+    def test_one_entity_per_paper_needs_no_study_series(self):
+        artifact = StubChartOperations(
+            records_json(
+                record(
+                    "p1",
+                    "?",
+                    benchmark=("AssistantBench", "AssistantBench accuracy was 33%"),
+                    score=("33", "AssistantBench accuracy was 33%"),
+                )
+            ),
+            records_json(
+                record(
+                    "p2",
+                    "?",
+                    benchmark=("WebVoyager", "WebVoyager accuracy was 41%"),
+                    score=("41", "WebVoyager accuracy was 41%"),
+                )
+            ),
+        ).build_chart_artifact(
+            prompt="chart benchmark accuracy",
+            plan=simple_plan(),
+            evidence={
+                "p1": ["AssistantBench accuracy was 33%"],
+                "p2": ["WebVoyager accuracy was 41%"],
+            },
+            papers=[("p1", "Paper one"), ("p2", "Paper two")],
+        )
+
+        assert artifact is not None
+        self.assertFalse(
+            artifact.series_by_paper,
+            "x already identifies every point, so the study would only add a "
+            "legend that disambiguates nothing",
+        )
+
+    def test_a_quoted_series_that_already_separates_papers_wins(self):
+        artifact = StubChartOperations(
+            records_json(
+                record(
+                    "p1",
+                    "?",
+                    model=("GPT-4o", "GPT-4o scores 65% on WebVoyager"),
+                    score=("65", "GPT-4o scores 65% on WebVoyager"),
+                    benchmark=("WebVoyager", "GPT-4o scores 65% on WebVoyager"),
+                )
+            ),
+            records_json(
+                record(
+                    "p2",
+                    "?",
+                    model=("GPT-4o", "GPT-4o scores 47% on SWE-bench"),
+                    score=("47", "GPT-4o scores 47% on SWE-bench"),
+                    benchmark=("SWE-bench", "GPT-4o scores 47% on SWE-bench"),
+                )
+            ),
+        ).build_chart_artifact(
+            prompt="chart model scores per benchmark",
+            plan=self.BENCH_PLAN,
+            evidence={
+                "p1": ["GPT-4o scores 65% on WebVoyager"],
+                "p2": ["GPT-4o scores 47% on SWE-bench"],
+            },
+            papers=[("p1", "Paper one"), ("p2", "Paper two")],
+        )
+
+        assert artifact is not None
+        self.assertFalse(
+            artifact.series_by_paper,
+            "the benchmark already tells these two points apart",
+        )
+
+    def test_one_paper_reporting_two_values_for_one_entity_keeps_both(self):
+        artifact = StubChartOperations(
+            records_json(
+                record(
+                    "p1",
+                    "?",
+                    benchmark=("AssistantBench", "girls scored 33% on AssistantBench"),
+                    score=("33", "girls scored 33% on AssistantBench"),
+                ),
+                record(
+                    "p1",
+                    "?",
+                    benchmark=("AssistantBench", "boys scored 41% on AssistantBench"),
+                    score=("41", "boys scored 41% on AssistantBench"),
+                ),
+            )
+        ).build_chart_artifact(
+            prompt="chart benchmark accuracy",
+            plan=simple_plan(),
+            evidence={
+                "p1": [
+                    "girls scored 33% on AssistantBench",
+                    "boys scored 41% on AssistantBench",
+                ]
+            },
+            papers=[("p1", "Paper one")],
+        )
+
+        assert artifact is not None
+        plotted = [r for r in artifact.records if not r.exclusion_reason]
+        self.assertEqual(
+            sorted(r.values["score"].value for r in plotted),
+            ["33", "41"],
+            "two subgroups reported for one entity are two findings; keying "
+            "identity on the x label alone silently discards one of them",
+        )
+        self.assertEqual(len({r.record_id for r in plotted}), 2)
+        self.assertFalse(
+            artifact.series_by_paper,
+            "one paper cannot be told apart from itself",
+        )
+
+    def test_points_sharing_an_x_are_grouped_by_study(self):
+        artifact = StubChartOperations(
+            records_json(
+                record(
+                    "p1",
+                    "?",
+                    benchmark=("AssistantBench", "33%"),
+                    score=("33", "33%"),
+                ),
+                record("p1", "?", benchmark=("WebVoyager", "51%"), score=("51", "51%")),
+            ),
+            records_json(
+                record(
+                    "p2",
+                    "?",
+                    benchmark=("AssistantBench", "41%"),
+                    score=("41", "41%"),
+                ),
+                record("p2", "?", benchmark=("WebVoyager", "62%"), score=("62", "62%")),
+            ),
+        ).build_chart_artifact(
+            prompt="chart benchmark accuracy",
+            plan=simple_plan(),
+            evidence={"p1": ["33%", "51%"], "p2": ["41%", "62%"]},
+            papers=[("p1", "Alpha study"), ("p2", "Beta study")],
+        )
+
+        assert artifact is not None
+        plotted = [r for r in artifact.records if not r.exclusion_reason]
+        self.assertEqual(
+            [(r.values["benchmark"].value, r.paper_title) for r in plotted],
+            [
+                ("AssistantBench", "Alpha study"),
+                ("AssistantBench", "Beta study"),
+                ("WebVoyager", "Alpha study"),
+                ("WebVoyager", "Beta study"),
+            ],
+            "tied x values order by study, so a chart never interleaves two "
+            "papers by their position in the roster",
+        )
+
+
 class TestTraceIsSpecific(unittest.TestCase):
     """The trace is how a reader audits an absence, so it has to say what was
     actually searched and found — not name the phases it went through."""

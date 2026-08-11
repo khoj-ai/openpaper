@@ -94,6 +94,15 @@ class ChartArtifactPayload(BaseModel):
     plan: ChartPlan
     records: List[ChartRecord] = Field(default_factory=list)
     coverage: ChartCoverage
+    series_by_paper: bool = Field(
+        default=False,
+        description=(
+            "Draw the paper as the series. Set when several papers report the "
+            "same x, where the study is what tells otherwise identical points "
+            "apart. Distinct from plan.series, which is a value quoted from a "
+            "paper's text; the study is metadata and is never extracted."
+        ),
+    )
     computation: Optional[dict] = None
     warnings: List[str] = Field(default_factory=list)
     extraction_steps: List[str] = Field(
