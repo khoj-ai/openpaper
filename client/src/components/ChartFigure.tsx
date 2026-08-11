@@ -44,6 +44,20 @@ export function seriesKeys(points: ChartPoint[]): string[] {
     return seen.sort((a, b) => a.localeCompare(b));
 }
 
+/** Display form for a series in the gutter and the legend.
+ *
+ * A quoted discriminator is already short; a paper title is a sentence, and
+ * when the study is the series it would otherwise swamp the row it labels. The
+ * full title stays on the tooltip, the hover text, and the values table, so
+ * nothing is lost by shortening what is drawn. */
+export function seriesLabel(series: string): string {
+    const head = series.split(":")[0].trim() || series.trim();
+    if (head.length <= 40) return head;
+    const clipped = head.slice(0, 40);
+    const boundary = clipped.lastIndexOf(" ");
+    return `${(boundary > 20 ? clipped.slice(0, boundary) : clipped).trimEnd()}…`;
+}
+
 /** Compact form for marks and ticks, where width is scarce. */
 export function compactNumber(value: number): string {
     const abs = Math.abs(value);
@@ -67,8 +81,16 @@ export function chartPoints(artifact: ChartArtifact): ChartPoint[] {
         if (value === null) continue;
         const label = record.values[artifact.plan.x.key]?.value ?? "";
         const seriesKey = artifact.plan.series?.key;
+        // A quoted discriminator wins when the plan has one; otherwise the
+        // study separates papers that reported the same x, which would
+        // otherwise draw as repeated identical labels.
+        const series = seriesKey
+            ? record.values[seriesKey]?.value
+            : artifact.series_by_paper
+                ? record.paper_title
+                : undefined;
         points.push({
-            series: seriesKey ? record.values[seriesKey]?.value : undefined,
+            series,
             recordId: record.record_id,
             paperId: record.paper_id,
             paperTitle: record.paper_title,
@@ -181,7 +203,7 @@ function CategoricalPlot({ points, log, yLabel, xLabel, colorFor, onOpenPaper }:
                                 title={point.series ? `${point.label} · ${point.series}` : point.label}
                             >
                                 {point.label}
-                                {point.series && <span className="opacity-70"> · {point.series}</span>}
+                                {point.series && <span className="opacity-70"> · {seriesLabel(point.series)}</span>}
                             </span>
                             <span className="relative h-4 flex-1">
                                 {log ? (
@@ -248,8 +270,12 @@ function XYPlot({ points, chartType, log, yLabel, xLabel, colorFor }: {
     colorFor: (point: ChartPoint) => string;
 }) {
     const [active, setActive] = useState<number | null>(null);
+    // Grouped by series before x so each series is a contiguous run and a
+    // segment can be drawn between neighbours without joining two series.
     const ordered = useMemo(
-        () => [...points].sort((a, b) => (a.x ?? 0) - (b.x ?? 0)),
+        () => [...points].sort((a, b) =>
+            (a.series ?? "").localeCompare(b.series ?? "") || (a.x ?? 0) - (b.x ?? 0),
+        ),
         [points],
     );
     const ys = ordered.map(point => point.value);
@@ -276,16 +302,21 @@ function XYPlot({ points, chartType, log, yLabel, xLabel, colorFor }: {
                 <text x="2" y="24" className="fill-muted-foreground text-[9px]">{compactNumber(yCeiling)}</text>
                 <text x="2" y="152" className="fill-muted-foreground text-[9px]">{log ? compactNumber(yFloor) : "0"}</text>
                 {chartType === "line" && ordered.slice(1).map((point, index) => (
-                    <line
-                        key={point.recordId}
-                        x1={xFor(ordered[index].x ?? 0)}
-                        y1={yFor(ordered[index].value)}
-                        x2={xFor(point.x ?? 0)}
-                        y2={yFor(point.value)}
-                        className="stroke-blue-500"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                    />
+                    // A segment only exists inside a series. Joining the last
+                    // point of one to the first of the next would draw a trend
+                    // between two papers that never measured each other.
+                    ordered[index].series === point.series && (
+                        <line
+                            key={point.recordId}
+                            x1={xFor(ordered[index].x ?? 0)}
+                            y1={yFor(ordered[index].value)}
+                            x2={xFor(point.x ?? 0)}
+                            y2={yFor(point.value)}
+                            stroke={colorFor(point)}
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                        />
+                    )
                 ))}
                 {ordered.map((point, index) => (
                     <g key={point.recordId}>
@@ -327,19 +358,29 @@ export interface ChartView {
     isXY: boolean;
     canLog: boolean;
     defaultLog: boolean;
+    /** Points are ordered by magnitude, so a truncated preview really is the
+     * leaders. Grouped points are in category order and a preview is only the
+     * first few. */
+    ranked: boolean;
 }
 
 /** Everything both the figure and the PNG export need to agree on. */
 export function chartView(artifact: ChartArtifact): ChartView {
     const derived = chartPoints(artifact);
-    // Sorted by magnitude: the reader's job on a categorical chart is ranking,
-    // and the paper roster's order carries no meaning.
-    const points = artifact.plan.chart_type === "bar" || derived.some(point => point.x === null)
+    // Sorted by magnitude, because the reader's job on a categorical chart is
+    // ranking and the paper roster's order carries no meaning — unless an x
+    // repeats. Then ranking scatters the rows that share a category, and the
+    // grouped order the artifact already arrived in is what makes several
+    // studies of one entity comparable.
+    const repeated = new Set(derived.map(point => point.label)).size < derived.length;
+    const ranked = artifact.plan.chart_type === "bar" || derived.some(point => point.x === null);
+    const points = ranked && !repeated
         ? [...derived].sort((a, b) => b.value - a.value)
         : derived;
     const canLog = points.every(point => point.value > 0) && points.length > 1;
     return {
         points,
+        ranked: ranked && !repeated,
         isXY: artifact.plan.chart_type !== "bar" && points.length > 0 && points.every(point => point.x !== null),
         canLog,
         defaultLog: canLog && spread(points) >= 100,
@@ -354,7 +395,7 @@ export function ChartFigure({ artifact, view, log, onToggleLog, onOpenPaper, dis
     onOpenPaper: (paperId: string, searchTerm?: string) => void;
     display?: "compact" | "full";
 }) {
-    const { points: all, isXY, canLog } = view;
+    const { points: all, isXY, canLog, ranked } = view;
     const dark = useIsDarkMode().darkMode;
     const groups = useMemo(() => seriesKeys(all), [all]);
     const palette = seriesPalette(dark);
@@ -375,12 +416,12 @@ export function ChartFigure({ artifact, view, log, onToggleLog, onOpenPaper, dis
             {groups.length > 1 && (
                 <ul className="m-0 mt-2 flex list-none flex-wrap gap-x-3 gap-y-1 p-0 text-[11px] text-muted-foreground">
                     {groups.map((group, index) => (
-                        <li key={group} className="flex items-center gap-1">
+                        <li key={group} className="flex items-center gap-1" title={group}>
                             <span
                                 className="h-2 w-2 shrink-0 rounded-sm"
                                 style={{ backgroundColor: palette[index % palette.length] }}
                             />
-                            {group}
+                            {seriesLabel(group)}
                         </li>
                     ))}
                 </ul>
@@ -407,7 +448,7 @@ export function ChartFigure({ artifact, view, log, onToggleLog, onOpenPaper, dis
             <figcaption className="mt-2 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
                 <span>
                     {yLabel}
-                    {truncated ? ` · top ${COMPACT_ROWS} of ${all.length}` : ""}
+                    {truncated ? ` · ${ranked ? "top" : "first"} ${COMPACT_ROWS} of ${all.length}` : ""}
                 </span>
                 {canLog && display === "full" && (
                     <Tabs value={log ? "log" : "linear"} onValueChange={value => onToggleLog(value === "log")}>

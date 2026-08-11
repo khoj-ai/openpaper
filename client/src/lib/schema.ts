@@ -97,6 +97,9 @@ export interface ChartArtifact {
         included_paper_ids: string[];
         excluded: Record<string, string>;
     };
+    // Several papers reported the same x, so the study is what tells the
+    // points apart and becomes the series.
+    series_by_paper?: boolean;
     computation?: { script?: string; warnings?: string[] } | null;
     warnings: string[];
     investigation_trace?: MessageTrace | null;

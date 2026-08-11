@@ -9,16 +9,20 @@
  */
 
 import { ChartArtifact } from "@/lib/schema";
-import { ChartPoint, compactNumber, seriesKeys, seriesPalette } from "@/components/ChartFigure";
+import { ChartPoint, compactNumber, seriesKeys, seriesLabel, seriesPalette } from "@/components/ChartFigure";
 
 const SCALE = 2;
 const WIDTH = 920;
 const PAD = 32;
 const ROW = 30;
+// A study series is drawn on its own line under the category, so the row grows
+// and the gutter widens to hold a paper title rather than clip it.
+const ROW_WITH_SERIES = 38;
 const LABEL_COLUMN = 0.28;
+const LABEL_COLUMN_WITH_SERIES = 0.4;
 const VALUE_COLUMN = 92;
 const MARK = "#3b82f6";
-const LEGEND_BAND = 22;
+const LEGEND_ROW = 22;
 
 interface Palette {
     background: string;
@@ -53,6 +57,40 @@ function decadeTicks(min: number, max: number): number[] {
     return ticks;
 }
 
+interface LegendEntry {
+    label: string;
+    /** Position in the series order, so a wrapped entry keeps its own colour —
+     * the hue follows the entity, never the slot it lands in. */
+    index: number;
+}
+
+/** Break the legend into lines that fit the canvas.
+ *
+ * The canvas is a fixed width and a series can now be a paper title, so a
+ * single row of swatches walks straight off the right edge. Laying it out
+ * before the canvas is sized lets the image grow a band per line instead.
+ */
+function layoutLegend(
+    ctx: CanvasRenderingContext2D,
+    groups: string[],
+    maxWidth: number,
+): LegendEntry[][] {
+    ctx.font = font(11);
+    const lines: LegendEntry[][] = [[]];
+    let cursor = 0;
+    groups.forEach((group, index) => {
+        const label = truncate(ctx, seriesLabel(group), maxWidth - 12);
+        const width = 12 + ctx.measureText(label).width + 16;
+        if (cursor > 0 && cursor + width > maxWidth) {
+            lines.push([]);
+            cursor = 0;
+        }
+        lines[lines.length - 1].push({ label, index });
+        cursor += width;
+    });
+    return lines;
+}
+
 export interface ChartExportOptions {
     artifact: ChartArtifact;
     points: ChartPoint[];
@@ -69,16 +107,24 @@ export function drawChart({ artifact, points, log, isXY, dark }: ChartExportOpti
         const index = point.series ? groups.indexOf(point.series) : -1;
         return index < 0 ? MARK : palette[index % palette.length];
     };
-    const legendBand = groups.length > 1 ? LEGEND_BAND : 0;
-    const plotHeight = isXY ? 300 : points.length * ROW;
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return canvas;
+
+    // Measured before the canvas is sized, because how tall the image has to be
+    // depends on how many lines the legend and the labels actually take. Sizing
+    // resets the context, so nothing may be drawn until after it.
+    const legendLines = groups.length > 1 ? layoutLegend(ctx, groups, WIDTH - PAD * 2) : [];
+    const legendBand = legendLines.length * LEGEND_ROW;
+    const hasSeries = points.some(point => point.series);
+    const row = hasSeries ? ROW_WITH_SERIES : ROW;
+    const labelWidth = (WIDTH - PAD * 2) * (hasSeries ? LABEL_COLUMN_WITH_SERIES : LABEL_COLUMN);
+    const plotHeight = isXY ? 300 : points.length * row;
     const tickBand = log && !isXY ? 22 : 0;
     const height = PAD + 58 + legendBand + plotHeight + tickBand + 26 + PAD;
 
-    const canvas = document.createElement("canvas");
     canvas.width = WIDTH * SCALE;
     canvas.height = height * SCALE;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return canvas;
     ctx.scale(SCALE, SCALE);
     ctx.textBaseline = "middle";
 
@@ -100,31 +146,32 @@ export function drawChart({ artifact, points, log, isXY, dark }: ChartExportOpti
     ctx.fillText(subtitle, PAD, PAD + 34);
 
     // A legend is always present for two or more series.
-    if (groups.length > 1) {
+    ctx.font = font(11);
+    ctx.textAlign = "left";
+    legendLines.forEach((entries, line) => {
+        const top = PAD + 52 + line * LEGEND_ROW;
         let cursor = PAD;
-        ctx.font = font(11);
-        ctx.textAlign = "left";
-        groups.forEach((group, index) => {
-            ctx.fillStyle = palette[index % palette.length];
-            ctx.fillRect(cursor, PAD + 52, 8, 8);
+        for (const entry of entries) {
+            ctx.fillStyle = palette[entry.index % palette.length];
+            ctx.fillRect(cursor, top, 8, 8);
             ctx.fillStyle = theme.muted;
-            ctx.fillText(group, cursor + 12, PAD + 56);
-            cursor += 12 + ctx.measureText(group).width + 16;
-        });
-    }
+            ctx.fillText(entry.label, cursor + 12, top + 4);
+            cursor += 12 + ctx.measureText(entry.label).width + 16;
+        }
+    });
 
     const top = PAD + 58 + legendBand;
 
     if (isXY) {
         drawXY(ctx, points, log, theme, top, plotHeight, artifact.plan.chart_type === "line", colorFor);
     } else {
-        drawCategorical(ctx, points, log, theme, top, colorFor);
+        drawCategorical(ctx, points, log, theme, top, colorFor, row, labelWidth);
     }
 
     if (log && !isXY) {
         const values = points.map(point => point.value).filter(value => value > 0);
         const ticks = decadeTicks(Math.min(...values), Math.max(...values));
-        const trackLeft = PAD + (WIDTH - PAD * 2) * LABEL_COLUMN + 12;
+        const trackLeft = PAD + labelWidth + 12;
         const trackRight = WIDTH - PAD - VALUE_COLUMN;
         const span = Math.log10(ticks[ticks.length - 1]) - Math.log10(ticks[0]);
         ctx.fillStyle = theme.muted;
@@ -153,8 +200,9 @@ function drawCategorical(
     palette: Palette,
     top: number,
     colorFor: (point: ChartPoint) => string,
+    row: number,
+    labelWidth: number,
 ): void {
-    const labelWidth = (WIDTH - PAD * 2) * LABEL_COLUMN;
     const trackLeft = PAD + labelWidth + 12;
     const trackRight = WIDTH - PAD - VALUE_COLUMN;
     const trackWidth = trackRight - trackLeft;
@@ -173,13 +221,27 @@ function drawCategorical(
     };
 
     points.forEach((point, index) => {
-        const centre = top + index * ROW + ROW / 2;
+        const centre = top + index * row + row / 2;
 
-        ctx.fillStyle = palette.muted;
-        ctx.font = font(12);
         ctx.textAlign = "left";
-        const rowLabel = point.series ? `${point.label} · ${point.series}` : point.label;
-        ctx.fillText(truncate(ctx, rowLabel, labelWidth), PAD, centre);
+        if (point.series) {
+            // Stacked rather than joined by a separator: a category and a paper
+            // title on one line only ever truncates to the category plus a few
+            // characters of the study, which is the half that identifies it.
+            ctx.fillStyle = palette.ink;
+            ctx.font = font(12);
+            ctx.fillText(truncate(ctx, point.label, labelWidth), PAD, centre - 7);
+            // Measured against the gutter rather than pre-capped: the export
+            // has far more width here than the sidebar figure does, and a
+            // shortened title is only worth showing if it still names a study.
+            ctx.fillStyle = palette.muted;
+            ctx.font = font(11);
+            ctx.fillText(truncate(ctx, point.series, labelWidth), PAD, centre + 7);
+        } else {
+            ctx.fillStyle = palette.muted;
+            ctx.font = font(12);
+            ctx.fillText(truncate(ctx, point.label, labelWidth), PAD, centre);
+        }
 
         if (log) {
             ctx.strokeStyle = palette.border;
@@ -225,7 +287,10 @@ function drawXY(
     const left = PAD + 52;
     const right = WIDTH - PAD;
     const bottom = top + plotHeight - 26;
-    const ordered = [...points].sort((a, b) => (a.x ?? 0) - (b.x ?? 0));
+    // Series first so each one is a contiguous run to stroke.
+    const ordered = [...points].sort((a, b) =>
+        (a.series ?? "").localeCompare(b.series ?? "") || (a.x ?? 0) - (b.x ?? 0),
+    );
     const ys = ordered.map(point => point.value);
     const xs = ordered.map(point => point.x ?? 0);
     const positive = ys.filter(value => value > 0);
@@ -257,15 +322,20 @@ function drawXY(
     ctx.fillText(log ? compactNumber(yFloor) : "0", left - 8, bottom);
 
     if (line && ordered.length > 1) {
-        ctx.strokeStyle = MARK;
+        // One stroke per series: a segment across a series boundary would draw
+        // a trend between two papers that never measured each other.
         ctx.lineWidth = 2;
         ctx.lineJoin = "round";
-        ctx.beginPath();
         ordered.forEach((point, index) => {
-            const x = xFor(point.x ?? 0);
-            const y = yFor(point.value);
-            if (index === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
+            const previous = index > 0 ? ordered[index - 1] : null;
+            if (!previous || previous.series !== point.series) {
+                if (previous) ctx.stroke();
+                ctx.strokeStyle = point.series ? colorFor(point) : MARK;
+                ctx.beginPath();
+                ctx.moveTo(xFor(point.x ?? 0), yFor(point.value));
+                return;
+            }
+            ctx.lineTo(xFor(point.x ?? 0), yFor(point.value));
         });
         ctx.stroke();
     }
