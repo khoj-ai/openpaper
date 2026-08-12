@@ -67,13 +67,18 @@ class ChartRecord(BaseModel):
 
 
 class ChartExtractionRecord(BaseModel):
-    """A qualifying point emitted by the model before coverage is computed."""
+    """A qualifying point emitted by the model before coverage is computed.
+
+    The request schema is built per plan so every field the plan needs is a
+    required property; this is the static shape those responses are read back
+    as, and completeness is checked per record so one short record costs a
+    point rather than the whole paper's response.
+    """
 
     paper_id: str
     paper_title: str
     values: Dict[str, ChartValue] = Field(
-        min_length=2,
-        description="At least the paired x/y fields, each with a direct quote",
+        description="The plan's fields, each with a direct quote",
     )
 
 

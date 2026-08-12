@@ -11,8 +11,10 @@ class Operations(
     PaperOperations,
     MultiPaperOperations,
     ConversationOperations,
-    DataTableOperations,
+    # ChartOperations subclasses DataTableOperations, so it precedes it here
+    # to keep the linearization consistent.
     ChartOperations,
+    DataTableOperations,
 ):
     """
     Unified operations class that combines all LLM operations

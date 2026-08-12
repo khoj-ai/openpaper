@@ -25,16 +25,18 @@ import unicodedata
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from contextvars import copy_context
-from typing import Optional
+from typing import Any, Optional
 
 from app.helpers.compute_agent import ComputeAgentError, run_computed_columns
 from app.llm.base import ModelType
-from app.llm.conversation_operations import FieldInvestigation
+from app.llm.conversation_operations import DataTableOperations, FieldInvestigation
 from app.llm.provider import LLMProvider, TextContent
 from app.llm.tools.file_tools import read_abstract, search_all_files, search_file
 from app.schemas.chart import (
     ChartArtifactPayload,
     ChartCoverage,
+    ChartExtraction,
+    ChartExtractionRecord,
     ChartField,
     ChartPlan,
     ChartPlanCandidates,
@@ -48,7 +50,7 @@ from app.schemas.responses import (
     ResponseCitation,
 )
 from app.schemas.user import CurrentUser
-from pydantic import Field, create_model
+from pydantic import BaseModel, Field, create_model
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -347,6 +349,17 @@ def _slug(value: str) -> str:
     return _condense(_normalize(value))[:48]
 
 
+def _required_value_fields(keys: list[str]) -> type[BaseModel]:
+    """A model whose every field is a required ChartValue.
+
+    The field names come from the plan, so they cannot be written as keyword
+    arguments; create_model's overloads reserve names like `__config__` for
+    itself and cannot express a caller-supplied mapping.
+    """
+    fields: dict[str, Any] = {key: (ChartValue, ...) for key in keys}
+    return create_model("ChartPointValues", **fields)  # type: ignore[call-overload]
+
+
 def _values_digest(values: dict[str, ChartValue]) -> str:
     """A stable fingerprint of one extracted point.
 
@@ -411,8 +424,12 @@ def _sweep_query(plan: ChartPlan) -> str:
     return "|".join(sorted(terms)[:SWEEP_MAX_TERMS])
 
 
-class ChartOperations:
-    """Mixin used by the unified Operations client."""
+class ChartOperations(DataTableOperations):
+    """Mixin used by the unified Operations client.
+
+    Built on the data-table mixin because chart evidence is gathered with that
+    field-investigation harness, not a parallel one.
+    """
 
     @staticmethod
     def is_chart_request(question: str) -> bool:
@@ -847,11 +864,9 @@ class ChartOperations:
         )
         # A generic Dict[str, ChartValue] lets Gemini emit `{}`. Build the
         # structured-output schema from the confirmed plan so each required
-        # source-backed field is an explicit required JSON property.
-        point_values_model = create_model(
-            "ChartPointValues",
-            **{key: (ChartValue, ...) for key in required_keys},
-        )
+        # source-backed field is an explicit required JSON property. Responses
+        # are read back as ChartExtraction, whose values stay a plain mapping.
+        point_values_model = _required_value_fields(required_keys)
         point_record_model = create_model(
             "ChartPointExtractionRecord",
             paper_id=(str, ...),
@@ -876,7 +891,7 @@ class ChartOperations:
         seen_record_ids: set[str] = set()
         papers_attempted: set[str] = set()
 
-        def extract(paper_id: str) -> list:
+        def extract(paper_id: str) -> list[ChartExtractionRecord]:
             response = self.generate_content(
                 contents=[
                     TextContent(
@@ -901,12 +916,19 @@ class ChartOperations:
             if not response or not response.text:
                 return []
             try:
-                return list(extraction_model.model_validate_json(response.text).records)
+                parsed = ChartExtraction.model_validate_json(response.text)
             except Exception:
                 logger.exception("Failed to parse chart extraction for %s", paper_id)
                 return []
+            # The request schema already demands these keys; a record that came
+            # back short is one point lost, not the paper's whole response.
+            return [
+                record
+                for record in parsed.records
+                if all(key in record.values for key in required_keys)
+            ]
 
-        results: dict[str, list] = {}
+        results: dict[str, list[ChartExtractionRecord]] = {}
         if targets:
             # A fresh context copy per task: it carries the request's langfuse
             # span into the worker thread, and copies can't be entered twice
@@ -935,7 +957,7 @@ class ChartOperations:
                 # this one; the per-paper call has no business emitting it.
                 if extracted.paper_id != paper_id:
                     continue
-                values = {key: getattr(extracted.values, key) for key in required_keys}
+                values = {key: extracted.values[key] for key in required_keys}
                 series_value = (
                     values[plan.series.key].value
                     if plan.series and plan.series.key in values
