@@ -31,7 +31,7 @@ from app.helpers.compute_agent import ComputeAgentError, run_computed_columns
 from app.llm.base import ModelType
 from app.llm.conversation_operations import DataTableOperations, FieldInvestigation
 from app.llm.provider import LLMProvider, TextContent
-from app.llm.tools.file_tools import read_abstract, search_all_files, search_file
+from app.llm.tools.file_tools import read_abstract, read_file, search_all_files
 from app.schemas.chart import (
     ChartArtifactPayload,
     ChartCoverage,
@@ -73,7 +73,29 @@ EXTRACTION_WORKERS = 5
 # Terms in the plan-driven sweep. Enough to cover an axis and its primitives,
 # few enough that the regex stays selective.
 SWEEP_MAX_TERMS = 12
-SWEEP_LINES_PER_PAPER = 40
+# Lines kept either side of a sweep hit. Matching lines alone cannot retrieve a
+# results table, which is where a paper reports most of its chartable points:
+# PDF extraction routinely destroys the row structure, leaving a caption, a
+# block of row labels, and then one block of numbers per column. No single line
+# holds both an entity and its value, so the line that names the measure is
+# findable and the numbers under it are only reachable as its context.
+SWEEP_CONTEXT_LINES = 15
+# A flattened table is a long run of very short lines — a header, a label, a
+# number, one per line — where prose is long lines. A fixed context window
+# lands in the middle of one, so a window that ends inside such a run follows
+# it to its end instead of cutting a column off halfway.
+TABULAR_LINE_CHARS = 48
+TABLE_RUN_MAX_LINES = 200
+# A whole table and its neighbours, and still an order of magnitude under the
+# per-paper compaction threshold.
+SWEEP_MAX_LINES_PER_PAPER = 320
+# Part of that budget is spent in document order before the rest goes to the
+# densest blocks. A paper states its headline result in prose near the top,
+# where one sentence pairs an entity with its value outright — the surest
+# evidence in the document, and the only thing that can tell whether a
+# reconstructed table's columns line up. Ranking on numbers alone buys every
+# table in the paper and loses that sentence.
+SWEEP_LEAD_LINES = 80
 SWEEP_STOPWORDS = frozenset(
     {
         "the",
@@ -215,16 +237,32 @@ You are a research investigator preparing a chart over selected papers against
 a confirmed plan. You do NOT redesign the chart or invent numbers. Your job is
 to retain source passages for a later extractor.
 
+Search to LOCATE the data; read with view_file to COLLECT it. A search hit is
+one line, and one line is almost never the whole finding.
+
 Start with search_all_files using the plan's field terms and corpus-specific
-synonyms. Then use search_file and view_file on promising papers to verify that
-the x and y values describe the same named entity (benchmark, dataset, model,
-arm, condition) and are not two unpaired lists. A paper reporting several
-entities should yield several pairs — collect them all.
+synonyms, and use search_file to place them within a paper. Then spend most of
+your remaining calls on view_file over the blocks those hits point into.
+
+Where the data is:
+- Results tables hold nearly every point a paper contributes, and extraction
+  destroys their layout. Expect a caption, then a column header, then a block
+  of row labels, then a separate block of numbers for each column — spread over
+  dozens of lines, with no line containing both an entity and its value. Only a
+  view_file over the entire block recovers the pairing, so when a hit looks like
+  a table caption, a column header, or a "Results" heading, view at least 40
+  lines from it and keep viewing while the block continues.
+- A sentence in the abstract that names ONE entity's value is a signpost, not
+  the finding. The table it was drawn from reports all of them. Go read it.
+- Verify that x and y describe the same named entity (benchmark, dataset,
+  model, arm, condition) and are not two unpaired lists. A paper reporting
+  several entities should yield several pairs — collect them all.
 
 On the final round, reply with findings only: exact terminology, units, the
-entity that pairs the values, candidate papers with both fields, and fields
-that are absent. Never claim a field is absent merely because a first broad
-search failed. You are on round {n_round} of {max_rounds}.
+entity that pairs the values, candidate papers with both fields, the line
+ranges of any results tables you found and how many entities each reports, and
+fields that are absent. Never claim a field is absent merely because a first
+broad search failed. You are on round {n_round} of {max_rounds}.
 """.strip()
 
 
@@ -255,6 +293,46 @@ Rules:
   trimesters, five models, or four benchmarks yields three, five, or four
   records; each pairs its values to that one entity. Read all of the evidence
   before answering — later passages are as eligible as the opening ones.
+- Most of those entities live in a table, and the evidence will not look like
+  one. Extraction flattens tables into a caption, then the column headers one
+  per line, then a block of row labels one per line, then a SEPARATE block of
+  numbers for each column, in the order the columns appear. Reconstruct it
+  positionally: the k-th row label goes with the k-th number of each block, and
+  the j-th block belongs to the j-th column header. One record per row label.
+  Two things must hold before you use a table:
+    1. Every numeric block holds exactly as many values as there are row labels.
+       If a block is short or long, the rows do not line up. Stop.
+    2. Where the prose states a value for a named row, your alignment gives that
+       row the same value. Prose is the check on the count: when it disagrees,
+       your columns are shifted. Stop.
+  A flattened header often merges two column names onto one line, which leaves
+  more numeric blocks than headers and shifts every column after it, so count
+  them: when blocks outnumber headers, only a value the prose states outright
+  can tell you which block is which. If neither the headers nor the prose can
+  name the column you are reading, skip that table and return only what the
+  prose states. One true point beats seven plausible ones, and a number under
+  the wrong heading is worse than a missing bar.
+- A table has two dimensions and this chart wants one measure, so decide once,
+  before extracting, which dimension carries the plan's y:
+  - Usually a column does. Then that ONE column supplies every y value. The
+    other columns are different measures — a precision beside a latency beside a
+    refusal rate — and they belong on a different chart. Do not emit them, not
+    even as extra records. Reading six columns off one table is six charts, not
+    a fuller version of this one.
+  - Occasionally the columns are themselves entities of the kind the plan's x
+    names — a column per benchmark, per year, per cohort. Then every cell is a y
+    and the header is the x.
+  A header naming a measure ("Cite. Acc", "Accuracy", "p-value", "n", "Latency")
+  is never an x value; it is the name of a column, and this chart reads one.
+- Where the x comes from when the table has no column for it: a table often
+  describes a single entity of the kind the plan's x names — one benchmark, one
+  cohort, one dataset — which the paper names in its title or in the sentence
+  introducing the table. That one name is then the x on every record from that
+  table. Take the entity the paper is reporting on, not the software, harness,
+  or vendor it used to run the experiment.
+- A sentence naming one entity's value ("Model A reaches 0.84") is usually the
+  paper quoting its own table. If that table is in the evidence, extract every
+  row of it, not just the one the sentence mentioned.
 - Return an empty records array when the paper does not report the required
   fields — a missing paper is a fine outcome, an invented one is not.
 - Do not return exclusion records or coverage; the application creates those
@@ -400,6 +478,84 @@ def _field_terms(fields: list[ChartField]) -> str:
     return "|".join(sorted(terms)[:SWEEP_MAX_TERMS])
 
 
+def _through_tabular_run(lines: list[str], start: int, end: int) -> int:
+    """Where a window should really end, if it ended inside a table.
+
+    The header of a flattened table is the only part of it a search can match:
+    "Model" and "Benchmark" are words, and the rows beneath are bare numbers.
+    Stopping a fixed distance past that header takes the labels and leaves the
+    columns, which is the difference between charting one entity and charting
+    all of them. Prose is the boundary — one long line is tolerated so a
+    wrapped caption inside the table does not end the run early.
+    """
+    floor = end
+    long_run = 0
+    limit = min(len(lines), start + TABLE_RUN_MAX_LINES)
+    while end < limit:
+        if len(lines[end].strip()) <= TABULAR_LINE_CHARS:
+            long_run = 0
+        elif long_run:
+            break
+        else:
+            long_run += 1
+        end += 1
+    # Give back prose that only the tolerance admitted — but never shrink the
+    # window below the context it was asked for.
+    while end > floor and len(lines[end - 1].strip()) > TABULAR_LINE_CHARS:
+        end -= 1
+    return end
+
+
+def _context_windows(lines: list[str], hits: list[int]) -> list[tuple[int, int]]:
+    """Blocks around the hits worth reading, within a per-paper line budget.
+
+    The budget is real: the sweep touches every selected paper and every paper
+    it reaches gets its own extraction call, so what is kept here is paid for a
+    few hundred times over. It goes to the numbers.
+
+    Each hit is ranked on its own and blocks are merged only at the end. Merging
+    first collapses the dozens of hits a word like "benchmark" scatters through
+    an introduction into one enormous region that no budget can admit, and the
+    table — a compact, unmistakably numeric block — gets dropped along with it.
+    Ranked individually, the table wins outright: proportion of numeric lines is
+    what separates a results block from a paragraph that mentions results.
+    """
+    blocks: list[tuple[int, int]] = []
+    for index in hits:
+        start = max(0, index - SWEEP_CONTEXT_LINES)
+        end = _through_tabular_run(
+            lines, start, min(len(lines), index + SWEEP_CONTEXT_LINES + 1)
+        )
+        blocks.append((start, end))
+
+    def density(block: tuple[int, int]) -> tuple[float, int]:
+        start, end = block
+        numeric = sum(1 for line in lines[start:end] if _NUMERIC_RE.search(line))
+        return (-numeric / (end - start), start)
+
+    kept: set[int] = set()
+
+    def spend(order: list[tuple[int, int]], ceiling: int) -> None:
+        for start, end in order:
+            fresh = [index for index in range(start, end) if index not in kept]
+            if len(kept) + len(fresh) > ceiling:
+                continue
+            kept.update(fresh)
+
+    spend(blocks, min(SWEEP_LEAD_LINES, SWEEP_MAX_LINES_PER_PAPER))
+    spend(sorted(blocks, key=density), SWEEP_MAX_LINES_PER_PAPER)
+
+    # Back into document order, so the extractor reads a table's caption, its
+    # labels and its columns in the order the paper printed them.
+    windows: list[tuple[int, int]] = []
+    for index in sorted(kept):
+        if windows and index == windows[-1][1]:
+            windows[-1] = (windows[-1][0], index + 1)
+        else:
+            windows.append((index, index + 1))
+    return windows
+
+
 def _sweep_query(plan: ChartPlan) -> str:
     """Build the regex that guarantees every paper is searched for this plan.
 
@@ -481,37 +637,72 @@ class ChartOperations(DataTableOperations):
         current_user: CurrentUser,
         db: Session,
         project_id: str,
-    ) -> tuple[dict[str, list[str]], list[str]]:
+    ) -> tuple[dict[str, list[str]], list[str], set[str]]:
         """Give every selected paper a floor of plan-relevant evidence.
 
         The investigator agent decides where to look, which means coverage is
         whatever its search terms happened to reach — the reason two identical
         requests can chart different papers. This sweep is deterministic: the
-        same plan searches the same terms in every paper, every run. It merges
+        same plan reads the same blocks of every paper, every run. It merges
         into the agent's findings rather than replacing them, and it costs no
         LLM calls.
+
+        Each hit is kept with its surrounding lines rather than on its own,
+        because a matching line is a pointer to the data far more often than it
+        is the data. "Aggregate results are shown below" is the only line in a
+        paper that mentions the measure by name; the eight rows underneath it
+        are what the chart needs.
+
+        Also returns the papers that are second copies of one already read. The
+        same PDF imported twice is one study, and reading it twice charts it
+        twice; that costs an extraction call and puts a duplicate bar on the
+        chart. Deciding it here is exact and free, because the text is already
+        in hand — no title matching, no similarity threshold. Keeping the
+        project's own library clean is a separate job than drawing a chart from
+        it, and this only stops one chart from double-counting.
         """
         query = _sweep_query(plan)
         if not query:
-            return evidence, []
+            return evidence, [], set()
+        try:
+            pattern = re.compile(query, re.IGNORECASE)
+        except re.error:
+            logger.warning("Chart sweep built an invalid query %r", query)
+            return evidence, [], set()
         paper_ids = [paper_id for paper_id, _ in papers]
+        duplicates: set[str] = set()
+        seen_contents: dict[str, str] = {}
         matched = 0
         fell_back = 0
         unreadable = 0
+        lines_kept = 0
         for paper_id in paper_ids:
             found: list[str] = []
             try:
+                content = read_file(
+                    paper_id=paper_id,
+                    current_user=current_user,
+                    db=db,
+                    project_id=project_id,
+                    restrict_to_paper_ids=paper_ids,
+                )
+                fingerprint = hashlib.sha1(content.encode("utf-8")).hexdigest()
+                if fingerprint in seen_contents:
+                    duplicates.add(paper_id)
+                    continue
+                seen_contents[fingerprint] = paper_id
+                lines = content.splitlines()
+                hits = [
+                    index for index, line in enumerate(lines) if pattern.search(line)
+                ]
                 found = [
-                    str(line)
-                    for line in search_file(
-                        paper_id=paper_id,
-                        query=query,
-                        current_user=current_user,
-                        db=db,
-                        project_id=project_id,
-                        restrict_to_paper_ids=paper_ids,
-                    )
-                ][:SWEEP_LINES_PER_PAPER]
+                    # Numbered as search_file numbers its hits, so a quote can
+                    # still carry the line the extractor took it from.
+                    f"{index + 1}: {lines[index]}"
+                    for start, end in _context_windows(lines, hits)
+                    for index in range(start, end)
+                ]
+                lines_kept += len(found)
             except Exception:
                 logger.warning(
                     "Chart sweep could not search paper %s", paper_id, exc_info=True
@@ -552,7 +743,9 @@ class ChartOperations(DataTableOperations):
         steps = [
             f'Swept all {len(paper_ids)} paper{"s" if len(paper_ids) != 1 else ""} '
             f'for the plan\'s own terms ("{query}")',
-            f"{matched} paper{'s' if matched != 1 else ''} matched those terms",
+            f"{matched} paper{'s' if matched != 1 else ''} matched those terms; "
+            f"kept {lines_kept} line{'s' if lines_kept != 1 else ''} of surrounding "
+            "context so whole tables come through, not just the line that named them",
         ]
         if fell_back:
             steps.append(
@@ -562,7 +755,12 @@ class ChartOperations(DataTableOperations):
             steps.append(
                 f"{unreadable} paper{'s' if unreadable != 1 else ''} had no readable text"
             )
-        return evidence, steps
+        if duplicates:
+            steps.append(
+                f"{len(duplicates)} paper{'s' if len(duplicates) != 1 else ''} held text "
+                "identical to another in the project; read once, charted once"
+            )
+        return evidence, steps, duplicates
 
     def investigate_chart_fields(
         self,
@@ -599,7 +797,7 @@ class ChartOperations(DataTableOperations):
             ),
         )
         if plan:
-            investigation.evidence, steps = self.sweep_plan_evidence(
+            investigation.evidence, steps, duplicates = self.sweep_plan_evidence(
                 plan=plan,
                 papers=papers,
                 evidence=investigation.evidence,
@@ -608,6 +806,7 @@ class ChartOperations(DataTableOperations):
                 project_id=project_id,
             )
             investigation.trace.setdefault("status_messages", []).extend(steps)
+            investigation.trace["duplicate_paper_ids"] = sorted(duplicates)
         return investigation
 
     @staticmethod
@@ -728,16 +927,27 @@ class ChartOperations(DataTableOperations):
 
         # The plan-targeted pass: an agent reading for these exact fields finds
         # pairs that a term sweep alone misses, and it runs the sweep too.
-        absorb(
-            self.investigate_chart_fields(
-                prompt=prompt,
-                papers=papers,
-                current_user=current_user,
-                db=db,
-                project_id=project_id,
-                plan=plan,
-            )
+        verification = self.investigate_chart_fields(
+            prompt=prompt,
+            papers=papers,
+            current_user=current_user,
+            db=db,
+            project_id=project_id,
+            plan=plan,
         )
+        absorb(verification)
+        # A second copy of a paper is not a second study. Dropping it from the
+        # roster before extraction keeps it out of the coverage count as well as
+        # off the chart, so "3 of 249 papers" means 249 distinct papers.
+        duplicates = set(verification.trace.get("duplicate_paper_ids") or [])
+        if duplicates:
+            papers = [
+                (paper_id, title)
+                for paper_id, title in papers
+                if paper_id not in duplicates
+            ]
+            for paper_id in duplicates:
+                evidence.pop(paper_id, None)
         artifact = self.build_chart_artifact(
             prompt=prompt, plan=plan, evidence=evidence, papers=papers
         )

@@ -16,7 +16,13 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from app.helpers.compute_agent import ComputeAgentError
-from app.llm.chart_operations import ChartOperations
+from app.llm.chart_operations import (
+    SWEEP_CONTEXT_LINES,
+    SWEEP_LEAD_LINES,
+    SWEEP_MAX_LINES_PER_PAPER,
+    ChartOperations,
+    _context_windows,
+)
 from app.llm.conversation_operations import DataTableOperations
 from app.schemas.chart import ChartCalculation, ChartField, ChartPlan
 from app.schemas.responses import DataTableCellValue
@@ -1297,6 +1303,134 @@ class TestPaperCanBeTheSeries(unittest.TestCase):
         )
 
 
+class TestOnePaperIsReadOnce(unittest.TestCase):
+    """The same PDF imported twice is one study, not two.
+
+    A duplicate import charted twice: two bars, two extraction calls, and a
+    coverage denominator counting one paper as two. The sweep already holds
+    each paper's text, so identity is the text itself — no title matching and
+    no threshold.
+    """
+
+    def test_a_second_copy_is_reported_and_left_unread(self):
+        with patch(
+            "app.llm.chart_operations.read_file",
+            return_value="Benchmark A reports 100 examples",
+        ):
+            evidence, steps, duplicates = ChartOperations.sweep_plan_evidence(
+                plan=simple_plan(),
+                papers=[("paper-1", "System Card"), ("paper-2", "System Card")],
+                evidence={},
+                current_user=SimpleNamespace(),
+                db=SimpleNamespace(),
+                project_id="project-1",
+            )
+
+        self.assertEqual(duplicates, {"paper-2"})
+        self.assertNotIn("paper-2", evidence)
+        self.assertTrue([step for step in steps if "identical" in step])
+
+    def test_papers_that_merely_share_a_title_are_both_read(self):
+        with patch(
+            "app.llm.chart_operations.read_file",
+            side_effect=lambda paper_id, **_: f"Benchmark A reports {paper_id} examples",
+        ):
+            evidence, _, duplicates = ChartOperations.sweep_plan_evidence(
+                plan=simple_plan(),
+                papers=[("paper-1", "A Study"), ("paper-2", "A Study")],
+                evidence={},
+                current_user=SimpleNamespace(),
+                db=SimpleNamespace(),
+                project_id="project-1",
+            )
+
+        self.assertFalse(duplicates)
+        self.assertEqual(set(evidence), {"paper-1", "paper-2"})
+
+
+class TestSweepReadsBlocksNotLines(unittest.TestCase):
+    """The sweep keeps a hit's surroundings, because tables lose their rows.
+
+    A results table survives PDF extraction as a caption, a block of row
+    labels, and one block of numbers per column, so no line holds both an
+    entity and its value. Matching lines alone retrieve the sentence that
+    announces the table and none of the table, which is how a benchmark tested
+    on eight models charted one of them.
+    """
+
+    TABLE = "\n".join(
+        [
+            "Introduction",
+            "We survey retrieval systems.",
+            "Aggregate results are shown below, one row per benchmark.",
+            "Model",
+            "gemini-3.1-pro",
+            "gpt-5.4",
+            "zai-glm-4.7",
+            "0.817",
+            "0.834",
+            "0.840",
+        ]
+    )
+
+    def test_a_table_reaches_the_extractor_though_its_rows_match_nothing(self):
+        with patch("app.llm.chart_operations.read_file", return_value=self.TABLE):
+            evidence, _, _ = ChartOperations.sweep_plan_evidence(
+                plan=simple_plan(),
+                papers=[("paper-1", "Paper one")],
+                evidence={},
+                current_user=SimpleNamespace(),
+                db=SimpleNamespace(),
+                project_id="project-1",
+            )
+
+        gathered = "\n".join(evidence["paper-1"])
+        self.assertIn("zai-glm-4.7", gathered)
+        self.assertIn("0.840", gathered)
+
+    def test_context_keeps_the_source_line_numbers(self):
+        with patch("app.llm.chart_operations.read_file", return_value=self.TABLE):
+            evidence, _, _ = ChartOperations.sweep_plan_evidence(
+                plan=simple_plan(),
+                papers=[("paper-1", "Paper one")],
+                evidence={},
+                current_user=SimpleNamespace(),
+                db=SimpleNamespace(),
+                project_id="project-1",
+            )
+
+        self.assertIn("10: 0.840", evidence["paper-1"])
+
+    def test_a_dense_block_outranks_prose_when_the_budget_runs_out(self):
+        """Hits arrive in document order and a paper's tables come last, so a
+        plain prefix spends the whole budget on the introduction."""
+        prose = (
+            "Earlier work established this measure as a standard reference for "
+            "evaluating systems of the kind, and later studies followed suit."
+        )
+        lines: list[str] = []
+        for block in range(40):
+            lines.append(f"Aggregate benchmark results are reported below. {prose}")
+            lines.extend(["0.81" if block >= 30 else prose] * 39)
+        hits = [index for index, line in enumerate(lines) if "benchmark" in line]
+        tables_begin = 30 * 40 - SWEEP_CONTEXT_LINES
+
+        windows = _context_windows(lines, hits)
+
+        kept = [index for start, end in windows for index in range(start, end)]
+        self.assertTrue(kept, "a budget this size must keep something")
+        self.assertLessEqual(len(kept), SWEEP_MAX_LINES_PER_PAPER)
+        # The lead reserve is deliberately spent in document order, so some
+        # prose is expected; everything past it belongs to the tables.
+        from_prose = [index for index in kept if index < tables_begin]
+        self.assertLessEqual(len(from_prose), SWEEP_LEAD_LINES)
+        self.assertGreater(
+            (len(kept) - len(from_prose)) / len(kept),
+            0.7,
+            "most of the budget belongs to the numeric half, where the data is",
+        )
+
+
 class TestTraceIsSpecific(unittest.TestCase):
     """The trace is how a reader audits an absence, so it has to say what was
     actually searched and found — not name the phases it went through."""
@@ -1449,8 +1583,8 @@ class TestInvestigationHarness(unittest.TestCase):
             "app.llm.conversation_operations.search_all_files",
             return_value={"paper-1": ["7: Benchmark A uses 100 examples"]},
         ), patch(
-            "app.llm.chart_operations.search_file",
-            return_value=["18: benchmark C reports 12 examples"],
+            "app.llm.chart_operations.read_file",
+            side_effect=lambda paper_id, **_: f"benchmark {paper_id} reports 12 examples",
         ):
             investigation = Harness().investigate_chart_fields(
                 prompt="chart examples by benchmark",
@@ -1464,11 +1598,13 @@ class TestInvestigationHarness(unittest.TestCase):
         self.assertEqual(set(investigation.evidence), {"paper-1", "paper-2"})
 
     def test_sweep_falls_back_to_the_abstract_so_absence_is_evidenced(self):
-        with patch("app.llm.chart_operations.search_file", return_value=[]), patch(
+        with patch(
+            "app.llm.chart_operations.read_file", return_value="Nothing relevant here."
+        ), patch(
             "app.llm.chart_operations.read_abstract",
             return_value="Abstract:\n\nWe study retrieval.",
         ):
-            evidence, _ = ChartOperations.sweep_plan_evidence(
+            evidence, _, _ = ChartOperations.sweep_plan_evidence(
                 plan=simple_plan(),
                 papers=[("paper-1", "Paper one")],
                 evidence={},
@@ -1481,13 +1617,13 @@ class TestInvestigationHarness(unittest.TestCase):
 
     def test_sweep_does_not_duplicate_passages_the_agent_already_found(self):
         with patch(
-            "app.llm.chart_operations.search_file",
-            return_value=["7: Benchmark A uses 100 examples"],
+            "app.llm.chart_operations.read_file",
+            return_value="Benchmark A uses 100 examples",
         ):
-            evidence, _ = ChartOperations.sweep_plan_evidence(
+            evidence, _, _ = ChartOperations.sweep_plan_evidence(
                 plan=simple_plan(),
                 papers=[("paper-1", "Paper one")],
-                evidence={"paper-1": ["7: Benchmark A uses 100 examples"]},
+                evidence={"paper-1": ["1: Benchmark A uses 100 examples"]},
                 current_user=SimpleNamespace(),
                 db=SimpleNamespace(),
                 project_id="project-1",
