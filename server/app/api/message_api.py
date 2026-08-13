@@ -438,6 +438,8 @@ async def chat_message_multipaper(
                                 plan=chart_plan,
                                 evidence=evidence_collection.get_evidence_dict(),
                                 papers=roster,
+                                current_user=current_user,
+                                db=db,
                             )
                     if chart and operations.is_chart_ready(chart):
                         payload = chart.model_dump()

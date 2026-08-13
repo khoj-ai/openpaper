@@ -16,13 +16,8 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from app.helpers.compute_agent import ComputeAgentError
-from app.llm.chart_operations import (
-    SWEEP_CONTEXT_LINES,
-    SWEEP_LEAD_LINES,
-    SWEEP_MAX_LINES_PER_PAPER,
-    ChartOperations,
-    _context_windows,
-)
+from app.llm.chart_operations import ChartOperations
+from app.llm.chart_operations import _plan_screen as _real_plan_screen
 from app.llm.conversation_operations import DataTableOperations
 from app.schemas.chart import ChartCalculation, ChartField, ChartPlan
 from app.schemas.responses import DataTableCellValue
@@ -47,7 +42,18 @@ class StubChartOperations(ChartOperations):
 
     @property
     def last_prompt(self) -> str:
-        return "".join(part.text for part in self.calls[-1]["contents"])
+        return prompt_text(self.calls[-1])
+
+
+def prompt_text(call: dict) -> str:
+    """The text a call carried, ignoring the attached document."""
+    return "".join(
+        part.text for part in call["contents"] if getattr(part, "type", "") != "file"
+    )
+
+
+def documents(call: dict) -> list:
+    return [part for part in call["contents"] if getattr(part, "type", "") == "file"]
 
 
 def simple_plan(
@@ -66,6 +72,34 @@ def simple_plan(
         fields=fields,
         calculation=calculation,
     )
+
+
+# build_chart_artifact reaches the database for each paper's stored PDF; the
+# stub below stands in for that, so tests exercise extraction rather than S3.
+DB = {"current_user": SimpleNamespace(), "db": SimpleNamespace(), "project_id": None}
+
+_patches = []
+
+
+def setUpModule():
+    _patches.append(
+        patch(
+            "app.llm.chart_operations._paper_pdf",
+            side_effect=lambda paper_id, *_a, **_k: (b"%PDF-1.4", f"{paper_id}.pdf"),
+        )
+    )
+    # The screen decides which papers are worth opening, and it is tested on
+    # its own terms in TestTheScreenDecidesWhatIsOpened. Everywhere else the
+    # fixtures are about what happens to a paper once it IS opened, so any
+    # paper with gathered evidence is treated as worth opening.
+    _patches.append(patch("app.llm.chart_operations._plan_screen", return_value=len))
+    for started in _patches:
+        started.start()
+
+
+def tearDownModule():
+    for started in _patches:
+        started.stop()
 
 
 def records_json(*records: dict) -> str:
@@ -112,6 +146,7 @@ class TestChartRecords(unittest.TestCase):
                 ("two", "Paper two"),
                 ("three", "Paper three"),
             ],
+            **DB,
         )
 
         assert artifact is not None
@@ -125,6 +160,7 @@ class TestChartRecords(unittest.TestCase):
             plan=simple_plan(),
             evidence={},
             papers=[("one", "Paper one"), ("two", "Paper two")],
+            **DB,
         )
 
         assert artifact is not None
@@ -147,6 +183,7 @@ class TestChartRecords(unittest.TestCase):
             plan=simple_plan(),
             evidence={"one": ["12: accuracy was 91%"]},
             papers=[("one", "Paper one")],
+            **DB,
         )
 
         assert artifact is not None
@@ -179,6 +216,7 @@ class TestChartRecords(unittest.TestCase):
                 ]
             },
             papers=[("paper-1", "Chain of Thought")],
+            **DB,
         )
 
         assert artifact is not None
@@ -197,11 +235,12 @@ class TestAbsenceIsExplained(unittest.TestCase):
             plan=simple_plan(),
             evidence={"one": ["12: this paper discusses something else entirely"]},
             papers=[("one", "Paper one"), ("two", "Paper two")],
+            **DB,
         )
 
         assert artifact is not None
-        self.assertIn("We searched this paper", artifact.coverage.excluded["one"])
-        self.assertIn("could be retrieved", artifact.coverage.excluded["two"])
+        self.assertIn("We read this paper", artifact.coverage.excluded["one"])
+        self.assertIn("does not mention", artifact.coverage.excluded["two"])
 
     def test_extraction_for_one_paper_cannot_speak_for_another(self):
         """Each call sees one paper. A record naming a different paper is not
@@ -220,6 +259,7 @@ class TestAbsenceIsExplained(unittest.TestCase):
             plan=simple_plan(),
             evidence={"one": ["12: accuracy was 80%"]},
             papers=[("one", "Paper one"), ("two", "Paper two")],
+            **DB,
         )
 
         assert artifact is not None
@@ -244,6 +284,7 @@ class TestChartFailureReporting(unittest.TestCase):
             plan=simple_plan(),
             evidence={"one": ["12: accuracy was 91%"]},
             papers=[("one", "Paper one"), ("two", "Paper two")],
+            **DB,
         )
 
         assert artifact is not None
@@ -257,6 +298,7 @@ class TestChartFailureReporting(unittest.TestCase):
             plan=simple_plan(),
             evidence={"one": ["12: nothing relevant"]},
             papers=[("one", "Paper one"), ("two", "Paper two")],
+            **DB,
         )
 
         assert artifact is not None
@@ -291,6 +333,7 @@ class TestChartFailureReporting(unittest.TestCase):
                 plan=plan,
                 evidence={"one": ["12 of 20 hits"]},
                 papers=[("one", "Paper one")],
+                **DB,
             )
 
         assert artifact is not None
@@ -472,6 +515,7 @@ class TestRecordIdentity(unittest.TestCase):
             plan=simple_plan(),
             evidence={"paper-1": ["AssistantBench contains 33 tasks"]},
             papers=[("paper-1", "Chain of Thought")],
+            **DB,
         )
 
         assert artifact is not None
@@ -501,6 +545,7 @@ class TestRecordIdentity(unittest.TestCase):
             plan=simple_plan(),
             evidence={"paper-1": ["AssistantBench contains 33 tasks"]},
             papers=[("paper-1", "Chain of Thought")],
+            **DB,
         )
 
         assert artifact is not None
@@ -533,6 +578,7 @@ class TestRecordIdentity(unittest.TestCase):
                 plan=simple_plan(),
                 evidence=evidence,
                 papers=[("paper-1", "Chain of Thought")],
+                **DB,
             )
             assert artifact is not None
             return [
@@ -588,6 +634,7 @@ class TestRecordIdentity(unittest.TestCase):
                     "paper-1": ["AssistantBench: 12 of 33", "TAU-bench: 25 of 50"]
                 },
                 papers=[("paper-1", "Chain of Thought")],
+                **DB,
             )
 
         assert artifact is not None
@@ -643,6 +690,7 @@ class TestRecordIdentity(unittest.TestCase):
                 plan=plan,
                 evidence={"paper-1": ["AssistantBench: 12 of 33"]},
                 papers=[("paper-1", "Chain of Thought")],
+                **DB,
             )
 
         assert artifact is not None
@@ -677,6 +725,7 @@ class TestExtractionIsPerPaper(unittest.TestCase):
             plan=simple_plan(),
             evidence=evidence,
             papers=roster,
+            **DB,
         )
         self.assertEqual(len(stub.calls), len(roster))
 
@@ -698,7 +747,7 @@ class TestExtractionIsPerPaper(unittest.TestCase):
 
         class FlakyExtractor(StubChartOperations):
             def generate_content(self, **kwargs):
-                if 'paper_id": "two"' in "".join(p.text for p in kwargs["contents"]):
+                if 'paper_id": "two"' in prompt_text(kwargs):
                     raise RuntimeError("provider exploded")
                 return super().generate_content(**kwargs)
 
@@ -715,6 +764,7 @@ class TestExtractionIsPerPaper(unittest.TestCase):
                 ("two", "Paper two"),
                 ("three", "Paper three"),
             ],
+            **DB,
         )
 
         assert artifact is not None
@@ -730,10 +780,13 @@ class TestExtractionIsPerPaper(unittest.TestCase):
             plan=simple_plan(),
             evidence=evidence,
             papers=roster,
+            **DB,
         )
-        largest = max(
-            len("".join(part.text for part in call["contents"])) for call in stub.calls
+        self.assertTrue(
+            all(len(documents(call)) == 1 for call in stub.calls),
+            "one call carries one paper, so a large corpus cannot crowd out its tail",
         )
+        largest = max(len(prompt_text(call)) for call in stub.calls)
         self.assertLess(largest, 60_000, "extraction context must be bounded per call")
 
 
@@ -879,45 +932,191 @@ class TestPlanCoverageIsMeasured(unittest.TestCase):
         self.assertIn("maternal fever", stub.last_prompt)
 
 
-class TestEvidenceReachesTheExtractor(unittest.TestCase):
-    """Evidence is passed through whole; trimming it routinely lost real data.
+class TestTheScreenDecidesWhatIsOpened(unittest.TestCase):
+    """Retrieval's job is to say which papers are worth opening.
 
-    An 80-line cap once dropped a paper's third-trimester odds ratio purely
-    because it appeared late, and the chart came back empty.
+    Opening a PDF costs real money and a library holds hundreds, so the shallow
+    question text search is good at — does this paper talk about this measure
+    and this kind of entity — is the only one it is asked. It is deliberately
+    generous: rejecting a paper that mentions neither is safe, and everything
+    past that is the reader's job.
     """
 
-    def test_every_retrieved_line_reaches_the_extraction_prompt(self):
-        # More lines than any old cap allowed, with the payload deliberately last.
-        evidence = [f"{n}: filler mentioning 1 result" for n in range(300)]
-        evidence.append("999: third-trimester fever and ADHD (OR = 0.80)")
+    def setUp(self):
+        # This class tests the screen itself, so the module-wide stand-in is
+        # lifted for its duration.
+        patcher = patch("app.llm.chart_operations._plan_screen", _real_plan_screen)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _artifact(self, evidence, papers):
+        artifact = StubChartOperations(records_json()).build_chart_artifact(
+            prompt="chart scores",
+            plan=simple_plan(),
+            evidence=evidence,
+            papers=papers,
+            **DB,
+        )
+        assert artifact is not None
+        return artifact
+
+    def test_a_paper_mentioning_neither_field_is_never_opened(self):
+        stub = StubChartOperations(records_json())
+        stub.build_chart_artifact(
+            prompt="chart scores",
+            plan=simple_plan(),
+            evidence={
+                "one": ["4: benchmark A reports a score of 91"],
+                "two": ["9: this paper is about something else entirely"],
+            },
+            papers=[("one", "Paper one"), ("two", "Paper two")],
+            **DB,
+        )
+
+        self.assertEqual(len(stub.calls), 1)
+        self.assertIn("one", prompt_text(stub.calls[0]))
+
+    def test_a_field_label_with_punctuation_is_matched_literally(self):
+        """Labels are prose — "Lat. (s)", "Accuracy (%)" — and a label read as
+        a regex either explodes or matches the wrong thing."""
+        plan = simple_plan()
+        plan.y = ChartField(key="latency", label="Lat. (s)")
+        plan.fields = [plan.x, plan.y]
+        stub = StubChartOperations(records_json())
+        stub.build_chart_artifact(
+            prompt="chart latency",
+            plan=plan,
+            evidence={"one": ["4: benchmark A reports Lat. (s) of 4.9"]},
+            papers=[("one", "Paper one")],
+            **DB,
+        )
+
+        self.assertEqual(len(stub.calls), 1)
+
+    def test_every_paper_the_screen_passes_is_read(self):
+        """No ceiling on how many PDFs a chart opens.
+
+        A rank-based cap decides coverage by position in a list whose scores
+        are mostly ties — on a real corpus the 40th and the 56th match scored
+        the same, so which papers reached the chart came down to roster order.
+        The screen is the filter; what it passes gets read.
+        """
+        roster = [(f"paper-{n}", f"Paper {n}") for n in range(60)]
+        stub = StubChartOperations(records_json())
+        stub.build_chart_artifact(
+            prompt="chart scores",
+            plan=simple_plan(),
+            evidence={
+                paper_id: ["4: benchmark A reports a score of 91"]
+                for paper_id, _ in roster
+            },
+            papers=roster,
+            **DB,
+        )
+
+        self.assertEqual(len(stub.calls), len(roster))
+
+    def test_an_unscreened_paper_is_reported_as_unmentioned_not_unread(self):
+        artifact = self._artifact(
+            {"two": ["9: this paper is about something else entirely"]},
+            [("two", "Paper two")],
+        )
+        self.assertIn("does not mention", artifact.coverage.excluded["two"])
+
+
+class TestAnUnindexedPaperIsReported(unittest.TestCase):
+    """A shortlisted paper with no stored PDF is an indexing failure.
+
+    Falling back to its extracted text is what put wrong numbers on charts, so
+    it is named instead — the gap belongs in the library, not on the chart.
+    """
+
+    def test_a_paper_with_no_pdf_is_excluded_by_name(self):
+        with patch("app.llm.chart_operations._paper_pdf", return_value=None):
+            artifact = StubChartOperations(records_json()).build_chart_artifact(
+                prompt="chart scores",
+                plan=simple_plan(),
+                evidence={"one": ["4: benchmark A reports a score of 91"]},
+                papers=[("one", "Paper one")],
+                **DB,
+            )
+
+        assert artifact is not None
+        self.assertIn("no indexed PDF", artifact.coverage.excluded["one"])
+        self.assertTrue(
+            any("no indexed PDF" in step for step in artifact.extraction_steps)
+        )
+
+    def test_one_unreadable_paper_does_not_stop_the_others(self):
+        def missing_for_two(paper_id, *_args, **_kwargs):
+            if paper_id == "two":
+                raise RuntimeError("s3 exploded")
+            return b"%PDF-1.4", f"{paper_id}.pdf"
+
+        with patch("app.llm.chart_operations._paper_pdf", side_effect=missing_for_two):
+            artifact = StubChartOperations(
+                records_json(
+                    record(
+                        "one",
+                        "Paper one",
+                        benchmark=("A", "a score of 91"),
+                        score=("91", "a score of 91"),
+                    )
+                )
+            ).build_chart_artifact(
+                prompt="chart scores",
+                plan=simple_plan(),
+                evidence={
+                    "one": ["4: benchmark A reports a score of 91"],
+                    "two": ["4: benchmark B reports a score of 80"],
+                },
+                papers=[("one", "Paper one"), ("two", "Paper two")],
+                **DB,
+            )
+
+        assert artifact is not None
+        self.assertEqual(artifact.coverage.included_paper_ids, ["one"])
+        self.assertIn("no indexed PDF", artifact.coverage.excluded["two"])
+
+
+class TestThePaperIsWhatIsRead(unittest.TestCase):
+    """Extraction reads the PDF, never the reassembled text.
+
+    Retrieval flattens a results table into a caption, a column of row labels
+    and a separate run of numbers per column, so no line pairs an entity with
+    its value. Asking a model to put that back together produced numbers under
+    the wrong heading — a benchmark tested on eight models charted one of them,
+    and the one it charted came from a sentence in the abstract. Retrieval now
+    only decides which papers to open.
+    """
+
+    def test_the_extractor_receives_the_document(self):
         stub = StubChartOperations(records_json())
         stub.build_chart_artifact(
             prompt="chart odds ratios by trimester",
             plan=simple_plan(x_key="trimester", y_key="odds_ratio"),
-            evidence={"p1": evidence},
+            evidence={"p1": ["7: third-trimester fever and ADHD (OR = 0.80)"]},
             papers=[("p1", "Paper one")],
-        )
-        self.assertIn("third-trimester fever and ADHD (OR = 0.80)", stub.last_prompt)
-
-    def test_compaction_only_engages_on_a_context_explosion(self):
-        from app.llm.chart_operations import (
-            EVIDENCE_COMPACTION_THRESHOLD_CHARS,
-            _fit_evidence,
+            **DB,
         )
 
-        modest = [f"{n}: a line about accuracy 91%" for n in range(500)]
-        self.assertEqual(_fit_evidence(modest), modest)
+        attached = documents(stub.calls[-1])
+        self.assertEqual(len(attached), 1)
+        self.assertEqual(attached[0].mime_type, "application/pdf")
 
-        huge = [f"{n}: {'x' * 2000} accuracy 91%" for n in range(200)]
-        self.assertGreater(
-            sum(len(line) for line in huge), EVIDENCE_COMPACTION_THRESHOLD_CHARS
+    def test_gathered_lines_are_not_forwarded_as_the_source(self):
+        """A quote must come from the paper, so the retrieved text is not
+        offered as something to copy from."""
+        stub = StubChartOperations(records_json())
+        stub.build_chart_artifact(
+            prompt="chart odds ratios by trimester",
+            plan=simple_plan(x_key="trimester", y_key="odds_ratio"),
+            evidence={"p1": ["7: third-trimester fever and ADHD (OR = 0.80)"]},
+            papers=[("p1", "Paper one")],
+            **DB,
         )
-        fitted = _fit_evidence(huge)
-        self.assertLess(len(fitted), len(huge))
-        # Whole lines only — a truncated or reworded passage would no longer
-        # contain the quote the extractor cites, and grounding would reject it.
-        for line in fitted:
-            self.assertIn(line, huge)
+
+        self.assertNotIn("OR = 0.80", stub.last_prompt)
 
 
 class TestBothSurfacesShareOnePath(unittest.TestCase):
@@ -974,19 +1173,26 @@ class TestBothSurfacesShareOnePath(unittest.TestCase):
         self.assertEqual(ops.investigations, [True])
 
     def test_prior_evidence_is_merged_not_replaced(self):
-        ops = self.Recorder(self.CANDIDATE, records_json())
-        ops.create_chart_artifact(
-            prompt="chart scores",
-            papers=[("p1", "Paper one")],
-            current_user=SimpleNamespace(),
-            db=SimpleNamespace(),
-            project_id="project-1",
-            plan=simple_plan(),
-            prior_evidence={"p1": ["9: from the chat's own arc"]},
-        )
-        prompt = ops.last_prompt
-        self.assertIn("from the chat's own arc", prompt)
-        self.assertIn("accuracy was 91%", prompt)
+        """The chat's own passages decide which papers get opened alongside the
+        investigation's, rather than being dropped in favour of them."""
+        seen: list[list[str]] = []
+        with patch(
+            "app.llm.chart_operations._plan_screen",
+            side_effect=lambda _plan: lambda lines: seen.append(lines) or len(lines),
+        ):
+            self.Recorder(self.CANDIDATE, records_json()).create_chart_artifact(
+                prompt="chart scores",
+                papers=[("p1", "Paper one")],
+                current_user=SimpleNamespace(),
+                db=SimpleNamespace(),
+                project_id="project-1",
+                plan=simple_plan(),
+                prior_evidence={"p1": ["9: from the chat's own arc"]},
+            )
+
+        screened = [line for lines in seen for line in lines]
+        self.assertIn("9: from the chat's own arc", screened)
+        self.assertIn("12: accuracy was 91%", screened)
 
     def test_a_single_paper_chart_is_a_valid_outcome(self):
         """One paper reporting two entities is a chart, not a failure."""
@@ -1010,6 +1216,7 @@ class TestBothSurfacesShareOnePath(unittest.TestCase):
             plan=simple_plan(),
             evidence={"p1": ["12: A scored 91%", "13: B scored 72%"]},
             papers=[("p1", "Paper one"), ("p2", "Paper two")],
+            **DB,
         )
 
         assert artifact is not None
@@ -1062,6 +1269,7 @@ class TestSeriesIsExtracted(unittest.TestCase):
                 ]
             },
             papers=[("p1", "Paper one")],
+            **DB,
         )
 
         assert artifact is not None
@@ -1088,6 +1296,7 @@ class TestSeriesIsExtracted(unittest.TestCase):
             plan=self.PLAN,
             evidence={"p1": ["12: GPT-4o scores 65% on WebVoyager"]},
             papers=[("p1", "Paper one")],
+            **DB,
         )
 
         assert artifact is not None
@@ -1140,6 +1349,7 @@ class TestPaperCanBeTheSeries(unittest.TestCase):
                 "p2": ["we measured 41% on AssistantBench"],
             },
             papers=[("p1", "Paper one"), ("p2", "Paper two")],
+            **DB,
         )
 
         assert artifact is not None
@@ -1174,6 +1384,7 @@ class TestPaperCanBeTheSeries(unittest.TestCase):
                 "p2": ["WebVoyager accuracy was 41%"],
             },
             papers=[("p1", "Paper one"), ("p2", "Paper two")],
+            **DB,
         )
 
         assert artifact is not None
@@ -1211,6 +1422,7 @@ class TestPaperCanBeTheSeries(unittest.TestCase):
                 "p2": ["GPT-4o scores 47% on SWE-bench"],
             },
             papers=[("p1", "Paper one"), ("p2", "Paper two")],
+            **DB,
         )
 
         assert artifact is not None
@@ -1245,6 +1457,7 @@ class TestPaperCanBeTheSeries(unittest.TestCase):
                 ]
             },
             papers=[("p1", "Paper one")],
+            **DB,
         )
 
         assert artifact is not None
@@ -1286,6 +1499,7 @@ class TestPaperCanBeTheSeries(unittest.TestCase):
             plan=simple_plan(),
             evidence={"p1": ["33%", "51%"], "p2": ["41%", "62%"]},
             papers=[("p1", "Alpha study"), ("p2", "Beta study")],
+            **DB,
         )
 
         assert artifact is not None
@@ -1346,89 +1560,6 @@ class TestOnePaperIsReadOnce(unittest.TestCase):
 
         self.assertFalse(duplicates)
         self.assertEqual(set(evidence), {"paper-1", "paper-2"})
-
-
-class TestSweepReadsBlocksNotLines(unittest.TestCase):
-    """The sweep keeps a hit's surroundings, because tables lose their rows.
-
-    A results table survives PDF extraction as a caption, a block of row
-    labels, and one block of numbers per column, so no line holds both an
-    entity and its value. Matching lines alone retrieve the sentence that
-    announces the table and none of the table, which is how a benchmark tested
-    on eight models charted one of them.
-    """
-
-    TABLE = "\n".join(
-        [
-            "Introduction",
-            "We survey retrieval systems.",
-            "Aggregate results are shown below, one row per benchmark.",
-            "Model",
-            "gemini-3.1-pro",
-            "gpt-5.4",
-            "zai-glm-4.7",
-            "0.817",
-            "0.834",
-            "0.840",
-        ]
-    )
-
-    def test_a_table_reaches_the_extractor_though_its_rows_match_nothing(self):
-        with patch("app.llm.chart_operations.read_file", return_value=self.TABLE):
-            evidence, _, _ = ChartOperations.sweep_plan_evidence(
-                plan=simple_plan(),
-                papers=[("paper-1", "Paper one")],
-                evidence={},
-                current_user=SimpleNamespace(),
-                db=SimpleNamespace(),
-                project_id="project-1",
-            )
-
-        gathered = "\n".join(evidence["paper-1"])
-        self.assertIn("zai-glm-4.7", gathered)
-        self.assertIn("0.840", gathered)
-
-    def test_context_keeps_the_source_line_numbers(self):
-        with patch("app.llm.chart_operations.read_file", return_value=self.TABLE):
-            evidence, _, _ = ChartOperations.sweep_plan_evidence(
-                plan=simple_plan(),
-                papers=[("paper-1", "Paper one")],
-                evidence={},
-                current_user=SimpleNamespace(),
-                db=SimpleNamespace(),
-                project_id="project-1",
-            )
-
-        self.assertIn("10: 0.840", evidence["paper-1"])
-
-    def test_a_dense_block_outranks_prose_when_the_budget_runs_out(self):
-        """Hits arrive in document order and a paper's tables come last, so a
-        plain prefix spends the whole budget on the introduction."""
-        prose = (
-            "Earlier work established this measure as a standard reference for "
-            "evaluating systems of the kind, and later studies followed suit."
-        )
-        lines: list[str] = []
-        for block in range(40):
-            lines.append(f"Aggregate benchmark results are reported below. {prose}")
-            lines.extend(["0.81" if block >= 30 else prose] * 39)
-        hits = [index for index, line in enumerate(lines) if "benchmark" in line]
-        tables_begin = 30 * 40 - SWEEP_CONTEXT_LINES
-
-        windows = _context_windows(lines, hits)
-
-        kept = [index for start, end in windows for index in range(start, end)]
-        self.assertTrue(kept, "a budget this size must keep something")
-        self.assertLessEqual(len(kept), SWEEP_MAX_LINES_PER_PAPER)
-        # The lead reserve is deliberately spent in document order, so some
-        # prose is expected; everything past it belongs to the tables.
-        from_prose = [index for index in kept if index < tables_begin]
-        self.assertLessEqual(len(from_prose), SWEEP_LEAD_LINES)
-        self.assertGreater(
-            (len(kept) - len(from_prose)) / len(kept),
-            0.7,
-            "most of the budget belongs to the numeric half, where the data is",
-        )
 
 
 class TestTraceIsSpecific(unittest.TestCase):
@@ -1497,14 +1628,15 @@ class TestTraceIsSpecific(unittest.TestCase):
                 "two": ["12: nothing relevant here"],
             },
             papers=[("one", "Paper one"), ("two", "Paper two")],
+            **DB,
         )
 
         assert artifact is not None
         steps = artifact.extraction_steps
-        self.assertTrue(any("2 papers with evidence" in step for step in steps))
+        self.assertTrue(any("Read 2 PDFs in full" in step for step in steps))
         self.assertTrue(any('"Paper one" — 1 point' in step for step in steps))
         self.assertTrue(
-            any("1 searched paper reported no usable value" in step for step in steps)
+            any("1 paper we read reported no usable value" in step for step in steps)
         )
 
 

@@ -12,9 +12,18 @@ cited:
   wherever its terms lead it; on top of that, every selected paper gets a
   plan-driven sweep, so a paper's absence means "we looked and it isn't
   there", never "the agent didn't happen to search here".
-- Extraction is per paper. One call per paper over that paper's own bounded
-  evidence, so a large corpus can't crowd out the tail of the roster and one
-  bad response can't take the whole chart down with it.
+- Extraction is per paper, and it reads the PDF rather than the extracted
+  text. One call per paper, so a large corpus can't crowd out the tail of the
+  roster and one bad response can't take the whole chart down with it.
+
+Retrieval screens; the PDF extracts. Text search decides which papers are worth
+opening, which is cheap and can run over a whole library. It cannot do the
+extracting, because the thing a chart most needs from a paper is its results
+table, and that is exactly what text extraction destroys: a table arrives as a
+caption, a column of row labels, and a separate run of numbers per column, with
+no line pairing an entity to its value. Reassembling that is guesswork, and a
+number under the wrong heading is worse than a missing bar. The model is given
+the document instead, the same way the data table feature already does it.
 """
 
 import hashlib
@@ -22,15 +31,19 @@ import json
 import logging
 import re
 import unicodedata
+import uuid
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from contextvars import copy_context
 from typing import Any, Optional
 
+from app.database.crud.paper_crud import paper_crud
+from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.helpers.compute_agent import ComputeAgentError, run_computed_columns
+from app.helpers.s3 import s3_service
 from app.llm.base import ModelType
 from app.llm.conversation_operations import DataTableOperations, FieldInvestigation
-from app.llm.provider import LLMProvider, TextContent
+from app.llm.provider import FileContent, LLMProvider, TextContent
 from app.llm.tools.file_tools import read_abstract, read_file, search_all_files
 from app.schemas.chart import (
     ChartArtifactPayload,
@@ -56,46 +69,18 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 
-# One extraction call carries one paper, so its evidence goes to the model
-# whole. Routinely trimming it did more harm than good: an 80-line cap was
-# silently dropping the very odds ratios a chart was asked for, because they
-# happened to appear late in the paper.
-#
-# This mirrors the chat's threshold-gated compaction
-# (CONTENT_LIMIT_EVIDENCE_GATHERING) with one deliberate difference. Chat
-# compacts by summarizing, which would be fatal here: a rewritten passage no
-# longer contains the quote the extractor cites, so grounding would reject its
-# own evidence, and a mangled number would still render a chart. When this
-# does engage it SELECTS whole retrieved lines and never rewrites one.
-EVIDENCE_COMPACTION_THRESHOLD_CHARS = 150_000
-EXTRACTION_WORKERS = 5
+# Every paper the screen passes is read, so this is what decides how long a
+# chart takes. The work is a download and a model call — waiting, not
+# computing — so the pool is wider than a CPU-bound one would be.
+EXTRACTION_WORKERS = 12
 
 # Terms in the plan-driven sweep. Enough to cover an axis and its primitives,
 # few enough that the regex stays selective.
 SWEEP_MAX_TERMS = 12
-# Lines kept either side of a sweep hit. Matching lines alone cannot retrieve a
-# results table, which is where a paper reports most of its chartable points:
-# PDF extraction routinely destroys the row structure, leaving a caption, a
-# block of row labels, and then one block of numbers per column. No single line
-# holds both an entity and its value, so the line that names the measure is
-# findable and the numbers under it are only reachable as its context.
-SWEEP_CONTEXT_LINES = 15
-# A flattened table is a long run of very short lines — a header, a label, a
-# number, one per line — where prose is long lines. A fixed context window
-# lands in the middle of one, so a window that ends inside such a run follows
-# it to its end instead of cutting a column off halfway.
-TABULAR_LINE_CHARS = 48
-TABLE_RUN_MAX_LINES = 200
-# A whole table and its neighbours, and still an order of magnitude under the
-# per-paper compaction threshold.
-SWEEP_MAX_LINES_PER_PAPER = 320
-# Part of that budget is spent in document order before the rest goes to the
-# densest blocks. A paper states its headline result in prose near the top,
-# where one sentence pairs an entity with its value outright — the surest
-# evidence in the document, and the only thing that can tell whether a
-# reconstructed table's columns line up. Ranking on numbers alone buys every
-# table in the paper and loses that sentence.
-SWEEP_LEAD_LINES = 80
+# Matching lines are all the screen needs: it asks whether a paper mentions
+# this measure and this kind of entity, never what the numbers are. Reading the
+# numbers is the PDF's job.
+SWEEP_LINES_PER_PAPER = 60
 SWEEP_STOPWORDS = frozenset(
     {
         "the",
@@ -267,13 +252,13 @@ broad search failed. You are on round {n_round} of {max_rounds}.
 
 
 EXTRACTION_PROMPT = """
-You extract the cited primitive values required by a chart plan from one
-paper's collected evidence. Return only the JSON ChartExtraction schema.
+You extract the cited primitive values required by a chart plan from one paper.
+The paper itself is attached. Return only the JSON ChartExtraction schema.
 
 Rules:
-- Copy values only when directly supported by the supplied evidence.
-- Every value MUST include an exact quote from that evidence; use the source
-  line number when available.
+- Copy values only when the attached paper states them.
+- Every value MUST include an exact quote from the paper. For a value read out
+  of a table, quote the row and column that locate it.
 - The quote must support the measure AS THE PLAN DEFINES IT, subject included.
   A quote is not enough on its own: if the plan's y is an odds ratio for autism
   and this paper reports an odds ratio for a different outcome, a different
@@ -287,52 +272,28 @@ Rules:
 - Do not calculate values. For a derived y, return only its primitive inputs;
   the application calculates the derived value later.
 - Return a record ONLY when it contains every field needed to plot a point.
-- The evidence below is from ONE paper. Use its paper_id on every record.
-- Return a record for EVERY distinct entity the evidence supports, not only the
+- The attached paper is the only source. Use its paper_id on every record.
+- Return a record for EVERY distinct entity the paper supports, not only the
   first or the most prominent. A paper reporting the measure for three
   trimesters, five models, or four benchmarks yields three, five, or four
-  records; each pairs its values to that one entity. Read all of the evidence
-  before answering — later passages are as eligible as the opening ones.
-- Most of those entities live in a table, and the evidence will not look like
-  one. Extraction flattens tables into a caption, then the column headers one
-  per line, then a block of row labels one per line, then a SEPARATE block of
-  numbers for each column, in the order the columns appear. Reconstruct it
-  positionally: the k-th row label goes with the k-th number of each block, and
-  the j-th block belongs to the j-th column header. One record per row label.
-  Two things must hold before you use a table:
-    1. Every numeric block holds exactly as many values as there are row labels.
-       If a block is short or long, the rows do not line up. Stop.
-    2. Where the prose states a value for a named row, your alignment gives that
-       row the same value. Prose is the check on the count: when it disagrees,
-       your columns are shifted. Stop.
-  A flattened header often merges two column names onto one line, which leaves
-  more numeric blocks than headers and shifts every column after it, so count
-  them: when blocks outnumber headers, only a value the prose states outright
-  can tell you which block is which. If neither the headers nor the prose can
-  name the column you are reading, skip that table and return only what the
-  prose states. One true point beats seven plausible ones, and a number under
-  the wrong heading is worse than a missing bar.
-- A table has two dimensions and this chart wants one measure, so decide once,
-  before extracting, which dimension carries the plan's y:
-  - Usually a column does. Then that ONE column supplies every y value. The
-    other columns are different measures — a precision beside a latency beside a
-    refusal rate — and they belong on a different chart. Do not emit them, not
-    even as extra records. Reading six columns off one table is six charts, not
-    a fuller version of this one.
-  - Occasionally the columns are themselves entities of the kind the plan's x
-    names — a column per benchmark, per year, per cohort. Then every cell is a y
-    and the header is the x.
-  A header naming a measure ("Cite. Acc", "Accuracy", "p-value", "n", "Latency")
-  is never an x value; it is the name of a column, and this chart reads one.
+  records; each pairs its values to that one entity.
+  Its tables are where most of those entities are. Read them as tables: find
+  the column that is the plan's y, and emit one record per row. A sentence in
+  the abstract naming one entity's value is usually the paper quoting its own
+  table — go to the table and take every row, not the one the sentence
+  mentioned.
+- This chart carries ONE measure, so one table contributes ONE column of
+  numbers. The other columns are different measures — a precision beside a
+  latency beside a refusal rate — and they belong on a different chart. Reading
+  six columns off one table is six charts, not a fuller version of this one.
+  A header naming a measure ("Cite. Acc", "Accuracy", "p-value", "n") is the
+  name of a column and is never an x value.
 - Where the x comes from when the table has no column for it: a table often
   describes a single entity of the kind the plan's x names — one benchmark, one
   cohort, one dataset — which the paper names in its title or in the sentence
   introducing the table. That one name is then the x on every record from that
   table. Take the entity the paper is reporting on, not the software, harness,
   or vendor it used to run the experiment.
-- A sentence naming one entity's value ("Model A reaches 0.84") is usually the
-  paper quoting its own table. If that table is in the evidence, extract every
-  row of it, not just the one the sentence mentioned.
 - Return an empty records array when the paper does not report the required
   fields — a missing paper is a fine outcome, an invented one is not.
 - Do not return exclusion records or coverage; the application creates those
@@ -379,48 +340,6 @@ def _normalize(text: str) -> str:
 def _condense(text: str) -> str:
     """Drop everything but letters and digits."""
     return _NON_ALNUM_RE.sub("", text)
-
-
-def _fit_evidence(lines: list[str], topic: Optional[re.Pattern] = None) -> list[str]:
-    """One paper's evidence, whole unless it would explode the context.
-
-    Below the threshold this is a pass-through — the extractor sees everything
-    retrieved, which is the point. Above it, lines are kept or dropped entire,
-    ranked by how likely each is to BE the payload: naming one of the plan's
-    fields AND carrying a number beats carrying a number alone. No line is ever
-    truncated or reworded, so every passage the extractor can quote is still
-    verbatim source text and grounding still recognises it.
-    """
-    ordered = [str(line) for line in lines]
-    if sum(len(line) for line in ordered) <= EVIDENCE_COMPACTION_THRESHOLD_CHARS:
-        return ordered
-
-    def rank(index: int) -> int:
-        line = ordered[index]
-        numeric = bool(_NUMERIC_RE.search(line))
-        on_topic = bool(topic.search(line)) if topic else False
-        if on_topic and numeric:
-            return 0
-        if numeric:
-            return 1
-        return 2 if on_topic else 3
-
-    preference = sorted(range(len(ordered)), key=lambda index: (rank(index), index))
-    kept: list[tuple[int, str]] = []
-    budget = EVIDENCE_COMPACTION_THRESHOLD_CHARS
-    for index in preference:
-        line = ordered[index]
-        if len(line) > budget:
-            continue
-        kept.append((index, line))
-        budget -= len(line)
-    logger.info(
-        "Chart evidence compacted: %d of %d retrieved lines kept for one paper",
-        len(kept),
-        len(ordered),
-    )
-    # Restore retrieval order so the extractor reads passages as they appear.
-    return [line for _, line in sorted(kept)]
 
 
 def _slug(value: str) -> str:
@@ -478,82 +397,87 @@ def _field_terms(fields: list[ChartField]) -> str:
     return "|".join(sorted(terms)[:SWEEP_MAX_TERMS])
 
 
-def _through_tabular_run(lines: list[str], start: int, end: int) -> int:
-    """Where a window should really end, if it ended inside a table.
+def _phrase_pattern(fields: list[ChartField]) -> Optional[re.Pattern]:
+    """Match a field's own wording literally.
 
-    The header of a flattened table is the only part of it a search can match:
-    "Model" and "Benchmark" are words, and the rows beneath are bare numbers.
-    Stopping a fixed distance past that header takes the labels and leaves the
-    columns, which is the difference between charting one entity and charting
-    all of them. Prose is the boundary — one long line is tolerated so a
-    wrapped caption inside the table does not end the run early.
+    Field labels are prose and carry regex metacharacters — "Lat. (s)",
+    "Accuracy (%)" — so every phrase is escaped before it becomes a pattern.
     """
-    floor = end
-    long_run = 0
-    limit = min(len(lines), start + TABLE_RUN_MAX_LINES)
-    while end < limit:
-        if len(lines[end].strip()) <= TABULAR_LINE_CHARS:
-            long_run = 0
-        elif long_run:
-            break
-        else:
-            long_run += 1
-        end += 1
-    # Give back prose that only the tolerance admitted — but never shrink the
-    # window below the context it was asked for.
-    while end > floor and len(lines[end - 1].strip()) > TABULAR_LINE_CHARS:
-        end -= 1
-    return end
+    phrases = [phrase for phrase in _field_phrases(fields).split("|") if phrase]
+    if not phrases:
+        return None
+    return re.compile("|".join(re.escape(phrase) for phrase in phrases), re.IGNORECASE)
 
 
-def _context_windows(lines: list[str], hits: list[int]) -> list[tuple[int, int]]:
-    """Blocks around the hits worth reading, within a per-paper line budget.
+def _plan_screen(plan: ChartPlan):
+    """How strongly one paper's gathered text answers this plan, or zero.
 
-    The budget is real: the sweep touches every selected paper and every paper
-    it reaches gets its own extraction call, so what is kept here is paid for a
-    few hundred times over. It goes to the numbers.
-
-    Each hit is ranked on its own and blocks are merged only at the end. Merging
-    first collapses the dozens of hits a word like "benchmark" scatters through
-    an introduction into one enormous region that no budget can admit, and the
-    table — a compact, unmistakably numeric block — gets dropped along with it.
-    Ranked individually, the table wins outright: proportion of numeric lines is
-    what separates a results block from a paragraph that mentions results.
+    Opening a PDF costs real money, so this decides which papers are worth
+    opening. It is deliberately shallow: text search is good at "does this
+    paper talk about this measure and this kind of entity" and bad at reading a
+    number out of a table, so it is asked only the first question. Zero means
+    the paper never mentions one of them, which is the one thing retrieval can
+    settle on its own.
     """
-    blocks: list[tuple[int, int]] = []
-    for index in hits:
-        start = max(0, index - SWEEP_CONTEXT_LINES)
-        end = _through_tabular_run(
-            lines, start, min(len(lines), index + SWEEP_CONTEXT_LINES + 1)
+    measures = (
+        [field for field in plan.fields if field.key in set(plan.calculation.inputs)]
+        or [plan.y]
+        if plan.calculation
+        else [plan.y]
+    )
+    # A derived y needs every primitive in the SAME paper, so each is required
+    # separately rather than as one alternation.
+    measure_patterns = [
+        pattern
+        for pattern in (_phrase_pattern([field]) for field in measures)
+        if pattern
+    ]
+    entity_terms = _field_terms([plan.x])
+    entity_pattern = re.compile(entity_terms, re.IGNORECASE) if entity_terms else None
+
+    def score(lines: list[str]) -> int:
+        text = "\n".join(lines)
+        if entity_pattern and not entity_pattern.search(text):
+            return 0
+        hits = 0
+        for pattern in measure_patterns:
+            found = len(pattern.findall(text))
+            if not found:
+                return 0
+            hits += found
+        return hits or 1
+
+    return score
+
+
+def _paper_pdf(
+    paper_id: str,
+    current_user: CurrentUser,
+    db: Session,
+    project_id: Optional[str],
+) -> Optional[tuple[bytes, str]]:
+    """The stored PDF for a paper, or None when it has no indexed file.
+
+    A paper in a project with no object key is an indexing failure, not a
+    paper without data, so callers report it rather than quietly falling back
+    to its extracted text — the fallback is what produced wrong numbers.
+    """
+    paper = (
+        project_paper_crud.get_paper_by_project(
+            db,
+            paper_id=uuid.UUID(paper_id),
+            project_id=uuid.UUID(project_id),
+            user=current_user,
         )
-        blocks.append((start, end))
-
-    def density(block: tuple[int, int]) -> tuple[float, int]:
-        start, end = block
-        numeric = sum(1 for line in lines[start:end] if _NUMERIC_RE.search(line))
-        return (-numeric / (end - start), start)
-
-    kept: set[int] = set()
-
-    def spend(order: list[tuple[int, int]], ceiling: int) -> None:
-        for start, end in order:
-            fresh = [index for index in range(start, end) if index not in kept]
-            if len(kept) + len(fresh) > ceiling:
-                continue
-            kept.update(fresh)
-
-    spend(blocks, min(SWEEP_LEAD_LINES, SWEEP_MAX_LINES_PER_PAPER))
-    spend(sorted(blocks, key=density), SWEEP_MAX_LINES_PER_PAPER)
-
-    # Back into document order, so the extractor reads a table's caption, its
-    # labels and its columns in the order the paper printed them.
-    windows: list[tuple[int, int]] = []
-    for index in sorted(kept):
-        if windows and index == windows[-1][1]:
-            windows[-1] = (windows[-1][0], index + 1)
-        else:
-            windows.append((index, index + 1))
-    return windows
+        if project_id
+        else paper_crud.get(db, id=paper_id, user=current_user)
+    )
+    if not paper or not paper.s3_object_key:
+        return None
+    data = s3_service.download_bytes(str(paper.s3_object_key))
+    if not data:
+        return None
+    return data, f"{str(paper.title) if paper.title else 'paper'}.pdf"
 
 
 def _sweep_query(plan: ChartPlan) -> str:
@@ -647,12 +571,6 @@ class ChartOperations(DataTableOperations):
         into the agent's findings rather than replacing them, and it costs no
         LLM calls.
 
-        Each hit is kept with its surrounding lines rather than on its own,
-        because a matching line is a pointer to the data far more often than it
-        is the data. "Aggregate results are shown below" is the only line in a
-        paper that mentions the measure by name; the eight rows underneath it
-        are what the chart needs.
-
         Also returns the papers that are second copies of one already read. The
         same PDF imported twice is one study, and reading it twice charts it
         twice; that costs an extraction call and puts a duplicate bar on the
@@ -691,17 +609,11 @@ class ChartOperations(DataTableOperations):
                     duplicates.add(paper_id)
                     continue
                 seen_contents[fingerprint] = paper_id
-                lines = content.splitlines()
-                hits = [
-                    index for index, line in enumerate(lines) if pattern.search(line)
-                ]
                 found = [
-                    # Numbered as search_file numbers its hits, so a quote can
-                    # still carry the line the extractor took it from.
-                    f"{index + 1}: {lines[index]}"
-                    for start, end in _context_windows(lines, hits)
-                    for index in range(start, end)
-                ]
+                    f"{index + 1}: {line}"
+                    for index, line in enumerate(content.splitlines(), start=0)
+                    if pattern.search(line)
+                ][:SWEEP_LINES_PER_PAPER]
                 lines_kept += len(found)
             except Exception:
                 logger.warning(
@@ -743,9 +655,8 @@ class ChartOperations(DataTableOperations):
         steps = [
             f'Swept all {len(paper_ids)} paper{"s" if len(paper_ids) != 1 else ""} '
             f'for the plan\'s own terms ("{query}")',
-            f"{matched} paper{'s' if matched != 1 else ''} matched those terms; "
-            f"kept {lines_kept} line{'s' if lines_kept != 1 else ''} of surrounding "
-            "context so whole tables come through, not just the line that named them",
+            f"{matched} paper{'s' if matched != 1 else ''} matched those terms "
+            f"across {lines_kept} line{'s' if lines_kept != 1 else ''}",
         ]
         if fell_back:
             steps.append(
@@ -949,7 +860,13 @@ class ChartOperations(DataTableOperations):
             for paper_id in duplicates:
                 evidence.pop(paper_id, None)
         artifact = self.build_chart_artifact(
-            prompt=prompt, plan=plan, evidence=evidence, papers=papers
+            prompt=prompt,
+            plan=plan,
+            evidence=evidence,
+            papers=papers,
+            current_user=current_user,
+            db=db,
+            project_id=project_id,
         )
         if artifact is not None:
             status.extend(artifact.extraction_steps)
@@ -1064,6 +981,9 @@ class ChartOperations(DataTableOperations):
         plan: ChartPlan,
         evidence: dict[str, list[str]],
         papers: list[tuple[str, str]],
+        current_user: CurrentUser,
+        db: Session,
+        project_id: Optional[str] = None,
     ) -> Optional[ChartArtifactPayload]:
         paper_ids = [paper_id for paper_id, _ in papers]
         paper_titles = dict(papers)
@@ -1089,28 +1009,60 @@ class ChartOperations(DataTableOperations):
         )
         extraction_schema = extraction_model.model_json_schema()
 
-        topic_terms = _field_terms([plan.x, plan.y, *plan.fields])
-        topic = re.compile(topic_terms, re.IGNORECASE) if topic_terms else None
-        capped = {
-            paper_id: _fit_evidence(evidence.get(paper_id) or [], topic)
+        # The screen: retrieval says which papers are worth opening, ranked by
+        # how much they say about this plan's measure. Everything it rejects
+        # never reaches a model, which is what makes reading whole PDFs
+        # affordable over a library of hundreds.
+        score = _plan_screen(plan)
+        scored = [
+            (points, paper_id)
             for paper_id in paper_ids
-        }
-        targets = [paper_id for paper_id in paper_ids if capped[paper_id]]
+            if (points := score(evidence.get(paper_id) or []))
+        ]
+        # Every paper it passes is read. A ceiling here would decide coverage
+        # by rank in a list whose scores are mostly ties, so which papers made
+        # the chart would come down to roster position — the arbitrariness this
+        # module exists to remove. The screen is the filter; it either says a
+        # paper mentions this measure or it does not.
+        scored.sort(key=lambda entry: (-entry[0], paper_ids.index(entry[1])))
+        shortlisted = [paper_id for _, paper_id in scored]
+
+        # A shortlisted paper with no stored PDF is an indexing failure. Falling
+        # back to its extracted text is what put wrong numbers on charts, so it
+        # is reported instead.
+        documents: dict[str, tuple[bytes, str]] = {}
+        unindexed: list[str] = []
+        for paper_id in shortlisted:
+            try:
+                document = _paper_pdf(paper_id, current_user, db, project_id)
+            except Exception:
+                logger.warning(
+                    "Could not load the PDF for paper %s", paper_id, exc_info=True
+                )
+                document = None
+            if document is None:
+                unindexed.append(paper_id)
+            else:
+                documents[paper_id] = document
+        targets = [paper_id for paper_id in shortlisted if paper_id in documents]
 
         included: list[ChartRecord] = []
         seen_record_ids: set[str] = set()
         papers_attempted: set[str] = set()
 
         def extract(paper_id: str) -> list[ChartExtractionRecord]:
+            data, filename = documents[paper_id]
             response = self.generate_content(
                 contents=[
+                    FileContent(
+                        data=data, mime_type="application/pdf", filename=filename
+                    ),
                     TextContent(
                         text=(
                             f"User request:\n{prompt}\n\nChart plan:\n{plan.model_dump_json()}"
                             f"\n\nPaper:\n{json.dumps({'paper_id': paper_id, 'paper_title': paper_titles[paper_id]})}"
-                            f"\n\nCollected evidence for this paper:\n{json.dumps(capped[paper_id])}"
                         )
-                    )
+                    ),
                 ],
                 system_prompt=(
                     f"{EXTRACTION_PROMPT}\n\nFor this run, every returned record's values "
@@ -1220,11 +1172,18 @@ class ChartOperations(DataTableOperations):
             if failed:
                 excluded[paper_id] = failed[0] or ""
                 continue
-            excluded[paper_id] = (
-                "We searched this paper and found no directly quoted " f"{plan.y.label}"
-                if paper_id in papers_attempted
-                else "No passages for these fields could be retrieved from this paper"
-            )
+            if paper_id in papers_attempted:
+                excluded[paper_id] = (
+                    f"We read this paper and found no directly quoted {plan.y.label}"
+                )
+            elif paper_id in unindexed:
+                excluded[paper_id] = (
+                    "This paper matched the search but has no indexed PDF to read"
+                )
+            else:
+                excluded[paper_id] = (
+                    f"We searched this paper and it does not mention {plan.y.label}"
+                )
             payload.records.append(
                 ChartRecord(
                     record_id=paper_id,
@@ -1243,8 +1202,11 @@ class ChartOperations(DataTableOperations):
             record.paper_id for record in payload.records if not record.exclusion_reason
         )
         payload.extraction_steps = [
-            f"Extracted from {len(targets)} paper{'s' if len(targets) != 1 else ''} "
-            f"with evidence, one call each",
+            f"Screened {len(paper_ids)} paper{'s' if len(paper_ids) != 1 else ''}; "
+            f"{len(scored)} mention{'s' if len(scored) == 1 else ''} both "
+            f"{plan.y.label} and {plan.x.label}",
+            f"Read {len(targets)} PDF{'s' if len(targets) != 1 else ''} in full, "
+            "one call each",
             *(
                 f'"{paper_titles[paper_id]}" — {plotted[paper_id]} point'
                 f"{'s' if plotted[paper_id] != 1 else ''}"
@@ -1252,10 +1214,15 @@ class ChartOperations(DataTableOperations):
                 if plotted.get(paper_id)
             ),
         ]
+        if unindexed:
+            payload.extraction_steps.append(
+                f"{len(unindexed)} matching paper{'s' if len(unindexed) != 1 else ''} "
+                "had no indexed PDF and could not be read"
+            )
         silent = len(targets) - len(plotted)
         if silent > 0:
             payload.extraction_steps.append(
-                f"{silent} searched paper{'s' if silent != 1 else ''} reported no usable value"
+                f"{silent} paper{'s' if silent != 1 else ''} we read reported no usable value"
             )
         return payload
 
