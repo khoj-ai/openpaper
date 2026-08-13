@@ -613,7 +613,7 @@ def get_doi(title: str, authors: Optional[List[str]] = None) -> Optional[str]:
         title: str, authors: Optional[List[str]] = None
     ) -> Optional[str]:
         base_url = "https://api.crossref.org/works"
-        params = {"query.title": quote(title), "rows": 1}
+        params = {"query.title": title, "rows": 1}
         if authors:
             params["query.author"] = ", ".join(authors)
 
