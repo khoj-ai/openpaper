@@ -653,34 +653,23 @@ def get_doi(title: str, authors: Optional[List[str]] = None) -> Optional[str]:
     if not title:
         return None
 
-    try:
-        crossref_doi = get_crossref_doi(title, authors)
-    except requests.RequestException as e:
-        _log_lookup_failure("CrossRef", f"DOI - {title}", e)
-        crossref_doi = None
+    sources = (
+        ("CrossRef", lambda: get_crossref_doi(title, authors)),
+        ("OpenAlex", lambda: get_openalex_doi(title)),
+        ("Semantic Scholar", lambda: search_semantic_scholar_doi(title)),
+    )
 
-    try:
-        openalex_doi = get_openalex_doi(title)
-    except requests.RequestException as e:
-        _log_lookup_failure("OpenAlex", f"DOI - {title}", e)
-        openalex_doi = None
+    for service, lookup in sources:
+        try:
+            doi = lookup()
+        except requests.RequestException as e:
+            _log_lookup_failure(service, f"DOI - {title}", e)
+            continue
+        if doi:
+            logger.info(f"Found DOI from {service}: {doi} for title: {title}")
+            return doi
 
-    try:
-        semantic_scholar_doi = search_semantic_scholar_doi(title)
-    except requests.RequestException as e:
-        _log_lookup_failure("Semantic Scholar", f"DOI - {title}", e)
-        semantic_scholar_doi = None
-
-    if crossref_doi:
-        logger.info(f"Found DOI from CrossRef: {crossref_doi} for title: {title}")
-    elif openalex_doi:
-        logger.info(f"Found DOI from OpenAlex: {openalex_doi} for title: {title}")
-    elif semantic_scholar_doi:
-        logger.info(
-            f"Found DOI from Semantic Scholar: {semantic_scholar_doi} for title: {title}"
-        )
-
-    return crossref_doi or openalex_doi or semantic_scholar_doi
+    return None
 
 
 def get_enriched_data(doi: str) -> Optional[EnrichedData]:
