@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Check, ChevronDown, Copy, Download, Share2 } from "lucide-react";
 import { ChartArtifact } from "@/lib/schema";
-import { ChartView } from "@/components/ChartFigure";
+import { ChartView, plotRows } from "@/components/ChartFigure";
 import { copyChartPng, downloadChartPng } from "@/lib/chartExport";
 import { useIsDarkMode } from "@/hooks/useDarkMode";
 import { Button } from "@/components/ui/button";
@@ -26,8 +26,19 @@ export function ChartExportButtons({ artifact, view, log, compact = false }: {
 
     if (view.points.length === 0) return null;
 
-    // Export what is on screen, including the scale the reader chose.
-    const options = { artifact, points: view.points, log, isXY: view.isXY, dark: darkMode };
+    // Export what is on screen, including the scale the reader chose and the
+    // rows the plot actually drew — a canvas tall enough for several hundred
+    // rows is one the browser declines to rasterize, and the reader would get a
+    // blank image instead of the chart they were looking at.
+    const options = {
+        artifact,
+        points: plotRows(view, "full"),
+        total: view.points.length,
+        ranked: view.ranked,
+        log,
+        isXY: view.isXY,
+        dark: darkMode,
+    };
 
     const run = async (action: () => Promise<void>, mark?: () => void) => {
         setError(null);

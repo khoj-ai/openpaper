@@ -6,7 +6,12 @@ import { ChartPoint, exactNumber } from "@/components/ChartFigure";
 /** The chart's table twin: every plotted number, exactly, without hovering.
  *
  * A tooltip enhances but must never be the only way to read a value, and the
- * chart's own labels are compacted ("226K") where the reader may want 225,596. */
+ * chart's own labels are compacted ("226K") where the reader may want 225,596.
+ *
+ * It is also where the points the plot could not draw live. The figure shows
+ * the leaders because bar lengths stop being comparable past a couple of dozen
+ * rows; nothing is dropped from here, so a chart of four hundred points is
+ * still fully readable — it just is not fully drawable. */
 export function ChartValuesTable({ artifact, points, onOpenPaper }: {
     artifact: ChartArtifact;
     points: ChartPoint[];
@@ -17,10 +22,10 @@ export function ChartValuesTable({ artifact, points, onOpenPaper }: {
 
     return (
         <div className="mt-4">
-            {points.length > 0 && <div className="overflow-x-auto">
+            {points.length > 0 && <div className="max-h-[70vh] overflow-auto">
                 <table className="w-full border-collapse text-xs">
                     <caption className="sr-only">{artifact.plan.title}</caption>
-                    <thead>
+                    <thead className="sticky top-0 bg-card">
                         <tr className="border-b text-left text-muted-foreground">
                             <th scope="col" className="py-1 pr-3 font-medium">{artifact.plan.x.label}</th>
                             <th scope="col" className="py-1 pr-3 text-right font-medium">
@@ -48,6 +53,11 @@ export function ChartValuesTable({ artifact, points, onOpenPaper }: {
                     </tbody>
                 </table>
             </div>}
+            {points.length > 0 && (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                    All {points.length} plotted point{points.length === 1 ? "" : "s"}, in the chart's order.
+                </p>
+            )}
             {excluded.length > 0 && (
                 <details className="mt-2" open={points.length === 0}>
                     <summary className="cursor-pointer text-xs text-muted-foreground">

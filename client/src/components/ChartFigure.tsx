@@ -128,6 +128,21 @@ const ROW_HEIGHT = 28;
 // the plot instead of being cropped by it.
 const TOOLTIP_HEIGHT = 108;
 const COMPACT_ROWS = 6;
+// A categorical chart is read by comparing bar lengths, and past a couple of
+// dozen rows there is nothing left to compare: the marks become a texture and
+// the labels a wall. With no ceiling on how many papers a chart reads, a broad
+// measure now returns hundreds of points, so the plot draws the leaders and the
+// values table — the form that does scale — carries the rest.
+const FULL_ROWS = 24;
+
+/** The rows a plot actually draws, which the figure and the PNG must agree on.
+ *
+ * An XY plot is exempt: a scatter of 400 dots is a distribution, and reading it
+ * is the point. It is the one-row-per-point form that runs out of room. */
+export function plotRows(view: ChartView, display: "compact" | "full"): ChartPoint[] {
+    if (view.isXY) return view.points;
+    return view.points.slice(0, display === "compact" ? COMPACT_ROWS : FULL_ROWS);
+}
 
 function Tooltip({ point, yLabel, xLabel, top }: {
     point: ChartPoint;
@@ -404,11 +419,10 @@ export function ChartFigure({ artifact, view, log, onToggleLog, onOpenPaper, dis
         return palette[(index < 0 ? 0 : index) % palette.length];
     };
     if (all.length === 0) return null;
-    // The panel card is a preview, not a workspace: show the leaders and let
-    // the title carry the reader to the full chart rather than stacking 20 rows
-    // and a scale control into a sidebar.
-    const truncated = display === "compact" && !isXY && all.length > COMPACT_ROWS;
-    const points = truncated ? all.slice(0, COMPACT_ROWS) : all;
+    // The panel card is a preview, not a workspace, so it shows fewer rows than
+    // the full chart and lets the title carry the reader onward.
+    const points = plotRows(view, display);
+    const truncated = points.length < all.length;
     const yLabel = artifact.plan.y.unit ? `${artifact.plan.y.label} (${artifact.plan.y.unit})` : artifact.plan.y.label;
 
     return (
@@ -448,7 +462,7 @@ export function ChartFigure({ artifact, view, log, onToggleLog, onOpenPaper, dis
             <figcaption className="mt-2 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
                 <span>
                     {yLabel}
-                    {truncated ? ` · ${ranked ? "top" : "first"} ${COMPACT_ROWS} of ${all.length}` : ""}
+                    {truncated ? ` · ${ranked ? "top" : "first"} ${points.length} of ${all.length}` : ""}
                 </span>
                 {canLog && display === "full" && (
                     <Tabs value={log ? "log" : "linear"} onValueChange={value => onToggleLog(value === "log")}>

@@ -93,13 +93,18 @@ function layoutLegend(
 
 export interface ChartExportOptions {
     artifact: ChartArtifact;
+    /** The rows the plot drew, which may be fewer than the chart has. */
     points: ChartPoint[];
+    /** How many points exist in total, so the image can say what it left out. */
+    total?: number;
+    /** Whether those rows are the largest values or merely the first. */
+    ranked?: boolean;
     log: boolean;
     isXY: boolean;
     dark: boolean;
 }
 
-export function drawChart({ artifact, points, log, isXY, dark }: ChartExportOptions): HTMLCanvasElement {
+export function drawChart({ artifact, points, total, ranked, log, isXY, dark }: ChartExportOptions): HTMLCanvasElement {
     const theme = dark ? DARK : LIGHT;
     const groups = seriesKeys(points);
     const palette = seriesPalette(dark);
@@ -142,7 +147,14 @@ export function drawChart({ artifact, points, log, isXY, dark }: ChartExportOpti
 
     ctx.fillStyle = theme.muted;
     ctx.font = font(12);
-    const subtitle = `${artifact.plan.chart_type} · ${points.length} data point${points.length === 1 ? "" : "s"} from ${artifact.coverage.included_paper_ids.length} of ${artifact.coverage.searched_paper_ids.length} papers`;
+    // The count is the chart's, not the picture's. An image that says "24 data
+    // points" when 412 were found misreports the evidence, so the total is what
+    // is stated and the shortfall is named alongside it.
+    const drawn = total !== undefined && total > points.length
+        ? ` · ${ranked ? "top" : "first"} ${points.length} shown`
+        : "";
+    const found = total ?? points.length;
+    const subtitle = `${artifact.plan.chart_type} · ${found} data point${found === 1 ? "" : "s"} from ${artifact.coverage.included_paper_ids.length} of ${artifact.coverage.searched_paper_ids.length} papers${drawn}`;
     ctx.fillText(subtitle, PAD, PAD + 34);
 
     // A legend is always present for two or more series.
