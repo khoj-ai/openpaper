@@ -50,14 +50,12 @@ from app.database.crud.user_crud import user as user_crud
 from app.database.database import SessionLocal
 from app.database.models import SubscriptionPlan
 from app.helpers.s3 import s3_service
+from app.logging_config import configure_logging
 from app.schemas.user import CurrentUser
 from evals.run_benchmark import ensure_eval_user, extract_text_from_pdf
 
+configure_logging()
 logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
 
 EVALS_DIR = os.path.dirname(os.path.abspath(__file__))
 SEED_DATA_DIR = os.path.join(EVALS_DIR, "seed_data")

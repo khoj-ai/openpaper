@@ -6,10 +6,12 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
 from app.database.config import create_database, run_migrations
+from app.logging_config import configure_logging
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+configure_logging()
+logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     create_database()
     run_migrations()
-    logging.info("Migrations complete")
+    logger.info("Migrations complete")

@@ -8,9 +8,10 @@ from typing import Dict, Any, Optional
 import logging
 
 from src.celery_app import celery_app
+from src.logging_config import configure_logging
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+configure_logging()
 logger = logging.getLogger(__name__)
 
 app = FastAPI(

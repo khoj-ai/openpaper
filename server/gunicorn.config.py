@@ -2,6 +2,8 @@
 import multiprocessing
 import os
 
+from app.logging_config import build_formatter
+
 # Bind address and port
 # Use environment variable PORT if available, otherwise default to 8000
 port = os.getenv("PORT", "8000")
@@ -21,6 +23,34 @@ errorlog = "-"
 loglevel = os.getenv(
     "GUNICORN_LOG_LEVEL", "info"
 )  # e.g., debug, info, warning, error, critical
+
+# Workers pick up the shared format when they import the app, but the arbiter
+# never does — and the arbiter is what reports worker timeouts and SIGKILLs.
+logconfig_dict = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"openpaper": {"()": build_formatter}},
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "openpaper",
+            "stream": "ext://sys.stderr",
+        }
+    },
+    "root": {"level": loglevel.upper(), "handlers": ["console"]},
+    "loggers": {
+        "gunicorn.error": {
+            "level": loglevel.upper(),
+            "handlers": ["console"],
+            "propagate": False,
+        },
+        "gunicorn.access": {
+            "level": "INFO",
+            "handlers": ["console"],
+            "propagate": False,
+        },
+    },
+}
 
 # Reload workers when code changes (useful for development, disable in production)
 # reload = True

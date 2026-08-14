@@ -44,13 +44,11 @@ from app.database.models import ConversableType, SubscriptionStatus
 from app.llm.base import ModelType
 from app.llm.operations import operations
 from app.llm.provider import LLMProvider, TextContent
+from app.logging_config import configure_logging
 from app.schemas.responses import FileContent
 from app.schemas.user import CurrentUser
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
+configure_logging()
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
