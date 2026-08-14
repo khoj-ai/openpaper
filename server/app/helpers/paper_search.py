@@ -16,6 +16,28 @@ OPENALEX_MAX_RETRIES = 3
 OPENALEX_RETRY_DELAY = 1  # seconds
 OPENALEX_API_KEY = os.getenv("OPENALEX_API_KEY")
 
+# Failures we expect from free upstream APIs. They resolve on their own, so they
+# are logged as warnings rather than errors.
+TRANSIENT_HTTP_STATUSES = {408, 429, 500, 502, 503, 504}
+
+
+def _is_transient(exc: requests.RequestException) -> bool:
+    """Whether the failure is an upstream blip rather than something to fix here."""
+    response = getattr(exc, "response", None)
+    if response is not None:
+        return response.status_code in TRANSIENT_HTTP_STATUSES
+    return isinstance(exc, (requests.Timeout, requests.ConnectionError))
+
+
+def _log_lookup_failure(
+    service: str, context: str, exc: requests.RequestException
+) -> None:
+    """Log an upstream lookup failure, reserving error level for actionable ones."""
+    if _is_transient(exc):
+        logger.warning(f"{service} lookup unavailable for {context}: {exc}")
+    else:
+        logger.error(f"Error querying {service} API for {context}", exc_info=exc)
+
 
 def _with_openalex_auth(url: str) -> str:
     """Append the OpenAlex api_key query parameter to a URL if configured."""
@@ -33,7 +55,7 @@ def _request_with_retry(
     timeout: int = 10,
 ) -> requests.Response:
     """
-    Make an HTTP request with automatic retry on failure.
+    Make an HTTP request, with automatic retry on recoverable failures.
 
     Args:
         url: The URL to request.
@@ -57,18 +79,39 @@ def _request_with_retry(
             return response
         except requests.RequestException as e:
             last_exception = e
-            if attempt < max_retries - 1:
-                logger.warning(
-                    f"OpenAlex API request failed (attempt {attempt + 1}/{max_retries}): {e}. "
-                    f"Retrying in {retry_delay}s..."
+            if not _is_transient(e) or attempt == max_retries - 1:
+                _log_lookup_failure(
+                    "OpenAlex", f"{url} after {attempt + 1} attempt(s)", e
                 )
-                time.sleep(retry_delay)
-            else:
-                logger.error(
-                    f"OpenAlex API request failed after {max_retries} attempts: {e}"
-                )
+                break
+            logger.warning(
+                f"OpenAlex API request failed (attempt {attempt + 1}/{max_retries}): {e}. "
+                f"Retrying in {retry_delay}s..."
+            )
+            time.sleep(retry_delay)
 
     raise last_exception  # type: ignore
+
+
+CROSSREF_MAX_ATTEMPTS = 3
+CROSSREF_RETRY_DELAY = 2  # seconds, doubled per attempt
+# UA with mailto to use Crossref's polite pool rate limits, worth 3 req/s and 3 concurrent on search queries vs default 1.
+CROSSREF_MAILTO = os.getenv("CROSSREF_MAILTO", "team@khoj.dev")
+CROSSREF_USER_AGENT = f"OpenPaper/1.0 (https://openpaper.ai); mailto:{CROSSREF_MAILTO}"
+
+
+def _crossref_get(url: str, params: Optional[dict] = None) -> requests.Response:
+    """GET from Crossref, backing off on rate limits before returning the response."""
+    headers = {"User-Agent": CROSSREF_USER_AGENT}
+    response = requests.get(url, params=params, headers=headers, timeout=10)
+    for attempt in range(CROSSREF_MAX_ATTEMPTS - 1):
+        if response.status_code != 429:
+            break
+        delay = CROSSREF_RETRY_DELAY * 2**attempt
+        logger.warning(f"CrossRef rate limited {url}. Retrying in {delay}s...")
+        time.sleep(delay)
+        response = requests.get(url, params=params, headers=headers, timeout=10)
+    return response
 
 
 SEMANTIC_SCHOLAR_API_KEY = os.getenv("SEMANTIC_SCHOLAR_API_KEY")
@@ -355,14 +398,13 @@ def get_host_organization_name(host_organization_url: str) -> Optional[str]:
             else:
                 response.raise_for_status()
         except requests.RequestException as e:
-            if attempt < OPENALEX_MAX_RETRIES - 1:
-                logger.warning(
-                    f"Error fetching host organization (attempt {attempt + 1}): {e}. Retrying..."
-                )
-                time.sleep(OPENALEX_RETRY_DELAY)
-            else:
-                logger.exception(f"Error fetching host organization: {url}")
+            if not _is_transient(e) or attempt == OPENALEX_MAX_RETRIES - 1:
+                _log_lookup_failure("OpenAlex", f"host organization - {url}", e)
                 return None
+            logger.warning(
+                f"Error fetching host organization (attempt {attempt + 1}): {e}. Retrying..."
+            )
+            time.sleep(OPENALEX_RETRY_DELAY)
     return None
 
 
@@ -407,13 +449,12 @@ def get_paper_by_open_alex_id(open_alex_id: str) -> Optional[OpenAlexWork]:
             else:
                 response.raise_for_status()
         except requests.RequestException as e:
-            if attempt < OPENALEX_MAX_RETRIES - 1:
-                logger.warning(
-                    f"Error fetching paper by OpenAlex ID (attempt {attempt + 1}): {e}. Retrying..."
-                )
-                time.sleep(OPENALEX_RETRY_DELAY)
-            else:
+            if not _is_transient(e) or attempt == OPENALEX_MAX_RETRIES - 1:
                 raise
+            logger.warning(
+                f"Error fetching paper by OpenAlex ID (attempt {attempt + 1}): {e}. Retrying..."
+            )
+            time.sleep(OPENALEX_RETRY_DELAY)
     return None
 
 
@@ -447,13 +488,12 @@ def get_work_by_doi(doi: str) -> Optional[OpenAlexWork]:
             else:
                 response.raise_for_status()
         except requests.RequestException as e:
-            if attempt < OPENALEX_MAX_RETRIES - 1:
-                logger.warning(
-                    f"Error fetching work by DOI (attempt {attempt + 1}): {e}. Retrying..."
-                )
-                time.sleep(OPENALEX_RETRY_DELAY)
-            else:
+            if not _is_transient(e) or attempt == OPENALEX_MAX_RETRIES - 1:
                 raise
+            logger.warning(
+                f"Error fetching work by DOI (attempt {attempt + 1}): {e}. Retrying..."
+            )
+            time.sleep(OPENALEX_RETRY_DELAY)
     return None
 
 
@@ -573,11 +613,11 @@ def get_doi(title: str, authors: Optional[List[str]] = None) -> Optional[str]:
         title: str, authors: Optional[List[str]] = None
     ) -> Optional[str]:
         base_url = "https://api.crossref.org/works"
-        params = {"query.title": quote(title), "rows": 1}
+        params = {"query.title": title, "rows": 1}
         if authors:
             params["query.author"] = ", ".join(authors)
 
-        response = requests.get(base_url, params=params, timeout=10)
+        response = _crossref_get(base_url, params=params)
         response.raise_for_status()
         data = response.json()
         items = data.get("message", {}).get("items", [])
@@ -613,40 +653,23 @@ def get_doi(title: str, authors: Optional[List[str]] = None) -> Optional[str]:
     if not title:
         return None
 
-    try:
-        crossref_doi = get_crossref_doi(title, authors)
-    except requests.RequestException:
-        logger.exception(
-            f"Error querying CrossRef API for DOI - {title}", exc_info=True
-        )
-        crossref_doi = None
+    sources = (
+        ("CrossRef", lambda: get_crossref_doi(title, authors)),
+        ("OpenAlex", lambda: get_openalex_doi(title)),
+        ("Semantic Scholar", lambda: search_semantic_scholar_doi(title)),
+    )
 
-    try:
-        openalex_doi = get_openalex_doi(title)
-    except requests.RequestException:
-        logger.exception(
-            f"Error querying OpenAlex API for DOI - {title}", exc_info=True
-        )
-        openalex_doi = None
+    for service, lookup in sources:
+        try:
+            doi = lookup()
+        except requests.RequestException as e:
+            _log_lookup_failure(service, f"DOI - {title}", e)
+            continue
+        if doi:
+            logger.info(f"Found DOI from {service}: {doi} for title: {title}")
+            return doi
 
-    try:
-        semantic_scholar_doi = search_semantic_scholar_doi(title)
-    except requests.RequestException:
-        logger.exception(
-            f"Error querying Semantic Scholar API for DOI - {title}", exc_info=True
-        )
-        semantic_scholar_doi = None
-
-    if crossref_doi:
-        logger.info(f"Found DOI from CrossRef: {crossref_doi} for title: {title}")
-    elif openalex_doi:
-        logger.info(f"Found DOI from OpenAlex: {openalex_doi} for title: {title}")
-    elif semantic_scholar_doi:
-        logger.info(
-            f"Found DOI from Semantic Scholar: {semantic_scholar_doi} for title: {title}"
-        )
-
-    return crossref_doi or openalex_doi or semantic_scholar_doi
+    return None
 
 
 def get_enriched_data(doi: str) -> Optional[EnrichedData]:
@@ -686,6 +709,9 @@ def get_enriched_data(doi: str) -> Optional[EnrichedData]:
                     publication_date=publication_date,
                 )
 
+        except requests.RequestException as e:
+            _log_lookup_failure("OpenAlex", f"enriched data - {doi}", e)
+            return None
         except Exception:
             logger.error(
                 f"Error when querying Open Alex API for DOI {doi}", exc_info=True
@@ -695,7 +721,7 @@ def get_enriched_data(doi: str) -> Optional[EnrichedData]:
 
     def get_crossref_enriched_data(doi: str) -> Optional[EnrichedData]:
         base_url = f"https://api.crossref.org/works/{quote(doi)}"
-        response = requests.get(base_url, timeout=10)
+        response = _crossref_get(base_url)
         if response.status_code == 404:
             # DOI not found in CrossRef (common for arXiv, DataCite DOIs)
             return None
@@ -735,10 +761,8 @@ def get_enriched_data(doi: str) -> Optional[EnrichedData]:
         if openalex_data:
             logger.info(f"Found enriched data from OpenAlex for DOI: {doi}")
             return openalex_data
-    except requests.RequestException:
-        logger.exception(
-            f"Error querying OpenAlex API for enriched data - {doi}", exc_info=True
-        )
+    except requests.RequestException as e:
+        _log_lookup_failure("OpenAlex", f"enriched data - {doi}", e)
 
     try:
         crossref_data = get_crossref_enriched_data(doi)
@@ -746,9 +770,7 @@ def get_enriched_data(doi: str) -> Optional[EnrichedData]:
             logger.info(f"Found enriched data from CrossRef for DOI: {doi}")
             return crossref_data
 
-    except requests.RequestException:
-        logger.exception(
-            f"Error querying CrossRef API for enriched data - {doi}", exc_info=True
-        )
+    except requests.RequestException as e:
+        _log_lookup_failure("CrossRef", f"enriched data - {doi}", e)
 
     return None
