@@ -82,6 +82,9 @@ export interface ChartValue {
 
 export interface ChartArtifact {
     kind: 'chart';
+    // Set once the artifact has been persisted, so a chat card can link to its
+    // viewer page. Absent while a chart is still streaming.
+    artifact_id?: string;
     plan: ChartPlan;
     records: Array<{
         // One plotted point, not one paper: a paper reporting several

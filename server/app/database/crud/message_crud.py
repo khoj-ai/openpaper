@@ -220,7 +220,13 @@ class MessageCRUD(CRUDBase[Message, MessageCreate, MessageUpdate]):
                 "role": message.role,
                 "content": message.content,
                 "references": message.references,
-                "artifacts": [a.payload for a in message.artifacts] or None,
+                # The artifact's own id rides along with its payload so the
+                # conversation can link each card to its viewer page. It is
+                # assigned on persistence, so a still-streaming card has none.
+                "artifacts": [
+                    {**a.payload, "artifact_id": str(a.id)} for a in message.artifacts
+                ]
+                or None,
                 "trace": message.trace,
                 "scope": message.scope,
                 "sequence": message.sequence,

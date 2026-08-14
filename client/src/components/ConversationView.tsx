@@ -28,7 +28,7 @@ import {
 	scopeItemsToEntities,
 } from "@/components/chat/MentionAutocomplete";
 import ReferencePaperCards from "@/components/ReferencePaperCards";
-import { ChatArtifactCards } from "@/components/ChatArtifactCards";
+import { ChatArtifactCards, chartViewerHrefs } from "@/components/ChatArtifactCards";
 import { MessageTraceViewer } from "@/components/MessageTraceViewer";
 import Link from "next/link";
 import { TopicBubbles } from "@/components/TopicBubbles";
@@ -73,6 +73,9 @@ interface ConversationViewProps {
 	onMentionSelectionChange?: (selection: MentionSelection) => void;
 	// Project chat scopes mentions to papers only (no projects/highlights).
 	mentionPapersOnly?: boolean;
+	// Lets a chart card link to its viewer page. Everything-mode chat has no
+	// project to hang that route off, so its cards stay unlinked.
+	projectId?: string;
 }
 
 export const ConversationView = ({
@@ -106,6 +109,7 @@ export const ConversationView = ({
 	mentionSelection = EMPTY_MENTION_SELECTION,
 	onMentionSelectionChange,
 	mentionPapersOnly = false,
+	projectId,
 }: ConversationViewProps) => {
 	const messagesContainerRef = useRef<HTMLDivElement>(null);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -302,7 +306,11 @@ export const ConversationView = ({
 					{msg.content}
 				</Markdown>
 				{msg.artifacts && msg.artifacts.length > 0 && (
-					<ChatArtifactCards artifacts={msg.artifacts} onOpenPaper={openArtifactPaper} />
+					<ChatArtifactCards
+						artifacts={msg.artifacts}
+						onOpenPaper={openArtifactPaper}
+						chartDetailHrefs={chartViewerHrefs(msg.artifacts, projectId)}
+					/>
 				)}
 				{msg.references && msg.references["citations"]?.length > 0 ? (
 					<div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">

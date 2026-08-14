@@ -541,6 +541,7 @@ function ProjectConversationPageContent() {
                     mentionSelection={mentionSelection}
                     onMentionSelectionChange={setMentionSelection}
                     mentionPapersOnly
+                    projectId={projectId}
                 />
             </div>
         </div>
