@@ -87,7 +87,6 @@ async def get_project_artifacts(
     rows = artifact_crud.list_for_project(
         db,
         project_id=uuid.UUID(project_id),
-        kind=None,
     )
 
     artifacts = [
