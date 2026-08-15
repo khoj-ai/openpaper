@@ -36,11 +36,9 @@ export function breakTagsToNodes(text: string, key: string): React.ReactNode {
     ));
 }
 
-/** The pre-render pass over markdown text nodes.
- *
- * Break tags are the first thing it handles and, so far, the only one; the
- * name is the job rather than today's single rule, so the next fixup a model's
- * output needs has an obvious home. */
+/** Walk arbitrary children, applying the fixups above wherever a string
+ * appears. Elements are recursed into rather than rewritten, so a node the
+ * markdown pipeline already built keeps its own props. */
 export function preFormatTextForRendering(node: React.ReactNode, key: string): React.ReactNode {
     if (typeof node === 'string') return breakTagsToNodes(node, key);
     if (Array.isArray(node)) {
