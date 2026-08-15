@@ -21,6 +21,8 @@ from app.llm.provider import LLMProvider, TextContent
 from app.llm.tools.file_tools import (
     read_abstract,
     read_abstract_function,
+    read_file,
+    read_file_function,
     search_all_files,
     search_all_files_function,
     search_file,
@@ -188,8 +190,12 @@ class DataTableOperations(BaseLLMClient):
     # character budgets so a broad search over a large corpus can't blow the
     # context.
     PROPOSE_MAX_TURNS = 6
-    PROPOSE_TOOL_RESULT_CHARS = 8_000
-    PROPOSE_TOOL_BUDGET_CHARS = 60_000
+    # A single result still has to fit alongside everything else the turn is
+    # carrying, so long ones are cut — but the cut is announced (see below), so
+    # the model can page through the rest with view_file instead of concluding
+    # the paper simply ends there.
+    PROPOSE_TOOL_RESULT_CHARS = 30_000
+    PROPOSE_TOOL_BUDGET_CHARS = 120_000
 
     def investigate_fields(
         self,
@@ -211,12 +217,14 @@ class DataTableOperations(BaseLLMClient):
         paper_ids = [paper_id for paper_id, _ in papers]
         function_declarations = [
             read_abstract_function,
+            read_file_function,
             search_all_files_function,
             search_file_function,
             view_file_function,
         ]
         function_maps = {
             "read_abstract": read_abstract,
+            "read_file": read_file,
             "search_all_files": search_all_files,
             "search_file": search_file,
             "view_file": view_file,
@@ -296,7 +304,16 @@ class DataTableOperations(BaseLLMClient):
                         project_id=project_id,
                         restrict_to_paper_ids=paper_ids,
                     )
-                    result = str(raw)[: self.PROPOSE_TOOL_RESULT_CHARS]
+                    whole = str(raw)
+                    result = whole[: self.PROPOSE_TOOL_RESULT_CHARS]
+                    if len(whole) > len(result):
+                        # Silently returning a prefix reads as a complete
+                        # answer, and an investigator that believes it has seen
+                        # the whole paper stops looking.
+                        result += (
+                            f"\n\n[Truncated: {len(result)} of {len(whole)} characters "
+                            "shown. Use view_file with a line range to read further.]"
+                        )
                     total_result_chars += len(result)
                     if call.name == "search_all_files" and isinstance(raw, dict):
                         hits = 0
@@ -363,6 +380,9 @@ class DataTableOperations(BaseLLMClient):
             f"Gathered passages from {covered} of {len(papers)} paper{'s' if len(papers) != 1 else ''}",
         ]
         if investigation_report:
+            # Display only. The report goes on whole in `findings`, which is
+            # what the planner reads; this is a one-line trace entry and a
+            # thousand-word paragraph in it would bury every other step.
             summary = " ".join(investigation_report.split())
             status_messages.append(
                 f"Investigator's read: {summary[:400]}{'…' if len(summary) > 400 else ''}"
@@ -414,12 +434,14 @@ class DataTableOperations(BaseLLMClient):
 
         function_declarations = [
             read_abstract_function,
+            read_file_function,
             search_all_files_function,
             search_file_function,
             view_file_function,
         ]
         function_maps = {
             "read_abstract": read_abstract,
+            "read_file": read_file,
             "search_all_files": search_all_files,
             "search_file": search_file,
             "view_file": view_file,

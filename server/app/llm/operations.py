@@ -11,8 +11,6 @@ class Operations(
     PaperOperations,
     MultiPaperOperations,
     ConversationOperations,
-    # ChartOperations subclasses DataTableOperations, so it precedes it here
-    # to keep the linearization consistent.
     ChartOperations,
     DataTableOperations,
 ):
