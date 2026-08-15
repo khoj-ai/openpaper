@@ -17,7 +17,7 @@ from unittest.mock import patch
 
 from app.helpers.compute_agent import ComputeAgentError
 from app.llm.chart_operations import ChartOperations
-from app.llm.chart_operations import _plan_screen as _real_plan_screen
+from app.llm.chart_operations.extraction import _plan_screen as _real_plan_screen
 from app.llm.conversation_operations import DataTableOperations
 from app.schemas.chart import ChartCalculation, ChartField, ChartPlan
 from app.schemas.responses import DataTableCellValue
@@ -84,7 +84,7 @@ _patches = []
 def setUpModule():
     _patches.append(
         patch(
-            "app.llm.chart_operations._paper_pdf",
+            "app.llm.chart_operations.extraction._paper_pdf",
             side_effect=lambda paper_id, *_a, **_k: (b"%PDF-1.4", f"{paper_id}.pdf"),
         )
     )
@@ -92,7 +92,9 @@ def setUpModule():
     # its own terms in TestTheScreenDecidesWhatIsOpened. Everywhere else the
     # fixtures are about what happens to a paper once it IS opened, so any
     # paper with gathered evidence is treated as worth opening.
-    _patches.append(patch("app.llm.chart_operations._plan_screen", return_value=len))
+    _patches.append(
+        patch("app.llm.chart_operations.extraction._plan_screen", return_value=len)
+    )
     for started in _patches:
         started.start()
 
@@ -315,7 +317,7 @@ class TestChartFailureReporting(unittest.TestCase):
             ),
         )
         with patch(
-            "app.llm.chart_operations.run_computed_columns",
+            "app.llm.chart_operations.extraction.run_computed_columns",
             side_effect=ComputeAgentError("sandbox unavailable"),
         ):
             artifact = StubChartOperations(
@@ -630,6 +632,41 @@ class TestRecordIdentity(unittest.TestCase):
 
         self.assertEqual(build(forward, backward), build(backward, forward))
 
+    def test_a_typeset_minus_sign_still_sorts_as_negative(self):
+        """PDFs write a minus as U+2212, not as a hyphen.
+
+        The sort key looks for a sign before comparing, so a number still
+        wearing the typeset form parses as positive and a negative value lands
+        on the wrong side of zero."""
+        artifact = StubChartOperations(
+            records_json(
+                record(
+                    "paper-1",
+                    "Study",
+                    benchmark=("3.1", "a shift of 3.1"),
+                    score=("10", "a shift of 3.1"),
+                ),
+                record(
+                    "paper-1",
+                    "Study",
+                    benchmark=("\u22125.2", "a shift of \u22125.2"),
+                    score=("20", "a shift of \u22125.2"),
+                ),
+            )
+        ).build_chart_artifact(
+            prompt="chart score against shift",
+            plan=simple_plan(),
+            evidence={"paper-1": ["4: benchmark shifts and their scores"]},
+            papers=[("paper-1", "Study")],
+            **DB,
+        )
+
+        assert artifact is not None
+        plotted = [r for r in artifact.records if not r.exclusion_reason]
+        self.assertEqual(
+            [r.values["benchmark"].value for r in plotted], ["\u22125.2", "3.1"]
+        )
+
     def test_each_entity_from_one_paper_gets_its_own_derived_value(self):
         plan = simple_plan(
             y_key="hit_ratio",
@@ -650,7 +687,9 @@ class TestRecordIdentity(unittest.TestCase):
                 )
             return {"version": 1, "script": "…", "warnings": []}
 
-        with patch("app.llm.chart_operations.run_computed_columns", fake_compute):
+        with patch(
+            "app.llm.chart_operations.extraction.run_computed_columns", fake_compute
+        ):
             artifact = StubChartOperations(
                 records_json(
                     record(
@@ -715,7 +754,9 @@ class TestRecordIdentity(unittest.TestCase):
                 "warnings": ["paper-1: total imputed from reported SE"],
             }
 
-        with patch("app.llm.chart_operations.run_computed_columns", fake_compute):
+        with patch(
+            "app.llm.chart_operations.extraction.run_computed_columns", fake_compute
+        ):
             artifact = StubChartOperations(
                 records_json(
                     record(
@@ -877,7 +918,8 @@ class TestPlanCoverageIsMeasured(unittest.TestCase):
     def test_the_widest_covered_candidate_wins_over_the_first_offered(self):
         papers = [(f"p{i}", f"Paper {i}") for i in range(1, 19)]
         with patch(
-            "app.llm.chart_operations.search_all_files", side_effect=self._search
+            "app.llm.chart_operations.planning.search_all_files",
+            side_effect=self._search,
         ):
             plan = (
                 StubChartOperations(self.CANDIDATES)
@@ -907,7 +949,8 @@ class TestPlanCoverageIsMeasured(unittest.TestCase):
             fields=[],
         )
         with patch(
-            "app.llm.chart_operations.search_all_files", side_effect=self._search
+            "app.llm.chart_operations.planning.search_all_files",
+            side_effect=self._search,
         ):
             coverage = ChartOperations.measure_plan_coverage(
                 narrow, papers, SimpleNamespace(), SimpleNamespace(), "project-1"
@@ -952,7 +995,9 @@ class TestPlanCoverageIsMeasured(unittest.TestCase):
                 inputs=inputs,
             ),
         )
-        with patch("app.llm.chart_operations.search_all_files", side_effect=search):
+        with patch(
+            "app.llm.chart_operations.planning.search_all_files", side_effect=search
+        ):
             coverage = ChartOperations.measure_plan_coverage(
                 computed, papers, SimpleNamespace(), SimpleNamespace(), "project-1"
             )
@@ -980,7 +1025,7 @@ class TestPlanCoverageIsMeasured(unittest.TestCase):
         ]
         stub = StubChartOperations(self.CANDIDATES)
         with patch(
-            "app.llm.chart_operations.message_crud.get_conversation_messages",
+            "app.llm.chart_operations.planning.message_crud.get_conversation_messages",
             return_value=turns,
         ):
             stub.propose_chart_plan(
@@ -1006,7 +1051,9 @@ class TestTheScreenDecidesWhatIsOpened(unittest.TestCase):
     def setUp(self):
         # This class tests the screen itself, so the module-wide stand-in is
         # lifted for its duration.
-        patcher = patch("app.llm.chart_operations._plan_screen", _real_plan_screen)
+        patcher = patch(
+            "app.llm.chart_operations.extraction._plan_screen", _real_plan_screen
+        )
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -1093,7 +1140,7 @@ class TestAnUnindexedPaperIsReported(unittest.TestCase):
     """
 
     def test_a_paper_with_no_pdf_is_excluded_by_name(self):
-        with patch("app.llm.chart_operations._paper_pdf", return_value=None):
+        with patch("app.llm.chart_operations.extraction._paper_pdf", return_value=None):
             artifact = StubChartOperations(records_json()).build_chart_artifact(
                 prompt="chart scores",
                 plan=simple_plan(),
@@ -1114,7 +1161,10 @@ class TestAnUnindexedPaperIsReported(unittest.TestCase):
                 raise RuntimeError("s3 exploded")
             return b"%PDF-1.4", f"{paper_id}.pdf"
 
-        with patch("app.llm.chart_operations._paper_pdf", side_effect=missing_for_two):
+        with patch(
+            "app.llm.chart_operations.extraction._paper_pdf",
+            side_effect=missing_for_two,
+        ):
             artifact = StubChartOperations(
                 records_json(
                     record(
@@ -1238,7 +1288,7 @@ class TestBothSurfacesShareOnePath(unittest.TestCase):
         investigation's, rather than being dropped in favour of them."""
         seen: list[list[str]] = []
         with patch(
-            "app.llm.chart_operations._plan_screen",
+            "app.llm.chart_operations.extraction._plan_screen",
             side_effect=lambda _plan: lambda lines: seen.append(lines) or len(lines),
         ):
             self.Recorder(self.CANDIDATE, records_json()).create_chart_artifact(
@@ -1589,7 +1639,7 @@ class TestOnePaperIsReadOnce(unittest.TestCase):
 
     def test_a_second_copy_is_reported_and_left_unread(self):
         with patch(
-            "app.llm.chart_operations.read_file",
+            "app.llm.chart_operations.planning.read_file",
             return_value="Benchmark A reports 100 examples",
         ):
             evidence, steps, duplicates = ChartOperations.sweep_plan_evidence(
@@ -1607,7 +1657,7 @@ class TestOnePaperIsReadOnce(unittest.TestCase):
 
     def test_papers_that_merely_share_a_title_are_both_read(self):
         with patch(
-            "app.llm.chart_operations.read_file",
+            "app.llm.chart_operations.planning.read_file",
             side_effect=lambda paper_id, **_: f"Benchmark A reports {paper_id} examples",
         ):
             evidence, _, duplicates = ChartOperations.sweep_plan_evidence(
@@ -1776,7 +1826,7 @@ class TestInvestigationHarness(unittest.TestCase):
             "app.llm.conversation_operations.search_all_files",
             return_value={"paper-1": ["7: Benchmark A uses 100 examples"]},
         ), patch(
-            "app.llm.chart_operations.read_file",
+            "app.llm.chart_operations.planning.read_file",
             side_effect=lambda paper_id, **_: f"benchmark {paper_id} reports 12 examples",
         ):
             investigation = Harness().investigate_chart_fields(
@@ -1792,9 +1842,10 @@ class TestInvestigationHarness(unittest.TestCase):
 
     def test_sweep_falls_back_to_the_abstract_so_absence_is_evidenced(self):
         with patch(
-            "app.llm.chart_operations.read_file", return_value="Nothing relevant here."
+            "app.llm.chart_operations.planning.read_file",
+            return_value="Nothing relevant here.",
         ), patch(
-            "app.llm.chart_operations.read_abstract",
+            "app.llm.chart_operations.planning.read_abstract",
             return_value="Abstract:\n\nWe study retrieval.",
         ):
             evidence, _, _ = ChartOperations.sweep_plan_evidence(
@@ -1810,7 +1861,7 @@ class TestInvestigationHarness(unittest.TestCase):
 
     def test_sweep_does_not_duplicate_passages_the_agent_already_found(self):
         with patch(
-            "app.llm.chart_operations.read_file",
+            "app.llm.chart_operations.planning.read_file",
             return_value="Benchmark A uses 100 examples",
         ):
             evidence, _, _ = ChartOperations.sweep_plan_evidence(
