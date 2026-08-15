@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { ChartArtifact } from "@/lib/schema";
 import { fetchFromApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -44,8 +44,8 @@ export function ProjectChartDetail({ artifactId }: { artifactId: string }) {
         return <div className="flex flex-1 flex-col items-center justify-center gap-4">
             <p className="text-muted-foreground">{error}</p>
             <Button variant="outline" onClick={() => router.push(`/projects/${projectId}`)}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Project
+                <X className="mr-2 h-4 w-4" />
+                Close
             </Button>
         </div>;
     }
