@@ -49,30 +49,6 @@ def _append_status(messages: Optional[List[str]], message: str) -> None:
         messages.append(message)
 
 
-def _recent_exchange(
-    db: Session, conversation_id: str, current_user: CurrentUser, turns: int = 4
-) -> str:
-    """The last few turns, for requests that refer back to them.
-
-    "Chart this relationship" names nothing on its own; without the turn that
-    established the relationship, a planner has to invent a subject.
-    """
-    try:
-        messages = message_crud.get_conversation_messages(
-            db,
-            conversation_id=uuid.UUID(conversation_id),
-            current_user=current_user,
-            page=1,
-            page_size=turns,
-        )
-    except Exception:
-        logger.warning("Could not load history for the chart plan", exc_info=True)
-        return ""
-    return "\n\n".join(
-        f"{message.role}: {str(message.content or '')[:1500]}" for message in messages
-    )
-
-
 async def _stream_chat_chunks(
     chunk_generator: AsyncGenerator[Union[dict, str], None],
     content_chunks: List[str],
@@ -403,39 +379,36 @@ async def chat_message_multipaper(
                         for paper in all_papers
                     ]
                     chart = None
+                    chart_trace: dict = {}
                     if request.project_id:
                         # Same entry point the artifact composer uses, so a
                         # request that charts in one surface charts in the
                         # other. The chat's own gathered passages go in as
                         # prior evidence, and recent turns let a follow-up like
                         # "chart that relationship" resolve.
-                        chart, _ = operations.create_chart_artifact(
+                        chart, chart_trace = operations.create_chart_artifact(
                             prompt=request.user_query,
                             papers=roster,
                             current_user=current_user,
                             db=db,
                             project_id=request.project_id,
-                            history=_recent_exchange(
-                                db, request.conversation_id, current_user
-                            ),
+                            conversation_id=request.conversation_id,
                             prior_evidence=evidence_collection.get_evidence_dict(),
                         )
                     else:
                         # Everything-mode chat has no project to investigate
                         # within, so it plans from the scoped evidence it
                         # already gathered.
-                        chart_plan = operations.propose_chart_plan(
+                        chart_proposal = operations.propose_chart_plan(
                             request.user_query,
                             roster,
                             json.dumps(evidence_collection.get_evidence_dict()),
-                            history=_recent_exchange(
-                                db, request.conversation_id, current_user
-                            ),
+                            conversation_id=request.conversation_id,
                         )
-                        if chart_plan:
+                        if chart_proposal.plan:
                             chart = operations.build_chart_artifact(
                                 prompt=request.user_query,
-                                plan=chart_plan,
+                                plan=chart_proposal.plan,
                                 evidence=evidence_collection.get_evidence_dict(),
                                 papers=roster,
                                 current_user=current_user,
@@ -446,10 +419,13 @@ async def chat_message_multipaper(
                         artifacts_collected.append(payload)
                         yield f"{json.dumps({'type': 'artifact', 'content': payload})}{END_DELIMITER}"
                     else:
+                        # A planner that declined said why; that is a better
+                        # answer than the generic one and it goes back verbatim.
                         failure = (
                             operations.chart_failure_message(chart)
                             if chart
-                            else "I couldn't determine a chart shape supported by these papers. "
+                            else chart_trace.get("clarification")
+                            or "I couldn't determine a chart shape supported by these papers. "
                             "Use **Artifacts → Chart** to choose the axes yourself."
                         ) + "\n\n"
                         content_chunks.append(failure)
