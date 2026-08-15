@@ -1,7 +1,7 @@
 """CRUD for first-party artifacts (citations today; charts/images later)."""
 
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 from app.database.crud.base_crud import CRUDBase
 from app.database.models import (
@@ -104,7 +104,7 @@ class ArtifactCRUD(CRUDBase[Artifact, ArtifactCreate, ArtifactUpdate]):
         scope_type: str,
         scope_id: Optional[uuid.UUID],
         user: CurrentUser,
-        kind: Optional[ArtifactKind] = None,
+        kinds: Optional[Sequence[ArtifactKind]] = None,
         limit: int = 100,
         offset: int = 0,
     ) -> List[Artifact]:
@@ -121,8 +121,8 @@ class ArtifactCRUD(CRUDBase[Artifact, ArtifactCreate, ArtifactUpdate]):
             q = q.filter(Artifact.scope_id == scope_id)
         else:
             q = q.filter(Artifact.scope_id.is_(None))
-        if kind is not None:
-            q = q.filter(Artifact.kind == kind.value)
+        if kinds is not None:
+            q = q.filter(Artifact.kind.in_([kind.value for kind in kinds]))
         return q.order_by(Artifact.created_at.desc()).offset(offset).limit(limit).all()
 
     def list_for_project(
@@ -130,7 +130,7 @@ class ArtifactCRUD(CRUDBase[Artifact, ArtifactCreate, ArtifactUpdate]):
         db: Session,
         *,
         project_id: uuid.UUID,
-        kind: Optional[ArtifactKind] = None,
+        kinds: Optional[Sequence[ArtifactKind]] = None,
         limit: int = 200,
         offset: int = 0,
     ) -> List[tuple[Artifact, uuid.UUID, Optional[str]]]:
@@ -152,8 +152,8 @@ class ArtifactCRUD(CRUDBase[Artifact, ArtifactCreate, ArtifactUpdate]):
                 Artifact.scope_id == project_id,
             )
         )
-        if kind is not None:
-            q = q.filter(Artifact.kind == kind.value)
+        if kinds is not None:
+            q = q.filter(Artifact.kind.in_([kind.value for kind in kinds]))
         return q.order_by(Artifact.created_at.desc()).offset(offset).limit(limit).all()
 
 
