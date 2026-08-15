@@ -1,11 +1,19 @@
+/** Fixups applied to model-authored markdown on its way to being rendered.
+ *
+ * Raw HTML stays disabled in the markdown pipeline, because model output is
+ * untrusted. That is the right default and it has a cost: anything the model
+ * writes as a tag arrives here as literal text, so the few tags worth honouring
+ * have to be turned back into nodes by hand.
+ *
+ * Break tags are the only rule so far. The file is named for the job rather
+ * than for that one rule, so the next thing a model's output needs on the way
+ * to the DOM has an obvious home.
+ */
+
 import React from 'react';
 
-/** Turn literal `<br>` text into real line breaks.
- *
- * Models keep emitting `<br>` inside GFM table cells, because a cell has no
- * other way to hold more than one line. Raw HTML stays disabled in the markdown
- * pipeline — model output is untrusted — so the tag survives as plain text and
- * has to be converted here.
+/** A literal `<br>`, which models emit inside GFM table cells because a cell
+ * has no other way to hold more than one line.
  *
  * Deliberately not a global regex: `split` handles every occurrence either way,
  * and a global regex carries `lastIndex` across `.test()` calls, which would
@@ -28,13 +36,17 @@ export function breakTagsToNodes(text: string, key: string): React.ReactNode {
     ));
 }
 
-/** Walk arbitrary children, converting break tags wherever a string appears. */
-export function splitOnBreakTags(node: React.ReactNode, key: string): React.ReactNode {
+/** The pre-render pass over markdown text nodes.
+ *
+ * Break tags are the first thing it handles and, so far, the only one; the
+ * name is the job rather than today's single rule, so the next fixup a model's
+ * output needs has an obvious home. */
+export function preFormatTextForRendering(node: React.ReactNode, key: string): React.ReactNode {
     if (typeof node === 'string') return breakTagsToNodes(node, key);
     if (Array.isArray(node)) {
         return node.map((child, index) => (
             <React.Fragment key={`${key}-${index}`}>
-                {splitOnBreakTags(child, `${key}-${index}`)}
+                {preFormatTextForRendering(child, `${key}-${index}`)}
             </React.Fragment>
         ));
     }
@@ -44,7 +56,7 @@ export function splitOnBreakTags(node: React.ReactNode, key: string): React.Reac
         if (props?.children !== undefined) {
             return React.cloneElement(
                 node as React.ReactElement<{ children?: React.ReactNode }>,
-                { children: splitOnBreakTags(props.children, `${key}-c`) },
+                { children: preFormatTextForRendering(props.children, `${key}-c`) },
             );
         }
     }

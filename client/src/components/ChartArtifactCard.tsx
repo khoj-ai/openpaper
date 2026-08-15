@@ -8,6 +8,7 @@ import { MessageTraceViewer } from "@/components/MessageTraceViewer";
 import { ChartFigure, chartView } from "@/components/ChartFigure";
 import { ChartValuesTable } from "@/components/ChartValuesTable";
 import { ChartExportButtons } from "@/components/ChartExportButtons";
+import { AnimatedMarkdown } from "@/components/AnimatedMarkdown";
 
 export function ChartArtifactCard({ artifact, onOpenPaper, chatHref, detailHref, display = "compact" }: {
     artifact: ChartArtifact;
@@ -98,7 +99,9 @@ export function ChartArtifactCard({ artifact, onOpenPaper, chatHref, detailHref,
                         </div>
                     ))}
                     {artifact.warnings.map(warning => (
-                        <p key={warning} className="text-amber-700 dark:text-amber-300">{warning}</p>
+                        <div key={warning} className="text-amber-700 dark:text-amber-300">
+                            <AnimatedMarkdown content={warning} />
+                        </div>
                     ))}
                 </div>}
             </>}

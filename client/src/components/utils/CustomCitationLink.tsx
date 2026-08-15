@@ -1,6 +1,6 @@
 import { Citation, ReferenceCitation } from "@/lib/schema";
 import React, { HTMLAttributes, ReactNode, createElement, Children } from "react";
-import { BREAK_TAG, hasBreakTag } from "@/lib/markdownBreaks";
+import { BREAK_TAG, hasBreakTag } from "@/lib/markdownPreFormat";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { PaperItem } from "@/lib/schema";
 

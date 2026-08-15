@@ -7,14 +7,14 @@ import remarkMath from 'remark-math';
 import Markdown, { Components } from 'react-markdown';
 import { PluggableList } from 'unified';
 import { Copy, Check, Download } from 'lucide-react';
-import { cellText, splitOnBreakTags } from '@/lib/markdownBreaks';
+import { cellText, preFormatTextForRendering } from '@/lib/markdownPreFormat';
 
 function TableCell({ children, ...props }: React.TdHTMLAttributes<HTMLTableCellElement>) {
-    return <td {...props}>{splitOnBreakTags(children, 'td')}</td>;
+    return <td {...props}>{preFormatTextForRendering(children, 'td')}</td>;
 }
 
 function TableHeaderCell({ children, ...props }: React.ThHTMLAttributes<HTMLTableCellElement>) {
-    return <th {...props}>{splitOnBreakTags(children, 'th')}</th>;
+    return <th {...props}>{preFormatTextForRendering(children, 'th')}</th>;
 }
 
 
