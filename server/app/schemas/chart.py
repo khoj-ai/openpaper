@@ -44,6 +44,21 @@ class ChartPlanCandidates(BaseModel):
     """
 
     candidates: List[ChartPlan] = Field(default_factory=list)
+    clarification: Optional[str] = Field(
+        default=None,
+        description=(
+            "Returned INSTEAD of candidates when the request cannot honestly be "
+            "turned into a chart over this corpus. Say what is missing and what "
+            "the user could specify, in one or two sentences addressed to them."
+        ),
+    )
+
+
+class ChartProposal(BaseModel):
+    """What the planner came back with: a plan, or why it could not make one."""
+
+    plan: Optional[ChartPlan] = None
+    clarification: Optional[str] = None
 
 
 class ChartValue(BaseModel):

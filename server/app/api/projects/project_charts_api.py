@@ -34,10 +34,13 @@ def _papers_for_request(
     papers = project_paper_crud.get_all_papers_by_project_id(
         db, project_id=uuid.UUID(project_id), user=user
     )
-    if paper_ids:
-        allowed = set(paper_ids)
-        papers = [paper for paper in papers if str(paper.id) in allowed]
-    return papers
+    if not paper_ids:
+        return papers
+    # Keyed lookup rather than a scan per id, and it hands back the papers in
+    # the order the request named them. Ids that are not in the project simply
+    # do not resolve, which is the membership check as well as the filter.
+    by_id = {str(paper.id): paper for paper in papers}
+    return [by_id[paper_id] for paper_id in paper_ids if paper_id in by_id]
 
 
 @project_charts_router.post("/propose")
@@ -65,7 +68,7 @@ def propose_chart(
         db=db,
         project_id=request.project_id,
     )
-    plan = operations.propose_chart_plan(
+    proposal = operations.propose_chart_plan(
         prompt,
         [(str(paper.id), str(paper.title or "Untitled")) for paper in papers],
         investigation.findings,
@@ -73,11 +76,17 @@ def propose_chart(
         db=db,
         project_id=request.project_id,
     )
-    if not plan:
+    if not proposal.plan:
+        # A planner that declined has something useful to say; only a genuine
+        # failure to produce anything is a server error.
+        if proposal.clarification:
+            return JSONResponse(
+                status_code=400, content={"message": proposal.clarification}
+            )
         return JSONResponse(
             status_code=500, content={"message": "Failed to propose a chart plan"}
         )
-    return JSONResponse(content={"plan": plan.model_dump()})
+    return JSONResponse(content={"plan": proposal.plan.model_dump()})
 
 
 @project_charts_router.post("")
