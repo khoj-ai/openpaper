@@ -347,22 +347,28 @@ class TestChartPlanHygiene(unittest.TestCase):
     def test_series_survives_so_one_entity_can_be_measured_several_ways(self):
         """x=model, y=score, series=benchmark: without the series the same
         model appears once per benchmark with no way to tell them apart."""
-        plan = StubChartOperations(
-            json.dumps(
-                {
-                    "candidates": [
-                        {
-                            "title": "Score by model",
-                            "chart_type": "bar",
-                            "x": {"key": "model", "label": "Model"},
-                            "y": {"key": "score", "label": "Score"},
-                            "series": {"key": "benchmark", "label": "Benchmark"},
-                            "fields": [],
-                        }
-                    ]
-                }
+        plan = (
+            StubChartOperations(
+                json.dumps(
+                    {
+                        "candidates": [
+                            {
+                                "title": "Score by model",
+                                "chart_type": "bar",
+                                "x": {"key": "model", "label": "Model"},
+                                "y": {"key": "score", "label": "Score"},
+                                "series": {"key": "benchmark", "label": "Benchmark"},
+                                "fields": [],
+                            }
+                        ]
+                    }
+                )
             )
-        ).propose_chart_plan("chart model scores per benchmark", [("one", "Paper one")])
+            .propose_chart_plan(
+                "chart model scores per benchmark", [("one", "Paper one")]
+            )
+            .plan
+        )
 
         assert plan is not None
         assert plan.series is not None
@@ -370,71 +376,83 @@ class TestChartPlanHygiene(unittest.TestCase):
         self.assertEqual({f.key for f in plan.fields}, {"model", "score", "benchmark"})
 
     def test_series_that_repeats_an_axis_is_dropped(self):
-        plan = StubChartOperations(
-            json.dumps(
-                {
-                    "candidates": [
-                        {
-                            "title": "Score by model",
-                            "chart_type": "bar",
-                            "x": {"key": "model", "label": "Model"},
-                            "y": {"key": "score", "label": "Score"},
-                            "series": {"key": "model", "label": "Model"},
-                            "fields": [],
-                        }
-                    ]
-                }
+        plan = (
+            StubChartOperations(
+                json.dumps(
+                    {
+                        "candidates": [
+                            {
+                                "title": "Score by model",
+                                "chart_type": "bar",
+                                "x": {"key": "model", "label": "Model"},
+                                "y": {"key": "score", "label": "Score"},
+                                "series": {"key": "model", "label": "Model"},
+                                "fields": [],
+                            }
+                        ]
+                    }
+                )
             )
-        ).propose_chart_plan("chart model scores", [("one", "Paper one")])
+            .propose_chart_plan("chart model scores", [("one", "Paper one")])
+            .plan
+        )
 
         assert plan is not None
         self.assertIsNone(plan.series)
 
     def test_axis_fields_are_backfilled(self):
-        plan = StubChartOperations(
-            json.dumps(
-                {
-                    "candidates": [
-                        {
-                            "title": "Score by benchmark",
-                            "chart_type": "bar",
-                            "x": {"key": "benchmark", "label": "Benchmark"},
-                            "y": {"key": "score", "label": "Score"},
-                            "series": {"key": "model", "label": "Model"},
-                            "fields": [],
-                        }
-                    ]
-                }
+        plan = (
+            StubChartOperations(
+                json.dumps(
+                    {
+                        "candidates": [
+                            {
+                                "title": "Score by benchmark",
+                                "chart_type": "bar",
+                                "x": {"key": "benchmark", "label": "Benchmark"},
+                                "y": {"key": "score", "label": "Score"},
+                                "series": {"key": "model", "label": "Model"},
+                                "fields": [],
+                            }
+                        ]
+                    }
+                )
             )
-        ).propose_chart_plan("chart scores", [("one", "Paper one")])
+            .propose_chart_plan("chart scores", [("one", "Paper one")])
+            .plan
+        )
 
         assert plan is not None
         self.assertEqual({f.key for f in plan.fields}, {"benchmark", "score", "model"})
 
     def test_derived_y_is_bound_to_the_y_field_key(self):
-        plan = StubChartOperations(
-            json.dumps(
-                {
-                    "candidates": [
-                        {
-                            "title": "Hit ratio",
-                            "chart_type": "bar",
-                            "x": {"key": "benchmark", "label": "Benchmark"},
-                            "y": {"key": "hit_ratio", "label": "Hit ratio"},
-                            "fields": [
-                                {"key": "hits", "label": "Hits"},
-                                {"key": "total", "label": "Total"},
-                            ],
-                            "calculation": {
-                                "label": "whatever",
-                                "spec": "hits / total",
-                                "inputs": ["hits", "total"],
-                            },
-                        }
-                    ]
-                }
+        plan = (
+            StubChartOperations(
+                json.dumps(
+                    {
+                        "candidates": [
+                            {
+                                "title": "Hit ratio",
+                                "chart_type": "bar",
+                                "x": {"key": "benchmark", "label": "Benchmark"},
+                                "y": {"key": "hit_ratio", "label": "Hit ratio"},
+                                "fields": [
+                                    {"key": "hits", "label": "Hits"},
+                                    {"key": "total", "label": "Total"},
+                                ],
+                                "calculation": {
+                                    "label": "whatever",
+                                    "spec": "hits / total",
+                                    "inputs": ["hits", "total"],
+                                },
+                            }
+                        ]
+                    }
+                )
             )
-        ).propose_chart_plan("chart hit ratio", [("one", "Paper one")])
+            .propose_chart_plan("chart hit ratio", [("one", "Paper one")])
+            .plan
+        )
 
         assert plan is not None
         assert plan.calculation is not None
@@ -442,9 +460,28 @@ class TestChartPlanHygiene(unittest.TestCase):
 
     def test_unparseable_plan_returns_none(self):
         self.assertIsNone(
-            StubChartOperations("not json at all").propose_chart_plan(
-                "chart it", [("one", "P")]
+            StubChartOperations("not json at all")
+            .propose_chart_plan("chart it", [("one", "P")])
+            .plan
+        )
+
+    def test_a_planner_that_declines_says_why(self):
+        """A request that pins to no axis is better refused than invented.
+
+        Guessing an axis spends a long generation and returns a chart nobody
+        asked for; the planner's own words go back to the user instead."""
+        proposal = StubChartOperations(
+            json.dumps(
+                {
+                    "candidates": [],
+                    "clarification": "Name the measure you want on the y axis.",
+                }
             )
+        ).propose_chart_plan("chart these papers", [("one", "P")])
+
+        self.assertIsNone(proposal.plan)
+        self.assertEqual(
+            proposal.clarification, "Name the measure you want on the y axis."
         )
 
     def test_calculation_inputs_are_declared_as_extractable_fields(self):
@@ -452,33 +489,37 @@ class TestChartPlanHygiene(unittest.TestCase):
         target. If a calculation reads primitives that never appear there, the
         investigator has no instruction to look for them, so whether they land
         in evidence depends on which synonyms the agent happened to try."""
-        plan = StubChartOperations(
-            json.dumps(
-                {
-                    "candidates": [
-                        {
-                            "title": "Effect size by sample size",
-                            "chart_type": "scatter",
-                            "x": {"key": "n_total", "label": "Sample size"},
-                            "y": {"key": "cohens_d", "label": "Cohen's d"},
-                            "fields": [{"key": "n_total", "label": "Sample size"}],
-                            "calculation": {
-                                "label": "cohens_d",
-                                "spec": "standardised mean difference",
-                                "inputs": [
-                                    "mean_t",
-                                    "sd_t",
-                                    "n_t",
-                                    "mean_c",
-                                    "sd_c",
-                                    "n_c",
-                                ],
-                            },
-                        }
-                    ]
-                }
+        plan = (
+            StubChartOperations(
+                json.dumps(
+                    {
+                        "candidates": [
+                            {
+                                "title": "Effect size by sample size",
+                                "chart_type": "scatter",
+                                "x": {"key": "n_total", "label": "Sample size"},
+                                "y": {"key": "cohens_d", "label": "Cohen's d"},
+                                "fields": [{"key": "n_total", "label": "Sample size"}],
+                                "calculation": {
+                                    "label": "cohens_d",
+                                    "spec": "standardised mean difference",
+                                    "inputs": [
+                                        "mean_t",
+                                        "sd_t",
+                                        "n_t",
+                                        "mean_c",
+                                        "sd_c",
+                                        "n_c",
+                                    ],
+                                },
+                            }
+                        ]
+                    }
+                )
             )
-        ).propose_chart_plan("chart effect size against sample size", [("one", "P")])
+            .propose_chart_plan("chart effect size against sample size", [("one", "P")])
+            .plan
+        )
 
         assert plan is not None
         assert plan.calculation is not None
@@ -838,12 +879,16 @@ class TestPlanCoverageIsMeasured(unittest.TestCase):
         with patch(
             "app.llm.chart_operations.search_all_files", side_effect=self._search
         ):
-            plan = StubChartOperations(self.CANDIDATES).propose_chart_plan(
-                "chart models tested vs their relative scores",
-                papers,
-                current_user=SimpleNamespace(),
-                db=SimpleNamespace(),
-                project_id="project-1",
+            plan = (
+                StubChartOperations(self.CANDIDATES)
+                .propose_chart_plan(
+                    "chart models tested vs their relative scores",
+                    papers,
+                    current_user=SimpleNamespace(),
+                    db=SimpleNamespace(),
+                    project_id="project-1",
+                )
+                .plan
             )
 
         assert plan is not None
@@ -915,21 +960,37 @@ class TestPlanCoverageIsMeasured(unittest.TestCase):
         self.assertEqual(coverage, 1)
 
     def test_without_a_corpus_to_measure_the_first_candidate_stands(self):
-        plan = StubChartOperations(self.CANDIDATES).propose_chart_plan(
-            "chart scores", [("p1", "Paper 1")]
+        plan = (
+            StubChartOperations(self.CANDIDATES)
+            .propose_chart_plan("chart scores", [("p1", "Paper 1")])
+            .plan
         )
         assert plan is not None
         self.assertEqual(plan.y.key, "robust_accuracy")
 
     def test_the_planner_is_told_what_the_conversation_established(self):
-        """'Chart this relationship' names nothing without the prior turn."""
+        """'Chart this relationship' names nothing without the prior turn.
+
+        The turns ride in as conversation history, the same way every other
+        chat call passes them, rather than being flattened into the prompt."""
+        turns = [
+            SimpleNamespace(
+                role="assistant", content="Six papers inspect maternal fever"
+            )
+        ]
         stub = StubChartOperations(self.CANDIDATES)
-        stub.propose_chart_plan(
-            "can you create a chart that illustrates this relationship quantitatively?",
-            [("p1", "Paper 1")],
-            history="assistant: Six papers inspect maternal fever and adverse outcomes...",
-        )
-        self.assertIn("maternal fever", stub.last_prompt)
+        with patch(
+            "app.llm.chart_operations.message_crud.get_conversation_messages",
+            return_value=turns,
+        ):
+            stub.propose_chart_plan(
+                "can you create a chart that illustrates this relationship quantitatively?",
+                [("p1", "Paper 1")],
+                conversation_id="11111111-1111-1111-1111-111111111111",
+                current_user=SimpleNamespace(),
+                db=SimpleNamespace(),
+            )
+        self.assertEqual(stub.calls[-1]["history"], turns)
 
 
 class TestTheScreenDecidesWhatIsOpened(unittest.TestCase):

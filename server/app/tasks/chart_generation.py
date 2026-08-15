@@ -69,7 +69,11 @@ def generate_chart(
             message = (
                 operations.chart_failure_message(artifact)
                 if artifact
-                else "No cited chart could be built from this scope."
+                else (
+                    "I couldn't determine a chart shape these papers support. "
+                    "Try naming the measure and the entity you want on each axis "
+                    '— for example "odds ratio by trimester".'
+                )
             )
             chart_job_crud.update(
                 db,
