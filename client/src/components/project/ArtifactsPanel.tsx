@@ -58,15 +58,25 @@ const audioLengthOptions = [
     { label: "Long (20+ mins)", value: "long" },
 ];
 
+/** The kinds of row the panel can list. Named rather than spelled out at each
+ * use so the switch below, the row builders and the type all move together. */
+const ArtifactRow = {
+    DataTable: "data-table",
+    Chart: "chart",
+    AudioJob: "audio-job",
+    AudioOverview: "audio-overview",
+    Chat: "chat",
+} as const;
+
 type ArtifactListItem =
-    | { id: string; timestamp: string | null; type: "data-table"; job: DataTableJob }
-    | { id: string; timestamp: string | null; type: "chart"; job: ChartGenerationJob }
-    | { id: string; timestamp: string | null; type: "audio-job"; job: AudioOverviewJob }
-    | { id: string; timestamp: string | null; type: "audio-overview"; overview: AudioOverview }
+    | { id: string; timestamp: string | null; type: typeof ArtifactRow.DataTable; job: DataTableJob }
+    | { id: string; timestamp: string | null; type: typeof ArtifactRow.Chart; job: ChartGenerationJob }
+    | { id: string; timestamp: string | null; type: typeof ArtifactRow.AudioJob; job: AudioOverviewJob }
+    | { id: string; timestamp: string | null; type: typeof ArtifactRow.AudioOverview; overview: AudioOverview }
     | {
         id: string;
         timestamp: string | null;
-        type: "chat";
+        type: typeof ArtifactRow.Chat;
         group: {
             messageId: string;
             conversationId: string;
@@ -470,11 +480,11 @@ export function ArtifactsPanel() {
 
     const artifactItems = useMemo<ArtifactListItem[]>(() => {
         const items: ArtifactListItem[] = [
-            ...dataTableJobs.map((job) => ({ id: job.id, timestamp: job.updated_at || job.completed_at || job.created_at, type: "data-table" as const, job })),
-            ...chartJobs.map((job) => ({ id: job.id, timestamp: job.updated_at || job.completed_at || job.created_at || null, type: "chart" as const, job })),
-            ...audioJobs.map((job) => ({ id: job.id, timestamp: job.updated_at || job.completed_at || job.created_at || null, type: "audio-job" as const, job })),
-            ...audioOverviews.map((overview) => ({ id: overview.id, timestamp: overview.updated_at || overview.created_at, type: "audio-overview" as const, overview })),
-            ...chatArtifactGroups.map((group) => ({ id: group.messageId, timestamp: group.timestamp, type: "chat" as const, group })),
+            ...dataTableJobs.map((job) => ({ id: job.id, timestamp: job.updated_at || job.completed_at || job.created_at, type: ArtifactRow.DataTable, job })),
+            ...chartJobs.map((job) => ({ id: job.id, timestamp: job.updated_at || job.completed_at || job.created_at || null, type: ArtifactRow.Chart, job })),
+            ...audioJobs.map((job) => ({ id: job.id, timestamp: job.updated_at || job.completed_at || job.created_at || null, type: ArtifactRow.AudioJob, job })),
+            ...audioOverviews.map((overview) => ({ id: overview.id, timestamp: overview.updated_at || overview.created_at, type: ArtifactRow.AudioOverview, overview })),
+            ...chatArtifactGroups.map((group) => ({ id: group.messageId, timestamp: group.timestamp, type: ArtifactRow.Chat, group })),
         ];
         return items.sort((a, b) => timestampMs(b.timestamp) - timestampMs(a.timestamp));
     }, [audioJobs, audioOverviews, chartJobs, chatArtifactGroups, dataTableJobs]);
@@ -547,16 +557,16 @@ export function ArtifactsPanel() {
                             padding from the scrollable overflow area. */}
                         <div className="space-y-3 pb-6">
                             {artifactItems.map((item) => {
-                                if (item.type === "data-table") {
+                                if (item.type === ArtifactRow.DataTable) {
                                     return <DataTableGenerationJobCard key={item.id} job={item.job} projectId={projectId} />;
                                 }
-                                if (item.type === "chart") {
+                                if (item.type === ArtifactRow.Chart) {
                                     return <ChartGenerationJobCard key={item.id} job={item.job} onOpenPaper={handleOpenChartPaper} />;
                                 }
-                                if (item.type === "audio-job") {
+                                if (item.type === ArtifactRow.AudioJob) {
                                     return <AudioOverviewGenerationJobCard key={item.id} job={item.job} />;
                                 }
-                                if (item.type === "audio-overview") {
+                                if (item.type === ArtifactRow.AudioOverview) {
                                     const { overview } = item;
                                     return <AudioOverviewCard
                                         key={item.id}
