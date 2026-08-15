@@ -70,6 +70,9 @@ def downgrade() -> None:
     op.drop_index(
         "ix_chart_generation_jobs_project_created", table_name="chart_generation_jobs"
     )
-    op.alter_column("artifacts", "message_id", existing_type=sa.UUID(), nullable=False)
     op.drop_table("chart_generation_jobs")
+    # Artifacts created while message_id was nullable (chart artifacts are not tied to
+    # a chat message) cannot survive restoring the NOT NULL constraint.
+    op.execute("DELETE FROM artifacts WHERE message_id IS NULL")
+    op.alter_column("artifacts", "message_id", existing_type=sa.UUID(), nullable=False)
     # ### end Alembic commands ###
