@@ -78,6 +78,10 @@ export interface ChartValue {
     value: string;
     quote: string;
     line_number?: string | null;
+    // The quantity `value` carries, parsed on the server. `value` stays as the
+    // paper wrote it, so this is what gets plotted; null when the quoted text
+    // states no plottable quantity.
+    number?: number | null;
 }
 
 export interface ChartArtifact {

@@ -65,6 +65,16 @@ class ChartValue(BaseModel):
     value: str
     quote: str = Field(description="Exact supporting quote from the paper")
     line_number: Optional[str] = None
+    number: Optional[float] = Field(
+        default=None,
+        description=(
+            "The quantity `value` carries, parsed once on the server. `value` "
+            "stays exactly as the paper wrote it — converting it is the model's "
+            "one forbidden operation — so the number every renderer plots is "
+            "derived here rather than re-parsed at each drawing surface. None "
+            "when the quoted text states no plottable quantity."
+        ),
+    )
 
 
 class ChartRecord(BaseModel):

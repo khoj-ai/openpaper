@@ -18,6 +18,7 @@ from unittest.mock import patch
 from app.helpers.compute_agent import ComputeAgentError
 from app.llm.chart_operations import ChartOperations
 from app.llm.chart_operations.extraction import _plan_screen as _real_plan_screen
+from app.llm.chart_operations.text import parse_number
 from app.llm.conversation_operations import DataTableOperations
 from app.schemas.chart import ChartCalculation, ChartField, ChartPlan
 from app.schemas.responses import DataTableCellValue
@@ -226,6 +227,83 @@ class TestChartRecords(unittest.TestCase):
         self.assertEqual(
             [r.values["score"].value for r in artifact.records], ["33", "50"]
         )
+
+
+class TestValuesAreParsedOnce(unittest.TestCase):
+    """The quantity is parsed on the server and stored beside the quote.
+
+    `value` stays as the paper wrote it, because converting it is the model's
+    one forbidden operation. That left every drawing surface re-deriving the
+    number from the string, and they disagreed: a quoted "2.5e-3" ordered as
+    2.5 on the server and drew as 0.0025 in the browser.
+    """
+
+    def test_the_leading_number_is_the_value_and_the_rest_is_annotation(self):
+        for raw, expected in [
+            ("56.5", 56.5),
+            ("1,234", 1234.0),
+            ("2.5e-3", 0.0025),
+            ("\u22120.42", -0.42),
+            ("12%", 12.0),
+            ("1.5 (95% CI 1.1\u20139.4)", 1.5),
+            ("1.5 \u00b1 0.2", 1.5),
+        ]:
+            with self.subTest(raw=raw):
+                self.assertEqual(parse_number(raw), expected)
+
+    def test_a_bound_is_not_a_value(self):
+        """ "p < 0.001" is a bound. Drawing it as a bar of 0.001 states
+        something the study never claimed."""
+        for raw in ["p < 0.001", "\u2264 0.05", "> 100", "N/A", ""]:
+            with self.subTest(raw=raw):
+                self.assertIsNone(parse_number(raw))
+
+    def test_the_parsed_number_is_stored_on_the_record(self):
+        artifact = StubChartOperations(
+            records_json(
+                record(
+                    "paper-1",
+                    "Study",
+                    benchmark=("A", "a rate of 2.5e-3"),
+                    score=("2.5e-3", "a rate of 2.5e-3"),
+                ),
+            )
+        ).build_chart_artifact(
+            prompt="chart scores",
+            plan=simple_plan(),
+            evidence={"paper-1": ["4: benchmark A score"]},
+            papers=[("paper-1", "Study")],
+            **DB,
+        )
+
+        assert artifact is not None
+        plotted = [r for r in artifact.records if not r.exclusion_reason]
+        self.assertEqual(plotted[0].values["score"].number, 0.0025)
+        self.assertEqual(plotted[0].values["score"].value, "2.5e-3")
+
+    def test_an_unplottable_value_is_excluded_with_its_own_words(self):
+        artifact = StubChartOperations(
+            records_json(
+                record(
+                    "paper-1",
+                    "Study",
+                    benchmark=("A", "significant at p < 0.001"),
+                    score=("p < 0.001", "significant at p < 0.001"),
+                ),
+            )
+        ).build_chart_artifact(
+            prompt="chart scores",
+            plan=simple_plan(),
+            evidence={"paper-1": ["4: benchmark A score"]},
+            papers=[("paper-1", "Study")],
+            **DB,
+        )
+
+        assert artifact is not None
+        self.assertFalse([r for r in artifact.records if not r.exclusion_reason])
+        reason = artifact.records[0].exclusion_reason or ""
+        self.assertIn("p < 0.001", reason)
+        self.assertIn("no plottable value", reason)
 
 
 class TestAbsenceIsExplained(unittest.TestCase):

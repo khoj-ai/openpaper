@@ -32,6 +32,7 @@ from app.llm.base import ModelType
 from app.llm.chart_operations.text import (
     field_terms,
     normalize,
+    parse_number,
     phrase_pattern,
     slug,
     values_digest,
@@ -185,12 +186,13 @@ def _point_sort_key(plan: ChartPlan):
     """
 
     def key(record: ChartRecord):
-        raw = record.values[plan.x.key].value if plan.x.key in record.values else ""
-        cleaned = normalize(raw).replace(",", "")
+        cell = record.values.get(plan.x.key)
+        cleaned = normalize(cell.value) if cell else ""
         tail = (cleaned, record.paper_title, record.record_id)
-        match = re.search(r"-?\d+(?:\.\d+)?", cleaned)
-        if match:
-            return (0, float(match.group()), *tail)
+        # The same parsed number the renderer plots, so the order a chart is
+        # stored in and the positions it is drawn at cannot disagree.
+        if cell and cell.number is not None:
+            return (0, cell.number, *tail)
         return (1, 0.0, *tail)
 
     return key
@@ -344,7 +346,12 @@ class ChartExtracting(DataTableOperations):
                 # this one; the per-paper call has no business emitting it.
                 if extracted.paper_id != paper_id:
                     continue
-                values = {key: extracted.values[key] for key in required_keys}
+                values = {
+                    key: extracted.values[key].model_copy(
+                        update={"number": parse_number(extracted.values[key].value)}
+                    )
+                    for key in required_keys
+                }
                 series_value = (
                     values[plan.series.key].value
                     if plan.series and plan.series.key in values
@@ -364,6 +371,15 @@ class ChartExtracting(DataTableOperations):
                 # the model emitted twice is a duplicate.
                 if record.record_id in seen_record_ids:
                     continue
+                # A y that parsed to nothing is not a bar. Saying so here puts
+                # it in the not-charted list with its own quoted text, which is
+                # what lets a reader see that the paper reported "p < 0.001"
+                # rather than wonder why it is missing.
+                if not plan.calculation and values[plan.y.key].number is None:
+                    record.exclusion_reason = (
+                        f"Reported {plan.y.label} as "
+                        f'"{values[plan.y.key].value}", which states no plottable value'
+                    )
                 seen_record_ids.add(record.record_id)
                 included.append(record)
 
@@ -511,7 +527,9 @@ class ChartExtracting(DataTableOperations):
                     # The derived value's inputs remain in values; this empty quote
                     # is intentionally distinguishable from an extracted primitive.
                     record.values[calculation.label] = ChartValue(
-                        value=value, quote="Computed from cited inputs"
+                        value=value,
+                        quote="Computed from cited inputs",
+                        number=parse_number(value),
                     )
             payload.computation = provenance
             # An imputed or dropped input is exactly what a reader needs to see

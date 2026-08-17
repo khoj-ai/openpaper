@@ -16,12 +16,6 @@ export interface ChartPoint {
     cells: Array<{ key: string; value: string; quote: string; lineNumber?: string | null }>;
 }
 
-export function numeric(raw?: string): number | null {
-    if (!raw) return null;
-    const match = raw.replace(/,/g, "").match(/-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?/);
-    return match ? Number(match[0]) : null;
-}
-
 /** Categorical slots, validated for CVD separation and lightness against both
  * theme surfaces. Assigned in fixed order and never cycled or generated: a
  * ninth series folds into the table rather than inventing a hue. Contrast for
@@ -77,8 +71,12 @@ export function chartPoints(artifact: ChartArtifact): ChartPoint[] {
     const points: ChartPoint[] = [];
     for (const record of artifact.records) {
         if (record.exclusion_reason) continue;
-        const value = numeric(record.values[artifact.plan.y.key]?.value);
-        if (value === null) continue;
+        // Parsed once on the server and stored on the value, so the figure,
+        // the table, the PNG and the server's own ordering all plot the same
+        // number. Re-deriving it here is how a quoted "2.5e-3" came to be
+        // ordered as 2.5 and drawn as 0.0025.
+        const value = record.values[artifact.plan.y.key]?.number;
+        if (value === null || value === undefined) continue;
         const label = record.values[artifact.plan.x.key]?.value ?? "";
         const seriesKey = artifact.plan.series?.key;
         // A quoted discriminator wins when the plan has one; otherwise the
@@ -96,7 +94,7 @@ export function chartPoints(artifact: ChartArtifact): ChartPoint[] {
             paperTitle: record.paper_title,
             label,
             value,
-            x: numeric(label),
+            x: record.values[artifact.plan.x.key]?.number ?? null,
             cells: Object.entries(record.values).map(([key, cell]) => ({
                 key,
                 value: cell.value,
