@@ -73,9 +73,11 @@ _WORD_RE = re.compile(r"[A-Za-z]{3,}")
 # ratio of -0.4 sorts, and reads, as 0.4. Folding these before anything looks
 # for a sign is what keeps that from happening.
 #
-# The quote and space variants below matter less — every other caller condenses
-# to alphanumerics straight afterwards, which strips them anyway — but they
-# keep two renderings of one retrieved line from deduplicating as two.
+# The quote variants below matter less — every other caller condenses to
+# alphanumerics straight afterwards, which strips them anyway — but they keep
+# two renderings of one retrieved line from deduplicating as two. Exotic spaces
+# are not listed: NFKC already folds them to a plain space. A zero-width space
+# is, because NFKC leaves it exactly where it is, in the middle of a word.
 _TYPOGRAPHY = str.maketrans(
     {
         "‘": "'",
@@ -92,9 +94,6 @@ _TYPOGRAPHY = str.maketrans(
         "—": "-",
         "―": "-",
         "−": "-",
-        " ": " ",
-        " ": " ",
-        " ": " ",
         "​": "",
     }
 )
@@ -125,37 +124,6 @@ def values_digest(values: dict[str, ChartValue]) -> str:
         f"{key}={condense(normalize(values[key].value))}" for key in sorted(values)
     )
     return hashlib.sha1(material.encode("utf-8")).hexdigest()[:8]
-
-
-# A quoted value is prose: "0.84", "1.5 (95% CI 1.1-9.4)", "12%", "p < 0.001".
-# Only some of that is a quantity, and deciding which is a judgement made here,
-# once, rather than by whatever regex each renderer happens to carry.
-_NUMBER_RE = re.compile(r"[-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?")
-_COMPARISON = frozenset("<>\u2264\u2265")
-
-
-def parse_number(raw: str) -> Optional[float]:
-    """The quantity a quoted value carries, or None if it carries none.
-
-    The leading number is the value; whatever follows it is annotation the
-    chart does not plot — a unit, a confidence interval, a standard deviation.
-    So "1.5 (95% CI 1.1-9.4)" is 1.5 and "12%" is 12.
-
-    A comparison in front of it means the paper did not report a value at all.
-    "p < 0.001" is a bound, and drawing it as a bar of 0.001 states something
-    the study never claimed, so it is refused and the point is excluded with a
-    reason rather than quietly plotted.
-    """
-    folded = normalize(raw).replace(",", "")
-    match = _NUMBER_RE.search(folded)
-    if not match:
-        return None
-    if any(character in _COMPARISON for character in folded[: match.start()]):
-        return None
-    try:
-        return float(match.group())
-    except ValueError:
-        return None
 
 
 def field_phrases(fields: list[ChartField]) -> str:

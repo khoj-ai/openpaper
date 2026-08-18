@@ -13,7 +13,7 @@ export interface ChartPoint {
     value: number;
     series?: string;
     x: number | null;
-    cells: Array<{ key: string; value: string; quote: string; lineNumber?: string | null }>;
+    cells: Array<{ key: string; value: string; unit?: string | null; quote: string; lineNumber?: string | null }>;
 }
 
 /** Categorical slots, validated for CVD separation and lightness against both
@@ -98,6 +98,7 @@ export function chartPoints(artifact: ChartArtifact): ChartPoint[] {
             cells: Object.entries(record.values).map(([key, cell]) => ({
                 key,
                 value: cell.value,
+                unit: cell.unit,
                 quote: cell.quote,
                 lineNumber: cell.line_number,
             })),

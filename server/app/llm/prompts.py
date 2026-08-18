@@ -480,6 +480,13 @@ outcome when that is where the evidence is.
   one model is scored on several benchmarks. Leave `series` null otherwise.
 - `fields` must list every primitive the extractor needs. Never invent paper
   findings or values.
+- Give every field the `unit` its numbers are plotted in. One field is one
+  unit, and naming it is what lets a paper reporting milliseconds join a chart
+  drawn in seconds — the extractor converts each paper's number into the unit
+  named here. So name it even when you expect the literature to disagree;
+  especially then. Prefer the unit the request asked for, then the one this
+  literature most often reports in. Leave it empty only for a measure that has
+  no unit at all — a count, an index, a dimensionless score.
 
 Papers rarely STATE a derived quantity, so do not assume one is reported. When
 the requested measure is an effect size, an odds/risk ratio, a percentage
@@ -581,6 +588,25 @@ Rules:
 - Copy values only when the attached paper states them.
 - Every value MUST include an exact quote from the paper. For a value read out
   of a table, quote the row and column that locate it.
+- Give each value the `unit` this paper states for it — %, s, ms, mg/dL — copied
+  from the paper and never converted. A table's unit is usually in its column
+  header, so "Lat. (s)" makes the unit "s" for every value in that column. Leave
+  it empty when the paper states none; do not guess one from the measure's name.
+- The plan gives each field the unit the chart is drawn in, which is often not
+  the unit this paper used. You do not convert the number — `value` stays
+  exactly as printed — you say HOW to convert it, in `conversion`: a one-line
+  Python lambda taking this paper's number to the plan's unit. `lambda v: v`
+  when the paper already reports in it, or the field has no unit at all.
+  `lambda v: v / 1000` for a paper in ms on a chart in s. `lambda v: v * 100`
+  for a proportion on a chart in %. `lambda v: v * 0.621371` for km on a chart
+  in miles. `lambda v: v * 9 / 5 + 32` for °C on a chart in °F. Work the factor
+  out from what the units mean, not from a list — any conversion that is
+  arithmetic is allowed, however unusual the units.
+  Leave `conversion` EMPTY when this paper's number cannot be expressed in the
+  plan's unit by arithmetic at all — a score on a different instrument, an
+  incommensurable scale — and put one plain sentence in `conversion_note`
+  saying so. That excludes the point and shows the reader your sentence, which
+  is the right outcome; a made-up factor is not.
 - The quote must support the measure AS THE PLAN DEFINES IT, subject included.
   A quote is not enough on its own: if the plan's y is an odds ratio for autism
   and this paper reports an odds ratio for a different outcome, a different

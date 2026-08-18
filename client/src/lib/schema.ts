@@ -78,9 +78,18 @@ export interface ChartValue {
     value: string;
     quote: string;
     line_number?: string | null;
-    // The quantity `value` carries, parsed on the server. `value` stays as the
-    // paper wrote it, so this is what gets plotted; null when the quoted text
-    // states no plottable quantity.
+    // What this paper measured the value in, as it stated it — which is often
+    // not what the chart is drawn in.
+    unit?: string | null;
+    // The lambda the extractor proposed to take this paper's number into the
+    // field's unit, run in the sandbox. `lambda v: v` when the paper already
+    // reported in it; empty when it could not be expressed there at all, in
+    // which case the point is excluded and `conversion_note` says why.
+    conversion?: string | null;
+    conversion_note?: string | null;
+    // The plotted quantity: `value` parsed and put through `conversion`, so it
+    // is in the field's unit. `value` stays as the paper wrote it; null when
+    // the quoted text states no plottable quantity.
     number?: number | null;
 }
 

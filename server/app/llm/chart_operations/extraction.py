@@ -11,8 +11,13 @@ the document instead, the same way the data table feature already does it.
 
 Extraction is per paper: one call each, so a large corpus cannot crowd out the
 tail of the roster and one bad response cannot take the whole chart down with
-it. The model may quote primitives; it may never do arithmetic. Derived y values
-go to the sandboxed compute agent, whose provenance becomes part of the payload.
+it.
+
+The model may quote primitives and it may propose arithmetic, but it never
+performs any. A paper reporting in a unit the plan does not use comes back with
+the lambda that would move it, and that lambda runs in the sandbox with every
+other one, in a single pass, before any derived y is computed. Both the
+conversions and the calculation leave their provenance in the payload.
 """
 
 import json
@@ -26,13 +31,24 @@ from typing import Any, Optional
 
 from app.database.crud.paper_crud import paper_crud
 from app.database.crud.projects.project_paper_crud import project_paper_crud
-from app.helpers.compute_agent import ComputeAgentError, run_computed_columns
+from app.helpers.compute_agent import (
+    ComputeAgentError,
+    format_number,
+    run_computed_columns,
+)
 from app.helpers.s3 import s3_service
+from app.helpers.unit_conversion import (
+    ConversionError,
+    ConversionRequest,
+    is_identity,
+    run_unit_conversions,
+    shape_error,
+)
 from app.llm.base import ModelType
+from app.llm.chart_operations.quantities import normalize_unit, parse_quantity
 from app.llm.chart_operations.text import (
     field_terms,
     normalize,
-    parse_number,
     phrase_pattern,
     slug,
     values_digest,
@@ -46,6 +62,7 @@ from app.schemas.chart import (
     ChartExtraction,
     ChartExtractionRecord,
     ChartPlan,
+    ChartQuotedValue,
     ChartRecord,
     ChartValue,
 )
@@ -68,13 +85,16 @@ EXTRACTION_WORKERS = 12
 
 
 def _required_value_fields(keys: list[str]) -> type[BaseModel]:
-    """A model whose every field is a required ChartValue.
+    """A model whose every field is a required quoted value.
+
+    Built on ChartQuotedValue, not ChartValue: the request schema must not
+    contain the parsed number, or the model is being invited to compute one.
 
     The field names come from the plan, so they cannot be written as keyword
     arguments; create_model's overloads reserve names like `__config__` for
     itself and cannot express a caller-supplied mapping.
     """
-    fields: dict[str, Any] = {key: (ChartValue, ...) for key in keys}
+    fields: dict[str, Any] = {key: (ChartQuotedValue, ...) for key in keys}
     return create_model("ChartPointValues", **fields)  # type: ignore[call-overload]
 
 
@@ -148,6 +168,150 @@ def _paper_pdf(
     if not data:
         return None
     return data, f"{str(paper.title) if paper.title else 'paper'}.pdf"
+
+
+def _read_quantity(quoted: ChartQuotedValue) -> ChartValue:
+    """A quoted value with the number the paper printed read out of it.
+
+    Only the number. Which unit it belongs in is the plan's decision and
+    getting it there is the extractor's lambda, run later in the sandbox — so
+    at this point the value is still in whatever the paper used.
+    """
+    parsed = parse_quantity(quoted.value)
+    return ChartValue(
+        **quoted.model_dump(exclude={"unit"}),
+        unit=normalize_unit(quoted.unit) or parsed.unit,
+        number=parsed.number,
+    )
+
+
+def _convert_to_plan_units(
+    payload: ChartArtifactPayload,
+) -> Optional[dict[str, Any]]:
+    """Put every extracted number into the unit its field declares.
+
+    The plan names a unit per field and the extractor, reading one paper with
+    that plan in hand, proposes the arithmetic that gets that paper's number
+    there. Applying it is this function's job, and it happens in one sandbox
+    run for the whole chart: the conversions are model-authored code and the
+    server does not execute those.
+
+    Most charts do no work here. A paper reporting in the plan's unit gets
+    `lambda v: v`, which is recognised and skipped, so the sandbox is only
+    reached when a corpus genuinely disagrees with itself.
+
+    A conversion the extractor withheld is a refusal — this number cannot be
+    expressed in the plan's unit without changing what it measures — and the
+    point leaves the chart carrying the reason it was given. A conversion that
+    is malformed, or that fails in the sandbox, costs its own point too: the
+    alternative is plotting milliseconds on an axis of seconds.
+    """
+    labels = {
+        field.key: field
+        for field in [
+            payload.plan.x,
+            payload.plan.y,
+            *([payload.plan.series] if payload.plan.series else []),
+            *payload.plan.fields,
+        ]
+    }
+
+    def target(key: str) -> str:
+        field = labels.get(key)
+        return normalize_unit(field.unit if field else "") or "the chart's unit"
+
+    convertible: list[ConversionRequest] = []
+    # A record can hold several values, so the point alone does not identify
+    # the number being converted; the field key has to ride along with it.
+    addressed: dict[str, tuple[ChartRecord, str]] = {}
+
+    for record in payload.records:
+        if record.exclusion_reason:
+            continue
+        pending: list[tuple[ConversionRequest, str]] = []
+        for key, cell in record.values.items():
+            if cell.number is None or is_identity(cell.conversion):
+                continue
+            problem = shape_error(cell.conversion)
+            if problem:
+                # Withholding the conversion is how the extractor says this
+                # number does not belong on this axis, so its note is the
+                # reader's explanation. A conversion that is merely malformed
+                # gets a generic one and a line in the log.
+                record.exclusion_reason = cell.conversion_note or (
+                    f"Reported {labels[key].label if key in labels else key} in "
+                    f"{cell.unit or 'a unit it did not name'}, which could not "
+                    f"be expressed in {target(key)}"
+                )
+                if not cell.conversion_note:
+                    logger.warning(
+                        "Discarding conversion %r for %s: %s",
+                        cell.conversion,
+                        record.record_id,
+                        problem,
+                    )
+                break
+            pending.append(
+                (
+                    ConversionRequest(
+                        key=f"{record.record_id}::{key}",
+                        number=cell.number,
+                        conversion=cell.conversion,
+                    ),
+                    key,
+                )
+            )
+        if record.exclusion_reason:
+            continue
+        for request, key in pending:
+            addressed[request.key] = (record, key)
+            convertible.append(request)
+
+    if not convertible:
+        return None
+
+    try:
+        results, provenance = run_unit_conversions(convertible)
+    except ConversionError as exc:
+        payload.warnings.append(
+            f"{len(convertible)} value{'s' if len(convertible) != 1 else ''} "
+            f"needed converting onto the chart's units and could not be: {exc}"
+        )
+        for record, _ in addressed.values():
+            if not record.exclusion_reason:
+                record.exclusion_reason = (
+                    "This paper reported in a different unit, and the "
+                    "conversion could not be run"
+                )
+        return None
+
+    moved = Counter()
+    for address, (record, key) in addressed.items():
+        cell = record.values[key]
+        result = results.get(address)
+        if result is None or result.number is None:
+            if not record.exclusion_reason:
+                record.exclusion_reason = (
+                    f"Reported {labels[key].label if key in labels else key} in "
+                    f"{cell.unit or 'a unit it did not name'}, and converting "
+                    f"it to {target(key)} failed"
+                )
+            logger.warning(
+                "Conversion failed for %s: %s",
+                address,
+                result.error if result else "no result returned",
+            )
+            continue
+        # `value` is left as the paper printed it, so the quote still matches
+        # the number's origin rather than its destination.
+        cell.number = result.number
+        moved[(cell.unit or "an unnamed unit", target(key))] += 1
+
+    for (unit, into), count in sorted(moved.items()):
+        payload.warnings.append(
+            f"{count} value{'s' if count != 1 else ''} converted from {unit} to {into}"
+        )
+    return provenance
 
 
 def _papers_collide_on_x(records: list[ChartRecord], plan: ChartPlan) -> bool:
@@ -224,6 +388,26 @@ class ChartExtracting(DataTableOperations):
         # source-backed field is an explicit required JSON property. Responses
         # are read back as ChartExtraction, whose values stay a plain mapping.
         point_values_model = _required_value_fields(required_keys)
+        # Named in the system prompt as well as the dumped plan: the target
+        # unit is what every conversion has to land on, so it is stated where
+        # the required keys are rather than left to be looked up.
+        plan_units = {
+            field.key: normalize_unit(field.unit)
+            for field in [
+                plan.x,
+                plan.y,
+                *([plan.series] if plan.series else []),
+                *plan.fields,
+            ]
+        }
+        target_units = [
+            (
+                f"{key} in {plan_units[key]}"
+                if plan_units.get(key)
+                else f"{key} has no unit"
+            )
+            for key in required_keys
+        ]
         point_record_model = create_model(
             "ChartPointExtractionRecord",
             paper_id=(str, ...),
@@ -294,6 +478,8 @@ class ChartExtracting(DataTableOperations):
                 system_prompt=(
                     f"{CHART_EXTRACTION_SYSTEM_PROMPT}\n\nFor this run, every returned record's values "
                     f"MUST include these exact keys: {', '.join(required_keys)}. "
+                    f"Each one's `conversion` must land on the unit this plan gives it — "
+                    f"{'; '.join(target_units)}. "
                     f"Every record's paper_id MUST be exactly {paper_id}. "
                     "Return an empty records array if this paper does not report all of "
                     "them; never return an empty values object."
@@ -347,10 +533,7 @@ class ChartExtracting(DataTableOperations):
                 if extracted.paper_id != paper_id:
                     continue
                 values = {
-                    key: extracted.values[key].model_copy(
-                        update={"number": parse_number(extracted.values[key].value)}
-                    )
-                    for key in required_keys
+                    key: _read_quantity(extracted.values[key]) for key in required_keys
                 }
                 series_value = (
                     values[plan.series.key].value
@@ -390,6 +573,10 @@ class ChartExtracting(DataTableOperations):
             records=list(included),
             coverage=ChartCoverage(),
         )
+        # Before the calculation, not after: a derivation over primitives that
+        # are still in each paper's own units is arithmetic over incomparable
+        # numbers, and no spec can rescue that.
+        payload.conversions = _convert_to_plan_units(payload)
         if plan.calculation:
             self._compute_derived_y(payload)
         payload.series_by_paper = _papers_collide_on_x(payload.records, plan)
@@ -485,8 +672,16 @@ class ChartExtracting(DataTableOperations):
                 DataTableRow(
                     paper_id=record.record_id,
                     values={
+                        # The converted number, not the paper's own text: the
+                        # inputs have been put on the plan's units and the
+                        # script must compute over those, not re-read a string
+                        # that still says milliseconds.
                         key: DataTableCellValue(
-                            value=value.value,
+                            value=(
+                                format_number(value.number)
+                                if value.number is not None
+                                else value.value
+                            ),
                             citations=[
                                 ResponseCitation(
                                     text=value.quote, index=1, paper_id=record.paper_id
@@ -526,10 +721,14 @@ class ChartExtracting(DataTableOperations):
                 else:
                     # The derived value's inputs remain in values; this empty quote
                     # is intentionally distinguishable from an extracted primitive.
+                    parsed = parse_quantity(value)
                     record.values[calculation.label] = ChartValue(
                         value=value,
                         quote="Computed from cited inputs",
-                        number=parse_number(value),
+                        # A derivation over inputs already on the plan's units
+                        # lands on the plan's unit; nothing further to convert.
+                        unit=normalize_unit(payload.plan.y.unit) or parsed.unit,
+                        number=parsed.number,
                     )
             payload.computation = provenance
             # An imputed or dropped input is exactly what a reader needs to see

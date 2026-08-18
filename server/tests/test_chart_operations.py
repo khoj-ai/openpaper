@@ -16,9 +16,15 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from app.helpers.compute_agent import ComputeAgentError
+from app.helpers.unit_conversion import (
+    ConversionError,
+    ConversionResult,
+    is_identity,
+    shape_error,
+)
 from app.llm.chart_operations import ChartOperations
 from app.llm.chart_operations.extraction import _plan_screen as _real_plan_screen
-from app.llm.chart_operations.text import parse_number
+from app.llm.chart_operations.quantities import parse_quantity
 from app.llm.conversation_operations import DataTableOperations
 from app.schemas.chart import ChartCalculation, ChartField, ChartPlan
 from app.schemas.responses import DataTableCellValue
@@ -109,13 +115,23 @@ def records_json(*records: dict) -> str:
     return json.dumps({"records": list(records)})
 
 
-def record(paper_id: str, title: str, **values: tuple[str, str]) -> dict:
+def record(paper_id: str, title: str, **values: tuple[str, ...]) -> dict:
+    """One model-emitted record.
+
+    Each value is (value, quote) and optionally the unit the paper stated, the
+    conversion the extractor proposed, and its note, in that order.
+    """
     return {
         "paper_id": paper_id,
         "paper_title": title,
         "values": {
-            key: {"value": value, "quote": quote}
-            for key, (value, quote) in values.items()
+            key: dict(
+                zip(
+                    ("value", "quote", "unit", "conversion", "conversion_note"),
+                    stated,
+                ),
+            )
+            for key, stated in values.items()
         },
     }
 
@@ -240,23 +256,32 @@ class TestValuesAreParsedOnce(unittest.TestCase):
 
     def test_the_leading_number_is_the_value_and_the_rest_is_annotation(self):
         for raw, expected in [
-            ("56.5", 56.5),
-            ("1,234", 1234.0),
-            ("2.5e-3", 0.0025),
-            ("\u22120.42", -0.42),
-            ("12%", 12.0),
-            ("1.5 (95% CI 1.1\u20139.4)", 1.5),
-            ("1.5 \u00b1 0.2", 1.5),
+            ("56.5", (56.5, "")),
+            ("1,234", (1234.0, "")),
+            ("2.5e-3", (0.0025, "")),
+            ("\u22120.42", (-0.42, "")),
+            ("12%", (12.0, "%")),
+            # A unit is read off the text only when it is punctuation stuck to
+            # the digits. A word is left alone, because nothing here can tell
+            # "ms" from "patients" and the extractor states the unit anyway.
+            ("4900 ms", (4900.0, "")),
+            ("4.9 seconds", (4.9, "")),
+            # A confidence interval is annotation, not a unit.
+            ("1.5 (95% CI 1.1\u20139.4)", (1.5, "")),
+            ("1.5 \u00b1 0.2", (1.5, "")),
+            # A noun the sentence carried along is not a unit either.
+            ("33 patients", (33.0, "")),
+            ("8.4 mg/dL", (8.4, "mg/dl")),
         ]:
             with self.subTest(raw=raw):
-                self.assertEqual(parse_number(raw), expected)
+                self.assertEqual(tuple(parse_quantity(raw)), expected)
 
     def test_a_bound_is_not_a_value(self):
         """ "p < 0.001" is a bound. Drawing it as a bar of 0.001 states
         something the study never claimed."""
         for raw in ["p < 0.001", "\u2264 0.05", "> 100", "N/A", ""]:
             with self.subTest(raw=raw):
-                self.assertIsNone(parse_number(raw))
+                self.assertIsNone(parse_quantity(raw).number)
 
     def test_the_parsed_number_is_stored_on_the_record(self):
         artifact = StubChartOperations(
@@ -304,6 +329,258 @@ class TestValuesAreParsedOnce(unittest.TestCase):
         reason = artifact.records[0].exclusion_reason or ""
         self.assertIn("p < 0.001", reason)
         self.assertIn("no plottable value", reason)
+
+
+def fake_sandbox(requests):
+    """Stand-in for the E2B run, honouring the same contract.
+
+    The lambdas are evaluated here rather than remotely, which is what makes
+    these tests about the chart's half of the arrangement: which values are
+    sent, what happens to the ones that come back, and what happens to the
+    ones that do not. Nothing in the application evaluates a conversion — that
+    is the property TestAConversionIsNeverRunHere pins down.
+    """
+    results = {}
+    for request in requests:
+        try:
+            results[request.key] = ConversionResult(
+                number=float(eval(request.conversion)(request.number))  # noqa: S307
+            )
+        except Exception as exc:
+            results[request.key] = ConversionResult(error=str(exc))
+    return results, {"version": 1, "inputs": [r._asdict() for r in requests]}
+
+
+class TestAConversionIsShapeChecked(unittest.TestCase):
+    """A conversion is model-authored code, so its shape is a contract.
+
+    The sandbox is the security boundary; this is the check that keeps a
+    conversion from being something other than one lambda of one number, which
+    would break the harness for every value rather than for its own.
+    """
+
+    def test_a_lambda_of_one_argument_is_what_a_conversion_is(self):
+        for conversion in [
+            "lambda v: v",
+            "lambda v: v / 1000",
+            "lambda value: value * 9 / 5 + 32",
+            "lambda v: math.log10(v)",
+        ]:
+            with self.subTest(conversion=conversion):
+                self.assertEqual(shape_error(conversion), "")
+
+    def test_anything_else_is_refused(self):
+        for conversion in [
+            "",
+            "   ",
+            "v / 1000",
+            "divide by 1000",
+            "import os",
+            "lambda: 1",
+            "lambda a, b: a / b",
+            "lambda *v: v",
+            "lambda v=2: v",
+        ]:
+            with self.subTest(conversion=conversion):
+                self.assertNotEqual(shape_error(conversion), "")
+
+    def test_returning_the_argument_untouched_is_recognised(self):
+        """Most papers already report in the plan's unit, and the sandbox is
+        not worth reaching for a chart with no conversion to do."""
+        self.assertTrue(is_identity("lambda v: v"))
+        self.assertTrue(is_identity("lambda value: value"))
+        self.assertFalse(is_identity("lambda v: v / 1000"))
+        self.assertFalse(is_identity("lambda v: 1"))
+        self.assertFalse(is_identity("not a lambda"))
+
+
+class TestValuesReachThePlansUnit(unittest.TestCase):
+    """One field is one unit, and the plan is what names it.
+
+    A study's 4.9 s and the next's 4900 ms are the same latency, and plotted
+    as bare numbers they differ by a factor of a thousand. The plan declares
+    the unit the chart is drawn in; the extractor, holding the paper, proposes
+    the arithmetic that gets that paper's number there; the sandbox runs it.
+    Nothing about which conversions are possible is written down in advance,
+    which is the point — km to miles and Celsius to Fahrenheit are as
+    available as ms to s.
+    """
+
+    def _artifact(self, plan, *values, sandbox=fake_sandbox):
+        with patch(
+            "app.llm.chart_operations.extraction.run_unit_conversions",
+            side_effect=sandbox,
+        ) as run:
+            artifact = StubChartOperations(
+                records_json(
+                    *(
+                        record(
+                            f"paper-{n}",
+                            f"Study {n}",
+                            benchmark=(f"Run {n}", f"took {stated[0]}"),
+                            score=stated,
+                        )
+                        for n, stated in enumerate(values)
+                    )
+                )
+            ).build_chart_artifact(
+                prompt="chart latency",
+                plan=plan,
+                evidence={
+                    f"paper-{n}": ["4: benchmark run score"] for n in range(len(values))
+                },
+                papers=[(f"paper-{n}", f"Study {n}") for n in range(len(values))],
+                **DB,
+            )
+        assert artifact is not None
+        return artifact, run
+
+    @staticmethod
+    def _seconds_plan():
+        plan = simple_plan()
+        plan.y = ChartField(key="score", label="Latency", unit="s")
+        plan.fields = [plan.x, plan.y]
+        return plan
+
+    def test_a_paper_in_another_unit_is_converted_to_the_plans(self):
+        artifact, _ = self._artifact(
+            self._seconds_plan(),
+            ("4.9", "took 4.9 s", "s", "lambda v: v"),
+            ("4900", "took 4900 ms", "ms", "lambda v: v / 1000"),
+        )
+
+        plotted = {
+            r.paper_title: r.values["score"]
+            for r in artifact.records
+            if not r.exclusion_reason
+        }
+        self.assertEqual(plotted["Study 0"].number, 4.9)
+        self.assertEqual(plotted["Study 1"].number, 4.9)
+        # The quote has to keep matching what the paper printed, so the value
+        # is the paper's and only the number moved.
+        self.assertEqual(plotted["Study 1"].value, "4900")
+        self.assertTrue(
+            any("converted from ms to s" in w for w in artifact.warnings),
+            artifact.warnings,
+        )
+
+    def test_the_conversion_need_not_be_a_scale_factor(self):
+        """The table this replaced could do ms to s and nothing else. Celsius
+        to Fahrenheit has an offset, and miles per km is not in any dimension
+        a fixed table would have carried."""
+        plan = simple_plan()
+        plan.y = ChartField(key="score", label="Temperature", unit="°F")
+        plan.fields = [plan.x, plan.y]
+        artifact, _ = self._artifact(
+            plan,
+            ("100", "at 100 °C", "°C", "lambda v: v * 9 / 5 + 32"),
+            ("50", "at 50 °F", "°F", "lambda v: v"),
+        )
+
+        plotted = sorted(
+            r.values["score"].number or 0.0
+            for r in artifact.records
+            if not r.exclusion_reason
+        )
+        self.assertEqual(plotted, [50.0, 212.0])
+
+    def test_a_chart_with_nothing_to_convert_never_reaches_the_sandbox(self):
+        artifact, run = self._artifact(
+            self._seconds_plan(),
+            ("4.9", "took 4.9 s", "s", "lambda v: v"),
+            ("3.2", "took 3.2 s", "s", "lambda v: v"),
+        )
+
+        run.assert_not_called()
+        self.assertIsNone(artifact.conversions)
+        self.assertEqual(
+            sorted(
+                r.values["score"].number or 0.0
+                for r in artifact.records
+                if not r.exclusion_reason
+            ),
+            [3.2, 4.9],
+        )
+
+    def test_a_withheld_conversion_excludes_the_point_in_the_extractors_words(self):
+        """Refusing is the right answer when a number cannot be expressed in
+        the plan's unit, and the reason belongs to whoever read the paper."""
+        artifact, _ = self._artifact(
+            self._seconds_plan(),
+            ("4.9", "took 4.9 s", "s", "lambda v: v"),
+            (
+                "8.4",
+                "8.4 mg/dL of it",
+                "mg/dL",
+                "",
+                "A concentration is not a latency",
+            ),
+        )
+
+        excluded = [r for r in artifact.records if r.exclusion_reason]
+        self.assertEqual(len(excluded), 1)
+        self.assertEqual(excluded[0].paper_title, "Study 1")
+        self.assertEqual(
+            excluded[0].exclusion_reason, "A concentration is not a latency"
+        )
+
+    def test_a_malformed_conversion_costs_its_own_point_and_no_other(self):
+        artifact, _ = self._artifact(
+            self._seconds_plan(),
+            ("4.9", "took 4.9 s", "s", "lambda v: v"),
+            ("4900", "took 4900 ms", "ms", "divide it by a thousand"),
+        )
+
+        plotted = [r for r in artifact.records if not r.exclusion_reason]
+        self.assertEqual([r.paper_title for r in plotted], ["Study 0"])
+        reason = next(
+            r.exclusion_reason for r in artifact.records if r.exclusion_reason
+        )
+        self.assertIn("ms", reason or "")
+        self.assertIn("s", reason or "")
+
+    def test_a_conversion_that_fails_in_the_sandbox_costs_its_own_point(self):
+        artifact, _ = self._artifact(
+            self._seconds_plan(),
+            ("4.9", "took 4.9 s", "s", "lambda v: v"),
+            ("4900", "took 4900 ms", "ms", "lambda v: v / 0"),
+        )
+
+        plotted = [r for r in artifact.records if not r.exclusion_reason]
+        self.assertEqual([r.paper_title for r in plotted], ["Study 0"])
+
+    def test_no_sandbox_excludes_the_points_rather_than_plotting_them_raw(self):
+        """The failure that matters: 4900 kept on an axis of seconds is a bar
+        a thousand times too long, and it looks like data."""
+
+        def unavailable(_requests):
+            raise ConversionError("no E2B key")
+
+        artifact, _ = self._artifact(
+            self._seconds_plan(),
+            ("4.9", "took 4.9 s", "s", "lambda v: v"),
+            ("4900", "took 4900 ms", "ms", "lambda v: v / 1000"),
+            sandbox=unavailable,
+        )
+
+        plotted = [r for r in artifact.records if not r.exclusion_reason]
+        self.assertEqual([r.paper_title for r in plotted], ["Study 0"])
+        self.assertTrue(
+            any("could not be" in w for w in artifact.warnings), artifact.warnings
+        )
+
+    def test_what_ran_is_kept_for_review(self):
+        artifact, _ = self._artifact(
+            self._seconds_plan(),
+            ("4900", "took 4900 ms", "ms", "lambda v: v / 1000"),
+        )
+
+        assert artifact.conversions is not None
+        self.assertEqual(
+            [entry["conversion"] for entry in artifact.conversions["inputs"]],
+            ["lambda v: v / 1000"],
+        )
+        self.assertEqual(artifact.conversions["inputs"][0]["number"], 4900.0)
 
 
 class TestAbsenceIsExplained(unittest.TestCase):

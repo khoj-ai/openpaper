@@ -80,6 +80,21 @@ export function ChartComposerDialog({ open, onOpenChange, projectId, papers, onC
         });
     };
 
+    /** Set the unit the y axis is drawn in. This is not cosmetic: every paper's
+     * number is converted into it during extraction, so changing it here is how
+     * a chart of latencies is redrawn in ms rather than s. Papers whose values
+     * cannot be expressed in it leave the chart with a stated reason. */
+    const updateUnit = (unit: string) => {
+        setGenerationError(null);
+        if (!plan) return;
+        const { key } = plan.y;
+        setPlan({
+            ...plan,
+            y: { ...plan.y, unit },
+            fields: plan.fields.map(field => (field.key === key ? { ...field, unit } : field)),
+        });
+    };
+
     return <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
             <DialogHeader>
@@ -179,6 +194,20 @@ export function ChartComposerDialog({ open, onOpenChange, projectId, papers, onC
                                 onChange={event => updateField("y", event.target.value)}
                             />
                         </div>
+                    </div>
+                    <div>
+                        <Label htmlFor="chart-unit">Y axis unit</Label>
+                        <Input
+                            id="chart-unit"
+                            className="mt-1"
+                            placeholder="none"
+                            value={plan.y.unit ?? ""}
+                            onChange={event => updateUnit(event.target.value)}
+                        />
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            Every paper&apos;s value is converted into this unit. Leave it empty
+                            for a count or a dimensionless score.
+                        </p>
                     </div>
                     {plan.calculation && (
                         <p className="text-xs text-muted-foreground">

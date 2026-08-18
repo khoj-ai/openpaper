@@ -35,10 +35,25 @@ export function ChartValuesTable({ artifact, points, onOpenPaper }: {
                         </tr>
                     </thead>
                     <tbody>
-                        {points.map(point => (
+                        {points.map(point => {
+                            // A converted number does not match the paper it is
+                            // sourced from, which reads as an error unless the
+                            // paper's own printing is shown beside it.
+                            const cell = point.cells.find(c => c.key === artifact.plan.y.key);
+                            const printed = cell?.unit && cell.unit !== artifact.plan.y.unit
+                                ? `${cell.value} ${cell.unit}`
+                                : null;
+                            return (
                             <tr key={point.recordId} className="border-b last:border-0 align-top">
                                 <td className="py-1.5 pr-3">{point.label}</td>
-                                <td className="py-1.5 pr-3 text-right tabular-nums">{exactNumber(point.value)}</td>
+                                <td className="py-1.5 pr-3 text-right tabular-nums">
+                                    {exactNumber(point.value)}
+                                    {printed && (
+                                        <div className="text-[10px] font-normal text-muted-foreground">
+                                            {printed} as printed
+                                        </div>
+                                    )}
+                                </td>
                                 <td className="py-1.5">
                                     <button
                                         type="button"
@@ -49,7 +64,8 @@ export function ChartValuesTable({ artifact, points, onOpenPaper }: {
                                     </button>
                                 </td>
                             </tr>
-                        ))}
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>}

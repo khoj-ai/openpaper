@@ -12,7 +12,16 @@ class ChartField(BaseModel):
 
     key: str = Field(description="Stable short key used in chart records")
     label: str = Field(description="Human-readable axis or grouping label")
-    unit: Optional[str] = Field(default=None, description="Unit displayed with values")
+    unit: Optional[str] = Field(
+        default=None,
+        description=(
+            "The unit this field's numbers are plotted in — s, %, mg/dL, kg. "
+            "One field is one unit, so name it here even when the papers are "
+            "expected to disagree: each paper's number is converted into this "
+            "one. Leave empty only for a measure that has no unit at all — a "
+            "count, an index, a dimensionless score."
+        ),
+    )
 
 
 class ChartCalculation(BaseModel):
@@ -61,18 +70,63 @@ class ChartProposal(BaseModel):
     clarification: Optional[str] = None
 
 
-class ChartValue(BaseModel):
-    value: str
+class ChartQuotedValue(BaseModel):
+    """What the extractor is asked for: what the paper says, and how to read it.
+
+    Separate from ChartValue because this is the shape the model fills in. It
+    may state a conversion but never perform one — `value` is what the paper
+    printed, and the arithmetic that moves it onto the chart's unit runs later,
+    in the sandbox, from the lambda given here.
+    """
+
+    value: str = Field(description="The value exactly as the paper prints it")
     quote: str = Field(description="Exact supporting quote from the paper")
     line_number: Optional[str] = None
+    unit: Optional[str] = Field(
+        default=None,
+        description=(
+            "The unit this paper states for this value — %, s, ms, mg/dL — "
+            "copied from the paper, never converted and never invented. Leave "
+            "empty when the paper states none."
+        ),
+    )
+    conversion: str = Field(
+        default="lambda v: v",
+        description=(
+            "A Python lambda of one argument that takes the number in `value`, "
+            "in this paper's unit, to the same quantity in the unit the plan "
+            "gives this field. `lambda v: v` when the paper already reports in "
+            "that unit, or the field has no unit. `lambda v: v / 1000` for ms "
+            "on a seconds axis; `lambda v: v * 0.621371` for km on a miles "
+            "axis; `lambda v: v * 9 / 5 + 32` for Celsius on a Fahrenheit one. "
+            "One expression — no statements, no imports — though `math` is "
+            "available. Leave it EMPTY when this paper's number cannot be "
+            "expressed in the plan's unit at all, and say why in "
+            "`conversion_note`."
+        ),
+    )
+    conversion_note: Optional[str] = Field(
+        default=None,
+        description=(
+            "Why this value cannot be expressed in the plan's unit, when "
+            "`conversion` is empty — a different instrument, an "
+            "incommensurable scale. One sentence, addressed to someone reading "
+            "the chart and wondering where this paper went."
+        ),
+    )
+
+
+class ChartValue(ChartQuotedValue):
+    """A quoted value with the quantity the application read out of it."""
+
     number: Optional[float] = Field(
         default=None,
         description=(
-            "The quantity `value` carries, parsed once on the server. `value` "
-            "stays exactly as the paper wrote it — converting it is the model's "
-            "one forbidden operation — so the number every renderer plots is "
-            "derived here rather than re-parsed at each drawing surface. None "
-            "when the quoted text states no plottable quantity."
+            "The plotted quantity: the number `value` carries, parsed on the "
+            "server and put through `conversion` in the sandbox, so it is in "
+            "the unit the plan gives this field. `value` stays exactly as the "
+            "paper wrote it, so the quote still matches. None when the quoted "
+            "text states no plottable quantity."
         ),
     )
 
@@ -102,7 +156,7 @@ class ChartExtractionRecord(BaseModel):
 
     paper_id: str
     paper_title: str
-    values: Dict[str, ChartValue] = Field(
+    values: Dict[str, ChartQuotedValue] = Field(
         description="The plan's fields, each with a direct quote",
     )
 
@@ -134,6 +188,14 @@ class ChartArtifactPayload(BaseModel):
         ),
     )
     computation: Optional[dict] = None
+    conversions: Optional[dict] = Field(
+        default=None,
+        description=(
+            "Provenance for the unit conversions: the harness, every lambda it "
+            "ran and what each one produced. Present only when some paper "
+            "reported in a unit other than the plan's."
+        ),
+    )
     warnings: List[str] = Field(default_factory=list)
     extraction_steps: List[str] = Field(
         default_factory=list,
