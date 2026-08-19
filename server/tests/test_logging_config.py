@@ -16,9 +16,11 @@ class TestConfigureLogging(unittest.TestCase):
         self.addCleanup(lambda: root.setLevel(level))
         self.addCleanup(lambda: root.handlers.__setitem__(slice(None), handlers))
 
-    def _emit(self, log_something: Callable[[logging.Logger], None]) -> str:
+    def _emit(self, log_something: Callable[[logging.Logger], None], **env: str) -> str:
         stream = io.StringIO()
-        with patch.dict(os.environ, {"LOG_FORMAT": "json"}), patch(
+        # Pinned rather than left to the ambient environment, so a developer
+        # running the suite with DEBUG set still exercises the JSON format.
+        with patch.dict(os.environ, {"DEBUG": "False", **env}), patch(
             "sys.stderr", stream
         ):
             configure_logging()
@@ -47,6 +49,11 @@ class TestConfigureLogging(unittest.TestCase):
         self.assertEqual(record["level"], "ERROR")
         self.assertEqual(record["service"], "server")
         self.assertIn("ValueError: bad doi", record["exception"])
+
+    def test_debug_swaps_in_the_readable_text_format(self) -> None:
+        output = self._emit(lambda log: log.error("boom"), DEBUG="True")
+
+        self.assertIn("[ERROR] app.tests.sample: boom", output)
 
 
 if __name__ == "__main__":

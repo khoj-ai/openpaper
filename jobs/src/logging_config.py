@@ -1,9 +1,9 @@
 """Logging setup shared by the jobs API, the Celery worker and Beat.
 
-`LOG_FORMAT=json`, as deployed environments set, emits one JSON object per
-record so log searches can filter on the `level` field instead of grepping for
-the word ERROR — which also turns up in request paths, traceback bodies and
-model output. The default is the human-readable text format.
+Records go out as one JSON object each, so log searches can filter on the
+`level` field instead of grepping for the word ERROR — which also turns up in
+request paths, traceback bodies and model output. `DEBUG` swaps in the
+human-readable text format, which reads better in a local terminal.
 
 Mirrored in server/app/logging_config.py; the two services deploy
 independently and so cannot share a module.
@@ -92,10 +92,10 @@ class JsonFormatter(logging.Formatter):
 
 
 def build_formatter() -> logging.Formatter:
-    """Text by default; JSON when LOG_FORMAT says so."""
-    if os.getenv("LOG_FORMAT", "text").lower() == "json":
-        return JsonFormatter(os.getenv("SERVICE_NAME", DEFAULT_SERVICE))
-    return logging.Formatter(TEXT_FORMAT, DATE_FORMAT)
+    """JSON everywhere; the readable text format under DEBUG."""
+    if os.getenv("DEBUG", "False").lower() in ("true", "1", "t"):
+        return logging.Formatter(TEXT_FORMAT, DATE_FORMAT)
+    return JsonFormatter(os.getenv("SERVICE_NAME", DEFAULT_SERVICE))
 
 
 def configure_logging(level: int | str | None = None) -> None:
