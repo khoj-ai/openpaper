@@ -19,7 +19,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { ChatMessageActions } from "@/components/ChatMessageActions";
-import { ChatMessage, Reference, PaperItem, ChatArtifact, Project } from "@/lib/schema";
+import { ChatMessage, Reference, PaperItem, ChatArtifact, ChartGenerationJob, Project } from "@/lib/schema";
 import { MentionInput } from "@/components/chat/MentionInput";
 import {
 	MentionContextBar,
@@ -29,6 +29,7 @@ import {
 } from "@/components/chat/MentionAutocomplete";
 import ReferencePaperCards from "@/components/ReferencePaperCards";
 import { ChatArtifactCards, chartViewerHrefs } from "@/components/ChatArtifactCards";
+import { ChatChartJobs } from "@/components/ChatChartJobs";
 import { MessageTraceViewer } from "@/components/MessageTraceViewer";
 import Link from "next/link";
 import { TopicBubbles } from "@/components/TopicBubbles";
@@ -45,6 +46,7 @@ interface ConversationViewProps {
 	streamingChunks: string[];
 	streamingReferences?: Reference;
 	streamingArtifacts?: ChatArtifact[];
+	streamingChartJobs?: ChartGenerationJob[];
 	statusMessage: string;
 	error: string | null;
 	isSessionLoading: boolean;
@@ -87,6 +89,7 @@ export const ConversationView = ({
 	streamingChunks,
 	streamingReferences,
 	streamingArtifacts,
+	streamingChartJobs,
 	statusMessage,
 	error,
 	isSessionLoading,
@@ -312,6 +315,16 @@ export const ConversationView = ({
 						chartDetailHrefs={chartViewerHrefs(msg.artifacts, projectId)}
 					/>
 				)}
+				{/* A chart this turn asked for that finished after it was
+				    answered. Its own card links to the full viewer, so the
+				    completed artifact is not rendered twice. */}
+				{projectId && msg.chart_jobs && msg.chart_jobs.length > 0 && (
+					<ChatChartJobs
+						jobs={msg.chart_jobs}
+						projectId={projectId}
+						onOpenPaper={openArtifactPaper}
+					/>
+				)}
 				{msg.references && msg.references["citations"]?.length > 0 ? (
 					<div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
 						<div
@@ -488,6 +501,9 @@ export const ConversationView = ({
 										table: CopyableTable,
 									}}
 								/>
+								{projectId && streamingChartJobs && streamingChartJobs.length > 0 && (
+									<ChatChartJobs jobs={streamingChartJobs} projectId={projectId} onOpenPaper={openArtifactPaper} />
+								)}
 								{streamingArtifacts && streamingArtifacts.length > 0 && (
 									<ChatArtifactCards artifacts={streamingArtifacts} onOpenPaper={openArtifactPaper} />
 								)}

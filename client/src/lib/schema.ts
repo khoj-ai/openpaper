@@ -139,6 +139,10 @@ export interface ProjectChatArtifact {
 export interface ChartGenerationJob {
     id: string;
     project_id: string;
+    // The assistant turn that asked for this chart, when chat did. Null for
+    // jobs raised from the artifacts composer, which has no conversation.
+    message_id?: string | null;
+    prompt?: string;
     status: JobStatus;
     status_message?: string | null;
     error_message?: string | null;
@@ -198,6 +202,10 @@ export interface ChatMessage {
     // First-party artifacts (e.g. citations) produced for this turn. Set for
     // both freshly-streamed and persisted/reloaded messages.
     artifacts?: ChatArtifact[];
+    // Charts this turn asked for. A chart takes minutes, so the turn is
+    // answered long before one exists: these render as pending cards and become
+    // artifacts when their job completes.
+    chart_jobs?: ChartGenerationJob[];
     // Agent trajectory (tool calls + per-citation subagent steps) for this turn.
     trace?: MessageTrace;
     // @-mention context attached to this (user) turn.

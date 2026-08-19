@@ -7,6 +7,7 @@ import { useParams, useRouter } from 'next/navigation';
 import {
     ChatMessage,
     ChatArtifact,
+    ChartGenerationJob,
     MessageTrace,
     Reference,
 } from '@/lib/schema';
@@ -78,6 +79,7 @@ function ProjectConversationPageContent() {
     const [streamingChunks, setStreamingChunks] = useState<string[]>([]);
     const [streamingReferences, setStreamingReferences] = useState<Reference | undefined>(undefined);
     const [streamingArtifacts, setStreamingArtifacts] = useState<ChatArtifact[]>([]);
+    const [streamingChartJobs, setStreamingChartJobs] = useState<ChartGenerationJob[]>([]);
     const [currentLoadingMessageIndex, setCurrentLoadingMessageIndex] = useState(0);
     const [displayedText, setDisplayedText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
@@ -302,6 +304,7 @@ function ProjectConversationPageContent() {
         setStreamingChunks([]);
         setStreamingReferences(undefined);
         setStreamingArtifacts([]);
+        setStreamingChartJobs([]);
         setError(null);
 
         const requestBody: ChatRequestBody = {
@@ -337,6 +340,7 @@ function ProjectConversationPageContent() {
             let accumulatedContent = '';
             let references: Reference | undefined = undefined;
             const artifacts: ChatArtifact[] = [];
+            const chartJobs: ChartGenerationJob[] = [];
             let trace: MessageTrace | undefined = undefined;
             let buffer = '';
 
@@ -401,6 +405,12 @@ function ProjectConversationPageContent() {
                                 } else if (chunkType === 'artifact') {
                                     artifacts.push(chunkContent as ChatArtifact);
                                     setStreamingArtifacts(prev => [...prev, chunkContent as ChatArtifact]);
+                                } else if (chunkType === 'chart_job') {
+                                    // The chart is being built in the
+                                    // background; this is the card to watch it
+                                    // by, and it arrives before the answer text.
+                                    chartJobs.push(chunkContent as ChartGenerationJob);
+                                    setStreamingChartJobs(prev => [...prev, chunkContent as ChartGenerationJob]);
                                 } else if (chunkType === 'trace') {
                                     trace = chunkContent as MessageTrace;
                                 } else if (chunkType === 'status') {
@@ -438,6 +448,7 @@ function ProjectConversationPageContent() {
                     content: accumulatedContent,
                     references: references,
                     artifacts: artifacts.length ? artifacts : undefined,
+                    chart_jobs: chartJobs.length ? chartJobs : undefined,
                     trace: trace,
                 };
                 setMessages(prev => {
@@ -449,6 +460,9 @@ function ProjectConversationPageContent() {
                 setStreamingChunks([]);
                 setStreamingReferences(undefined);
                 setStreamingArtifacts([]);
+            setStreamingChartJobs([]);
+                setStreamingChartJobs([]);
+        setStreamingChartJobs([]);
             }
 
         } catch (error) {
@@ -496,6 +510,8 @@ function ProjectConversationPageContent() {
             setStreamingChunks([]);
             setStreamingReferences(undefined);
             setStreamingArtifacts([]);
+            setStreamingChartJobs([]);
+        setStreamingChartJobs([]);
             setStatusMessage('');
             refetchSubscription();
         }
@@ -520,6 +536,7 @@ function ProjectConversationPageContent() {
                     streamingChunks={streamingChunks}
                     streamingReferences={streamingReferences}
                     streamingArtifacts={streamingArtifacts}
+                    streamingChartJobs={streamingChartJobs}
                     statusMessage={statusMessage}
                     error={error}
                     isSessionLoading={isSessionLoading}
