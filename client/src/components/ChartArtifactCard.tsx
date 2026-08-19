@@ -10,6 +10,46 @@ import { ChartValuesTable } from "@/components/ChartValuesTable";
 import { ChartExportButtons } from "@/components/ChartExportButtons";
 import { AnimatedMarkdown } from "@/components/AnimatedMarkdown";
 
+interface QuotedField {
+    key: string;
+    value: string;
+    quote: string;
+    lineNumber?: string | null;
+}
+
+/** The evidence behind the plot, gathered by paper rather than by point.
+ *
+ * A paper that reports one measure across thirty benchmarks contributes thirty
+ * points, and listing each as its own card repeated that paper's title thirty
+ * times and re-quoted the same table line beneath every one of them. The
+ * quotable unit is the passage, not the point: a field, its value and the
+ * sentence it came from are one piece of evidence however many points rest on
+ * it. */
+function paperSources(artifact: ChartArtifact) {
+    const byPaper = new Map<string, {
+        paperId: string;
+        title: string;
+        points: number;
+        fields: QuotedField[];
+    }>();
+    for (const record of artifact.records) {
+        if (record.exclusion_reason) continue;
+        let group = byPaper.get(record.paper_id);
+        if (!group) {
+            group = { paperId: record.paper_id, title: record.paper_title, points: 0, fields: [] };
+            byPaper.set(record.paper_id, group);
+        }
+        group.points += 1;
+        for (const [key, value] of Object.entries(record.values)) {
+            const seen = group.fields.some(field =>
+                field.key === key && field.value === value.value && field.quote === value.quote);
+            if (seen) continue;
+            group.fields.push({ key, value: value.value, quote: value.quote, lineNumber: value.line_number });
+        }
+    }
+    return [...byPaper.values()];
+}
+
 export function ChartArtifactCard({ artifact, onOpenPaper, chatHref, detailHref, display = "compact" }: {
     artifact: ChartArtifact;
     onOpenPaper: (paperId: string, searchTerm?: string) => void;
@@ -18,6 +58,7 @@ export function ChartArtifactCard({ artifact, onOpenPaper, chatHref, detailHref,
     display?: "compact" | "full";
 }) {
     const view = useMemo(() => chartView(artifact), [artifact]);
+    const sources = useMemo(() => paperSources(artifact), [artifact]);
     const [log, setLog] = useState(view.defaultLog);
     // Held here rather than in the figure, alongside the log scale and for the
     // same reason: the export has to draw what the reader is looking at.
@@ -79,29 +120,32 @@ export function ChartArtifactCard({ artifact, onOpenPaper, chatHref, detailHref,
                         </details>
                     )}
                     {artifact.investigation_trace && <MessageTraceViewer trace={artifact.investigation_trace} />}
-                    {artifact.records.filter(record => !record.exclusion_reason).map(record => (
-                        <div key={record.record_id} className="rounded bg-muted/60 p-2">
-                            <button
-                                type="button"
-                                onClick={() => onOpenPaper(record.paper_id)}
-                                className="text-left font-medium hover:underline"
-                            >
-                                {record.paper_title}
-                            </button>
-                            {Object.entries(record.values).map(([key, value]) => (
-                                <p key={key} className="mt-1 text-muted-foreground">
+                    {/* Folded, because the values table above already lists
+                        every plotted number against the paper it came from.
+                        What is kept here is the wording behind it, which a
+                        reader wants for one paper at a time. */}
+                    {sources.map(source => (
+                        <details key={source.paperId} className="rounded bg-muted/60 p-2">
+                            <summary className="cursor-pointer font-medium">
+                                {source.title}
+                                <span className="ml-1.5 font-normal text-muted-foreground">
+                                    {source.points} point{source.points === 1 ? "" : "s"}
+                                </span>
+                            </summary>
+                            {source.fields.map(field => (
+                                <p key={`${field.key}:${field.value}:${field.quote}`} className="mt-1 text-muted-foreground">
                                     <button
                                         type="button"
-                                        onClick={() => onOpenPaper(record.paper_id, value.quote)}
+                                        onClick={() => onOpenPaper(source.paperId, field.quote)}
                                         className="text-left hover:text-foreground hover:underline"
                                     >
-                                        <span className="font-medium text-foreground">{key}: {value.value}</span>
-                                        {" — "}&ldquo;{value.quote}&rdquo;
-                                        {value.line_number ? ` (line ${value.line_number})` : ""}
+                                        <span className="font-medium text-foreground">{field.key}: {field.value}</span>
+                                        {" — "}&ldquo;{field.quote}&rdquo;
+                                        {field.lineNumber ? ` (line ${field.lineNumber})` : ""}
                                     </button>
                                 </p>
                             ))}
-                        </div>
+                        </details>
                     ))}
                     {artifact.warnings.map(warning => (
                         <div key={warning} className="text-amber-700 dark:text-amber-300">
