@@ -607,6 +607,16 @@ Rules:
   incommensurable scale — and put one plain sentence in `conversion_note`
   saying so. That excludes the point and shows the reader your sentence, which
   is the right outcome; a made-up factor is not.
+- The conversion happens ONCE, and not by you. If the paper prints 0.653 and
+  the chart is in %, then `value` is "0.653" and `conversion` is
+  `lambda v: v * 100`. Writing `value` as "65.3" AND giving that lambda applies
+  the factor twice and puts 6530 on the axis. So before returning a value, read
+  it back against your own quote: the number in `value` must be a number that
+  appears in `quote`, character for character. If it is not there, you
+  converted it — put it back.
+- `unit` is the unit of the number in `value`, before any conversion. A paper
+  printing a bare 0.653 success rate is reporting a fraction; say so. A
+  conversion out of nothing is not arithmetic.
 - The quote must support the measure AS THE PLAN DEFINES IT, subject included.
   A quote is not enough on its own: if the plan's y is an odds ratio for autism
   and this paper reports an odds ratio for a different outcome, a different

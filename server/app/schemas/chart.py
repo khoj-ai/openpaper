@@ -79,7 +79,14 @@ class ChartQuotedValue(BaseModel):
     in the sandbox, from the lambda given here.
     """
 
-    value: str = Field(description="The value exactly as the paper prints it")
+    value: str = Field(
+        description=(
+            "The value exactly as the paper prints it — the same characters, "
+            "never converted, rescaled, or rounded. It must be findable in "
+            "`quote`. Any change of unit belongs in `conversion` and nowhere "
+            "else; doing it here as well applies it twice."
+        )
+    )
     quote: str = Field(description="Exact supporting quote from the paper")
     line_number: Optional[str] = None
     unit: Optional[str] = Field(

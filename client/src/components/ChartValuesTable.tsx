@@ -38,10 +38,12 @@ export function ChartValuesTable({ artifact, points, onOpenPaper }: {
                         {points.map(point => {
                             // A converted number does not match the paper it is
                             // sourced from, which reads as an error unless the
-                            // paper's own printing is shown beside it.
+                            // paper's own printing is shown beside it. Keyed off
+                            // whether a conversion ran, not off the paper naming
+                            // a unit — papers print bare fractions constantly.
                             const cell = point.cells.find(c => c.key === artifact.plan.y.key);
-                            const printed = cell?.unit && cell.unit !== artifact.plan.y.unit
-                                ? `${cell.value} ${cell.unit}`
+                            const printed = cell?.converted
+                                ? `${cell.value}${cell.unit ? ` ${cell.unit}` : ""}`
                                 : null;
                             return (
                             <tr key={point.recordId} className="border-b last:border-0 align-top">

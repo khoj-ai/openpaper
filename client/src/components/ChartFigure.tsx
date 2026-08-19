@@ -13,7 +13,7 @@ export interface ChartPoint {
     value: number;
     series?: string;
     x: number | null;
-    cells: Array<{ key: string; value: string; unit?: string | null; quote: string; lineNumber?: string | null }>;
+    cells: Array<{ key: string; value: string; unit?: string | null; converted?: boolean; quote: string; lineNumber?: string | null }>;
 }
 
 /** Categorical slots, validated for CVD separation and lightness against both
@@ -99,6 +99,9 @@ export function chartPoints(artifact: ChartArtifact): ChartPoint[] {
                 key,
                 value: cell.value,
                 unit: cell.unit,
+                // The server clears the conversion when it moved nothing, so a
+                // surviving one means the plotted number is not the printed one.
+                converted: Boolean(cell.conversion),
                 quote: cell.quote,
                 lineNumber: cell.line_number,
             })),

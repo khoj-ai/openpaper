@@ -583,6 +583,54 @@ class TestValuesReachThePlansUnit(unittest.TestCase):
         self.assertEqual(artifact.conversions["inputs"][0]["number"], 4900.0)
 
 
+class TestAConversionIsAppliedOnce(unittest.TestCase):
+    """The factor belongs in the lambda, never also in the value.
+
+    A paper printed a success rate of 0.653 against a chart drawn in %. The
+    extractor returned `value` already converted to "65.3" AND the lambda that
+    converts it, so the factor landed twice and the bar was 6530. The prompt is
+    what prevents that; this pins the shape it has to produce.
+    """
+
+    def test_the_printed_number_goes_through_the_lambda(self):
+        plan = simple_plan()
+        plan.y = ChartField(key="score", label="Accuracy", unit="%")
+        plan.fields = [plan.x, plan.y]
+        with patch(
+            "app.llm.chart_operations.extraction.run_unit_conversions",
+            side_effect=fake_sandbox,
+        ):
+            artifact = StubChartOperations(
+                records_json(
+                    record(
+                        "paper-1",
+                        "WebCoach",
+                        benchmark=("WebVoyager", "GPT-4o | 118.4 | 10.9 | 0.653"),
+                        score=(
+                            "0.653",
+                            "GPT-4o | 118.4 | 10.9 | 0.653",
+                            "fraction",
+                            "lambda v: v * 100",
+                        ),
+                    ),
+                )
+            ).build_chart_artifact(
+                prompt="chart accuracy",
+                plan=plan,
+                evidence={"paper-1": ["4: benchmark accuracy"]},
+                papers=[("paper-1", "WebCoach")],
+                **DB,
+            )
+
+        assert artifact is not None
+        plotted = [r for r in artifact.records if not r.exclusion_reason]
+        self.assertEqual(len(plotted), 1)
+        self.assertAlmostEqual(plotted[0].values["score"].number or 0.0, 65.3)
+        # The quote has to keep matching the value, so the paper's own printing
+        # is what is stored and only the plotted number moved.
+        self.assertEqual(plotted[0].values["score"].value, "0.653")
+
+
 class TestAbsenceIsExplained(unittest.TestCase):
     """A chart implies completeness, so every gap needs a specific reason."""
 
@@ -607,8 +655,8 @@ class TestAbsenceIsExplained(unittest.TestCase):
                 record(
                     "two",
                     "?",
-                    benchmark=("B", "accuracy was 80%"),
-                    score=("80", "accuracy was 80%"),
+                    benchmark=("B", "invented sentence"),
+                    score=("80", "invented sentence"),
                 ),
             )
         ).build_chart_artifact(

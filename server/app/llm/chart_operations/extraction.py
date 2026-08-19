@@ -61,6 +61,7 @@ from app.schemas.chart import (
     ChartCoverage,
     ChartExtraction,
     ChartExtractionRecord,
+    ChartField,
     ChartPlan,
     ChartQuotedValue,
     ChartRecord,
@@ -185,6 +186,19 @@ def _read_quantity(quoted: ChartQuotedValue) -> ChartValue:
     )
 
 
+def _fields_by_key(plan: ChartPlan) -> dict[str, ChartField]:
+    """Every field the plan names, however it names it."""
+    return {
+        field.key: field
+        for field in [
+            plan.x,
+            plan.y,
+            *([plan.series] if plan.series else []),
+            *plan.fields,
+        ]
+    }
+
+
 def _convert_to_plan_units(
     payload: ChartArtifactPayload,
 ) -> Optional[dict[str, Any]]:
@@ -206,15 +220,7 @@ def _convert_to_plan_units(
     is malformed, or that fails in the sandbox, costs its own point too: the
     alternative is plotting milliseconds on an axis of seconds.
     """
-    labels = {
-        field.key: field
-        for field in [
-            payload.plan.x,
-            payload.plan.y,
-            *([payload.plan.series] if payload.plan.series else []),
-            *payload.plan.fields,
-        ]
-    }
+    labels = _fields_by_key(payload.plan)
 
     def target(key: str) -> str:
         field = labels.get(key)
@@ -231,6 +237,11 @@ def _convert_to_plan_units(
         pending: list[tuple[ConversionRequest, str]] = []
         for key, cell in record.values.items():
             if cell.number is None or is_identity(cell.conversion):
+                # A stored conversion means this number moved, which is what
+                # tells a reader why the value beside the quote is not the
+                # number on the bar. Identity moves nothing, so it is cleared
+                # rather than left to be re-interpreted at each surface.
+                cell.conversion = ""
                 continue
             problem = shape_error(cell.conversion)
             if problem:
@@ -391,15 +402,8 @@ class ChartExtracting(DataTableOperations):
         # Named in the system prompt as well as the dumped plan: the target
         # unit is what every conversion has to land on, so it is stated where
         # the required keys are rather than left to be looked up.
-        plan_units = {
-            field.key: normalize_unit(field.unit)
-            for field in [
-                plan.x,
-                plan.y,
-                *([plan.series] if plan.series else []),
-                *plan.fields,
-            ]
-        }
+        labels = _fields_by_key(plan)
+        plan_units = {key: normalize_unit(field.unit) for key, field in labels.items()}
         target_units = [
             (
                 f"{key} in {plan_units[key]}"
