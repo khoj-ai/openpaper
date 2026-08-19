@@ -2281,3 +2281,77 @@ class TestInvestigationHarness(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ScopeOperations(StubChartOperations):
+    """Scope resolution with the model's answer supplied by the test."""
+
+    def resolve(self, prompt: str, papers):
+        return self.resolve_chart_scope(prompt, papers)
+
+
+ROSTER = [
+    ("paper-1", "WebCoach"),
+    ("paper-2", "UpBench"),
+    ("paper-3", "Predicting Poverty"),
+]
+
+
+class TestScopeIsDecidedBeforeAnythingIsPlanned(unittest.TestCase):
+    """The roster is the only thing that can express "just this paper".
+
+    Everything downstream widens to fill whatever roster it is handed — the
+    sweep reads every paper, the screen admits every paper that mentions the
+    measure — so a request about one paper has to be narrowed here or it comes
+    back as a chart over the whole project.
+    """
+
+    def test_a_corpus_wide_request_charts_everything(self):
+        scope = ScopeOperations(
+            json.dumps({"covers": "all_papers", "paper_ids": []})
+        ).resolve("chart accuracy across these papers", ROSTER)
+        self.assertEqual(scope.paper_ids, [])
+
+    def test_a_named_paper_narrows_the_roster(self):
+        scope = ScopeOperations(
+            json.dumps({"covers": "specific_papers", "paper_ids": ["paper-1"]})
+        ).resolve("chart accuracy in WebCoach", ROSTER)
+        self.assertEqual(scope.paper_ids, ["paper-1"])
+
+    def test_ids_are_ignored_when_the_request_was_called_corpus_wide(self):
+        # `covers` is the decision and the ids only carry it out. Honouring
+        # ids listed beside "all_papers" would narrow by the back door.
+        scope = ScopeOperations(
+            json.dumps({"covers": "all_papers", "paper_ids": ["paper-1"]})
+        ).resolve("chart accuracy across these papers", ROSTER)
+        self.assertEqual(scope.paper_ids, [])
+
+    def test_an_invented_id_is_dropped_rather_than_charted(self):
+        # A paper id that is not in the project would narrow the chart to
+        # nothing, which reads exactly like a corpus reporting none of the
+        # measure.
+        scope = ScopeOperations(
+            json.dumps(
+                {"covers": "specific_papers", "paper_ids": ["paper-1", "made-up"]}
+            )
+        ).resolve("chart accuracy in WebCoach", ROSTER)
+        self.assertEqual(scope.paper_ids, ["paper-1"])
+
+    def test_an_unanswerable_reference_asks_instead_of_guessing(self):
+        scope = ScopeOperations(
+            json.dumps(
+                {
+                    "covers": "specific_papers",
+                    "paper_ids": [],
+                    "clarification": "Which paper did you mean — WebCoach or UpBench?",
+                }
+            )
+        ).resolve("chart accuracy in that paper", ROSTER)
+        self.assertEqual(scope.paper_ids, [])
+        self.assertIn("WebCoach", scope.clarification or "")
+
+    def test_an_unreadable_answer_falls_back_to_the_whole_project(self):
+        # The safe default is what the surface did before scope existed.
+        scope = ScopeOperations("not json at all").resolve("chart accuracy", ROSTER)
+        self.assertEqual(scope.paper_ids, [])
+        self.assertIsNone(scope.clarification)

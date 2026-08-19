@@ -18,8 +18,9 @@ class ChartJobCRUD:
         project_id: UUID,
         prompt: str,
         paper_ids: list[str],
-        plan: dict[str, Any],
+        plan: Optional[dict[str, Any]],
         user: CurrentUser,
+        message_id: Optional[UUID] = None,
     ) -> Optional[ChartGenerationJob]:
         can_edit = project_crud.has_role(
             db,
@@ -37,6 +38,7 @@ class ChartJobCRUD:
         job = ChartGenerationJob(
             user_id=user.id,
             project_id=project_id,
+            message_id=message_id,
             prompt=prompt,
             paper_ids=paper_ids,
             plan=plan,
@@ -83,6 +85,7 @@ class ChartJobCRUD:
         error_message: Optional[str] = None,
         trace: Optional[dict[str, Any]] = None,
         artifact_id: Optional[UUID] = None,
+        message_id: Optional[UUID] = None,
     ) -> Optional[ChartGenerationJob]:
         job = self.get(db, job_id=job_id)
         if not job:
@@ -102,6 +105,8 @@ class ChartJobCRUD:
             job.trace = trace  # type: ignore[assignment]
         if artifact_id is not None:
             job.artifact_id = artifact_id  # type: ignore[assignment]
+        if message_id is not None:
+            job.message_id = message_id  # type: ignore[assignment]
         db.commit()
         db.refresh(job)
         return job
@@ -111,6 +116,8 @@ class ChartJobCRUD:
         return {
             "id": str(job.id),
             "project_id": str(job.project_id),
+            "message_id": str(job.message_id) if job.message_id else None,
+            "prompt": job.prompt,
             "status": job.status,
             "status_message": job.status_message,
             "error_message": job.error_message,

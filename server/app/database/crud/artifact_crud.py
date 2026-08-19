@@ -265,11 +265,16 @@ class ArtifactCRUD(CRUDBase[Artifact, ArtifactCreate, ArtifactUpdate]):
         scope_type: str,
         scope_id: Optional[uuid.UUID],
         user: CurrentUser,
+        message_id: Optional[uuid.UUID] = None,
     ) -> Optional[Artifact]:
         """Create an artifact raised by a job rather than by a conversation.
 
-        Only kinds that can exist without a message may take this path; the
-        table's own CHECK is the backstop.
+        `message_id` is still accepted, because a job can be raised BY a chat
+        turn and finish minutes later: the chart belongs to the turn that asked
+        for it even though nothing about that turn was waiting. It stays
+        optional for the composer, which has no conversation at all. Only kinds
+        that can exist without a message may pass None; the table's own CHECK is
+        the backstop.
         """
         return self._persist(
             db,
@@ -277,7 +282,7 @@ class ArtifactCRUD(CRUDBase[Artifact, ArtifactCreate, ArtifactUpdate]):
             user=user,
             scope_type=scope_type,
             scope_id=scope_id,
-            message_id=None,
+            message_id=message_id,
         )
 
     def bulk_create_for_message(

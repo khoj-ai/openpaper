@@ -392,6 +392,15 @@ class Message(Base):
         cascade="all, delete-orphan",
         order_by="Artifact.created_at",
     )
+    # Artifacts this turn asked for that are still being built. A chart takes
+    # minutes, so the turn is answered long before its chart exists; these are
+    # what let a reloaded conversation show the pending card rather than a gap.
+    chart_jobs = relationship(
+        "ChartGenerationJob",
+        back_populates="message",
+        cascade="all, delete-orphan",
+        order_by="ChartGenerationJob.created_at",
+    )
 
 
 class ConversableType(str, Enum):
@@ -921,7 +930,11 @@ def _chart_field_payload(field) -> Optional[dict]:
 
 
 class ChartGenerationJob(Base):
-    """An artifact-native, pollable chart-generation request."""
+    """A pollable chart-generation request, from the composer or from chat.
+
+    Charts take minutes, so nothing waits for one. The request is recorded
+    here, the work runs in the background, and whoever asked watches this row.
+    """
 
     __tablename__ = "chart_generation_jobs"
 
@@ -932,9 +945,22 @@ class ChartGenerationJob(Base):
     project_id = Column(
         UUID(as_uuid=True), ForeignKey("project.id", ondelete="CASCADE"), nullable=False
     )
+    # The assistant turn that asked for this chart, when one did. The composer
+    # raises jobs from a dialog and has no message; a job from chat has one, and
+    # it is how the finished chart finds its way back into the conversation.
+    message_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("messages.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     prompt = Column(Text, nullable=False)
     paper_ids = Column(JSONB, nullable=False, default=list)
-    plan = Column(JSONB, nullable=False)
+    # The composer confirms a plan with the user before queueing, so its jobs
+    # arrive with one. Chat cannot: planning needs the corpus investigated, and
+    # that is minutes of work which is exactly what this row exists to defer.
+    # A null plan means the job plans for itself.
+    plan = Column(JSONB, nullable=True)
     status = Column(String, nullable=False, default=JobStatus.PENDING)
     status_message = Column(String, nullable=True)
     error_message = Column(Text, nullable=True)
@@ -950,6 +976,7 @@ class ChartGenerationJob(Base):
     user = relationship("User")
     project = relationship("Project")
     artifact = relationship("Artifact", foreign_keys=[artifact_id])
+    message = relationship("Message", back_populates="chart_jobs")
 
     __table_args__ = (
         Index("ix_chart_generation_jobs_project_created", "project_id", "created_at"),

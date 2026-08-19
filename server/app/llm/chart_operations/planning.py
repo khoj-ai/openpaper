@@ -26,11 +26,18 @@ from app.llm.conversation_operations import DataTableOperations, FieldInvestigat
 from app.llm.prompts import (
     CHART_DISCOVERY_SYSTEM_PROMPT,
     CHART_PLAN_SYSTEM_PROMPT,
+    CHART_SCOPE_SYSTEM_PROMPT,
     CHART_VERIFICATION_SYSTEM_PROMPT,
 )
 from app.llm.provider import LLMProvider, TextContent
 from app.llm.tools.file_tools import read_abstract, read_file, search_all_files
-from app.schemas.chart import ChartField, ChartPlan, ChartPlanCandidates, ChartProposal
+from app.schemas.chart import (
+    ChartField,
+    ChartPlan,
+    ChartPlanCandidates,
+    ChartProposal,
+    ChartScope,
+)
 from app.schemas.user import CurrentUser
 from sqlalchemy.orm import Session
 
@@ -288,6 +295,81 @@ class ChartPlanning(DataTableOperations):
         else:
             measure_hits = hits(field_phrases([plan.y]))
         return len(measure_hits & hits(field_terms([plan.x])))
+
+    def resolve_chart_scope(
+        self,
+        prompt: str,
+        papers: list[tuple[str, str]],
+        conversation_id: Optional[str] = None,
+        current_user: Optional[CurrentUser] = None,
+        db: Optional[Session] = None,
+    ) -> ChartScope:
+        """Which papers the request is about, before anything is planned.
+
+        Chat hands the chart pipeline the whole project, and everything
+        downstream is built to maximize coverage over whatever roster it is
+        given — the sweep reads every paper, and the screen admits every paper
+        that mentions the measure. That is right for "compare these papers" and
+        wrong for "from that paper", and nothing between the two could tell
+        them apart, because a plan describes a measurement and never a subset.
+
+        So the subset is decided here, first, from the request and the turns
+        that gave it its antecedent. A resolver that cannot tell asks; guessing
+        wide is not a partial answer, it is a different one.
+
+        Returns the whole roster when the request is corpus-wide, which is the
+        common case and the safe default.
+        """
+        roster = "\n".join(f"- [{paper_id}] {title}" for paper_id, title in papers)
+        history = (
+            message_crud.get_conversation_messages(
+                db,
+                conversation_id=uuid.UUID(conversation_id),
+                current_user=current_user,
+            )
+            if conversation_id and db and current_user
+            else []
+        )
+        response = self.generate_content(
+            contents=[
+                TextContent(text=f"Chart request:\n{prompt}\n\nPapers:\n{roster}")
+            ],
+            history=history,
+            system_prompt=CHART_SCOPE_SYSTEM_PROMPT,
+            model_type=ModelType.FAST,
+            schema=ChartScope.model_json_schema(),
+            provider=LLMProvider.GEMINI,
+        )
+        if not response or not response.text:
+            return ChartScope(covers="all_papers")
+        try:
+            scope = ChartScope.model_validate_json(response.text)
+        except Exception:
+            logger.exception("Failed to parse chart scope")
+            return ChartScope(covers="all_papers")
+        # An id the model invented would silently narrow the chart to nothing,
+        # which looks exactly like a corpus that reports none of the measure.
+        known = {paper_id for paper_id, _ in papers}
+        # `covers` is the decision; ids only carry it out. Honouring ids the
+        # model listed after calling the request corpus-wide would reintroduce
+        # the narrowing by the back door.
+        if scope.covers == "all_papers":
+            return ChartScope(covers=scope.covers)
+        resolved = [paper_id for paper_id in scope.paper_ids if paper_id in known]
+        if len(resolved) != len(scope.paper_ids):
+            logger.warning(
+                "Chart scope named %d paper(s) not in the roster",
+                len(scope.paper_ids) - len(resolved),
+            )
+        if resolved:
+            logger.info(
+                "Chart scope narrowed to %d of %d papers", len(resolved), len(papers)
+            )
+        return ChartScope(
+            covers=scope.covers,
+            paper_ids=resolved,
+            clarification=scope.clarification,
+        )
 
     def propose_chart_plan(
         self,

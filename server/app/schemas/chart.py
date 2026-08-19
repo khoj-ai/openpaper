@@ -63,6 +63,46 @@ class ChartPlanCandidates(BaseModel):
     )
 
 
+class ChartScope(BaseModel):
+    """Which of a project's papers a chart request is about.
+
+    Separate from the plan on purpose. The plan says what to measure and is the
+    same question whether it runs over one paper or fifty; this says which
+    papers to run it over, and it is the only thing that was missing when a
+    request about one paper produced a chart collating eighteen.
+    """
+
+    # Answered FIRST, and from the request's own words. Asked as its own
+    # question because a thread about one paper pulls every later request
+    # toward that paper: made to commit here, the model reads what was asked;
+    # left to jump straight to ids, it reads what the conversation was about.
+    covers: Literal["all_papers", "specific_papers"] = Field(
+        description=(
+            "Does THIS request name particular papers, or is it about the "
+            "corpus? 'specific_papers' only when the request itself points at "
+            "papers — a demonstrative, a title, a count. Anything else, "
+            "including a request that names no paper at all, is 'all_papers', "
+            "no matter what the conversation has been discussing."
+        )
+    )
+    paper_ids: List[str] = Field(
+        default_factory=list,
+        description=(
+            "The papers this chart is about. Fill this ONLY when `covers` is "
+            "'specific_papers'; leave it empty otherwise, where empty means "
+            "every paper in the project."
+        ),
+    )
+    clarification: Optional[str] = Field(
+        default=None,
+        description=(
+            "Returned INSTEAD of ids when `covers` is 'specific_papers' but "
+            "which ones cannot be told. One short question to the user, naming "
+            "the candidates."
+        ),
+    )
+
+
 class ChartProposal(BaseModel):
     """What the planner came back with: a plan, or why it could not make one."""
 

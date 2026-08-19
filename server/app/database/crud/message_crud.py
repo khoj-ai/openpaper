@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from app.database.crud.base_crud import CRUDBase
+from app.database.crud.projects.project_chart_crud import chart_job_crud
 from app.database.crud.sanitization import sanitize_for_postgres
 from app.database.models import (
     ConversableType,
@@ -223,6 +224,15 @@ class MessageCRUD(CRUDBase[Message, MessageCreate, MessageUpdate]):
                 # The artifact's own id rides along with its payload so the
                 # conversation can link each card to its viewer page. It is
                 # assigned on persistence, so a still-streaming card has none.
+                # A chart this turn asked for that has not finished yet. It is
+                # sent alongside the artifacts rather than instead of them: a
+                # job that completed has both, and the card that was pending on
+                # the last load is a chart on this one.
+                "chart_jobs": [
+                    chart_job_crud.to_dict(job)
+                    for job in list(message.chart_jobs or [])  # type: ignore[arg-type]
+                ]
+                or None,
                 "artifacts": [
                     {**a.to_payload(), "artifact_id": str(a.id)}
                     for a in message.artifacts

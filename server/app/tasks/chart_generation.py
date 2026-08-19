@@ -1,18 +1,61 @@
-"""Background execution for project chart-generation jobs."""
+"""Background execution for chart-generation jobs.
+
+A chart takes minutes — the papers are investigated, then read as PDFs, then
+their values converted in a sandbox — so nothing waits for one. Both surfaces
+that can ask for a chart queue a job and watch it: the composer, which confirms
+a plan with the user first, and chat, which does not have one yet and lets the
+job plan for itself.
+"""
 
 import logging
+from typing import Optional
 from uuid import UUID
 
 from app.database.crud.artifact_crud import artifact_crud
+from app.database.crud.message_crud import MessageCreate, message_crud
 from app.database.crud.projects.project_chart_crud import chart_job_crud
 from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import SessionLocal
-from app.database.models import ConversableType, JobStatus
+from app.database.models import ChartGenerationJob, ConversableType, JobStatus, Message
 from app.llm.operations import operations
 from app.schemas.chart import ChartPlan
 from app.schemas.user import CurrentUser
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
+
+
+def _reply_in_conversation(
+    db: Session,
+    *,
+    job: ChartGenerationJob,
+    content: str,
+    user: CurrentUser,
+) -> None:
+    """Say something back in the thread that asked for this chart.
+
+    A job raised from chat was answered minutes ago, so an outcome that is not
+    a chart — a planner that declined, a corpus that reported nothing — has
+    nowhere to appear unless it is posted as its own turn. The composer's jobs
+    have no conversation and simply skip this; their card carries the message.
+    """
+    if job.message_id is None:
+        return
+    message = db.query(Message).filter(Message.id == job.message_id).first()
+    if not message:
+        return
+    try:
+        message_crud.create(
+            db,
+            obj_in=MessageCreate(
+                conversation_id=message.conversation_id,  # type: ignore[arg-type]
+                role="assistant",
+                content=content,
+            ),
+            user=user,
+        )
+    except Exception:
+        logger.exception("Could not post the chart outcome back to the conversation")
 
 
 def generate_chart(
@@ -21,12 +64,7 @@ def generate_chart(
     project_id: UUID,
     user: CurrentUser,
 ) -> None:
-    """Run a saved chart request in an independent DB session.
-
-    This follows the audio-overview pattern: the request returns immediately,
-    while a background worker owns the long-running investigation and writes
-    incremental, pollable status to the job record.
-    """
+    """Run a saved chart request in an independent DB session."""
     db = SessionLocal()
     try:
         job = chart_job_crud.get(db, job_id=job_id)
@@ -49,7 +87,12 @@ def generate_chart(
                 "None of the selected papers are available in this project"
             )
 
-        plan = ChartPlan.model_validate(job.plan)
+        # The composer confirmed a plan with the user; a chat request has none
+        # and the pipeline proposes one, which is the slow half of the work and
+        # the reason this runs here rather than inside the request.
+        plan: Optional[ChartPlan] = (
+            ChartPlan.model_validate(job.plan) if job.plan else None
+        )
         roster = [(str(paper.id), str(paper.title or "Untitled")) for paper in papers]
         artifact, trace = operations.create_chart_artifact(
             prompt=job.prompt,
@@ -58,6 +101,7 @@ def generate_chart(
             db=db,
             project_id=str(project_id),
             plan=plan,
+            conversation_id=(str(job.message.conversation_id) if job.message else None),
         )
         chart_job_crud.update(
             db,
@@ -69,7 +113,8 @@ def generate_chart(
             message = (
                 operations.chart_failure_message(artifact)
                 if artifact
-                else (
+                else trace.get("clarification")
+                or (
                     "I couldn't determine a chart shape these papers support. "
                     "Try naming the measure and the entity you want on each axis "
                     '— for example "odds ratio by trimester".'
@@ -82,14 +127,19 @@ def generate_chart(
                 status_message="Chart generation could not find enough cited values",
                 error_message=message,
             )
+            _reply_in_conversation(db, job=job, content=message, user=user)
             return
 
+        # The artifact belongs to the turn that asked for it, so the pending
+        # card in that turn becomes the chart itself rather than a second one
+        # appearing somewhere else in the thread.
         created = artifact_crud.create_for_scope(
             db,
             payload=artifact,
             scope_type=ConversableType.PROJECT.value,
             scope_id=project_id,
             user=user,
+            message_id=job.message_id,  # type: ignore[arg-type]
         )
         if not created:
             raise ValueError("Failed to save chart artifact")
@@ -97,6 +147,7 @@ def generate_chart(
             db,
             job_id=job_id,
             status=JobStatus.COMPLETED,
+            status_message="Chart ready",
             artifact_id=created.id,
         )
     except Exception as exc:

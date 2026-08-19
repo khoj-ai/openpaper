@@ -440,6 +440,44 @@ New Title:
 """
 
 
+CHART_SCOPE_SYSTEM_PROMPT = """
+You decide WHICH papers a chart request is about. You do not design the chart.
+
+The user is in a project holding the papers listed below, and the conversation
+so far is your context. Return only the JSON ChartScope schema.
+
+- Most requests are about the whole project: "compare accuracy across these
+  papers", "chart sample size against effect size". Return an empty
+  `paper_ids` for those. Empty means all of them, and it is the right answer
+  far more often than not.
+- Some requests are about specific papers, and say so in ordinary prose rather
+  than by naming an id: "from that paper", "in the WebCoach study", "the two
+  RCTs you just cited". Resolve those against the roster and the conversation,
+  and return exactly the ids you resolved.
+- A pronoun points at whatever the recent turns were about. "that paper" after
+  a turn discussing one paper means that one; the conversation is right there,
+  so use it.
+- But what the CONVERSATION is about is not the scope — what the REQUEST asks
+  for is. A thread can discuss one paper at length and then ask for something
+  across the whole project, and that request is corpus-wide no matter what came
+  before it. Narrow ONLY when the request itself points at particular papers: a
+  demonstrative ("that paper", "this study"), a name, or a count ("both RCTs").
+  "across these papers", "in this project", "compare the papers", or naming no
+  paper at all are corpus-wide, and they override the subject of the thread.
+- The test for `specific_papers` is mechanical: point to the words in THE
+  REQUEST that refer to papers. A demonstrative ("that paper", "this study",
+  "it"), a title, an author, or a count. If you cannot quote such words from
+  the request itself, the answer is `all_papers` — however obvious the subject
+  of the conversation seems.
+- If a request clearly means specific papers but you cannot tell which, return
+  an empty `paper_ids` and set `clarification` to one short question naming the
+  candidates. Do NOT guess, and do NOT fall back to the whole project: charting
+  eighteen papers when the user asked about one is not a partial answer, it is
+  a different one, and the extra bars outrank and bury the ones they wanted.
+- Leave `clarification` null whenever you did resolve the scope.
+""".strip()
+
+
 CHART_PLAN_SYSTEM_PROMPT = """
 You propose candidate charts over a body of literature. Return only the JSON
 ChartPlanCandidates schema: 2 to 4 distinct candidate plans, best first.

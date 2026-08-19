@@ -10,13 +10,14 @@ from app.database.crud.conversation_crud import conversation_crud
 from app.database.crud.highlight_crud import highlight_crud
 from app.database.crud.message_crud import MessageCreate, message_crud
 from app.database.crud.paper_crud import paper_crud
+from app.database.crud.projects.project_chart_crud import chart_job_crud
 from app.database.crud.projects.project_conversation_crud import (
     project_conversation_crud,
 )
 from app.database.crud.projects.project_crud import project_crud
 from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
-from app.database.models import Annotation, ConversableType
+from app.database.models import Annotation, ChartGenerationJob, ConversableType
 from app.database.telemetry import track_event
 from app.llm.base import LLMProvider
 from app.llm.citation_handler import CitationHandler
@@ -24,8 +25,9 @@ from app.llm.operations import operations
 from app.schemas.artifact import artifact_payload_adapter
 from app.schemas.message import EvidenceCollection, ResponseStyle
 from app.schemas.user import CurrentUser
+from app.tasks.chart_generation import generate_chart
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
@@ -244,6 +246,7 @@ def _resolve_mention_scope(
 @message_router.post("/chat/everything")
 async def chat_message_multipaper(
     request: MultiPaperChatRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_required_user),
 ) -> StreamingResponse:
@@ -369,68 +372,93 @@ async def chat_message_multipaper(
                         paper for paper in all_papers if str(paper.id) in allowed_ids
                     ]
 
-                # Chart requests are first-class chat artifacts. They run from
-                # the gathered, scoped evidence and do not pause for a second
-                # confirmation step; the artifact composer is the deliberate
-                # pre-generation editing surface.
-                if operations.is_chart_request(request.user_query):
+                # Chart requests are queued, not built here. A chart is minutes
+                # of investigation, and running it inline held the whole turn —
+                # the user waited on a spinner before a single word of the
+                # answer appeared. The job is raised now, dispatched once this
+                # turn is saved, and reports itself through its own card.
+                chart_job: Optional[ChartGenerationJob] = None
+                if (
+                    operations.is_chart_request(request.user_query)
+                    and not request.project_id
+                ):
+                    # Everything-mode chat has no project, and a job is a row
+                    # against one. It still builds inline, and still holds the
+                    # turn while it does.
                     yield f"{json.dumps({'type': 'status', 'content': 'Building a cited chart...'})}{END_DELIMITER}"
                     roster = [
                         (str(paper.id), str(paper.title or "Untitled"))
                         for paper in all_papers
                     ]
                     chart = None
-                    chart_trace: dict = {}
-                    if request.project_id:
-                        # Same entry point the artifact composer uses, so a
-                        # request that charts in one surface charts in the
-                        # other. The chat's own gathered passages go in as
-                        # prior evidence, and recent turns let a follow-up like
-                        # "chart that relationship" resolve.
-                        chart, chart_trace = operations.create_chart_artifact(
+                    chart_proposal = operations.propose_chart_plan(
+                        request.user_query,
+                        roster,
+                        json.dumps(evidence_collection.get_evidence_dict()),
+                        conversation_id=request.conversation_id,
+                    )
+                    if chart_proposal.plan:
+                        chart = operations.build_chart_artifact(
                             prompt=request.user_query,
+                            plan=chart_proposal.plan,
+                            evidence=evidence_collection.get_evidence_dict(),
                             papers=roster,
                             current_user=current_user,
                             db=db,
-                            project_id=request.project_id,
-                            conversation_id=request.conversation_id,
-                            prior_evidence=evidence_collection.get_evidence_dict(),
                         )
-                    else:
-                        # Everything-mode chat has no project to investigate
-                        # within, so it plans from the scoped evidence it
-                        # already gathered.
-                        chart_proposal = operations.propose_chart_plan(
-                            request.user_query,
-                            roster,
-                            json.dumps(evidence_collection.get_evidence_dict()),
-                            conversation_id=request.conversation_id,
-                        )
-                        if chart_proposal.plan:
-                            chart = operations.build_chart_artifact(
-                                prompt=request.user_query,
-                                plan=chart_proposal.plan,
-                                evidence=evidence_collection.get_evidence_dict(),
-                                papers=roster,
-                                current_user=current_user,
-                                db=db,
-                            )
                     if chart and operations.is_chart_ready(chart):
                         payload = chart.model_dump()
                         artifacts_collected.append(payload)
                         yield f"{json.dumps({'type': 'artifact', 'content': payload})}{END_DELIMITER}"
                     else:
-                        # A planner that declined said why; that is a better
-                        # answer than the generic one and it goes back verbatim.
                         failure = (
                             operations.chart_failure_message(chart)
                             if chart
-                            else chart_trace.get("clarification")
+                            else chart_proposal.clarification
                             or "I couldn't determine a chart shape supported by these papers. "
                             "Use **Artifacts → Chart** to choose the axes yourself."
                         ) + "\n\n"
                         content_chunks.append(failure)
                         yield f"{json.dumps({'type': 'content', 'content': failure})}{END_DELIMITER}"
+                elif operations.is_chart_request(request.user_query):
+                    roster = [
+                        (str(paper.id), str(paper.title or "Untitled"))
+                        for paper in all_papers
+                    ]
+                    # Which papers, before what to measure. Everything
+                    # downstream widens to fill whatever roster it is handed, so
+                    # a request about one paper has to be narrowed here or it
+                    # comes back as a chart over the whole project.
+                    scope = operations.resolve_chart_scope(
+                        request.user_query,
+                        roster,
+                        conversation_id=request.conversation_id,
+                        current_user=current_user,
+                        db=db,
+                    )
+                    if scope.clarification:
+                        # Asking is cheap; a five-minute chart of the wrong
+                        # papers is not. This is the one chart outcome that
+                        # stays inline, because it is a question, and the user
+                        # is still here to answer it.
+                        question = scope.clarification.rstrip() + "\n\n"
+                        content_chunks.append(question)
+                        yield f"{json.dumps({'type': 'content', 'content': question})}{END_DELIMITER}"
+                    else:
+                        chart_job = chart_job_crud.create(
+                            db,
+                            project_id=uuid.UUID(request.project_id),
+                            prompt=request.user_query,
+                            paper_ids=scope.paper_ids,
+                            plan=None,
+                            user=current_user,
+                        )
+                        if chart_job:
+                            yield f"{json.dumps({'type': 'chart_job', 'content': chart_job_crud.to_dict(chart_job)})}{END_DELIMITER}"
+                        else:
+                            denied = "You need edit access to this project to build a chart.\n\n"
+                            content_chunks.append(denied)
+                            yield f"{json.dumps({'type': 'content', 'content': denied})}{END_DELIMITER}"
 
                 yield f"{json.dumps({'type': 'status', 'content': 'Generating response...'})}{END_DELIMITER}"
 
@@ -530,6 +558,23 @@ async def chat_message_multipaper(
                         message=assistant_message,
                         conversation=conversation,
                         payloads=payloads,
+                        user=current_user,
+                    )
+
+                # The chart is dispatched only now, because the turn it belongs
+                # to did not exist when the job was raised. Attaching it first
+                # is what lets the finished chart land back in this turn, and
+                # lets a reload show the pending card in the right place.
+                if chart_job is not None and assistant_message and request.project_id:
+                    chart_job_crud.update(
+                        db,
+                        job_id=chart_job.id,  # type: ignore[arg-type]
+                        message_id=assistant_message.id,  # type: ignore[arg-type]
+                    )
+                    background_tasks.add_task(
+                        generate_chart,
+                        job_id=chart_job.id,  # type: ignore[arg-type]
+                        project_id=uuid.UUID(request.project_id),
                         user=current_user,
                     )
 
