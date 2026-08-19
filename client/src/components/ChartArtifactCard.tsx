@@ -19,6 +19,10 @@ export function ChartArtifactCard({ artifact, onOpenPaper, chatHref, detailHref,
 }) {
     const view = useMemo(() => chartView(artifact), [artifact]);
     const [log, setLog] = useState(view.defaultLog);
+    // Held here rather than in the figure, alongside the log scale and for the
+    // same reason: the export has to draw what the reader is looking at.
+    const [expanded, setExpanded] = useState(false);
+    const shown = display === "full" && expanded ? "all" : display;
     const points = view.points;
     // The title is the affordance for opening the chart, so the card needs no
     // separate link of its own.
@@ -36,8 +40,8 @@ export function ChartArtifactCard({ artifact, onOpenPaper, chatHref, detailHref,
                     <p className="text-xs text-muted-foreground">{meta}</p>
                 </div>
                 {display === "full"
-                    ? <ChartExportButtons artifact={artifact} view={view} log={log} />
-                    : <ChartExportButtons artifact={artifact} view={view} log={log} compact />}
+                    ? <ChartExportButtons artifact={artifact} view={view} log={log} display={shown} />
+                    : <ChartExportButtons artifact={artifact} view={view} log={log} display={shown} compact />}
             </div>
 
             <ChartFigure
@@ -46,7 +50,8 @@ export function ChartArtifactCard({ artifact, onOpenPaper, chatHref, detailHref,
                 log={log}
                 onToggleLog={setLog}
                 onOpenPaper={onOpenPaper}
-                display={display}
+                display={shown}
+                onToggleExpanded={setExpanded}
             />
 
             {points.length === 0 && (

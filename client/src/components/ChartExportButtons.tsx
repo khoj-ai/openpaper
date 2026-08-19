@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { Check, ChevronDown, Copy, Download, Share2 } from "lucide-react";
 import { ChartArtifact } from "@/lib/schema";
-import { ChartView, plotRows } from "@/components/ChartFigure";
-import { copyChartPng, downloadChartPng } from "@/lib/chartExport";
+import { ChartDisplay, ChartView, plotRows } from "@/components/ChartFigure";
+import { EXPORT_MAX_ROWS, copyChartPng, downloadChartPng } from "@/lib/chartExport";
 import { useIsDarkMode } from "@/hooks/useDarkMode";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,10 +14,11 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export function ChartExportButtons({ artifact, view, log, compact = false }: {
+export function ChartExportButtons({ artifact, view, log, display = "full", compact = false }: {
     artifact: ChartArtifact;
     view: ChartView;
     log: boolean;
+    display?: ChartDisplay;
     compact?: boolean;
 }) {
     const { darkMode } = useIsDarkMode();
@@ -26,13 +27,13 @@ export function ChartExportButtons({ artifact, view, log, compact = false }: {
 
     if (view.points.length === 0) return null;
 
-    // Export what is on screen, including the scale the reader chose and the
-    // rows the plot actually drew — a canvas tall enough for several hundred
-    // rows is one the browser declines to rasterize, and the reader would get a
-    // blank image instead of the chart they were looking at.
+    // Export what is on screen: the scale the reader chose and the rows the
+    // plot actually drew, expanded or not. The one thing it will not follow is
+    // an expansion past what a canvas can rasterize; the image's own subtitle
+    // reports how many of the total it managed to draw.
     const options = {
         artifact,
-        points: plotRows(view, "full"),
+        points: plotRows(view, display).slice(0, EXPORT_MAX_ROWS),
         total: view.points.length,
         ranked: view.ranked,
         log,

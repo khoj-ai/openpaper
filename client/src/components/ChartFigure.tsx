@@ -134,12 +134,18 @@ const COMPACT_ROWS = 6;
 // values table — the form that does scale — carries the rest.
 const FULL_ROWS = 24;
 
+export type ChartDisplay = "compact" | "full" | "all";
+
 /** The rows a plot actually draws, which the figure and the PNG must agree on.
+ *
+ * "all" is the reader overriding the cap above. The default stands because
+ * twenty-four bars is where comparison stops working, not because the rest of
+ * the data is unwelcome — so the ceiling is a starting position, not a wall.
  *
  * An XY plot is exempt: a scatter of 400 dots is a distribution, and reading it
  * is the point. It is the one-row-per-point form that runs out of room. */
-export function plotRows(view: ChartView, display: "compact" | "full"): ChartPoint[] {
-    if (view.isXY) return view.points;
+export function plotRows(view: ChartView, display: ChartDisplay): ChartPoint[] {
+    if (view.isXY || display === "all") return view.points;
     return view.points.slice(0, display === "compact" ? COMPACT_ROWS : FULL_ROWS);
 }
 
@@ -401,13 +407,15 @@ export function chartView(artifact: ChartArtifact): ChartView {
     };
 }
 
-export function ChartFigure({ artifact, view, log, onToggleLog, onOpenPaper, display = "full" }: {
+export function ChartFigure({ artifact, view, log, onToggleLog, onOpenPaper, display = "full", onToggleExpanded }: {
     artifact: ChartArtifact;
     view: ChartView;
     log: boolean;
     onToggleLog: (log: boolean) => void;
     onOpenPaper: (paperId: string, searchTerm?: string) => void;
-    display?: "compact" | "full";
+    display?: ChartDisplay;
+    /** Omit to fix the plot at `display`; the caption's expander needs it. */
+    onToggleExpanded?: (expanded: boolean) => void;
 }) {
     const { points: all, isXY, canLog, ranked } = view;
     const dark = useIsDarkMode().darkMode;
@@ -422,6 +430,9 @@ export function ChartFigure({ artifact, view, log, onToggleLog, onOpenPaper, dis
     // the full chart and lets the title carry the reader onward.
     const points = plotRows(view, display);
     const truncated = points.length < all.length;
+    // Only where there is room to grow into: the preview card stays a preview,
+    // and an XY plot already draws every point.
+    const expandable = Boolean(onToggleExpanded) && display !== "compact" && !isXY && all.length > FULL_ROWS;
     const yLabel = artifact.plan.y.unit ? `${artifact.plan.y.label} (${artifact.plan.y.unit})` : artifact.plan.y.label;
 
     return (
@@ -462,8 +473,18 @@ export function ChartFigure({ artifact, view, log, onToggleLog, onOpenPaper, dis
                 <span>
                     {yLabel}
                     {truncated ? ` · ${ranked ? "top" : "first"} ${points.length} of ${all.length}` : ""}
+                    {display === "all" && !isXY ? ` · all ${all.length}` : ""}
+                    {expandable && (
+                        <button
+                            type="button"
+                            onClick={() => onToggleExpanded?.(display !== "all")}
+                            className="ml-1.5 underline underline-offset-2 hover:text-foreground"
+                        >
+                            {display === "all" ? `Show top ${FULL_ROWS}` : `Show all ${all.length}`}
+                        </button>
+                    )}
                 </span>
-                {canLog && display === "full" && (
+                {canLog && display !== "compact" && (
                     <Tabs value={log ? "log" : "linear"} onValueChange={value => onToggleLog(value === "log")}>
                         <TabsList className="h-6 p-0.5">
                             <TabsTrigger

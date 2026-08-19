@@ -91,6 +91,17 @@ function layoutLegend(
     return lines;
 }
 
+/** The most rows a rasterized chart can safely carry.
+ *
+ * A canvas is bounded by total pixel area, not only by either dimension, and
+ * the strictest limit in common browsers (16,777,216 px) divided by this
+ * image's backing width leaves room for about this many rows once the header
+ * and legend are paid for. Past it the browser hands back a blank bitmap rather
+ * than an error, so a reader who expanded the plot and hit export would get an
+ * empty PNG of the chart they were looking at. The subtitle says what it drew.
+ */
+export const EXPORT_MAX_ROWS = 120;
+
 export interface ChartExportOptions {
     artifact: ChartArtifact;
     /** The rows the plot drew, which may be fewer than the chart has. */
