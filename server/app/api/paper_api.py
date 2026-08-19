@@ -733,7 +733,11 @@ async def delete_pdf(
             )
 
         removed_paper = paper_crud.remove(db, id=id, user=current_user)
-        if not removed_paper:
+        if not removed_paper and paper_crud.get(db, id=id, user=current_user):
+            # Only a paper that is still there is a real failure. A duplicate
+            # delete request loses the race against the one that got there
+            # first, and reporting that as an error would fail a request whose
+            # outcome — the paper is gone — is the one that was asked for.
             return JSONResponse(
                 status_code=500, content={"message": "Failed to delete document"}
             )
