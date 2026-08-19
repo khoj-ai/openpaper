@@ -2,10 +2,9 @@ import logging
 import uuid
 
 from app.auth.dependencies import get_required_user
-from app.database.crud.artifact_crud import artifact_crud
+from app.database.crud.artifact_crud import artifact_crud, artifact_response
 from app.database.crud.projects.project_crud import project_crud
 from app.database.database import get_db
-from app.database.models import Artifact, ArtifactKind, ConversableType
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
@@ -37,15 +36,8 @@ async def get_project_chart_artifact(
     if role is None:
         return JSONResponse(status_code=404, content={"message": "Project not found"})
 
-    artifact = (
-        db.query(Artifact)
-        .filter(
-            Artifact.id == artifact_uuid,
-            Artifact.kind == ArtifactKind.CHART.value,
-            Artifact.scope_type == ConversableType.PROJECT.value,
-            Artifact.scope_id == project_uuid,
-        )
-        .first()
+    artifact = artifact_crud.get_chart_for_project(
+        db, artifact_id=artifact_uuid, project_id=project_uuid
     )
     if not artifact:
         return JSONResponse(status_code=404, content={"message": "Chart not found"})
@@ -54,7 +46,7 @@ async def get_project_chart_artifact(
         status_code=200,
         content={
             "id": str(artifact.id),
-            "payload": artifact.payload,
+            "payload": artifact.to_payload(),
             "created_at": (
                 artifact.created_at.isoformat() if artifact.created_at else None
             ),
@@ -90,20 +82,11 @@ async def get_project_artifacts(
     )
 
     artifacts = [
-        {
-            "id": str(artifact.id),
-            "kind": artifact.kind,
-            "payload": artifact.payload,
-            "message_id": str(artifact.message_id) if artifact.message_id else None,
-            "conversation_id": str(conversation_id) if conversation_id else None,
-            "conversation_title": conversation_title,
-            "created_at": (
-                artifact.created_at.isoformat() if artifact.created_at else None
-            ),
-            "updated_at": (
-                artifact.updated_at.isoformat() if artifact.updated_at else None
-            ),
-        }
+        artifact_response(
+            artifact,
+            conversation_id=conversation_id,
+            conversation_title=conversation_title,
+        )
         for artifact, conversation_id, conversation_title in rows
     ]
 

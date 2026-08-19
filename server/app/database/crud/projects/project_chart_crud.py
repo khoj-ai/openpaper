@@ -119,7 +119,7 @@ class ChartJobCRUD:
             "updated_at": job.updated_at.isoformat() if job.updated_at else None,
             "started_at": job.started_at.isoformat() if job.started_at else None,
             "completed_at": job.completed_at.isoformat() if job.completed_at else None,
-            "artifact": job.artifact.payload if job.artifact else None,
+            "artifact": job.artifact.to_payload() if job.artifact else None,
             "artifact_id": str(job.artifact_id) if job.artifact_id else None,
         }
 

@@ -1,6 +1,7 @@
 import uuid
 from enum import Enum
 from types import NoneType
+from typing import Any, List, Optional
 
 from sqlalchemy import (  # type: ignore
     ARRAY,
@@ -475,6 +476,16 @@ class Conversation(Base):
     )
 
 
+def _rows(value: Any) -> list:
+    """A list column or relationship as a plain list, empty where it is null.
+
+    Also the seam where the ORM's own types stop: everything below reads its
+    columns to build a payload, and SQLAlchemy's declarative attributes are not
+    the Python types they hold until an instance is loaded.
+    """
+    return list(value or [])
+
+
 class ArtifactKind(str, Enum):
     """First-party artifacts produced by chat (or other agentic flows).
 
@@ -487,7 +498,14 @@ class ArtifactKind(str, Enum):
 
 
 class Artifact(Base):
-    """A first-party artifact (citation card today; charts/images later).
+    """What every first-party artifact has in common, whatever its kind.
+
+    This is the parent of a joined-table hierarchy: the columns here are the
+    ones that mean the same thing for a citation as for a chart — who owns it,
+    where it surfaces, which message produced it — and each kind carries its own
+    columns in its own table. There is deliberately no JSON payload: a blob
+    means the shape lives in whichever code last wrote it, and readers are left
+    to guess.
 
     Scope mirrors `ConversableType` so the same primitive that targets a
     conversation also targets an artifact's surfacing — a project panel filters
@@ -506,12 +524,13 @@ class Artifact(Base):
         index=True,
     )
 
-    kind = Column(String, nullable=False)  # ArtifactKind value
-    payload = Column(JSONB, nullable=False)
+    kind = Column(String, nullable=False)  # ArtifactKind value; the discriminator
 
-    # Provenance: which assistant message produced this artifact. Artifact-native
-    # jobs (for example charts) have no synthetic chat message, so this is
-    # intentionally optional.
+    # Provenance: which assistant message produced this artifact. It lives here
+    # rather than on a child because both kinds can come from chat. What differs
+    # by kind is whether it is REQUIRED, and that is the CHECK below: a citation
+    # is only ever a reply to something a user asked, while a chart can equally
+    # be raised by a background job that has no conversation at all.
     message_id = Column(
         UUID(as_uuid=True),
         ForeignKey("messages.id", ondelete="CASCADE"),
@@ -525,6 +544,11 @@ class Artifact(Base):
 
     message = relationship("Message", back_populates="artifacts")
 
+    __mapper_args__ = {
+        "polymorphic_on": kind,
+        "polymorphic_identity": "artifact",
+    }
+
     __table_args__ = (
         Index(
             "ix_artifacts_scope",
@@ -534,7 +558,366 @@ class Artifact(Base):
             "created_at",
         ),
         Index("ix_artifacts_message_id", "message_id"),
+        CheckConstraint(
+            "kind <> 'citation' OR message_id IS NOT NULL",
+            name="ck_artifacts_citation_has_message",
+        ),
     )
+
+    def to_payload(self) -> dict:
+        """The artifact as the API and the client have always seen it.
+
+        Storage is normalized; the wire shape is not, and it does not need to
+        change for storage to. Each kind reassembles its own.
+        """
+        raise NotImplementedError
+
+
+class CitationArtifact(Artifact):
+    """A resolved citation for one paper, in the user's preferred style.
+
+    The application never formats the citation string — it stores the fields a
+    style needs and the client renders them — so those fields are the columns.
+    """
+
+    __tablename__ = "citation_artifacts"
+
+    id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("artifacts.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    paper_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    preferred_style = Column(String, nullable=False)  # canonical key, e.g. "APA"
+    style_display = Column(String, nullable=False)  # e.g. "APA 7th Edition"
+    method = Column(String, nullable=False)  # CitationMethod value
+    # How sure the resolver is, when it said. Absent for the paths that do not
+    # estimate one (a cached or deterministic hit is not a guess).
+    confidence = Column(Float, nullable=True)
+    # Which of the fields below the resolver could not fill, named so the card
+    # can say what is missing rather than silently printing a gap.
+    missing_fields = Column(ARRAY(Text), nullable=False, default=list)
+
+    # The citation's own metadata.
+    title = Column(String, nullable=True)
+    authors = Column(ARRAY(Text), nullable=False, default=list)
+    # Text, not Date: papers report partial dates ("2024", "2024-12") and a
+    # date column would force a precision the source never had.
+    publish_date = Column(String, nullable=True)
+    journal = Column(String, nullable=True)
+    publisher = Column(String, nullable=True)
+    doi = Column(String, nullable=True)
+
+    __mapper_args__ = {"polymorphic_identity": ArtifactKind.CITATION.value}
+
+    def to_payload(self) -> dict:
+        return {
+            "kind": ArtifactKind.CITATION.value,
+            "paper_id": str(self.paper_id),
+            "preferred_style": self.preferred_style,
+            "style_display": self.style_display,
+            "method": self.method,
+            "confidence": self.confidence,
+            "missing_fields": _rows(self.missing_fields),
+            "data": {
+                # The paper id is repeated inside `data` because that is the
+                # object the client renders from; one column, written twice.
+                "paper_id": str(self.paper_id),
+                "title": self.title,
+                "authors": _rows(self.authors),
+                "publish_date": self.publish_date,
+                "journal": self.journal,
+                "publisher": self.publisher,
+                "doi": self.doi,
+            },
+        }
+
+
+class ChartArtifact(Artifact):
+    """A chart drawn from values quoted out of papers.
+
+    The plan, the points and the quotes behind them are rows in the tables
+    below. What stays JSON is only what a RUN emitted — the sandbox harness and
+    its output, the investigation trace — because those are documents whose
+    shape belongs to the harness that produced them, and giving them columns
+    would invent a structure this application does not own.
+    """
+
+    __tablename__ = "chart_artifacts"
+
+    id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("artifacts.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    title = Column(String, nullable=False)
+    chart_type = Column(String, nullable=False)  # ChartType value
+    # Draw the paper as the series: set when several papers report the same x.
+    series_by_paper = Column(Boolean, nullable=False, default=False)
+
+    # A derived y, computed from cited primitives after extraction. Null label
+    # means the plan plots a quoted value directly.
+    calculation_label = Column(String, nullable=True)
+    calculation_spec = Column(Text, nullable=True)
+    calculation_inputs = Column(ARRAY(Text), nullable=False, default=list)
+
+    # Coverage: which papers were searched, and which supplied a point. Plain
+    # id arrays — they are read as a set to report "3 of 18 papers", never
+    # joined against.
+    searched_paper_ids = Column(ARRAY(UUID(as_uuid=True)), nullable=False, default=list)
+    included_paper_ids = Column(ARRAY(UUID(as_uuid=True)), nullable=False, default=list)
+
+    warnings = Column(ARRAY(Text), nullable=False, default=list)
+    extraction_steps = Column(ARRAY(Text), nullable=False, default=list)
+
+    computation = Column(JSONB, nullable=True)
+    conversions = Column(JSONB, nullable=True)
+    investigation_trace = Column(JSONB, nullable=True)
+
+    fields = relationship(
+        "ChartField",
+        back_populates="chart",
+        cascade="all, delete-orphan",
+        order_by="ChartField.position",
+    )
+    records = relationship(
+        "ChartRecord",
+        back_populates="chart",
+        cascade="all, delete-orphan",
+        order_by="ChartRecord.position",
+    )
+    excluded_papers = relationship(
+        "ChartExcludedPaper",
+        back_populates="chart",
+        cascade="all, delete-orphan",
+        order_by="ChartExcludedPaper.position",
+    )
+
+    __mapper_args__ = {"polymorphic_identity": ArtifactKind.CHART.value}
+
+    def to_payload(self) -> dict:
+        by_role = {str(field.role): field for field in _rows(self.fields)}
+        return {
+            "kind": ArtifactKind.CHART.value,
+            "plan": {
+                "title": self.title,
+                "chart_type": self.chart_type,
+                "x": _chart_field_payload(by_role.get(ChartFieldRole.X.value)),
+                "y": _chart_field_payload(by_role.get(ChartFieldRole.Y.value)),
+                "series": _chart_field_payload(
+                    by_role.get(ChartFieldRole.SERIES.value)
+                ),
+                "fields": [
+                    _chart_field_payload(field)
+                    for field in _rows(self.fields)
+                    if field.role == ChartFieldRole.PRIMITIVE.value
+                ],
+                "calculation": (
+                    {
+                        "label": self.calculation_label,
+                        "spec": self.calculation_spec,
+                        "inputs": _rows(self.calculation_inputs),
+                    }
+                    if self.calculation_label
+                    else None
+                ),
+            },
+            "records": [record.to_payload() for record in _rows(self.records)],
+            "coverage": {
+                "searched_paper_ids": [
+                    str(pid) for pid in _rows(self.searched_paper_ids)
+                ],
+                "included_paper_ids": [
+                    str(pid) for pid in _rows(self.included_paper_ids)
+                ],
+                "excluded": {
+                    str(row.paper_id): row.reason for row in _rows(self.excluded_papers)
+                },
+            },
+            "series_by_paper": self.series_by_paper,
+            "computation": self.computation,
+            "conversions": self.conversions,
+            "warnings": _rows(self.warnings),
+            "extraction_steps": _rows(self.extraction_steps),
+            "investigation_trace": self.investigation_trace,
+        }
+
+
+class ChartFieldRole(str, Enum):
+    """What a plan field is FOR, which is what tells x from y from a primitive.
+
+    A plan names the same shape (key, label, unit) in four positions; the role
+    is the position, so one table holds them all without four nullable
+    columns.
+    """
+
+    X = "x"
+    Y = "y"
+    SERIES = "series"
+    PRIMITIVE = "primitive"
+
+
+class ChartField(Base):
+    """One field of a chart's plan: what to look for, and what it is called."""
+
+    __tablename__ = "chart_fields"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    chart_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("chart_artifacts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    role = Column(String, nullable=False)  # ChartFieldRole value
+    key = Column(String, nullable=False)
+    label = Column(String, nullable=False)
+    # The unit every paper's number is converted INTO for this field. Empty for
+    # a measure that has none: a count, an index, a dimensionless score.
+    unit = Column(String, nullable=True)
+    position = Column(Integer, nullable=False, default=0)
+
+    chart = relationship("ChartArtifact", back_populates="fields")
+
+    __table_args__ = (
+        # x, y and series are one field each; only primitives repeat.
+        UniqueConstraint("chart_id", "role", "key", name="uq_chart_fields_role_key"),
+    )
+
+
+class ChartRecord(Base):
+    """One plotted point: a paper, and the values it supplied for the plan.
+
+    A paper reporting several benchmarks contributes several records, so the
+    point — not the paper — is the unit of identity.
+    """
+
+    __tablename__ = "chart_records"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    chart_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("chart_artifacts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # The extractor's own id for this point, which the client keys rows on.
+    record_key = Column(String, nullable=False)
+    # No foreign key to papers on purpose: a chart cites what it read, and
+    # removing the paper from a project must not silently delete a bar or
+    # rewrite what the chart claims. The title is denormalized for the same
+    # reason — the chart has to keep naming its source either way.
+    paper_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    paper_title = Column(String, nullable=False)
+    # Why this point is listed but not drawn — a bound instead of a value, a
+    # unit that could not reach the plan's. Null means it plots.
+    exclusion_reason = Column(Text, nullable=True)
+    position = Column(Integer, nullable=False, default=0)
+
+    chart = relationship("ChartArtifact", back_populates="records")
+    values = relationship(
+        "ChartValue",
+        back_populates="record",
+        cascade="all, delete-orphan",
+        order_by="ChartValue.position",
+    )
+
+    __table_args__ = (
+        UniqueConstraint("chart_id", "record_key", name="uq_chart_records_key"),
+    )
+
+    def to_payload(self) -> dict:
+        return {
+            "record_id": self.record_key,
+            "paper_id": str(self.paper_id),
+            "paper_title": self.paper_title,
+            "values": {
+                str(value.key): value.to_payload() for value in _rows(self.values)
+            },
+            "exclusion_reason": self.exclusion_reason,
+        }
+
+
+class ChartValue(Base):
+    """One quoted number behind a point, and the sentence it came from."""
+
+    __tablename__ = "chart_values"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    record_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("chart_records.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    key = Column(String, nullable=False)  # matches a ChartField.key
+
+    # Exactly as the paper prints it, so the quote still matches.
+    value = Column(Text, nullable=False)
+    quote = Column(Text, nullable=False)
+    line_number = Column(String, nullable=True)
+    # The unit the PAPER stated, before conversion.
+    unit = Column(String, nullable=True)
+    # The lambda that carried `value` onto the plan's unit, run in the sandbox.
+    # Empty when the number never moved, so a stored conversion always means the
+    # plotted number is not the printed one.
+    conversion = Column(Text, nullable=False, default="")
+    # Why no conversion was possible, when that is why the point was excluded.
+    conversion_note = Column(Text, nullable=True)
+    # What is actually plotted: `value` parsed, then put through `conversion`.
+    number = Column(Float, nullable=True)
+    position = Column(Integer, nullable=False, default=0)
+
+    record = relationship("ChartRecord", back_populates="values")
+
+    __table_args__ = (UniqueConstraint("record_id", "key", name="uq_chart_values_key"),)
+
+    def to_payload(self) -> dict:
+        return {
+            "value": self.value,
+            "quote": self.quote,
+            "line_number": self.line_number,
+            "unit": self.unit,
+            "conversion": self.conversion,
+            "conversion_note": self.conversion_note,
+            "number": self.number,
+        }
+
+
+class ChartExcludedPaper(Base):
+    """A searched paper that supplied no point, and the reason it did not.
+
+    Distinct from a record's exclusion: this is a paper that never produced a
+    point at all, which is what lets the chart account for every paper it read.
+    """
+
+    __tablename__ = "chart_excluded_papers"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    chart_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("chart_artifacts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    paper_id = Column(UUID(as_uuid=True), nullable=False)
+    reason = Column(Text, nullable=False)
+    position = Column(Integer, nullable=False, default=0)
+
+    chart = relationship("ChartArtifact", back_populates="excluded_papers")
+
+    __table_args__ = (
+        UniqueConstraint("chart_id", "paper_id", name="uq_chart_excluded_paper"),
+    )
+
+
+def _chart_field_payload(field) -> Optional[dict]:
+    """A plan field on the wire, or nothing where the plan named none."""
+    if field is None:
+        return None
+    return {"key": field.key, "label": field.label, "unit": field.unit}
 
 
 class ChartGenerationJob(Base):

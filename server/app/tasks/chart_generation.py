@@ -7,7 +7,7 @@ from app.database.crud.artifact_crud import artifact_crud
 from app.database.crud.projects.project_chart_crud import chart_job_crud
 from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import SessionLocal
-from app.database.models import ArtifactKind, ConversableType, JobStatus
+from app.database.models import ConversableType, JobStatus
 from app.llm.operations import operations
 from app.schemas.chart import ChartPlan
 from app.schemas.user import CurrentUser
@@ -86,8 +86,7 @@ def generate_chart(
 
         created = artifact_crud.create_for_scope(
             db,
-            kind=ArtifactKind.CHART,
-            payload=artifact.model_dump(),
+            payload=artifact,
             scope_type=ConversableType.PROJECT.value,
             scope_id=project_id,
             user=user,

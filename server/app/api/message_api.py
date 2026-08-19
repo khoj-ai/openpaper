@@ -16,17 +16,18 @@ from app.database.crud.projects.project_conversation_crud import (
 from app.database.crud.projects.project_crud import project_crud
 from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
-from app.database.models import Annotation, ArtifactKind, ConversableType
+from app.database.models import Annotation, ConversableType
 from app.database.telemetry import track_event
 from app.llm.base import LLMProvider
 from app.llm.citation_handler import CitationHandler
 from app.llm.operations import operations
+from app.schemas.artifact import artifact_payload_adapter
 from app.schemas.message import EvidenceCollection, ResponseStyle
 from app.schemas.user import CurrentUser
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
 load_dotenv()
@@ -508,21 +509,27 @@ async def chat_message_multipaper(
                 )
 
                 if assistant_message and artifacts_collected:
+                    # Each collected dict is whatever was streamed to the client
+                    # as a card. Its own `kind` selects the member to parse it
+                    # as, so an artifact that does not match its kind's shape
+                    # fails here rather than being stored as an unreadable blob.
+                    payloads = []
+                    for raw in artifacts_collected:
+                        try:
+                            payloads.append(
+                                artifact_payload_adapter.validate_python(raw)
+                            )
+                        except ValidationError:
+                            logger.warning(
+                                "Discarding malformed %r artifact",
+                                raw.get("kind"),
+                                exc_info=True,
+                            )
                     artifact_crud.bulk_create_for_message(
                         db,
                         message=assistant_message,
                         conversation=conversation,
-                        items=[
-                            (
-                                (
-                                    ArtifactKind.CHART
-                                    if payload.get("kind") == "chart"
-                                    else ArtifactKind.CITATION
-                                ),
-                                payload,
-                            )
-                            for payload in artifacts_collected
-                        ],
+                        payloads=payloads,
                         user=current_user,
                     )
 

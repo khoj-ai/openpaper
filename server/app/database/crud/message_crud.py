@@ -224,7 +224,8 @@ class MessageCRUD(CRUDBase[Message, MessageCreate, MessageUpdate]):
                 # conversation can link each card to its viewer page. It is
                 # assigned on persistence, so a still-streaming card has none.
                 "artifacts": [
-                    {**a.payload, "artifact_id": str(a.id)} for a in message.artifacts
+                    {**a.to_payload(), "artifact_id": str(a.id)}
+                    for a in message.artifacts
                 ]
                 or None,
                 "trace": message.trace,
