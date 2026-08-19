@@ -32,9 +32,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.llm.base import BaseLLMClient
 from app.llm.json_parser import JSONParser
 from app.llm.provider import FileContent, TextContent
-from app.logging_config import configure_logging
 
-configure_logging()
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
