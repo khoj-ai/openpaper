@@ -15,10 +15,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 from app.database.crud.paper_crud import paper_crud
 from app.database.database import SessionLocal
-from app.logging_config import configure_logging
 from sqlalchemy import text
 
-configure_logging()
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 

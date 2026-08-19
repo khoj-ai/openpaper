@@ -29,10 +29,9 @@ from app.database.database import SessionLocal
 from app.database.models import Paper
 from app.helpers.citations import bibliographic_gaps, fields_from_paper
 from app.helpers.metadata_hydration import hydrate_paper_metadata
-from app.logging_config import configure_logging
 from sqlalchemy.orm import Session
 
-configure_logging()
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
