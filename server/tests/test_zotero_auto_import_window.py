@@ -4,10 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 from app.services import zotero_import as zotero_import_module
-from app.services.zotero_import import (
-    _parse_zotero_date_added,
-    auto_import_new_papers,
-)
+from app.services.zotero_import import _parse_zotero_date_added, auto_import_new_papers
 
 
 class TestParseZoteroDateAdded(unittest.TestCase):
@@ -27,7 +24,9 @@ class TestAutoImportWindow(unittest.IsolatedAsyncioTestCase):
     @patch.object(zotero_import_module, "list_library")
     @patch.object(zotero_import_module, "zotero_import_crud")
     @patch.object(zotero_import_module, "zotero_crud")
-    @patch.object(zotero_import_module, "can_user_upload_paper", return_value=(True, None))
+    @patch.object(
+        zotero_import_module, "can_user_upload_paper", return_value=(True, None)
+    )
     @patch.object(
         zotero_import_module, "get_remaining_paper_upload_slots", return_value=10
     )
@@ -49,12 +48,12 @@ class TestAutoImportWindow(unittest.IsolatedAsyncioTestCase):
                 {
                     "zotero_item_key": "OLD1",
                     "already_imported": False,
-                    "date_added": datetime(2020, 1, 1, tzinfo=timezone.utc),
+                    "date_added": "2020-01-01T00:00:00Z",
                 },
                 {
                     "zotero_item_key": "NEW1",
                     "already_imported": False,
-                    "date_added": datetime(2025, 7, 1, tzinfo=timezone.utc),
+                    "date_added": "2025-07-01T00:00:00Z",
                 },
             ],
             "remaining_slots": 10,
