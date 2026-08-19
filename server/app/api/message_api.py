@@ -377,50 +377,17 @@ async def chat_message_multipaper(
                 # the user waited on a spinner before a single word of the
                 # answer appeared. The job is raised now, dispatched once this
                 # turn is saved, and reports itself through its own card.
+                #
+                # Which also makes charts project work for the moment: a job is
+                # a row against a project, so library-wide chat cannot raise
+                # one, and building inline there instead is the very thing this
+                # replaced. Those requests are answered as ordinary questions
+                # until a job can carry a scope of its own.
                 chart_job: Optional[ChartGenerationJob] = None
                 if (
                     operations.is_chart_request(request.user_query)
-                    and not request.project_id
+                    and request.project_id
                 ):
-                    # Everything-mode chat has no project, and a job is a row
-                    # against one. It still builds inline, and still holds the
-                    # turn while it does.
-                    yield f"{json.dumps({'type': 'status', 'content': 'Building a cited chart...'})}{END_DELIMITER}"
-                    roster = [
-                        (str(paper.id), str(paper.title or "Untitled"))
-                        for paper in all_papers
-                    ]
-                    chart = None
-                    chart_proposal = operations.propose_chart_plan(
-                        request.user_query,
-                        roster,
-                        json.dumps(evidence_collection.get_evidence_dict()),
-                        conversation_id=request.conversation_id,
-                    )
-                    if chart_proposal.plan:
-                        chart = operations.build_chart_artifact(
-                            prompt=request.user_query,
-                            plan=chart_proposal.plan,
-                            evidence=evidence_collection.get_evidence_dict(),
-                            papers=roster,
-                            current_user=current_user,
-                            db=db,
-                        )
-                    if chart and operations.is_chart_ready(chart):
-                        payload = chart.model_dump()
-                        artifacts_collected.append(payload)
-                        yield f"{json.dumps({'type': 'artifact', 'content': payload})}{END_DELIMITER}"
-                    else:
-                        failure = (
-                            operations.chart_failure_message(chart)
-                            if chart
-                            else chart_proposal.clarification
-                            or "I couldn't determine a chart shape supported by these papers. "
-                            "Use **Artifacts → Chart** to choose the axes yourself."
-                        ) + "\n\n"
-                        content_chunks.append(failure)
-                        yield f"{json.dumps({'type': 'content', 'content': failure})}{END_DELIMITER}"
-                elif operations.is_chart_request(request.user_query):
                     roster = [
                         (str(paper.id), str(paper.title or "Untitled"))
                         for paper in all_papers
