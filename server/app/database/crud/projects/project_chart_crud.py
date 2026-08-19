@@ -1,6 +1,7 @@
-"""Persistence helpers for artifact-native chart generation jobs."""
+"""Persistence helpers for chart generation jobs."""
 
-from datetime import datetime, timezone
+import logging
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 from uuid import UUID
 
@@ -8,6 +9,16 @@ from app.database.crud.projects.project_crud import project_crud
 from app.database.models import ChartGenerationJob, JobStatus, ProjectRoles
 from app.schemas.user import CurrentUser
 from sqlalchemy.orm import Session, joinedload
+
+logger = logging.getLogger(__name__)
+
+# How long a job may go without any recorded progress before it is presumed
+# dead. Generous on purpose: a job's status only moves at a few points, and the
+# gap between "investigating" and the finished chart is the whole run — every
+# paper investigated, read as a PDF, and its values converted. A large project
+# spends a long time in that gap, and failing a job that is still working is
+# worse than a card that spins a while longer.
+STALE_AFTER = timedelta(minutes=30)
 
 
 class ChartJobCRUD:
@@ -59,6 +70,10 @@ class ChartJobCRUD:
             is None
         ):
             return []
+        # Opportunistic, and scoped to the project being read: the only jobs
+        # worth resolving are the ones somebody is about to look at, and this
+        # is the path they are polling. Nothing anywhere else has to run.
+        self.fail_stale(db, project_id=project_id)
         return (
             db.query(ChartGenerationJob)
             .options(joinedload(ChartGenerationJob.artifact))
@@ -110,6 +125,58 @@ class ChartJobCRUD:
         db.commit()
         db.refresh(job)
         return job
+
+    @staticmethod
+    def fail_stale(db: Session, *, project_id: UUID) -> int:
+        """Fail the project's jobs that nothing is working on any more.
+
+        Generation runs inside a web process, so a job dies with the process
+        that owned it — a deploy, a crash, a scaled-in task — and no one is
+        left to finish it or to mark it failed. The card would spin forever.
+
+        Deliberately not swept at startup. The backend runs as a dozen
+        identical servers, and a booting one cannot tell "this job died with
+        its process" from "this job is running on a sibling right now"; a
+        rolling deploy would have new tasks failing jobs their neighbours were
+        still working on. Elapsed time is the one signal that means the same
+        thing on every server, so that is what this uses.
+
+        Scoped to the project rather than to the requester, because the panel
+        shows the project's jobs whoever raised them: a member's abandoned job
+        would otherwise spin in everyone's panel until that one member happened
+        to look at it themselves.
+
+        Written as a single conditional UPDATE rather than a read then a write:
+        several servers can run this at the same moment, and the second one to
+        commit simply matches no rows.
+
+        Returns how many were failed.
+        """
+        cutoff = datetime.now(timezone.utc) - STALE_AFTER
+        failed = (
+            db.query(ChartGenerationJob)
+            .filter(
+                ChartGenerationJob.project_id == project_id,
+                ChartGenerationJob.status.in_([JobStatus.PENDING, JobStatus.RUNNING]),
+                ChartGenerationJob.updated_at < cutoff,
+            )
+            .update(
+                {
+                    ChartGenerationJob.status: JobStatus.FAILED,
+                    ChartGenerationJob.status_message: "Chart generation was interrupted",
+                    ChartGenerationJob.error_message: (
+                        "This chart stopped being built — the server running it "
+                        "went away. Ask for it again and it will start over."
+                    ),
+                    ChartGenerationJob.completed_at: datetime.now(timezone.utc),
+                },
+                synchronize_session=False,
+            )
+        )
+        if failed:
+            db.commit()
+            logger.info("Failed %d chart job(s) that stopped making progress", failed)
+        return failed
 
     @staticmethod
     def to_dict(job: ChartGenerationJob) -> dict[str, Any]:
