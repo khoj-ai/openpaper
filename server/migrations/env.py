@@ -1,18 +1,16 @@
-from logging.config import fileConfig
-
 from alembic import context
 from app.database.config import Settings
 from app.database.models import Base
+from app.logging_config import configure_logging
 from sqlalchemy import engine_from_config, pool
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
-# Interpret the config file for Python logging.
-# This line sets up loggers basically.
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+# Alembic's own log config is skipped in favour of the service-wide one, so
+# migrations run from the CLI log in the same format as everything else.
+configure_logging()
 
 # add your model's MetaData object here
 # for 'autogenerate' support

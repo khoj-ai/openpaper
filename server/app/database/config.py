@@ -1,8 +1,6 @@
-import logging
 import os
 
 import psycopg2
-from alembic.config import main as alembic_config
 from dotenv import load_dotenv
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from pydantic_settings import BaseSettings
@@ -24,36 +22,10 @@ class Settings(BaseSettings):
 
 
 def run_migrations():
-    import logging
-
     from alembic import command
     from alembic.config import Config
 
-    # Get an Alembic configuration object
-    alembic_cfg = Config("alembic.ini")
-
-    # Instead of manipulating all loggers, just control Alembic's logging
-    alembic_logger = logging.getLogger("alembic")
-    old_level = alembic_logger.level
-    old_propagate = alembic_logger.propagate
-    old_handlers = list(alembic_logger.handlers)
-
-    try:
-        # Configure Alembic logging as needed
-        alembic_logger.setLevel(logging.INFO)  # or your preferred level
-        alembic_logger.propagate = False  # prevent propagation to root
-
-        # Run the migrations
-        command.upgrade(alembic_cfg, "head")
-    finally:
-        # Restore just the Alembic logger
-        alembic_logger.setLevel(old_level)
-        alembic_logger.propagate = old_propagate
-
-        # Clear and restore handlers
-        alembic_logger.handlers.clear()
-        for handler in old_handlers:
-            alembic_logger.addHandler(handler)
+    command.upgrade(Config("alembic.ini"), "head")
 
 
 def create_database():

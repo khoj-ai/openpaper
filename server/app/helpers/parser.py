@@ -6,7 +6,6 @@ from typing import Tuple
 import requests
 from pypdf import PdfReader
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 MAX_UPLOAD_SIZE_MB = 30

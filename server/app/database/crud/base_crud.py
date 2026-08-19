@@ -7,6 +7,7 @@ from app.database.database import Base
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import StaleDataError
 
 # Type variable for SQLAlchemy models
 ModelType = TypeVar("ModelType", bound="Base")  # type: ignore
@@ -237,6 +238,39 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                 db.delete(obj)
                 db.commit()
                 return obj
+            return None
+        except StaleDataError:
+            # The flush expected to delete rows that were no longer there. A
+            # duplicate delete request is the benign cause, but the same error
+            # also comes from a session whose view has drifted from the database
+            # — deleting rows with synchronize_session=False and then deleting
+            # their parent through the ORM does it without any second request.
+            # Only the first leaves the record actually gone, so re-read before
+            # deciding which one this was rather than assuming the benign case.
+            db.rollback()
+            try:
+                gone = (
+                    self._filter_by_user(
+                        db.query(self.model).filter(self.model.id == id), user
+                    ).first()
+                    is None
+                )
+            except Exception:
+                gone = False
+            if gone:
+                logger.warning(
+                    "Concurrent delete of %s with ID %s; another transaction removed it first",
+                    self.model.__name__,
+                    id,
+                )
+            else:
+                logger.error(
+                    "Stale session deleting %s with ID %s: the flush found rows missing "
+                    "but the record is still present",
+                    self.model.__name__,
+                    id,
+                    exc_info=True,
+                )
             return None
         except Exception as e:
             db.rollback()

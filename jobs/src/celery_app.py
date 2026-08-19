@@ -6,8 +6,19 @@ from datetime import timedelta
 
 from dotenv import load_dotenv
 from celery import Celery # type: ignore
+from celery.signals import setup_logging # type: ignore
+
+from src.logging_config import configure_logging
 
 load_dotenv()  # Load environment variables from .env file
+
+
+@setup_logging.connect
+def configure_celery_logging(**_kwargs):
+    """Connecting here makes Celery skip its own log config entirely, so the
+    worker, Beat and task records go out in the same format as the jobs API."""
+    configure_logging()
+
 
 BROKER_URL = os.getenv("CELERY_BROKER_URL", "pyamqp://guest@localhost:5672//")
 BACKEND_URL = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
@@ -41,8 +52,6 @@ celery_app.conf.update(
     # Health monitoring settings
     worker_send_task_events=True,
     task_send_sent_event=True,
-    worker_hijack_root_logger=False,
-    worker_log_color=False,
     # Worker heartbeat and timeout settings
     broker_heartbeat=30,
     broker_heartbeat_checkrate=2.0,
