@@ -8,8 +8,10 @@ from dotenv import load_dotenv
 # its credentials are available and before clients that it instruments.
 load_dotenv()
 
+from app.logging_config import configure_logging
 from app.observability import configure_langfuse
 
+configure_logging()
 configure_langfuse()
 
 from app.api.annotation_api import annotation_router
@@ -43,11 +45,6 @@ from app.api.zotero_import_api import zotero_router
 from app.database.admin import setup_admin
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
 
 logger = logging.getLogger(__name__)
 
@@ -104,21 +101,13 @@ setup_admin(app)  # Setup admin interface
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
-    log_config = uvicorn.config.LOGGING_CONFIG  # type: ignore
-    log_config["formatters"]["access"][
-        "fmt"
-    ] = "%(asctime)s - %(levelname)s - %(message)s"
-    log_config["formatters"]["default"][
-        "fmt"
-    ] = "%(asctime)s - %(levelname)s - %(message)s"
-    # Set higher log level to see more details
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
         port=port,
         # reload=True,
-        log_level="debug",
-        log_config=log_config,
+        log_level="debug",  # Set higher log level to see more details
+        log_config=None,  # Keep the handlers configure_logging() installed
         forwarded_allow_ips="*",  # Allow all forwarded IPs
         proxy_headers=True,  # Enable proxy headers
     )
