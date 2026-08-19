@@ -55,6 +55,25 @@ _RESERVED_RECORD_FIELDS = frozenset(
 _FRAMEWORK_LOGGERS = ("uvicorn", "uvicorn.access", "uvicorn.error")
 _BILLIARD_LOGGER = "multiprocessing"
 
+# The load balancer probes every task several times a second, which is the bulk
+# of everything we log. A probe that fails shows up as an unhealthy target, so
+# the access records carry no signal of their own.
+_ACCESS_LOGGERS = ("uvicorn.access",)
+_HEALTH_PATHS = frozenset({"/health", "/api/health"})
+
+
+class HealthCheckFilter(logging.Filter):
+    """Drop access-log records for health probes."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        # Access records are logged as
+        # (client_addr, method, full_path, http_version, status_code); anything
+        # else is some other record on this logger and is kept.
+        args = record.args
+        if isinstance(args, tuple) and len(args) >= 3:
+            return str(args[2]).split("?", 1)[0] not in _HEALTH_PATHS
+        return True
+
 
 class JsonFormatter(logging.Formatter):
     """Render a record as one JSON line, traceback included."""
@@ -116,6 +135,14 @@ def configure_logging(level: int | str | None = None) -> None:
         framework_logger = logging.getLogger(name)
         framework_logger.handlers.clear()
         framework_logger.propagate = True
+
+    # Cleared first so repeated calls don't stack duplicate filters. A filter on
+    # the logger applies before propagation, so it still drops the record even
+    # though the handler now lives on the root logger.
+    for name in _ACCESS_LOGGERS:
+        access_logger = logging.getLogger(name)
+        access_logger.filters.clear()
+        access_logger.addFilter(HealthCheckFilter())
 
     # billiard reports pool process deaths — a task killed by the OOM killer —
     # on this logger, and keeps resetting it to not propagate, so it needs the
