@@ -460,9 +460,7 @@ function ProjectConversationPageContent() {
                 setStreamingChunks([]);
                 setStreamingReferences(undefined);
                 setStreamingArtifacts([]);
-            setStreamingChartJobs([]);
                 setStreamingChartJobs([]);
-        setStreamingChartJobs([]);
             }
 
         } catch (error) {
@@ -511,7 +509,6 @@ function ProjectConversationPageContent() {
             setStreamingReferences(undefined);
             setStreamingArtifacts([]);
             setStreamingChartJobs([]);
-        setStreamingChartJobs([]);
             setStatusMessage('');
             refetchSubscription();
         }
