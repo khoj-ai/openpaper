@@ -527,7 +527,6 @@ export function ArtifactsPanel() {
                                     icon={<Table className="h-4 w-4" />}
                                     label="Data Table"
                                     sub="Compare findings across papers"
-                                    isNew
                                     disabled={papers.length === 0}
                                     onClick={() => setDataTableSchemaModalOpen(true)}
                                 />

@@ -39,6 +39,5 @@ export const navItems: SidebarNavItem[] = [
         url: "/discover",
         icon: Compass,
         requiresAuth: true,
-        isNew: true,
     },
 ];
