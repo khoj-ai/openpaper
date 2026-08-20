@@ -481,7 +481,14 @@ export function ArtifactsPanel() {
     const artifactItems = useMemo<ArtifactListItem[]>(() => {
         const items: ArtifactListItem[] = [
             ...dataTableJobs.map((job) => ({ id: job.id, timestamp: job.updated_at || job.completed_at || job.created_at, type: ArtifactRow.DataTable, job })),
-            ...chartJobs.map((job) => ({ id: job.id, timestamp: job.updated_at || job.completed_at || job.created_at || null, type: ArtifactRow.Chart, job })),
+            // A chart raised from chat is grouped with its message above, the
+            // same as any other chat artifact — so its job card steps aside
+            // once it has something to hand over. Until then the card is the
+            // only sign the chart exists, and dropping it earlier would leave
+            // a chart being built nowhere to be seen in this panel.
+            ...chartJobs
+                .filter((job) => !(job.message_id && job.artifact))
+                .map((job) => ({ id: job.id, timestamp: job.updated_at || job.completed_at || job.created_at || null, type: ArtifactRow.Chart, job })),
             ...audioJobs.map((job) => ({ id: job.id, timestamp: job.updated_at || job.completed_at || job.created_at || null, type: ArtifactRow.AudioJob, job })),
             ...audioOverviews.map((overview) => ({ id: overview.id, timestamp: overview.updated_at || overview.created_at, type: ArtifactRow.AudioOverview, overview })),
             ...chatArtifactGroups.map((group) => ({ id: group.messageId, timestamp: group.timestamp, type: ArtifactRow.Chat, group })),

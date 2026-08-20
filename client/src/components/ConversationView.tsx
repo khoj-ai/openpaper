@@ -37,6 +37,40 @@ import { AnimatedGradientText } from "@/components/magicui/animated-gradient-tex
 import { ChatHistorySkeleton } from "@/components/ChatHistorySkeleton";
 import { PdfHighlighterViewer } from "@/components/PdfHighlighterViewer";
 
+/** A turn's own artifact cards, minus any chart its job card already draws.
+ *
+ * A chart raised from chat ends up attached to the message as well as owned by
+ * its job, because the finished artifact belongs to the turn that asked for it.
+ * That leaves two routes to the same card, and both were being taken. The job
+ * card wins here: it is the placeholder the user has been watching, and it is
+ * the one that fills in the moment the poll reports the chart done — the
+ * message's copy only arrives on the next load. */
+function MessageArtifactCards({ msg, projectId, onOpenPaper }: {
+	msg: ChatMessage;
+	projectId?: string;
+	onOpenPaper: (paperId: string, searchTerm?: string) => void;
+}) {
+	const claimedByJob = new Set(
+		(msg.chart_jobs ?? [])
+			.map((job) => job.artifact_id)
+			.filter((id): id is string => Boolean(id)),
+	);
+	const artifacts = (msg.artifacts ?? []).filter(
+		(artifact) =>
+			artifact.kind !== "chart" ||
+			!artifact.artifact_id ||
+			!claimedByJob.has(artifact.artifact_id),
+	);
+	if (artifacts.length === 0) return null;
+	return (
+		<ChatArtifactCards
+			artifacts={artifacts}
+			onOpenPaper={onOpenPaper}
+			chartDetailHrefs={chartViewerHrefs(artifacts, projectId)}
+		/>
+	);
+}
+
 interface ConversationViewProps {
 	messages: ChatMessage[];
 	isOwner: boolean;
@@ -308,16 +342,14 @@ export const ConversationView = ({
 				>
 					{msg.content}
 				</Markdown>
-				{msg.artifacts && msg.artifacts.length > 0 && (
-					<ChatArtifactCards
-						artifacts={msg.artifacts}
-						onOpenPaper={openArtifactPaper}
-						chartDetailHrefs={chartViewerHrefs(msg.artifacts, projectId)}
-					/>
-				)}
-				{/* A chart this turn asked for that finished after it was
-				    answered. Its own card links to the full viewer, so the
-				    completed artifact is not rendered twice. */}
+				<MessageArtifactCards
+					msg={msg}
+					projectId={projectId}
+					onOpenPaper={openArtifactPaper}
+				/>
+				{/* A chart this turn asked for. Its job card is the placeholder
+				    that becomes the chart in place, so it owns the render and
+				    the same artifact is withheld from the cards above. */}
 				{projectId && msg.chart_jobs && msg.chart_jobs.length > 0 && (
 					<ChatChartJobs
 						jobs={msg.chart_jobs}
