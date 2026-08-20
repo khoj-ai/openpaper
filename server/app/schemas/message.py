@@ -165,10 +165,21 @@ class EvidenceCollection(BaseModel):
             actions["charts_started"] = [
                 {
                     "request": job.get("prompt"),
-                    "status": "generating in the background, card already on screen",
-                    "note": (
-                        "You cannot see the result — do not describe, "
-                        "summarize, or predict what it will show."
+                    "status": "being built now; takes a few minutes, arrives on its own",
+                    # Saying only "don't describe it" produces a model that
+                    # proves its compliance out loud: it restates the request
+                    # back in full, formally, to show it has not looked. Hence
+                    # a worked example of the good version — what to do is the
+                    # instruction that carries, and what not to do trails it.
+                    "how_to_mention_it": (
+                        "One short clause in your own voice, then straight on "
+                        "with the answer: \"I'm charting fever timing against "
+                        "the reported disorders now — in the meantime, the "
+                        'papers say...". Do not restate the request back, do '
+                        'not call it "the requested chart", do not narrate '
+                        "that it is generating, and do not mention screens. "
+                        "You cannot see it, so never describe, summarize, or "
+                        "predict what it will show."
                     ),
                 }
                 for job in self.chart_jobs

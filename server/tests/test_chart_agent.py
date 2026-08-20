@@ -219,11 +219,22 @@ class TestTheAnsweringModelHearsAboutIt(unittest.TestCase):
         ).describe_actions()
 
         self.assertIn("charts_started", actions)
-        self.assertEqual(
-            actions["charts_started"][0]["request"],
-            "plot accuracy against model size",
-        )
-        self.assertIn("do not describe", actions["charts_started"][0]["note"].lower())
+        started = actions["charts_started"][0]
+        self.assertEqual(started["request"], "plot accuracy against model size")
+        self.assertIn("never describe", started["how_to_mention_it"].lower())
+
+    def test_the_model_is_shown_how_to_mention_it_not_only_how_not_to(self):
+        # A bare prohibition gets obeyed loudly: the model restates the request
+        # back formally to demonstrate it has not looked at the chart. The
+        # guidance has to carry an example of the natural version.
+        started = self.collection(
+            jobs=[{"id": "job-1", "prompt": "plot it"}]
+        ).describe_actions()["charts_started"][0]
+
+        guidance = started["how_to_mention_it"].lower()
+        self.assertIn("your own voice", guidance)
+        self.assertIn("the requested chart", guidance)  # named as the thing to avoid
+        self.assertIn("screens", guidance)
 
     def test_a_chart_is_not_double_counted_as_a_search(self):
         actions = self.collection(
