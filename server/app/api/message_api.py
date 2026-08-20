@@ -17,7 +17,7 @@ from app.database.crud.projects.project_conversation_crud import (
 from app.database.crud.projects.project_crud import project_crud
 from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
-from app.database.models import Annotation, ChartGenerationJob, ConversableType
+from app.database.models import Annotation, ConversableType
 from app.database.telemetry import track_event
 from app.llm.base import LLMProvider
 from app.llm.citation_handler import CitationHandler
@@ -343,11 +343,15 @@ async def chat_message_multipaper(
                         else:
                             logger.debug(f"received chunks: {chunk}")
 
-                # Artifacts (e.g. a citation card from find_citation) count as
-                # a real outcome — only short-circuit if we have neither.
+                # Artifacts (a citation card) and queued charts count as real
+                # outcomes — only short-circuit if we have none of them. A
+                # chart request in particular can gather no passages at all and
+                # still be the whole point of the turn, and bailing here would
+                # strand its job as permanently pending.
                 if evidence_collection is None or (
                     len(evidence_collection.evidence) == 0
                     and len(evidence_collection.artifacts) == 0
+                    and len(evidence_collection.chart_jobs) == 0
                 ):
                     json_response = json.dumps(
                         {
@@ -372,60 +376,16 @@ async def chat_message_multipaper(
                         paper for paper in all_papers if str(paper.id) in allowed_ids
                     ]
 
-                # Chart requests are queued, not built here. A chart is minutes
-                # of investigation, and running it inline held the whole turn —
-                # the user waited on a spinner before a single word of the
-                # answer appeared. The job is raised now, dispatched once this
-                # turn is saved, and reports itself through its own card.
-                #
-                # Which also makes charts project work for the moment: a job is
-                # a row against a project, so library-wide chat cannot raise
-                # one, and building inline there instead is the very thing this
-                # replaced. Those requests are answered as ordinary questions
-                # until a job can carry a scope of its own.
-                chart_job: Optional[ChartGenerationJob] = None
-                if (
-                    operations.is_chart_request(request.user_query)
-                    and request.project_id
-                ):
-                    roster = [
-                        (str(paper.id), str(paper.title or "Untitled"))
-                        for paper in all_papers
-                    ]
-                    # Which papers, before what to measure. Everything
-                    # downstream widens to fill whatever roster it is handed, so
-                    # a request about one paper has to be narrowed here or it
-                    # comes back as a chart over the whole project.
-                    scope = operations.resolve_chart_scope(
-                        request.user_query,
-                        roster,
-                        conversation_id=request.conversation_id,
-                        current_user=current_user,
-                        db=db,
-                    )
-                    if scope.clarification:
-                        # Asking is cheap; a five-minute chart of the wrong
-                        # papers is not. This is the one chart outcome that
-                        # stays inline, because it is a question, and the user
-                        # is still here to answer it.
-                        question = scope.clarification.rstrip() + "\n\n"
-                        content_chunks.append(question)
-                        yield f"{json.dumps({'type': 'content', 'content': question})}{END_DELIMITER}"
-                    else:
-                        chart_job = chart_job_crud.create(
-                            db,
-                            project_id=uuid.UUID(request.project_id),
-                            prompt=request.user_query,
-                            paper_ids=scope.paper_ids,
-                            plan=None,
-                            user=current_user,
-                        )
-                        if chart_job:
-                            yield f"{json.dumps({'type': 'chart_job', 'content': chart_job_crud.to_dict(chart_job)})}{END_DELIMITER}"
-                        else:
-                            denied = "You need edit access to this project to build a chart.\n\n"
-                            content_chunks.append(denied)
-                            yield f"{json.dumps({'type': 'content', 'content': denied})}{END_DELIMITER}"
+                # Charts are queued by the evidence-gathering model, which calls
+                # create_chart_artifact when it judges the question wants one.
+                # Nothing is built here: a chart is minutes of investigation,
+                # and running it inline held the whole turn — the user waited on
+                # a spinner before a single word of the answer appeared. The
+                # jobs surface now as pending cards and are dispatched once this
+                # turn is saved.
+                chart_jobs = evidence_collection.get_chart_jobs()
+                for job in chart_jobs:
+                    yield f"{json.dumps({'type': 'chart_job', 'content': job})}{END_DELIMITER}"
 
                 yield f"{json.dumps({'type': 'status', 'content': 'Generating response...'})}{END_DELIMITER}"
 
@@ -528,22 +488,24 @@ async def chat_message_multipaper(
                         user=current_user,
                     )
 
-                # The chart is dispatched only now, because the turn it belongs
-                # to did not exist when the job was raised. Attaching it first
-                # is what lets the finished chart land back in this turn, and
-                # lets a reload show the pending card in the right place.
-                if chart_job is not None and assistant_message and request.project_id:
-                    chart_job_crud.update(
-                        db,
-                        job_id=chart_job.id,  # type: ignore[arg-type]
-                        message_id=assistant_message.id,  # type: ignore[arg-type]
-                    )
-                    background_tasks.add_task(
-                        generate_chart,
-                        job_id=chart_job.id,  # type: ignore[arg-type]
-                        project_id=uuid.UUID(request.project_id),
-                        user=current_user,
-                    )
+                # Charts are dispatched only now, because the turn they belong
+                # to did not exist when the jobs were raised. Attaching them
+                # first is what lets a finished chart land back in this turn,
+                # and lets a reload show the pending card in the right place.
+                if assistant_message and request.project_id:
+                    for job in chart_jobs:
+                        job_id = uuid.UUID(job["id"])
+                        chart_job_crud.update(
+                            db,
+                            job_id=job_id,
+                            message_id=assistant_message.id,  # type: ignore[arg-type]
+                        )
+                        background_tasks.add_task(
+                            generate_chart,
+                            job_id=job_id,
+                            project_id=uuid.UUID(request.project_id),
+                            user=current_user,
+                        )
 
                 # Rename the conversation based on the chat history
                 operations.rename_conversation(

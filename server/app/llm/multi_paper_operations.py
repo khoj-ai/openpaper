@@ -126,6 +126,19 @@ class MultiPaperOperations(EvidenceOperations):
             for payload in artifact_payloads:
                 yield {"type": "artifact", "content": payload}
 
+        # What the turn actually did. Gathering replays its tool results to
+        # itself and they stop there, so anything whose outcome is not evidence
+        # — a queued chart above all — reaches this model only if it is stated.
+        actions = evidence_gathered.describe_actions()
+        if actions:
+            message_content.insert(
+                1,
+                SupplementaryContent(
+                    content=json.dumps(actions, indent=2),
+                    label="actions_taken_this_turn",
+                ),
+            )
+
         queue = asyncio.Queue()
 
         async def pinger():

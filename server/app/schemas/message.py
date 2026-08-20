@@ -103,6 +103,10 @@ class EvidenceCollection(BaseModel):
         default_factory=list,
         description="First-party artifacts produced during gathering (e.g. citations)",
     )
+    chart_jobs: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Chart jobs queued during gathering; nothing here has run yet",
+    )
 
     def add_artifact(self, artifact: CitationResult) -> None:
         """Record a first-party artifact (e.g. a resolved citation)."""
@@ -110,6 +114,66 @@ class EvidenceCollection(BaseModel):
 
     def get_artifacts(self) -> List[CitationResult]:
         return self.artifacts
+
+    def add_chart_job(self, job: Dict[str, Any]) -> None:
+        """Record a chart job the request tool queued.
+
+        Kept apart from `artifacts`, which hold finished work. A chart takes
+        minutes and outlives this turn's response, so what travels here is the
+        job: the client renders it as a pending card, and the caller dispatches
+        it once the turn's message exists to attach the result to.
+        """
+        self.chart_jobs.append(job)
+
+    def get_chart_jobs(self) -> List[Dict[str, Any]]:
+        return self.chart_jobs
+
+    def describe_actions(self) -> Optional[Dict[str, Any]]:
+        """What this turn did, for the model that has to write about it.
+
+        Gathering and answering are two separate model calls. The tool results
+        are replayed into the gathering loop and stop there; the answering model
+        is handed digested evidence instead, which is usually right — the
+        passages are the point, not the searches that found them. But an action
+        whose outcome is not evidence disappears at that boundary. A queued
+        chart is the clearest case: its card is already on the user's screen,
+        and without this the answer never mentions it, or worse, describes a
+        chart it has never seen.
+
+        So this is the actions, not their contents: what was done, and what now
+        exists because of it. The citation data travels separately, because
+        that one the model does need to read.
+        """
+        # The tools that produce something get their own entry below, so
+        # counting them here as well would report each one twice.
+        reported_separately = {"stop", "find_citation", "create_chart_artifact"}
+        searched = [
+            call.name
+            for call in self.previous_tool_calls
+            if call.name not in reported_separately
+        ]
+        actions: Dict[str, Any] = {}
+        if searched:
+            # Counted rather than listed: the answering model needs to know how
+            # hard the corpus was looked at, not to replay the queries.
+            actions["evidence_gathering"] = (
+                f"{len(searched)} tool call(s): {', '.join(sorted(set(searched)))}"
+            )
+        if self.artifacts:
+            actions["citations_resolved"] = [a.paper_id for a in self.artifacts]
+        if self.chart_jobs:
+            actions["charts_started"] = [
+                {
+                    "request": job.get("prompt"),
+                    "status": "generating in the background, card already on screen",
+                    "note": (
+                        "You cannot see the result — do not describe, "
+                        "summarize, or predict what it will show."
+                    ),
+                }
+                for job in self.chart_jobs
+            ]
+        return actions or None
 
     def to_trace_dict(self) -> Optional[Dict[str, Any]]:
         """Compact trajectory of this turn for user-facing inspection: the tool

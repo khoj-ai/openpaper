@@ -43,13 +43,6 @@ class ChartOperations(ChartPlanning, ChartExtracting):
     """
 
     @staticmethod
-    def is_chart_request(question: str) -> bool:
-        text = question.lower()
-        return any(
-            word in text for word in ("chart", "plot", "graph", "visualize", "scatter")
-        )
-
-    @staticmethod
     def is_chart_ready(payload: ChartArtifactPayload) -> bool:
         """Any grounded point is a chart.
 
