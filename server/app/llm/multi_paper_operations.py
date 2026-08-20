@@ -22,6 +22,7 @@ from app.llm.prompts import (
 )
 from app.llm.provider import LLMProvider, StreamChunk, SupplementaryContent, TextContent
 from app.llm.utils import retry_llm_operation
+from app.schemas.artifact import CitationArtifactPayload
 from app.schemas.message import EvidenceCollection
 from app.schemas.responses import AudioOverviewForLLM
 from app.schemas.user import CurrentUser
@@ -112,16 +113,7 @@ class MultiPaperOperations(EvidenceOperations):
         citation_artifacts = evidence_gathered.get_artifacts()
         if citation_artifacts:
             artifact_payloads = [
-                {
-                    "kind": "citation",
-                    "paper_id": artifact.paper_id,
-                    "preferred_style": artifact.preferred_style,
-                    "style_display": artifact.style_display,
-                    "data": artifact.data.model_dump(),
-                    "method": artifact.method,
-                    "missing_fields": artifact.missing_fields,
-                    "confidence": artifact.confidence,
-                }
+                CitationArtifactPayload.from_result(artifact).model_dump()
                 for artifact in citation_artifacts
             ]
             message_content.insert(
@@ -133,6 +125,19 @@ class MultiPaperOperations(EvidenceOperations):
             )
             for payload in artifact_payloads:
                 yield {"type": "artifact", "content": payload}
+
+        # What the turn actually did. Gathering replays its tool results to
+        # itself and they stop there, so anything whose outcome is not evidence
+        # — a queued chart above all — reaches this model only if it is stated.
+        actions = evidence_gathered.describe_actions()
+        if actions:
+            message_content.insert(
+                1,
+                SupplementaryContent(
+                    content=json.dumps(actions, indent=2),
+                    label="actions_taken_this_turn",
+                ),
+            )
 
         queue = asyncio.Queue()
 

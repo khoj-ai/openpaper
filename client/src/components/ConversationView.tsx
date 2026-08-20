@@ -19,7 +19,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { ChatMessageActions } from "@/components/ChatMessageActions";
-import { ChatMessage, Reference, PaperItem, CitationArtifact, Project } from "@/lib/schema";
+import { ChatMessage, Reference, PaperItem, ChatArtifact, ChartGenerationJob, Project } from "@/lib/schema";
 import { MentionInput } from "@/components/chat/MentionInput";
 import {
 	MentionContextBar,
@@ -28,13 +28,48 @@ import {
 	scopeItemsToEntities,
 } from "@/components/chat/MentionAutocomplete";
 import ReferencePaperCards from "@/components/ReferencePaperCards";
-import { CitationArtifactCard } from "@/components/CitationArtifactCard";
+import { ChatArtifactCards, chartViewerHrefs } from "@/components/ChatArtifactCards";
+import { ChatChartJobs } from "@/components/ChatChartJobs";
 import { MessageTraceViewer } from "@/components/MessageTraceViewer";
 import Link from "next/link";
 import { TopicBubbles } from "@/components/TopicBubbles";
 import { AnimatedGradientText } from "@/components/magicui/animated-gradient-text";
 import { ChatHistorySkeleton } from "@/components/ChatHistorySkeleton";
 import { PdfHighlighterViewer } from "@/components/PdfHighlighterViewer";
+
+/** A turn's own artifact cards, minus any chart its job card already draws.
+ *
+ * A chart raised from chat ends up attached to the message as well as owned by
+ * its job, because the finished artifact belongs to the turn that asked for it.
+ * That leaves two routes to the same card, and both were being taken. The job
+ * card wins here: it is the placeholder the user has been watching, and it is
+ * the one that fills in the moment the poll reports the chart done — the
+ * message's copy only arrives on the next load. */
+function MessageArtifactCards({ msg, projectId, onOpenPaper }: {
+	msg: ChatMessage;
+	projectId?: string;
+	onOpenPaper: (paperId: string, searchTerm?: string) => void;
+}) {
+	const claimedByJob = new Set(
+		(msg.chart_jobs ?? [])
+			.map((job) => job.artifact_id)
+			.filter((id): id is string => Boolean(id)),
+	);
+	const artifacts = (msg.artifacts ?? []).filter(
+		(artifact) =>
+			artifact.kind !== "chart" ||
+			!artifact.artifact_id ||
+			!claimedByJob.has(artifact.artifact_id),
+	);
+	if (artifacts.length === 0) return null;
+	return (
+		<ChatArtifactCards
+			artifacts={artifacts}
+			onOpenPaper={onOpenPaper}
+			chartDetailHrefs={chartViewerHrefs(artifacts, projectId)}
+		/>
+	);
+}
 
 interface ConversationViewProps {
 	messages: ChatMessage[];
@@ -44,7 +79,8 @@ interface ConversationViewProps {
 	isStreaming: boolean;
 	streamingChunks: string[];
 	streamingReferences?: Reference;
-	streamingArtifacts?: CitationArtifact[];
+	streamingArtifacts?: ChatArtifact[];
+	streamingChartJobs?: ChartGenerationJob[];
 	statusMessage: string;
 	error: string | null;
 	isSessionLoading: boolean;
@@ -73,6 +109,9 @@ interface ConversationViewProps {
 	onMentionSelectionChange?: (selection: MentionSelection) => void;
 	// Project chat scopes mentions to papers only (no projects/highlights).
 	mentionPapersOnly?: boolean;
+	// Lets a chart card link to its viewer page. Everything-mode chat has no
+	// project to hang that route off, so its cards stay unlinked.
+	projectId?: string;
 }
 
 export const ConversationView = ({
@@ -84,6 +123,7 @@ export const ConversationView = ({
 	streamingChunks,
 	streamingReferences,
 	streamingArtifacts,
+	streamingChartJobs,
 	statusMessage,
 	error,
 	isSessionLoading,
@@ -106,6 +146,7 @@ export const ConversationView = ({
 	mentionSelection = EMPTY_MENTION_SELECTION,
 	onMentionSelectionChange,
 	mentionPapersOnly = false,
+	projectId,
 }: ConversationViewProps) => {
 	const messagesContainerRef = useRef<HTMLDivElement>(null);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -182,6 +223,11 @@ export const ConversationView = ({
 			}
 		}
 	}, [onRefreshPaperUrl, onOpenPaperExternal]);
+
+	const openArtifactPaper = useCallback((paperId: string, searchText?: string) => {
+		const paper = papers.find((candidate) => candidate.id === paperId);
+		if (paper) openPaperPdf(paper, searchText ?? null);
+	}, [openPaperPdf, papers]);
 
 	const handleCitationClick = (key: string, messageIndex: number) => {
 		originalHandleCitationClick(key, messageIndex);
@@ -296,8 +342,20 @@ export const ConversationView = ({
 				>
 					{msg.content}
 				</Markdown>
-				{msg.artifacts && msg.artifacts.length > 0 && (
-					<CitationArtifactCard artifacts={msg.artifacts} />
+				<MessageArtifactCards
+					msg={msg}
+					projectId={projectId}
+					onOpenPaper={openArtifactPaper}
+				/>
+				{/* A chart this turn asked for. Its job card is the placeholder
+				    that becomes the chart in place, so it owns the render and
+				    the same artifact is withheld from the cards above. */}
+				{projectId && msg.chart_jobs && msg.chart_jobs.length > 0 && (
+					<ChatChartJobs
+						jobs={msg.chart_jobs}
+						projectId={projectId}
+						onOpenPaper={openArtifactPaper}
+					/>
 				)}
 				{msg.references && msg.references["citations"]?.length > 0 ? (
 					<div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
@@ -475,8 +533,11 @@ export const ConversationView = ({
 										table: CopyableTable,
 									}}
 								/>
+								{projectId && streamingChartJobs && streamingChartJobs.length > 0 && (
+									<ChatChartJobs jobs={streamingChartJobs} projectId={projectId} onOpenPaper={openArtifactPaper} />
+								)}
 								{streamingArtifacts && streamingArtifacts.length > 0 && (
-									<CitationArtifactCard artifacts={streamingArtifacts} />
+									<ChatArtifactCards artifacts={streamingArtifacts} onOpenPaper={openArtifactPaper} />
 								)}
 								<ChatMessageActions
 									message={streamingChunks.join("")}

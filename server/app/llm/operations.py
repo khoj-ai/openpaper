@@ -1,3 +1,4 @@
+from app.llm.chart_operations import ChartOperations
 from app.llm.citation_handler import CitationHandler
 from app.llm.conversation_operations import ConversationOperations, DataTableOperations
 from app.llm.json_parser import JSONParser
@@ -10,6 +11,7 @@ class Operations(
     PaperOperations,
     MultiPaperOperations,
     ConversationOperations,
+    ChartOperations,
     DataTableOperations,
 ):
     """

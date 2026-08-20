@@ -1,6 +1,6 @@
 import logging
 import uuid
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 from app.database.crud.conversation_crud import ConversationUpdate, conversation_crud
 from app.database.crud.message_crud import message_crud
@@ -21,6 +21,8 @@ from app.llm.provider import LLMProvider, TextContent
 from app.llm.tools.file_tools import (
     read_abstract,
     read_abstract_function,
+    read_file,
+    read_file_function,
     search_all_files,
     search_all_files_function,
     search_file,
@@ -63,6 +65,14 @@ class DataTableSchemaProposal(BaseModel):
     columns: list[ProposedColumn] = Field(
         description="Proposed columns for the data table"
     )
+
+
+class FieldInvestigation(BaseModel):
+    """The reusable, evidence-preserving output of a field investigation."""
+
+    findings: str
+    evidence: dict[str, list[str]] = Field(default_factory=dict)
+    trace: dict[str, Any] = Field(default_factory=dict)
 
 
 class ConversationOperations(BaseLLMClient):
@@ -180,8 +190,214 @@ class DataTableOperations(BaseLLMClient):
     # character budgets so a broad search over a large corpus can't blow the
     # context.
     PROPOSE_MAX_TURNS = 6
-    PROPOSE_TOOL_RESULT_CHARS = 8_000
-    PROPOSE_TOOL_BUDGET_CHARS = 60_000
+    # A single result still has to fit alongside everything else the turn is
+    # carrying, so long ones are cut — but the cut is announced (see below), so
+    # the model can page through the rest with view_file instead of concluding
+    # the paper simply ends there.
+    PROPOSE_TOOL_RESULT_CHARS = 30_000
+    PROPOSE_TOOL_BUDGET_CHARS = 120_000
+
+    def investigate_fields(
+        self,
+        *,
+        prompt: str,
+        papers: list[tuple[str, str]],
+        current_user: CurrentUser,
+        db: Session,
+        project_id: str,
+        system_prompt: str,
+        user_message: str,
+    ) -> FieldInvestigation:
+        """Run the Data Table's bounded, tool-using shape-finding harness.
+
+        Besides the investigator report, retain the source passages by paper so
+        downstream artifact builders can validate exact quotes instead of
+        receiving only a prose hand-off.
+        """
+        paper_ids = [paper_id for paper_id, _ in papers]
+        function_declarations = [
+            read_abstract_function,
+            read_file_function,
+            search_all_files_function,
+            search_file_function,
+            view_file_function,
+        ]
+        function_maps = {
+            "read_abstract": read_abstract,
+            "read_file": read_file,
+            "search_all_files": search_all_files,
+            "search_file": search_file,
+            "view_file": view_file,
+        }
+        paper_titles = dict(papers)
+        tool_call_results: list[ToolCallResult] = []
+        evidence: dict[str, list[str]] = {}
+        total_result_chars = 0
+        seen_calls: set[str] = set()
+        investigation_report = ""
+        # What the agent actually did, in order. Generic phase labels ("Collected
+        # source passages") tell a reader nothing about why a paper is missing;
+        # the search terms and hit counts do.
+        steps: list[str] = []
+
+        def title_of(paper_id: str) -> str:
+            return paper_titles.get(str(paper_id), str(paper_id))
+
+        for turn in range(self.PROPOSE_MAX_TURNS):
+            response = self.generate_content(
+                contents=[TextContent(text=user_message)],
+                system_prompt=system_prompt.format(
+                    n_round=turn + 1,
+                    max_rounds=self.PROPOSE_MAX_TURNS,
+                ),
+                model_type=ModelType.FAST,
+                function_declarations=function_declarations,
+                tool_call_results=tool_call_results or None,
+                provider=LLMProvider.GEMINI,
+            )
+            if not response or not response.tool_calls:
+                investigation_report = (response.text or "").strip() if response else ""
+                break
+
+            for call in response.tool_calls:
+                if call.name not in function_maps:
+                    tool_call_results.append(
+                        ToolCallResult(
+                            id=call.id,
+                            name=call.name,
+                            args=call.args,
+                            thought_signature=call.thought_signature,
+                            result=f"Error: unknown tool {call.name}",
+                        )
+                    )
+                    continue
+                call_key = f"{call.name}:{call.args}"
+                if call_key in seen_calls:
+                    tool_call_results.append(
+                        ToolCallResult(
+                            id=call.id,
+                            name=call.name,
+                            args=call.args,
+                            thought_signature=call.thought_signature,
+                            result="Error: this exact call was already made — use its earlier result",
+                        )
+                    )
+                    continue
+                seen_calls.add(call_key)
+                if total_result_chars >= self.PROPOSE_TOOL_BUDGET_CHARS:
+                    tool_call_results.append(
+                        ToolCallResult(
+                            id=call.id,
+                            name=call.name,
+                            args=call.args,
+                            thought_signature=call.thought_signature,
+                            result="Error: investigation budget exhausted — stop calling tools and reply with your findings report",
+                        )
+                    )
+                    continue
+
+                try:
+                    raw: Any = function_maps[call.name](
+                        **call.args,
+                        current_user=current_user,
+                        db=db,
+                        project_id=project_id,
+                        restrict_to_paper_ids=paper_ids,
+                    )
+                    whole = str(raw)
+                    result = whole[: self.PROPOSE_TOOL_RESULT_CHARS]
+                    if len(whole) > len(result):
+                        # Silently returning a prefix reads as a complete
+                        # answer, and an investigator that believes it has seen
+                        # the whole paper stops looking.
+                        result += (
+                            f"\n\n[Truncated: {len(result)} of {len(whole)} characters "
+                            "shown. Use view_file with a line range to read further.]"
+                        )
+                    total_result_chars += len(result)
+                    if call.name == "search_all_files" and isinstance(raw, dict):
+                        hits = 0
+                        for paper_id, lines in raw.items():
+                            evidence.setdefault(str(paper_id), []).extend(
+                                map(str, lines)
+                            )
+                            hits += len(lines)
+                        steps.append(
+                            f'Searched every paper for "{call.args.get("query", "")}" — '
+                            f"{hits} matching line{'s' if hits != 1 else ''} in {len(raw)} paper{'s' if len(raw) != 1 else ''}"
+                        )
+                    elif call.args.get("paper_id") and isinstance(raw, (str, list)):
+                        lines = [raw] if isinstance(raw, str) else [str(x) for x in raw]
+                        evidence.setdefault(str(call.args["paper_id"]), []).extend(
+                            lines
+                        )
+                        target = title_of(call.args["paper_id"])
+                        if call.name == "search_file":
+                            steps.append(
+                                f'Searched "{target}" for "{call.args.get("query", "")}" — '
+                                f"{len(lines)} matching line{'s' if len(lines) != 1 else ''}"
+                            )
+                        elif call.name == "view_file":
+                            steps.append(
+                                f'Read "{target}" lines {call.args.get("range_start")}–{call.args.get("range_end")}'
+                            )
+                        else:
+                            steps.append(f'Read the abstract of "{target}"')
+                except Exception as exc:
+                    result = f"Error: {exc}"
+                    steps.append(f"{call.name} failed: {exc}")
+
+                tool_call_results.append(
+                    ToolCallResult(
+                        id=call.id,
+                        name=call.name,
+                        args=call.args,
+                        result=result,
+                        thought_signature=call.thought_signature,
+                    )
+                )
+
+        gathered = "\n\n".join(
+            f"[{result.name}({result.args})]\n{result.result}"
+            for result in tool_call_results
+        )
+        findings = "\n\n".join(
+            part
+            for part in (
+                (
+                    f"Investigator's report:\n{investigation_report}"
+                    if investigation_report
+                    else ""
+                ),
+                f"Raw tool results:\n\n{gathered}" if gathered else "",
+            )
+            if part
+        )
+        covered = sum(1 for lines in evidence.values() if lines)
+        status_messages = [
+            f"Searching {len(papers)} selected paper{'s' if len(papers) != 1 else ''}",
+            *steps,
+            f"Gathered passages from {covered} of {len(papers)} paper{'s' if len(papers) != 1 else ''}",
+        ]
+        if investigation_report:
+            # Display only. The report goes on whole in `findings`, which is
+            # what the planner reads; this is a one-line trace entry and a
+            # thousand-word paragraph in it would bury every other step.
+            summary = " ".join(investigation_report.split())
+            status_messages.append(
+                f"Investigator's read: {summary[:400]}{'…' if len(summary) > 400 else ''}"
+            )
+        return FieldInvestigation(
+            findings=findings,
+            evidence=evidence,
+            trace={
+                "status_messages": status_messages,
+                "tool_calls": [
+                    {"name": result.name, "args": result.args}
+                    for result in tool_call_results
+                ],
+            },
+        )
 
     def propose_data_table_schema(
         self,
@@ -218,12 +434,14 @@ class DataTableOperations(BaseLLMClient):
 
         function_declarations = [
             read_abstract_function,
+            read_file_function,
             search_all_files_function,
             search_file_function,
             view_file_function,
         ]
         function_maps = {
             "read_abstract": read_abstract,
+            "read_file": read_file,
             "search_all_files": search_all_files,
             "search_file": search_file,
             "view_file": view_file,

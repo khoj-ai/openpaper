@@ -1,5 +1,6 @@
 import { Citation, ReferenceCitation } from "@/lib/schema";
-import { HTMLAttributes, ReactNode, createElement, Children } from "react";
+import React, { HTMLAttributes, ReactNode, createElement, Children } from "react";
+import { BREAK_TAG, hasBreakTag } from "@/lib/markdownPreFormat";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { PaperItem } from "@/lib/schema";
 
@@ -86,9 +87,33 @@ export default function CustomCitationLink({ children, handleCitationClick, mess
         // Use the original component type from props
         props.node?.tagName || 'span',
         elementProps,
-        Children.map(children, (child) => {
+        Children.map(children, (child, childIndex) => {
             // If the child is a string, process it for citations
             if (typeof child === 'string') {
+                // A literal `<br>` reaches us as text because raw HTML is off in
+                // the markdown pipeline. Split on it first, then look for
+                // citations within each line, so a cell holding several lines
+                // keeps both its breaks and its citation chips.
+                if (hasBreakTag(child)) {
+                    return (
+                        <>
+                            {child.split(BREAK_TAG).map((line, lineIndex) => (
+                                <React.Fragment key={`line-${childIndex}-${lineIndex}`}>
+                                    {lineIndex > 0 && <br />}
+                                    <CustomCitationLink
+                                        {...props}
+                                        node={undefined}
+                                        handleCitationClick={handleCitationClick}
+                                        messageIndex={messageIndex}
+                                        papers={papers}
+                                    >
+                                        {line}
+                                    </CustomCitationLink>
+                                </React.Fragment>
+                            ))}
+                        </>
+                    );
+                }
                 // Updated regex to match both single citations [^1] and multiple citations [^10, ^14]
                 const citationRegex = /\[\^(\d+(?:[a-zA-Z]*)?(?:,\s*\^?\d+(?:[a-zA-Z]*)?)*)\]/g;
 

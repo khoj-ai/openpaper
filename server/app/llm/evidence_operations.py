@@ -5,6 +5,7 @@ import re
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from typing import Any, AsyncGenerator, Dict, List, Mapping, Optional, Sequence, Union
 
 from app.database.crud.message_crud import message_crud
@@ -14,6 +15,11 @@ from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
 from app.database.telemetry import track_event
 from app.llm.base import BaseLLMClient, ModelType
+from app.llm.chart_agent import (
+    ChartRequest,
+    create_chart_function,
+    run_create_chart_artifact,
+)
 from app.llm.citation_agent import find_citation_function, run_find_citation
 from app.llm.json_parser import JSONParser
 from app.llm.prompts import (
@@ -146,10 +152,12 @@ class EvidenceOperations(BaseLLMClient):
         n_iterations = 0
         max_iterations = 4
 
+        project_title = "Project"
         if project_id:
             project = project_crud.get(db, id=project_id, user=current_user)
             if not project:
                 raise ValueError("Project not found.")
+            project_title = str(project.title)
             all_papers = project_paper_crud.get_all_papers_by_project_id(
                 db, project_id=uuid.UUID(project_id), user=current_user
             )
@@ -171,7 +179,7 @@ class EvidenceOperations(BaseLLMClient):
             str(paper.id): {
                 "title": paper.title,
                 "length": len(str(paper.raw_content)),
-                "keywords": [tag.name for tag in paper.tags if tag.name],
+                "keywords": [tag.name for tag in paper.tags if tag.name],  # type: ignore
                 "authors": paper.authors,
                 "published": paper.publish_date,
             }
@@ -197,6 +205,25 @@ class EvidenceOperations(BaseLLMClient):
             "find_citation": run_find_citation,
             "stop": lambda: None,
         }
+
+        # Charts are offered only inside a project, because a generation job is
+        # a row against one. Withholding the declaration rather than refusing
+        # the call keeps a library-wide thread from spending a turn on a tool
+        # that could never have worked.
+        if project_id:
+            chart_roster = [
+                (paper_id, str(options.get("title") or "Untitled"))
+                for paper_id, options in formatted_paper_options.items()
+            ]
+            function_declarations.insert(-1, create_chart_function)
+            # The roster and the thread are bound here rather than passed with
+            # the other tool arguments: they are context, not something the
+            # model chooses, and every other tool would have to accept them.
+            function_maps["create_chart_artifact"] = partial(
+                run_create_chart_artifact,
+                conversation_id=conversation_id,
+                roster=chart_roster,
+            )
 
         prev_queries = set()
         should_stop = False
@@ -314,7 +341,11 @@ class EvidenceOperations(BaseLLMClient):
 
                         yield {
                             "type": "status",
-                            "content": f"{pretty_fn_name} - {paper_name}{display_query}",
+                            "content": (
+                                f"Initiated chart creation for - {project_title}"
+                                if fn_name == "create_chart_artifact"
+                                else f"{pretty_fn_name} - {paper_name}{display_query}"
+                            ),
                         }
 
                         logger.debug(f"Thinking process - {llm_response.thinking}")
@@ -346,7 +377,19 @@ class EvidenceOperations(BaseLLMClient):
                                     "content": f"{pretty_fn_name} - {paper_name}{display_query}",
                                 }
 
-                        if fn_name == "find_citation" and isinstance(
+                        if fn_name == "create_chart_artifact" and isinstance(
+                            result, ChartRequest
+                        ):
+                            # Nothing is charted yet — a job was queued. The
+                            # model gets the acknowledgement so it can write an
+                            # answer around a chart it will never see, and the
+                            # job travels out for the caller to dispatch.
+                            if result.job:
+                                evidence_collection.add_chart_job(result.job)
+                            evidence_collection.add_tool_call_result(
+                                fn_selected, result.summary
+                            )
+                        elif fn_name == "find_citation" and isinstance(
                             result, CitationResult
                         ):
                             # Citations are first-party artifacts (rendered as a

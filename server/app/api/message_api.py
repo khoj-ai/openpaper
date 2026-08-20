@@ -10,23 +10,26 @@ from app.database.crud.conversation_crud import conversation_crud
 from app.database.crud.highlight_crud import highlight_crud
 from app.database.crud.message_crud import MessageCreate, message_crud
 from app.database.crud.paper_crud import paper_crud
+from app.database.crud.projects.project_chart_crud import chart_job_crud
 from app.database.crud.projects.project_conversation_crud import (
     project_conversation_crud,
 )
 from app.database.crud.projects.project_crud import project_crud
 from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
-from app.database.models import Annotation, ArtifactKind, ConversableType
+from app.database.models import Annotation, ConversableType
 from app.database.telemetry import track_event
 from app.llm.base import LLMProvider
 from app.llm.citation_handler import CitationHandler
 from app.llm.operations import operations
+from app.schemas.artifact import artifact_payload_adapter
 from app.schemas.message import EvidenceCollection, ResponseStyle
 from app.schemas.user import CurrentUser
+from app.tasks.chart_generation import generate_chart
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
 load_dotenv()
@@ -243,6 +246,7 @@ def _resolve_mention_scope(
 @message_router.post("/chat/everything")
 async def chat_message_multipaper(
     request: MultiPaperChatRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_required_user),
 ) -> StreamingResponse:
@@ -339,11 +343,15 @@ async def chat_message_multipaper(
                         else:
                             logger.debug(f"received chunks: {chunk}")
 
-                # Artifacts (e.g. a citation card from find_citation) count as
-                # a real outcome — only short-circuit if we have neither.
+                # Artifacts (a citation card) and queued charts count as real
+                # outcomes — only short-circuit if we have none of them. A
+                # chart request in particular can gather no passages at all and
+                # still be the whole point of the turn, and bailing here would
+                # strand its job as permanently pending.
                 if evidence_collection is None or (
                     len(evidence_collection.evidence) == 0
                     and len(evidence_collection.artifacts) == 0
+                    and len(evidence_collection.chart_jobs) == 0
                 ):
                     json_response = json.dumps(
                         {
@@ -354,25 +362,32 @@ async def chat_message_multipaper(
                     yield f"{json_response}{END_DELIMITER}"
                     return
 
-                yield f"{json.dumps({'type': 'status', 'content': 'Generating response...'})}{END_DELIMITER}"
-
                 if request.project_id:
                     all_papers = project_paper_crud.get_all_papers_by_project_id(
                         db, project_id=uuid.UUID(request.project_id), user=current_user
                     )
                 else:
                     all_papers = paper_crud.get_all_available_papers(
-                        db,
-                        user=current_user,
+                        db, user=current_user
                     )
-
-                # Keep the answer-generation paper set aligned with the scoped
-                # evidence space so citations can't reference out-of-scope papers.
                 if scoped_paper_ids is not None:
                     allowed_ids = set(scoped_paper_ids)
                     all_papers = [
                         paper for paper in all_papers if str(paper.id) in allowed_ids
                     ]
+
+                # Charts are queued by the evidence-gathering model, which calls
+                # create_chart_artifact when it judges the question wants one.
+                # Nothing is built here: a chart is minutes of investigation,
+                # and running it inline held the whole turn — the user waited on
+                # a spinner before a single word of the answer appeared. The
+                # jobs surface now as pending cards and are dispatched once this
+                # turn is saved.
+                chart_jobs = evidence_collection.get_chart_jobs()
+                for job in chart_jobs:
+                    yield f"{json.dumps({'type': 'chart_job', 'content': job})}{END_DELIMITER}"
+
+                yield f"{json.dumps({'type': 'status', 'content': 'Generating response...'})}{END_DELIMITER}"
 
                 chat_generator = operations.chat_with_papers(
                     question=request.user_query,
@@ -449,16 +464,48 @@ async def chat_message_multipaper(
                 )
 
                 if assistant_message and artifacts_collected:
+                    # Each collected dict is whatever was streamed to the client
+                    # as a card. Its own `kind` selects the member to parse it
+                    # as, so an artifact that does not match its kind's shape
+                    # fails here rather than being stored as an unreadable blob.
+                    payloads = []
+                    for raw in artifacts_collected:
+                        try:
+                            payloads.append(
+                                artifact_payload_adapter.validate_python(raw)
+                            )
+                        except ValidationError:
+                            logger.warning(
+                                "Discarding malformed %r artifact",
+                                raw.get("kind"),
+                                exc_info=True,
+                            )
                     artifact_crud.bulk_create_for_message(
                         db,
                         message=assistant_message,
                         conversation=conversation,
-                        items=[
-                            (ArtifactKind.CITATION, payload)
-                            for payload in artifacts_collected
-                        ],
+                        payloads=payloads,
                         user=current_user,
                     )
+
+                # Charts are dispatched only now, because the turn they belong
+                # to did not exist when the jobs were raised. Attaching them
+                # first is what lets a finished chart land back in this turn,
+                # and lets a reload show the pending card in the right place.
+                if assistant_message and request.project_id:
+                    for job in chart_jobs:
+                        job_id = uuid.UUID(job["id"])
+                        chart_job_crud.update(
+                            db,
+                            job_id=job_id,
+                            message_id=assistant_message.id,  # type: ignore[arg-type]
+                        )
+                        background_tasks.add_task(
+                            generate_chart,
+                            job_id=job_id,
+                            project_id=uuid.UUID(request.project_id),
+                            user=current_user,
+                        )
 
                 # Rename the conversation based on the chat history
                 operations.rename_conversation(

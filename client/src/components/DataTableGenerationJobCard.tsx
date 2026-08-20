@@ -15,17 +15,17 @@ interface DataTableGenerationJobCardProps {
 const getStatusIcon = (status: JobStatus) => {
     switch (status) {
         case JobStatus.PENDING:
-            return <Clock className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />;
+            return <Clock className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />;
         case JobStatus.RUNNING:
-            return <Loader2 className="w-5 h-5 text-blue-600 dark:text-blue-400 animate-spin" />;
+            return <Loader2 className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-spin" />;
         case JobStatus.COMPLETED:
-            return <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />;
+            return <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />;
         case JobStatus.FAILED:
-            return <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />;
+            return <XCircle className="w-4 h-4 text-red-600 dark:text-red-400" />;
         case JobStatus.CANCELLED:
-            return <AlertCircle className="w-5 h-5 text-gray-600 dark:text-gray-400" />;
+            return <AlertCircle className="w-4 h-4 text-muted-foreground" />;
         default:
-            return <Clock className="w-5 h-5 text-gray-600 dark:text-gray-400" />;
+            return <Clock className="w-4 h-4 text-muted-foreground" />;
     }
 };
 
@@ -71,9 +71,9 @@ const getStatusColor = (status: JobStatus) => {
         case JobStatus.FAILED:
             return 'text-red-600 dark:text-red-400';
         case JobStatus.CANCELLED:
-            return 'text-gray-600 dark:text-gray-400';
+            return 'text-muted-foreground';
         default:
-            return 'text-gray-600 dark:text-gray-400';
+            return 'text-muted-foreground';
     }
 };
 
@@ -123,10 +123,10 @@ export default function DataTableGenerationJobCard({ job, projectId }: DataTable
     };
 
     const CardContent = () => (
-        <div className="w-full p-4 rounded-lg cursor-pointer bg-gray-50 dark:bg-gray-800/40 hover:bg-gray-100 dark:hover:bg-gray-800/70 transition-colors">
-            <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                    {currentStatus === JobStatus.COMPLETED ? <Table className="w-5 h-5 text-blue-600 dark:text-blue-400" /> : getStatusIcon(currentStatus)}
+        <div className="w-full rounded-lg border bg-card p-3 text-card-foreground cursor-pointer transition-colors hover:bg-accent/40">
+            <div className="flex items-start gap-2">
+                <div className="mt-0.5 flex-shrink-0">
+                    {currentStatus === JobStatus.COMPLETED ? <Table className="w-4 h-4 text-blue-600 dark:text-blue-400" /> : getStatusIcon(currentStatus)}
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
@@ -134,12 +134,12 @@ export default function DataTableGenerationJobCard({ job, projectId }: DataTable
                             <Link
                                 href={`/projects/${projectId}/tables/${job.result_id}`}
                                 onClick={(e) => e.stopPropagation()}
-                                className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline mb-1"
+                                className="text-sm font-semibold hover:underline mb-1"
                             >
                                 {job.title || 'Data Table'}
                             </Link>
                         ) : (
-                            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                            <h3 className="text-sm font-semibold mb-1">
                                 {job.title || 'Creating Data Table'}
                             </h3>
                         )}
@@ -150,16 +150,16 @@ export default function DataTableGenerationJobCard({ job, projectId }: DataTable
                                         e.stopPropagation();
                                         fetchLiveData();
                                     }}
-                                    className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                                    className="p-1 hover:bg-muted rounded"
                                     title="Refresh status"
                                 >
-                                    <RefreshCw className={`w-4 h-4 text-gray-500 ${isLoading ? 'animate-spin' : ''}`} />
+                                    <RefreshCw className={`w-4 h-4 text-muted-foreground ${isLoading ? 'animate-spin' : ''}`} />
                                 </button>
                             )}
                             {isExpanded ? (
-                                <ChevronUp className="w-4 h-4 text-gray-500" />
+                                <ChevronUp className="w-4 h-4 text-muted-foreground" />
                             ) : (
-                                <ChevronDown className="w-4 h-4 text-gray-500" />
+                                <ChevronDown className="w-4 h-4 text-muted-foreground" />
                             )}
                         </div>
                     </div>
@@ -169,16 +169,16 @@ export default function DataTableGenerationJobCard({ job, projectId }: DataTable
                         </p>
                     )}
                     {job.created_at && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                        <p className="text-xs text-muted-foreground">
                             <span>{formatDateTime(job.created_at)}</span>
                         </p>
                     )}
                     {currentStatus === JobStatus.RUNNING && (
                         <div className="mt-2">
-                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1">
-                                <div className="bg-blue-600 h-1 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+                            <div className="w-full bg-muted rounded-full h-1">
+                                <div className="bg-blue-500 h-1 rounded-full animate-pulse" style={{ width: '60%' }}></div>
                             </div>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            <p className="text-xs text-muted-foreground mt-1">
                                 This may take a few minutes...
                             </p>
                         </div>
@@ -198,7 +198,7 @@ export default function DataTableGenerationJobCard({ job, projectId }: DataTable
                                             {getStatusText(liveData.status)}
                                         </span>
                                         {liveData.completed_at && (
-                                            <span className="text-gray-500 dark:text-gray-400">
+                                            <span className="text-muted-foreground">
                                                 {' '}{formatDateTime(liveData.completed_at)}
                                                 {formatDuration(job.created_at, liveData.completed_at) &&
                                                     ` · took ${formatDuration(job.created_at, liveData.completed_at)}`}
@@ -207,7 +207,7 @@ export default function DataTableGenerationJobCard({ job, projectId }: DataTable
                                     </p>
 
                                     {liveData.celery_progress_message && currentStatus !== JobStatus.COMPLETED && (
-                                        <p className="text-xs text-gray-700 dark:text-gray-300 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
+                                        <p className="text-xs text-muted-foreground bg-muted p-2 rounded">
                                             {liveData.celery_progress_message}
                                         </p>
                                     )}
@@ -217,7 +217,7 @@ export default function DataTableGenerationJobCard({ job, projectId }: DataTable
                                             {liveData.columns.map((col, idx) => (
                                                 <span
                                                     key={idx}
-                                                    className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-gray-700 dark:text-gray-300"
+                                                    className="px-2 py-0.5 bg-muted rounded text-muted-foreground"
                                                 >
                                                     {col}
                                                 </span>
@@ -244,7 +244,7 @@ export default function DataTableGenerationJobCard({ job, projectId }: DataTable
                             )}
 
                             {isLoading && !liveData && (
-                                <div className="flex items-center gap-2 text-xs text-gray-500">
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                     <Loader2 className="w-3 h-3 animate-spin" />
                                     Loading job details...
                                 </div>

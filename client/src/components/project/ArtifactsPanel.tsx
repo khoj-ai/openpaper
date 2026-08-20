@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, MessageSquare, Sparkles, Table, Volume2, X } from "lucide-react";
+import { BarChart3, Loader2, MessageSquare, Sparkles, Table, Volume2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -10,7 +10,8 @@ import { fetchFromApi } from "@/lib/api";
 import {
     AudioOverview,
     AudioOverviewJob,
-    CitationArtifact,
+    ChatArtifact,
+    ChartGenerationJob,
     DataTableJob,
     ProjectChatArtifact,
     ProjectRole,
@@ -35,7 +36,9 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import AudioOverviewCard from "@/components/AudioOverviewCard";
-import { CitationArtifactCard } from "@/components/CitationArtifactCard";
+import { ChatArtifactCards } from "@/components/ChatArtifactCards";
+import { ChartComposerDialog } from "@/components/project/ChartComposerDialog";
+import { ChartGenerationJobCard } from "@/components/ChartGenerationJobCard";
 import AudioOverviewGenerationJobCard from "@/components/AudioOverviewGenerationJobCard";
 import DataTableGenerationJobCard from "@/components/DataTableGenerationJobCard";
 import DataTableSchemaModal, { FieldDefinition } from "@/components/DataTableSchemaModal";
@@ -54,6 +57,40 @@ const audioLengthOptions = [
     { label: "Medium (10-20 mins)", value: "medium" },
     { label: "Long (20+ mins)", value: "long" },
 ];
+
+/** The kinds of row the panel can list. Named rather than spelled out at each
+ * use so the switch below, the row builders and the type all move together. */
+const ArtifactRow = {
+    DataTable: "data-table",
+    Chart: "chart",
+    AudioJob: "audio-job",
+    AudioOverview: "audio-overview",
+    Chat: "chat",
+} as const;
+
+type ArtifactListItem =
+    | { id: string; timestamp: string | null; type: typeof ArtifactRow.DataTable; job: DataTableJob }
+    | { id: string; timestamp: string | null; type: typeof ArtifactRow.Chart; job: ChartGenerationJob }
+    | { id: string; timestamp: string | null; type: typeof ArtifactRow.AudioJob; job: AudioOverviewJob }
+    | { id: string; timestamp: string | null; type: typeof ArtifactRow.AudioOverview; overview: AudioOverview }
+    | {
+        id: string;
+        timestamp: string | null;
+        type: typeof ArtifactRow.Chat;
+        group: {
+            messageId: string;
+            conversationId: string;
+            conversationTitle: string | null;
+            timestamp: string | null;
+            artifacts: ChatArtifact[];
+            chartDetailHrefs: string[];
+        };
+    };
+
+const timestampMs = (timestamp: string | null) => {
+    const value = timestamp ? new Date(timestamp).getTime() : 0;
+    return Number.isNaN(value) ? 0 : value;
+};
 
 interface CreateTileProps {
     icon: React.ReactNode;
@@ -88,7 +125,7 @@ function CreateTile({ icon, label, sub, isNew, disabled, onClick }: CreateTilePr
 // Shares the right slot with the reader panel; kept mounted (CSS-hidden) while
 // inactive so in-progress polling and audio playback survive mode switches.
 export function ArtifactsPanel() {
-    const { projectId, project, papers, rightPanel, closeArtifacts } = useProjectWorkspace();
+    const { projectId, project, papers, rightPanel, closeArtifacts, openPaper } = useProjectWorkspace();
     const router = useRouter();
     const { subscription, refetch: refetchSubscription } = useSubscription();
     const atAudioLimit = subscription ? isAudioOverviewAtLimit(subscription) : false;
@@ -123,7 +160,9 @@ export function ArtifactsPanel() {
     const [isDataTableSchemaModalOpen, setDataTableSchemaModalOpen] = useState(false);
     const [isCreatingDataTable, setIsCreatingDataTable] = useState(false);
     const [dataTableJobs, setDataTableJobs] = useState<DataTableJob[]>([]);
+    const [chartJobs, setChartJobs] = useState<ChartGenerationJob[]>([]);
     const [chatArtifacts, setChatArtifacts] = useState<ProjectChatArtifact[]>([]);
+    const [isChartComposerOpen, setChartComposerOpen] = useState(false);
 
     const fetchChatArtifacts = useCallback(async () => {
         try {
@@ -134,31 +173,42 @@ export function ArtifactsPanel() {
         }
     }, [projectId]);
 
-    // Citations arrive one row per artifact; bundle them per assistant message
-    // so each chat turn renders as a single citation card, as it did in chat.
+    // Chat artifacts arrive one row per payload; bundle them by message so the
+    // project panel preserves the same grouping as the conversation.
     const chatArtifactGroups = useMemo(() => {
         const groups: {
             messageId: string;
             conversationId: string;
             conversationTitle: string | null;
-            createdAt: string | null;
-            artifacts: CitationArtifact[];
+            timestamp: string | null;
+            artifacts: ChatArtifact[];
+            chartDetailHrefs: string[];
         }[] = [];
         const byMessage = new Map<string, (typeof groups)[number]>();
         for (const artifact of chatArtifacts) {
+            // Artifact-native jobs are rendered from their job cards. They have
+            // no chat message and must not become a synthetic conversation row.
+            if (!artifact.message_id || !artifact.conversation_id) continue;
+            const artifactTimestamp = artifact.updated_at ?? artifact.created_at ?? null;
             let group = byMessage.get(artifact.message_id);
             if (!group) {
                 group = {
                     messageId: artifact.message_id,
                     conversationId: artifact.conversation_id,
                     conversationTitle: artifact.conversation_title ?? null,
-                    createdAt: artifact.created_at ?? null,
+                    timestamp: artifactTimestamp,
                     artifacts: [],
+                    chartDetailHrefs: [],
                 };
                 byMessage.set(artifact.message_id, group);
                 groups.push(group);
+            } else if (timestampMs(artifactTimestamp) > timestampMs(group.timestamp)) {
+                group.timestamp = artifactTimestamp;
             }
             group.artifacts.push(artifact.payload);
+            if (artifact.kind === "chart") {
+                group.chartDetailHrefs.push(`/projects/${projectId}/charts/${artifact.id}`);
+            }
         }
         return groups;
     }, [chatArtifacts]);
@@ -194,6 +244,18 @@ export function ArtifactsPanel() {
         }
     }, [projectId]);
 
+    const fetchChartJobs = useCallback(async () => {
+        try {
+            const response = await fetchFromApi(`/api/projects/charts/jobs/${projectId}`);
+            const jobs = response.jobs ?? [];
+            setChartJobs(jobs);
+            return jobs;
+        } catch (err) {
+            console.error("Failed to fetch chart jobs:", err);
+            return [] as ChartGenerationJob[];
+        }
+    }, [projectId]);
+
     const stopPolling = useCallback(() => {
         if (pollingInterval.current) {
             clearInterval(pollingInterval.current);
@@ -205,9 +267,10 @@ export function ArtifactsPanel() {
         stopPolling();
 
         const interval = setInterval(async () => {
-            const [audioJobs, dataTableJobs] = await Promise.all([
+            const [audioJobs, dataTableJobs, chartJobs] = await Promise.all([
                 getProjectAudioJobs(),
-                fetchDataTableJobs()
+                fetchDataTableJobs(),
+                fetchChartJobs(),
             ]);
             const hasPendingAudioJobs = audioJobs.some((job: AudioOverviewJob) => job.status === 'pending' || job.status === 'running');
             // A completed job whose result hasn't landed yet is still pending —
@@ -216,15 +279,17 @@ export function ArtifactsPanel() {
                 job.status === 'pending' || job.status === 'running' ||
                 (job.status === 'completed' && !job.result_id));
 
-            if (!hasPendingAudioJobs && !hasPendingDataTableJobs) {
+            const hasPendingChartJobs = chartJobs.some((job: ChartGenerationJob) => job.status === 'pending' || job.status === 'running');
+            if (!hasPendingAudioJobs && !hasPendingDataTableJobs && !hasPendingChartJobs) {
                 // No more pending jobs, stop polling and refresh overviews
                 stopPolling();
                 getProjectAudioOverviews();
+                fetchChatArtifacts();
             }
         }, 20000); // Poll every 20 seconds
 
         pollingInterval.current = interval;
-    }, [getProjectAudioJobs, fetchDataTableJobs, getProjectAudioOverviews, stopPolling]);
+    }, [getProjectAudioJobs, fetchDataTableJobs, fetchChartJobs, getProjectAudioOverviews, fetchChatArtifacts, stopPolling]);
 
     useEffect(() => {
         if (projectId) {
@@ -232,15 +297,17 @@ export function ArtifactsPanel() {
             fetchChatArtifacts();
             Promise.all([
                 getProjectAudioJobs(),
-                fetchDataTableJobs()
-            ]).then(([audioJobs, dataTableJobs]) => {
+                fetchDataTableJobs(),
+                fetchChartJobs()
+            ]).then(([audioJobs, dataTableJobs, chartJobs]) => {
                 const hasPendingAudioJobs = audioJobs.some((job: AudioOverviewJob) => job.status === 'pending' || job.status === 'running');
                 // A completed job whose result hasn't landed yet is still pending —
             // stopping here would freeze the card in its pre-result state.
             const hasPendingDataTableJobs = dataTableJobs.some((job: DataTableJob) =>
                 job.status === 'pending' || job.status === 'running' ||
                 (job.status === 'completed' && !job.result_id));
-                if (hasPendingAudioJobs || hasPendingDataTableJobs) {
+                const hasPendingChartJobs = chartJobs.some((job: ChartGenerationJob) => job.status === 'pending' || job.status === 'running');
+                if (hasPendingAudioJobs || hasPendingDataTableJobs || hasPendingChartJobs) {
                     startPolling();
                 }
             });
@@ -406,8 +473,30 @@ export function ArtifactsPanel() {
         }
     };
 
-    const artifactCount =
-        dataTableJobs.length + audioJobs.length + audioOverviews.length + chatArtifactGroups.length;
+    const handleOpenChartPaper = useCallback((paperId: string, searchTerm?: string) => {
+        const paper = papers.find((candidate) => candidate.id === paperId);
+        if (paper) openPaper(paper, searchTerm ?? null);
+    }, [openPaper, papers]);
+
+    const artifactItems = useMemo<ArtifactListItem[]>(() => {
+        const items: ArtifactListItem[] = [
+            ...dataTableJobs.map((job) => ({ id: job.id, timestamp: job.updated_at || job.completed_at || job.created_at, type: ArtifactRow.DataTable, job })),
+            // A chart raised from chat is grouped with its message above, the
+            // same as any other chat artifact — so its job card steps aside
+            // once it has something to hand over. Until then the card is the
+            // only sign the chart exists, and dropping it earlier would leave
+            // a chart being built nowhere to be seen in this panel.
+            ...chartJobs
+                .filter((job) => !(job.message_id && job.artifact))
+                .map((job) => ({ id: job.id, timestamp: job.updated_at || job.completed_at || job.created_at || null, type: ArtifactRow.Chart, job })),
+            ...audioJobs.map((job) => ({ id: job.id, timestamp: job.updated_at || job.completed_at || job.created_at || null, type: ArtifactRow.AudioJob, job })),
+            ...audioOverviews.map((overview) => ({ id: overview.id, timestamp: overview.updated_at || overview.created_at, type: ArtifactRow.AudioOverview, overview })),
+            ...chatArtifactGroups.map((group) => ({ id: group.messageId, timestamp: group.timestamp, type: ArtifactRow.Chat, group })),
+        ];
+        return items.sort((a, b) => timestampMs(b.timestamp) - timestampMs(a.timestamp));
+    }, [audioJobs, audioOverviews, chartJobs, chatArtifactGroups, dataTableJobs]);
+
+    const artifactCount = artifactItems.length;
 
     return (
         <>
@@ -445,9 +534,16 @@ export function ArtifactsPanel() {
                                     icon={<Table className="h-4 w-4" />}
                                     label="Data Table"
                                     sub="Compare findings across papers"
-                                    isNew
                                     disabled={papers.length === 0}
                                     onClick={() => setDataTableSchemaModalOpen(true)}
+                                />
+                                <CreateTile
+                                    icon={<BarChart3 className="h-4 w-4" />}
+                                    label="Chart"
+                                    sub="Turn cited findings into a visual"
+                                    isNew
+                                    disabled={papers.length === 0}
+                                    onClick={() => setChartComposerOpen(true)}
                                 />
                             </div>
                             {papers.length === 0 && (
@@ -466,35 +562,40 @@ export function ArtifactsPanel() {
                             container — Chromium drops a scroller's own bottom
                             padding from the scrollable overflow area. */}
                         <div className="space-y-3 pb-6">
-                            {dataTableJobs.map((job) => (
-                                <DataTableGenerationJobCard key={job.id} job={job} projectId={projectId} />
-                            ))}
-                            {audioJobs.map((job) => (
-                                <AudioOverviewGenerationJobCard key={job.id} job={job} />
-                            ))}
-                            {audioOverviews.map((overview) => (
-                                <AudioOverviewCard
-                                    key={overview.id}
-                                    overview={overview}
-                                    onOpenTranscript={() => router.push(`/projects/${projectId}/audio/${overview.id}`)}
-                                    isPlaying={playingAudioId === overview.id}
-                                    isLoading={loadingAudioId === overview.id}
-                                    isActivated={activatedAudioIds.includes(overview.id)}
-                                    progress={audioProgress[overview.id]}
-                                    volume={audioVolume[overview.id] || 1}
-                                    speed={audioSpeed[overview.id] || 1}
-                                    progressPercentage={getProgressPercentage(overview.id)}
-                                    onPlayPause={() => handlePlayAudio(overview.id)}
-                                    onSeek={(percentage) => handleSeek(overview.id, percentage)}
-                                    onVolumeChange={(volume) => handleVolumeChange(overview.id, volume)}
-                                    onSpeedChange={(speed) => handleSpeedChange(overview.id, speed)}
-                                    onSkipBackward={() => skipBackward(overview.id)}
-                                    onSkipForward={() => skipForward(overview.id)}
-                                    formatTime={formatTime}
-                                />
-                            ))}
-                            {chatArtifactGroups.map((group) => (
-                                <div key={group.messageId} className="rounded-lg bg-muted/40 p-3">
+                            {artifactItems.map((item) => {
+                                if (item.type === ArtifactRow.DataTable) {
+                                    return <DataTableGenerationJobCard key={item.id} job={item.job} projectId={projectId} />;
+                                }
+                                if (item.type === ArtifactRow.Chart) {
+                                    return <ChartGenerationJobCard key={item.id} job={item.job} onOpenPaper={handleOpenChartPaper} />;
+                                }
+                                if (item.type === ArtifactRow.AudioJob) {
+                                    return <AudioOverviewGenerationJobCard key={item.id} job={item.job} />;
+                                }
+                                if (item.type === ArtifactRow.AudioOverview) {
+                                    const { overview } = item;
+                                    return <AudioOverviewCard
+                                        key={item.id}
+                                        overview={overview}
+                                        onOpenTranscript={() => router.push(`/projects/${projectId}/audio/${overview.id}`)}
+                                        isPlaying={playingAudioId === overview.id}
+                                        isLoading={loadingAudioId === overview.id}
+                                        isActivated={activatedAudioIds.includes(overview.id)}
+                                        progress={audioProgress[overview.id]}
+                                        volume={audioVolume[overview.id] || 1}
+                                        speed={audioSpeed[overview.id] || 1}
+                                        progressPercentage={getProgressPercentage(overview.id)}
+                                        onPlayPause={() => handlePlayAudio(overview.id)}
+                                        onSeek={(percentage) => handleSeek(overview.id, percentage)}
+                                        onVolumeChange={(volume) => handleVolumeChange(overview.id, volume)}
+                                        onSpeedChange={(speed) => handleSpeedChange(overview.id, speed)}
+                                        onSkipBackward={() => skipBackward(overview.id)}
+                                        onSkipForward={() => skipForward(overview.id)}
+                                        formatTime={formatTime}
+                                    />;
+                                }
+                                const { group } = item;
+                                return <div key={item.id} className="rounded-lg bg-muted/40 p-3">
                                     <div className="flex items-center justify-between gap-2">
                                         <Link
                                             href={`/projects/${projectId}/conversations/${group.conversationId}`}
@@ -505,15 +606,15 @@ export function ArtifactsPanel() {
                                                 {group.conversationTitle || "Untitled conversation"}
                                             </span>
                                         </Link>
-                                        {group.createdAt && (
+                                        {group.timestamp && (
                                             <span className="shrink-0 text-xs text-muted-foreground">
-                                                {new Date(group.createdAt).toLocaleDateString()}
+                                                {new Date(group.timestamp).toLocaleDateString()}
                                             </span>
                                         )}
                                     </div>
-                                    <CitationArtifactCard artifacts={group.artifacts} />
-                                </div>
-                            ))}
+                                    <ChatArtifactCards artifacts={group.artifacts} onOpenPaper={handleOpenChartPaper} chatHref={`/projects/${projectId}/conversations/${group.conversationId}`} chartDetailHrefs={group.chartDetailHrefs} />
+                                </div>;
+                            })}
                             {artifactCount === 0 && (
                                 <p className="text-xs text-muted-foreground">
                                     Nothing here yet. Artifacts you generate appear in this list.
@@ -601,6 +702,16 @@ export function ArtifactsPanel() {
                 projectId={projectId}
                 isCreating={isCreatingDataTable}
                 atLimit={atDataTableLimit}
+            />
+            <ChartComposerDialog
+                open={isChartComposerOpen}
+                onOpenChange={setChartComposerOpen}
+                projectId={projectId}
+                papers={papers}
+                onCreated={async () => {
+                    await fetchChartJobs();
+                    startPolling();
+                }}
             />
         </>
     );

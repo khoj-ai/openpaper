@@ -58,16 +58,101 @@ export interface CitationArtifact {
     confidence?: number | null;
 }
 
+export interface ChartField {
+    key: string;
+    label: string;
+    unit?: string | null;
+}
+
+export interface ChartPlan {
+    title: string;
+    chart_type: 'bar' | 'line' | 'scatter';
+    x: ChartField;
+    y: ChartField;
+    series?: ChartField | null;
+    fields: ChartField[];
+    calculation?: { label: string; spec: string; inputs: string[] } | null;
+}
+
+export interface ChartValue {
+    value: string;
+    quote: string;
+    line_number?: string | null;
+    // What this paper measured the value in, as it stated it — which is often
+    // not what the chart is drawn in.
+    unit?: string | null;
+    // The lambda the extractor proposed to take this paper's number into the
+    // field's unit, run in the sandbox. `lambda v: v` when the paper already
+    // reported in it; empty when it could not be expressed there at all, in
+    // which case the point is excluded and `conversion_note` says why.
+    conversion?: string | null;
+    conversion_note?: string | null;
+    // The plotted quantity: `value` parsed and put through `conversion`, so it
+    // is in the field's unit. `value` stays as the paper wrote it; null when
+    // the quoted text states no plottable quantity.
+    number?: number | null;
+}
+
+export interface ChartArtifact {
+    kind: 'chart';
+    // Set once the artifact has been persisted, so a chat card can link to its
+    // viewer page. Absent while a chart is still streaming.
+    artifact_id?: string;
+    plan: ChartPlan;
+    records: Array<{
+        // One plotted point, not one paper: a paper reporting several
+        // benchmarks contributes several records.
+        record_id: string;
+        paper_id: string;
+        paper_title: string;
+        values: Record<string, ChartValue>;
+        exclusion_reason?: string | null;
+    }>;
+    coverage: {
+        searched_paper_ids: string[];
+        included_paper_ids: string[];
+        excluded: Record<string, string>;
+    };
+    // Several papers reported the same x, so the study is what tells the
+    // points apart and becomes the series.
+    series_by_paper?: boolean;
+    computation?: { script?: string; warnings?: string[] } | null;
+    warnings: string[];
+    investigation_trace?: MessageTrace | null;
+}
+
+export type ChatArtifact = CitationArtifact | ChartArtifact;
+
 // A chat-generated artifact surfaced at the project level (artifacts panel),
 // with breadcrumbs back to the conversation/message that produced it.
 export interface ProjectChatArtifact {
     id: string;
-    kind: 'citation';
-    payload: CitationArtifact;
-    message_id: string;
-    conversation_id: string;
+    kind: 'citation' | 'chart';
+    payload: ChatArtifact;
+    message_id?: string | null;
+    conversation_id?: string | null;
     conversation_title?: string | null;
     created_at?: string | null;
+    updated_at?: string | null;
+}
+
+export interface ChartGenerationJob {
+    id: string;
+    project_id: string;
+    // The assistant turn that asked for this chart, when chat did. Null for
+    // jobs raised from the artifacts composer, which has no conversation.
+    message_id?: string | null;
+    prompt?: string;
+    status: JobStatus;
+    status_message?: string | null;
+    error_message?: string | null;
+    trace?: MessageTrace | null;
+    created_at?: string | null;
+    updated_at?: string | null;
+    started_at?: string | null;
+    completed_at?: string | null;
+    artifact_id?: string | null;
+    artifact?: ChartArtifact | null;
 }
 
 export interface MessageTraceToolCall {
@@ -116,7 +201,11 @@ export interface ChatMessage {
     references?: Reference;
     // First-party artifacts (e.g. citations) produced for this turn. Set for
     // both freshly-streamed and persisted/reloaded messages.
-    artifacts?: CitationArtifact[];
+    artifacts?: ChatArtifact[];
+    // Charts this turn asked for. A chart takes minutes, so the turn is
+    // answered long before one exists: these render as pending cards and become
+    // artifacts when their job completes.
+    chart_jobs?: ChartGenerationJob[];
     // Agent trajectory (tool calls + per-citation subagent steps) for this turn.
     trace?: MessageTrace;
     // @-mention context attached to this (user) turn.
@@ -421,6 +510,7 @@ export interface AudioOverviewJob extends JobStatusResponse {
     conversable_id: string;
     conversable_type: string;
     status_message: string | null;
+    updated_at?: string | null;
 }
 
 export interface Project {

@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from app.database.crud.base_crud import CRUDBase
+from app.database.crud.projects.project_chart_crud import chart_job_crud
 from app.database.crud.sanitization import sanitize_for_postgres
 from app.database.models import (
     ConversableType,
@@ -220,7 +221,27 @@ class MessageCRUD(CRUDBase[Message, MessageCreate, MessageUpdate]):
                 "role": message.role,
                 "content": message.content,
                 "references": message.references,
-                "artifacts": [a.payload for a in message.artifacts] or None,
+                # The charts this turn asked for, sent alongside the artifacts
+                # rather than instead of them: a completed job carries the same
+                # artifact that is also attached to the message, and each
+                # surface picks which of the two draws it. Both being sent is
+                # what lets the card that was pending on the last load be a
+                # chart on this one.
+                "chart_jobs": [
+                    chart_job_crud.to_dict(job)
+                    for job in list(message.chart_jobs or [])  # type: ignore[arg-type]
+                ]
+                or None,
+                # The artifact's own id rides along with its payload so the
+                # conversation can link each card to its viewer page — and so a
+                # chart already drawn by its job card can be recognised here and
+                # left out. It is assigned on persistence, so a still-streaming
+                # card has none.
+                "artifacts": [
+                    {**a.to_payload(), "artifact_id": str(a.id)}
+                    for a in message.artifacts
+                ]
+                or None,
                 "trace": message.trace,
                 "scope": message.scope,
                 "sequence": message.sequence,
