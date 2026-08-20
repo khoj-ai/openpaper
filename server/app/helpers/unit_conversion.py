@@ -21,8 +21,10 @@ things keep it bounded:
   of one argument, or the value is excluded. That is what stops a conversion
   string from being a second statement in the harness.
 
-There is no local execution path. If E2B is unavailable, the values needing
-conversion are excluded and the chart draws from the rest.
+There is no local execution path, so the sandbox credential is checked when
+this module is imported rather than when a conversion is attempted. If the
+sandbox is reachable but a run fails, the values needing conversion are
+excluded and the chart draws from the rest.
 """
 
 import ast
@@ -31,7 +33,21 @@ import logging
 import os
 from typing import Any, NamedTuple, Optional
 
+from e2b_code_interpreter import Sandbox
+
 logger = logging.getLogger(__name__)
+
+# A requirement of the feature, not a runtime branch. There is no local
+# execution path — a chart whose papers disagree on units cannot be drawn
+# without the sandbox — so a server without a key would accept chart requests
+# and fail them one by one, minutes apart, at the last step. Better to refuse
+# to start.
+E2B_API_KEY = os.getenv("E2B_DEV_API_KEY") or os.getenv("E2B_API_KEY")
+if not E2B_API_KEY:
+    raise ValueError(
+        "E2B_DEV_API_KEY or E2B_API_KEY environment variable is not set. "
+        "Model-authored unit conversions only run in the sandbox."
+    )
 
 CONVERSIONS_PATH = "/home/user/conversions.json"
 CONVERTED_PATH = "/home/user/converted.json"
@@ -143,17 +159,8 @@ def run_unit_conversions(
     if not requests:
         return {}, {}
 
-    api_key = os.getenv("E2B_DEV_API_KEY") or os.getenv("E2B_API_KEY")
-    if not api_key:
-        raise ConversionError(
-            "E2B API key is required to convert units: set E2B_DEV_API_KEY or "
-            "E2B_API_KEY. Model-authored conversions only run in the sandbox."
-        )
-
-    from e2b_code_interpreter import Sandbox
-
     payload = [request._asdict() for request in requests]
-    sandbox = Sandbox.create(api_key=api_key, timeout=120)
+    sandbox = Sandbox.create(api_key=E2B_API_KEY, timeout=120)
     try:
         sandbox.files.write(CONVERSIONS_PATH, json.dumps(payload))
         execution = sandbox.run_code(HARNESS, timeout=60)
