@@ -130,9 +130,12 @@ class ChartJobCRUD:
     def fail_stale(db: Session, *, project_id: UUID) -> int:
         """Fail the project's jobs that nothing is working on any more.
 
-        Generation runs inside a web process, so a job dies with the process
-        that owned it — a deploy, a crash, a scaled-in task — and no one is
-        left to finish it or to mark it failed. The card would spin forever.
+        Generation runs inside a web process, so a job can be orphaned by a
+        deploy, a crash, or a scaled-in task, with no one left to finish it or
+        to mark it failed — but that is only the clearest way to get stuck, not
+        the only one. Anything that leaves a run neither progressing nor
+        completing lands here, so this reads elapsed time and claims nothing
+        about the cause.
 
         Deliberately not swept at startup. The backend runs as a dozen
         identical servers, and a booting one cannot tell "this job died with
@@ -163,10 +166,17 @@ class ChartJobCRUD:
             .update(
                 {
                     ChartGenerationJob.status: JobStatus.FAILED,
-                    ChartGenerationJob.status_message: "Chart generation was interrupted",
+                    ChartGenerationJob.status_message: "Chart generation stopped",
+                    # Deliberately non-specific about the cause. All this
+                    # actually knows is that no progress was recorded for a
+                    # long time, and a lost server is only one way to get
+                    # there — an unhandled error, a provider timing out, or an
+                    # investigation that ran long look identical from here.
+                    # Naming a cause we didn't observe sends the user looking
+                    # in the wrong place.
                     ChartGenerationJob.error_message: (
-                        "This chart stopped being built — the server running it "
-                        "went away. Ask for it again and it will start over."
+                        "This chart stopped making progress and was closed out. "
+                        "Ask for it again and it will start over."
                     ),
                     ChartGenerationJob.completed_at: datetime.now(timezone.utc),
                 },
