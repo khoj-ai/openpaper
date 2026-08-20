@@ -212,6 +212,14 @@ def upgrade() -> None:
     )
     # ### end Alembic commands ###
 
+    # Held for the copy, the count check, and the drop of `payload` together.
+    # The old code is still writing payload while this runs, and a citation
+    # committed between the check and the drop would lose its body without the
+    # check ever seeing it — the one case the check exists to prevent and the
+    # one case it cannot observe on its own. drop_column takes this same lock
+    # regardless, so this only moves it earlier.
+    op.execute("LOCK TABLE artifacts IN ACCESS EXCLUSIVE MODE")
+
     # Citations are shipped. Carry every one across, reading each field
     # defensively so an older payload missing a key costs that field and not
     # the row.
