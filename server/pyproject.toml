@@ -34,7 +34,11 @@ dependencies = [
     "gunicorn>=23.0.0",
     "firecrawl-py>=4.28.2",
     "openai>=1.82.0",
-    "anthropic>=0.96.0",
+    # Capped below 1.0: that major dropped the legacy Text Completions API, and
+    # openinference-instrumentation-anthropic still imports
+    # anthropic.resources.completions at instrument() time. Lift the cap once
+    # the instrumentor releases a build that no longer does.
+    "anthropic>=0.96.0,<1.0",
     "posthog>=4.2.0",
     "resend>=2.10.0",
     "celery>=5.5.3",
