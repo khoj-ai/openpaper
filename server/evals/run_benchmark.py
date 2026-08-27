@@ -380,6 +380,11 @@ async def run_single_question(
                 answer_parts.append(chunk["content"])
             elif chunk.get("type") == "references":
                 citations = chunk.get("content", {}).get("citations", [])
+            elif chunk.get("type") == "reset":
+                # Upstream dropped and the request was re-sent; the partial
+                # answer is not resumable, so score only the replacement.
+                answer_parts = []
+                citations = []
 
     return {
         "answer_text": "".join(answer_parts).strip(),

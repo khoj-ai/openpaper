@@ -152,25 +152,13 @@ class MultiPaperOperations(EvidenceOperations):
 
         async def stream_reader():
             """Reads from the LLM stream and puts chunks into the queue."""
-            _sentinel = object()
-
-            def get_next_chunk(iterator):
-                try:
-                    return next(iterator)
-                except StopIteration:
-                    return _sentinel
-
             try:
-                blocking_iterator = self.send_message_stream(
+                async for chunk in self.send_message_stream(
                     message=message_content,
                     system_prompt=formatted_system_prompt,
                     history=conversation_history,
                     provider=llm_provider,
-                )
-                while True:
-                    chunk = await asyncio.to_thread(get_next_chunk, blocking_iterator)
-                    if chunk is _sentinel:
-                        break
+                ):
                     await queue.put(chunk)
             finally:
                 await queue.put(None)
@@ -195,6 +183,18 @@ class MultiPaperOperations(EvidenceOperations):
                     first_chunk_received = True
 
                 chunk: StreamChunk = item  # type: ignore
+
+                if chunk.is_restart:
+                    # The upstream connection dropped mid-answer and the request
+                    # was re-sent. The partial answer is not resumable, so drop
+                    # the parse state and tell the client to clear what it
+                    # rendered.
+                    evidence_buffer = []
+                    text_buffer = ""
+                    in_evidence_section = False
+                    yield {"type": "reset", "content": ""}
+                    continue
+
                 text = chunk.text
 
                 logger.debug(f"Received chunk: {text}")

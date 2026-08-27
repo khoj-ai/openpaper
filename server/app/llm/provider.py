@@ -5,13 +5,13 @@ import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Iterator, List, Optional, Sequence, Union
+from typing import Any, AsyncIterator, Dict, List, Optional, Sequence, Union
 
 import anthropic
 import openai
 from app.database.models import Message
 from app.llm.citation_handler import CitationHandler
-from app.llm.utils import LLMBlockedError
+from app.llm.utils import STREAM_RESTART, LLMBlockedError, stream_with_retry
 from app.schemas.responses import (
     FileContent,
     SupplementaryContent,
@@ -35,6 +35,7 @@ from google.genai.types import (
     Tool,
     ToolConfig,
 )
+from langfuse.openai import AsyncOpenAI as LangfuseAsyncOpenAI
 from langfuse.openai import OpenAI as LangfuseOpenAI
 from openai.types.chat import (
     ChatCompletionAssistantMessageParam,
@@ -77,12 +78,21 @@ class StreamChunk:
     """Standardized streaming chunk format across all LLM providers"""
 
     def __init__(
-        self, text: str, model: str, provider: LLMProvider, is_done: bool = False
+        self,
+        text: str,
+        model: str,
+        provider: LLMProvider,
+        is_done: bool = False,
+        is_restart: bool = False,
     ):
         self.text = text
         self.model = model
         self.provider = provider
         self.is_done = is_done
+        # Set when the upstream connection dropped and the request was re-sent.
+        # Everything streamed before this chunk belongs to the abandoned
+        # attempt and must be discarded; a full replacement answer follows.
+        self.is_restart = is_restart
 
 
 # Union type for all content types
@@ -137,7 +147,7 @@ class BaseLLMProvider(ABC):
         system_prompt: str,
         file: FileContent | None = None,
         **kwargs,
-    ) -> Iterator[StreamChunk]:
+    ) -> AsyncIterator[StreamChunk]:
         """Send a streaming message"""
         pass
 
@@ -370,7 +380,7 @@ class GeminiProvider(BaseLLMProvider):
         # but the message now tells us which one so we can act on it.
         raise ValueError(f"Empty response from Gemini ({model}): {detail}")
 
-    def send_message_stream(
+    async def send_message_stream(
         self,
         model: str,
         message: MessageParam,
@@ -378,8 +388,13 @@ class GeminiProvider(BaseLLMProvider):
         system_prompt: str,
         file: FileContent | None = None,
         **kwargs,
-    ) -> Iterator[StreamChunk]:
-        """Send streaming message to Gemini"""
+    ) -> AsyncIterator[StreamChunk]:
+        """Send streaming message to Gemini.
+
+        Uses the async client so the socket reads yield to the event loop —
+        the sync client blocks the whole worker, which starves other in-flight
+        streams until their upstream gives up and closes the connection.
+        """
 
         config = GenerateContentConfig(
             system_instruction=system_prompt,
@@ -390,14 +405,26 @@ class GeminiProvider(BaseLLMProvider):
             history=history, new_message=message, file=file
         )
 
-        response_stream = self.client.models.generate_content_stream(
-            model=model,
-            contents=contents,
-            config=config,
-            **kwargs,
-        )
+        async def open_stream():
+            return await self.client.aio.models.generate_content_stream(
+                model=model,
+                contents=contents,
+                config=config,
+                **kwargs,
+            )
 
-        for chunk in response_stream:
+        async for chunk in stream_with_retry(
+            open_stream, description=f"gemini/{model}"
+        ):
+            if chunk is STREAM_RESTART:
+                yield StreamChunk(
+                    text="",
+                    model=model,
+                    provider=LLMProvider.GEMINI,
+                    is_restart=True,
+                )
+                continue
+
             yield StreamChunk(
                 text=chunk.text if chunk.text else "",
                 model=model,
@@ -588,6 +615,11 @@ class OpenAIProvider(BaseLLMProvider):
         # For standard OpenAI, base_url should be None. For OpenAI-compatible
         # providers, pass a custom base_url when constructing this provider.
         self._client = LangfuseOpenAI(api_key=self.api_key, base_url=base_url)
+        # Streaming runs on the async client so chunk reads don't block the
+        # event loop; everything else still uses the sync client.
+        self._async_client = LangfuseAsyncOpenAI(
+            api_key=self.api_key, base_url=base_url
+        )
         self._default_model = default_model or "gpt-5.6-sol"
         self._fast_model = fast_model or "gpt-5.6-luna"
         # Some OpenAI-compatible endpoints reject `file` content blocks.
@@ -680,7 +712,7 @@ class OpenAIProvider(BaseLLMProvider):
             tool_calls=tool_calls,
         )
 
-    def send_message_stream(
+    async def send_message_stream(
         self,
         model: str,
         message: MessageParam,
@@ -688,18 +720,31 @@ class OpenAIProvider(BaseLLMProvider):
         system_prompt: str,
         file: FileContent | None = None,
         **kwargs,
-    ) -> Iterator[StreamChunk]:
+    ) -> AsyncIterator[StreamChunk]:
         """Send streaming message to OpenAI"""
         messages = self._prepare_openai_messages(history, message, system_prompt, file)
-        stream = self.client.chat.completions.create(
-            model=model,
-            messages=messages,
-            stream=True,
-            stream_options={"include_usage": True},
-            **kwargs,
-        )
 
-        for chunk in stream:
+        async def open_stream():
+            return await self._async_client.chat.completions.create(
+                model=model,
+                messages=messages,
+                stream=True,
+                stream_options={"include_usage": True},
+                **kwargs,
+            )
+
+        async for chunk in stream_with_retry(
+            open_stream, description=f"openai/{model}"
+        ):
+            if chunk is STREAM_RESTART:
+                yield StreamChunk(
+                    text="",
+                    model=model,
+                    provider=LLMProvider.OPENAI,
+                    is_restart=True,
+                )
+                continue
+
             if chunk.choices and chunk.choices[0].delta.content:
                 yield StreamChunk(
                     text=chunk.choices[0].delta.content,
@@ -917,6 +962,9 @@ class AnthropicProvider(BaseLLMProvider):
             raise ValueError("ANTHROPIC_API_KEY environment variable is required")
 
         self._client = anthropic.Anthropic(api_key=self.api_key)
+        # Streaming runs on the async client so chunk reads don't block the
+        # event loop; everything else still uses the sync client.
+        self._async_client = anthropic.AsyncAnthropic(api_key=self.api_key)
         self._default_model = default_model or "claude-opus-4-7"
         self._fast_model = fast_model or "claude-haiku-4-5"
 
@@ -1014,7 +1062,7 @@ class AnthropicProvider(BaseLLMProvider):
             tool_calls=tool_calls,
         )
 
-    def send_message_stream(
+    async def send_message_stream(
         self,
         model: str,
         message: MessageParam,
@@ -1022,7 +1070,7 @@ class AnthropicProvider(BaseLLMProvider):
         system_prompt: str,
         file: FileContent | None = None,
         **kwargs,
-    ) -> Iterator[StreamChunk]:
+    ) -> AsyncIterator[StreamChunk]:
         params: Dict[str, Any] = {
             "model": model,
             "max_tokens": kwargs.pop("max_tokens", self.DEFAULT_MAX_TOKENS_STREAM),
@@ -1045,19 +1093,37 @@ class AnthropicProvider(BaseLLMProvider):
 
         params.update(kwargs)
 
-        with self._client.messages.stream(**params) as stream:
-            for text in stream.text_stream:
+        async def open_stream():
+            async def text_chunks():
+                async with self._async_client.messages.stream(**params) as stream:
+                    async for text in stream.text_stream:
+                        yield text
+                    # Surface usage after the stream completes; helpful for
+                    # verifying cache hits via cache_read_input_tokens.
+                    final = await stream.get_final_message()
+                    if final.usage:
+                        logger.debug(f"Anthropic usage stats: {final.usage}")
+
+            return text_chunks()
+
+        async for text in stream_with_retry(
+            open_stream, description=f"anthropic/{model}"
+        ):
+            if text is STREAM_RESTART:
                 yield StreamChunk(
-                    text=text,
+                    text="",
                     model=model,
                     provider=LLMProvider.ANTHROPIC,
-                    is_done=False,
+                    is_restart=True,
                 )
-            # Surface usage after the stream completes; helpful for verifying
-            # cache hits via cache_read_input_tokens.
-            final = stream.get_final_message()
-            if final.usage:
-                logger.debug(f"Anthropic usage stats: {final.usage}")
+                continue
+
+            yield StreamChunk(
+                text=text,
+                model=model,
+                provider=LLMProvider.ANTHROPIC,
+                is_done=False,
+            )
 
     def get_default_model(self) -> str:
         return self._default_model

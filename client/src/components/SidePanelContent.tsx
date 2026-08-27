@@ -528,6 +528,19 @@ export function SidePanelContent({
                                 return newChunks;
                             });
                         }
+                        else if (chunkType === 'reset') {
+                            // The upstream model connection dropped mid-answer and
+                            // the server re-sent the request. The partial answer is
+                            // not resumable, so clear it before the replacement
+                            // answer streams in.
+                            console.warn('Stream restarted; discarding partial answer');
+                            accumulatedContent = '';
+                            references = undefined;
+                            contentChunks = 0;
+                            referenceChunks = 0;
+                            setStreamingChunks([]);
+                            setStreamingReferences(undefined);
+                        }
                         else if (chunkType === 'references') {
                             referenceChunks++;
                             console.log(`Processing references chunk #${referenceChunks}:`, chunkContent);

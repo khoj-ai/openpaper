@@ -68,6 +68,20 @@ async def _stream_chat_chunks(
         chunk_type = chunk.get("type")
         chunk_content = chunk.get("content", "")
 
+        if chunk_type == "reset":
+            # The upstream connection dropped mid-answer and the request was
+            # re-sent from scratch. Everything accumulated so far belongs to the
+            # abandoned attempt — drop it here so the persisted message is the
+            # replacement answer, and forward the signal so the client clears
+            # what it already rendered.
+            # Only the answer stream is discarded: artifacts and status
+            # messages come from the evidence-gathering phase that ran before
+            # this stream opened, and are still valid.
+            content_chunks.clear()
+            evidence_container["evidence"] = None
+            yield f"{json.dumps({'type': 'reset', 'content': ''})}{END_DELIMITER}"
+            continue
+
         if chunk_type == "artifact":
             if artifacts is not None:
                 artifacts.append(chunk_content)

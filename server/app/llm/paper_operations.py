@@ -27,6 +27,10 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
+# Presigned S3 PDF fetches are on the critical path of a chat turn; fail fast
+# rather than holding the turn open on a stalled download.
+PDF_FETCH_TIMEOUT = httpx.Timeout(60.0, connect=10.0)
+
 from app.database.crud.message_crud import message_crud
 from app.database.database import get_db
 from app.helpers.s3 import s3_service
@@ -178,15 +182,21 @@ class PaperOperations(BaseLLMClient):
                 f"Could not generate presigned URL for paper with ID {paper_id}."
             )
 
-        # Retrieve and encode the PDF byte
-        pdf_bytes = httpx.get(signed_url).content
+        # Retrieve and encode the PDF bytes. This runs inside an async
+        # generator, so it must not be a blocking fetch: a sync download of a
+        # multi-megabyte PDF stalls the whole worker's event loop, including
+        # every other user's in-flight LLM stream.
+        async with httpx.AsyncClient(timeout=PDF_FETCH_TIMEOUT) as client:
+            pdf_response = await client.get(signed_url)
+            pdf_response.raise_for_status()
+            pdf_bytes = pdf_response.content
 
         message_content = [
             TextContent(text=formatted_prompt),
         ]
 
         # Chat with the paper using the LLM
-        for chunk in self.send_message_stream(
+        async for chunk in self.send_message_stream(
             message=message_content,
             file=FileContent(
                 data=pdf_bytes,
@@ -199,6 +209,16 @@ class PaperOperations(BaseLLMClient):
             provider=llm_provider,
             model_type=model_type,
         ):
+            if chunk.is_restart:
+                # The upstream connection dropped mid-answer and the request was
+                # re-sent. The partial answer is not resumable, so drop the
+                # parse state and tell the client to clear what it rendered.
+                evidence_buffer = []
+                text_buffer = ""
+                in_evidence_section = False
+                yield {"type": "reset", "content": ""}
+                continue
+
             text = chunk.text
 
             logger.debug(f"Received chunk: {text}")

@@ -1,7 +1,7 @@
 import logging
 import time
 from enum import Enum
-from typing import Any, Dict, Iterator, List, Optional, Union
+from typing import Any, AsyncIterator, Dict, List, Optional, Union
 
 from app.database.models import Message
 from app.database.telemetry import track_event
@@ -221,8 +221,13 @@ class BaseLLMClient:
         model_type: ModelType = ModelType.DEFAULT,
         provider: Optional[LLMProvider] = None,
         **kwargs,
-    ) -> Iterator[StreamChunk]:
-        """Send a message and stream the response"""
+    ) -> AsyncIterator[StreamChunk]:
+        """Send a message and stream the response.
+
+        Returns an async iterator — iterate it with `async for`. Chunks with
+        `is_restart` set mean the upstream connection dropped and the request
+        was re-sent: discard everything streamed so far.
+        """
         model = self._get_model_for_type(model_type, provider)
         return self._get_provider(provider).send_message_stream(
             model, message, history, system_prompt, file, **kwargs

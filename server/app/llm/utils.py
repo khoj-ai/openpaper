@@ -5,8 +5,10 @@ import json
 import logging
 import random
 import time
-from typing import Any, Callable, Tuple
+from typing import Any, AsyncIterator, Callable, Tuple
 
+import anthropic
+import httpx
 import openai
 
 logger = logging.getLogger(__name__)
@@ -108,6 +110,82 @@ def retry_llm_operation(max_retries: int = 3, delay: float = 1.0):
         return wrapper
 
     return decorator
+
+
+# Transport-level failures that kill a response mid-body. These are not model
+# errors: the connection died with bytes still owed, so the same request sent
+# again will usually succeed. httpx exceptions arrive raw from the Gemini SDK;
+# the OpenAI and Anthropic SDKs wrap theirs in APIConnectionError.
+RETRYABLE_STREAM_EXCEPTIONS = (
+    httpx.RemoteProtocolError,
+    httpx.ReadError,
+    httpx.ReadTimeout,
+    httpx.WriteError,
+    httpx.ConnectError,
+    httpx.ConnectTimeout,
+    openai.APIConnectionError,
+    anthropic.APIConnectionError,
+)
+
+
+class _StreamRestart:
+    """Marker yielded when a dropped stream is being retried from scratch."""
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+        return "STREAM_RESTART"
+
+
+STREAM_RESTART = _StreamRestart()
+
+
+async def stream_with_retry(
+    open_stream: Callable[[], Any],
+    *,
+    max_retries: int = 2,
+    delay: float = 1.0,
+    description: str = "stream",
+) -> AsyncIterator[Any]:
+    """Iterate an upstream LLM stream, re-issuing the whole request if the
+    connection drops mid-body.
+
+    `open_stream` is an awaitable factory returning a fresh async iterator, so
+    each attempt is a brand new HTTP request. Chunks are passed through
+    untouched.
+
+    A partially-streamed answer cannot be resumed — the retry produces different
+    text, not a continuation — so when chunks were already emitted before the
+    drop, STREAM_RESTART is yielded first. Callers must treat it as "discard
+    everything received so far"; what follows is a complete replacement answer.
+    """
+    for attempt in range(max_retries + 1):
+        emitted = False
+        try:
+            stream = await open_stream()
+            async for chunk in stream:
+                emitted = True
+                yield chunk
+            return
+        except RETRYABLE_STREAM_EXCEPTIONS as e:
+            if attempt >= max_retries:
+                logger.error(
+                    f"{description}: stream dropped after {max_retries} retries: "
+                    f"{type(e).__name__}: {e}",
+                    exc_info=e,
+                )
+                raise
+
+            backoff_time = delay * (2**attempt) * (0.5 + 0.5 * random.random())
+            logger.warning(
+                f"{description}: stream dropped ({type(e).__name__}: {str(e)[:120]}) "
+                f"after emitting={emitted}. Retry {attempt+1}/{max_retries} "
+                f"in {backoff_time:.2f}s"
+            )
+            await asyncio.sleep(backoff_time)
+
+            # Only signal a restart if the caller already saw part of the
+            # answer. Dropping before the first chunk is invisible downstream.
+            if emitted:
+                yield STREAM_RESTART
 
 
 def find_offsets(target: str, full_text: str) -> Tuple[int, int]:

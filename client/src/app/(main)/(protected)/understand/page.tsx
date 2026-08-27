@@ -330,6 +330,18 @@ function UnderstandPageContent() {
                             if (chunkType === 'content') {
                                 accumulatedContent += chunkContent;
                                 setStreamingChunks(prev => [...prev, chunkContent]);
+                            } else if (chunkType === 'reset') {
+                                // The upstream model connection dropped mid-answer
+                                // and the server re-sent the request. The partial
+                                // answer is not resumable, so clear it before the
+                                // replacement answer streams in. Artifacts and the
+                                // trace come from the earlier evidence phase and
+                                // survive the restart.
+                                console.warn('Stream restarted; discarding partial answer');
+                                accumulatedContent = '';
+                                references = undefined;
+                                setStreamingChunks([]);
+                                setStreamingReferences(undefined);
                             } else if (chunkType === 'references') {
                                 references = chunkContent;
                                 setStreamingReferences(chunkContent);
