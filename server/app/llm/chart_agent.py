@@ -18,7 +18,7 @@ import logging
 import uuid
 from typing import Any, NamedTuple, Optional
 
-from app.database.crud.projects.project_chart_crud import chart_job_crud
+from app.database.crud.projects.project_chart_crud import SOURCE_CHAT, chart_job_crud
 from app.llm.chart_operations.planning import ChartPlanning
 from app.schemas.user import CurrentUser
 from sqlalchemy.orm import Session
@@ -186,6 +186,7 @@ def run_create_chart_artifact(
         paper_ids=selected,
         plan=None,
         user=current_user,
+        source=SOURCE_CHAT,
     )
     if not job:
         return ChartRequest(

@@ -3,7 +3,10 @@
 import uuid
 
 from app.auth.dependencies import get_required_user
-from app.database.crud.projects.project_chart_crud import chart_job_crud
+from app.database.crud.projects.project_chart_crud import (
+    SOURCE_COMPOSER,
+    chart_job_crud,
+)
 from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.database import get_db
 from app.llm.operations import operations
@@ -115,6 +118,7 @@ def create_chart(
         paper_ids=request.paper_ids,
         plan=request.plan.model_dump(),
         user=current_user,
+        source=SOURCE_COMPOSER,
     )
     if not job:
         return JSONResponse(
