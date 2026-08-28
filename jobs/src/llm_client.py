@@ -60,6 +60,28 @@ def _format_api_error(e: Exception) -> Any:
     return e
 
 
+# HTTP status codes worth another attempt. Everything else the API returns as a
+# 4xx is deterministic — a 400 INVALID_ARGUMENT for an oversized prompt, a 403
+# for a bad key, a 404 for an expired cache — and re-sending the identical
+# request just burns quota and wall-clock before failing the same way.
+RETRYABLE_STATUS_CODES = frozenset({408, 429})
+
+
+def _is_retryable(e: Exception) -> bool:
+    """Whether re-sending the identical request could plausibly succeed.
+
+    Transport-level failures (timeouts) and server-side errors are transient.
+    Client errors are not, except for request timeout and rate limiting.
+    """
+    if isinstance(e, httpx.TimeoutException):
+        return True
+    if isinstance(e, ServerError):
+        return True
+    if isinstance(e, APIError):
+        return getattr(e, "code", None) in RETRYABLE_STATUS_CODES
+    return False
+
+
 # Constants
 DEFAULT_CHAT_MODEL = "gemini-3.6-flash"
 FAST_CHAT_MODEL = "gemini-3.5-flash-lite"
@@ -150,6 +172,33 @@ class AsyncLLMClient:
             await client.aio.aclose()
         except Exception as e:
             logger.debug(f"Error closing genai client: {e}")
+
+    async def count_tokens(self, text: str, model: Optional[str] = None) -> int:
+        """Exact input token count for `text`, as `model` will tokenize it.
+
+        countTokens is a separate, free endpoint with its own quota — it costs
+        no generation tokens. Use it rather than a chars-per-token estimate
+        whenever a request is near the input window: dense paper text (tables,
+        math, reference lists, CJK) packs far more tokens per character than
+        English prose, so a character heuristic under-counts and the request
+        comes back as a 400 INVALID_ARGUMENT that no retry can fix.
+        """
+        client = self._create_client()
+        try:
+            response = await client.aio.models.count_tokens(
+                model=model or self.default_model,
+                contents=types.Content(
+                    role='user',
+                    parts=[types.Part.from_text(text=text)],
+                ),
+            )
+        finally:
+            await self._close_client(client)
+
+        total_tokens = getattr(response, "total_tokens", None)
+        if total_tokens is None:
+            raise ValueError("count_tokens returned no total_tokens")
+        return total_tokens
 
     async def create_cache(self, cache_content: str, client: genai.Client, model: Optional[str] = None) -> str:
         """Create a cache entry for the given content.
@@ -302,6 +351,9 @@ class AsyncLLMClient:
 
             except (ServerError, ClientError, APIError, httpx.TimeoutException) as e:
                 last_exception = e
+                if not _is_retryable(e):
+                    logger.error(f"Non-retryable LLM API error for generate_content: {_format_api_error(e)}")
+                    break
                 if attempt < max_retries:
                     # Exponential backoff with jitter
                     backoff_time = base_delay * (2 ** attempt) * (0.5 + 0.5 * random.random())
@@ -388,6 +440,12 @@ class AsyncLLMClient:
 
             except (ServerError, ClientError, APIError, httpx.TimeoutException) as e:
                 last_exception = e
+                if not _is_retryable(e):
+                    logger.error(
+                        f"Non-retryable LLM API error for generate_structured "
+                        f"({schema.__name__}): {_format_api_error(e)}"
+                    )
+                    break
                 if attempt < max_retries:
                     backoff_time = base_delay * (2 ** attempt) * (0.5 + 0.5 * random.random())
                     logger.warning(
@@ -425,6 +483,14 @@ class PaperOperations(AsyncLLMClient):
     def __init__(self, api_key: str, default_model: Optional[str] = None):
         """Initialize the LLM client for paper operations."""
         super().__init__(api_key, default_model=default_model)
+
+    async def count_metadata_prompt_tokens(self, paper_content: str) -> int:
+        """Token count for `paper_content` as the metadata extraction model sees it.
+
+        Keeps the choice of extraction model (and therefore of tokenizer) inside
+        this client, so callers can ask "does this fit?" without knowing it.
+        """
+        return await self.count_tokens(paper_content, model=FAST_CHAT_MODEL)
 
     async def _extract_single_metadata_field(
         self,

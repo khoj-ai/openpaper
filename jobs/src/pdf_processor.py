@@ -52,17 +52,80 @@ MIN_EXTRACTED_TEXT_CHARS = 1000
 # safely between the two.
 MIN_COMPRESSED_TEXT_BYTES = 600
 
-# Upper bound on text we send to the LLM. Gemini 3.1 Pro's input window is
-# 1,048,576 tokens; we budget conservatively at ~3.5 chars/token and reserve
-# headroom for the prompt, so content above this many chars risks overflowing
-# the window. Content over the limit is truncated rather than failed — but only
-# if we can still keep at least MIN_RETAINED_FRACTION of it; otherwise the
-# metadata wouldn't reflect the paper and we reject it instead.
+# Upper bound on text we send to the LLM. The extraction model's input window is
+# 1,048,576 tokens; we reserve headroom for the extraction prompt and system
+# instructions, leaving the rest for paper content. Content over the budget is
+# truncated rather than failed — but only if we can still keep at least
+# MIN_RETAINED_FRACTION of it; otherwise the metadata wouldn't reflect the paper
+# and we reject it instead.
 MODEL_INPUT_TOKEN_LIMIT = 1_048_576
 PROMPT_TOKEN_RESERVE = 48_576
-EST_CHARS_PER_TOKEN = 3.5
-MAX_LLM_CONTENT_CHARS = int((MODEL_INPUT_TOKEN_LIMIT - PROMPT_TOKEN_RESERVE) * EST_CHARS_PER_TOKEN)
+CONTENT_TOKEN_BUDGET = MODEL_INPUT_TOKEN_LIMIT - PROMPT_TOKEN_RESERVE
 MIN_RETAINED_FRACTION = 0.80
+
+# Character ceiling below which we skip the countTokens call entirely. Gemini
+# never packs fewer than ~1.5 characters into a token, even for the densest
+# text, so text shorter than this cannot overflow the window no matter how it
+# tokenizes — which covers every normal paper. Above it we measure for real: a
+# chars-per-token average is worthless at the boundary, because table- and
+# math-heavy papers tokenize two to three times denser than English prose.
+MIN_CHARS_PER_TOKEN = 1.5
+UNMEASURED_CHAR_CEILING = int(CONTENT_TOKEN_BUDGET * MIN_CHARS_PER_TOKEN)
+
+# Each truncation pass rescales by the document's own measured chars-per-token
+# ratio, so it lands within a percent or two of the budget; the margin absorbs
+# that error and the extra passes cover pathological documents whose density
+# varies sharply between the head and the tail.
+MAX_FIT_ITERATIONS = 3
+FIT_SAFETY_MARGIN = 0.98
+
+
+async def fit_content_to_token_budget(pdf_text: str, job_id: str) -> str:
+    """Truncate `pdf_text` to what actually fits the extraction model's window.
+
+    Measures with the countTokens endpoint instead of estimating from character
+    count, rescales by the document's own measured chars-per-token ratio, and
+    re-measures until it fits. Raises ExcessivePDFTextError if fitting would drop
+    more than (1 - MIN_RETAINED_FRACTION) of the paper.
+    """
+    if len(pdf_text) <= UNMEASURED_CHAR_CEILING:
+        return pdf_text
+
+    content = pdf_text
+    token_count = await llm_client.count_metadata_prompt_tokens(content)
+
+    for _ in range(MAX_FIT_ITERATIONS):
+        if token_count <= CONTENT_TOKEN_BUDGET:
+            break
+        keep_chars = int(
+            len(content) * (CONTENT_TOKEN_BUDGET / token_count) * FIT_SAFETY_MARGIN
+        )
+        retained_fraction = keep_chars / len(pdf_text)
+        if retained_fraction < MIN_RETAINED_FRACTION:
+            raise ExcessivePDFTextError(
+                f"PDF too large for the model: {token_count} tokens exceeds the "
+                f"{CONTENT_TOKEN_BUDGET}-token budget, and truncating to fit would "
+                f"keep only {retained_fraction:.0%} of the content "
+                f"(minimum {MIN_RETAINED_FRACTION:.0%})"
+            )
+        content = content[:keep_chars]
+        token_count = await llm_client.count_metadata_prompt_tokens(content)
+
+    if token_count > CONTENT_TOKEN_BUDGET:
+        raise ExcessivePDFTextError(
+            f"PDF too large for the model: still {token_count} tokens after "
+            f"{MAX_FIT_ITERATIONS} truncation passes (budget {CONTENT_TOKEN_BUDGET})"
+        )
+
+    if len(content) < len(pdf_text):
+        logger.warning(
+            f"PDF for job {job_id} exceeded the token budget; truncated to "
+            f"{len(content)} chars / {token_count} tokens "
+            f"({len(content) / len(pdf_text):.0%} retained) for metadata extraction"
+        )
+
+    return content
+
 
 async def process_pdf_file(
     pdf_bytes: bytes,
@@ -159,24 +222,8 @@ async def process_pdf_file(
 
             # Cap what we send to the LLM at the model's context window. We keep the
             # full text for raw_content; only the metadata extraction sees a truncated
-            # copy. If truncation would drop more than (1 - MIN_RETAINED_FRACTION) of
-            # the paper, the extracted metadata wouldn't be representative, so reject.
-            content_for_llm = pdf_text
-            if extracted_chars > MAX_LLM_CONTENT_CHARS:
-                retained_fraction = MAX_LLM_CONTENT_CHARS / extracted_chars
-                if retained_fraction < MIN_RETAINED_FRACTION:
-                    raise ExcessivePDFTextError(
-                        f"PDF too large for the model: {extracted_chars} chars exceeds "
-                        f"the ~{MAX_LLM_CONTENT_CHARS}-char budget, and truncating would "
-                        f"keep only {retained_fraction:.0%} of the content "
-                        f"(minimum {MIN_RETAINED_FRACTION:.0%})"
-                    )
-                content_for_llm = pdf_text[:MAX_LLM_CONTENT_CHARS]
-                logger.warning(
-                    f"PDF for job {job_id} is {extracted_chars} chars; truncating to "
-                    f"{MAX_LLM_CONTENT_CHARS} ({retained_fraction:.0%} retained) for "
-                    f"metadata extraction"
-                )
+            # copy.
+            content_for_llm = await fit_content_to_token_budget(pdf_text, job_id)
 
             # Run I/O-bound tasks and LLM extraction concurrently
             async with time_it("Running I/O-bound tasks and LLM extraction concurrently", job_id=job_id):
