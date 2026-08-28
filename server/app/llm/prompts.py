@@ -9,7 +9,7 @@ Your summary should be approximately {length} words long (this is important - ai
 
 Write the summary in plain text, with minimal syntax formatting for citations.
 
-Include any citations or references to specific sections of the paper, reproducing the raw text. It should read like a cohesive brief that could be read on a podcast or in a blog post.
+Cite the specific sections of the paper that back your claims, but narrate them in your own words. This summary is going to be read aloud, so do not reproduce long passages of the paper verbatim in it. It should read like a cohesive brief that could be read on a podcast or in a blog post.
 
 Citations should be formatted as [^1], [^2], etc., where each number corresponds to the idx of the list of citations you will provide at the end of the summary.
 

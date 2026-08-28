@@ -374,7 +374,10 @@ class GeminiProvider(BaseLLMProvider):
         )
 
         if finish_reason in BLOCKED_REASONS:
-            raise LLMBlockedError(f"Gemini declined to answer ({model}): {detail}")
+            raise LLMBlockedError(
+                f"Gemini declined to answer ({model}): {detail}",
+                reason=getattr(finish_reason, "name", str(finish_reason)),
+            )
 
         # MAX_TOKENS, OTHER, or STOP-with-empty-text fall through as retryable —
         # but the message now tells us which one so we can act on it.
