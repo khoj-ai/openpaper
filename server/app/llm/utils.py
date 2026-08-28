@@ -16,7 +16,21 @@ logger = logging.getLogger(__name__)
 
 class LLMBlockedError(Exception):
     """The model declined to produce output for a reason that retrying won't fix
-    (safety filter, recitation, prompt-level block, malformed function call)."""
+    (safety filter, recitation, prompt-level block, malformed function call).
+
+    `reason` is the provider's finish reason as a bare name (e.g. "RECITATION"),
+    so callers can tell the terminal blocks apart from the one that isn't:
+    recitation depends on the sampled continuation, not on anything stable about
+    the request.
+    """
+
+    def __init__(self, message: str, reason: str | None = None):
+        super().__init__(message)
+        self.reason = reason
+
+    @property
+    def is_recitation(self) -> bool:
+        return self.reason == "RECITATION"
 
 
 # Exceptions that should trigger a retry with backoff. LLMBlockedError is

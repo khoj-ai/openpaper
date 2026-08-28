@@ -18,7 +18,7 @@ from app.llm.prompts import (
     NORMAL_MODE_INSTRUCTIONS,
 )
 from app.llm.provider import FileContent, LLMProvider, TextContent
-from app.llm.utils import retry_llm_operation
+from app.llm.utils import LLMBlockedError, retry_llm_operation
 from app.schemas.message import ResponseStyle
 from app.schemas.responses import AudioOverviewForLLM
 from app.schemas.user import CurrentUser
@@ -95,10 +95,27 @@ class PaperOperations(BaseLLMClient):
         ]
 
         # Generate narrative summary using the LLM
-        response = self.generate_content(
-            contents=message_content,
-            schema=AudioOverviewForLLM,
-        )
+        try:
+            response = self.generate_content(
+                contents=message_content,
+                schema=AudioOverviewForLLM,
+            )
+        except LLMBlockedError as e:
+            # Narrating a whole paper is the longest single generation we ask
+            # for, which makes it the most likely to wander into a stretch the
+            # model has memorized and trip Gemini's recitation filter. That
+            # verdict is a property of the sampled continuation, not of the
+            # request, so one fresh draw usually clears it — unlike a safety or
+            # blocklist verdict, which is stable and gets re-raised as-is.
+            if not e.is_recitation:
+                raise
+            logger.warning(
+                f"Recitation block on narrative summary for paper {paper_id}; resampling once."
+            )
+            response = self.generate_content(
+                contents=message_content,
+                schema=AudioOverviewForLLM,
+            )
 
         try:
             if response and response.text:

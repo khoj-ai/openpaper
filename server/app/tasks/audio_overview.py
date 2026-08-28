@@ -247,7 +247,10 @@ async def generate_audio_overview(
                 job_id=audio_overview_job_id,
                 status=JobStatus.FAILED,
                 current_user=user,
-                status_message=f"Failed: {str(e)[:200]}",
+                # The exception text carries provider diagnostics (finish
+                # reasons, model ids) that render verbatim in the job card;
+                # the traceback above is where they belong.
+                status_message="Failed to generate audio overview. Please try again.",
             )
             track_event(
                 "audio_overview_failed",
