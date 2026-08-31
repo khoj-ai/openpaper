@@ -85,6 +85,12 @@ function LoginContent() {
 				case 'different_provider':
 					setError('This email is already associated with a different sign-in method. Please use your original sign-in method.');
 					break;
+				case 'login_expired':
+					setError('That sign-in link took too long to complete. Please try again.');
+					break;
+				case 'login_cancelled':
+					setError('Sign-in was cancelled. Please try again when you’re ready.');
+					break;
 				default:
 					setError('An error occurred during login. Please try again.');
 			}

@@ -9,7 +9,7 @@ from typing import Optional, cast
 
 from app.auth.dependencies import get_admin_user, get_current_user, get_required_user
 from app.auth.email import email_auth_client
-from app.auth.google import google_auth_client
+from app.auth.google import GoogleTokenError, google_auth_client
 from app.auth.utils import (
     clear_session_cookie,
     is_verification_code_valid,
@@ -17,6 +17,7 @@ from app.auth.utils import (
 )
 from app.auth.zotero import zotero_auth_client
 from app.database.crud.annotation_crud import annotation_crud
+from app.database.crud.google_oauth_crud import ClaimOutcome, google_oauth_state_crud
 from app.database.crud.highlight_crud import highlight_crud
 from app.database.crud.message_crud import message_crud
 from app.database.crud.paper_crud import paper_crud
@@ -28,7 +29,9 @@ from app.database.crud.user_crud import user as user_crud
 from app.database.crud.zotero_crud import zotero_crud
 from app.database.crud.zotero_import_crud import zotero_import_crud
 from app.database.database import get_db
-from app.database.models import PaperStatus, Project, User
+from app.database.models import PaperStatus, Project
+from app.database.models import Session as DBSession
+from app.database.models import User
 from app.database.telemetry import track_event
 from app.helpers.abuse_detection import check_signup_abuse, send_abuse_alert
 from app.helpers.email import (
@@ -173,11 +176,38 @@ async def logout(
     return AuthResponse(success=True, message="Logged out successfully")
 
 
+def _login_error_redirect(reason: str) -> RedirectResponse:
+    """Send the user back to the login page with a nameable reason."""
+    return RedirectResponse(
+        url=f"{client_domain}/login?error={reason}", status_code=status.HTTP_302_FOUND
+    )
+
+
+def _signed_in_redirect(session: DBSession, welcome: bool) -> RedirectResponse:
+    """The post-sign-in redirect, with the session cookie attached."""
+    redirect_url = f"{client_domain}/auth/callback?success=true"
+    if welcome:
+        redirect_url += "&welcome=true"
+
+    response = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
+    set_session_cookie(
+        response, token=str(session.token), expires_at=session.expires_at  # type: ignore[arg-type]
+    )
+    # Set a header that the frontend can use to detect successful auth
+    response.headers["X-Auth-Success"] = "true"
+    return response
+
+
 @auth_router.get("/google/login")
-async def google_login():
+async def google_login(db: Session = Depends(get_db)):
     """Start Google OAuth flow."""
+    # This route is unauthenticated, so it is the only place state rows build
+    # up. Clearing them here keeps the table bounded without a separate job.
+    google_oauth_state_crud.delete_stale(db)
+
     # Generate a random state for security
     state = secrets.token_urlsafe(32)
+    google_oauth_state_crud.create(db, state=state)
 
     # Get the authorization URL
     auth_url = google_auth_client.get_auth_url(state=state)
@@ -188,18 +218,96 @@ async def google_login():
 @auth_router.get("/google/callback", response_class=RedirectResponse)
 async def google_callback(
     request: Request,
-    code: str = Query(...),
+    code: Optional[str] = Query(None),
+    state: Optional[str] = Query(None),
+    error: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
-    """Handle Google OAuth callback."""
+    """Handle Google OAuth callback.
+
+    Every parameter is optional because we do not control who calls this. Google
+    sends `error` instead of `code` when the user declines at the consent
+    screen, and link scanners re-fetch the URL with a code that has already been
+    spent. Requiring `code` turned both into a raw 422.
+    """
+    # The user declined, or Google refused before ever issuing a code.
+    if error:
+        logger.info(
+            f"Google sign-in did not complete at the consent screen: {error}",
+            extra={"google_error": error},
+        )
+        reason = "login_cancelled" if error == "access_denied" else "callback_failed"
+        return _login_error_redirect(reason)
+
+    if not state or not code:
+        logger.warning(
+            "Google callback arrived without the parameters to act on",
+            extra={"has_code": bool(code), "has_state": bool(state)},
+        )
+        return _login_error_redirect("missing_code")
+
+    claim = google_oauth_state_crud.claim(db, state=state)
+
+    if claim.outcome is ClaimOutcome.UNKNOWN:
+        # A state we never issued, or one we issued long enough ago that it has
+        # aged out of retention. Either way there is nothing safe to exchange.
+        logger.warning("Google callback carried a state we did not issue")
+        return _login_error_redirect("callback_failed")
+
+    if claim.outcome is ClaimOutcome.EXPIRED:
+        logger.info("Google callback arrived after its state expired")
+        return _login_error_redirect("login_expired")
+
+    if claim.outcome is ClaimOutcome.REPLAY:
+        # Somebody already exchanged this code — usually a prefetcher or link
+        # scanner that followed the redirect before the browser did. Hand over
+        # the session that exchange produced instead of spending the code again
+        # against Google, which would only earn an invalid_grant.
+        record = claim.record
+        replay_session = (
+            user_crud.get_session_by_id(db, session_id=record.session_id)  # type: ignore[arg-type]
+            if record is not None and record.session_id is not None
+            else None
+        )
+        if replay_session is None:
+            logger.warning(
+                "Replayed Google callback had no session to hand back",
+                extra={"had_session_id": bool(record and record.session_id)},
+            )
+            return _login_error_redirect("callback_failed")
+
+        logger.info("Serving a replayed Google callback from the existing session")
+        return _signed_in_redirect(
+            replay_session, welcome=bool(record.was_new_user)  # type: ignore[union-attr]
+        )
+
+    assert claim.record is not None  # CLAIMED always carries its row
+    oauth_state = claim.record
+
     try:
         # Exchange the code for a token
-        token_data = google_auth_client.get_token(code)
-        if not token_data or "access_token" not in token_data:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to get access token",
-            )
+        try:
+            token_data = google_auth_client.get_token(code)
+        except GoogleTokenError as e:
+            if e.is_caller_fault:
+                # Nothing is broken on our side: the code was already spent,
+                # expired, or malformed. Logged at WARNING so it stops competing
+                # with real faults in the error stream, with Google's own answer
+                # kept verbatim so the specific cause stays recoverable.
+                logger.warning(
+                    f"Google refused the authorization code: {e.error}",
+                    extra=e.log_fields(),
+                )
+            else:
+                # invalid_client, unauthorized_client, a 5xx or a network
+                # failure — our configuration or Google itself. The code was
+                # never spent, so let a retry through.
+                logger.error(
+                    f"Could not exchange the Google authorization code: {e.error}",
+                    extra=e.log_fields(),
+                )
+                google_oauth_state_crud.release(db, record=oauth_state)
+            return _login_error_redirect("authentication_error")
 
         # Get user info from Google
         user_info = google_auth_client.get_user_info(token_data["access_token"])
@@ -217,8 +325,7 @@ async def google_callback(
 
         if user_with_different_provider and not existing_user:
             # User exists but with a different provider - redirect with specific error
-            redirect_url = f"{client_domain}/login?error=different_provider"
-            return RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
+            return _login_error_redirect("different_provider")
 
         # Create or update user
         user_data = UserCreateWithProvider(
@@ -231,6 +338,12 @@ async def google_callback(
         )
 
         db_user, newly_created = user_crud.upsert_with_provider(db=db, obj_in=user_data)
+
+        if not db_user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found after creation",
+            )
 
         # Track user signup event
         if newly_created:
@@ -259,12 +372,6 @@ async def google_callback(
         user_agent = request.headers.get("user-agent")
         client_host = request.client.host if request.client else None
 
-        if not db_user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found after creation",
-            )
-
         session = user_crud.create_session(
             db=db,
             user_id=db_user.id,  # type: ignore
@@ -272,33 +379,19 @@ async def google_callback(
             ip_address=client_host,
         )
 
-        # Create redirect response
-        redirect_url = f"{client_domain}/auth/callback?success=true"
-
-        if newly_created:
-            redirect_url += "&welcome=true"
-
-        redirect_response = RedirectResponse(
-            url=redirect_url, status_code=status.HTTP_302_FOUND
+        # Recorded before responding so a replay arriving moments from now has
+        # a session to be handed rather than a signed-out page.
+        google_oauth_state_crud.attach_session(
+            db,
+            record=oauth_state,
+            session_id=session.id,  # type: ignore[arg-type]
+            was_new_user=bool(newly_created),
         )
 
-        # Set the session cookie on the redirect response
-        set_session_cookie(
-            redirect_response, token=session.token, expires_at=session.expires_at  # type: ignore
-        )
-
-        # Set a header that the frontend can use to detect successful auth
-        redirect_response.headers["X-Auth-Success"] = "true"
-
-        return redirect_response
+        return _signed_in_redirect(session, welcome=bool(newly_created))
     except Exception as e:
-        logger.error(f"Error during Google OAuth callback: {e}")
-        # Redirect to frontend with failure status
-        redirect_url = f"{client_domain}/auth/callback?success=false"
-        redirect_response = RedirectResponse(
-            url=redirect_url, status_code=status.HTTP_302_FOUND
-        )
-        return redirect_response
+        logger.error(f"Error during Google OAuth callback: {e}", exc_info=True)
+        return _login_error_redirect("authentication_error")
 
 
 @auth_router.get("/zotero/connect", response_model=ZoteroConnectResponse)

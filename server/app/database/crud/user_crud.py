@@ -144,6 +144,22 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         )
         return session
 
+    def get_session_by_id(
+        self, db: Session, *, session_id: UUID
+    ) -> Optional[DBSession]:
+        """Get an unexpired session by its id.
+
+        Used by the Google callback to hand a replayed request the session its
+        first redemption created; the expiry filter keeps that from reviving a
+        session that has since lapsed.
+        """
+        now = datetime.datetime.now(datetime.timezone.utc)
+        return (
+            db.query(DBSession)
+            .filter(DBSession.id == session_id, DBSession.expires_at > now)
+            .first()
+        )
+
     def revoke_session(self, db: Session, *, token: str) -> bool:
         """Revoke (delete) a session."""
         session = db.query(DBSession).filter(DBSession.token == token).first()

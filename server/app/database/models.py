@@ -262,6 +262,41 @@ class Session(Base):
     user = relationship("User", back_populates="sessions")
 
 
+class GoogleOAuthState(Base):
+    """One in-flight Google sign-in, from /google/login to its callback.
+
+    Two jobs. It is the CSRF check — a callback whose state we never issued is
+    not a login we started. And it makes the callback replay-safe: Google's
+    authorization codes are single-use, but the callback URL is a GET that gets
+    re-fetched by link scanners, prefetchers and the back button, so the second
+    arrival would otherwise burn a spent code against Google and show the user
+    a failure page. Consuming the state under a conditional UPDATE lets exactly
+    one request do the exchange; the rest are recognised as replays and handed
+    the session the winner created.
+    """
+
+    __tablename__ = "google_oauth_state"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    state = Column(String, unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+
+    # Set the moment a request claims this state, before the token exchange is
+    # attempted. A losing request sees it non-null and stops.
+    consumed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Filled in once the exchange succeeds, so a replay can be handed the same
+    # session rather than being left signed out. Null between claim and success.
+    session_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("sessions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    was_new_user = Column(Boolean, nullable=False, default=False)
+
+    session = relationship("Session")
+
+
 class ZoteroOAuthPending(Base):
     __tablename__ = "zotero_oauth_pending"
 
