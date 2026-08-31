@@ -179,6 +179,10 @@ class EvidenceOperations(BaseLLMClient):
             str(paper.id): {
                 "title": paper.title,
                 "length": len(str(paper.raw_content)),
+                # view_file takes line numbers, so the roster advertises the
+                # line count too: a model that knows where a paper ends stops
+                # asking for ranges past it.
+                "lines": len(str(paper.raw_content).splitlines()),
                 "keywords": [tag.name for tag in paper.tags if tag.name],  # type: ignore
                 "authors": paper.authors,
                 "published": paper.publish_date,

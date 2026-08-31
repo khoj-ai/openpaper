@@ -26,6 +26,35 @@ def _ensure_paper_in_scope(
         raise ValueError("Paper is not in the scoped set for this conversation")
 
 
+def _normalize_line_range(
+    range_start: object, range_end: object, total_lines: int
+) -> tuple[int, int]:
+    """Coerce a model-supplied line range into a valid 1-based inclusive span.
+
+    Every line number the model sees elsewhere is 1-based (search_file and
+    search_all_files both number from one), so this range is read the same way
+    rather than as a 0-based half-open slice.
+
+    Ranges are clamped rather than rejected. The investigation prompts tell the
+    model to keep reading while a results block continues, and it has no way to
+    know where a paper ends, so overshooting the last line is expected traffic
+    rather than a mistake. Refusing it costs a whole turn and teaches nothing;
+    returning the lines that do exist answers what was actually being asked.
+    """
+
+    def as_int(value: object, fallback: int) -> int:
+        try:
+            return int(value)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return fallback
+
+    start = as_int(range_start, 1)
+    end = as_int(range_end, total_lines)
+    if start > end:
+        start, end = end, start
+    return max(1, start), min(end, total_lines)
+
+
 # --------------------------------------------------------------
 # Function declarations for LLM tools related to file operations
 # --------------------------------------------------------------
@@ -78,11 +107,11 @@ view_file_function = {
             },
             "range_start": {
                 "type": "integer",
-                "description": "The starting line number (0-based index).",
+                "description": "The first line to show (1-based, inclusive). These are the same line numbers 'search_file' and 'search_all_files' report, so a search hit can be passed straight through.",
             },
             "range_end": {
                 "type": "integer",
-                "description": "The ending line number (exclusive, 0-based index).",
+                "description": "The last line to show (1-based, inclusive). Overshooting the end of the paper is fine: the range is clamped to the lines the paper actually has, and the result tells you its total length.",
             },
         },
         "required": ["paper_id", "range_start", "range_end"],
@@ -285,13 +314,22 @@ def view_file(
         raise ValueError("File content not found")
 
     lines = file_content.splitlines()
-    if range_start < 0 or range_end > len(lines) or range_start >= range_end:
-        raise ValueError("Invalid range specified")
+    total_lines = len(lines)
+    start, end = _normalize_line_range(range_start, range_end, total_lines)
 
-    all_lines = lines[range_start:range_end]
+    if start > total_lines:
+        return (
+            f"This paper is {total_lines} lines long, so there is nothing at line "
+            f"{start}. View a range within lines 1 to {total_lines}."
+        )
+
+    all_lines = lines[start - 1 : end]
     total_chunk = "\n".join(all_lines)
+    # Naming the paper's length in the header is what stops a repeat overshoot:
+    # after one view the model knows where the paper ends.
     total_chunk = (
-        f"File content from lines {range_start + 1} to {range_end}:\n\n{total_chunk}"
+        f"File content from lines {start} to {end} (of {total_lines} total):"
+        f"\n\n{total_chunk}"
     )
 
     return total_chunk
