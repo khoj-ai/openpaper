@@ -1,0 +1,18 @@
+# Dev image for the Next client, used only by docker-compose.dev.yml.
+#
+# The production Dockerfile can't be reused for local work: it bakes
+# NEXT_PUBLIC_API_URL=https://api.openpaper.ai into the bundle at build time and
+# its source-map stage needs PostHog build secrets. This image installs
+# dependencies only — source arrives via bind mount and `next dev` compiles it.
+FROM node:24-slim
+
+WORKDIR /app
+
+# Split from the source mount so the install layer is cached until the lockfile
+# changes. On a lockfile change: `scripts/dev rebuild client`.
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile
+
+EXPOSE 3000
+
+CMD ["yarn", "dev", "--hostname", "0.0.0.0", "--port", "3000"]

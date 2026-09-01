@@ -1,0 +1,7 @@
+# server/dev/ holds local development tooling — the fixture builder and anything
+# like it. None of it belongs in a shipped image.
+#
+# The Dockerfile already copies an explicit allowlist rather than the whole
+# context, so this is belt-and-braces: it keeps dev/ out even if someone later
+# replaces those COPY lines with a broad `COPY . .`.
+dev/
