@@ -239,7 +239,7 @@ use it intentionally.
   links, focus accents, and hero/marketing emphasis.
   - Light surfaces: `bg-blue-50` / `bg-blue-100`, text `text-blue-600` / `text-blue-700`.
   - Dark surfaces: `bg-blue-900` / `bg-blue-950`, text `text-blue-400` / `text-blue-300`.
-  - Gradients use the blue scale (`from-blue-500 to-blue-500`, etc.).
+  - **Flat fills only** — no gradients on brand surfaces (see §10).
 - **Neutral base is slate** (the shadcn base color), expressed through the OKLch theme tokens
   in §8 (`background`, `foreground`, `muted`, `border`). Chrome, surfaces, and body text use
   tokens — **not** raw blue. Blue is an accent on top of a neutral base, not the background.
@@ -300,6 +300,35 @@ Standard sizes:
 For icon + text, rely on the parent's flex `gap-2` (shadcn `Button` spaces SVG children
 automatically); `mr-2` is the older idiom in existing code — prefer `gap` for new work.
 Decorative icons get `aria-hidden`; icon-only buttons get an `aria-label`.
+
+**Separation & hierarchy.** Reach for the cheapest primitive that does the job, in this order:
+
+1. **Space.** Whitespace is the default separator. A larger `gap`/`space-y` between groups than
+   within them is enough to read as a group — `space-y-6` between sections, `space-y-2` inside
+   one.
+2. **Type.** Size and weight carry rank: a `font-medium` label above `text-sm` body above
+   `text-xs text-muted-foreground` metadata is a hierarchy on its own, no container needed.
+3. **Color.** `text-muted-foreground` to recede, `text-foreground` to advance. A flat
+   `bg-muted` / `bg-card` tint groups a region without drawing a line around it.
+4. **Border.** Only when a real boundary exists — a control's hit area (inputs, buttons,
+   `Card`s you can click), or a single hairline `border-b` separating stacked rows. Prefer one
+   `divide-y` on the list over a border on every child. Never nest bordered boxes inside
+   bordered boxes: if a container and its children both have borders, delete the inner ones.
+5. **Shadow.** Only for surfaces that genuinely float above the page: `Popover`,
+   `DropdownMenu`, `Dialog`, `Sheet`, `Tooltip`, and drag-in-progress items. Those come from the
+   shadcn primitives already — don't add your own. If a shadow can be deleted without losing
+   meaning, delete it.
+
+Boxing content is the last resort, not the starting point. If a section already reads as
+distinct from spacing and type, adding a border or a card around it only adds noise.
+
+**No gradients.** Fills are flat — a single token or scale color. A gradient is decoration that
+carries no meaning, it muddies text contrast, and it rarely has a correct dark-mode counterpart.
+This includes text gradients and `bg-gradient-to-*` on cards, hero sections, and buttons. The
+existing gradients (landing page, `magicui/animated-gradient-text`, `PaperCard`, `TopicBubbles`)
+are legacy — flatten them as you touch those files. The one exception is a **functional**
+gradient: a fade-to-`background` mask over scrollable or truncated content, which communicates
+"there is more here."
 
 **Motion & transitions.** Default to **`transition-colors`** or `transition-opacity` — avoid
 `transition-all` (it animates unintended properties). Durations are **200–300ms**
@@ -391,8 +420,26 @@ if we need to gate before first paint.
   `FormField` / `FormControl` / `FormMessage` compound components. Submit handlers are async
   and surface errors via `FormMessage` (field) and a toast (request).
 - **Destructive actions** go through an `AlertDialog` confirmation, never a bare button.
+- **Clarity of action.** Every screen should make the next action obvious: one primary
+  action per view (a filled `Button`; everything else is `variant="outline"`/`"ghost"`), a
+  label that names the action in verb form ("Add paper", "Run extraction" — not "Submit" or
+  "OK"), and disabled states that say *why* (tooltip or helper text), never a dead control.
+  Empty states carry the primary action, not just a message.
+- **Live updates over silent waiting.** If work takes longer than a moment, show it
+  progressing rather than a frozen spinner: stream partial results as they arrive, update
+  counts/status in place, and reflect a mutation optimistically (§6) so the UI responds
+  immediately. A long job shows *which step it's on*, not just that it's busy. Prefer
+  updating the view over asking the user to refresh.
+- **Explainability is king.** The user should always be able to see where an answer came
+  from or the status of a long-running background process. Anything the model produced — a summary, an extracted value, a chart, a table cell —
+  carries its provenance: a citation back to the source passage, the paper it came from, or
+  the code that computed it. Never present a generated number or claim as a bare fact. When
+  state changes for a non-obvious reason (a filter is active, a result was truncated, an item
+  was skipped), say so inline in plain language.
 - **Accessibility** comes from Radix primitives — prefer them over hand-rolled menus/dialogs;
   keep `aria-*` wiring the primitives provide.
+
+**Copy.** Direct and simple. Write short declarative sentences in the user's vocabulary, not ours: say what happened and what to do next. Prefer "Couldn't upload this PDF. Try again." over "An unexpected error occurred while processing your request." No exclamation marks, no apologies, no jokes, no marketing voice inside the app; sentence case for labels, buttons, and headings. Cut hedges ("please", "just", "simply") and internal jargon (job, payload, endpoint, schema) — name the thing the user sees. Errors name the failure and the recovery.
 
 ---
 
