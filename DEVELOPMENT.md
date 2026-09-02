@@ -116,7 +116,7 @@ anyone's local database.
 | `seed` | Force-restore the fixture over a dirty database |
 | `build-fixture` | Re-ingest the seed PDFs and refreeze the fixture (rare) |
 | `migrate` | Run alembic migrations |
-| `restart server` | Pick up server edits (no autoreload; client hot-reloads) |
+| `restart server` | Restart the API (it autoreloads on `server/app` edits, so this is only for env or dependency changes) |
 | `rebuild <svc>` | After a `yarn.lock` or `uv.lock` change |
 
 ### The fixture

@@ -19,10 +19,17 @@ class LLMBlockedError(Exception):
     (safety filter, recitation, prompt-level block, malformed function call).
 
     `reason` is the provider's finish reason as a bare name (e.g. "RECITATION"),
-    so callers can tell the terminal blocks apart from the one that isn't:
-    recitation depends on the sampled continuation, not on anything stable about
-    the request.
+    so callers can tell the terminal blocks apart from the ones that aren't:
+    some verdicts depend on the sampled continuation, not on anything stable
+    about the request.
     """
+
+    # Verdicts that are a property of the draw rather than of the request, so a
+    # fresh sample usually clears them. RECITATION fires when a continuation
+    # wanders into memorized text. MALFORMED_FUNCTION_CALL fires when the model
+    # emits a function call the request never offered it — which, on a request
+    # carrying no tools at all, is purely a sampling accident.
+    RESAMPLABLE_REASONS = frozenset({"RECITATION", "MALFORMED_FUNCTION_CALL"})
 
     def __init__(self, message: str, reason: str | None = None):
         super().__init__(message)
@@ -31,6 +38,19 @@ class LLMBlockedError(Exception):
     @property
     def is_recitation(self) -> bool:
         return self.reason == "RECITATION"
+
+    @property
+    def is_resamplable(self) -> bool:
+        return self.reason in self.RESAMPLABLE_REASONS
+
+
+class EmptyStreamError(Exception):
+    """A stream finished cleanly without producing any answer text.
+
+    Distinct from LLMBlockedError: nothing refused the request. The model ran
+    out of output budget mid-thought, or stopped with nothing visible to show.
+    Re-issuing the request is worth a try.
+    """
 
 
 # Exceptions that should trigger a retry with backoff. LLMBlockedError is
@@ -142,6 +162,11 @@ RETRYABLE_STREAM_EXCEPTIONS = (
 )
 
 
+# What a re-issued request can plausibly fix: the connection died with bytes
+# still owed, or the stream ran to completion having produced nothing to read.
+RETRYABLE_STREAM_FAILURES = RETRYABLE_STREAM_EXCEPTIONS + (EmptyStreamError,)
+
+
 class _StreamRestart:
     """Marker yielded when a dropped stream is being retried from scratch."""
 
@@ -158,6 +183,7 @@ async def stream_with_retry(
     max_retries: int = 2,
     delay: float = 1.0,
     description: str = "stream",
+    on_complete: Callable[[], None] | None = None,
 ) -> AsyncIterator[Any]:
     """Iterate an upstream LLM stream, re-issuing the whole request if the
     connection drops mid-body.
@@ -170,6 +196,14 @@ async def stream_with_retry(
     text, not a continuation — so when chunks were already emitted before the
     drop, STREAM_RESTART is yielded first. Callers must treat it as "discard
     everything received so far"; what follows is a complete replacement answer.
+
+    `on_complete` runs after a stream ends without a transport error, and is
+    where the caller decides whether what arrived was actually an answer. A
+    stream can finish cleanly having produced nothing a reader can see — every
+    part a thought, a recitation verdict, an output budget spent before the
+    first visible token — and without this hook that is indistinguishable from
+    a model that chose to say nothing. Raising from it re-enters the retry
+    logic below.
     """
     for attempt in range(max_retries + 1):
         emitted = False
@@ -178,11 +212,27 @@ async def stream_with_retry(
             async for chunk in stream:
                 emitted = True
                 yield chunk
+            if on_complete is not None:
+                on_complete()
             return
-        except RETRYABLE_STREAM_EXCEPTIONS as e:
+        except LLMBlockedError as e:
+            # Some verdicts are a property of the sampled continuation, not of
+            # the request, so one fresh draw usually clears them. The rest —
+            # safety, blocklist, prohibited content — are stable, and
+            # re-sampling only burns time and tokens.
+            if not e.is_resamplable or attempt >= max_retries:
+                raise
+            logger.warning(
+                f"{description}: {e.reason} block after emitting={emitted}. "
+                f"Resampling {attempt+1}/{max_retries}."
+            )
+            await asyncio.sleep(delay * (2**attempt) * (0.5 + 0.5 * random.random()))
+            if emitted:
+                yield STREAM_RESTART
+        except RETRYABLE_STREAM_FAILURES as e:
             if attempt >= max_retries:
                 logger.error(
-                    f"{description}: stream dropped after {max_retries} retries: "
+                    f"{description}: stream failed after {max_retries} retries: "
                     f"{type(e).__name__}: {e}",
                     exc_info=e,
                 )
@@ -190,7 +240,7 @@ async def stream_with_retry(
 
             backoff_time = delay * (2**attempt) * (0.5 + 0.5 * random.random())
             logger.warning(
-                f"{description}: stream dropped ({type(e).__name__}: {str(e)[:120]}) "
+                f"{description}: stream failed ({type(e).__name__}: {str(e)[:120]}) "
                 f"after emitting={emitted}. Retry {attempt+1}/{max_retries} "
                 f"in {backoff_time:.2f}s"
             )

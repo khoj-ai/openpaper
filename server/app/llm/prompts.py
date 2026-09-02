@@ -126,8 +126,53 @@ You are in normal mode. Provide a balanced response to the user's question. Incl
 # ---------------------------------------------------------------------
 # Multi-paper operations related prompts
 # ---------------------------------------------------------------------
+# The two models in a turn — the one that gathers and the one that answers —
+# are given the same sentence about what they are looking at, so an answer
+# cannot describe a different container than the search covered.
+#
+# It matters because the user's own words are relative. "These papers", "this
+# project", "all of them" have no referent unless the model is told what set it
+# holds. CHART_SCOPE_SYSTEM_PROMPT has spelled this out for the chart agent for
+# a while; the chat loop used to say "the library" even inside a project.
+PROJECT_SCOPE = (
+    "The {n_papers} paper(s) listed below are everything this conversation "
+    'covers. The user has gathered them in a project they named "{project_title}". '
+    'Read an unqualified reference — "these papers", "this project", "all of '
+    'them", or no reference at all — as the whole set: never a subset, and never '
+    "their wider library."
+)
+
+LIBRARY_SCOPE = (
+    "The {n_papers} paper(s) listed below are everything this conversation "
+    "covers: the user's whole library. Read an unqualified reference — \"these "
+    'papers", "my papers", or no reference at all — as the whole set.'
+)
+
+MENTIONED_SCOPE = (
+    "The {n_papers} paper(s) listed below are everything this conversation "
+    "covers; the user narrowed it to them by name. Nothing outside the set is "
+    "available, and nothing outside it should be discussed."
+)
+
+
+def format_scope(
+    n_papers: int,
+    project_title: str | None = None,
+    is_mention_scoped: bool = False,
+) -> str:
+    """The one sentence both models get about what they are looking at."""
+    if is_mention_scoped:
+        return MENTIONED_SCOPE.format(n_papers=n_papers)
+    if project_title:
+        return PROJECT_SCOPE.format(project_title=project_title, n_papers=n_papers)
+    return LIBRARY_SCOPE.format(n_papers=n_papers)
+
+
 EVIDENCE_GATHERING_SYSTEM_PROMPT = """
 You are a systematic research assistant specializing in academic evidence synthesis. Your task is to strategically use the available tools to gather relevant evidence from academic papers to comprehensively answer user questions.
+
+## Scope
+{scope}
 
 ## Available Papers:
 {available_papers}
@@ -159,6 +204,8 @@ You are on iteration {n_iteration} of {max_iterations} allowed
 - `STOP`: Signal completion when you have gathered sufficient evidence
 
 **Tool Selection Guidelines:**
+- Let the size of the set above shape the plan. A handful of papers can each be read directly — reading every abstract is a reasonable opening move. A large one has to be narrowed by search first
+- A question about the set as a whole ("key takeaways", "how do these compare", "what should I understand") has no single term to search for. Cover the set rather than hunting for a phrase: read the abstracts, then follow the specifics each one raises
 - Start broad with `search_all_files` to identify which papers are relevant
 - Use `read_abstract` to quickly assess papers before diving deeper
 - Use `search_file` with well-crafted regex queries to find specific information
@@ -249,9 +296,17 @@ Return them in the `keywords` field of the JSON object.
 """
 
 ANSWER_EVIDENCE_BASED_QUESTION_SYSTEM_PROMPT = """
-You are an excellent researcher who provides precise, evidence-based answers from academic papers. Your responses must always include specific text evidence from the paper. You give holistic answers, not just snippets. Help the user understand the content across a library of papers. Your answers should be clear, concise, and informative.
+You are an excellent researcher who provides precise, evidence-based answers from academic papers. Your responses must always include specific text evidence from the paper. You give holistic answers, not just snippets. Help the user understand the content across a set of papers. Your answers should be clear, concise, and informative.
 
-These are the papers available in the library:
+## Scope
+{scope}
+
+Scope is context for reading the question, not a subject to write about. The user
+can see what they gave you, so do not open by naming the project, counting the
+papers, or announcing what the set is. Write as though the framing is understood
+and go straight to the substance.
+
+These are the papers in scope:
 {available_papers}
 
 You will receive collected evidence from a research assistant in a <collected_evidence> block within the user's message. This evidence has been gathered from the papers above. Use it to inform your answer to the user's question.

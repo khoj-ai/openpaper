@@ -43,6 +43,11 @@ message_router = APIRouter()
 
 END_DELIMITER = "END_OF_STREAM"
 
+ANSWER_FAILED_MESSAGE = (
+    "I ran into a problem writing this response. Please try asking again — if it "
+    "keeps happening, contact support (saba@openpaper.ai)."
+)
+
 
 def _append_status(messages: Optional[List[str]], message: str) -> None:
     """Append a status message, collapsing consecutive duplicates (e.g. heartbeats)."""
@@ -58,8 +63,14 @@ async def _stream_chat_chunks(
     evidence_container: dict,
     artifacts: Optional[List] = None,
     status_messages: Optional[List[str]] = None,
+    errors: Optional[List[str]] = None,
 ) -> AsyncGenerator[str, None]:
-    """Helper to stream chat chunks and handle common logic."""
+    """Helper to stream chat chunks and handle common logic.
+
+    Anything appended to `errors` has already been reported to the client, so
+    the caller can tell a turn that failed loudly from one that simply ended
+    with nothing to show.
+    """
     async for chunk in chunk_generator:
         if not isinstance(chunk, dict):
             logger.warning(f"Received unexpected chunk format: {chunk}")
@@ -119,6 +130,15 @@ async def _stream_chat_chunks(
         elif chunk_type == "status":
             _append_status(status_messages, chunk_content)
             yield f"{json.dumps({'type': 'status', 'content': chunk_content})}{END_DELIMITER}"
+        elif chunk_type == "error":
+            # The answer stream failed. Forwarding this is what turns a blank
+            # message into something the user can act on — the client renders
+            # it and stops the turn. Dropping it here left the two
+            # indistinguishable.
+            logger.error(f"Error while streaming the answer: {chunk_content}")
+            if errors is not None:
+                errors.append(str(chunk_content))
+            yield f"{json.dumps({'type': 'error', 'content': chunk_content})}{END_DELIMITER}"
 
 
 @message_router.get("/models")
@@ -277,6 +297,7 @@ async def chat_message_multipaper(
                 content_chunks = []
                 artifacts_collected: List[dict] = []
                 status_messages: List[str] = []
+                stream_errors: List[str] = []
                 start_time = datetime.now(timezone.utc)
                 evidence_container = {"evidence": None}
                 evidence_collection: Optional[EvidenceCollection] = None
@@ -412,6 +433,8 @@ async def chat_message_multipaper(
                     current_user=current_user,
                     all_papers=all_papers,
                     mentioned_highlights=mentioned_highlights,
+                    project_title=str(project.title) if request.project_id else None,
+                    is_mention_scoped=scoped_paper_ids is not None,
                     db=db,
                 )
                 async for stream_chunk in _stream_chat_chunks(
@@ -420,6 +443,7 @@ async def chat_message_multipaper(
                     evidence_container=evidence_container,
                     artifacts=artifacts_collected,
                     status_messages=status_messages,
+                    errors=stream_errors,
                 ):
                     yield stream_chunk
 
@@ -427,6 +451,37 @@ async def chat_message_multipaper(
 
                 # Save the complete message to the database
                 full_content = "".join(content_chunks)
+
+                # An answer that produced no text is a failure, not a turn.
+                # Persisting it puts a blank bubble in the thread and — worse —
+                # replays an empty model part into the history of every later
+                # turn in this conversation, which visibly degrades them. Say
+                # what happened instead and leave the thread as it was.
+                if not full_content.strip() and not artifacts_collected:
+                    logger.error(
+                        "Answer stream produced no content for conversation %s; "
+                        "not saving an empty turn.",
+                        request.conversation_id,
+                    )
+                    # Counted as well as logged. This failure used to be
+                    # invisible from every direction — nothing raised, the
+                    # request returned 200, and the only trace was a blank row
+                    # that looked like a real message. A metric is what makes a
+                    # regression here noticeable before a user reports it.
+                    track_event(
+                        "chat_answer_empty",
+                        properties={
+                            "had_stream_error": bool(stream_errors),
+                            "has_evidence": bool(evidence),
+                            "type": conversation.conversable_type,
+                            "project_id": request.project_id,
+                        },
+                        user_id=str(current_user.id),
+                        db=db,
+                    )
+                    if not stream_errors:
+                        yield f"{json.dumps({'type': 'error', 'content': ANSWER_FAILED_MESSAGE})}{END_DELIMITER}"
+                    return
 
                 assistant_trace = (
                     evidence_collection.to_trace_dict() if evidence_collection else None
@@ -628,6 +683,7 @@ async def chat_message_stream(
         async def response_generator():
             try:
                 content_chunks = []
+                stream_errors: List[str] = []
                 start_time = datetime.now(timezone.utc)
                 evidence_container = {"evidence": None}
 
@@ -646,6 +702,7 @@ async def chat_message_stream(
                     chunk_generator=chat_generator,
                     content_chunks=content_chunks,
                     evidence_container=evidence_container,
+                    errors=stream_errors,
                 ):
                     yield chunk
 
@@ -653,6 +710,31 @@ async def chat_message_stream(
 
                 # Save the complete message to the database
                 full_content = "".join(content_chunks)
+
+                # An answer that produced no text is a failure, not a turn.
+                # Persisting it puts a blank bubble in the thread and — worse —
+                # replays an empty model part into the history of every later
+                # turn in this conversation, which visibly degrades them. Say
+                # what happened instead and leave the thread as it was.
+                if not full_content.strip():
+                    logger.error(
+                        "Answer stream produced no content for conversation %s; "
+                        "not saving an empty turn.",
+                        request.conversation_id,
+                    )
+                    track_event(
+                        "chat_answer_empty",
+                        properties={
+                            "had_stream_error": bool(stream_errors),
+                            "has_evidence": bool(evidence),
+                            "type": "paper",
+                        },
+                        user_id=str(current_user.id),
+                        db=db,
+                    )
+                    if not stream_errors:
+                        yield f"{json.dumps({'type': 'error', 'content': ANSWER_FAILED_MESSAGE})}{END_DELIMITER}"
+                    return
 
                 formatted_references = (
                     CitationHandler.convert_references_to_dict(

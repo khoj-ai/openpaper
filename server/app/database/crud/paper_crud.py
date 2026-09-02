@@ -641,16 +641,25 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
             FROM paper_passages pp
             JOIN papers p ON p.id = pp.paper_id
             WHERE pp.ts_vector @@ ({fts_query_clause})
-              AND p.user_id = :user_id
         """
 
-        params: dict = {"user_id": user.id}
+        params: dict = {}
         for i, term in enumerate(search_terms):
             params[f"term_{i}"] = term
 
         if paper_ids:
+            # An explicit paper set has already been authorized by the caller —
+            # project membership, or a resolved @-mention scope — and those
+            # papers are not necessarily the caller's own. Narrowing again by
+            # owner is what made this search return nothing on a shared
+            # project while every other tool read the same papers fine.
             sql += " AND pp.paper_id = ANY(:paper_ids)"
             params["paper_ids"] = paper_ids
+        else:
+            # No explicit set: the search is over the whole library, and
+            # ownership is the only thing scoping it.
+            sql += " AND p.user_id = :user_id"
+            params["user_id"] = user.id
 
         sql += " ORDER BY pp.paper_id, pp.start_line"
 

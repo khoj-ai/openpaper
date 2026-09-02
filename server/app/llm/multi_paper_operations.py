@@ -19,6 +19,7 @@ from app.llm.prompts import (
     ANSWER_EVIDENCE_BASED_QUESTION_MESSAGE,
     ANSWER_EVIDENCE_BASED_QUESTION_SYSTEM_PROMPT,
     GENERATE_MULTI_PAPER_NARRATIVE_SUMMARY,
+    format_scope,
 )
 from app.llm.provider import LLMProvider, StreamChunk, SupplementaryContent, TextContent
 from app.llm.utils import retry_llm_operation
@@ -48,10 +49,17 @@ class MultiPaperOperations(EvidenceOperations):
         llm_provider: Optional[LLMProvider] = None,
         user_references: Optional[Sequence[str]] = None,
         mentioned_highlights: Optional[List[dict]] = None,
+        project_title: Optional[str] = None,
+        is_mention_scoped: bool = False,
         db: Session = Depends(get_db),
     ) -> AsyncGenerator[Union[str, dict], None]:
         """
         Chat with everything in the user's knowledge base using the specified model
+
+        `project_title` and `is_mention_scoped` describe the set of papers this
+        answer is being written about. They are the same inputs the gathering
+        loop was given, so the answer names the container the search actually
+        covered — a project by its title rather than "the library".
         """
         user_citations = (
             CitationHandler.convert_references_to_citations(user_references)
@@ -72,6 +80,11 @@ class MultiPaperOperations(EvidenceOperations):
         logger.debug(f"Evidence gathered: {evidence_gathered.get_evidence_dict()}")
 
         formatted_system_prompt = ANSWER_EVIDENCE_BASED_QUESTION_SYSTEM_PROMPT.format(
+            scope=format_scope(
+                n_papers=len(all_papers),
+                project_title=project_title,
+                is_mention_scoped=is_mention_scoped,
+            ),
             available_papers=formatted_paper_options,
         )
 
