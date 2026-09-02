@@ -103,11 +103,25 @@ setup_admin(app)  # Setup admin interface
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
+
+    # Production never reaches this block: the image's CMD is gunicorn, which
+    # imports `app.main:app` and never runs __main__. So the reloader is
+    # dev-only by construction. It is still gated on an env var rather than
+    # switched on outright, because start.sh routes the uncontainerized
+    # `uv run start` through here too, and that is someone's own setup to
+    # decide about. The containerized stack sets UVICORN_RELOAD itself.
+    reload = os.getenv("UVICORN_RELOAD", "").strip().lower() in {"1", "true", "yes"}
+
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
         port=port,
-        # reload=True,
+        reload=reload,
+        # Only the application package. The server directory also holds eval
+        # fixtures, dev tooling and tests — none of them should trigger a
+        # restart, and the seed PDFs would make the watcher needlessly
+        # expensive.
+        reload_dirs=[os.path.dirname(os.path.abspath(__file__))] if reload else None,
         log_level="debug",  # Set higher log level to see more details
         log_config=None,  # Keep the handlers configure_logging() installed
         forwarded_allow_ips="*",  # Allow all forwarded IPs

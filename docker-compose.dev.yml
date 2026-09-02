@@ -107,8 +107,7 @@ services:
     build:
       context: ./server
     # python -m app.main runs uvicorn directly (readable single-process logs),
-    # where prod runs gunicorn. There is no autoreload: after editing server
-    # code, `scripts/dev restart server`.
+    # where prod runs gunicorn.
     command: ["python3", "-m", "app.main"]
     env_file: [server/.env]
     environment:
@@ -140,6 +139,18 @@ services:
       ZOTERO_REDIRECT_URI: http://${DEV_HOST:-127.0.0.1}:${SERVER_PORT:-8100}/api/auth/zotero/callback
       LANGFUSE_TRACING_ENVIRONMENT: local-docker
       DEBUG: "True"
+      # Autoreload. server/ is bind-mounted, so edits are live in the container
+      # immediately — but the uvicorn process keeps whatever it imported at
+      # start. Without this, anything exercised through the HTTP API runs stale
+      # code until `scripts/dev restart server`, while `scripts/dev exec` spawns
+      # a fresh process and looks perfectly fine. That asymmetry is a
+      # verification trap, not a convenience problem: an agent can watch tests
+      # pass against code the running app is not serving.
+      #
+      # It works over the bind mount only because watchfiles is not installed,
+      # so uvicorn falls back to StatReload and polls mtimes. inotify events do
+      # not cross a macOS bind mount, so the faster watcher would see nothing.
+      UVICORN_RELOAD: "True"
     ports:
       - "${SERVER_PORT:-8100}:8000"
     volumes:
