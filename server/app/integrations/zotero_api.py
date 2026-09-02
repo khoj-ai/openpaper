@@ -4,12 +4,26 @@ import time
 from typing import Any, Dict, List, Optional
 
 import requests
+from app.helpers.http_retry import is_retryable_status
 
 logger = logging.getLogger(__name__)
 
 ZOTERO_API_BASE = "https://api.zotero.org"
 MAX_RETRIES = 3
 IMPORTABLE_ITEM_TYPES = ("journalArticle", "conferencePaper", "preprint")
+
+
+class ZoteroFileNotStoredError(Exception):
+    """An attachment's file is not retrievable from Zotero File Storage.
+
+    Zotero's ``linkMode`` only records that the user stored a copy of the file,
+    not that the bytes reached Zotero's servers. Files synced over WebDAV, never
+    uploaded, or blocked by a full storage quota keep ``imported_file`` and 404
+    on the file endpoint — the API docs note a file "may be available only via
+    WebDAV, not via Zotero File Storage, and it is up to the client how to
+    proceed". This is an expected account state, not a bug, so it is raised
+    distinctly to let callers explain it rather than reporting a generic failure.
+    """
 
 
 class ZoteroApiClient:
@@ -77,8 +91,10 @@ class ZoteroApiClient:
                 # raise_for_status()'s message omits the response body, which is
                 # where Zotero explains *why* the call failed — capture it here.
                 resp = getattr(e, "response", None)
-                status = resp.status_code if resp is not None else "no response"
+                status_code = resp.status_code if resp is not None else None
+                status = status_code if status_code is not None else "no response"
                 body = resp.text[:500] if resp is not None and resp.text else ""
+                retryable = is_retryable_status(status_code)
                 logger.warning(
                     "Zotero API request failed: %s %s -> %s (attempt %d/%d): %s%s",
                     method,
@@ -89,6 +105,12 @@ class ZoteroApiClient:
                     e,
                     f" | body: {body}" if body else "",
                 )
+                # A 4xx describes a request that is wrong on its own terms — most
+                # often a 404 for an attachment whose file was never uploaded to
+                # Zotero File Storage. Retrying only multiplies the latency of a
+                # bulk import and turns an expected data condition into an ERROR.
+                if not retryable:
+                    raise
                 if attempt < MAX_RETRIES - 1:
                     time.sleep(2**attempt)
         logger.error(
@@ -280,7 +302,13 @@ class ZoteroApiClient:
 
     def download_attachment_file(self, attachment_key: str) -> bytes:
         url = f"{self._user_base}/items/{attachment_key}/file"
-        response = self._request("GET", url, stream=True)
+        try:
+            response = self._request("GET", url, stream=True)
+        except requests.HTTPError as e:
+            resp = getattr(e, "response", None)
+            if resp is not None and resp.status_code == 404:
+                raise ZoteroFileNotStoredError(attachment_key) from e
+            raise
         return response.content
 
     @staticmethod
