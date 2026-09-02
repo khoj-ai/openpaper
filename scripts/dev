@@ -222,13 +222,18 @@ cmd_build_fixture() {
     compose up -d
     wait_for_server || die "server never came up; cannot build the fixture"
     compose exec -T server python dev/build_dev_fixture.py
-    # The builder clears its own session, but anything minted by hand in the
-    # meantime would otherwise be frozen into a dump that ships in git. Whatever
-    # is in the database at this moment becomes a committed artifact, so the
-    # guarantee that it holds no credentials belongs here, at the dump.
-    echo "clearing sessions before freeze"
+    # Whatever is in the database at this moment becomes a committed artifact,
+    # so both cleanups belong here, at the dump:
+    #  - sessions: the builder clears its own, but one minted by hand in the
+    #    meantime would be frozen in, and a committed token is a credential.
+    #  - cached_presigned_url: baked URLs expire 24h after the build, so a
+    #    fixture restored later serves dead links. Nulling them makes the server
+    #    mint a fresh URL on demand — which also sidesteps any stale CDN cache,
+    #    since a new signature is a new cache key.
+    echo "clearing sessions and cached presigned URLs before freeze"
     compose exec -T postgres psql -U postgres -d "$DB_NAME" -v ON_ERROR_STOP=1 -q \
-        -c "DELETE FROM sessions;" >/dev/null
+        -c "DELETE FROM sessions;" \
+        -c "UPDATE papers SET cached_presigned_url = NULL, presigned_url_expires_at = NULL;" >/dev/null
     echo "freezing -> $SEED_FILE"
     compose exec -T postgres pg_dump \
         -U postgres -d "$DB_NAME" -Fc --no-owner --no-privileges \
