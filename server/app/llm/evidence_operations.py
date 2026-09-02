@@ -28,6 +28,7 @@ from app.llm.prompts import (
     EVIDENCE_GATHERING_SYSTEM_PROMPT,
     KEYWORD_EXTRACTION_PROMPT,
     TOOL_RESULT_COMPACTION_PROMPT,
+    format_scope,
 )
 from app.llm.provider import LLMProvider, TextContent
 from app.llm.tools.file_tools import (
@@ -71,6 +72,11 @@ HEARTBEAT_INTERVAL_SECONDS = (
 )
 
 _tool_executor = ThreadPoolExecutor(max_workers=4)
+
+# How many papers the abstract fallback will read. Generous enough to cover a
+# normal project whole, bounded so a large library cannot blow the answer
+# model's context on a question that already failed to retrieve anything.
+ABSTRACT_FALLBACK_PAPER_LIMIT = 30
 
 # Structured-output schema for the fallback keyword extractor — provider
 # constrains the response to this shape so we never have to scrape JSON out of
@@ -152,7 +158,7 @@ class EvidenceOperations(BaseLLMClient):
         n_iterations = 0
         max_iterations = 4
 
-        project_title = "Project"
+        project_title: Optional[str] = None
         if project_id:
             project = project_crud.get(db, id=project_id, user=current_user)
             if not project:
@@ -174,6 +180,15 @@ class EvidenceOperations(BaseLLMClient):
         if restrict_to_paper_ids is not None:
             allowed_ids = set(restrict_to_paper_ids)
             all_papers = [paper for paper in all_papers if str(paper.id) in allowed_ids]
+
+        # Both models in this turn are told the same thing about what set they
+        # hold, so the answer cannot describe a different container than the
+        # search covered.
+        scope = format_scope(
+            n_papers=len(all_papers),
+            project_title=project_title,
+            is_mention_scoped=restrict_to_paper_ids is not None,
+        )
 
         formatted_paper_options = {
             str(paper.id): {
@@ -252,6 +267,7 @@ class EvidenceOperations(BaseLLMClient):
                 )
 
             evidence_gathering_prompt = EVIDENCE_GATHERING_SYSTEM_PROMPT.format(
+                scope=scope,
                 available_papers=formatted_paper_options,
                 n_iteration=n_iterations,
                 max_iterations=max_iterations,
@@ -346,7 +362,7 @@ class EvidenceOperations(BaseLLMClient):
                         yield {
                             "type": "status",
                             "content": (
-                                f"Initiated chart creation for - {project_title}"
+                                f"Initiated chart creation for - {project_title or 'your library'}"
                                 if fn_name == "create_chart_artifact"
                                 else f"{pretty_fn_name} - {paper_name}{display_query}"
                             ),
@@ -524,6 +540,55 @@ class EvidenceOperations(BaseLLMClient):
                     user_id=str(current_user.id),
                     db=db,
                 )
+
+        # Last resort: the papers themselves.
+        #
+        # Everything above is retrieval — it finds passages by matching terms
+        # against them. That is the wrong shape for the question this whole
+        # feature exists to answer. "What are the key takeaways across these
+        # papers", "how do they differ" — there is no term to match, the search
+        # returns nothing, and the turn ends by telling the user their project
+        # has no relevant papers while their papers sit right there.
+        #
+        # So when search comes up empty on a question scoped to a known set of
+        # papers, hand over what the papers say about themselves. Abstracts are
+        # the papers' own text, not a summary this model invented, which keeps
+        # the answer grounded in the same way a retrieved passage is.
+        if (
+            not evidence_collection.has_evidence()
+            and not evidence_collection.get_artifacts()
+            and not evidence_collection.get_chart_jobs()
+            and all_papers
+        ):
+            logger.info(
+                "Search found nothing for %d in-scope paper(s); falling back to "
+                "their abstracts.",
+                len(all_papers),
+            )
+            yield {
+                "type": "status",
+                "content": "Reading the papers in scope...",
+            }
+
+            for paper in all_papers[:ABSTRACT_FALLBACK_PAPER_LIMIT]:
+                abstract = str(paper.abstract).strip() if paper.abstract else ""
+                if not abstract:
+                    continue
+                evidence_collection.add_evidence(
+                    str(paper.id),
+                    f"Abstract of '{paper.title}':\n\n{abstract}",
+                )
+
+            track_event(
+                "abstract_fallback",
+                {
+                    "papers_in_scope": len(all_papers),
+                    "papers_with_abstracts": len(evidence_collection.evidence),
+                    "project_type": project_id is not None,
+                },
+                user_id=str(current_user.id),
+                db=db,
+            )
 
         # Compact evidence if it exceeds the limit for chat response
         evidence_size = evidence_collection.get_evidence_size()
