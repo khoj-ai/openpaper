@@ -11,7 +11,12 @@ import anthropic
 import openai
 from app.database.models import Message
 from app.llm.citation_handler import CitationHandler
-from app.llm.utils import STREAM_RESTART, LLMBlockedError, stream_with_retry
+from app.llm.utils import (
+    STREAM_RESTART,
+    EmptyStreamError,
+    LLMBlockedError,
+    stream_with_retry,
+)
 from app.schemas.responses import (
     FileContent,
     SupplementaryContent,
@@ -192,6 +197,20 @@ def _sanitize_schema_for_gemini(schema: Any) -> Any:
     return schema
 
 
+# Finish reasons where the model landed on a verdict rather than failing. Some
+# of them are stable properties of the request and re-asking only burns tokens;
+# the rest depend on which continuation got sampled. LLMBlockedError.reason
+# carries the distinction (see is_resamplable).
+BLOCKED_FINISH_REASONS = {
+    FinishReason.SAFETY,
+    FinishReason.RECITATION,
+    FinishReason.BLOCKLIST,
+    FinishReason.PROHIBITED_CONTENT,
+    FinishReason.SPII,
+    FinishReason.MALFORMED_FUNCTION_CALL,
+}
+
+
 class GeminiProvider(BaseLLMProvider):
     """Gemini LLM provider implementation"""
 
@@ -331,16 +350,6 @@ class GeminiProvider(BaseLLMProvider):
     def _raise_for_empty_response(
         response: Optional[GenerateContentResponse], model: str
     ) -> None:
-        # Non-retryable finish reasons: retrying won't change the outcome.
-        BLOCKED_REASONS = {
-            FinishReason.SAFETY,
-            FinishReason.RECITATION,
-            FinishReason.BLOCKLIST,
-            FinishReason.PROHIBITED_CONTENT,
-            FinishReason.SPII,
-            FinishReason.MALFORMED_FUNCTION_CALL,
-        }
-
         if response is None:
             raise ValueError(f"No response object from Gemini ({model})")
 
@@ -373,7 +382,7 @@ class GeminiProvider(BaseLLMProvider):
             f"thought_only={thought_only}"
         )
 
-        if finish_reason in BLOCKED_REASONS:
+        if finish_reason in BLOCKED_FINISH_REASONS:
             raise LLMBlockedError(
                 f"Gemini declined to answer ({model}): {detail}",
                 reason=getattr(finish_reason, "name", str(finish_reason)),
@@ -408,7 +417,17 @@ class GeminiProvider(BaseLLMProvider):
             history=history, new_message=message, file=file
         )
 
+        # `chunk.text` skips thought parts and function-call parts, so a stream
+        # can run to completion and hand the caller nothing at all. Without
+        # this tally the caller cannot tell that apart from a model that
+        # answered with silence, and the user gets a blank message with no
+        # error raised anywhere.
+        state: Dict[str, Any] = {"saw_text": False, "finish_reason": None}
+
         async def open_stream():
+            # A retry re-opens the stream, so what the previous attempt
+            # produced stops counting.
+            state.update(saw_text=False, finish_reason=None)
             return await self.client.aio.models.generate_content_stream(
                 model=model,
                 contents=contents,
@@ -416,8 +435,15 @@ class GeminiProvider(BaseLLMProvider):
                 **kwargs,
             )
 
+        def raise_if_no_answer() -> None:
+            if state["saw_text"]:
+                return
+            self._raise_for_empty_stream(state["finish_reason"], model)
+
         async for chunk in stream_with_retry(
-            open_stream, description=f"gemini/{model}"
+            open_stream,
+            description=f"gemini/{model}",
+            on_complete=raise_if_no_answer,
         ):
             if chunk is STREAM_RESTART:
                 yield StreamChunk(
@@ -428,14 +454,44 @@ class GeminiProvider(BaseLLMProvider):
                 )
                 continue
 
+            for candidate in getattr(chunk, "candidates", None) or []:
+                finish_reason = getattr(candidate, "finish_reason", None)
+                if finish_reason:
+                    state["finish_reason"] = finish_reason
+
+            text = chunk.text if chunk.text else ""
+            if text:
+                state["saw_text"] = True
+
             yield StreamChunk(
-                text=chunk.text if chunk.text else "",
+                text=text,
                 model=model,
                 provider=LLMProvider.GEMINI,
                 is_done=False,
             )
             if chunk.usage_metadata:
                 logger.debug(f"Gemini usage stats: {chunk.usage_metadata}")
+
+    @staticmethod
+    def _raise_for_empty_stream(finish_reason: Any, model: str) -> None:
+        """Classify a stream that ended having produced no answer text.
+
+        The same split the non-streaming path makes: a verdict the model
+        landed on is an LLMBlockedError, whose reason decides whether a fresh
+        draw is worth taking. Anything else — an exhausted output budget, a
+        bare STOP with nothing to show — is a transient miss worth re-issuing.
+        """
+        detail = f"finish_reason={finish_reason}"
+
+        if finish_reason in BLOCKED_FINISH_REASONS:
+            raise LLMBlockedError(
+                f"Gemini declined to answer ({model}): {detail}",
+                reason=getattr(finish_reason, "name", str(finish_reason)),
+            )
+
+        raise EmptyStreamError(
+            f"Gemini stream produced no answer text ({model}): {detail}"
+        )
 
     def _prepare_gemini_messages(
         self,
@@ -727,7 +783,13 @@ class OpenAIProvider(BaseLLMProvider):
         """Send streaming message to OpenAI"""
         messages = self._prepare_openai_messages(history, message, system_prompt, file)
 
+        # Same tally the Gemini path keeps: a stream that ends having produced
+        # no text is a failure, and returning it quietly hands the user a blank
+        # message with nothing raised anywhere.
+        state = {"saw_text": False}
+
         async def open_stream():
+            state["saw_text"] = False
             return await self._async_client.chat.completions.create(
                 model=model,
                 messages=messages,
@@ -736,8 +798,16 @@ class OpenAIProvider(BaseLLMProvider):
                 **kwargs,
             )
 
+        def raise_if_no_answer() -> None:
+            if not state["saw_text"]:
+                raise EmptyStreamError(
+                    f"OpenAI stream produced no answer text ({model})"
+                )
+
         async for chunk in stream_with_retry(
-            open_stream, description=f"openai/{model}"
+            open_stream,
+            description=f"openai/{model}",
+            on_complete=raise_if_no_answer,
         ):
             if chunk is STREAM_RESTART:
                 yield StreamChunk(
@@ -749,6 +819,7 @@ class OpenAIProvider(BaseLLMProvider):
                 continue
 
             if chunk.choices and chunk.choices[0].delta.content:
+                state["saw_text"] = True
                 yield StreamChunk(
                     text=chunk.choices[0].delta.content,
                     model=model,
@@ -1096,7 +1167,11 @@ class AnthropicProvider(BaseLLMProvider):
 
         params.update(kwargs)
 
+        state = {"saw_text": False}
+
         async def open_stream():
+            state["saw_text"] = False
+
             async def text_chunks():
                 async with self._async_client.messages.stream(**params) as stream:
                     async for text in stream.text_stream:
@@ -1109,8 +1184,16 @@ class AnthropicProvider(BaseLLMProvider):
 
             return text_chunks()
 
+        def raise_if_no_answer() -> None:
+            if not state["saw_text"]:
+                raise EmptyStreamError(
+                    f"Anthropic stream produced no answer text ({model})"
+                )
+
         async for text in stream_with_retry(
-            open_stream, description=f"anthropic/{model}"
+            open_stream,
+            description=f"anthropic/{model}",
+            on_complete=raise_if_no_answer,
         ):
             if text is STREAM_RESTART:
                 yield StreamChunk(
@@ -1120,6 +1203,9 @@ class AnthropicProvider(BaseLLMProvider):
                     is_restart=True,
                 )
                 continue
+
+            if text:
+                state["saw_text"] = True
 
             yield StreamChunk(
                 text=text,
