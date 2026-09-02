@@ -1,0 +1,402 @@
+#!/usr/bin/env bash
+#
+# Entry point for the containerized dev stack (docker-compose.dev.yml).
+#
+# This is the interface agents and humans should use. Prefer these subcommands
+# over raw `docker compose`: the published-port wiring lives here, and the
+# compose file's defaults are only coherent when every port variable is set
+# together. `scripts/dev help` lists everything.
+#
+# The stack is disposable by design. Nothing here touches the uncontainerized
+# services you run by hand, so `reset` is always safe to reach for.
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+COMPOSE_FILE="docker-compose.dev.yml"
+
+# Published host ports, offset from the uncontainerized stack (3000/8000/8001/
+# 5432/5672/6379) so both can run at the same time — an agent restarting or
+# wiping this stack must not take down the one you are using.
+#
+# To run on the standard ports instead (browser OAuth needs the registered
+# redirect URIs, so this is the way to exercise a real login):
+#   CLIENT_PORT=3000 SERVER_PORT=8000 JOBS_PORT=8001 scripts/dev up
+# Served on 127.0.0.1, not localhost, so this stack has its own browser cookie
+# jar. Cookies ignore ports, so on `localhost` a session_token from the
+# uncontainerized stack on :3000 would also be sent here — and being httponly,
+# JavaScript cannot replace it, leaving you 401'd with no way to fix it from the
+# page. Override to `localhost` only when you need the registered OAuth redirect
+# URIs (see `claim`).
+export DEV_HOST="${DEV_HOST:-127.0.0.1}"
+export CLIENT_PORT="${CLIENT_PORT:-3100}"
+export SERVER_PORT="${SERVER_PORT:-8100}"
+export JOBS_PORT="${JOBS_PORT:-8101}"
+export POSTGRES_PORT="${POSTGRES_PORT:-5433}"
+export RABBITMQ_PORT="${RABBITMQ_PORT:-5673}"
+export RABBITMQ_UI_PORT="${RABBITMQ_UI_PORT:-15673}"
+export REDIS_PORT="${REDIS_PORT:-6380}"
+
+DB_NAME="annotated-paper"
+
+# The committed fixture: 11 papers from server/evals/seed_data/ run through the
+# real ingestion pipeline once, then frozen. Restored automatically the first
+# time the stack comes up, so a fresh checkout has usable data with no extra
+# step and without anyone's real database. Rebuild with `build-fixture`.
+SEED_FILE="docker/seed/fixture.dump"
+
+# The fixture user, created by build_dev_fixture.py with a fixed id.
+DEFAULT_USER_ID="11111111-1111-4111-8111-111111111111"
+
+compose() { docker compose -f "$COMPOSE_FILE" "$@"; }
+die() { echo "error: $*" >&2; exit 1; }
+
+preflight() {
+    docker info >/dev/null 2>&1 || die "Docker isn't running. Start Docker Desktop and retry."
+    # Secrets are read from the same env files the uncontainerized stack uses,
+    # so a missing one is a setup error, not something to paper over with
+    # defaults — the server won't boot without GEMINI_API_KEY and E2B_API_KEY.
+    local missing=()
+    for f in server/.env jobs/.env client/.env.local; do
+        [ -f "$f" ] || missing+=("$f")
+    done
+    if [ ${#missing[@]} -gt 0 ]; then
+        echo "error: missing env file(s): ${missing[*]}" >&2
+        echo "  The stack reads your existing local env files directly." >&2
+        echo "  Start from server/.env.example; see DEVELOPMENT.md." >&2
+        exit 1
+    fi
+}
+
+# The origin the running stack actually serves, read back from the server rather
+# than from this shell's variables. Starting the stack with overrides in one
+# terminal and running `login` in another would otherwise print a URL that
+# nothing is listening on. This is also exactly the origin CORS allows, so it is
+# the only URL a browser can use.
+running_client_origin() {
+    compose exec -T server printenv CLIENT_DOMAIN 2>/dev/null | tr -d '\r\n'
+}
+
+client_origin() {
+    local origin
+    origin=$(running_client_origin)
+    [ -n "$origin" ] && { echo "$origin"; return; }
+    echo "http://${DEV_HOST}:${CLIENT_PORT}"
+}
+
+urls() {
+    echo "  client    $(client_origin)"
+    echo "  server    http://${DEV_HOST}:${SERVER_PORT}  (docs: /docs)"
+    echo "  jobs api  http://${DEV_HOST}:${JOBS_PORT}    (health: /health)"
+    echo "  postgres  postgresql://postgres:postgres@localhost:${POSTGRES_PORT}/${DB_NAME}"
+    echo "  rabbitmq  http://localhost:${RABBITMQ_UI_PORT}  (guest/guest)"
+}
+
+wait_for_postgres() {
+    local tries=40
+    while [ $tries -gt 0 ]; do
+        compose exec -T postgres pg_isready -U postgres -d "$DB_NAME" >/dev/null 2>&1 && return 0
+        sleep 2; tries=$((tries - 1))
+    done
+    die "postgres did not become ready"
+}
+
+# Blocks until the server answers, so callers can drive the app immediately
+# rather than racing a still-booting stack.
+wait_for_server() {
+    local tries=90
+    printf 'waiting for server'
+    while [ $tries -gt 0 ]; do
+        if curl -fsS -o /dev/null "http://${DEV_HOST}:${SERVER_PORT}/docs" 2>/dev/null; then
+            printf ' ok\n'; return 0
+        fi
+        printf '.'; sleep 2; tries=$((tries - 1))
+    done
+    printf '\n'
+    echo "warning: server did not come up in time. Check: scripts/dev logs server" >&2
+    return 1
+}
+
+# True when the database has no fixture loaded yet — either migrations have
+# never run or they ran against an empty volume.
+db_is_empty() {
+    local n
+    n=$(compose exec -T postgres psql -U postgres -d "$DB_NAME" -tAc \
+        "SELECT CASE WHEN to_regclass('public.users') IS NULL THEN 0
+                     ELSE (SELECT count(*) FROM users) END" 2>/dev/null | tr -d '[:space:]')
+    [ "${n:-0}" = "0" ]
+}
+
+cmd_up() {
+    preflight
+
+    # Data services first, so the fixture can be restored before anything holds
+    # a connection: pg_restore --clean drops tables out from under live readers.
+    compose up -d postgres rabbitmq redis
+    wait_for_postgres
+
+    if [ -z "${1:-}" ] && db_is_empty && [ -f "$SEED_FILE" ]; then
+        echo "empty database — restoring fixture"
+        restore_fixture
+    fi
+
+    compose up -d "$@"
+    wait_for_server || true
+    echo; urls
+}
+
+cmd_down()    { compose down "$@"; }
+cmd_stop()    { compose stop "$@"; }
+cmd_restart() { compose restart "$@"; }
+cmd_logs()    { compose logs -f --tail=200 "$@"; }
+cmd_build()   { preflight; compose build "$@"; }
+cmd_exec()    { compose exec "$@"; }
+
+# Rebuild an image and recreate the container so the client's anonymous volumes
+# (node_modules, .next) are repopulated from the new image. Plain `build` alone
+# leaves the stale volume in place, so a lockfile change wouldn't take effect.
+cmd_rebuild() {
+    preflight
+    [ $# -gt 0 ] || die "usage: scripts/dev rebuild <service> [service...]"
+    compose build "$@"
+    compose up -d --force-recreate --renew-anon-volumes "$@"
+}
+
+cmd_status() {
+    compose ps
+    echo; urls
+}
+
+cmd_psql() { compose exec postgres psql -U postgres -d "$DB_NAME" "$@"; }
+
+cmd_sql() {
+    [ $# -gt 0 ] || die "usage: scripts/dev sql \"SELECT ...\""
+    compose exec -T postgres psql -U postgres -d "$DB_NAME" -v ON_ERROR_STOP=1 -c "$*"
+}
+
+cmd_migrate() {
+    preflight
+    compose run --rm migrate
+}
+
+# Restore the committed fixture, then migrate.
+#
+# Order matters: the dump carries the schema as of the day it was built, so
+# migrations run *after* the restore to bring it up to head. That is what lets
+# a fixture built months ago still boot against today's code.
+restore_fixture() {
+    [ -f "$SEED_FILE" ] || die "no fixture at $SEED_FILE — run: scripts/dev build-fixture"
+    # pg_restore exits non-zero on benign "already exists"/"does not exist"
+    # noise from --clean, so its status is not a reliable failure signal; the
+    # migrate step that follows is what proves the schema is usable.
+    compose exec -T postgres pg_restore \
+        -U postgres -d "$DB_NAME" \
+        --clean --if-exists --no-owner --no-privileges \
+        "/seed/$(basename "$SEED_FILE")" || true
+    cmd_migrate
+}
+
+# Force a restore over whatever is in the database now. `up` does this on its
+# own for an empty database, so this is for deliberately rewinding a dirty one.
+cmd_seed() {
+    preflight
+    compose up -d postgres
+    wait_for_postgres
+    echo "restoring $SEED_FILE"
+    restore_fixture
+    echo "seeded."
+}
+
+# Rebuild the fixture from the committed PDFs in server/evals/seed_data/ and
+# freeze the result into $SEED_FILE.
+#
+# This is the only step that costs LLM calls and real time: each paper goes
+# through the actual upload pipeline so the fixture carries passages, images,
+# extracted metadata, and summaries rather than bare rows. Run it when the seed
+# corpus or the ingestion pipeline changes — not as part of a normal reset.
+cmd_build_fixture() {
+    preflight
+    echo "This ingests 11 PDFs through the real pipeline (LLM calls, several minutes)."
+    compose up -d
+    wait_for_server || die "server never came up; cannot build the fixture"
+    compose exec -T server python dev/build_dev_fixture.py
+    # Whatever is in the database at this moment becomes a committed artifact,
+    # so both cleanups belong here, at the dump:
+    #  - sessions: the builder clears its own, but one minted by hand in the
+    #    meantime would be frozen in, and a committed token is a credential.
+    #  - cached_presigned_url: baked URLs expire 24h after the build, so a
+    #    fixture restored later serves dead links. Nulling them makes the server
+    #    mint a fresh URL on demand — which also sidesteps any stale CDN cache,
+    #    since a new signature is a new cache key.
+    echo "clearing sessions and cached presigned URLs before freeze"
+    compose exec -T postgres psql -U postgres -d "$DB_NAME" -v ON_ERROR_STOP=1 -q \
+        -c "DELETE FROM sessions;" \
+        -c "UPDATE papers SET cached_presigned_url = NULL, presigned_url_expires_at = NULL;" >/dev/null
+    echo "freezing -> $SEED_FILE"
+    compose exec -T postgres pg_dump \
+        -U postgres -d "$DB_NAME" -Fc --no-owner --no-privileges \
+        -f "/seed/$(basename "$SEED_FILE")"
+    echo "wrote $SEED_FILE ($(du -h "$SEED_FILE" | cut -f1)) — commit it"
+    echo "the fixture ships no sessions; sign in with: scripts/dev login"
+}
+
+# The full wipe: destroy volumes, rebuild the stack, restore the fixture.
+# This is the thing the uncontainerized setup can't offer.
+cmd_reset() {
+    preflight
+    compose down -v
+    # up restores the fixture on its own once it sees an empty database.
+    cmd_up
+}
+
+# Mint a DB-backed session cookie, skipping OAuth entirely. Print the token and
+# set it as a `session_token` cookie on localhost to authenticate as that user;
+# cookies ignore port, so one cookie covers both the client and server ports.
+cmd_session() {
+    local uid="${1:-$DEFAULT_USER_ID}"
+    local token="dev-$(openssl rand -hex 8)"
+    compose exec -T postgres psql -U postgres -d "$DB_NAME" -v ON_ERROR_STOP=1 -q -c \
+        "INSERT INTO sessions (id, user_id, token, expires_at)
+         VALUES (gen_random_uuid(), '${uid}', '${token}', now() + interval '7 days');" >/dev/null
+    echo "$token"
+}
+
+# Log a human into the app in a browser.
+#
+# There is deliberately no dev-login endpoint in the server: an auth bypass that
+# ships in prod code is not worth the convenience. Setting the cookie by hand
+# costs one paste and adds no attack surface. httponly only stops JavaScript
+# from *reading* the cookie — a cookie set this way is still sent and accepted.
+cmd_login() {
+    local token
+    token=$(cmd_session "$@")
+    local origin
+    origin=$(client_origin)
+    cat <<EOF
+
+Open ${origin} , then paste this into the browser console:
+
+  document.cookie = "session_token=${token}; path=/"; location.reload()
+
+You are then signed in as the fixture user and see its projects and papers.
+
+That URL is read from the running server, so it is the one the browser must use:
+the server allows exactly one CORS origin.
+
+If the paste seems to do nothing and you still get 401s, an httponly
+session_token from another localhost app is shadowing it — JavaScript cannot
+overwrite one. Use a private window, or delete that cookie in
+DevTools > Application > Cookies.
+EOF
+}
+
+# Point the fixture user at a real Google account so normal sign-in lands in the
+# seeded data instead of a fresh empty account.
+#
+# Only the email moves. On the next Google login the provider-id lookup misses,
+# upsert_with_provider falls back to matching on email, and writes the real
+# provider id onto the fixture user's existing row — so the user id never
+# changes and everything it owns stays owned. The fixture user is already
+# auth_provider=google, which is what keeps the callback's "different_provider"
+# guard from firing first.
+#
+# Browser OAuth needs the registered redirect URI, so run the stack on the
+# standard ports for this:
+#   DEV_HOST=localhost CLIENT_PORT=3000 SERVER_PORT=8000 JOBS_PORT=8001 scripts/dev up
+# DEV_HOST must be localhost there too, since that is what is registered with
+# Google — which means stopping your own dev servers first, as both the ports
+# and the cookie jar then collide.
+cmd_claim() {
+    local email="${1:-}"
+    [ -n "$email" ] || die "usage: scripts/dev claim <your-google-email>"
+    compose exec -T postgres psql -U postgres -d "$DB_NAME" -v ON_ERROR_STOP=1 -q -c \
+        "UPDATE users SET email = '${email}' WHERE id = '${DEFAULT_USER_ID}';" >/dev/null \
+        || die "could not claim — is '${email}' already used by another user in this db?"
+    echo "fixture user is now ${email}"
+    echo "sign in with Google at $(client_origin) to land in the seeded data"
+    echo "(needs the standard ports — see 'scripts/dev help')"
+}
+
+cmd_help() {
+    cat <<'HELP'
+scripts/dev — containerized local dev stack
+
+Lifecycle
+  up [service...]        Start the stack (builds on first run), wait for the server
+  down [--volumes]       Stop and remove containers
+  stop / restart [svc]   Stop or restart services in place
+  reset                  Destroy volumes, rebuild, restore the fixture — full wipe
+  build [svc]            Build images
+  rebuild <svc>          Build and recreate, refreshing anonymous volumes
+                         (needed after a yarn.lock or uv.lock change)
+
+Database
+  seed                   Restore the committed fixture over the current db
+  build-fixture          Re-ingest server/evals/seed_data/*.pdf and refreeze the
+                         fixture (LLM calls, several minutes — rarely needed)
+  migrate                Run alembic migrations
+  psql [args]            Interactive psql
+  sql "SELECT ..."       Run one statement
+
+Driving
+  session [user_id]      Mint a session token and print it (skips OAuth)
+  login                  Print a one-liner to sign in as the fixture user in a
+                         browser (no server-side dev-login endpoint by design)
+  claim <google-email>   Repoint the fixture user at your Google account so real
+                         sign-in lands in the seeded data (standard ports only)
+  logs [svc]             Follow logs
+  status                 Container state and URLs
+  exec <svc> <cmd...>    Run a command in a service
+
+First run
+  scripts/dev up         The fixture restores automatically into an empty db
+
+Notes
+  - Ports are offset from the uncontainerized stack so both can run at once, and
+    the host is 127.0.0.1 rather than localhost so the browser keeps the two
+    cookie jars separate. Override with DEV_HOST / CLIENT_PORT / SERVER_PORT /
+    JOBS_PORT / POSTGRES_PORT.
+  - Secrets come from server/.env, jobs/.env, client/.env.local — the same files
+    the uncontainerized stack uses. Only container-network URLs are overridden.
+  - The fixture is manufactured from committed PDFs, not copied from anyone's
+    database. It ships in git, so a fresh checkout needs no build step.
+  - S3 buckets and LLM keys are shared with your normal dev setup: this stack is
+    isolated on process, port, and database, not on third-party state.
+  - PDFs are fetched by the browser straight from the bucket, whose CORS rules
+    allow exact origins: https://openpaper.ai and http://localhost:3000 only. So
+    on the default 127.0.0.1:3100 the reader fails with a NetworkError while the
+    rest of the app works. Until a dev origin is added to the bucket, open papers
+    with:
+      DEV_HOST=localhost CLIENT_PORT=3000 scripts/dev up
+    (needs your own client on :3000 stopped)
+  - Server code has no autoreload: `scripts/dev restart server` after edits.
+    Client code hot-reloads.
+  - There is no `test` subcommand: pytest is not declared in server/pyproject.toml
+    or uv.lock, so server/tests/ can't be run without adding it as a dev group.
+HELP
+}
+
+case "${1:-help}" in
+    up)        shift; cmd_up "$@" ;;
+    down)      shift; cmd_down "$@" ;;
+    stop)      shift; cmd_stop "$@" ;;
+    restart)   shift; cmd_restart "$@" ;;
+    logs)      shift; cmd_logs "$@" ;;
+    build)     shift; cmd_build "$@" ;;
+    rebuild)   shift; cmd_rebuild "$@" ;;
+    status|ps) shift; cmd_status "$@" ;;
+    psql)      shift; cmd_psql "$@" ;;
+    sql)       shift; cmd_sql "$@" ;;
+    migrate)   shift; cmd_migrate "$@" ;;
+    seed)      shift; cmd_seed "$@" ;;
+    build-fixture) shift; cmd_build_fixture "$@" ;;
+    reset)     shift; cmd_reset "$@" ;;
+    session)   shift; cmd_session "$@" ;;
+    login)     shift; cmd_login "$@" ;;
+    claim)     shift; cmd_claim "$@" ;;
+    exec)      shift; cmd_exec "$@" ;;
+    help|-h|--help) cmd_help ;;
+    *) echo "unknown command: $1" >&2; echo >&2; cmd_help >&2; exit 1 ;;
+esac

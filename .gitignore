@@ -63,3 +63,8 @@ neurips.md
 *.tex
 build_*tex.sh
 *.sty
+
+# containerized dev stack (docker-compose.dev.yml): docker/seed/fixture.dump is
+# deliberately COMMITTED. It is manufactured from the PDFs in
+# server/evals/seed_data/ by `scripts/dev build-fixture`, holds no real user
+# data, and has to be present for a fresh checkout to come up with usable data.

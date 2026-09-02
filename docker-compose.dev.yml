@@ -1,0 +1,206 @@
+# Containerized local dev stack — the environment an agent can restart, migrate,
+# and wipe without touching the uncontainerized stack you run by hand.
+#
+# Drive it through `scripts/dev`, not raw `docker compose`: that script sets the
+# published-port variables this file interpolates, and defaults are only correct
+# when they are all set together.
+#
+# Service decomposition mirrors production (see ../open-paper-ci/ecs_definitions):
+# app-service, jobs-api, jobs-worker, jobs-beat are separate processes there and
+# separate containers here, with migrations as a one-shot run before the app
+# boots rather than on every app container's start.
+name: openpaper-dev
+
+# Secrets and third-party keys are read from the same env files the
+# uncontainerized stack uses — there is no second copy to keep in sync. Only the
+# values that must differ inside the container network are overridden below.
+x-jobs-service: &jobs-service
+  build:
+    context: ./jobs
+  env_file: [jobs/.env]
+  environment:
+    # Both halves must agree on broker and vhost or tasks are published to a
+    # queue nobody consumes. The checked-in envs disagree on the trailing slash
+    # (server "/" vs jobs "//"), so both are pinned to the explicit "/" vhost.
+    CELERY_BROKER_URL: pyamqp://guest:guest@rabbitmq:5672//
+    CELERY_RESULT_BACKEND: redis://redis:6379/0
+    # Webhooks land on the server over the compose network, not the host port.
+    WEBHOOK_BASE_URL: http://server:8000
+    LANGFUSE_TRACING_ENVIRONMENT: local-docker
+  volumes:
+    # Only the source dirs are mounted, not ./jobs itself. Mounting the whole
+    # directory would shadow the image's Linux virtualenv at /app/.venv with the
+    # macOS one `uv sync` leaves on the host, and a volume to protect it can't
+    # be shared: all three jobs services start at once and race to initialize
+    # it. Adding a new top-level file under jobs/ needs `scripts/dev rebuild`.
+    - ./jobs/src:/app/src
+    - ./jobs/scripts:/app/scripts
+  depends_on:
+    rabbitmq: {condition: service_healthy}
+    redis: {condition: service_healthy}
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: annotated-paper
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/seed:/seed
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d annotated-paper"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  rabbitmq:
+    # Pinned to the exact version the uncontainerized stack runs. Newer 4.x
+    # images disallow `transient_nonexcl_queues` by default, which is what
+    # Celery declares — the worker then crash-loops with a 541 INTERNAL_ERROR
+    # on connect. The local op-rabbitmq container predates that change and so
+    # never hit it; a floating tag here would have made this stack diverge from
+    # the one it is supposed to mirror.
+    image: rabbitmq:4.1.2-management
+    ports:
+      - "${RABBITMQ_PORT:-5673}:5672"
+      - "${RABBITMQ_UI_PORT:-15673}:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  # One-shot, exactly as prod does it. `server` waits for this to exit 0, so a
+  # failed migration surfaces as a failed startup instead of a half-migrated db.
+  migrate:
+    build:
+      context: ./server
+    command: ["python", "app/scripts/run_migrations.py"]
+    env_file: [server/.env]
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/annotated-paper
+    volumes:
+      - ./server:/app
+    depends_on:
+      postgres: {condition: service_healthy}
+    restart: "no"
+
+  server:
+    build:
+      context: ./server
+    # python -m app.main runs uvicorn directly (readable single-process logs),
+    # where prod runs gunicorn. There is no autoreload: after editing server
+    # code, `scripts/dev restart server`.
+    command: ["python3", "-m", "app.main"]
+    env_file: [server/.env]
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/annotated-paper
+      CELERY_BROKER_URL: pyamqp://guest:guest@rabbitmq:5672//
+      # No CELERY_RESULT_BACKEND here on purpose. server/.env leaves it unset
+      # and the server image has no redis package, so setting it makes every
+      # task submission fail with "No module named 'redis'". Only the jobs
+      # services, which do ship redis, get a result backend.
+      CELERY_API_URL: http://jobs-api:8001
+      # Read by the SERVER, not just by jobs: the server builds the callback URL
+      # it hands to each Celery task, and the worker is what dials it. So this
+      # has to be the compose-network address, never the host-published port —
+      # localhost inside the worker container is the worker itself.
+      WEBHOOK_BASE_URL: http://server:8000
+      # CORS allows exactly one origin, so this must be the *host-published*
+      # client port — it is compared against the browser's Origin header.
+      CLIENT_DOMAIN: http://${DEV_HOST:-127.0.0.1}:${CLIENT_PORT:-3100}
+      API_DOMAIN: http://${DEV_HOST:-127.0.0.1}:${SERVER_PORT:-8100}
+      # Browsers keep separate cookie jars for `localhost` and `127.0.0.1`, and
+      # cookies ignore ports. Without this split, a session_token set by the
+      # uncontainerized stack on :3000 is also sent to :3100/:8100 — and since
+      # the server marks it httponly, JavaScript cannot replace it, so you get
+      # 401s you cannot clear from the page. Different host, different jar.
+      SESSION_COOKIE_DOMAIN: ${DEV_HOST:-127.0.0.1}
+      # Browser OAuth against these ports only works if the redirect URIs are
+      # registered with the provider. Use `scripts/dev session` instead.
+      GOOGLE_REDIRECT_URI: http://${DEV_HOST:-127.0.0.1}:${SERVER_PORT:-8100}/api/auth/google/callback
+      ZOTERO_REDIRECT_URI: http://${DEV_HOST:-127.0.0.1}:${SERVER_PORT:-8100}/api/auth/zotero/callback
+      LANGFUSE_TRACING_ENVIRONMENT: local-docker
+      DEBUG: "True"
+    ports:
+      - "${SERVER_PORT:-8100}:8000"
+    volumes:
+      - ./server:/app
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/docs').status==200 else 1)\""]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 20s
+    depends_on:
+      postgres: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+    restart: unless-stopped
+
+  jobs-api:
+    <<: *jobs-service
+    command: ["./scripts/start_api.sh"]
+    ports:
+      - "${JOBS_PORT:-8101}:8001"
+
+  jobs-worker:
+    <<: *jobs-service
+    command: ["./scripts/start_worker.sh"]
+    # The image's HEALTHCHECK curls the jobs API port, which only jobs-api
+    # serves; left on, the worker and beat would report permanently unhealthy.
+    healthcheck:
+      disable: true
+
+  jobs-beat:
+    <<: *jobs-service
+    command: ["./scripts/start_beat.sh"]
+    healthcheck:
+      disable: true
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile.dev
+    command: ["yarn", "dev", "--hostname", "0.0.0.0", "--port", "3000"]
+    env_file: [client/.env.local]
+    environment:
+      # NEXT_PUBLIC_* is inlined into browser JS, so this is the host-published
+      # server port — a compose service name would not resolve in the browser.
+      NEXT_PUBLIC_API_URL: http://${DEV_HOST:-127.0.0.1}:${SERVER_PORT:-8100}
+      # Bind-mounted source over virtiofs drops inotify events; without polling
+      # edits land on disk but never trigger a rebuild.
+      WATCHPACK_POLLING: "true"
+    ports:
+      - "${CLIENT_PORT:-3100}:3000"
+    volumes:
+      - ./client:/app
+      # Host node_modules holds darwin binaries, and a shared .next is what
+      # corrupts the uncontainerized dev server. Both stay container-local.
+      # Anonymous rather than named on purpose: `rebuild` refreshes them with
+      # --renew-anon-volumes, which has no effect on named volumes.
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      server: {condition: service_started}
+    restart: unless-stopped
+
+volumes:
+  pgdata:
