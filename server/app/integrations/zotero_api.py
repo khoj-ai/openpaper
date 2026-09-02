@@ -1,7 +1,7 @@
 import json
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, FrozenSet, List, Optional
 
 import requests
 from app.helpers.http_retry import is_retryable_status
@@ -51,7 +51,14 @@ class ZoteroApiClient:
         *,
         params: Optional[Dict[str, Any]] = None,
         stream: bool = False,
+        expected_statuses: FrozenSet[int] = frozenset(),
     ) -> requests.Response:
+        """Issue a Zotero request, retrying only transient failures.
+
+        ``expected_statuses`` names statuses that are a normal outcome for the
+        endpoint rather than a fault; they are still logged, at INFO instead of
+        WARNING, so they stay available for analysis without reading as errors.
+        """
         last_error: Optional[Exception] = None
         for attempt in range(MAX_RETRIES):
             try:
@@ -95,15 +102,36 @@ class ZoteroApiClient:
                 status = status_code if status_code is not None else "no response"
                 body = resp.text[:500] if resp is not None and resp.text else ""
                 retryable = is_retryable_status(status_code)
-                logger.warning(
-                    "Zotero API request failed: %s %s -> %s (attempt %d/%d): %s%s",
+                # Saying "attempt 1/3" for a status we are about to give up on
+                # would promise two more lines that never arrive.
+                progress = (
+                    f"attempt {attempt + 1}/{MAX_RETRIES}"
+                    if retryable
+                    else "not retryable"
+                )
+                logger.log(
+                    # A status the caller declared normal for this endpoint is a
+                    # data condition, not a fault, so it stays queryable without
+                    # competing with real failures.
+                    (
+                        logging.INFO
+                        if status_code in expected_statuses
+                        else logging.WARNING
+                    ),
+                    "Zotero API request failed: %s %s -> %s (%s): %s%s",
                     method,
                     url,
                     status,
-                    attempt + 1,
-                    MAX_RETRIES,
+                    progress,
                     e,
                     f" | body: {body}" if body else "",
+                    # Structured so these can be counted and grouped by status or
+                    # endpoint without parsing the message text.
+                    extra={
+                        "zotero_status": status_code,
+                        "zotero_method": method,
+                        "zotero_url": url,
+                    },
                 )
                 # A 4xx describes a request that is wrong on its own terms — most
                 # often a 404 for an attachment whose file was never uploaded to
@@ -303,7 +331,9 @@ class ZoteroApiClient:
     def download_attachment_file(self, attachment_key: str) -> bytes:
         url = f"{self._user_base}/items/{attachment_key}/file"
         try:
-            response = self._request("GET", url, stream=True)
+            response = self._request(
+                "GET", url, stream=True, expected_statuses=frozenset({404})
+            )
         except requests.HTTPError as e:
             resp = getattr(e, "response", None)
             if resp is not None and resp.status_code == 404:

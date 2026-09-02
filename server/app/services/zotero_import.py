@@ -536,10 +536,17 @@ async def _resolve_pdf_bytes(
             except ZoteroFileNotStoredError:
                 # Expected account state rather than a fault, so it is logged
                 # without a stack trace and explained in the user's own terms.
+                # Kept at INFO with structured keys so the rate of storage-blocked
+                # imports stays measurable without reading as a failure.
                 logger.info(
                     "Zotero attachment %s for item %s is not in Zotero File Storage",
                     attachment_key,
                     item_key,
+                    extra={
+                        "zotero_item_key": item_key,
+                        "zotero_attachment_key": attachment_key,
+                        "zotero_failure": "file_not_stored",
+                    },
                 )
                 failure_reason = FILE_NOT_STORED_MESSAGE
             except Exception as e:
