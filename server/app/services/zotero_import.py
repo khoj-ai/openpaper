@@ -38,7 +38,7 @@ from app.helpers.subscription_limits import (
     can_user_upload_paper,
     get_remaining_paper_upload_slots,
 )
-from app.integrations.zotero_api import ZoteroApiClient
+from app.integrations.zotero_api import ZoteroApiClient, ZoteroFileNotStoredError
 from app.llm.utils import find_offsets
 from app.schemas.user import CurrentUser
 from sqlalchemy.orm import Session
@@ -46,6 +46,15 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 ZOTERO_IMPORT_CONCURRENCY = 10
+
+# Phrased like the linked-file/linked-URL reasons below: what is wrong, then what
+# to change in Zotero. The cause is on the user's Zotero account rather than in
+# their library metadata, so there is nothing we can detect ahead of the download.
+FILE_NOT_STORED_MESSAGE = (
+    "PDF is not stored in Zotero's cloud, so it cannot be downloaded. "
+    "In Zotero, check Settings → Sync → File Syncing: syncing may be off, set to "
+    "WebDAV, or your storage may be full."
+)
 
 
 class ImportErrorResult(TypedDict):
@@ -524,6 +533,22 @@ async def _resolve_pdf_bytes(
                     "Zotero PDF attachment invalid for %s: %s", item_key, err
                 )
                 failure_reason = f"PDF attachment could not be validated: {err}"
+            except ZoteroFileNotStoredError:
+                # Expected account state rather than a fault, so it is logged
+                # without a stack trace and explained in the user's own terms.
+                # Kept at INFO with structured keys so the rate of storage-blocked
+                # imports stays measurable without reading as a failure.
+                logger.info(
+                    "Zotero attachment %s for item %s is not in Zotero File Storage",
+                    attachment_key,
+                    item_key,
+                    extra={
+                        "zotero_item_key": item_key,
+                        "zotero_attachment_key": attachment_key,
+                        "zotero_failure": "file_not_stored",
+                    },
+                )
+                failure_reason = FILE_NOT_STORED_MESSAGE
             except Exception as e:
                 logger.warning(
                     "Failed to download Zotero PDF for %s: %s",

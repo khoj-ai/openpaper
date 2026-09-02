@@ -9,6 +9,7 @@ from typing import Optional
 from urllib.parse import unquote, urlparse
 
 import httpx
+from app.helpers.http_retry import is_retryable_status, retryable_status_in_message
 from exa_py import Exa
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,6 @@ EXA_REQUEST_TIMEOUT = 60.0
 # message embeds the HTTP status, and surfaces transport failures as httpx errors.
 EXA_MAX_RETRIES = 2
 EXA_RETRY_BASE_DELAY = 1.0
-_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 # Publication entities expose a DOI directly on some results and only as a
 # doi.org link on others; either is enough to look the work up in OpenAlex.
@@ -42,14 +42,14 @@ def _is_retryable_exa_error(e: Exception) -> bool:
     # A response we did receive is retryable only for the transient status codes;
     # checked before HTTPError since it is a subclass.
     if isinstance(e, httpx.HTTPStatusError):
-        return e.response.status_code in _RETRYABLE_STATUS_CODES
+        return is_retryable_status(e.response.status_code)
     # Transport-level failures (timeouts, connection resets) are transient.
     if isinstance(e, httpx.HTTPError):
         return True
     # exa_py raises ValueError("Request failed with status code <N>: ...").
-    match = re.search(r"status code (\d{3})", str(e))
-    if match:
-        return int(match.group(1)) in _RETRYABLE_STATUS_CODES
+    from_message = retryable_status_in_message(str(e))
+    if from_message is not None:
+        return from_message
     return False
 
 

@@ -23,7 +23,9 @@ import {
 import {
 	computeImportProgress,
 	defaultZoteroSelection,
+	describeFailureGroup,
 	formatZoteroLastSynced,
+	groupImportFailures,
 } from "./utils";
 
 export function ZoteroIntegrationCard() {
@@ -118,6 +120,21 @@ export function ZoteroIntegrationCard() {
 	);
 
 	const showSyncAnnotations = recentImportsLoaded && hasSyncableImports;
+
+	// The import toast is transient, but /import/status keeps the reason on each
+	// failed row — so the explanation survives a dismissed toast or a reload.
+	const failedImportGroups = useMemo(() => {
+		const failures = recentImports
+			.filter((i) => i.status === "failed" && i.error_message)
+			.map((i) => ({
+				zotero_item_key: i.zotero_item_key,
+				message: i.error_message as string,
+			}));
+		const keyToTitle = new Map(
+			recentImports.map((i) => [i.zotero_item_key, i.title])
+		);
+		return groupImportFailures(failures, (key) => keyToTitle.get(key));
+	}, [recentImports]);
 
 	useEffect(() => {
 		const zoteroParam = searchParams.get("zotero");
@@ -255,15 +272,19 @@ export function ZoteroIntegrationCard() {
 		}
 		if (hasDetailToast) {
 			const keyToTitle = new Map(libraryItems.map((i) => [i.zotero_item_key, i.title]));
-			toast.error("", {
+			const groups = groupImportFailures(
+				data.errors.map((e) => ({ zotero_item_key: e.zotero_item_key, message: e.error })),
+				(key) => keyToTitle.get(key),
+			);
+			toast.error(`${errorCount} paper${errorCount === 1 ? "" : "s"} could not be imported`, {
 				description: (
 					<ul className="mt-1 space-y-2 list-none">
-						{data.errors.map((e) => (
-							<li key={e.zotero_item_key}>
-								<span className="font-medium block">
-									{keyToTitle.get(e.zotero_item_key) ?? e.zotero_item_key}
+						{groups.map((group) => (
+							<li key={group.message}>
+								<span className="block">{group.message}</span>
+								<span className="block text-xs mt-0.5 opacity-75">
+									{describeFailureGroup(group)}
 								</span>
-								<span className="block text-xs mt-0.5 opacity-75">{e.error}</span>
 							</li>
 						))}
 					</ul>
@@ -432,6 +453,23 @@ export function ZoteroIntegrationCard() {
 			</div>
 					{importProgress !== null && importTotal !== null && (
 						<Progress value={importProgress} />
+					)}
+					{failedImportGroups.length > 0 && (
+						<div className="rounded-md bg-muted p-3 space-y-2">
+							<p className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
+								Some papers could not be imported
+							</p>
+							<ul className="space-y-2 list-none">
+								{failedImportGroups.map((group) => (
+									<li key={group.message}>
+										<p className="text-sm">{group.message}</p>
+										<p className="text-xs text-muted-foreground">
+											{describeFailureGroup(group)}
+										</p>
+									</li>
+								))}
+							</ul>
+						</div>
 					)}
 					</div>
 					) : (

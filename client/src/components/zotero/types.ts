@@ -10,6 +10,7 @@ export type ZoteroImportStatusItem = {
 	status: string;
 	import_source: string;
 	title?: string;
+	error_message?: string;
 	created_at?: string;
 };
 
