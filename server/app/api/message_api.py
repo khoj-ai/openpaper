@@ -301,6 +301,7 @@ async def chat_message_multipaper(
                 start_time = datetime.now(timezone.utc)
                 evidence_container = {"evidence": None}
                 evidence_collection: Optional[EvidenceCollection] = None
+                project = None
 
                 # Ensure conversation is valid
                 if request.project_id:
@@ -433,7 +434,7 @@ async def chat_message_multipaper(
                     current_user=current_user,
                     all_papers=all_papers,
                     mentioned_highlights=mentioned_highlights,
-                    project_title=str(project.title) if request.project_id else None,
+                    project_title=str(project.title) if project else None,
                     is_mention_scoped=scoped_paper_ids is not None,
                     db=db,
                 )
