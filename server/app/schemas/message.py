@@ -154,11 +154,15 @@ class EvidenceCollection(BaseModel):
         ]
         actions: Dict[str, Any] = {}
         if searched:
-            # Counted rather than listed: the answering model needs to know how
-            # hard the corpus was looked at, not to replay the queries.
-            actions["evidence_gathering"] = (
-                f"{len(searched)} tool call(s): {', '.join(sorted(set(searched)))}"
-            )
+            # Convert tool call result note to human-readable phrases for the note
+            note = f"Searched the papers in scope {len(searched)} time(s)."
+            if not self.has_evidence():
+                note += (
+                    " Nothing matched. Answer from the papers named above and"
+                    " anything else you were given, and say plainly what could"
+                    " not be found."
+                )
+            actions["evidence_gathering"] = note
         if self.artifacts:
             actions["citations_resolved"] = [a.paper_id for a in self.artifacts]
         if self.chart_jobs:

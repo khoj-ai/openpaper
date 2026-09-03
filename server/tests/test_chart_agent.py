@@ -245,9 +245,12 @@ class TestTheAnsweringModelHearsAboutIt(unittest.TestCase):
             ],
         ).describe_actions()
 
-        self.assertEqual(
-            actions["evidence_gathering"], "1 tool call(s): search_all_files"
-        )
+        # The count is what this is about: the chart is reported under
+        # charts_started, so counting it here as well would say two searches
+        # ran when one did. The tool names themselves must stay out of the
+        # block entirely — see test_actions_block_hides_tool_names.
+        self.assertIn("1 time(s)", actions["evidence_gathering"])
+        self.assertNotIn("2", actions["evidence_gathering"])
 
     def test_a_turn_that_did_nothing_reports_nothing(self):
         self.assertIsNone(self.collection().describe_actions())
