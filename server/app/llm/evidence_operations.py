@@ -339,12 +339,14 @@ class EvidenceOperations(BaseLLMClient):
                     try:
                         paper_id_arg = fn_args.get("paper_id")
                         query_arg = fn_args.get("query")
+                        # Status line naming scope
+                        corpus_name = project_title or "your library"
                         paper_name = (
                             formatted_paper_options.get(str(paper_id_arg), {}).get(
-                                "title", "knowledge base"
+                                "title", corpus_name
                             )
                             if paper_id_arg
-                            else "knowledge base"
+                            else corpus_name
                         )
 
                         if paper_id_arg and paper_id_arg not in formatted_paper_options:
