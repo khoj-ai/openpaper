@@ -473,7 +473,21 @@ async def chat_message_multipaper(
                         "chat_answer_empty",
                         properties={
                             "had_stream_error": bool(stream_errors),
-                            "has_evidence": bool(evidence),
+                            # add additional context for when we end up without a usable chat answer
+                            "answer_emitted_citations": bool(evidence),
+                            "evidence_papers": len(evidence_collection.evidence),
+                            "evidence_chars": evidence_collection.get_evidence_size(),
+                            "evidence_compacted": evidence_collection.is_compacted,
+                            "chart_jobs": len(evidence_collection.chart_jobs),
+                            "citation_artifacts": len(evidence_collection.artifacts),
+                            "papers_in_scope": len(all_papers),
+                            "tools_used": sorted(
+                                {
+                                    call.name
+                                    for call in evidence_collection.previous_tool_calls
+                                }
+                            ),
+                            "question_chars": len(request.user_query),
                             "type": conversation.conversable_type,
                             "project_id": request.project_id,
                         },
@@ -727,7 +741,8 @@ async def chat_message_stream(
                         "chat_answer_empty",
                         properties={
                             "had_stream_error": bool(stream_errors),
-                            "has_evidence": bool(evidence),
+                            "answer_emitted_citations": bool(evidence),
+                            "question_chars": len(request.user_query),
                             "type": "paper",
                         },
                         user_id=str(current_user.id),
