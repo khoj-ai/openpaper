@@ -1,0 +1,46 @@
+name: test
+
+on:
+    pull_request:
+    push:
+        branches:
+            - master
+    workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+    server:
+      name: Server tests
+      runs-on: ubuntu-latest
+      defaults:
+          run:
+              working-directory: server
+      env:
+          # Presence-only guards: several modules raise at import time when
+          # these are unset (see app/helpers/unit_conversion.py), but the suite
+          # mocks every client, so no call is ever made. Placeholders keep it
+          # that way — a test that starts reaching a live API fails here
+          # instead of passing quietly against a real key.
+          GEMINI_API_KEY: ci-placeholder
+          E2B_API_KEY: ci-placeholder
+          FIRECRAWL_API_KEY: ci-placeholder
+          OPENAI_API_KEY: ci-placeholder
+          ANTHROPIC_API_KEY: ci-placeholder
+      steps:
+          - name: Checkout code
+            uses: actions/checkout@v7
+
+          - name: Install uv
+            uses: astral-sh/setup-uv@v10
+            with:
+                working-directory: server
+                # Matches server/Dockerfile; pyproject only floors at 3.12.
+                python-version: "3.12"
+
+          - name: Install dependencies
+            run: uv sync --locked
+
+          - name: Run tests
+            run: uv run python -m unittest discover -s tests
