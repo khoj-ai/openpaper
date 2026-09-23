@@ -591,10 +591,20 @@ async def chat_message_multipaper(
                             user=current_user,
                         )
 
-                # Rename the conversation based on the chat history
-                operations.rename_conversation(
-                    db=db, conversation_id=request.conversation_id, user=current_user
-                )
+                # The turn is saved. Renaming is cosmetic and must not turn a
+                # delivered answer into an error for the user.
+                try:
+                    operations.rename_conversation(
+                        db=db,
+                        conversation_id=request.conversation_id,
+                        user=current_user,
+                    )
+                except Exception:
+                    logger.warning(
+                        "Failed to rename conversation %s",
+                        request.conversation_id,
+                        exc_info=True,
+                    )
 
                 # @-mention scoping usage: whether the client asked to scope,
                 # what actually resolved (by entity type), and the effective
