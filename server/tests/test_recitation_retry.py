@@ -41,7 +41,7 @@ class BlockReasonTaggingTest(unittest.TestCase):
     def raise_for(self, finish_reason) -> LLMBlockedError:
         with self.assertRaises(LLMBlockedError) as caught:
             GeminiProvider._raise_for_empty_response(
-                blocked_response(finish_reason), "gemini-3.6-flash"
+                blocked_response(finish_reason), "gemini-3.8-flash"
             )
         return caught.exception
 

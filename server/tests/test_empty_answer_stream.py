@@ -77,7 +77,7 @@ class EmptyGeminiStreamTest(unittest.IsolatedAsyncioTestCase):
         return [
             c
             async for c in provider.send_message_stream(
-                model="gemini-3.6-flash",
+                model="gemini-3.8-flash",
                 message="q",
                 history=[],
                 system_prompt="s",

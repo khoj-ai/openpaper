@@ -83,7 +83,7 @@ def _is_retryable(e: Exception) -> bool:
 
 
 # Constants
-DEFAULT_CHAT_MODEL = "gemini-3.6-flash"
+DEFAULT_CHAT_MODEL = "gemini-3.8-flash"
 FAST_CHAT_MODEL = "gemini-3.5-flash-lite"
 CACHE_TTL_SECONDS = 3600
 

@@ -226,7 +226,7 @@ class GeminiProvider(BaseLLMProvider):
             # Retry twice more on a 408/429/5xx or a connect/read timeout.
             http_options=HttpOptions(retry_options=HttpRetryOptions(attempts=3)),
         )
-        self._default_model = "gemini-3.6-flash"
+        self._default_model = "gemini-3.8-flash"
         self._fast_model = "gemini-3.5-flash-lite"
 
     @property
