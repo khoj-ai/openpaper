@@ -35,6 +35,8 @@ from google.genai.types import (
     FunctionDeclaration,
     GenerateContentConfig,
     GenerateContentResponse,
+    HttpOptions,
+    HttpRetryOptions,
     Part,
     ThinkingConfig,
     Tool,
@@ -219,7 +221,11 @@ class GeminiProvider(BaseLLMProvider):
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY environment variable is required")
 
-        self._client = genai.Client(api_key=self.api_key)
+        self._client = genai.Client(
+            api_key=self.api_key,
+            # Retry twice more on a 408/429/5xx or a connect/read timeout.
+            http_options=HttpOptions(retry_options=HttpRetryOptions(attempts=3)),
+        )
         self._default_model = "gemini-3.6-flash"
         self._fast_model = "gemini-3.5-flash-lite"
 
