@@ -644,15 +644,17 @@ class EvidenceOperations(BaseLLMClient):
 
         message_content = [TextContent(text=formatted_prompt)]
 
-        llm_response = self.generate_content(
-            system_prompt="You are a research assistant that summarizes tool call results while preserving key information.",
-            contents=message_content,
-            model_type=ModelType.DEFAULT,
-            provider=llm_provider,
-            schema=ToolResultCompactionResponse,
-        )
-
+        # Compaction is an optimization: if the model call itself fails, the
+        # turn continues with the uncompacted results rather than dying here.
         try:
+            llm_response = self.generate_content(
+                system_prompt="You are a research assistant that summarizes tool call results while preserving key information.",
+                contents=message_content,
+                model_type=ModelType.DEFAULT,
+                provider=llm_provider,
+                schema=ToolResultCompactionResponse,
+            )
+
             if llm_response and llm_response.text:
                 compaction_response = JSONParser.validate_and_extract_json(
                     llm_response.text
@@ -776,17 +778,19 @@ class EvidenceOperations(BaseLLMClient):
 
         message_content = [TextContent(text=formatted_prompt)]
 
-        llm_response = self.generate_content(
-            system_prompt="You are a research assistant that summarizes evidence snippets from research papers.",
-            contents=message_content,
-            model_type=ModelType.FAST,
-            provider=llm_provider,
-            schema=EvidenceSummaryResponse,
-        )
-
         all_compacted: Dict[str, List[str]] = {}
 
+        # Compaction is an optimization: if the model call itself fails, the
+        # truncated fallback below stands in rather than the turn dying here.
         try:
+            llm_response = self.generate_content(
+                system_prompt="You are a research assistant that summarizes evidence snippets from research papers.",
+                contents=message_content,
+                model_type=ModelType.FAST,
+                provider=llm_provider,
+                schema=EvidenceSummaryResponse,
+            )
+
             if llm_response and llm_response.text:
                 response_json = JSONParser.validate_and_extract_json(llm_response.text)
                 compaction_response = EvidenceSummaryResponse.model_validate(
