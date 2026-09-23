@@ -32,6 +32,7 @@ Python 3.12+ with [uv](https://docs.astral.sh/uv/), Node.js + Yarn, PostgreSQL, 
 | ---------------------------------------------------------------------------------------- | --------------------------------------------------------- |
 | `DATABASE_URL`                                                                           | server                                                    |
 | `GEMINI_API_KEY`                                                                         | server + jobs                                             |
+| `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`                                                    | server (every provider initializes at startup; `LLM_FALLBACK_PROVIDER`, default `openai`, picks the one chat answers fall back to — set it empty to disable) |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET_NAME`, `CLOUDFLARE_BUCKET_NAME` | server + jobs                                             |
 | `CELERY_BROKER_URL`                                                                      | server + jobs                                             |
 | `CELERY_RESULT_BACKEND`                                                                  | jobs only — the server has no `redis` package, and setting it there makes every task submission fail with `No module named 'redis'` |

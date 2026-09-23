@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 from enum import Enum
 from typing import Any, AsyncIterator, Dict, List, Optional, Union
@@ -17,7 +18,7 @@ from app.llm.provider import (
     StreamChunk,
     ToolCallResult,
 )
-from app.llm.utils import retry_llm_operation
+from app.llm.utils import is_provider_outage, retry_llm_operation
 from langfuse import get_client, observe
 from pydantic import BaseModel
 
@@ -29,11 +30,20 @@ class ModelType(Enum):
     FAST = "fast"
 
 
+def _fallback_provider_from_env() -> Optional[LLMProvider]:
+    """LLM_FALLBACK_PROVIDER names the provider an answer stream is handed to
+    when its own provider fails outright. Defaults to OpenAI; set it empty to
+    disable the fallback."""
+    value = os.getenv("LLM_FALLBACK_PROVIDER", LLMProvider.OPENAI.value).strip()
+    return LLMProvider(value.lower()) if value else None
+
+
 class BaseLLMClient:
     """Unified LLM client that supports multiple providers"""
 
     def __init__(self, default_provider: LLMProvider = LLMProvider.GEMINI):
         self.default_provider = default_provider
+        self.fallback_provider = _fallback_provider_from_env()
         self._providers: Dict[LLMProvider, BaseLLMProvider] = {}
 
         # Initialize all providers to ensure they are ready for use
@@ -212,7 +222,7 @@ class BaseLLMClient:
             )
             raise
 
-    def send_message_stream(
+    async def send_message_stream(
         self,
         message: MessageParam,
         history: List[Message],
@@ -224,10 +234,65 @@ class BaseLLMClient:
     ) -> AsyncIterator[StreamChunk]:
         """Send a message and stream the response.
 
-        Returns an async iterator — iterate it with `async for`. Chunks with
-        `is_restart` set mean the upstream connection dropped and the request
-        was re-sent: discard everything streamed so far.
+        Iterate with `async for`. A chunk with `is_restart` set means the
+        answer streamed so far has been abandoned and a complete replacement
+        follows: either the provider re-sent a dropped request, or it failed
+        outright and the same request was handed to `fallback_provider`. A
+        failure another provider cannot fix — a stable content block, a
+        malformed request, a bug — is raised as-is (see is_provider_outage).
         """
+        target = provider or self.default_provider
+        fallback = self.fallback_provider
+        emitted = False
+        failure: Exception
+        try:
+            async for chunk in self._stream(
+                target, message, history, system_prompt, file, model_type, **kwargs
+            ):
+                emitted = True
+                yield chunk
+            return
+        except Exception as e:
+            if fallback is None or fallback == target or not is_provider_outage(e):
+                raise
+            failure = e
+
+        logger.warning(
+            f"{target.value} answer stream failed ({type(failure).__name__}: "
+            f"{str(failure)[:120]}); answering with {fallback.value} instead"
+        )
+        track_event(
+            "llm_stream_fallback",
+            {
+                "from_provider": target.value,
+                "to_provider": fallback.value,
+                "model_type": model_type.value,
+                "error": str(failure)[:200],
+                "had_emitted": emitted,
+            },
+        )
+        if emitted:
+            yield StreamChunk(
+                text="",
+                model=self._get_model_for_type(model_type, fallback),
+                provider=fallback,
+                is_restart=True,
+            )
+        async for chunk in self._stream(
+            fallback, message, history, system_prompt, file, model_type, **kwargs
+        ):
+            yield chunk
+
+    def _stream(
+        self,
+        provider: LLMProvider,
+        message: MessageParam,
+        history: List[Message],
+        system_prompt: str,
+        file: FileContent | None,
+        model_type: ModelType,
+        **kwargs,
+    ) -> AsyncIterator[StreamChunk]:
         model = self._get_model_for_type(model_type, provider)
         return self._get_provider(provider).send_message_stream(
             model, message, history, system_prompt, file, **kwargs

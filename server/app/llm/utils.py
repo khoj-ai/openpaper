@@ -10,6 +10,7 @@ from typing import Any, AsyncIterator, Callable, Tuple
 import anthropic
 import httpx
 import openai
+from google.genai import errors as genai_errors
 
 logger = logging.getLogger(__name__)
 
@@ -165,6 +166,29 @@ RETRYABLE_STREAM_EXCEPTIONS = (
 # What a re-issued request can plausibly fix: the connection died with bytes
 # still owed, or the stream ran to completion having produced nothing to read.
 RETRYABLE_STREAM_FAILURES = RETRYABLE_STREAM_EXCEPTIONS + (EmptyStreamError,)
+
+
+def is_provider_outage(exc: BaseException) -> bool:
+    """Whether a request that failed like this would plausibly succeed on a
+    different provider.
+
+    True for what is wrong with the provider rather than the request: the
+    connection died, the upstream is overloaded or rate-limiting (429/5xx), the
+    stream ended with nothing to show, or the model landed on a verdict a fresh
+    draw could have cleared. A stable content block, a malformed request, or a
+    bug in our own code would fail the same way anywhere.
+    """
+    if isinstance(exc, RETRYABLE_STREAM_FAILURES):
+        return True
+    if isinstance(exc, LLMBlockedError):
+        return exc.is_resamplable
+    if isinstance(exc, genai_errors.APIError):
+        status = exc.code or 0
+    elif isinstance(exc, (openai.APIStatusError, anthropic.APIStatusError)):
+        status = exc.status_code
+    else:
+        return False
+    return status == 429 or status >= 500
 
 
 class _StreamRestart:
