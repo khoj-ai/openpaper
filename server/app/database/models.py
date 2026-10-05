@@ -84,9 +84,11 @@ class AuthProvider(str, Enum):
 
 # BASIC plans are not considered active subscriptions.
 # They are used for users who have not yet subscribed.
+# TEAM is only ever held by an Organization, never by a personal Subscription.
 class SubscriptionPlan(str, Enum):
     BASIC = "basic"
     RESEARCHER = "researcher"
+    TEAM = "team"
 
 
 # When a user has a RESEARCHER (or more advanced) subscription,
@@ -1275,12 +1277,19 @@ class Organization(Base):
 
     __tablename__ = "organizations"
 
+    __table_args__ = (CheckConstraint("plan = 'team'", name="check_organization_plan"),)
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False)
 
     # Billing: one seat-based Stripe subscription per org, paid by an admin.
     # `status` is only meaningful once a Stripe subscription exists.
-    plan = Column(String, nullable=False, default=SubscriptionPlan.RESEARCHER)
+    plan = Column(
+        String,
+        nullable=False,
+        default=SubscriptionPlan.TEAM.value,
+        server_default=SubscriptionPlan.TEAM.value,
+    )
     status = Column(String, nullable=False, default=SubscriptionStatus.INCOMPLETE)
     seats = Column(Integer, nullable=False, default=1)
     current_period_start = Column(DateTime(timezone=True), nullable=True)
@@ -1604,6 +1613,12 @@ class AudioOverview(Base):
 
 class Subscription(Base):
     __tablename__ = "subscriptions"
+
+    __table_args__ = (
+        CheckConstraint(
+            "plan IN ('basic', 'researcher')", name="check_subscription_plan"
+        ),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(

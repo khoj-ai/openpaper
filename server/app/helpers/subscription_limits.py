@@ -58,6 +58,17 @@ SUBSCRIPTION_LIMITS = {
         DISCOVER_SEARCHES_KEY: 100,
         PROJECT_PAPERS_KEY: 120,
     },
+    # Held by organizations only; each seat gets these limits individually.
+    SubscriptionPlan.TEAM: {
+        PAPER_UPLOAD_KEY: 1500,
+        KB_SIZE_KEY: 10 * 1024 * 1024,  # 10 GB in KB
+        CHAT_CREDITS_KEY: 400000,
+        AUDIO_OVERVIEWS_KEY: 250,
+        PROJECTS_KEY: 300,
+        DATA_TABLES_KEY: 150,
+        DISCOVER_SEARCHES_KEY: 300,
+        PROJECT_PAPERS_KEY: 400,
+    },
 }
 
 
@@ -79,6 +90,7 @@ def get_user_subscription_plan(db: Session, user: CurrentUser) -> SubscriptionPl
 PLAN_RANK = {
     SubscriptionPlan.BASIC: 0,
     SubscriptionPlan.RESEARCHER: 1,
+    SubscriptionPlan.TEAM: 2,
 }
 
 
@@ -444,8 +456,9 @@ def can_user_run_discover_search(
 
 
 def can_user_auto_sync_zotero(db: Session, user: CurrentUser) -> bool:
-    """Return True if the user's plan allows automatic Zotero sync (Researcher only)."""
-    return get_user_subscription_plan(db, user) == SubscriptionPlan.RESEARCHER
+    """Return True if the user's plan allows automatic Zotero sync (Researcher or above)."""
+    plan = get_user_subscription_plan(db, user)
+    return PLAN_RANK[plan] >= PLAN_RANK[SubscriptionPlan.RESEARCHER]
 
 
 def get_user_chat_credits_used_this_week(db: Session, user: CurrentUser) -> int:

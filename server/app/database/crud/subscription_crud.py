@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Union
 
 from app.database.crud.base_crud import CRUDBase
+from app.database.crud.organization_crud import organization_crud
 from app.database.models import Subscription, SubscriptionPlan, SubscriptionStatus
 from app.schemas.user import CurrentUser
 from pydantic import BaseModel
@@ -40,14 +41,16 @@ class CRUDSubscription(CRUDBase[Subscription, SubscriptionCreate, SubscriptionUp
     """CRUD operations for subscription management"""
 
     def is_user_active(self, db: Session, user: CurrentUser) -> bool:
-        """Check if the user has an active subscription"""
+        """Check if the user is on a paid plan, personally or through an organization"""
         subscription = self.get_by_user_id(db, user.id)
-        if not subscription or not subscription.current_period_end:
-            return False
         # User is active if `current_period_end` is in the future
-        return subscription.current_period_end > datetime.now(
-            tz=timezone.utc
-        )  # type: ignore
+        if (
+            subscription
+            and subscription.current_period_end
+            and subscription.current_period_end > datetime.now(tz=timezone.utc)
+        ):
+            return True
+        return bool(organization_crud.get_paid_for_user(db, user.id))
 
     def get_by_user_id(self, db: Session, user_id: uuid.UUID) -> Optional[Subscription]:
         """Get subscription by user_id"""

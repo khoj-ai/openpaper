@@ -102,7 +102,7 @@ class CurrentUser(BaseModel):
     picture: Optional[str] = None
     is_email_verified: bool = False
 
-    # is_active describes if the user account is on the RESEARCHER or BASIC plan
+    # is_active describes if the user is on a paid plan (RESEARCHER, or TEAM via an organization)
     is_active: bool = False
     is_blocked: bool = False
 

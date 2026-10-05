@@ -18,6 +18,7 @@ try:
         OrganizationCreate,
         organization_crud,
     )
+    from app.database.crud.subscription_crud import subscription_crud
     from app.database.database import SessionLocal, engine
     from app.database.models import (
         Organization,
@@ -96,6 +97,16 @@ class TestOrganizationPlanResolution(unittest.TestCase):
 
         self.assertEqual(self._plan(member), SubscriptionPlan.TEAM)
         self.assertEqual(self._plan(admin), SubscriptionPlan.TEAM)
+
+    def test_member_of_paid_org_counts_as_active(self) -> None:
+        admin, member = self._user(), self._user()
+        org = self._org(
+            admin, status=SubscriptionStatus.ACTIVE.value, period_end=self._future()
+        )
+        self._join(org, member)
+
+        self.assertTrue(subscription_crud.is_user_active(self.db, member))
+        self.assertFalse(subscription_crud.is_user_active(self.db, self._user()))
 
     def test_org_that_never_finished_checkout_grants_nothing(self) -> None:
         admin = self._user()
