@@ -58,6 +58,17 @@ SUBSCRIPTION_LIMITS = {
         DISCOVER_SEARCHES_KEY: 100,
         PROJECT_PAPERS_KEY: 120,
     },
+    # Held by organizations only; each seat gets these limits individually.
+    SubscriptionPlan.TEAM: {
+        PAPER_UPLOAD_KEY: 1500,
+        KB_SIZE_KEY: 10 * 1024 * 1024,  # 10 GB in KB
+        CHAT_CREDITS_KEY: 300000,
+        AUDIO_OVERVIEWS_KEY: 150,
+        PROJECTS_KEY: 300,
+        DATA_TABLES_KEY: 75,
+        DISCOVER_SEARCHES_KEY: 300,
+        PROJECT_PAPERS_KEY: 400,
+    },
 }
 
 
@@ -79,7 +90,24 @@ def get_user_subscription_plan(db: Session, user: CurrentUser) -> SubscriptionPl
 PLAN_RANK = {
     SubscriptionPlan.BASIC: 0,
     SubscriptionPlan.RESEARCHER: 1,
+    SubscriptionPlan.TEAM: 2,
 }
+
+# How each plan is named in messages to the user.
+PLAN_NAMES = {
+    SubscriptionPlan.BASIC: "Basic",
+    SubscriptionPlan.RESEARCHER: "Researcher",
+    SubscriptionPlan.TEAM: "Team",
+}
+
+
+def limit_reached_message(
+    plan: SubscriptionPlan, reached: str, *, upgrade: str, otherwise: str
+) -> str:
+    """Tell someone which plan's limit they reached and what they can do next,
+    suggesting an upgrade only when a higher plan exists."""
+    next_step = otherwise if PLAN_RANK[plan] == max(PLAN_RANK.values()) else upgrade
+    return f"{reached} for the {PLAN_NAMES[plan]} plan. {next_step}"
 
 
 def _get_personal_plan(db: Session, user: CurrentUser) -> SubscriptionPlan:
@@ -158,13 +186,14 @@ def can_user_upload_paper(db: Session, user: CurrentUser) -> tuple[bool, Optiona
                 "plan": plan.value,
             },
         )
-        plan_name = {
-            SubscriptionPlan.BASIC: "Basic",
-            SubscriptionPlan.RESEARCHER: "Researcher",
-        }.get(plan, "Basic")
         return (
             False,
-            f"You have reached your paper upload limit ({int(paper_limit)} papers) for the {plan_name} plan. Please upgrade your subscription to upload more papers, or delete existing papers to free up space.",
+            limit_reached_message(
+                plan,
+                f"You have reached your paper upload limit ({int(paper_limit)} papers)",
+                upgrade="Please upgrade your subscription to upload more papers, or delete existing papers to free up space.",
+                otherwise="Delete existing papers to free up space.",
+            ),
         )
 
     return True, None
@@ -207,13 +236,14 @@ def can_user_add_papers_to_project(
                 "plan": plan.value,
             },
         )
-        plan_name = {
-            SubscriptionPlan.BASIC: "Basic",
-            SubscriptionPlan.RESEARCHER: "Researcher",
-        }.get(plan, "Basic")
         return (
             False,
-            f"This project has reached its limit of {int(project_paper_limit)} papers for the {plan_name} plan. Please upgrade your subscription or remove papers from this project to add more.",
+            limit_reached_message(
+                plan,
+                f"This project has reached its limit of {int(project_paper_limit)} papers",
+                upgrade="Please upgrade your subscription or remove papers from this project to add more.",
+                otherwise="Remove papers from this project to add more.",
+            ),
         )
 
     return True, None
@@ -250,13 +280,14 @@ def can_user_create_audio_overview(
                 "plan": plan.value,
             },
         )
-        plan_name = {
-            SubscriptionPlan.BASIC: "Basic",
-            SubscriptionPlan.RESEARCHER: "Researcher",
-        }.get(plan, "Basic")
         return (
             False,
-            f"You have reached your audio overview limit ({int(audio_overview_limit)} audio overviews per week) for the {plan_name} plan. Please upgrade your subscription to create more audio overviews.",
+            limit_reached_message(
+                plan,
+                f"You have reached your audio overview limit ({int(audio_overview_limit)} audio overviews per week)",
+                upgrade="Please upgrade your subscription to create more audio overviews.",
+                otherwise="The limit resets on Monday at 00:00 UTC.",
+            ),
         )
 
     return True, None
@@ -295,13 +326,14 @@ def can_user_create_project(
                 "plan": plan.value,
             },
         )
-        plan_name = {
-            SubscriptionPlan.BASIC: "Basic",
-            SubscriptionPlan.RESEARCHER: "Researcher",
-        }.get(plan, "Basic")
         return (
             False,
-            f"You have reached your project limit ({int(project_limit)} projects) for the {plan_name} plan. Please upgrade your subscription to create more projects.",
+            limit_reached_message(
+                plan,
+                f"You have reached your project limit ({int(project_limit)} projects)",
+                upgrade="Please upgrade your subscription to create more projects.",
+                otherwise="Delete a project you no longer need to create another.",
+            ),
         )
 
     return True, None
@@ -338,13 +370,14 @@ def can_user_access_knowledge_base(
                 "plan": plan.value,
             },
         )
-        plan_name = {
-            SubscriptionPlan.BASIC: "Basic",
-            SubscriptionPlan.RESEARCHER: "Researcher",
-        }.get(plan, "Basic")
         return (
             False,
-            f"You have reached your knowledge base size limit ({int(kb_limit)} MB) for the {plan_name} plan. Please upgrade your subscription to access more data.",
+            limit_reached_message(
+                plan,
+                f"You have reached your knowledge base size limit ({int(kb_limit)} MB)",
+                upgrade="Please upgrade your subscription to access more data.",
+                otherwise="Delete existing papers to free up space.",
+            ),
         )
 
     return True, None
@@ -383,13 +416,14 @@ def can_user_create_data_table_job(
                 "plan": plan.value,
             },
         )
-        plan_name = {
-            SubscriptionPlan.BASIC: "Basic",
-            SubscriptionPlan.RESEARCHER: "Researcher",
-        }.get(plan, "Basic")
         return (
             False,
-            f"You have reached your data table extraction job limit ({int(data_table_limit)} jobs per week) for the {plan_name} plan. Please upgrade your subscription to create more data table extraction jobs.",
+            limit_reached_message(
+                plan,
+                f"You have reached your data table extraction job limit ({int(data_table_limit)} jobs per week)",
+                upgrade="Please upgrade your subscription to create more data table extraction jobs.",
+                otherwise="The limit resets on Monday at 00:00 UTC.",
+            ),
         )
 
     return True, None
@@ -424,21 +458,23 @@ def can_user_run_discover_search(
                 "plan": plan.value,
             },
         )
-        plan_name = {
-            SubscriptionPlan.BASIC: "Basic",
-            SubscriptionPlan.RESEARCHER: "Researcher",
-        }.get(plan, "Basic")
         return (
             False,
-            f"You have reached your discover search limit ({int(search_limit)} searches per week) for the {plan_name} plan. Please upgrade your subscription to run more discover searches.",
+            limit_reached_message(
+                plan,
+                f"You have reached your discover search limit ({int(search_limit)} searches per week)",
+                upgrade="Please upgrade your subscription to run more discover searches.",
+                otherwise="The limit resets on Monday at 00:00 UTC.",
+            ),
         )
 
     return True, None
 
 
 def can_user_auto_sync_zotero(db: Session, user: CurrentUser) -> bool:
-    """Return True if the user's plan allows automatic Zotero sync (Researcher only)."""
-    return get_user_subscription_plan(db, user) == SubscriptionPlan.RESEARCHER
+    """Return True if the user's plan allows automatic Zotero sync (Researcher or above)."""
+    plan = get_user_subscription_plan(db, user)
+    return PLAN_RANK[plan] >= PLAN_RANK[SubscriptionPlan.RESEARCHER]
 
 
 def get_user_chat_credits_used_this_week(db: Session, user: CurrentUser) -> int:

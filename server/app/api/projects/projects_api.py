@@ -48,9 +48,7 @@ async def create_project(
             )
             return JSONResponse(
                 status_code=403,
-                content={
-                    "message": "Project creation limit reached. Please upgrade your subscription plan."
-                },
+                content={"message": reason},
             )
 
         project = project_crud.create(

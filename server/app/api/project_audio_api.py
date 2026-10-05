@@ -52,9 +52,7 @@ async def create_project_audio_overview(
         )
         return JSONResponse(
             status_code=403,
-            content={
-                "message": "Audio overview creation limit reached. Please upgrade your subscription plan."
-            },
+            content={"message": reason},
         )
 
     project = project_crud.get(db, id=project_id, user=current_user)
