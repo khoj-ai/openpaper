@@ -10,6 +10,7 @@ import {
     Settings,
     Sun,
     User as UserIcon,
+    Users,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -81,6 +82,12 @@ export const UserMenuContent = ({
             <Button variant="ghost" className="w-full justify-start">
                 <MessageCircleQuestion size={16} className="mr-2" />
                 Feedback
+            </Button>
+        </Link>
+        <Link href="/team" className="w-full">
+            <Button variant="ghost" className="w-full justify-start">
+                <Users size={16} className="mr-2" />
+                Team
             </Button>
         </Link>
         <Link href="/pricing" className="w-full">

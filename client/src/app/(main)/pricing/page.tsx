@@ -14,6 +14,7 @@ import { SubscriptionStatus, UserSubscription } from "@/lib/schema";
 import PricingTable from "./pricingTable";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
+import { TEAM_MONTHLY_PRICE_PER_SEAT, TEAM_YEARLY_PRICE_PER_SEAT } from "@/components/team/teamPricing";
 import { useRouter } from "next/navigation";
 
 const monthlyPrice = 12;
@@ -605,35 +606,41 @@ export default function PricingPage() {
                 />
 
                 {/* Teams Plan */}
-                <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 opacity-60 relative">
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                        <Badge variant="secondary" className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-0">
-                            Coming Soon
-                        </Badge>
-                    </div>
+                <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
                     <CardHeader className="pb-4">
                         <div className="space-y-2">
                             <CardTitle className="text-xl font-medium text-slate-900 dark:text-slate-100">
                                 Teams
                             </CardTitle>
                             <CardDescription className="text-slate-600 dark:text-slate-400">
-                                For research teams and organizations
+                                For labs and research groups, billed to one admin
                             </CardDescription>
                         </div>
                         <div className="pt-4">
                             <div className="text-3xl font-light text-slate-900 dark:text-slate-100">
-                                TBD
-                                <span className="text-lg font-normal text-slate-500 dark:text-slate-400">/month</span>
+                                ${isAnnual ? Math.round(TEAM_YEARLY_PRICE_PER_SEAT / 12) : TEAM_MONTHLY_PRICE_PER_SEAT}
+                                <span className="text-lg font-normal text-slate-500 dark:text-slate-400">/seat/month</span>
                             </div>
+                            {isAnnual && (
+                                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                                    Billed annually at ${TEAM_YEARLY_PRICE_PER_SEAT}/seat/year
+                                </p>
+                            )}
                         </div>
                     </CardHeader>
                     <CardContent>
                         <Button
-                            className="w-full font-medium border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400"
+                            className="w-full font-medium"
                             variant="outline"
-                            disabled
+                            onClick={() => {
+                                if (!user) {
+                                    setIsModalOpen(true);
+                                    return;
+                                }
+                                router.push("/team");
+                            }}
                         >
-                            Coming Soon
+                            Set up a team
                         </Button>
                     </CardContent>
                 </Card>
