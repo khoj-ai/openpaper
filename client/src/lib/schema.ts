@@ -696,7 +696,7 @@ export interface SubscriptionUsage {
 }
 
 export interface SubscriptionData {
-    plan: 'basic' | 'researcher';
+    plan: 'basic' | 'researcher' | 'team';
     limits: SubscriptionLimits;
     usage: SubscriptionUsage;
 }

@@ -14,6 +14,8 @@ import {
     getProjectUsagePercentage,
     getDataTableUsagePercentage,
     getDiscoverSearchUsagePercentage,
+    isPaidPlan,
+    PLAN_LABELS,
 } from "@/hooks/useSubscription";
 
 export const UsageLimitCard = ({
@@ -73,8 +75,8 @@ export const UsageLimitCard = ({
         <div className="p-4 space-y-4">
             <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold">Usage Limits</h3>
-                <Badge variant={subscription.plan === 'researcher' ? "default" : "secondary"}>
-                    {subscription.plan === 'researcher' ? 'Researcher' : 'Basic'}
+                <Badge variant={isPaidPlan(subscription.plan) ? "default" : "secondary"}>
+                    {PLAN_LABELS[subscription.plan]}
                 </Badge>
             </div>
 
@@ -133,7 +135,7 @@ export const UsageLimitCard = ({
             <div className="pt-2 border-t">
                 <Link href="/pricing" className="w-full">
                     <Button size="sm" className="w-full">
-                        {subscription.plan === 'researcher' ? 'Manage' : 'Upgrade'}
+                        {isPaidPlan(subscription.plan) ? 'Manage' : 'Upgrade'}
                     </Button>
                 </Link>
             </div>

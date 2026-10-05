@@ -47,7 +47,7 @@ import React, { useState, useRef, useEffect, useMemo, useCallback, FormEvent } f
 import { toast } from "sonner";
 import { fetchFromApi, fetchStreamFromApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { useSubscription, getChatCreditUsagePercentage, isChatCreditAtLimit, isChatCreditNearLimit } from '@/hooks/useSubscription';
+import { isPaidPlan, useSubscription, getChatCreditUsagePercentage, isChatCreditAtLimit, isChatCreditNearLimit } from '@/hooks/useSubscription';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { getAlphaHashToBackgroundColor, getInitials } from '@/lib/utils';
 
@@ -1145,12 +1145,12 @@ export function SidePanelContent({
                                                                 <DropdownMenuSubTrigger className="flex items-center">
                                                                     <Sparkle className="mr-2 h-4 w-4" />
                                                                     <span className="flex-1">Model {selectedModel ? `(${availableModels[selectedModel]})` : ''}</span>
-                                                                    {subscription && subscription.plan !== 'researcher' && (
+                                                                    {subscription && !isPaidPlan(subscription.plan) && (
                                                                         <LockIcon className="ml-2 h-3 w-3 text-muted-foreground" />
                                                                     )}
                                                                 </DropdownMenuSubTrigger>
                                                                 <DropdownMenuSubContent>
-                                                                    {subscription && subscription.plan !== 'researcher' ? (
+                                                                    {subscription && !isPaidPlan(subscription.plan) ? (
                                                                         <>
                                                                             {Object.entries(availableModels).map(([modelKey, modelName]) => (
                                                                                 <DropdownMenuItem

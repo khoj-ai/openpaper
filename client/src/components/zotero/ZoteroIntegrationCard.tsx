@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { refreshActivePapers, useActivePapers } from "@/hooks/useActivePapers";
-import { isPaperUploadAtLimit, useSubscription } from "@/hooks/useSubscription";
+import { isPaidPlan, isPaperUploadAtLimit, useSubscription } from "@/hooks/useSubscription";
 import { fetchFromApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { Loader2, RefreshCw } from "lucide-react";
@@ -39,7 +39,7 @@ export function ZoteroIntegrationCard() {
 	const paperUploadsRemaining = subscription?.usage?.paper_uploads_remaining ?? null;
 	const paperUploadsTotal = subscription?.limits?.paper_uploads ?? null;
 	const paperUploadsUsed = subscription?.usage?.paper_uploads ?? null;
-	const hasAutoSync = subscription?.plan === "researcher";
+	const hasAutoSync = isPaidPlan(subscription?.plan);
 	const [zoteroStatus, setZoteroStatus] = useState<ZoteroStatus | null>(null);
 	const [zoteroLoading, setZoteroLoading] = useState(true);
 	const [zoteroActionLoading, setZoteroActionLoading] = useState(false);

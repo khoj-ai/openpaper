@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/sheet";
 import { User } from "@/lib/auth";
 import { SubscriptionData } from "@/lib/schema";
+import { PLAN_LABELS } from "@/hooks/useSubscription";
 import { UserAvatar, UserMenuContent } from "./UserMenuContent";
 import { UsageLimitCard } from "./UsageLimitCard";
 import { ReferralEntry } from "./referralEntry";
@@ -98,7 +99,7 @@ export function AppSidebarFooter({
                                 variant={user.is_active ? "default" : "secondary"}
                                 className={`w-fit justify-center cursor-pointer hover:opacity-80 transition-opacity ${user.is_active ? "bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-200" : "bg-gray-100 text-gray-800"}`}
                             >
-                                {user.is_active ? "Researcher" : "Basic"}
+                                {subscription ? PLAN_LABELS[subscription.plan] : user.is_active ? "Researcher" : "Basic"}
                             </Badge>
                         </PopoverTrigger>
                         <PopoverContent className="w-80 p-0" align="start">
