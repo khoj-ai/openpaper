@@ -14,6 +14,7 @@ from typing import Dict, Optional
 from app.database.crud.audio_overview_crud import audio_overview_crud
 from app.database.crud.discover_crud import discover_search_crud
 from app.database.crud.message_crud import message_crud
+from app.database.crud.organization_crud import organization_crud
 from app.database.crud.paper_crud import paper_crud
 from app.database.crud.projects.project_crud import project_crud
 from app.database.crud.projects.project_data_table_crud import data_table_job_crud
@@ -62,9 +63,26 @@ SUBSCRIPTION_LIMITS = {
 
 def get_user_subscription_plan(db: Session, user: CurrentUser) -> SubscriptionPlan:
     """
-    Get the user's current subscription plan.
-    Returns BASIC if no active subscription is found.
+    Get the user's current subscription plan: the best of their personal
+    subscription and the plans of any paid-up organizations they belong to.
+    Returns BASIC if none of those are active.
     """
+    plans = [_get_personal_plan(db, user)]
+    plans += [
+        SubscriptionPlan(org.plan)
+        for org in organization_crud.get_paid_for_user(db, user.id)
+    ]
+    return max(plans, key=PLAN_RANK.__getitem__)
+
+
+# Higher rank wins when a user is covered by more than one plan.
+PLAN_RANK = {
+    SubscriptionPlan.BASIC: 0,
+    SubscriptionPlan.RESEARCHER: 1,
+}
+
+
+def _get_personal_plan(db: Session, user: CurrentUser) -> SubscriptionPlan:
     subscription = subscription_crud.get_by_user_id(db, user.id)
 
     if not subscription:

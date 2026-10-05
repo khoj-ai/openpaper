@@ -106,6 +106,11 @@ class ProjectRoles(str, Enum):
     VIEWER = "viewer"
 
 
+class OrganizationRoles(str, Enum):
+    ADMIN = "admin"
+    MEMBER = "member"
+
+
 class ReferralStatus(str, Enum):
     ATTRIBUTED = "attributed"
     CREDIT_PENDING = "credit_pending"
@@ -191,6 +196,9 @@ class User(Base):
     )
 
     project_roles = relationship("ProjectRole", back_populates="user")
+    organization_memberships = relationship(
+        "OrganizationMembership", back_populates="user", cascade="all, delete-orphan"
+    )
     paper_tags = relationship(
         "PaperTag", back_populates="user", cascade="all, delete-orphan"
     )
@@ -1257,6 +1265,95 @@ class ProjectRole(Base):
 
     project = relationship("Project", back_populates="project_roles")
     user = relationship("User", back_populates="project_roles")
+
+
+class Organization(Base):
+    """
+    A team (e.g., a lab group) whose admin pays for seats on behalf of its members.
+    Members get the org's plan limits; papers, projects, etc. stay user-owned.
+    """
+
+    __tablename__ = "organizations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String, nullable=False)
+
+    # Billing: one seat-based Stripe subscription per org, paid by an admin.
+    # `status` is only meaningful once a Stripe subscription exists.
+    plan = Column(String, nullable=False, default=SubscriptionPlan.RESEARCHER)
+    status = Column(String, nullable=False, default=SubscriptionStatus.INCOMPLETE)
+    seats = Column(Integer, nullable=False, default=1)
+    current_period_start = Column(DateTime(timezone=True), nullable=True)
+    current_period_end = Column(DateTime(timezone=True), nullable=True)
+    cancel_at_period_end = Column(Boolean, default=False)
+    canceled_at = Column(DateTime(timezone=True), nullable=True)
+    stripe_customer_id = Column(String, nullable=True)
+    stripe_subscription_id = Column(String, nullable=True, unique=True)
+    stripe_price_id = Column(String, nullable=True)
+
+    memberships = relationship(
+        "OrganizationMembership",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+    )
+    invitations = relationship(
+        "OrganizationInvitation",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+    )
+
+
+class OrganizationMembership(Base):
+    __tablename__ = "organization_membership"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "organization_id", "user_id", name="uq_organization_membership_org_user"
+        ),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    role = Column(String, nullable=False, default=OrganizationRoles.MEMBER)
+
+    organization = relationship("Organization", back_populates="memberships")
+    user = relationship("User", back_populates="organization_memberships")
+
+
+class OrganizationInvitation(Base):
+    """
+    A pending seat in an organization. Only the account whose email exactly
+    matches `email` can accept it, so a forwarded invite can't hand out a paid seat.
+    """
+
+    __tablename__ = "organization_invitations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    email = Column(String, nullable=False, index=True)
+    invited_by = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    role = Column(String, nullable=False, default=OrganizationRoles.MEMBER)
+    invited_at = Column(DateTime(timezone=True), server_default=func.now())
+    accepted_at = Column(DateTime(timezone=True), nullable=True)
+
+    organization = relationship("Organization", back_populates="invitations")
+    inviter = relationship("User", foreign_keys=[invited_by])
 
 
 class ProjectPaper(Base):
