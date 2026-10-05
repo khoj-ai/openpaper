@@ -707,3 +707,58 @@ export interface UseSubscriptionReturn {
     error: string | null;
     refetch: () => Promise<void>;
 }
+
+export type TeamRole = 'admin' | 'member';
+
+export interface Team {
+    id: string;
+    name: string;
+    plan: 'team';
+    status: string;
+    is_paid: boolean;
+    seats: number;
+    current_period_end: string | null;
+    cancel_at_period_end: boolean;
+    role: TeamRole | null;
+}
+
+export interface TeamMember {
+    user_id: string;
+    name: string | null;
+    email: string | null;
+    picture: string | null;
+    role: TeamRole;
+    joined_at: string | null;
+}
+
+export interface TeamInvitation {
+    id: string;
+    email: string;
+    role: TeamRole;
+    invited_at: string | null;
+}
+
+export interface MyTeamInvitation extends TeamInvitation {
+    organization_id: string;
+    organization_name: string;
+    invited_by: string | null;
+}
+
+export interface TeamDetail {
+    organization: Team;
+    members: TeamMember[];
+    // Admin-only
+    invitations?: TeamInvitation[];
+    seats_taken?: number;
+}
+
+export interface TeamMemberUsage extends TeamMember {
+    plan: SubscriptionData['plan'];
+    limits: SubscriptionLimits;
+    usage: SubscriptionUsage;
+}
+
+export interface MyTeamsResponse {
+    organizations: Team[];
+    has_active_personal_subscription: boolean;
+}

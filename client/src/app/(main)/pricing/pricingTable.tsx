@@ -22,37 +22,37 @@ const features: PricingFeature[] = [
         name: "Paper uploads",
         basic: "10",
         researcher: "500",
-        teams: "unlimited"
+        teams: "1,500"
     },
     {
         name: "Knowledge base size",
         basic: "200 MB",
         researcher: "3 GB",
-        teams: "50 GB"
+        teams: "10 GB"
     },
     {
         name: "Chat credits (weekly)",
         basic: "5000",
         researcher: "150,000",
-        teams: "unlimited"
+        teams: "400,000"
     },
     {
         name: "Audio overviews (weekly)",
         basic: "5",
         researcher: "100",
-        teams: "unlimited"
+        teams: "250"
     },
     {
         name: "Projects",
         basic: "2",
         researcher: "100",
-        teams: "500"
+        teams: "300"
     },
     {
         name: "Data tables",
         basic: "2",
         researcher: "50",
-        teams: "100"
+        teams: "150"
     }
 ];
 
@@ -144,11 +144,6 @@ export default function PricingTable({
                                             Recommended
                                         </Badge>
                                     )}
-                                    {option.value === "teams" && (
-                                        <Badge variant="outline" className="ml-2 text-xs">
-                                            Coming Soon
-                                        </Badge>
-                                    )}
                                 </SelectItem>
                             ))}
                         </SelectContent>
@@ -172,12 +167,10 @@ export default function PricingTable({
                                         {canResubscribe && !isActiveSubscription && <Clock className="h-4 w-4 text-amber-600" />}
                                     </div>
                                 </th>
-                                <th className="text-center p-2 sm:p-4 font-semibold min-w-[80px] text-muted-foreground">
+                                <th className="text-center p-2 sm:p-4 font-semibold min-w-[80px]">
                                     <div className="flex flex-col items-center gap-1">
                                         Teams
-                                        <Badge variant="outline" className="text-xs">
-                                            Coming Soon
-                                        </Badge>
+                                        <span className="text-xs font-normal text-muted-foreground">per seat</span>
                                     </div>
                                 </th>
                             </tr>
@@ -227,9 +220,6 @@ export default function PricingTable({
                             <CardTitle className="text-lg capitalize">{selectedPlan} Plan</CardTitle>
                             {selectedPlan === "researcher" && (
                                 <Badge className="w-fit bg-blue-600 dark:bg-blue-400">Recommended</Badge>
-                            )}
-                            {selectedPlan === "teams" && (
-                                <Badge variant="secondary" className="w-fit">Coming Soon</Badge>
                             )}
                         </CardHeader>
                         <CardContent className="space-y-4">
