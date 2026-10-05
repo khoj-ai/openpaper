@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import stripe
+from app.api.organization.stripe_events import handle_team_stripe_event
 from app.api.referral.service import handle_referee_converted
 from app.api.subscription.config import (
     MONTHLY_PRICE_ID,
@@ -83,6 +84,11 @@ async def handle_stripe_webhook(
         ]:
             logger.info(f"Skipping unsupported event type: {event_type}")
             return {"success": False}
+
+        # Team subscriptions are handled on their own; everything else is a
+        # personal subscription. Errors here propagate so Stripe retries.
+        if handle_team_stripe_event(db, event):
+            return {"success": True}
 
         if event_type == "checkout.session.completed":
             session = event["data"]["object"]

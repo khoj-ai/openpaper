@@ -475,11 +475,15 @@ def get_user_audio_overviews_used_this_month(db: Session, user: CurrentUser) -> 
     return audio_overview_crud.get_audio_overviews_used_this_week(db, current_user=user)
 
 
-def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
+def get_user_usage_info(
+    db: Session, user: CurrentUser, track_high_usage: bool = True
+) -> Dict:
     """
     Get comprehensive usage information for a user.
 
-    Returns a dictionary with current usage and limits.
+    Returns a dictionary with current usage and limits. Pass
+    `track_high_usage=False` when someone else is looking at this user's usage
+    (e.g., a team admin), so it isn't logged as the user nearing a limit.
     """
     plan = get_user_subscription_plan(db, user)
     limits = get_plan_limits(plan)
@@ -544,7 +548,7 @@ def get_user_usage_info(db: Session, user: CurrentUser) -> Dict:
         else 0
     )
 
-    HIGH_USAGE_THRESHOLD = 75
+    HIGH_USAGE_THRESHOLD = 75 if track_high_usage else float("inf")
 
     # Track event if usage is > 75%
     if paper_usage_percentage > HIGH_USAGE_THRESHOLD:

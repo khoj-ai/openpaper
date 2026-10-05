@@ -22,6 +22,7 @@ from app.api.discover_api import discover_router
 from app.api.highlight_api import highlight_router
 from app.api.message_api import message_router
 from app.api.onboarding_api import onboarding_router
+from app.api.organization import organization_billing_router, organization_router
 from app.api.paper_api import paper_router
 from app.api.paper_audio_api import paper_audio_router
 from app.api.paper_image_api import paper_image_router
@@ -98,6 +99,8 @@ app.include_router(onboarding_router, prefix="/api/onboarding")
 app.include_router(discover_router, prefix="/api/discover")
 app.include_router(referral_router, prefix="/api/referral")
 app.include_router(zotero_router, prefix="/api/zotero")
+app.include_router(organization_router, prefix="/api/organization")
+app.include_router(organization_billing_router, prefix="/api/organization")
 
 setup_admin(app)  # Setup admin interface
 
