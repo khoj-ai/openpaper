@@ -1360,6 +1360,9 @@ class OrganizationInvitation(Base):
     role = Column(String, nullable=False, default=OrganizationRoles.MEMBER)
     invited_at = Column(DateTime(timezone=True), server_default=func.now())
     accepted_at = Column(DateTime(timezone=True), nullable=True)
+    # Invitations can be added while setting up a team, before it's paid for.
+    # The email goes out once the team is paid; until then this stays NULL.
+    email_sent_at = Column(DateTime(timezone=True), nullable=True)
 
     organization = relationship("Organization", back_populates="invitations")
     inviter = relationship("User", foreign_keys=[invited_by])

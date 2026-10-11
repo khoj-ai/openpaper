@@ -4,6 +4,7 @@ paid by an admin; the subscription quantity is the number of seats.
 """
 
 import logging
+import time
 import uuid
 
 import stripe
@@ -18,10 +19,15 @@ from app.api.subscription.config import (
     SubscriptionInterval,
 )
 from app.auth.dependencies import get_required_user
-from app.database.crud.organization_crud import organization_crud
+from app.database.crud.organization_crud import (
+    LIVE_STATUSES,
+    MAX_SEATS,
+    organization_crud,
+)
 from app.database.database import get_db
-from app.database.models import OrganizationRoles, SubscriptionStatus
+from app.database.models import OrganizationRoles, SubscriptionPlan, SubscriptionStatus
 from app.database.telemetry import track_event
+from app.helpers.subscription_limits import SUBSCRIPTION_LIMITS
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -31,15 +37,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-MAX_SEATS = 500
-
-# Statuses where the team already has a live subscription to manage, rather
-# than one to buy.
-LIVE_STATUSES = [
-    SubscriptionStatus.ACTIVE.value,
-    SubscriptionStatus.TRIALING.value,
-    SubscriptionStatus.PAST_DUE.value,
-]
+# Prices live in Stripe, so trying a new price means swapping the configured
+# price IDs; no client change. Cached briefly to keep Stripe off the hot path.
+PRICING_CACHE_SECONDS = 600
+_pricing_cache: dict = {"expires_at": 0.0, "value": None}
 
 
 class CheckoutRequest(BaseModel):
@@ -61,6 +62,41 @@ def _ensure_enough_seats(db: Session, organization_id: uuid.UUID, seats: int) ->
                 "Remove someone or retract an invitation first."
             ),
         )
+
+
+def _price_per_seat(price_id: str) -> dict:
+    price = stripe.Price.retrieve(price_id)
+    return {"amount": price.unit_amount / 100, "currency": price.currency}
+
+
+@router.get("/pricing")
+def get_team_pricing():
+    """Per-seat team prices and what each seat gets, next to the Researcher plan."""
+    if _pricing_cache["value"] and _pricing_cache["expires_at"] > time.time():
+        return _pricing_cache["value"]
+    if not TEAM_MONTHLY_PRICE_ID or not TEAM_YEARLY_PRICE_ID:
+        raise HTTPException(status_code=500, detail="Team price ID not configured")
+
+    try:
+        monthly = _price_per_seat(TEAM_MONTHLY_PRICE_ID)
+        yearly = _price_per_seat(TEAM_YEARLY_PRICE_ID)
+    except Exception as e:
+        logger.error(f"Error fetching team prices: {e}", exc_info=True)
+        raise HTTPException(status_code=502, detail="Could not load pricing")
+
+    value = {
+        "currency": monthly["currency"],
+        "monthly_per_seat": monthly["amount"],
+        "yearly_per_seat": yearly["amount"],
+        "limits": {
+            SubscriptionPlan.TEAM.value: SUBSCRIPTION_LIMITS[SubscriptionPlan.TEAM],
+            SubscriptionPlan.RESEARCHER.value: SUBSCRIPTION_LIMITS[
+                SubscriptionPlan.RESEARCHER
+            ],
+        },
+    }
+    _pricing_cache.update(value=value, expires_at=time.time() + PRICING_CACHE_SECONDS)
+    return value
 
 
 @router.post("/{organization_id}/checkout")

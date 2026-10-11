@@ -5,32 +5,35 @@ invitations, and let admins see how each seat is being used.
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
+from app.api.organization.invitation_emails import send_held_invitations
 from app.auth.dependencies import get_required_user
 from app.database.crud.organization_crud import (
-    ACTIVE_STATUSES,
     OrganizationCreate,
     OrganizationError,
+    is_paid,
     organization_crud,
     organization_invitation_crud,
 )
 from app.database.crud.subscription_crud import subscription_crud
 from app.database.database import get_db
 from app.database.models import (
+    Message,
     Organization,
     OrganizationInvitation,
     OrganizationMembership,
     OrganizationRoles,
+    Paper,
     SubscriptionStatus,
 )
 from app.database.telemetry import track_event
-from app.helpers.email import send_organization_invite_email
 from app.helpers.subscription_limits import get_user_usage_info
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -54,14 +57,6 @@ class InviteRequest(BaseModel):
 
 class SetRoleRequest(BaseModel):
     role: OrganizationRoles
-
-
-def is_paid(organization: Organization) -> bool:
-    return bool(
-        organization.status in ACTIVE_STATUSES
-        and organization.current_period_end
-        and organization.current_period_end > datetime.now(timezone.utc)
-    )
 
 
 def serialize_organization(
@@ -105,6 +100,8 @@ def serialize_invitation(invitation: OrganizationInvitation) -> Dict:
         "invited_at": (
             invitation.invited_at.isoformat() if invitation.invited_at else None
         ),
+        # False while the team is being set up; the email goes out once it's paid.
+        "sent": invitation.email_sent_at is not None,
     }
 
 
@@ -319,16 +316,12 @@ def invite_members(
     current_user: CurrentUser = Depends(get_required_user),
 ):
     """Invite people by email. Each invitation holds a seat until it's accepted,
-    rejected, or retracted. Returns per-email results so one full seat or
-    existing member doesn't fail the whole batch."""
+    rejected, or retracted. On a team that's still being set up, invitations
+    are held and emailed once checkout goes through. Returns per-email results
+    so one full seat or existing member doesn't fail the whole batch."""
     organization = get_organization_for_admin(db, organization_id, current_user)
-    if not is_paid(organization):
-        raise HTTPException(
-            status_code=400,
-            detail="Buy seats for this team before inviting people.",
-        )
 
-    invited: List[Dict] = []
+    invited: List[OrganizationInvitation] = []
     failed: List[Dict] = []
     for email in request.emails:
         try:
@@ -342,12 +335,9 @@ def invite_members(
             failed.append({"email": str(email), "error": str(e)})
             continue
 
-        invited.append(serialize_invitation(invitation))
-        send_organization_invite_email(
-            to_email=str(invitation.email),
-            from_name=current_user.name or current_user.email,
-            organization_name=str(organization.name),
-        )
+        invited.append(invitation)
+
+    send_held_invitations(db, organization)
 
     if invited:
         track_event(
@@ -359,7 +349,12 @@ def invite_members(
             user_id=str(current_user.id),
             db=db,
         )
-    return {"invited": invited, "failed": failed}
+    for invitation in invited:
+        db.refresh(invitation)
+    return {
+        "invited": [serialize_invitation(i) for i in invited],
+        "failed": failed,
+    }
 
 
 @router.delete("/{organization_id}/invitations/{invitation_id}")
@@ -419,33 +414,115 @@ def set_member_role(
     return serialize_member(membership)
 
 
+def get_member_activity(
+    db: Session, user_ids: List[uuid.UUID]
+) -> Dict[uuid.UUID, Dict]:
+    """For each user: when they last asked a question or opened a paper, how
+    many questions they asked this week, and how many papers they opened in
+    the last 30 days."""
+    now = datetime.now(timezone.utc)
+    week_ago, month_ago = now - timedelta(days=7), now - timedelta(days=30)
+    activity: Dict[uuid.UUID, Dict] = {
+        user_id: {
+            "last_active_at": None,
+            "questions_this_week": 0,
+            "papers_opened_this_month": 0,
+        }
+        for user_id in user_ids
+    }
+    if not user_ids:
+        return activity
+
+    message_rows = (
+        db.query(
+            Message.user_id,
+            func.max(Message.created_at),
+            func.count(Message.id).filter(Message.created_at >= week_ago),
+        )
+        .filter(Message.user_id.in_(user_ids), Message.role == "user")
+        .group_by(Message.user_id)
+        .all()
+    )
+    paper_rows = (
+        db.query(
+            Paper.user_id,
+            func.max(Paper.last_accessed_at),
+            func.count(Paper.id).filter(Paper.last_accessed_at >= month_ago),
+        )
+        .filter(Paper.user_id.in_(user_ids))
+        .group_by(Paper.user_id)
+        .all()
+    )
+
+    for user_id, last_message_at, questions in message_rows:
+        activity[user_id]["last_active_at"] = last_message_at
+        activity[user_id]["questions_this_week"] = questions
+    for user_id, last_opened_at, papers_opened in paper_rows:
+        current = activity[user_id]["last_active_at"]
+        if last_opened_at and (current is None or last_opened_at > current):
+            activity[user_id]["last_active_at"] = last_opened_at
+        activity[user_id]["papers_opened_this_month"] = papers_opened
+    return activity
+
+
 @router.get("/{organization_id}/usage")
 def get_organization_usage(
     organization_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_required_user),
 ):
-    """Per-seat usage for admins. Limits apply to each seat individually, so this
-    is a breakdown by member rather than a pooled total."""
+    """Per-seat usage for admins, plus a team summary. Limits apply to each
+    seat individually, so this is a breakdown by member rather than a pooled
+    total. The summary is what an admin needs to judge whether the plan is
+    worth renewing."""
     get_organization_for_admin(db, organization_id, current_user)
 
+    memberships = [
+        m for m in organization_crud.get_members(db, organization_id) if m.user
+    ]
+    activity = get_member_activity(db, [uuid.UUID(str(m.user_id)) for m in memberships])
+    week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+
     members = []
-    for membership in organization_crud.get_members(db, organization_id):
+    for membership in memberships:
         user = membership.user
-        if not user:
-            continue
+        user_id = uuid.UUID(str(user.id))
         member_as_user = CurrentUser(
-            id=uuid.UUID(str(user.id)),
+            id=user_id,
             email=str(user.email),
             name=user.name,  # type: ignore[arg-type]
         )
         usage_info = get_user_usage_info(db, member_as_user, track_high_usage=False)
+        member_activity = activity[user_id]
+        last_active_at = member_activity["last_active_at"]
         members.append(
             {
                 **serialize_member(membership),
                 "plan": usage_info["plan"],
                 "limits": usage_info["limits"],
                 "usage": usage_info["usage"],
+                "last_active_at": (
+                    last_active_at.isoformat() if last_active_at else None
+                ),
+                "questions_this_week": member_activity["questions_this_week"],
+                "papers_opened_this_month": member_activity["papers_opened_this_month"],
             }
         )
-    return {"members": members}
+
+    return {
+        "summary": {
+            "members": len(members),
+            "active_this_week": sum(
+                1
+                for a in activity.values()
+                if a["last_active_at"] and a["last_active_at"] >= week_ago
+            ),
+            "questions_this_week": sum(
+                a["questions_this_week"] for a in activity.values()
+            ),
+            "papers_opened_this_month": sum(
+                a["papers_opened_this_month"] for a in activity.values()
+            ),
+        },
+        "members": members,
+    }

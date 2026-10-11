@@ -11,7 +11,7 @@ import {
     SheetTitle,
 } from "@/components/ui/sheet";
 import { fetchFromApi } from "@/lib/api";
-import { teamPriceTotal, TeamInterval } from "./teamPricing";
+import { formatPrice, TeamInterval, TeamPricing, teamPriceTotal } from "./teamPricing";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
 
@@ -22,9 +22,10 @@ interface TeamCheckoutSheetProps {
     teamName: string;
     seats: number;
     interval: TeamInterval;
+    pricing: TeamPricing;
 }
 
-export function TeamCheckoutSheet({ open, onOpenChange, teamId, teamName, seats, interval }: TeamCheckoutSheetProps) {
+export function TeamCheckoutSheet({ open, onOpenChange, teamId, teamName, seats, interval, pricing }: TeamCheckoutSheetProps) {
     const [error, setError] = useState<string | null>(null);
 
     const fetchClientSecret = useCallback(() => {
@@ -46,7 +47,7 @@ export function TeamCheckoutSheet({ open, onOpenChange, teamId, teamName, seats,
                 <SheetHeader>
                     <SheetTitle>Buy seats for {teamName}</SheetTitle>
                     <SheetDescription>
-                        {seats} {seats === 1 ? "seat" : "seats"}, ${teamPriceTotal(seats, interval).toLocaleString()} billed{" "}
+                        {seats} {seats === 1 ? "seat" : "seats"}, {formatPrice(teamPriceTotal(pricing, seats, interval))} billed{" "}
                         {interval === "month" ? "monthly" : "annually"} by{" "}
                         <a href="https://khoj.dev" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">
                             Khoj Inc.

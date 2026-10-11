@@ -14,7 +14,7 @@ import { SubscriptionStatus, UserSubscription } from "@/lib/schema";
 import PricingTable from "./pricingTable";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
-import { TEAM_MONTHLY_PRICE_PER_SEAT, TEAM_YEARLY_PRICE_PER_SEAT } from "@/components/team/teamPricing";
+import { formatPrice, useTeamPricing } from "@/components/team/teamPricing";
 import { useRouter } from "next/navigation";
 
 const monthlyPrice = 12;
@@ -30,6 +30,7 @@ export default function PricingPage() {
     const [isIntervalChangeLoading, setIsIntervalChangeLoading] = useState(false);
     const [isResubscribeLoading, setIsResubscribeLoading] = useState(false);
     const { user } = useAuth();
+    const teamPricing = useTeamPricing();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const router = useRouter();
     const { balance: referralBalance } = useReferralBalance(!!user);
@@ -617,13 +618,13 @@ export default function PricingPage() {
                             </CardDescription>
                         </div>
                         <div className="pt-4">
-                            <div className="text-3xl font-light text-slate-900 dark:text-slate-100">
-                                ${isAnnual ? Math.round(TEAM_YEARLY_PRICE_PER_SEAT / 12) : TEAM_MONTHLY_PRICE_PER_SEAT}
+                            <div className="text-3xl font-light text-slate-900 dark:text-slate-100 min-h-9">
+                                {teamPricing && formatPrice(isAnnual ? Math.round(teamPricing.yearly_per_seat / 12) : teamPricing.monthly_per_seat)}
                                 <span className="text-lg font-normal text-slate-500 dark:text-slate-400">/seat/month</span>
                             </div>
-                            {isAnnual && (
+                            {isAnnual && teamPricing && (
                                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                                    Billed annually at ${TEAM_YEARLY_PRICE_PER_SEAT}/seat/year
+                                    Billed annually at {formatPrice(teamPricing.yearly_per_seat)}/seat/year
                                 </p>
                             )}
                         </div>

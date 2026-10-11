@@ -8,6 +8,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
+from app.api.organization.invitation_emails import send_held_invitations
 from app.api.subscription.config import is_team_price_id
 from app.database.crud.organization_crud import organization_crud
 from app.database.models import (
@@ -119,6 +120,9 @@ def handle_team_stripe_event(db: Session, event) -> bool:
         else:
             _sync_from_subscription(db, organization, obj)
 
+        # Invitations added during setup go out once the team is paid.
+        send_held_invitations(db, organization)
+
         track_event(
             f"team_{event_type.removeprefix('customer.').replace('.', '_')}",
             properties={
@@ -148,6 +152,7 @@ def handle_team_stripe_event(db: Session, event) -> bool:
         if event_type == "invoice.payment_succeeded":
             organization.status = SubscriptionStatus.ACTIVE.value  # type: ignore[assignment]
             db.commit()
+            send_held_invitations(db, organization)
         elif event_type == "invoice.payment_failed":
             organization.status = SubscriptionStatus.PAST_DUE.value  # type: ignore[assignment]
             db.commit()

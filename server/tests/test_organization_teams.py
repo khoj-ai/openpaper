@@ -27,6 +27,8 @@ try:
     )
     from app.database.database import SessionLocal, engine
     from app.database.models import (
+        Conversation,
+        Message,
         Organization,
         OrganizationRoles,
         SubscriptionPlan,
@@ -86,13 +88,18 @@ class TeamTestCase(unittest.TestCase):
         if paid:
             org.status = SubscriptionStatus.ACTIVE.value
             org.current_period_end = datetime.now(timezone.utc) + timedelta(days=30)
+            org.stripe_subscription_id = f"sub_test_{secrets.token_hex(8)}"
         self.db.commit()
         return org
 
     def _invite(self, org: Organization, email: str, by: User):
-        return organization_invitation_crud.invite(
+        """Invite and mark sent, as the API does for a paid team."""
+        invitation = organization_invitation_crud.invite(
             self.db, organization=org, email=email, invited_by=by.id
         )
+        organization_invitation_crud.claim_unsent(self.db, org.id)
+        self.db.refresh(invitation)
+        return invitation
 
 
 @unittest.skipUnless(DB_AVAILABLE, "requires a migrated Postgres")
@@ -434,7 +441,7 @@ class TestTeamApiPermissions(TeamTestCase):
         self._as(admin)
 
         with patch(
-            "app.api.organization.organizations_api.send_organization_invite_email"
+            "app.api.organization.invitation_emails.send_organization_invite_email"
         ) as send:
             response = self.client.post(
                 f"/api/organization/{org.id}/invitations",
@@ -448,16 +455,122 @@ class TestTeamApiPermissions(TeamTestCase):
         usage = self.client.get(f"/api/organization/{org.id}/usage").json()
         self.assertEqual(len(usage["members"]), 1)
         self.assertEqual(usage["members"][0]["plan"], SubscriptionPlan.TEAM.value)
+        self.assertEqual(usage["summary"]["members"], 1)
 
-    def test_unpaid_team_cannot_invite(self) -> None:
+    def test_setup_invitations_wait_for_payment(self) -> None:
+        """Invitations added before checkout hold seats but aren't emailed or
+        visible to the invitee until the team is paid."""
+        admin, student = self._user(), self._user()
+        org = self._team(admin, seats=1, paid=False)
+        self._as(admin)
+
+        with patch(
+            "app.api.organization.invitation_emails.send_organization_invite_email"
+        ) as send:
+            response = self.client.post(
+                f"/api/organization/{org.id}/invitations",
+                json={"emails": [str(student.email), "two@example.com"]},
+            ).json()
+        # Seats aren't bought yet, so invitations aren't capped by them.
+        self.assertEqual(len(response["invited"]), 2)
+        self.assertFalse(any(i["sent"] for i in response["invited"]))
+        send.assert_not_called()
+
+        # Checkout can't buy fewer seats than the people already invited.
+        too_few = self.client.post(
+            f"/api/organization/{org.id}/checkout",
+            json={"interval": "year", "seats": 2},
+        )
+        self.assertEqual(too_few.status_code, 400)
+
+        self._as(student)
+        self.assertEqual(
+            self.client.get("/api/organization/invitations").json()["invitations"], []
+        )
+
+        with patch.object(
+            subscription_config, "TEAM_MONTHLY_PRICE_ID", TEAM_PRICE
+        ), patch(
+            "app.api.organization.invitation_emails.send_organization_invite_email"
+        ) as send:
+            stripe_events.handle_team_stripe_event(
+                self.db,
+                _event(
+                    "customer.subscription.created",
+                    _stripe_subscription(
+                        org.id, sub_id=f"sub_{secrets.token_hex(6)}", quantity=3
+                    ),
+                ),
+            )
+            # A redelivered event doesn't email anyone twice.
+            stripe_events.handle_team_stripe_event(
+                self.db,
+                _event(
+                    "invoice.payment_succeeded",
+                    SimpleNamespace(
+                        id="in_test",
+                        subscription=self.db.get(
+                            Organization, org.id
+                        ).stripe_subscription_id,
+                    ),
+                ),
+            )
+        self.assertEqual(send.call_count, 2)
+
+        invitations = self.client.get("/api/organization/invitations").json()[
+            "invitations"
+        ]
+        self.assertEqual([i["organization_id"] for i in invitations], [str(org.id)])
+
+    def test_usage_summary_counts_recent_activity(self) -> None:
+        admin = self._user()
+        org = self._team(admin)
+        conversation = Conversation(user_id=admin.id, conversable_type="everything")
+        self.db.add(conversation)
+        self.db.flush()
+        for sequence in range(2):
+            self.db.add(
+                Message(
+                    conversation_id=conversation.id,
+                    user_id=admin.id,
+                    role="user",
+                    content="What does this paper find?",
+                    sequence=sequence,
+                )
+            )
+        self.db.commit()
+        self.addCleanup(self._delete_conversation, conversation.id)
+
+        self._as(admin)
+        usage = self.client.get(f"/api/organization/{org.id}/usage").json()
+
+        self.assertEqual(usage["summary"]["active_this_week"], 1)
+        self.assertEqual(usage["summary"]["questions_this_week"], 2)
+        self.assertIsNotNone(usage["members"][0]["last_active_at"])
+
+    def _delete_conversation(self, conversation_id) -> None:
+        self.db.rollback()
+        self.db.query(Message).filter(
+            Message.conversation_id == conversation_id
+        ).delete()
+        self.db.query(Conversation).filter(Conversation.id == conversation_id).delete()
+        self.db.commit()
+
+
+@unittest.skipUnless(DB_AVAILABLE, "requires a migrated Postgres")
+class TestHeldInvitationClaims(TeamTestCase):
+    def test_each_invitation_is_claimed_once(self) -> None:
         admin = self._user()
         org = self._team(admin, paid=False)
-        self._as(admin)
-        response = self.client.post(
-            f"/api/organization/{org.id}/invitations",
-            json={"emails": ["one@example.com"]},
+        organization_invitation_crud.invite(
+            self.db, organization=org, email="held@example.com", invited_by=admin.id
         )
-        self.assertEqual(response.status_code, 400)
+
+        first = organization_invitation_crud.claim_unsent(self.db, org.id)
+        second = organization_invitation_crud.claim_unsent(self.db, org.id)
+
+        self.assertEqual([i.email for i in first], ["held@example.com"])
+        self.assertEqual(second, [])
 
 
 if __name__ == "__main__":
