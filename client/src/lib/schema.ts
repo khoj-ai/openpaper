@@ -738,6 +738,8 @@ export interface TeamInvitation {
     email: string;
     role: TeamRole;
     invited_at: string | null;
+    // False while the team is being set up; emailed once it's paid.
+    sent: boolean;
 }
 
 export interface MyTeamInvitation extends TeamInvitation {
@@ -755,9 +757,23 @@ export interface TeamDetail {
 }
 
 export interface TeamMemberUsage extends TeamMember {
-    plan: SubscriptionData['plan'];
-    limits: SubscriptionLimits;
-    usage: SubscriptionUsage;
+    last_active_at: string | null;
+    questions_this_week: number;
+    papers_opened_this_month: number;
+    chat_credits_used: number;
+}
+
+export interface TeamUsageSummary {
+    members: number;
+    active_this_week: number;
+    questions_this_week: number;
+    papers_opened_this_month: number;
+}
+
+export interface TeamUsageResponse {
+    summary: TeamUsageSummary;
+    chat_credits_per_seat: number;
+    members: TeamMemberUsage[];
 }
 
 export interface MyTeamsResponse {

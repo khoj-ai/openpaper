@@ -9,13 +9,6 @@ import { fetchFromApi } from "@/lib/api";
 import { Team } from "@/lib/schema";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { TeamCheckoutSheet } from "./TeamCheckoutSheet";
-import {
-    TEAM_MONTHLY_PRICE_PER_SEAT,
-    TEAM_YEARLY_PRICE_PER_SEAT,
-    teamPriceTotal,
-    TeamInterval,
-} from "./teamPricing";
 
 interface TeamBillingSectionProps {
     team: Team;
@@ -27,10 +20,7 @@ const formatDate = (iso: string | null) =>
     iso ? new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : null;
 
 export function TeamBillingSection({ team, seatsTaken, onChanged }: TeamBillingSectionProps) {
-    const hasSubscription = team.is_paid || team.status === "past_due";
     const [seats, setSeats] = useState(Math.max(team.seats, seatsTaken));
-    const [interval, setBillingInterval] = useState<TeamInterval>("year");
-    const [checkoutOpen, setCheckoutOpen] = useState(false);
     const [saving, setSaving] = useState(false);
     const [openingPortal, setOpeningPortal] = useState(false);
 
@@ -77,58 +67,6 @@ export function TeamBillingSection({ team, seatsTaken, onChanged }: TeamBillingS
             />
         </div>
     );
-
-    if (!hasSubscription) {
-        return (
-            <section className="space-y-4">
-                <div className="space-y-1">
-                    <h2 className="text-lg font-medium">Buy seats</h2>
-                    <p className="text-sm text-muted-foreground">
-                        One seat per person, including you. You can add or remove seats any time.
-                    </p>
-                </div>
-                <div className="flex flex-wrap items-end gap-4">
-                    {seatsInput}
-                    <div className="flex rounded-md border p-1 gap-1">
-                        {(["year", "month"] as const).map((option) => (
-                            <Button
-                                key={option}
-                                type="button"
-                                size="sm"
-                                variant={interval === option ? "default" : "ghost"}
-                                onClick={() => setBillingInterval(option)}
-                            >
-                                {option === "year"
-                                    ? `Yearly · $${TEAM_YEARLY_PRICE_PER_SEAT}/seat`
-                                    : `Monthly · $${TEAM_MONTHLY_PRICE_PER_SEAT}/seat`}
-                            </Button>
-                        ))}
-                    </div>
-                </div>
-                <div className="flex items-center gap-4">
-                    <Button disabled={!seatsValid} onClick={() => setCheckoutOpen(true)}>
-                        Continue to checkout
-                    </Button>
-                    {seatsValid && (
-                        <span className="text-sm text-muted-foreground">
-                            ${teamPriceTotal(seats, interval).toLocaleString()} / {interval}
-                            {interval === "year" && " (two months free)"}
-                        </span>
-                    )}
-                </div>
-                {seatsValid && (
-                    <TeamCheckoutSheet
-                        open={checkoutOpen}
-                        onOpenChange={setCheckoutOpen}
-                        teamId={team.id}
-                        teamName={team.name}
-                        seats={seats}
-                        interval={interval}
-                    />
-                )}
-            </section>
-        );
-    }
 
     return (
         <section className="space-y-4">

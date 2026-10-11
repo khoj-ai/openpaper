@@ -70,7 +70,7 @@ export function TeamInviteSection({ teamId, invitations, seatsLeft, onChanged }:
                     Use the address each person signs in to Open Paper with. Only that address can accept.{" "}
                     {seatsLeft > 0
                         ? `${seatsLeft} ${seatsLeft === 1 ? "seat" : "seats"} left.`
-                        : "Every seat is taken. Add seats above to invite more people."}
+                        : "Every seat is taken. Add seats under Billing to invite more people."}
                 </p>
             </div>
             <div className="space-y-2">

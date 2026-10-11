@@ -18,6 +18,31 @@ from sqlalchemy.orm import Session, joinedload
 ACTIVE_STATUSES = [SubscriptionStatus.ACTIVE.value, SubscriptionStatus.TRIALING.value]
 
 
+# Statuses where the team has a live subscription. Seats are enforced only
+# then; while a team is being set up, invitations decide how many seats to buy.
+LIVE_STATUSES = [
+    SubscriptionStatus.ACTIVE.value,
+    SubscriptionStatus.TRIALING.value,
+    SubscriptionStatus.PAST_DUE.value,
+]
+MAX_SEATS = 500
+
+
+def is_paid(organization: Organization) -> bool:
+    """Whether the team's subscription currently covers its members."""
+    return bool(
+        organization.status in ACTIVE_STATUSES
+        and organization.current_period_end
+        and organization.current_period_end > datetime.now(timezone.utc)
+    )
+
+
+def has_subscription(organization: Organization) -> bool:
+    return bool(
+        organization.status in LIVE_STATUSES and organization.stripe_subscription_id
+    )
+
+
 class OrganizationError(Exception):
     """A request the organization can't satisfy; the message is safe to show the user."""
 
@@ -218,6 +243,8 @@ class CRUDOrganizationInvitation:
     def get_pending_for_email(
         self, db: Session, email: str
     ) -> List[OrganizationInvitation]:
+        """Invitations the person has been sent. Ones still held while their team
+        is being set up stay hidden, so nobody joins a team that isn't paid for."""
         return (
             db.query(OrganizationInvitation)
             .options(
@@ -227,7 +254,41 @@ class CRUDOrganizationInvitation:
             .filter(
                 func.lower(OrganizationInvitation.email) == normalize_email(email),
                 OrganizationInvitation.accepted_at.is_(None),
+                OrganizationInvitation.email_sent_at.isnot(None),
             )
+            .all()
+        )
+
+    def claim_unsent(
+        self, db: Session, organization_id: uuid.UUID
+    ) -> List[OrganizationInvitation]:
+        """Mark the team's held invitations as sent and return them, so the caller
+        can email them. The conditional update makes this safe to call from
+        webhooks that Stripe may deliver more than once, or concurrently."""
+        claimed_ids = [
+            row[0]
+            for row in db.query(OrganizationInvitation.id)
+            .filter(
+                OrganizationInvitation.organization_id == organization_id,
+                OrganizationInvitation.accepted_at.is_(None),
+                OrganizationInvitation.email_sent_at.is_(None),
+            )
+            .with_for_update(skip_locked=True)
+            .all()
+        ]
+        if not claimed_ids:
+            return []
+        db.query(OrganizationInvitation).filter(
+            OrganizationInvitation.id.in_(claimed_ids)
+        ).update(
+            {OrganizationInvitation.email_sent_at: datetime.now(timezone.utc)},
+            synchronize_session=False,
+        )
+        db.commit()
+        return (
+            db.query(OrganizationInvitation)
+            .options(joinedload(OrganizationInvitation.inviter))
+            .filter(OrganizationInvitation.id.in_(claimed_ids))
             .all()
         )
 
@@ -258,7 +319,8 @@ class CRUDOrganizationInvitation:
             if normalize_email(str(pending.email)) == email:
                 return pending
 
-        if organization_crud.seats_taken(db, organization_id) >= organization.seats:
+        seat_limit = organization.seats if has_subscription(organization) else MAX_SEATS
+        if organization_crud.seats_taken(db, organization_id) >= seat_limit:
             raise OrganizationError(
                 "Every seat is taken. Add seats or retract an invitation first."
             )
@@ -282,6 +344,7 @@ class CRUDOrganizationInvitation:
             .filter(
                 OrganizationInvitation.id == invitation_id,
                 OrganizationInvitation.accepted_at.is_(None),
+                OrganizationInvitation.email_sent_at.isnot(None),
             )
             .first()
         )

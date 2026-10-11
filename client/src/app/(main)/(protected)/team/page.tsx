@@ -1,27 +1,25 @@
 "use client"
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
+import { TeamInvitationCard } from "@/components/team/TeamInvitationCard";
+import { TeamLanding } from "@/components/team/TeamLanding";
+import { TeamSetupWizard } from "@/components/team/TeamSetupWizard";
 import { TeamStatusBadge } from "@/components/team/TeamStatusBadge";
-import { TEAM_MONTHLY_PRICE_PER_SEAT, TEAM_YEARLY_PRICE_PER_SEAT } from "@/components/team/teamPricing";
+import { useTeamPricing } from "@/components/team/teamPricing";
 import { fetchFromApi } from "@/lib/api";
 import { MyTeamInvitation, MyTeamsResponse, Team } from "@/lib/schema";
-import { ChevronRight, Loader2, Users } from "lucide-react";
+import { ChevronRight, Loader2, Plus, Users } from "lucide-react";
 import { toast } from "sonner";
 
 export default function TeamsPage() {
-    const router = useRouter();
+    const pricing = useTeamPricing();
     const [teams, setTeams] = useState<Team[] | null>(null);
     const [invitations, setInvitations] = useState<MyTeamInvitation[]>([]);
     const [respondingTo, setRespondingTo] = useState<string | null>(null);
-    const [newTeamName, setNewTeamName] = useState("");
-    const [creating, setCreating] = useState(false);
+    const [settingUp, setSettingUp] = useState(false);
 
     const load = useCallback(async () => {
         try {
@@ -59,23 +57,6 @@ export default function TeamsPage() {
         }
     };
 
-    const createTeam = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const name = newTeamName.trim();
-        if (!name) return;
-        setCreating(true);
-        try {
-            const team: Team = await fetchFromApi("/api/organization", {
-                method: "POST",
-                body: JSON.stringify({ name }),
-            });
-            router.push(`/team/${team.id}`);
-        } catch (error) {
-            toast.error(error instanceof Error ? error.message : "Could not create the team.");
-            setCreating(false);
-        }
-    };
-
     if (teams === null) {
         return (
             <div className="flex items-center justify-center h-full">
@@ -84,52 +65,46 @@ export default function TeamsPage() {
         );
     }
 
-    return (
-        <div className="max-w-2xl p-6 space-y-8">
-            <div className="space-y-1">
-                <h1 className="text-2xl font-bold">Team</h1>
-                <p className="text-sm text-muted-foreground">
-                    Pay for your lab or group&apos;s seats in one place. Everyone on a team gets Team plan limits.
-                </p>
-            </div>
+    const startSetup = () => {
+        setSettingUp(true);
+        window.scrollTo({ top: 0 });
+    };
 
+    return (
+        <div className="max-w-2xl p-6 space-y-10">
             {invitations.length > 0 && (
                 <section className="space-y-3">
-                    <h2 className="text-lg font-medium">Invitations</h2>
                     {invitations.map((invitation) => (
-                        <div key={invitation.id} className="flex items-center justify-between gap-4 rounded-lg border p-4">
-                            <div className="min-w-0">
-                                <p className="font-medium truncate">{invitation.organization_name}</p>
-                                <p className="text-sm text-muted-foreground truncate">
-                                    {invitation.invited_by ? `Invited by ${invitation.invited_by}` : "You've been invited"}
-                                </p>
-                            </div>
-                            <div className="flex gap-2 shrink-0">
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    disabled={respondingTo === invitation.id}
-                                    onClick={() => respond(invitation, "reject")}
-                                >
-                                    Decline
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    disabled={respondingTo === invitation.id}
-                                    onClick={() => respond(invitation, "accept")}
-                                >
-                                    {respondingTo === invitation.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Join team
-                                </Button>
-                            </div>
-                        </div>
+                        <TeamInvitationCard
+                            key={invitation.id}
+                            invitation={invitation}
+                            pricing={pricing}
+                            responding={respondingTo === invitation.id}
+                            onRespond={(action) => respond(invitation, action)}
+                        />
                     ))}
                 </section>
             )}
 
-            {teams.length > 0 && (
+            {settingUp ? (
+                <TeamSetupWizard pricing={pricing} onCancel={() => setSettingUp(false)} />
+            ) : teams.length === 0 && invitations.length > 0 ? (
+                // Someone who was invited is here to join, not to buy.
+                <p className="text-sm text-muted-foreground">
+                    Running your own lab or group?{" "}
+                    <button className="underline hover:text-foreground" onClick={startSetup}>Set up a team</button>
+                </p>
+            ) : teams.length === 0 ? (
+                <TeamLanding pricing={pricing} onStart={startSetup} />
+            ) : (
                 <section className="space-y-3">
-                    <h2 className="text-lg font-medium">Your teams</h2>
+                    <div className="flex items-center justify-between">
+                        <h1 className="text-2xl font-bold">Your teams</h1>
+                        <Button variant="outline" size="sm" onClick={startSetup}>
+                            <Plus className="mr-1 h-4 w-4" />
+                            New team
+                        </Button>
+                    </div>
                     {teams.map((team) => (
                         <Link
                             key={team.id}
@@ -149,34 +124,6 @@ export default function TeamsPage() {
                     ))}
                 </section>
             )}
-
-            <Separator />
-
-            <section className="space-y-4">
-                <div className="space-y-1">
-                    <h2 className="text-lg font-medium">Create a team</h2>
-                    <p className="text-sm text-muted-foreground">
-                        ${TEAM_MONTHLY_PRICE_PER_SEAT} per seat a month, or ${TEAM_YEARLY_PRICE_PER_SEAT} per seat a year
-                        (two months free). You&apos;ll choose how many seats next.
-                    </p>
-                </div>
-                <form onSubmit={createTeam} className="flex flex-col sm:flex-row gap-3 sm:items-end">
-                    <div className="space-y-2 flex-1">
-                        <Label htmlFor="team-name">Team name</Label>
-                        <Input
-                            id="team-name"
-                            placeholder="e.g., Energy Controls Lab"
-                            value={newTeamName}
-                            maxLength={120}
-                            onChange={(e) => setNewTeamName(e.target.value)}
-                        />
-                    </div>
-                    <Button type="submit" disabled={creating || !newTeamName.trim()}>
-                        {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Create team
-                    </Button>
-                </form>
-            </section>
         </div>
     );
 }

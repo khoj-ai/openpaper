@@ -274,6 +274,17 @@ class MessageCRUD(CRUDBase[Message, MessageCreate, MessageUpdate]):
         """
         Get the number of chat credits used by the user this week.
         """
+        return self.get_chat_credits_used_this_week_by_user(db, [current_user.id]).get(
+            current_user.id, 0
+        )
+
+    def get_chat_credits_used_this_week_by_user(
+        self, db: Session, user_ids: List[UUID]
+    ) -> Dict[UUID, int]:
+        """
+        Get the chat credits each user has used this week, in one query.
+        Users who haven't used any are left out.
+        """
         # Start from the nearest Monday at 00:00 UTC
         start_of_week = datetime.now(timezone.utc) - timedelta(
             days=datetime.now(timezone.utc).weekday()
@@ -281,16 +292,17 @@ class MessageCRUD(CRUDBase[Message, MessageCreate, MessageUpdate]):
         start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
         end_of_week = start_of_week + timedelta(days=7)
         # We'll define a `chat credit` as being equal to the value of 5 characters processed. To compute, we take the length of the content of each message and divide by 5.
-        return (
-            db.query(func.sum(func.length(Message.content)) / 5)
+        rows = (
+            db.query(Message.user_id, func.sum(func.length(Message.content)) / 5)
             .filter(
-                Message.user_id == current_user.id,
+                Message.user_id.in_(user_ids),
                 Message.created_at >= start_of_week,
                 Message.created_at < end_of_week,
             )
-            .scalar()
-            or 0
+            .group_by(Message.user_id)
+            .all()
         )
+        return {user_id: credits or 0 for user_id, credits in rows}
 
 
 # Create a single instance to use throughout the application

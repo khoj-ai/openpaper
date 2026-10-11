@@ -27,12 +27,8 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import {
-    formatFileSize,
-    getChatCreditUsagePercentage,
-} from "@/hooks/useSubscription";
 import { fetchFromApi } from "@/lib/api";
-import { TeamMember, TeamMemberUsage } from "@/lib/schema";
+import { TeamMember, TeamUsageResponse } from "@/lib/schema";
 import { MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 
@@ -41,7 +37,7 @@ interface TeamMembersSectionProps {
     teamName: string;
     members: TeamMember[];
     // Present for admins only.
-    usage: TeamMemberUsage[] | null;
+    usage: TeamUsageResponse | null;
     currentUserId: string;
     isAdmin: boolean;
     onChanged: () => void;
@@ -49,6 +45,17 @@ interface TeamMembersSectionProps {
 }
 
 type PendingRemoval = { member: TeamMember; isSelf: boolean } | null;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function formatLastActive(iso: string | null): string {
+    if (!iso) return "Not yet";
+    const days = Math.floor((Date.now() - new Date(iso).getTime()) / DAY_MS);
+    if (days < 1) return "Today";
+    if (days === 1) return "Yesterday";
+    if (days < 30) return `${days} days ago`;
+    return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
 
 export function TeamMembersSection({
     teamId,
@@ -61,7 +68,9 @@ export function TeamMembersSection({
     onLeft,
 }: TeamMembersSectionProps) {
     const [pendingRemoval, setPendingRemoval] = useState<PendingRemoval>(null);
-    const usageByUser = new Map((usage ?? []).map((u) => [u.user_id, u]));
+    const usageByUser = new Map((usage?.members ?? []).map((u) => [u.user_id, u]));
+    const creditShare = (used: number) =>
+        usage && usage.chat_credits_per_seat > 0 ? Math.round((used / usage.chat_credits_per_seat) * 100) : 0;
 
     const setRole = async (member: TeamMember, role: "admin" | "member") => {
         try {
@@ -98,7 +107,7 @@ export function TeamMembersSection({
                 <h2 className="text-lg font-medium">Members</h2>
                 {isAdmin && (
                     <p className="text-sm text-muted-foreground">
-                        Limits apply to each seat separately. Chat credits reset weekly.
+                        Questions are from the last 7 days and papers opened from the last 30. Limits apply to each seat separately; chat credits reset weekly.
                     </p>
                 )}
             </div>
@@ -106,9 +115,10 @@ export function TeamMembersSection({
                 <TableHeader>
                     <TableRow>
                         <TableHead>Member</TableHead>
-                        {isAdmin && <TableHead className="text-right">Papers</TableHead>}
-                        {isAdmin && <TableHead className="text-right">Storage</TableHead>}
-                        {isAdmin && <TableHead className="text-right">Chat this week</TableHead>}
+                        {isAdmin && <TableHead>Last active</TableHead>}
+                        {isAdmin && <TableHead className="text-right hidden sm:table-cell" title="Questions asked in the last 7 days">Questions</TableHead>}
+                        {isAdmin && <TableHead className="text-right hidden sm:table-cell" title="Papers opened in the last 30 days">Papers</TableHead>}
+                        {isAdmin && <TableHead className="text-right hidden md:table-cell" title="Share of this week's chat credits used">Credits</TableHead>}
                         <TableHead className="w-10" />
                     </TableRow>
                 </TableHeader>
@@ -133,20 +143,23 @@ export function TeamMembersSection({
                                     </div>
                                 </TableCell>
                                 {isAdmin && (
-                                    <TableCell className="text-right tabular-nums">
-                                        {memberUsage
-                                            ? `${memberUsage.usage.paper_uploads.toLocaleString()} / ${memberUsage.limits.paper_uploads.toLocaleString()}`
-                                            : "—"}
+                                    <TableCell className="text-muted-foreground whitespace-nowrap">
+                                        {memberUsage ? formatLastActive(memberUsage.last_active_at) : "—"}
                                     </TableCell>
                                 )}
                                 {isAdmin && (
-                                    <TableCell className="text-right tabular-nums">
-                                        {memberUsage ? formatFileSize(memberUsage.usage.knowledge_base_size) : "—"}
+                                    <TableCell className="text-right tabular-nums hidden sm:table-cell">
+                                        {memberUsage ? memberUsage.questions_this_week.toLocaleString() : "—"}
                                     </TableCell>
                                 )}
                                 {isAdmin && (
-                                    <TableCell className="text-right tabular-nums">
-                                        {memberUsage ? `${Math.round(getChatCreditUsagePercentage(memberUsage))}%` : "—"}
+                                    <TableCell className="text-right tabular-nums hidden sm:table-cell">
+                                        {memberUsage ? memberUsage.papers_opened_this_month.toLocaleString() : "—"}
+                                    </TableCell>
+                                )}
+                                {isAdmin && (
+                                    <TableCell className="text-right tabular-nums hidden md:table-cell">
+                                        {memberUsage ? `${creditShare(memberUsage.chat_credits_used)}%` : "—"}
                                     </TableCell>
                                 )}
                                 <TableCell>
