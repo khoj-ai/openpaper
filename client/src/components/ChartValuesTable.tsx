@@ -73,7 +73,7 @@ export function ChartValuesTable({ artifact, points, onOpenPaper }: {
             </div>}
             {points.length > 0 && (
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                    All {points.length} plotted point{points.length === 1 ? "" : "s"}, in the chart's order.
+                    All {points.length} plotted point{points.length === 1 ? "" : "s"}, in the chart&apos;s order.
                 </p>
             )}
             {excluded.length > 0 && (

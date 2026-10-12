@@ -16,7 +16,7 @@ import { MessageCircleWarning, File } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
 import EnigmaticLoadingExperience from "@/components/EnigmaticLoadingExperience";
-import { PaperItem, JobStatus, PaperUploadJobStatusResponse, Project } from "@/lib/schema";
+import { PaperItem, JobStatus, PaperUploadJobStatusResponse } from "@/lib/schema";
 import { toast } from "sonner";
 import { useSubscription, isStorageAtLimit, isPaperUploadAtLimit, isPaperUploadNearLimit, isStorageNearLimit } from "@/hooks/useSubscription";
 import { uploadFiles, uploadFromUrlWithFallback } from "@/lib/uploadUtils";

@@ -22,8 +22,6 @@ export function AnnotationHoverCard({
     position,
     user,
 }: AnnotationHoverCardProps) {
-    if (annotations.length === 0) return null;
-
     const sorted = useMemo(
         () =>
             [...annotations].sort(
@@ -31,6 +29,8 @@ export function AnnotationHoverCard({
             ),
         [annotations]
     );
+
+    if (annotations.length === 0) return null;
 
     // Clamp so the card stays within the viewport
     const left = Math.min(position.x, window.innerWidth - CARD_WIDTH - VIEWPORT_PADDING);

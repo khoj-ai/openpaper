@@ -51,7 +51,7 @@
     "hono": "^4.12.25",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.483.0",
-    "next": "^15.5.18",
+    "next": "^15.5.28",
     "next-themes": "^0.4.6",
     "posthog-js": "^1.242.0",
     "protobufjs": "^7.6.3",
@@ -73,16 +73,15 @@
     "tailwind-merge": "^3.0.2",
     "tw-animate-css": "^1.2.4",
     "vaul": "^1.1.2",
-    "zod": "^4.1.5"
+    "zod": "^4.6.6"
   },
   "resolutions": {
     "pdfjs-dist": "4.10.38",
-    "fast-uri": "^3.1.2",
+    "fast-uri": "^3.1.9",
     "@eslint/eslintrc/js-yaml": "^4.2.0",
     "**/cosmiconfig/js-yaml": "^4.2.0",
     "@radix-ui/react-slot": "^1.2.3",
     "preact": "^10.28.2",
-    "minimatch": "^10.2.5",
     "hono": "^4.12.25",
     "@hono/node-server": "^1.19.10",
     "qs": "^6.14.2",
@@ -95,11 +94,10 @@
     "router/path-to-regexp": "^8.4.0",
     "@tailwindcss/postcss/postcss": "^8.5.10",
     "shadcn/postcss": "^8.5.10",
-    "sharp": "^0.35.0",
+    "sharp": "^0.35.4",
     "next/postcss": "^8.5.18",
     "express-rate-limit/ip-address": "^10.1.1",
-    "@opentelemetry/core": "^2.8.0",
-    "brace-expansion": "^5.0.8"
+    "@opentelemetry/core": "^2.8.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

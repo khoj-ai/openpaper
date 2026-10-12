@@ -31,13 +31,11 @@ interface PaperPreviewProps {
 function EditableField({
     value,
     onSave,
-    multiline = false,
     className = "",
     placeholder = "",
 }: {
     value: string;
     onSave: (value: string) => void;
-    multiline?: boolean;
     className?: string;
     placeholder?: string;
 }) {

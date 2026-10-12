@@ -167,7 +167,8 @@ export function ZoteroLibraryModal({
 
 	const toggleFilterType = (type: string, checked: boolean) => {
 		const next = new Set(filterTypes);
-		checked ? next.add(type) : next.delete(type);
+		if (checked) next.add(type);
+		else next.delete(type);
 		setFilterTypes(next);
 	};
 
@@ -178,7 +179,8 @@ export function ZoteroLibraryModal({
 	) => {
 		setter((prev) => {
 			const next = new Set(prev);
-			checked ? next.add(value) : next.delete(value);
+			if (checked) next.add(value);
+			else next.delete(value);
 			return next;
 		});
 	};

@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input";
 import { useSubscription, isProjectNearLimit, isProjectAtLimit, getProjectUsagePercentage } from "@/hooks/useSubscription";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { useAuth } from "@/lib/auth";
 import { Progress } from "@/components/ui/progress";
 import LoadingIndicator from "@/components/utils/Loading";
 import { ProjectInvitations } from "@/components/ProjectInvitations";
@@ -27,7 +26,6 @@ const FILTER_CONFIG: Record<ProjectFilter, { label: string; icon: React.ElementT
 
 function ProjectsPage() {
 	const { projects, isLoading, error, refetch: getProjects } = useProjects(true);
-	const { user, loading: userLoading } = useAuth();
 	const { subscription } = useSubscription();
 	const router = useRouter();
 	const searchParams = useSearchParams();
