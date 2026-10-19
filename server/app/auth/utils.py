@@ -2,17 +2,20 @@ import os
 import random
 import string
 from datetime import datetime, timedelta, timezone
-from typing import Literal
+from typing import Literal, Optional
 
 from app.auth.dependencies import SESSION_COOKIE_NAME
 from dotenv import load_dotenv
 from fastapi import Request, Response
+from pydantic import EmailStr, TypeAdapter, ValidationError
 
 load_dotenv()
 
 # Environment variables
 SESSION_COOKIE_DOMAIN = os.getenv("SESSION_COOKIE_DOMAIN", None)
 SECURE_COOKIES = os.getenv("SECURE_COOKIES", "false").lower() == "true"
+
+_email_validator = TypeAdapter(EmailStr)
 
 
 def set_session_cookie(
@@ -61,6 +64,24 @@ def clear_session_cookie(response: Response) -> None:
         domain=SESSION_COOKIE_DOMAIN,
         path="/",
     )
+
+
+def normalize_email(raw: str) -> Optional[str]:
+    """
+    Normalize an email address for storage and lookup.
+
+    Args:
+        raw: The address as the caller supplied it
+
+    Returns:
+        str: The trimmed, lowercased address, or None if it isn't a valid
+        address. Deliverability is not checked; that needs a DNS lookup on the
+        request path and the verification code already proves the mailbox.
+    """
+    try:
+        return str(_email_validator.validate_python(raw.strip())).lower()
+    except ValidationError:
+        return None
 
 
 def generate_verification_code() -> str:

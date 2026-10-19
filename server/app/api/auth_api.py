@@ -13,6 +13,7 @@ from app.auth.google import GoogleTokenError, google_auth_client
 from app.auth.utils import (
     clear_session_cookie,
     is_verification_code_valid,
+    normalize_email,
     set_session_cookie,
 )
 from app.auth.zotero import zotero_auth_client
@@ -542,7 +543,16 @@ async def email_signin(
     Creates user if they don't exist.
     """
     try:
-        email = request.email.lower().strip()
+        # Validate before anything else: sign-in creates the account, so an
+        # address the mail provider will reject only ever leaves a junk user
+        # behind.
+        email = normalize_email(request.email)
+
+        if not email:
+            return AuthResponse(
+                success=False,
+                message="Please enter a valid email address.",
+            )
 
         # Check if user exists with email auth provider
         db_user = user_crud.get_by_email_and_provider(db, email=email, provider="email")
