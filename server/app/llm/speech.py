@@ -10,8 +10,14 @@ from app.helpers.s3 import s3_service
 from langfuse.openai import AzureOpenAI as LangfuseAzureOpenAI
 from langfuse.openai import OpenAI as LangfuseOpenAI
 
-# Maximum characters per chunk for TTS generation
-MAX_CHUNK_SIZE = 10000
+# Maximum characters per chunk for TTS generation.
+#
+# The ceiling is the synthesis the provider is willing to return, not anything
+# about the text: the TTS model takes at most 2k input tokens and rejects a
+# response whose audio runs past ten minutes. At ~150 spoken words per minute,
+# 4k characters is ~660 words of narration -- ~4.5 minutes and ~1k tokens, half
+# of each limit, leaving room for text that narrates slower than prose.
+MAX_CHUNK_SIZE = 4000
 
 
 def clean_markdown_for_speech(text: str) -> str:

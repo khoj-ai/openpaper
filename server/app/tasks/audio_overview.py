@@ -268,8 +268,11 @@ async def generate_audio_overview(
         except Exception as update_error:
             logger.error(f"Failed to update job status to failed: {str(update_error)}")
 
-        # Re-raise the original exception
-        raise e
+        # Deliberately not re-raised. This runs as a FastAPI background task,
+        # so the only thing left to catch it is uvicorn, which logged the
+        # traceback a second time as "Exception in ASGI application" after the
+        # 202 had already gone out. The failure is recorded above, in the log
+        # with its traceback and on the job the client polls.
 
     finally:
         db.close()
