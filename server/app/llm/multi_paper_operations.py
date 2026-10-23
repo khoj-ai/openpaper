@@ -155,7 +155,10 @@ class MultiPaperOperations(EvidenceOperations):
         queue = asyncio.Queue()
 
         async def pinger():
-            """Yields a status message every 5 seconds to keep the connection alive."""
+            """Shows the user the turn is still working until the answer
+            starts, then is cancelled. Not what keeps the connection alive —
+            the message api does that, for the whole turn rather than only up
+            to the first chunk."""
             with suppress(asyncio.CancelledError):
                 while True:
                     await queue.put(
