@@ -1,8 +1,10 @@
+import asyncio
 import json
 import logging
 import uuid
+from contextlib import suppress
 from datetime import datetime, timezone
-from typing import AsyncGenerator, List, Optional, Union, cast
+from typing import Any, AsyncGenerator, List, Optional, Tuple, Union, cast
 
 from app.auth.dependencies import get_required_user
 from app.database.crud.artifact_crud import artifact_crud
@@ -49,12 +51,86 @@ ANSWER_FAILED_MESSAGE = (
 )
 
 
+# How long the answer stream may go quiet before we put a byte on the wire.
+#
+# The model emits nothing at all while it thinks, and thinking dominates a
+# hard question: a comprehensive overview of a full paper measures 50-110s to
+# its first token, against ~6s for a short one. An idle response is closed at
+# 60s by nginx's proxy_read_timeout default and at 100s by Cloudflare, so the
+# client sees the body fail mid-answer. Tick well inside the shorter ceiling;
+# a tick costs a dozen bytes.
+KEEPALIVE_INTERVAL_SECONDS = 15.0
+
+
 def _append_status(messages: Optional[List[str]], message: str) -> None:
     """Append a status message, collapsing consecutive duplicates (e.g. heartbeats)."""
     if messages is None or not message:
         return
     if not messages or messages[-1] != message:
         messages.append(message)
+
+
+class _KeepAlive:
+    """Marker for "the answer stream has gone quiet; send something".
+
+    Deliberately not a chunk type. This is transport, not an event: a bare
+    delimiter is already skipped by every client as it stands, and it carries
+    no payload to accumulate into the turn's content or trace. A typed chunk
+    would mean touching three clients and deciding what each persists, to say
+    something none of them needs to hear.
+    """
+
+
+_KEEPALIVE = _KeepAlive()
+
+
+async def _with_keepalive(
+    source: AsyncGenerator[Union[dict, str], None],
+    interval: float,
+) -> AsyncGenerator[Union[dict, str, _KeepAlive], None]:
+    """Yield everything `source` yields, plus `_KEEPALIVE` whenever it has
+    produced nothing for `interval` seconds.
+
+    One task drains `source` into a one-slot queue, rather than racing it
+    against a timer in place. In place, each item would resume the generator —
+    and the provider SDK's open response inside it — from a different task,
+    which those SDKs do not promise to tolerate. The single slot keeps the
+    backpressure a bare `async for` already had.
+    """
+    queue: asyncio.Queue[Tuple[str, Any]] = asyncio.Queue(maxsize=1)
+
+    async def drain() -> None:
+        try:
+            async for chunk in source:
+                await queue.put(("chunk", chunk))
+        except Exception as e:
+            # Re-raised on the consuming side, so the caller sees the failure
+            # where it would have surfaced without this wrapper.
+            await queue.put(("error", e))
+        else:
+            await queue.put(("done", None))
+
+    drain_task = asyncio.create_task(drain())
+    try:
+        while True:
+            try:
+                kind, payload = await asyncio.wait_for(queue.get(), interval)
+            except asyncio.TimeoutError:
+                yield _KEEPALIVE
+                continue
+
+            if kind == "chunk":
+                yield payload
+            elif kind == "error":
+                raise payload
+            else:
+                return
+    finally:
+        # A client that goes away mid-answer closes this generator; the drain
+        # is still holding the model's response open and has to go with it.
+        drain_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await drain_task
 
 
 async def _stream_chat_chunks(
@@ -70,8 +146,16 @@ async def _stream_chat_chunks(
     Anything appended to `errors` has already been reported to the client, so
     the caller can tell a turn that failed loudly from one that simply ended
     with nothing to show.
+
+    While the model is quiet this emits a bare delimiter — an event with
+    nothing in front of it — so the response never looks idle to whatever sits
+    between us and the browser. See `_KeepAlive`.
     """
-    async for chunk in chunk_generator:
+    async for chunk in _with_keepalive(chunk_generator, KEEPALIVE_INTERVAL_SECONDS):
+        if isinstance(chunk, _KeepAlive):
+            yield END_DELIMITER
+            continue
+
         if not isinstance(chunk, dict):
             logger.warning(f"Received unexpected chunk format: {chunk}")
             continue
