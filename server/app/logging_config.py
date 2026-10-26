@@ -66,6 +66,12 @@ _FRAMEWORK_LOGGERS = (
 _ACCESS_LOGGERS = ("uvicorn.access", "gunicorn.access")
 _HEALTH_PATHS = frozenset({"/health", "/api/health"})
 
+# pypdf logs a font encoding it cannot map at ERROR, then substitutes a standard
+# encoding and carries on. Upload validation is the only place pypdf reads text,
+# and it discards that text, so the substitution never reaches a user.
+_PDF_ENCODING_LOGGER = "pypdf._cmap"
+_PDF_ENCODING_FALLBACK_PREFIX = "Advanced encoding"
+
 
 class HealthCheckFilter(logging.Filter):
     """Drop access-log records for health probes."""
@@ -77,6 +83,21 @@ class HealthCheckFilter(logging.Filter):
         args = record.args
         if isinstance(args, tuple) and len(args) >= 3:
             return str(args[2]).split("?", 1)[0] not in _HEALTH_PATHS
+        return True
+
+
+class PdfEncodingFallbackFilter(logging.Filter):
+    """Downgrade pypdf's font encoding fallback from ERROR to WARNING.
+
+    Matched on the message so any other error pypdf adds still logs at ERROR.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.levelno == logging.ERROR and str(record.msg).startswith(
+            _PDF_ENCODING_FALLBACK_PREFIX
+        ):
+            record.levelno = logging.WARNING
+            record.levelname = "WARNING"
         return True
 
 
@@ -147,3 +168,7 @@ def configure_logging(level: int | str | None = None) -> None:
         access_logger = logging.getLogger(name)
         access_logger.filters.clear()
         access_logger.addFilter(HealthCheckFilter())
+
+    pdf_encoding_logger = logging.getLogger(_PDF_ENCODING_LOGGER)
+    pdf_encoding_logger.filters.clear()
+    pdf_encoding_logger.addFilter(PdfEncodingFallbackFilter())
