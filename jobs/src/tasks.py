@@ -8,6 +8,9 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Dict, Any, TypeVar, Coroutine
 import requests
+from billiard.exceptions import WorkerLostError
+from celery.exceptions import TimeLimitExceeded
+from celery.signals import task_failure, worker_process_init
 from langfuse import get_client, observe
 
 from src.schemas import DataTableSchema
@@ -20,6 +23,11 @@ from src.utils import time_it
 logger = logging.getLogger(__name__)
 
 T = TypeVar('T')
+
+WORKER_LOST_MESSAGE = (
+    "Processing stopped before this PDF finished. It may be too large or "
+    "complex to process. Try a shorter document, such as a single chapter."
+)
 
 def run_async_safely(coro: Coroutine[Any, Any, T]) -> T:
     """
@@ -175,25 +183,81 @@ def upload_and_process_file(
 
     except Exception as exc:
         logger.error(f"Task {task_id} failed: {exc}", exc_info=True)
-        # Send failure webhook
-        failure_payload = {
-            "task_id": task_id,
-            "status": "failed",
-            "result": None,
-            "error": str(exc),
-        }
-        try:
-            requests.post(
-                webhook_url,
-                json=failure_payload,
-                timeout=60,
-                headers={"Content-Type": "application/json"},
-            ).raise_for_status()
-        except requests.RequestException as e:
-            logger.error(f"Failed to send failure webhook for task {task_id}: {e}")
+        send_failure_webhook(webhook_url, task_id, error=str(exc))
 
         # Re-raise the exception to mark task as failed in Celery
         raise exc
+
+
+def send_failure_webhook(
+    webhook_url: str,
+    task_id: str,
+    error: str,
+    user_message: str | None = None,
+    timeout: int = 60,
+) -> None:
+    """Tell the server an upload task failed without producing a result."""
+    failure_payload = {
+        "task_id": task_id,
+        "status": "failed",
+        "result": None,
+        "error": error,
+        "user_message": user_message,
+    }
+    try:
+        requests.post(
+            webhook_url,
+            json=failure_payload,
+            timeout=timeout,
+            headers={"Content-Type": "application/json"},
+        ).raise_for_status()
+    except requests.RequestException as e:
+        logger.error(f"Failed to send failure webhook for task {task_id}: {e}")
+
+
+@worker_process_init.connect
+def put_pool_workers_first_in_line_for_oom_kill(**_):
+    """Make the kernel kill a pool worker, not the parent, when memory runs out.
+
+    Left at the default, it scores the parent about as high as a busy worker,
+    and killing the parent takes down every task in flight with nothing left
+    to report them (see report_lost_upload). Raising a process's own score
+    needs no privileges.
+    """
+    try:
+        with open("/proc/self/oom_score_adj", "w") as f:
+            f.write("1000")
+    except OSError:
+        pass  # Not Linux
+
+
+@task_failure.connect
+def report_lost_upload(sender=None, task_id=None, exception=None, kwargs=None, **_):
+    """Fail an upload whose worker process died before it could report back.
+
+    A worker killed mid-task, by the kernel for running out of memory or by
+    Celery for passing the hard time limit, never reaches the task's own
+    failure webhook, so the server would wait on the upload forever. Celery
+    reports the loss from the parent process that outlived the worker, and
+    this sends the failure webhook in the worker's place. Every other failure
+    is raised inside the task, which has already sent its own.
+
+    Runs in the parent's event loop, so the request gets a short timeout.
+    """
+    if getattr(sender, "name", None) != "upload_and_process_file":
+        return
+    if not isinstance(exception, (WorkerLostError, TimeLimitExceeded)):
+        return
+    # Celery has already logged the lost worker as an error.
+    logger.info(f"Reporting upload task {task_id} as failed: {exception!r}")
+    send_failure_webhook(
+        kwargs["webhook_url"],
+        task_id,
+        error=repr(exception),
+        user_message=WORKER_LOST_MESSAGE,
+        timeout=10,
+    )
+
 
 @celery_app.task(bind=True, name="process_data_table", soft_time_limit=900, time_limit=960)
 def construct_data_table_task(

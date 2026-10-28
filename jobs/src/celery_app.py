@@ -46,7 +46,11 @@ celery_app.conf.update(
     },
     worker_prefetch_multiplier=1,  # Process one task at a time
     task_acks_late=True,
-    reject_on_worker_lost=True,
+    # A task whose worker died is recorded as failed, not put back on the
+    # queue: a PDF that kills its worker would kill every worker it is handed
+    # to next. The upload task tells the server about the failure itself (see
+    # report_lost_upload), which only happens when the task isn't requeued.
+    task_reject_on_worker_lost=False,
     task_acks_on_failure_or_timeout=True,
     worker_max_tasks_per_child=1000,
     # Health monitoring settings
