@@ -27,6 +27,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import ObjectDeletedError
 
 load_dotenv()
 
@@ -527,7 +528,11 @@ async def get_pdf(
 
     paper = hydrate_paper_metadata(db=db, paper=paper, user=current_user)
 
-    paper_data = paper.to_dict()
+    try:
+        paper_data = paper.to_dict()
+    except ObjectDeletedError:
+        # Deleted while this request was loading it, e.g. by its upload failing.
+        return JSONResponse(status_code=404, content={"message": "Document not found"})
     paper_data["file_url"] = signed_url
     paper_data["summary_citations"] = [  # type: ignore
         ResponseCitation.model_validate(citation).model_dump()

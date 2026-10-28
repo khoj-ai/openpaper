@@ -23,10 +23,19 @@ from app.helpers.parser import parse_publication_date
 from app.llm.citation_recovery import get_recovery_agent
 from app.schemas.user import CurrentUser
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import ObjectDeletedError
 
 logger = logging.getLogger(__name__)
 
 CHECK_METADATA_INTERVAL_DAYS = 30
+
+
+def _log_failure(e: Exception, message: str, paper_id: Any) -> None:
+    # A paper deleted while this ran, e.g. by its upload failing, is expected.
+    if isinstance(e, ObjectDeletedError):
+        logger.warning(f"{message}: the paper was deleted", paper_id)
+    else:
+        logger.exception(message, paper_id, exc_info=e)
 
 
 def _is_metadata_cache_stale(paper: Paper) -> bool:
@@ -61,6 +70,10 @@ def hydrate_paper_metadata(
     """
     if not force and not _is_metadata_cache_stale(paper):
         return paper
+
+    # The paper can be deleted while this runs. A failed write then leaves it
+    # unreadable, so failures are logged by this id rather than paper.id.
+    paper_id = paper.id
 
     try:
         if not paper.doi and paper.title:
@@ -102,10 +115,8 @@ def hydrate_paper_metadata(
             paper, _, _ = get_recovery_agent().recover_metadata(
                 db=db, paper=paper, user=user, steps=agentic_steps
             )
-    except Exception:
-        logger.exception(
-            "Error hydrating metadata for paper %s", paper.id, exc_info=True
-        )
+    except Exception as e:
+        _log_failure(e, "Error hydrating metadata for paper %s", paper_id)
     finally:
         # Stamp the attempt regardless of outcome so we respect the cache window.
         try:
@@ -117,12 +128,10 @@ def hydrate_paper_metadata(
             )
             if updated:
                 paper = updated
-        except Exception:
+        except Exception as e:
             db.rollback()
-            logger.exception(
-                "Error stamping attempted_metadata_at for paper %s",
-                paper.id,
-                exc_info=True,
+            _log_failure(
+                e, "Error stamping attempted_metadata_at for paper %s", paper_id
             )
 
     return paper

@@ -188,6 +188,9 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         user: Optional[CurrentUser] = None,
     ) -> Optional[ModelType]:
         """Update a record, verifying user ownership if specified"""
+        # Read before the update: once a failed commit is rolled back, reading
+        # an attribute reloads the row, which raises if it has been deleted.
+        obj_id = db_obj.id
         if user and hasattr(db_obj, "user_id") and db_obj.user_id != user.id:
             logger.warning(
                 f"User {user.id} attempted to update {self.model.__name__} owned by another user"
@@ -218,10 +221,20 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             db.commit()
             db.refresh(db_obj)
             return db_obj
+        except StaleDataError:
+            # The UPDATE matched no row: another transaction deleted the record
+            # after it was loaded.
+            db.rollback()
+            logger.warning(
+                "Concurrent delete of %s with ID %s; it was removed before this update",
+                self.model.__name__,
+                obj_id,
+            )
+            return None
         except Exception as e:
             db.rollback()
             logger.error(
-                f"Error updating {self.model.__name__} with ID {db_obj.id}: {str(e)}",
+                f"Error updating {self.model.__name__} with ID {obj_id}: {str(e)}",
                 exc_info=True,
             )
             return None
