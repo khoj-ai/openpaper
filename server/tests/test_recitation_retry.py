@@ -80,11 +80,7 @@ class NarrativeSummaryRecitationTest(unittest.TestCase):
             ),
             patch(
                 "app.llm.paper_operations.s3_service",
-                SimpleNamespace(get_cached_presigned_url=lambda *a, **k: "https://pdf"),
-            ),
-            patch(
-                "app.llm.paper_operations.httpx.get",
-                lambda *a, **k: SimpleNamespace(content=b"%PDF-1.4"),
+                SimpleNamespace(download_bytes=lambda *a, **k: b"%PDF-1.4"),
             ),
         ]
         for p in patches:

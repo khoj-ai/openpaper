@@ -12,7 +12,9 @@ from app.database.crud.paper_crud import PaperUpdate, paper_crud
 from app.database.crud.projects.project_paper_crud import project_paper_crud
 from app.database.models import Paper, User
 from app.schemas.user import CurrentUser
-from botocore.exceptions import ClientError
+from botocore.config import Config
+from botocore.exceptions import ClientError, HTTPClientError, IncompleteReadError
+from botocore.response import StreamingBody
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -26,6 +28,10 @@ CLOUDFLARE_BUCKET_NAME = os.environ.get("CLOUDFLARE_BUCKET_NAME")
 
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
 
+# How a response body that breaks off mid-read surfaces: the connection drops or
+# times out (HTTPClientError), or ends short of its Content-Length.
+BODY_READ_ERRORS = (HTTPClientError, IncompleteReadError)
+
 
 class S3Service:
     """Service for handling S3 operations"""
@@ -37,6 +43,10 @@ class S3Service:
             aws_access_key_id=AWS_ACCESS_KEY_ID,
             aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
             region_name=AWS_REGION,
+            # Give up on a stalled connection after 10s rather than botocore's
+            # default 60s. botocore makes several attempts, so at 60s each a
+            # chat turn reading its PDF could be held open for minutes.
+            config=Config(connect_timeout=10),
         )
         self.bucket_name = S3_BUCKET_NAME
         self.cloudflare_bucket_name = CLOUDFLARE_BUCKET_NAME
@@ -154,18 +164,33 @@ class S3Service:
             return False
 
     def download_bytes(self, object_key: str) -> bytes:
-        """Download an object from S3 and return its raw bytes."""
+        """Download an object from S3 and return its raw bytes.
+
+        botocore retries a GetObject request that fails, but hands the body back
+        unread, so a body that breaks off mid-read isn't retried there. Such a
+        read is fetched once more here.
+        """
+        body = self._get_object_body(object_key)
+        try:
+            return body.read()
+        except BODY_READ_ERRORS as e:
+            logger.warning(
+                f"Reading {object_key} from S3 broke off: {e!r}. Fetching it again"
+            )
+        return self._get_object_body(object_key).read()
+
+    def _get_object_body(self, object_key: str) -> StreamingBody:
         try:
             response = self.s3_client.get_object(
                 Bucket=self.bucket_name, Key=object_key
             )
-            body = response.get("Body")
-            if body is None:
-                raise ValueError(f"S3 object {object_key} has no body")
-            return body.read()
         except ClientError as e:
             logger.error(f"Error downloading file from S3: {e}")
             raise ValueError(f"Failed to download file from S3: {object_key}") from e
+        body = response.get("Body")
+        if body is None:
+            raise ValueError(f"S3 object {object_key} has no body")
+        return body
 
     def generate_presigned_url(
         self, object_key: str, expiration: int = 86400

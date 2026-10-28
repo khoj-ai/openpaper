@@ -1,9 +1,9 @@
+import asyncio
 import logging
 import re
 import uuid
 from typing import AsyncGenerator, Literal, Optional, Sequence, Union
 
-import httpx
 from app.database.crud.paper_crud import paper_crud
 from app.database.models import Paper
 from app.llm.base import BaseLLMClient, ModelType
@@ -27,17 +27,13 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
-# Presigned S3 PDF fetches are on the critical path of a chat turn; fail fast
-# rather than holding the turn open on a stalled download.
-PDF_FETCH_TIMEOUT = httpx.Timeout(60.0, connect=10.0)
-
 from app.database.crud.message_crud import message_crud
 from app.database.database import get_db
 from app.helpers.s3 import s3_service
 
 
 class PaperNotFoundError(ValueError):
-    """The paper asked about doesn't exist."""
+    """The paper asked about doesn't exist, or doesn't belong to the user."""
 
 
 class PaperOperations(BaseLLMClient):
@@ -73,20 +69,7 @@ class PaperOperations(BaseLLMClient):
             length=word_count_map.get(str(length), word_count_map["medium"]),
         )
 
-        signed_url = s3_service.get_cached_presigned_url(
-            db,
-            paper_id=str(paper.id),
-            object_key=str(paper.s3_object_key),
-            current_user=user,
-        )
-
-        if not signed_url:
-            raise ValueError(
-                f"Could not generate presigned URL for paper with ID {paper_id}."
-            )
-
-        # Retrieve and encode the PDF byte
-        pdf_bytes = httpx.get(signed_url).content
+        pdf_bytes = s3_service.download_bytes(str(paper.s3_object_key))
 
         message_content = [
             FileContent(
@@ -156,7 +139,7 @@ class PaperOperations(BaseLLMClient):
             else None
         )
 
-        paper: Paper = paper_crud.get(db, id=paper_id)
+        paper: Paper = paper_crud.get(db, id=paper_id, user=current_user)
 
         if not paper:
             raise PaperNotFoundError(f"Paper with ID {paper_id} not found.")
@@ -191,26 +174,12 @@ class PaperOperations(BaseLLMClient):
         START_DELIMITER = "---EVIDENCE---"
         END_DELIMITER = "---END-EVIDENCE---"
 
-        signed_url = s3_service.get_cached_presigned_url(
-            db,
-            paper_id=str(paper.id),
-            object_key=str(paper.s3_object_key),
-            current_user=current_user,
+        # This runs inside an async generator, so the blocking download goes to
+        # a thread: run inline, a multi-megabyte PDF stalls the whole worker's
+        # event loop, including every other user's in-flight LLM stream.
+        pdf_bytes = await asyncio.to_thread(
+            s3_service.download_bytes, str(paper.s3_object_key)
         )
-
-        if not signed_url:
-            raise ValueError(
-                f"Could not generate presigned URL for paper with ID {paper_id}."
-            )
-
-        # Retrieve and encode the PDF bytes. This runs inside an async
-        # generator, so it must not be a blocking fetch: a sync download of a
-        # multi-megabyte PDF stalls the whole worker's event loop, including
-        # every other user's in-flight LLM stream.
-        async with httpx.AsyncClient(timeout=PDF_FETCH_TIMEOUT) as client:
-            pdf_response = await client.get(signed_url)
-            pdf_response.raise_for_status()
-            pdf_bytes = pdf_response.content
 
         message_content = [
             TextContent(text=formatted_prompt),
