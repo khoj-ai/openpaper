@@ -346,7 +346,7 @@ export default function PaperView() {
             } else if (response.status === 'failed') {
                 setJobId(null);
                 toast.error("Failed to process your paper", {
-                    description: "There was an error indexing your paper. Please try uploading again.",
+                    description: response.error_message ?? "There was an error indexing your paper. Please try uploading again.",
                     duration: 10000,
                     action: {
                         label: "Go Home",

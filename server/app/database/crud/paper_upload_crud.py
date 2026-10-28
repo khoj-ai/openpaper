@@ -38,6 +38,7 @@ class PaperUploadJobCreate(PaperUploadJobBase):
 class PaperUploadJobUpdate(PaperUploadJobBase):
     status: Optional[JobStatus] = None
     task_id: Optional[str] = None
+    error_message: Optional[str] = None
 
 
 # PaperUploadJob CRUD that inherits from the base CRUD
@@ -79,19 +80,26 @@ class PaperUploadJobCRUD(
         return None
 
     def mark_as_failed(
-        self, db: Session, *, job_id: str, user: CurrentUser
+        self,
+        db: Session,
+        *,
+        job_id: str,
+        user: CurrentUser,
+        error_message: Optional[str] = None,
     ) -> Optional[PaperUploadJob]:
-        """Mark a job as failed and set completed_at timestamp"""
+        """Mark a job as failed and set completed_at timestamp.
+
+        `error_message` is the reason shown to the user. Omitting it keeps any
+        reason an earlier report already recorded.
+        """
         job = self.get(db, id=job_id, user=user)
         if job:
-            return self.update(
-                db=db,
-                db_obj=job,
-                obj_in=PaperUploadJobUpdate(
-                    status=JobStatus.FAILED, completed_at=datetime.now(timezone.utc)
-                ),
-                user=user,
+            update = PaperUploadJobUpdate(
+                status=JobStatus.FAILED, completed_at=datetime.now(timezone.utc)
             )
+            if error_message:
+                update.error_message = error_message
+            return self.update(db=db, db_obj=job, obj_in=update, user=user)
         return None
 
     def mark_as_cancelled(

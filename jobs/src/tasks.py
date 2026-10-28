@@ -150,6 +150,7 @@ def upload_and_process_file(
             "status": "completed" if result.success else "failed",
             "result": result.model_dump(),
             "error": result.error if not result.success else None,
+            "user_message": result.user_message if not result.success else None,
         }
 
         # Send webhook notification

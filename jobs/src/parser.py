@@ -74,19 +74,21 @@ def map_pages_to_text_offsets(
     """
     Map each page of the PDF to its corresponding text offsets.
     """
-    doc = pymupdf.open(pdf_file_path)
     page_offsets = {}
     current_offset = 0
 
-    for page_num in range(len(doc)):
-        page = doc[page_num]
-        page_text = page.get_text("text")  # type: ignore
-        page_length = len(page_text)
+    # Close the document before returning, so its memory is freed before text
+    # extraction opens the PDF again.
+    with pymupdf.open(pdf_file_path) as doc:
+        for page_num in range(len(doc)):
+            page = doc[page_num]
+            page_text = page.get_text("text")  # type: ignore
+            page_length = len(page_text)
 
-        if page_length > 0:
-            # Technically, we're only returning Tuples, but the List is easier to work with for json serialization
-            page_offsets[page_num + 1] = [current_offset, current_offset + page_length]
-            current_offset += page_length
+            if page_length > 0:
+                # Technically, we're only returning Tuples, but the List is easier to work with for json serialization
+                page_offsets[page_num + 1] = [current_offset, current_offset + page_length]
+                current_offset += page_length
 
     return page_offsets
 

@@ -167,6 +167,11 @@ const PdfUploadTracker: React.FC<PdfUploadTrackerProps> = ({ initialJobs, onComp
 										{job.fileName}
 									</span>
 								)}
+								{job.status === 'failed' && job.details?.error_message && (
+									<span className="text-xs text-muted-foreground block">
+										{job.details.error_message}
+									</span>
+								)}
 							</div>
 							<div className="flex-shrink-0">
 								{(() => {

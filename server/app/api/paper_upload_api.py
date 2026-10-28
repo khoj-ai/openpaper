@@ -121,6 +121,7 @@ async def get_upload_status(
         "has_file_url": bool(paper.file_url) if paper else False,
         "has_metadata": bool(paper.abstract) if paper else False,
         "paper_id": str(paper.id) if paper else None,
+        "error_message": paper_upload_job.error_message,
     }
 
     # Add Celery task information if available

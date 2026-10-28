@@ -261,6 +261,7 @@ export default function Home() {
 				}, 500);
 			} else if (response.status === 'failed') {
 				console.error('Upload job failed');
+				setErrorAlertMessage(response.error_message ?? DEFAULT_PAPER_UPLOAD_ERROR_MESSAGE);
 				setShowErrorAlert(true);
 				setIsUploading(false);
 				setJobUploadStatus(null);

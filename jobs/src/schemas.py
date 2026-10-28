@@ -217,6 +217,9 @@ class PDFProcessingResult(BaseModel):
     preview_url: Optional[str] = None
     preview_object_key: Optional[str] = None
     error: Optional[str] = None
+    # Why processing failed, worded for the person who uploaded the PDF. Unset
+    # when the failure is ours rather than the PDF's.
+    user_message: Optional[str] = None
     duration: Optional[float] = None  # Duration in seconds
 
 class DocumentMapping(BaseModel):

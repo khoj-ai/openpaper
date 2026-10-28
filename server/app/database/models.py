@@ -384,6 +384,9 @@ class PaperUploadJob(Base):
     started_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
     task_id = Column(String, nullable=True)  # For tracking task in Celery
+    # Why the upload failed, shown to the user. Unset when the reason is an
+    # internal one the user can't act on.
+    error_message = Column(String, nullable=True)
 
     user = relationship("User", back_populates="paper_upload_jobs")
 

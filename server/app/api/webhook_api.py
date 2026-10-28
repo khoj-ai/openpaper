@@ -162,7 +162,11 @@ def _finalize_zotero_import(
 
 
 def handle_failed_upload(
-    db: Session, job_id: str, job_user: CurrentUser, reason: str = "Unknown error"
+    db: Session,
+    job_id: str,
+    job_user: CurrentUser,
+    reason: str = "Unknown error",
+    user_message: Optional[str] = None,
 ) -> None:
     """
     Handle cleanup for a failed paper upload job.
@@ -175,6 +179,7 @@ def handle_failed_upload(
         job_id: The upload job ID
         job_user: The user who owns the job
         reason: Description of why the upload failed
+        user_message: Why the upload failed, worded for the user
     """
     # Refuse to tear down a job that already succeeded. A redelivered Celery
     # task (acks_late) can post a late "failed" webhook after another delivery
@@ -219,7 +224,9 @@ def handle_failed_upload(
         logger.info(f"Removing failed paper {existing_paper.id} for job {job_id}")
         paper_crud.remove(db=db, id=str(existing_paper.id), user=job_user)
 
-    paper_upload_job_crud.mark_as_failed(db=db, job_id=job_id, user=job_user)
+    paper_upload_job_crud.mark_as_failed(
+        db=db, job_id=job_id, user=job_user, error_message=user_message
+    )
 
     zotero_import = zotero_import_crud.get_by_upload_job_id(
         db, upload_job_id=uuid.UUID(job_id)
@@ -348,6 +355,8 @@ class PdfProcessingWebhookData(BaseModel):
     # never marked failed and stayed stuck in "processing".
     result: Optional[PDFProcessingResult] = None
     error: Optional[str] = None
+    # Why processing failed, worded for the user. `error` is for our logs.
+    user_message: Optional[str] = None
 
 
 @webhook_router.post("/paper-processing/{job_id}")
@@ -668,7 +677,11 @@ async def handle_paper_processing_webhook(
                     }
 
             handle_failed_upload(
-                db=db, job_id=job_id, job_user=job_user, reason=error_message
+                db=db,
+                job_id=job_id,
+                job_user=job_user,
+                reason=error_message,
+                user_message=webhook_data.user_message,
             )
 
     except Exception as e:

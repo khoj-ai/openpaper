@@ -454,6 +454,8 @@ export interface PaperUploadJobStatusResponse extends JobStatusResponse {
     has_file_url: boolean;
     has_metadata: boolean;
     celery_progress_message: string | null;
+    // Why a failed upload failed, worded for the user; null when the reason is ours.
+    error_message: string | null;
 }
 
 export interface PaperTag {

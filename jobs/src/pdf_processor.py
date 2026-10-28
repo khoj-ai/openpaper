@@ -15,12 +15,21 @@ from src.utils import time_it
 logger = logging.getLogger(__name__)
 
 
+TOO_MUCH_TEXT_MESSAGE = (
+    "This PDF has too much text to process. "
+    "Try a shorter document, such as a single chapter."
+)
+
+
 class UnprocessablePDFError(Exception):
     """A PDF we can't process for an expected, benign reason (size extremes).
 
     These are not bugs or outages, so they are logged as warnings rather than
-    errors and should not page.
+    errors and should not page. `user_message`, when set, is shown to the
+    person who uploaded the PDF as the reason it failed.
     """
+
+    user_message: Optional[str] = None
 
 
 class InsufficientPDFTextError(UnprocessablePDFError):
@@ -35,6 +44,20 @@ class ExcessivePDFTextError(UnprocessablePDFError):
     context window would drop too much of the content to extract trustworthy
     metadata (see MIN_RETAINED_FRACTION)."""
 
+    user_message = TOO_MUCH_TEXT_MESSAGE
+
+
+class OversizedPDFError(UnprocessablePDFError):
+    """Raised when a PDF holds more text than the worker can safely process
+    (see MAX_PDF_TEXT_CHARS)."""
+
+    user_message = TOO_MUCH_TEXT_MESSAGE
+
+
+# Upper bound on a PDF's text, counted with pymupdf before full extraction runs.
+# Extraction costs far more time and memory than counting, so a PDF over this
+# is refused up front rather than risk the worker dying partway through it.
+MAX_PDF_TEXT_CHARS = 1_500_000
 
 # Minimum amount of extracted text we consider a viable paper. Below this,
 # extraction almost certainly failed (e.g. a scanned/image-only PDF that yielded
@@ -168,12 +191,23 @@ async def process_pdf_file(
         # Extract text and page offsets from PDF
         try:
             async with time_it("Extracting text, images, and page offsets from PDF", job_id=job_id):
+                # Mapping pages with pymupdf takes a fraction of the time and
+                # memory of full extraction, so it doubles as the size check
+                # that keeps an oversized PDF from reaching extraction at all.
+                page_offsets = map_pages_to_text_offsets(temp_file_path)
+                text_chars = max((end for _, end in page_offsets.values()), default=0)
+                if text_chars > MAX_PDF_TEXT_CHARS:
+                    raise OversizedPDFError(
+                        f"PDF has {text_chars} characters of text, over the "
+                        f"{MAX_PDF_TEXT_CHARS}-character limit"
+                    )
                 pdf_text = await extract_text(
                     temp_file_path,
                 )
                 status_callback(f"Processed bits and bytes")
                 logger.info(f"Extracted {len(pdf_text)} characters of text from PDF")
-                page_offsets = map_pages_to_text_offsets(temp_file_path)
+        except UnprocessablePDFError:
+            raise
         except Exception as e:
             logger.error(f"Failed to extract text from PDF: {e}")
             raise Exception(f"Failed to extract text from PDF: {e}")
@@ -299,6 +333,7 @@ async def process_pdf_file(
         return PDFProcessingResult(
             success=False,
             error=str(e),
+            user_message=e.user_message,
             job_id=job_id,
         )
     except Exception as e:
