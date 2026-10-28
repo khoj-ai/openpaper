@@ -7,7 +7,13 @@ POSTHOG_API_KEY = os.getenv("POSTHOG_API_KEY", '')
 DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "t")
 
 # Unfortunately we have to use sync_mode here because PostHog's async mode is not compatible with our Celery setup. See also: https://github.com/PostHog/posthog-python/issues/79
-posthog = Posthog(POSTHOG_API_KEY, host="https://us.i.posthog.com", sync_mode=True)
+# Local flag evaluation is off as we never read feature flags and otherwise every worker throws warnings about flag definitions every 30s
+posthog = Posthog(
+    POSTHOG_API_KEY,
+    host="https://us.i.posthog.com",
+    sync_mode=True,
+    enable_local_evaluation=False,
+)
 
 logger = logging.getLogger(__name__)
 
