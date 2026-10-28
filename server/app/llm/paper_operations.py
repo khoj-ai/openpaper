@@ -36,6 +36,10 @@ from app.database.database import get_db
 from app.helpers.s3 import s3_service
 
 
+class PaperNotFoundError(ValueError):
+    """The paper asked about doesn't exist."""
+
+
 class PaperOperations(BaseLLMClient):
     """Operations related to paper analysis and chat functionality"""
 
@@ -155,7 +159,7 @@ class PaperOperations(BaseLLMClient):
         paper: Paper = paper_crud.get(db, id=paper_id)
 
         if not paper:
-            raise ValueError(f"Paper with ID {paper_id} not found.")
+            raise PaperNotFoundError(f"Paper with ID {paper_id} not found.")
 
         casted_conversation_id = uuid.UUID(conversation_id)
 

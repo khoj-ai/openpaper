@@ -24,6 +24,7 @@ from app.database.telemetry import track_event
 from app.llm.base import LLMProvider
 from app.llm.citation_handler import CitationHandler
 from app.llm.operations import operations
+from app.llm.paper_operations import PaperNotFoundError
 from app.schemas.artifact import artifact_payload_adapter
 from app.schemas.message import EvidenceCollection, ResponseStyle
 from app.schemas.user import CurrentUser
@@ -916,7 +917,12 @@ async def chat_message_stream(
                     db=db,
                 )
 
-                logger.error(f"Error in streaming response: {e}", exc_info=True)
+                if isinstance(e, PaperNotFoundError):
+                    # Usually a paper whose upload just failed and was removed,
+                    # still open in the user's tab. Nothing to fix on our side.
+                    logger.warning(f"Chat with a paper that doesn't exist: {e}")
+                else:
+                    logger.error(f"Error in streaming response: {e}", exc_info=True)
                 yield f"{json.dumps({'type': 'error', 'content': str(e)})}{END_DELIMITER}"
 
         return StreamingResponse(response_generator(), media_type="text/event-stream")
