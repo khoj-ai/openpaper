@@ -199,6 +199,40 @@ def _sanitize_schema_for_gemini(schema: Any) -> Any:
     return schema
 
 
+def strict_json_schema(schema: Dict[str, Any]) -> Dict[str, Any]:
+    """Put a JSON schema in the form OpenAI's and Anthropic's structured outputs
+    require: every object sets additionalProperties to false and lists all its
+    properties as required, and a $ref carries no sibling keywords. Gemini
+    rejects additionalProperties, so schemas are written without it and made
+    strict on the way to the other providers. A property that had a default is
+    now always generated."""
+    defs = schema.get("$defs", {})
+
+    def strict(node: Any) -> Any:
+        if isinstance(node, list):
+            return [strict(item) for item in node]
+        if not isinstance(node, dict):
+            return node
+        if "$ref" in node and len(node) > 1:
+            # Inline the definition, so its siblings (e.g. a description) can stay.
+            target = defs[node["$ref"].split("/")[-1]]
+            node = {**target, **{k: v for k, v in node.items() if k != "$ref"}}
+        result: Dict[str, Any] = {}
+        for key, value in node.items():
+            if key == "default":
+                continue
+            if key in ("properties", "$defs"):
+                result[key] = {name: strict(sub) for name, sub in value.items()}
+            else:
+                result[key] = strict(value)
+        if "properties" in node:
+            result["additionalProperties"] = False
+            result["required"] = list(node["properties"])
+        return result
+
+    return strict(schema)
+
+
 # Finish reasons where the model landed on a verdict rather than failing. Some
 # of them are stable properties of the request and re-asking only burns tokens;
 # the rest depend on which continuation got sampled. LLMBlockedError.reason

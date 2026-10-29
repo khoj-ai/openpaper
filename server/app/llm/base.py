@@ -17,6 +17,7 @@ from app.llm.provider import (
     OpenAIProvider,
     StreamChunk,
     ToolCallResult,
+    strict_json_schema,
 )
 from app.llm.utils import is_provider_outage, retry_llm_operation
 from langfuse import get_client, observe
@@ -109,7 +110,6 @@ class BaseLLMClient:
         capture_input=False,
         capture_output=False,
     )
-    @retry_llm_operation(max_retries=3, delay=1.0)
     def generate_content(
         self,
         contents: Any,
@@ -125,25 +125,91 @@ class BaseLLMClient:
     ) -> LLMResponse:
         """Generate content using the specified provider. Automatically retries on transient errors.
 
+        If the provider still fails outright, the same request is handed to
+        `fallback_provider`, as send_message_stream does. A failure another
+        provider cannot fix is raised as-is (see is_provider_outage).
+
         Args:
             schema: Optional structured-output schema — a JSON schema dict, or a
                 pydantic model class. When provided, the LLM response will be
                 constrained to match this schema via the provider's native
                 structured output support.
         """
+
+        def generate(target: LLMProvider) -> LLMResponse:
+            return self._generate_with(
+                target,
+                contents,
+                system_prompt=system_prompt,
+                history=history,
+                function_declarations=function_declarations,
+                tool_call_results=tool_call_results,
+                model_type=model_type,
+                enable_thinking=enable_thinking,
+                schema=schema,
+                **kwargs,
+            )
+
+        primary = provider or self.default_provider
+        fallback = self.fallback_provider
+        try:
+            return generate(primary)
+        except Exception as e:
+            if fallback is None or fallback == primary or not is_provider_outage(e):
+                logger.error(
+                    f"Error generating content with {primary.value}: {e}",
+                    exc_info=True,
+                )
+                raise
+            failure = e
+
+        logger.warning(
+            f"{primary.value} generation failed ({type(failure).__name__}: "
+            f"{str(failure)[:120]}); generating with {fallback.value} instead"
+        )
+        track_event(
+            "llm_generate_fallback",
+            {
+                "from_provider": primary.value,
+                "to_provider": fallback.value,
+                "model_type": model_type.value,
+                "error": str(failure)[:200],
+            },
+        )
+        try:
+            return generate(fallback)
+        except Exception as e:
+            logger.error(
+                f"Error generating content with {fallback.value}: {e}", exc_info=True
+            )
+            raise
+
+    @retry_llm_operation(max_retries=3, delay=1.0)
+    def _generate_with(
+        self,
+        target_provider: LLMProvider,
+        contents: Any,
+        system_prompt: Optional[str],
+        history: Optional[List[Message]],
+        function_declarations: Optional[List[Dict]],
+        tool_call_results: Optional[List[ToolCallResult]],
+        model_type: ModelType,
+        enable_thinking: bool,
+        schema: Optional[Union[Dict, type[BaseModel]]],
+        **kwargs,
+    ) -> LLMResponse:
+        """One provider's attempt at generate_content, retried on transient errors."""
         start_time = time.time()
-        model = self._get_model_for_type(model_type, provider)
-        target_provider = provider or self.default_provider
+        model = self._get_model_for_type(model_type, target_provider)
 
         # Gemini's SDK accepts a pydantic class directly (and handles nested
-        # models, which its Schema type can't express as a dict via $refs);
-        # the other providers need a plain JSON schema dict.
-        if (
-            schema is not None
-            and not isinstance(schema, dict)
-            and target_provider != LLMProvider.GEMINI
-        ):
-            schema = schema.model_json_schema()
+        # models, which its Schema type can't express as a dict via $refs).
+        # The other providers need a JSON schema dict in the strict form their
+        # structured outputs require.
+        if schema is not None and target_provider != LLMProvider.GEMINI:
+            if not isinstance(schema, dict):
+                schema = schema.model_json_schema()
+            schema = strict_json_schema(schema)
         langfuse = get_client()
         langfuse.update_current_span(
             input={
@@ -160,7 +226,7 @@ class BaseLLMClient:
         )
 
         try:
-            response = self._get_provider(provider).generate_content(
+            response = self._get_provider(target_provider).generate_content(
                 model,
                 contents,
                 system_prompt=system_prompt,
@@ -214,11 +280,6 @@ class BaseLLMClient:
                     "duration_ms": duration_ms,
                     "error": str(e),
                 },
-            )
-
-            logger.error(
-                f"Error generating content with {target_provider.value}/{model}: {e}",
-                exc_info=True,
             )
             raise
 

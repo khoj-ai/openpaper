@@ -7,20 +7,23 @@ providers were configured and idle. These tests hold the seam where the request
 is handed to one of them instead: the fallback answers when the primary is
 overloaded, rate-limited, or keeps landing on a verdict a fresh draw could
 clear; whatever the primary already streamed is discarded first; and a failure
-a different provider cannot fix is raised as-is.
+a different provider cannot fix is raised as-is. Non-streaming generation, which
+the multi-paper evidence loop runs on, is handed off the same way.
 """
 
 import os
 import unittest
+from typing import Optional
 from unittest.mock import patch
 
 import anthropic
 import httpx
 import openai
 from app.llm.base import BaseLLMClient, _fallback_provider_from_env
-from app.llm.provider import LLMProvider, StreamChunk
+from app.llm.provider import LLMProvider, LLMResponse, StreamChunk
 from app.llm.utils import EmptyStreamError, LLMBlockedError, is_provider_outage
 from google.genai import errors as genai_errors
+from pydantic import BaseModel, Field
 
 
 def gemini_status(code: int, status: str) -> genai_errors.APIError:
@@ -37,12 +40,14 @@ def sdk_status(cls, code: int):
 
 class FakeProvider:
     """A provider whose stream plays back a script: text to yield, or an
-    exception to raise at that point."""
+    exception to raise at that point. A non-streaming call answers with the
+    script's first item."""
 
     def __init__(self, provider: LLMProvider, script):
         self.provider = provider
         self.script = list(script)
         self.calls = 0
+        self.schemas = []
 
     def get_default_model(self) -> str:
         return f"{self.provider.value}-default"
@@ -59,8 +64,16 @@ class FakeProvider:
                 raise item
             yield StreamChunk(text=item, model=model, provider=self.provider)
 
+    def generate_content(self, model, contents, schema=None, **kwargs):
+        self.calls += 1
+        self.schemas.append(schema)
+        item = self.script[0]
+        if isinstance(item, BaseException):
+            raise item
+        return LLMResponse(text=item, model=model, provider=self.provider)
 
-class AnswerStreamFallbackTest(unittest.IsolatedAsyncioTestCase):
+
+class ScriptedProviders:
     def make_client(
         self,
         primary_script,
@@ -80,6 +93,8 @@ class AnswerStreamFallbackTest(unittest.IsolatedAsyncioTestCase):
         }
         return client
 
+
+class AnswerStreamFallbackTest(ScriptedProviders, unittest.IsolatedAsyncioTestCase):
     async def stream(self, client, **kwargs):
         return [
             chunk
@@ -169,6 +184,55 @@ class AnswerStreamFallbackTest(unittest.IsolatedAsyncioTestCase):
             await self.stream(client)
 
         self.assertEqual((self.primary.calls, self.secondary.calls), (1, 1))
+
+
+class Source(BaseModel):
+    title: str
+    page: Optional[int] = None
+
+
+class Answer(BaseModel):
+    answer: str
+    source: Source = Field(description="Where the answer comes from.")
+
+
+class GenerateContentFallbackTest(ScriptedProviders, unittest.TestCase):
+    """The same handoff for a single non-streamed generation, e.g. one step
+    of the evidence loop."""
+
+    def test_overloaded_primary_is_answered_by_the_fallback(self):
+        client = self.make_client([gemini_status(503, "UNAVAILABLE")])
+
+        response = client.generate_content("q", schema=Answer)
+
+        self.assertEqual(
+            (response.text, response.provider),
+            ("a fallback answer", LLMProvider.OPENAI),
+        )
+        self.assertEqual((self.primary.calls, self.secondary.calls), (1, 1))
+        # Gemini gets the class as written. OpenAI's strict structured output
+        # needs every object closed, every property required, and no keyword
+        # beside a $ref, so the nested, described, optional field is rewritten.
+        self.assertIs(self.primary.schemas[0], Answer)
+        strict = self.secondary.schemas[0]
+        source = strict["properties"]["source"]
+        self.assertEqual(
+            (strict["additionalProperties"], strict["required"]),
+            (False, ["answer", "source"]),
+        )
+        self.assertNotIn("$ref", source)
+        self.assertEqual(
+            (source["additionalProperties"], source["required"]),
+            (False, ["title", "page"]),
+        )
+
+    def test_a_failure_another_provider_cannot_fix_is_not_handed_off(self):
+        client = self.make_client([gemini_status(400, "INVALID_ARGUMENT")])
+
+        with self.assertRaises(genai_errors.ClientError):
+            client.generate_content("q")
+
+        self.assertEqual(self.secondary.calls, 0)
 
 
 class ProviderOutageClassificationTest(unittest.TestCase):
