@@ -24,7 +24,8 @@ GoogleGenAIInstrumentor().instrument()
 from google import genai
 from google.genai import types
 from google.genai.errors import APIError, ClientError, ServerError
-from typing import Any, Dict, List, Optional, Type, TypeVar, Callable
+from langfuse.openai import AsyncOpenAI
+from typing import Any, Awaitable, Dict, List, Optional, Type, TypeVar, Callable
 
 from pydantic import BaseModel, ValidationError, create_model, Field, ConfigDict
 
@@ -67,6 +68,38 @@ def _format_api_error(e: Exception) -> Any:
 RETRYABLE_STATUS_CODES = frozenset({408, 429})
 
 
+def _strict_json_schema(schema: Dict[str, Any]) -> Dict[str, Any]:
+    """Make a JSON schema meet OpenAI's strict structured outputs: every object
+    sets additionalProperties to false and lists all its properties as
+    required, and a $ref carries no sibling keywords. A property that had a
+    default is now always generated."""
+    defs = schema.get("$defs", {})
+
+    def strict(node: Any) -> Any:
+        if isinstance(node, list):
+            return [strict(item) for item in node]
+        if not isinstance(node, dict):
+            return node
+        if "$ref" in node and len(node) > 1:
+            # Inline the definition, so its siblings (e.g. a description) can stay.
+            target = defs[node["$ref"].split("/")[-1]]
+            node = {**target, **{k: v for k, v in node.items() if k != "$ref"}}
+        result: Dict[str, Any] = {}
+        for key, value in node.items():
+            if key == "default":
+                continue
+            if key in ("properties", "$defs"):
+                result[key] = {name: strict(sub) for name, sub in value.items()}
+            else:
+                result[key] = strict(value)
+        if "properties" in node:
+            result["additionalProperties"] = False
+            result["required"] = list(node["properties"])
+        return result
+
+    return strict(schema)
+
+
 def _is_retryable(e: Exception) -> bool:
     """Whether re-sending the identical request could plausibly succeed.
 
@@ -85,6 +118,18 @@ def _is_retryable(e: Exception) -> bool:
 # Constants
 DEFAULT_CHAT_MODEL = "gemini-3.8-flash"
 FAST_CHAT_MODEL = "gemini-3.5-flash-lite"
+
+# A metadata step that keeps failing on Gemini's side gets one more attempt on
+# this model (see _with_model_fallback): OpenAI's, which a Gemini-wide outage
+# doesn't reach, or Gemini's default model when no OpenAI key is set.
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+METADATA_FALLBACK_MODEL = "gpt-6-luna" if OPENAI_API_KEY else DEFAULT_CHAT_MODEL
+if not OPENAI_API_KEY:
+    logger.warning(
+        f"OPENAI_API_KEY is not set; metadata extraction falls back to "
+        f"{DEFAULT_CHAT_MODEL} instead of OpenAI"
+    )
+
 CACHE_TTL_SECONDS = 3600
 
 # Gemini rejects caches below 1024 tokens. Below this many characters the content
@@ -454,7 +499,9 @@ class AsyncLLMClient:
                     )
                     await asyncio.sleep(backoff_time)
                 else:
-                    logger.error(f"All {max_retries + 1} attempts failed for generate_structured: {_format_api_error(e)}")
+                    # Warn: the caller decides whether this is final, and
+                    # metadata extraction still has a fallback model to try.
+                    logger.warning(f"All {max_retries + 1} attempts failed for generate_structured: {_format_api_error(e)}")
             except (ValueError, ValidationError) as e:
                 last_exception = e
                 if attempt < max_retries:
@@ -561,6 +608,58 @@ class PaperOperations(AsyncLLMClient):
             status_callback(f"Successfully extracted {model.__name__}")
 
         return instance
+
+    def _with_model_fallback(
+        self, extract: Callable[..., Awaitable[T]], schema: Type[T], job_id: str
+    ) -> Callable[..., Awaitable[T]]:
+        """Wrap a metadata extraction step so that, once its retries run out on
+        an error that is Gemini's rather than the request's (5xx, 429, timeout),
+        it runs once more on METADATA_FALLBACK_MODEL.
+        """
+
+        async def run(**kwargs: Any) -> T:
+            try:
+                return await extract(**kwargs)
+            except Exception as e:
+                if not _is_retryable(e):
+                    raise
+                logger.warning(
+                    f"Metadata step {schema.__name__} failed on {kwargs.get('llm_model')} "
+                    f"for job {job_id}: {_format_api_error(e)}. "
+                    f"Retrying on {METADATA_FALLBACK_MODEL}"
+                )
+            if OPENAI_API_KEY:
+                return await self._extract_with_openai(schema, kwargs["paper_content"])
+            # Inline, since a context cache only serves the model it was made for.
+            return await extract(
+                **{**kwargs, "cache_key": None, "llm_model": METADATA_FALLBACK_MODEL}
+            )
+
+        return run
+
+    async def _extract_with_openai(self, schema: Type[T], paper_content: str) -> T:
+        """Extract one metadata step on METADATA_FALLBACK_MODEL. The paper goes
+        inline, with the same instructions the Gemini context cache carries."""
+        async with AsyncOpenAI(api_key=OPENAI_API_KEY) as client:
+            response = await client.chat.completions.create(
+                model=METADATA_FALLBACK_MODEL,
+                messages=[
+                    {"role": "system", "content": SYSTEM_INSTRUCTIONS_CACHE},
+                    {
+                        "role": "user",
+                        "content": f"Paper Content:\n\n{paper_content}\n\n{EXTRACT_METADATA_PROMPT_TEMPLATE}",
+                    },
+                ],
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": schema.__name__,
+                        "strict": True,
+                        "schema": _strict_json_schema(schema.model_json_schema()),
+                    },
+                },
+            )
+        return schema.model_validate_json(response.choices[0].message.content or "")
 
     @retry_llm_operation(max_retries=3, delay=1.0)
     async def extract_title_authors_abstract(
@@ -684,7 +783,9 @@ class PaperOperations(AsyncLLMClient):
                 async with time_it("Running all metadata extraction tasks concurrently", job_id=job_id):
                     tasks = [
                         asyncio.create_task(time_it("Extracting title, authors, and abstract", job_id=job_id)(
-                            self.extract_title_authors_abstract
+                            self._with_model_fallback(
+                                self.extract_title_authors_abstract, TitleAuthorsAbstract, job_id
+                            )
                         )(
                             paper_content=paper_content,
                             cache_key=cache_key,
@@ -693,7 +794,9 @@ class PaperOperations(AsyncLLMClient):
                             llm_model=extraction_model,
                         )),
                         asyncio.create_task(time_it("Extracting institutions and keywords", job_id=job_id)(
-                            self.extract_institutions_keywords
+                            self._with_model_fallback(
+                                self.extract_institutions_keywords, InstitutionsKeywords, job_id
+                            )
                         )(
                             paper_content=paper_content,
                             cache_key=cache_key,
@@ -702,7 +805,9 @@ class PaperOperations(AsyncLLMClient):
                             llm_model=extraction_model,
                         )),
                         asyncio.create_task(time_it("Extracting summary and citations", job_id=job_id)(
-                            self.extract_summary_and_citations
+                            self._with_model_fallback(
+                                self.extract_summary_and_citations, SummaryAndCitations, job_id
+                            )
                         )(
                             paper_content=paper_content,
                             cache_key=cache_key,
@@ -711,7 +816,9 @@ class PaperOperations(AsyncLLMClient):
                             llm_model=extraction_model,
                         )),
                         asyncio.create_task(time_it("Extracting highlights", job_id=job_id)(
-                            self.extract_highlights
+                            self._with_model_fallback(
+                                self.extract_highlights, Highlights, job_id
+                            )
                         )(
                             paper_content=paper_content,
                             cache_key=cache_key,
