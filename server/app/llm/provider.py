@@ -685,8 +685,8 @@ class OpenAIProvider(BaseLLMProvider):
         self._async_client = LangfuseAsyncOpenAI(
             api_key=self.api_key, base_url=base_url
         )
-        self._default_model = default_model or "gpt-5.6-sol"
-        self._fast_model = fast_model or "gpt-5.6-luna"
+        self._default_model = default_model or "gpt-6.1-terra"
+        self._fast_model = fast_model or "gpt-6-luna"
         # Some OpenAI-compatible endpoints reject `file` content blocks.
         # When False, FileContent for PDFs uses text_fallback inline.
         self.supports_pdf_input = supports_pdf_input
@@ -726,11 +726,11 @@ class OpenAIProvider(BaseLLMProvider):
 
         if tools:
             kwargs["tools"] = tools
-            # gpt-5.x reasoning models reject function tools on
+            # gpt-5 and gpt-6 reasoning models reject function tools on
             # /v1/chat/completions unless reasoning is off (the alternative is
             # migrating to /v1/responses). Other models don't match the
             # prefix and are unaffected.
-            if model.startswith("gpt-5"):
+            if model.startswith(("gpt-5", "gpt-6")):
                 kwargs.setdefault("reasoning_effort", "none")
 
         # Apply structured output schema if provided
@@ -1045,8 +1045,8 @@ class AnthropicProvider(BaseLLMProvider):
         # Streaming runs on the async client so chunk reads don't block the
         # event loop; everything else still uses the sync client.
         self._async_client = anthropic.AsyncAnthropic(api_key=self.api_key)
-        self._default_model = default_model or "claude-opus-4-7"
-        self._fast_model = fast_model or "claude-haiku-4-5"
+        self._default_model = default_model or "claude-sonnet-5-5"
+        self._fast_model = fast_model or "claude-haiku-5-5"
 
     @property
     def client(self) -> anthropic.Anthropic:
@@ -1086,25 +1086,27 @@ class AnthropicProvider(BaseLLMProvider):
             tool_call_results=tool_call_results,
         )
 
-        # Adaptive thinking is the only on-mode for Opus 4.7; "summarized"
-        # makes the thinking text visible (default is "omitted" on 4.7).
+        # Sonnet 5.5 and Haiku 5.5 think adaptively by default, and Sonnet 5.5
+        # rejects disabling thinking, so "off" is low effort. "summarized"
+        # makes the thinking text visible (the default is "omitted").
+        output_config: Dict[str, Any] = {}
         if enable_thinking:
             params["thinking"] = {"type": "adaptive", "display": "summarized"}
+        else:
+            output_config["effort"] = "low"
 
         if function_declarations:
+            # Sonnet 5.5 rejects a forced tool_choice, so the model decides
+            # whether to call a tool. Callers end their tool loop on a reply
+            # without tool calls.
             params["tools"] = [
                 self._convert_tool_declaration(fd) for fd in function_declarations
             ]
-            # Match Gemini's behavior: force at least one tool call when tools
-            # are provided and no structured-output schema. Callers that want
-            # auto selection can override via kwargs.
-            if not schema:
-                params.setdefault("tool_choice", {"type": "any"})
 
         if schema:
-            params["output_config"] = {
-                "format": {"type": "json_schema", "schema": schema}
-            }
+            output_config["format"] = {"type": "json_schema", "schema": schema}
+        if output_config:
+            params["output_config"] = output_config
 
         params.update(kwargs)
 
