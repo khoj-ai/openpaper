@@ -13,9 +13,10 @@ import time
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
-from app.database.crud.paper_crud import paper_crud
+from app.database.crud.paper_crud import is_passage_paper_deleted, paper_crud
 from app.database.database import SessionLocal
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -102,17 +103,27 @@ def backfill(batch_size: int = 100, dry_run: bool = False) -> None:
                         logger.error(f"Failed to build passages for {paper_id}: {e}")
 
                 if all_passages:
-                    db.execute(
-                        text(
+                    try:
+                        db.execute(
+                            text(
+                                """
+                                INSERT INTO paper_passages (paper_id, start_line, end_line, content)
+                                VALUES (:paper_id, :start_line, :end_line, :content)
+                                ON CONFLICT (paper_id, start_line) DO NOTHING
                             """
-                            INSERT INTO paper_passages (paper_id, start_line, end_line, content)
-                            VALUES (:paper_id, :start_line, :end_line, :content)
-                            ON CONFLICT (paper_id, start_line) DO NOTHING
-                        """
-                        ),
-                        all_passages,
-                    )
-                    db.commit()
+                            ),
+                            all_passages,
+                        )
+                        db.commit()
+                    except IntegrityError as e:
+                        db.rollback()
+                        if not is_passage_paper_deleted(e):
+                            raise
+                        # The rolled back batch is selected again, less that paper.
+                        logger.warning(
+                            "A paper was deleted during its batch; retrying the batch"
+                        )
+                        continue
 
                 indexed += len(rows) - errors
 
