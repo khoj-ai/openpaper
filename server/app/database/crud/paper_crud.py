@@ -26,11 +26,21 @@ from app.helpers.parser import get_start_page_from_offset
 from app.llm.utils import find_offsets
 from app.schemas.responses import PaperMetadataExtraction, ResponseCitation
 from app.schemas.user import CurrentUser
+from psycopg2.errors import ForeignKeyViolation
 from pydantic import BaseModel
 from sqlalchemy import func, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, load_only, selectinload
 
 logger = logging.getLogger(__name__)
+
+
+def is_passage_paper_deleted(e: IntegrityError) -> bool:
+    """Whether a paper_passages write failed because its paper no longer exists.
+
+    paper_id is the table's only foreign key, so violating one means just that.
+    """
+    return isinstance(e.orig, ForeignKeyViolation)
 
 
 # Define Pydantic models for type safety
@@ -580,25 +590,36 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
                 paper_id,
             )
 
-        db.execute(
-            text("DELETE FROM paper_passages WHERE paper_id = :paper_id"),
-            {"paper_id": paper_id},
-        )
+        try:
+            # A savepoint, so failing here can't abort the caller's transaction.
+            with db.begin_nested():
+                db.execute(
+                    text("DELETE FROM paper_passages WHERE paper_id = :paper_id"),
+                    {"paper_id": paper_id},
+                )
 
-        passages = self.build_passages(
-            sanitized_raw_content,
-            window=window,
-            stride=stride,
-        )
-        if passages:
-            db.execute(
-                text(
-                    """
-                    INSERT INTO paper_passages (paper_id, start_line, end_line, content)
-                    VALUES (:paper_id, :start_line, :end_line, :content)
-                """
-                ),
-                [{"paper_id": paper_id, **p} for p in passages],
+                passages = self.build_passages(
+                    sanitized_raw_content,
+                    window=window,
+                    stride=stride,
+                )
+                if passages:
+                    db.execute(
+                        text(
+                            """
+                            INSERT INTO paper_passages (paper_id, start_line, end_line, content)
+                            VALUES (:paper_id, :start_line, :end_line, :content)
+                        """
+                        ),
+                        [{"paper_id": paper_id, **p} for p in passages],
+                    )
+        except IntegrityError as e:
+            if not is_passage_paper_deleted(e):
+                raise
+            logger.warning(
+                "Concurrent delete of paper %s; it was removed before its passages "
+                "were indexed",
+                paper_id,
             )
         db.flush()
 
