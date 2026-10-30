@@ -73,6 +73,7 @@ def _finalize_zotero_import(
     job_id: str,
     job_user: CurrentUser,
     result: "PDFProcessingResult",
+    background_tasks: BackgroundTasks,
     error_message: Optional[str] = None,
 ) -> Optional[str]:
     """
@@ -82,8 +83,9 @@ def _finalize_zotero_import(
     extraction skipped, and applies Zotero's authoritative metadata
     (title/authors/abstract/DOI/publish_date) up front via
     _apply_metadata_from_zotero. So here we only fill in the deterministic worker
-    outputs (preview, PDF text, page offsets, file size) and apply the Zotero
-    annotations — we never require or overwrite the Zotero metadata.
+    outputs (preview, PDF text, page offsets, file size), apply the Zotero
+    annotations and index the text — we never require or overwrite the Zotero
+    metadata.
 
     Used on the normal completion path (error_message=None) and as a best-effort
     salvage when the worker reports failure (error_message set) but still produced
@@ -152,6 +154,13 @@ def _finalize_zotero_import(
         logger.error(
             f"Error applying Zotero annotations for job {job_id}: {e}",
             exc_info=True,
+        )
+
+    if result.raw_content:
+        background_tasks.add_task(
+            index_zotero_paper,
+            paper_id=uuid.UUID(str(paper.id)),
+            raw_content=result.raw_content,
         )
 
     logger.info(
@@ -241,6 +250,27 @@ def handle_failed_upload(
         )
 
 
+def _index_passages(db: Session, paper_id: uuid.UUID, raw_content: str) -> None:
+    try:
+        paper_crud.index_paper_passages(db, paper_id=paper_id, raw_content=raw_content)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.error(
+            f"Error indexing passages for paper {paper_id}: {str(e)}",
+            exc_info=True,
+        )
+
+
+def index_zotero_paper(*, paper_id: uuid.UUID, raw_content: str) -> None:
+    """Index a Zotero import's passages off the webhook hot path."""
+    db = SessionLocal()
+    try:
+        _index_passages(db, paper_id, raw_content)
+    finally:
+        db.close()
+
+
 def post_process_paper(
     *,
     paper_id: uuid.UUID,
@@ -272,19 +302,7 @@ def post_process_paper(
                 exc_info=True,
             )
 
-        try:
-            paper_crud.index_paper_passages(
-                db,
-                paper_id=paper_id,
-                raw_content=raw_content,
-            )
-            db.commit()
-        except Exception as e:
-            db.rollback()
-            logger.error(
-                f"Error indexing passages for paper {paper_id}: {str(e)}",
-                exc_info=True,
-            )
+        _index_passages(db, paper_id, raw_content)
 
         doi: Optional[str] = None
         try:
@@ -433,7 +451,11 @@ async def handle_paper_processing_webhook(
             # worker outputs and apply Zotero annotations.
             if zotero_import:
                 finalized = _finalize_zotero_import(
-                    db=db, job_id=job_id, job_user=job_user, result=result
+                    db=db,
+                    job_id=job_id,
+                    job_user=job_user,
+                    result=result,
+                    background_tasks=background_tasks,
                 )
                 if finalized:
                     track_event(
@@ -668,6 +690,7 @@ async def handle_paper_processing_webhook(
                     job_id=job_id,
                     job_user=job_user,
                     result=result,
+                    background_tasks=background_tasks,
                     error_message=error_message,
                 )
                 if salvaged:
