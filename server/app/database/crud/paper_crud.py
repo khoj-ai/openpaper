@@ -781,20 +781,26 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
             parent_paper_id=uuid.UUID(str(original_paper.id)),  # Set parent paper ID
         )
 
-        # Create the new paper in the database
-        forked_paper = self.create(db, obj_in=new_paper_data, user=current_user)
+        # One commit at the end, so no other session sees a half-built fork.
+        # Tags and passages are best-effort: each runs in a savepoint, so a
+        # failure skips that step rather than losing the fork.
+        forked_paper = self.create(
+            db, obj_in=new_paper_data, user=current_user, auto_commit=False
+        )
 
         # Copy the original paper's tags onto the fork. Tags are user-scoped, so
         # this reuses the forking user's existing tags (case-insensitive) or
         # creates new ones, then links them to the forked paper.
         if forked_paper and original_paper.tags:
             try:
-                paper_tag_crud.apply_keyword_tags(
-                    db,
-                    paper_id=uuid.UUID(str(forked_paper.id)),
-                    keywords=[str(tag.name) for tag in original_paper.tags if tag.name],  # type: ignore
-                    user_id=current_user.id,
-                )
+                with db.begin_nested():
+                    paper_tag_crud.apply_keyword_tags(
+                        db,
+                        paper_id=uuid.UUID(str(forked_paper.id)),
+                        keywords=[str(tag.name) for tag in original_paper.tags if tag.name],  # type: ignore
+                        user_id=current_user.id,
+                        commit=False,
+                    )
             except Exception as e:
                 logger.error(
                     f"Error copying tags to forked paper {forked_paper.id}: {e}",
@@ -815,6 +821,7 @@ class PaperCRUD(CRUDBase["Paper", PaperCreate, PaperUpdate]):
                     exc_info=True,
                 )
 
+        db.commit()
         return forked_paper
 
     def get_by_doi_for_user(
