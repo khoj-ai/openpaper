@@ -611,8 +611,8 @@ async def _link_zotero_item_to_existing_paper(
     user: CurrentUser,
 ) -> None:
     """Link a Zotero item to an existing paper and merge any new annotations."""
-    import_source, attachment_key, source_url, annotations = (
-        _resolve_zotero_attachment_info(client, item)
+    import_source, attachment_key, source_url, annotations = await asyncio.to_thread(
+        _resolve_zotero_attachment_info, client, item
     )
     annotation_payload = (
         _serialize_annotations_payload(annotations) if annotations else None
@@ -635,7 +635,9 @@ async def _link_zotero_item_to_existing_paper(
         and attachment_key
         and annotations
     ):
-        _sync_item(db, client=client, import_row=import_row, user=user)
+        await asyncio.to_thread(
+            _sync_item, db, client=client, import_row=import_row, user=user
+        )
 
 
 def _apply_zotero_tags(
@@ -1180,7 +1182,7 @@ async def _discover_candidates_by_keys(
             )
         return candidates, deferred_links, skipped_already_imported, errors
 
-    items = client.get_items_by_keys(item_keys)
+    items = await asyncio.to_thread(client.get_items_by_keys, item_keys)
 
     for item in items:
         if len(candidates) >= max_new:
@@ -1530,7 +1532,9 @@ async def sync_batch(
 
     for import_row in syncable:
         try:
-            result = _sync_item(db, client=client, import_row=import_row, user=user)
+            result = await asyncio.to_thread(
+                _sync_item, db, client=client, import_row=import_row, user=user
+            )
             synced.append(result)
             new_annotations_count += result["new_annotations_count"]
         except Exception as e:
@@ -1580,7 +1584,7 @@ async def auto_import_new_papers(
         )
         return {"auto_imported_count": 0, "skipped_limit_reached": False}
 
-    library = list_library(db, user=user, limit=100)
+    library = await asyncio.to_thread(list_library, db, user=user, limit=100)
     candidate_items = [
         item for item in library["items"] if not item["already_imported"]
     ]

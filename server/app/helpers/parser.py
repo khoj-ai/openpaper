@@ -1,3 +1,4 @@
+import asyncio
 import io
 import logging
 from datetime import datetime
@@ -114,6 +115,23 @@ async def validate_pdf_content(
         return False, f"Failed to validate PDF: {str(e)}"
 
 
+def _download_capped(url: str, max_bytes: int) -> bytes | None:
+    """Download a URL, giving up with None once it passes max_bytes.
+
+    A running cap, since a server may send no content-length.
+    """
+    with requests.get(url, timeout=30, stream=True) as response:
+        response.raise_for_status()
+        chunks: list[bytes] = []
+        total = 0
+        for chunk in response.iter_content(chunk_size=65536):
+            total += len(chunk)
+            if total > max_bytes:
+                return None
+            chunks.append(chunk)
+    return b"".join(chunks)
+
+
 async def validate_url_and_fetch_pdf(url: str) -> tuple[bool, bytes, str]:
     """
     Validate URL and fetch PDF content with additional checks.
@@ -121,7 +139,9 @@ async def validate_url_and_fetch_pdf(url: str) -> tuple[bool, bytes, str]:
     """
     try:
         # Make HEAD request first to check content type without downloading
-        head_response = requests.head(str(url), timeout=10, allow_redirects=True)
+        head_response = await asyncio.to_thread(
+            requests.head, str(url), timeout=10, allow_redirects=True
+        )
 
         # Check if we were redirected to a non-PDF URL
         if head_response.url != str(url):
@@ -142,21 +162,11 @@ async def validate_url_and_fetch_pdf(url: str) -> tuple[bool, bytes, str]:
             if size_mb < 0.001:  # Less than 1KB
                 return False, b"", "File too small to be a valid PDF"
 
-        # Stream the download with a running size cap so we bail out early
-        # on servers that don't return a content-length header.
-        max_bytes = MAX_UPLOAD_SIZE_MB * 1024 * 1024
-        response = requests.get(str(url), timeout=30, stream=True)
-        response.raise_for_status()
-
-        chunks: list[bytes] = []
-        total = 0
-        for chunk in response.iter_content(chunk_size=65536):
-            total += len(chunk)
-            if total > max_bytes:
-                response.close()
-                return False, b"", f"File too large (max {MAX_UPLOAD_SIZE_MB}MB)"
-            chunks.append(chunk)
-        pdf_bytes = b"".join(chunks)
+        pdf_bytes = await asyncio.to_thread(
+            _download_capped, str(url), MAX_UPLOAD_SIZE_MB * 1024 * 1024
+        )
+        if pdf_bytes is None:
+            return False, b"", f"File too large (max {MAX_UPLOAD_SIZE_MB}MB)"
 
         # Validate the downloaded content
         is_valid, error_msg = await validate_pdf_content(pdf_bytes, "URL")
