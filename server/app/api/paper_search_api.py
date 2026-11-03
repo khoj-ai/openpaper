@@ -9,6 +9,7 @@ from app.database.telemetry import track_event
 from app.helpers.paper_search import (
     OpenAlexFilter,
     PaperSort,
+    _is_transient,
     construct_citation_graph,
     get_doi,
     get_work_by_doi,
@@ -16,6 +17,7 @@ from app.helpers.paper_search import (
 )
 from app.schemas.user import CurrentUser
 from fastapi import APIRouter, Depends, HTTPException, Response
+from requests import RequestException
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -23,6 +25,18 @@ logger = logging.getLogger(__name__)
 # API routes for effectively searching and retrieving papers from external sources
 
 paper_search_router = APIRouter()
+
+
+def _lookup_failed(lookup: str, e: Exception) -> HTTPException:
+    """Log a failed OpenAlex-backed lookup and build the response to send."""
+    if isinstance(e, RequestException) and _is_transient(e):
+        logger.error(f"{lookup} unavailable, OpenAlex still failing after retries: {e}")
+        return HTTPException(
+            status_code=503,
+            detail=f"{lookup} is temporarily unavailable. Try again in a few minutes.",
+        )
+    logger.error(f"{lookup} failed: {e}", exc_info=True)
+    return HTTPException(status_code=500, detail=f"{lookup} failed. Try again.")
 
 
 @paper_search_router.post("/search")
@@ -58,8 +72,7 @@ async def search_papers(
             content=results.model_dump_json(), media_type="application/json"
         )
     except Exception as e:
-        logger.error(f"Error searching papers: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Paper search failed")
+        raise _lookup_failed("Paper search", e)
 
 
 @paper_search_router.post("/match")
@@ -133,8 +146,7 @@ async def get_paper_graph(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error retrieving paper graph: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Citation graph lookup failed")
+        raise _lookup_failed("Citation graph lookup", e)
 
 
 @paper_search_router.get("/author")
@@ -168,5 +180,4 @@ async def get_author_works(
             content=results.model_dump_json(), media_type="application/json"
         )
     except Exception as e:
-        logger.error(f"Error retrieving author works: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Author works lookup failed")
+        raise _lookup_failed("Author lookup", e)

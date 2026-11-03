@@ -100,7 +100,7 @@ function CitationGraphContent() {
             }
         } catch (err) {
             console.error("Failed to fetch citation graph:", err);
-            setError("Could not find paper. Please check the DOI and try again.");
+            setError(err instanceof Error ? err.message : "Could not find paper. Please check the DOI and try again.");
         } finally {
             setLoading(false);
         }
@@ -129,7 +129,7 @@ function CitationGraphContent() {
             }
         } catch (err) {
             console.error("Failed to fetch author works:", err);
-            setError("Could not find author works. Please try again.");
+            setError(err instanceof Error ? err.message : "Could not find author works. Please try again.");
         } finally {
             setLoading(false);
         }

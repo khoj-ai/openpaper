@@ -2,6 +2,10 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 import httpx
+import requests
+from app.api.paper_search_api import paper_search_router
+from app.auth.dependencies import get_current_user
+from app.database.database import get_db
 from app.helpers import discover as discover_module
 from app.helpers import openalex_search as openalex_module
 from app.helpers.discover import run_discover_pipeline
@@ -16,6 +20,8 @@ from app.helpers.openalex_search import (
     fetch_metadata_by_doi,
     normalize_openalex_doi,
 )
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 
 def publication_payload(**overrides) -> dict:
@@ -437,6 +443,48 @@ class TestDiscoverRouting(unittest.IsolatedAsyncioTestCase):
 
         mock_exa.assert_not_called()
         mock_openalex.assert_called_once()
+
+
+def openalex_answering(status: int) -> requests.Response:
+    response = requests.Response()
+    response.status_code = status
+    response.url = "https://api.openalex.org/works"
+    return response
+
+
+class TestOpenAlexOutage(unittest.TestCase):
+    """A lookup OpenAlex keeps failing is answered as temporarily unavailable,
+    not as a server error, while a request OpenAlex rejects stays a 500."""
+
+    def setUp(self) -> None:
+        app = FastAPI()
+        app.include_router(paper_search_router)
+        app.dependency_overrides[get_db] = lambda: None
+        app.dependency_overrides[get_current_user] = lambda: None
+        self.client = TestClient(app, raise_server_exceptions=False)
+
+    @patch("app.helpers.paper_search.time.sleep")
+    @patch("app.helpers.paper_search.requests.request")
+    def test_upstream_outage_is_temporarily_unavailable(
+        self, mock_request, _sleep
+    ) -> None:
+        cases = [
+            (openalex_answering(503), 503, "temporarily unavailable"),
+            (requests.ConnectionError("connection reset"), 503, "temporarily"),
+            (openalex_answering(400), 500, "Paper search failed"),
+        ]
+        for upstream, status, detail in cases:
+            with self.subTest(upstream=upstream):
+                if isinstance(upstream, Exception):
+                    mock_request.side_effect = upstream
+                else:
+                    mock_request.side_effect = None
+                    mock_request.return_value = upstream
+
+                response = self.client.post("/search", params={"query": "q"})
+
+                self.assertEqual(response.status_code, status)
+                self.assertIn(detail, response.json()["detail"])
 
 
 if __name__ == "__main__":

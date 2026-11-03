@@ -228,7 +228,7 @@ function FinderPageContent() {
             }
         } catch (error) {
             console.error("Search failed:", error);
-            setError("Failed to fetch results. Please try again.");
+            setError(error instanceof Error ? error.message : "Failed to fetch results. Please try again.");
         } finally {
             setLoading(false);
         }
