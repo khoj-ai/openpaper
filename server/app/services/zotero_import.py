@@ -915,8 +915,8 @@ async def _import_one_paper(
         # asynchronously by the jobs worker (with LLM metadata extraction
         # skipped), so we no longer extract them server-side here.
         safe_filename = f"zotero-{item_key}.pdf"
-        s3_object_key, file_url = await asyncio.to_thread(
-            _upload_pdf_to_s3, pdf_bytes, safe_filename
+        s3_object_key, file_url = await s3_service.upload_file(
+            BytesIO(pdf_bytes), safe_filename
         )
 
         # Create the paper up front with Zotero's authoritative metadata. The
@@ -1025,17 +1025,6 @@ async def _import_one_paper(
         }
     finally:
         db.close()
-
-
-def _upload_pdf_to_s3(pdf_bytes: bytes, safe_filename: str) -> Tuple[str, str]:
-    """Run async S3 upload from a worker thread (boto3 blocks the event loop)."""
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(
-            s3_service.upload_file(BytesIO(pdf_bytes), safe_filename)
-        )
-    finally:
-        loop.close()
 
 
 def list_library(

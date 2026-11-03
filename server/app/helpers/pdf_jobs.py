@@ -5,6 +5,7 @@ This client connects to the Celery broker to submit PDF processing tasks
 to the separate jobs service worker, and uses the HTTP API to check task status.
 """
 
+import asyncio
 import logging
 import time
 from io import BytesIO
@@ -360,7 +361,6 @@ class JobsClient:
                 properties={
                     "duration": upload_duration,
                 },
-                sync=True,
                 db=db,
             )
 
@@ -407,7 +407,9 @@ class JobsClient:
             db_committed = True
 
             # Submit processing job with S3 object key
-            task_id = self.submit_pdf_processing_job(s3_object_key, job_id)
+            task_id = await asyncio.to_thread(
+                self.submit_pdf_processing_job, s3_object_key, job_id
+            )
 
             return task_id
 

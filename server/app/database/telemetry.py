@@ -20,13 +20,6 @@ posthog = Posthog(
     enable_exception_autocapture=True,
 )
 
-posthog_sync = Posthog(
-    POSTHOG_API_KEY,
-    host="https://us.i.posthog.com",
-    sync_mode=True,
-    enable_exception_autocapture=True,
-)
-
 if DEBUG:
     posthog.debug = True
 
@@ -67,7 +60,6 @@ def track_event(
     event_name,
     properties={},
     user_id=None,
-    sync=False,
     db: Optional[Session] = None,
 ):
     """
@@ -76,7 +68,6 @@ def track_event(
     :param event_name: Name of the event to track.
     :param properties: Optional dictionary of properties to associate with the event.
     :param user_id: User ID to associate with the event, or None for anonymous.
-    :param sync: If True, send the event synchronously (blocks until sent).
     :param db: Optional request-scoped session to reuse for the subscription
                lookup. Falls back to a fresh session if None or unusable.
     """
@@ -102,14 +93,7 @@ def track_event(
                     }
                 )
 
-        if sync:
-            posthog_sync.capture(
-                distinct_id=user_id, event=event_name, properties=properties
-            )
-        else:
-            posthog.capture(
-                distinct_id=user_id, event=event_name, properties=properties
-            )
+        posthog.capture(distinct_id=user_id, event=event_name, properties=properties)
     else:
         print(
             f"PostHog tracking disabled. Event: {event_name}, Properties: {properties}"

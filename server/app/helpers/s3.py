@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import uuid
@@ -128,7 +129,8 @@ class S3Service:
             object_key = f"{UPLOAD_DIR}/{uuid.uuid4()}-{original_filename}"
 
             # Stream upload directly from BytesIO object
-            self.s3_client.upload_fileobj(
+            await asyncio.to_thread(
+                self.s3_client.upload_fileobj,
                 file,  # BytesIO object
                 self.bucket_name,
                 object_key,

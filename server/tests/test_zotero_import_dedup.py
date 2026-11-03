@@ -92,8 +92,9 @@ def _patch_import_pipeline(fn):
             return_value="task-123",
         ),
         patch.object(
-            zotero_import_module,
-            "_upload_pdf_to_s3",
+            zotero_import_module.s3_service,
+            "upload_file",
+            new_callable=AsyncMock,
             return_value=("key", "https://example.com/file.pdf"),
         ),
         patch.object(zotero_import_module, "_apply_zotero_tags"),
