@@ -679,7 +679,8 @@ async def chat_message_multipaper(
                 # The turn is saved. Renaming is cosmetic and must not turn a
                 # delivered answer into an error for the user.
                 try:
-                    operations.rename_conversation(
+                    await asyncio.to_thread(
+                        operations.rename_conversation,
                         db=db,
                         conversation_id=request.conversation_id,
                         user=current_user,

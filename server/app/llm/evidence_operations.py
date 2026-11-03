@@ -291,7 +291,8 @@ class EvidenceOperations(BaseLLMClient):
                 else None
             )
 
-            llm_response = self.generate_content(
+            llm_response = await asyncio.to_thread(
+                self.generate_content,
                 system_prompt=evidence_gathering_prompt,
                 history=conversation_history,
                 contents=message_content,
@@ -645,7 +646,8 @@ class EvidenceOperations(BaseLLMClient):
         # Compaction is an optimization: if the model call itself fails, the
         # turn continues with the uncompacted results rather than dying here.
         try:
-            llm_response = self.generate_content(
+            llm_response = await asyncio.to_thread(
+                self.generate_content,
                 system_prompt="You are a research assistant that summarizes tool call results while preserving key information.",
                 contents=message_content,
                 model_type=ModelType.DEFAULT,
@@ -781,7 +783,8 @@ class EvidenceOperations(BaseLLMClient):
         # Compaction is an optimization: if the model call itself fails, the
         # truncated fallback below stands in rather than the turn dying here.
         try:
-            llm_response = self.generate_content(
+            llm_response = await asyncio.to_thread(
+                self.generate_content,
                 system_prompt="You are a research assistant that summarizes evidence snippets from research papers.",
                 contents=message_content,
                 model_type=ModelType.FAST,
@@ -851,7 +854,8 @@ class EvidenceOperations(BaseLLMClient):
 
         message_content = [TextContent(text=formatted_prompt)]
 
-        llm_response = self.generate_content(
+        llm_response = await asyncio.to_thread(
+            self.generate_content,
             system_prompt=(
                 "You extract search keywords. Respond only with the JSON object "
                 "matching the schema."

@@ -401,7 +401,8 @@ class MultiPaperOperations(EvidenceOperations):
 
         message_content = [TextContent(text=formatted_prompt)]
 
-        response = self.generate_content(
+        response = await asyncio.to_thread(
+            self.generate_content,
             contents=message_content,
             model_type=ModelType.DEFAULT,
             provider=LLMProvider.GEMINI,

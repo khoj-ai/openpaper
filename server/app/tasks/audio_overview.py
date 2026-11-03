@@ -94,7 +94,8 @@ async def generate_audio_overview(
 
             logger.info(f"Generating narrative summary for paper {paper_id}")
 
-            narrative_summary = operations.create_narrative_summary(
+            narrative_summary = await asyncio.to_thread(
+                operations.create_narrative_summary,
                 paper_id=str(paper_id),
                 user=user,
                 length=length,

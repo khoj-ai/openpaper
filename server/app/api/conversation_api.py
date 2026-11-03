@@ -28,7 +28,7 @@ conversation_router = APIRouter()
 
 
 @conversation_router.post("/{conversation_id}/rename")
-async def rename_conversation(
+def rename_conversation(
     conversation_id: str,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_required_user),
