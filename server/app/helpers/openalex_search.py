@@ -9,7 +9,6 @@ from urllib.parse import urlencode
 from app.helpers.paper_search import (
     OpenAlexFilter,
     _request_with_retry,
-    _with_openalex_auth,
     search_open_alex,
 )
 
@@ -98,7 +97,7 @@ def fetch_metadata_by_doi(dois: list[str]) -> dict[str, OpenAlexWorkMetadata]:
                 "select": "doi,primary_location,cited_by_count,authorships",
             }
         )
-        url = _with_openalex_auth(f"https://api.openalex.org/works?{params}")
+        url = f"https://api.openalex.org/works?{params}"
 
         try:
             response = _request_with_retry(

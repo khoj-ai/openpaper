@@ -59,7 +59,7 @@ async def search_papers(
         )
     except Exception as e:
         logger.error(f"Error searching papers: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Paper search failed")
 
 
 @paper_search_router.post("/match")
@@ -134,7 +134,7 @@ async def get_paper_graph(
         raise
     except Exception as e:
         logger.error(f"Error retrieving paper graph: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Citation graph lookup failed")
 
 
 @paper_search_router.get("/author")
@@ -169,4 +169,4 @@ async def get_author_works(
         )
     except Exception as e:
         logger.error(f"Error retrieving author works: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Author works lookup failed")
