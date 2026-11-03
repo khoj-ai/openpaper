@@ -502,7 +502,7 @@ async def get_mru_paper_conversation(
 
 
 @paper_router.get("")
-async def get_pdf(
+def get_pdf(
     request: Request,
     id: str,
     db: Session = Depends(get_db),

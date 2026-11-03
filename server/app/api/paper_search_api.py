@@ -40,7 +40,7 @@ def _lookup_failed(lookup: str, e: Exception) -> HTTPException:
 
 
 @paper_search_router.post("/search")
-async def search_papers(
+def search_papers(
     query: str,
     page: int = 1,
     # Accept filter in the body for more complex queries
@@ -76,7 +76,7 @@ async def search_papers(
 
 
 @paper_search_router.post("/match")
-async def get_paper_graph(
+def get_paper_graph(
     doi: Optional[str] = None,
     paper_id: Optional[str] = None,
     db: Session = Depends(get_db),
@@ -150,7 +150,7 @@ async def get_paper_graph(
 
 
 @paper_search_router.get("/author")
-async def get_author_works(
+def get_author_works(
     author_id: str,
     page: int = 1,
     db: Session = Depends(get_db),

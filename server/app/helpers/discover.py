@@ -1,5 +1,6 @@
 """Discovery pipeline: decompose research questions into subqueries and search."""
 
+import asyncio
 import json
 import logging
 from datetime import datetime, timedelta
@@ -114,7 +115,9 @@ async def run_discover_pipeline(
         year_filter: Optional time filter ("last_year", "last_5_years", or None for all time)
     """
     # Step 1: Decompose question into subqueries
-    subqueries = decompose_query(question)
+    # The model and search calls block, and this generator runs on the event
+    # loop, so each one runs in a thread.
+    subqueries = await asyncio.to_thread(decompose_query, question)
     yield {"type": "subqueries", "content": subqueries}
 
     # Determine search strategy based on sources
@@ -139,7 +142,8 @@ async def run_discover_pipeline(
     for subquery in subqueries:
         try:
             if use_openalex:
-                results = search_openalex(
+                results = await asyncio.to_thread(
+                    search_openalex,
                     subquery,
                     num_results=10,
                     sort=sort,
@@ -147,7 +151,8 @@ async def run_discover_pipeline(
                     year_filter=year_filter,
                 )
             else:
-                results = search_exa(
+                results = await asyncio.to_thread(
+                    search_exa,
                     subquery,
                     num_results=10,
                     domains=exa_domains,
@@ -155,7 +160,7 @@ async def run_discover_pipeline(
                     use_publication_index=use_publication_index,
                 )
                 if use_publication_index:
-                    results = _hydrate_from_openalex(results)
+                    results = await asyncio.to_thread(_hydrate_from_openalex, results)
 
             yield {
                 "type": "results",
