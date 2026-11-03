@@ -1,5 +1,7 @@
 import logging
 import os
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
 
 import uvicorn  # type: ignore
 from dotenv import load_dotenv
@@ -44,15 +46,26 @@ from app.api.subscription import subscription_router
 from app.api.webhook_api import webhook_router
 from app.api.zotero_import_api import zotero_router
 from app.database.admin import setup_admin
+from app.loop_watchdog import LoopWatchdog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    watchdog = LoopWatchdog()
+    watchdog.start()
+    yield
+    watchdog.stop()
+
+
 app = FastAPI(
     title="Open Paper",
     description="A web application for uploading and annotating papers.",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 client_domain = os.getenv("CLIENT_DOMAIN", "http://localhost:3000")

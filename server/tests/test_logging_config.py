@@ -1,12 +1,15 @@
+import asyncio
 import io
 import json
 import logging
 import os
+import time
 import unittest
 from typing import Callable
 from unittest.mock import patch
 
 from app.logging_config import configure_logging
+from app.loop_watchdog import LoopWatchdog
 
 
 class TestConfigureLogging(unittest.TestCase):
@@ -73,6 +76,27 @@ class TestConfigureLogging(unittest.TestCase):
         output = self._emit(lambda log: log.error("boom"), DEBUG="True")
 
         self.assertIn("[ERROR] app.tests.sample: boom", output)
+
+
+class TestLoopWatchdog(unittest.IsolatedAsyncioTestCase):
+    async def test_reports_where_a_blocked_loop_is_stuck(self) -> None:
+        watchdog = LoopWatchdog(threshold=0.5, interval=0.05)
+        watchdog.start()
+        self.addCleanup(watchdog.stop)
+
+        with self.assertNoLogs("app.loop_watchdog"):
+            await asyncio.sleep(1)
+
+        def fetch_upstream_synchronously() -> None:
+            time.sleep(1.2)
+
+        with self.assertLogs("app.loop_watchdog", logging.WARNING) as logs:
+            fetch_upstream_synchronously()
+            await asyncio.sleep(0.2)
+
+        self.assertIn("blocked for", logs.output[0])
+        self.assertIn("fetch_upstream_synchronously", logs.output[0])
+        self.assertIn("ran again", logs.output[-1])
 
 
 if __name__ == "__main__":
