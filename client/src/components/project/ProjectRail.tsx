@@ -15,7 +15,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { fetchFromApi } from "@/lib/api";
-import { PaperItem, ProjectRole } from "@/lib/schema";
+import { PaperItem } from "@/lib/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -48,10 +48,9 @@ function SectionHeading({ label, count, children }: { label: string; count?: num
 }
 
 function PaperRow({ paper, onNavigate }: { paper: PaperItem; onNavigate?: () => void }) {
-    const { project, projectId, openPaper, openPaperIds, activePaperId, refetchPapers } = useProjectWorkspace();
+    const { canEdit, projectId, openPaper, openPaperIds, activePaperId, refetchPapers } = useProjectWorkspace();
     const isOpen = openPaperIds.includes(paper.id);
     const isActive = activePaperId === paper.id;
-    const isViewer = project?.role === ProjectRole.Viewer;
 
     const handleUnlink = async () => {
         try {
@@ -115,7 +114,7 @@ function PaperRow({ paper, onNavigate }: { paper: PaperItem; onNavigate?: () => 
                             </Link>
                         </DropdownMenuItem>
                     )}
-                    {!isViewer && (
+                    {canEdit && (
                         <DropdownMenuItem variant="destructive" onClick={handleUnlink}>
                             <Unlink className="h-4 w-4" />
                             Remove from project
@@ -135,7 +134,7 @@ export function ProjectRail({ onNavigate }: ProjectRailProps) {
     const activeConversationId = params.conversationId as string | undefined;
     const {
         projectId,
-        project,
+        canEdit,
         papers,
         isPapersLoading,
         conversations,
@@ -144,7 +143,6 @@ export function ProjectRail({ onNavigate }: ProjectRailProps) {
     } = useProjectWorkspace();
     const [paperSearchQuery, setPaperSearchQuery] = useState("");
 
-    const isViewer = project?.role === ProjectRole.Viewer;
 
     const filteredPapers = useMemo(() => {
         if (!paperSearchQuery.trim()) return papers;
@@ -165,7 +163,7 @@ export function ProjectRail({ onNavigate }: ProjectRailProps) {
             <div className="flex min-h-0 flex-1 flex-col pt-2">
                 <SectionHeading label="Papers" count={papers.length}>
                     {papers.length > 0 && <CitePaperButton paper={papers} minimalist={true} />}
-                    {!isViewer && (
+                    {canEdit && (
                         <Button
                             variant="ghost"
                             size="icon"
@@ -206,7 +204,7 @@ export function ProjectRail({ onNavigate }: ProjectRailProps) {
                     ) : (
                         <div className="px-2 pt-1">
                             <p className="text-xs text-muted-foreground">No papers yet.</p>
-                            {!isViewer && (
+                            {canEdit && (
                                 <Button
                                     variant="link"
                                     className="h-auto p-0 text-xs"
@@ -225,7 +223,7 @@ export function ProjectRail({ onNavigate }: ProjectRailProps) {
                 <SectionHeading label="Chats" count={conversations.length} />
                 <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2">
                     {/* Explicit path back to the project home (= the new-chat surface) */}
-                    {!isViewer && (
+                    {canEdit && (
                         <Link
                             href={`/projects/${projectId}`}
                             onClick={onNavigate}

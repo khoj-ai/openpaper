@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { fetchFromApi } from "@/lib/api";
-import { ProjectRole } from "@/lib/schema";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MentionInput } from "@/components/chat/MentionInput";
@@ -25,6 +24,7 @@ export default function ProjectPage() {
         projectId,
         project,
         isProjectLoading,
+        canEdit,
         projectError,
         papers,
         isPapersLoading,
@@ -41,7 +41,6 @@ export default function ProjectPage() {
     const { subscription } = useSubscription();
 
     const chatDisabled = isChatCreditAtLimit(subscription);
-    const isViewer = project?.role === ProjectRole.Viewer;
 
     useEffect(() => {
         const CHAT_CREDIT_TOAST_KEY = "chat_credit_limit_toast_shown";
@@ -134,7 +133,7 @@ export default function ProjectPage() {
                     <h2 className="mb-2 text-2xl font-bold">Get Started with Your Project</h2>
                     <p className="mb-8 text-muted-foreground">Add research papers to your project, then ask questions and generate insights.</p>
 
-                    {!isViewer && (
+                    {canEdit && (
                         <div className="mb-8 grid w-full grid-cols-1 gap-4 sm:grid-cols-2">
                             {/* Deep-link straight to the chosen flow — no second chooser in the sheet */}
                             <button
@@ -181,7 +180,7 @@ export default function ProjectPage() {
         <div className="flex-1 overflow-y-auto">
             {/* min-h-full (not h-full) so tall content grows instead of clipping under justify-center */}
             <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center px-4 py-8">
-                {!isViewer && papers.length > 0 ? (
+                {canEdit && papers.length > 0 ? (
                     <>
                         {/* The project itself is the hero — title + description ground the user */}
                         <div className="mb-6 text-center">
@@ -214,7 +213,7 @@ export default function ProjectPage() {
                             {papers.length} paper{papers.length === 1 ? "" : "s"} in context · pick up past chats from the sidebar
                         </p>
                     </>
-                ) : !isViewer ? (
+                ) : canEdit ? (
                     <div className="rounded-xl border-2 border-dashed bg-muted/30 p-8 text-center">
                         <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted p-3">
                             <MessageCircle className="h-6 w-6 text-muted-foreground" />

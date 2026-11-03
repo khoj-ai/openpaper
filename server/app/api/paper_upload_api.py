@@ -27,8 +27,9 @@ from app.database.crud.paper_upload_crud import (
     PaperUploadJobUpdate,
     paper_upload_job_crud,
 )
+from app.database.crud.projects.project_crud import project_crud
 from app.database.database import get_db
-from app.database.models import JobStatus, PaperUploadJob
+from app.database.models import JobStatus, PaperUploadJob, ProjectRoles
 from app.database.telemetry import track_event
 from app.helpers.parser import validate_pdf_content, validate_url_and_fetch_pdf
 from app.helpers.pdf_jobs import jobs_client
@@ -54,6 +55,24 @@ paper_upload_router = APIRouter()
 
 class UploadFromUrlSchema(BaseModel):
     url: HttpUrl
+
+
+def refuse_upload_into_project(
+    db: Session, user: CurrentUser, project_id: Optional[UUID]
+) -> Optional[JSONResponse]:
+    """Turn away an upload into a project the user can't edit."""
+    if not project_id:
+        return None
+    role = project_crud.get_role_in_project(db, project_id=str(project_id), user=user)
+    if role in (ProjectRoles.ADMIN, ProjectRoles.EDITOR):
+        return None
+    logger.warning(
+        f"User {user.id} with role {role} tried to upload into project {project_id}"
+    )
+    return JSONResponse(
+        status_code=403,
+        content={"message": "You don't have permission to add papers to this project."},
+    )
 
 
 @paper_upload_router.get("/status/{job_id}")
@@ -143,11 +162,14 @@ async def upload_pdf_from_url(
     background_tasks: BackgroundTasks,
     current_user: CurrentUser = Depends(get_required_user),
     db: Session = Depends(get_db),
-    project_id: Optional[str] = None,
+    project_id: Optional[UUID] = None,
 ):
     """
     Upload a document from a given URL, rather than the raw file.
     """
+    refusal = refuse_upload_into_project(db, current_user, project_id)
+    if refusal:
+        return refusal
 
     # Check subscription limits before proceeding
     err_message = await check_subscription_limits(current_user, db, project_id)
@@ -183,8 +205,6 @@ async def upload_pdf_from_url(
             content={"message": "Failed to create paper upload job"},
         )
 
-    casted_project_id = UUID(str(project_id)) if project_id else None
-
     # Get filename from URL
     filename = url.split("/")[-1]
 
@@ -196,7 +216,7 @@ async def upload_pdf_from_url(
         paper_upload_job=paper_upload_job,
         current_user=current_user,
         db=db,
-        project_id=casted_project_id,
+        project_id=project_id,
     )
 
     return JSONResponse(
@@ -215,11 +235,15 @@ async def upload_pdf(
     file: UploadFile = File(...),
     current_user: CurrentUser = Depends(get_required_user),
     db: Session = Depends(get_db),
-    project_id: Optional[str] = None,
+    project_id: Optional[UUID] = None,
 ):
     """
     Upload a PDF file
     """
+    refusal = refuse_upload_into_project(db, current_user, project_id)
+    if refusal:
+        return refusal
+
     # Check subscription limits before proceeding
     err_message = await check_subscription_limits(current_user, db, project_id)
     if err_message:
@@ -263,8 +287,6 @@ async def upload_pdf(
             content={"message": "Failed to create paper upload job"},
         )
 
-    casted_project_id = UUID(str(project_id)) if project_id else None
-
     # Pass file contents and filename instead of the UploadFile object
     background_tasks.add_task(
         upload_raw_file_microservice,
@@ -273,7 +295,7 @@ async def upload_pdf(
         paper_upload_job=paper_upload_job,
         current_user=current_user,
         db=db,
-        project_id=casted_project_id,
+        project_id=project_id,
     )
 
     return JSONResponse(
@@ -288,7 +310,7 @@ async def upload_pdf(
 async def check_subscription_limits(
     current_user: CurrentUser,
     db: Session,
-    project_id: Optional[str] = None,
+    project_id: Optional[UUID] = None,
 ) -> Union[str, None]:
     """
     Check if the user can upload a new paper based on their subscription limits.
@@ -308,7 +330,7 @@ async def check_subscription_limits(
 
     if project_id:
         can_add, error_message = can_user_add_papers_to_project(
-            db, current_user, project_id=UUID(project_id), paper_count=1
+            db, current_user, project_id=project_id, paper_count=1
         )
         if not can_add and error_message:
             return error_message

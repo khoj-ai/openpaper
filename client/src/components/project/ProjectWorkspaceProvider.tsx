@@ -10,7 +10,7 @@ import {
     useState,
 } from "react";
 import { fetchFromApi, getProjectPaperFileUrl } from "@/lib/api";
-import { Conversation, MinimalJob, PaperItem, Project } from "@/lib/schema";
+import { Conversation, MinimalJob, PaperItem, Project, ProjectRole } from "@/lib/schema";
 import {
     useProject,
     useProjectConversations,
@@ -30,6 +30,8 @@ interface ProjectWorkspaceValue {
     // Shared data — fetched once for all project routes (rail, header, pages).
     project: Project | null;
     isProjectLoading: boolean;
+    // False until the project loads, so editing never shows to someone who can't.
+    canEdit: boolean;
     projectError: Error | null;
     refetchProject: () => Promise<void>;
     papers: PaperItem[];
@@ -235,10 +237,13 @@ export function ProjectWorkspaceProvider({ projectId, children }: ProjectWorkspa
         };
     }, [projectId]);
 
+    const canEdit = project?.role === ProjectRole.Admin || project?.role === ProjectRole.Editor;
+
     const value = useMemo<ProjectWorkspaceValue>(() => ({
         projectId,
         project,
         isProjectLoading,
+        canEdit,
         projectError,
         refetchProject,
         papers,
@@ -273,7 +278,7 @@ export function ProjectWorkspaceProvider({ projectId, children }: ProjectWorkspa
         uploadJobs,
         addUploadJobs,
     }), [
-        projectId, project, isProjectLoading, projectError, refetchProject,
+        projectId, project, isProjectLoading, canEdit, projectError, refetchProject,
         papers, isPapersLoading, refetchPapers, updatePaper,
         conversations, isConversationsLoading, refetchConversations,
         openPaperIds, activePaperId, readerSearchTerm,
