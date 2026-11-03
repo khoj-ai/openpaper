@@ -1525,6 +1525,7 @@ name = "open-paper"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "aiohttp" },
     { name = "alembic" },
     { name = "anthropic" },
     { name = "boto3" },
@@ -1562,6 +1563,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aiohttp", specifier = ">=3.14.4" },
     { name = "alembic", specifier = ">=1.15.1" },
     { name = "anthropic", specifier = ">=0.96.0,<1.0" },
     { name = "boto3", specifier = ">=1.37.33" },

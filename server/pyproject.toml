@@ -12,6 +12,7 @@ requires-python = ">= 3.12"
 description = "An Application to Read & Understand Papers with AI"
 readme = "README.md"
 dependencies = [
+    "aiohttp>=3.14.4",
     "fastapi>=0.115",
     "uvicorn>=0.34",
     "pydantic[email]>=2.10",

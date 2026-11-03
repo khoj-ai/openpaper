@@ -16,6 +16,7 @@ import unittest
 from typing import Optional
 from unittest.mock import patch
 
+import aiohttp
 import anthropic
 import httpx
 import openai
@@ -245,6 +246,8 @@ class ProviderOutageClassificationTest(unittest.TestCase):
             (sdk_status(openai.APIStatusError, 401), False),
             (sdk_status(anthropic.APIStatusError, 529), True),
             (httpx.RemoteProtocolError("incomplete chunked read"), True),
+            (aiohttp.ClientPayloadError("Response payload is not completed"), True),
+            (aiohttp.ServerDisconnectedError(), True),
             (EmptyStreamError("no answer text"), True),
             (LLMBlockedError("recited", reason="RECITATION"), True),
             (LLMBlockedError("unsafe", reason="SAFETY"), False),

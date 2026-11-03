@@ -7,6 +7,7 @@ import random
 import time
 from typing import Any, AsyncIterator, Callable, Tuple
 
+import aiohttp
 import anthropic
 import httpx
 import openai
@@ -149,9 +150,12 @@ def retry_llm_operation(max_retries: int = 3, delay: float = 1.0):
 
 # Transport-level failures that kill a response mid-body. These are not model
 # errors: the connection died with bytes still owed, so the same request sent
-# again will usually succeed. httpx exceptions arrive raw from the Gemini SDK;
-# the OpenAI and Anthropic SDKs wrap theirs in APIConnectionError.
+# again will usually succeed. The Gemini SDK streams over aiohttp whenever it is
+# installed, httpx otherwise, and lets either's exceptions through raw; the
+# OpenAI and Anthropic SDKs wrap theirs in APIConnectionError.
 RETRYABLE_STREAM_EXCEPTIONS = (
+    aiohttp.ClientPayloadError,
+    aiohttp.ClientConnectionError,
     httpx.RemoteProtocolError,
     httpx.ReadError,
     httpx.ReadTimeout,

@@ -19,6 +19,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import aiohttp
 import httpx
 from app.api.message_api import _stream_chat_chunks
 from app.llm.provider import GeminiProvider
@@ -29,6 +30,13 @@ def dropped_connection() -> httpx.RemoteProtocolError:
     return httpx.RemoteProtocolError(
         "peer closed connection without sending complete message body "
         "(incomplete chunked read)"
+    )
+
+
+def aiohttp_dropped_connection() -> aiohttp.ClientPayloadError:
+    return aiohttp.ClientPayloadError(
+        "Response payload is not completed: <TransferEncodingError: 400, "
+        "message='Not enough data to satisfy transfer length header.'>"
     )
 
 
@@ -257,25 +265,29 @@ class GeminiProviderStreamTest(unittest.IsolatedAsyncioTestCase):
         ]
 
     async def test_dropped_stream_is_resent_and_flagged_as_a_restart(self):
-        async def script(attempt):
-            yield "half an ans"
-            if attempt == 1:
-                raise dropped_connection()
-            yield "wer"
+        # The SDK streams over aiohttp when it is installed, httpx otherwise.
+        for drop in (aiohttp_dropped_connection, dropped_connection):
+            with self.subTest(transport=drop.__name__):
 
-        provider, attempts = self.make_provider(script)
-        chunks = await self.stream(provider)
+                async def script(attempt):
+                    yield "half an ans"
+                    if attempt == 1:
+                        raise drop()
+                    yield "wer"
 
-        self.assertEqual(attempts["n"], 2)
-        self.assertEqual(
-            [(c.text, c.is_restart) for c in chunks],
-            [
-                ("half an ans", False),
-                ("", True),
-                ("half an ans", False),
-                ("wer", False),
-            ],
-        )
+                provider, attempts = self.make_provider(script)
+                chunks = await self.stream(provider)
+
+                self.assertEqual(attempts["n"], 2)
+                self.assertEqual(
+                    [(c.text, c.is_restart) for c in chunks],
+                    [
+                        ("half an ans", False),
+                        ("", True),
+                        ("half an ans", False),
+                        ("wer", False),
+                    ],
+                )
 
     async def test_clean_stream_flags_no_restart(self):
         async def script(attempt):
