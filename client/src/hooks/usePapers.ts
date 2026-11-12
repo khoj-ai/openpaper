@@ -10,7 +10,7 @@ interface UserPapersProps {
 
 export function usePapers({ detailed = false }: UserPapersProps = {}) {
 	const url = detailed ? '/api/paper/all?detailed=true' : '/api/paper/all';
-	const { data, error, isLoading, mutate } = useSWR<PaperItem[]>(url, fetcher);
+	const { data, error, isLoading, mutate } = useSWR<PaperItem[], Error>(url, fetcher);
 
 	const setPapers = (paperId: string, updatedPaper: PaperItem) => {
 		if (data) {
