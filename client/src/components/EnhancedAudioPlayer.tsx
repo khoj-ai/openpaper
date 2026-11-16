@@ -70,6 +70,7 @@ const TranscriptSection = React.memo(function TranscriptSection({
 interface ReferencesSectionProps {
     transcript: string;
     citations: AudioOverview['citations'];
+    paperTitle?: string;
     activeCitationKey: string | null;
     handleCitationClick: (citationKey: string, messageIndex: number) => void;
 }
@@ -77,6 +78,7 @@ interface ReferencesSectionProps {
 const ReferencesSection = React.memo(function ReferencesSection({
     transcript,
     citations,
+    paperTitle,
     activeCitationKey,
     handleCitationClick,
 }: ReferencesSectionProps) {
@@ -101,6 +103,7 @@ const ReferencesSection = React.memo(function ReferencesSection({
                 <ChatMessageActions
                     message={transcript}
                     references={{ citations: citationsForActions }}
+                    paperTitle={paperTitle}
                 />
             </div>
             <ul className="list-none p-0">
@@ -365,6 +368,7 @@ export function EnhancedAudioPlayer({ audioOverview, paper_title, setExplicitSea
             <ReferencesSection
                 transcript={audioOverview.transcript}
                 citations={audioOverview.citations}
+                paperTitle={paper_title}
                 activeCitationKey={activeCitationKey}
                 handleCitationClick={handleCitationClick}
             />

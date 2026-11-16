@@ -163,6 +163,7 @@ export const RichAudioOverview = ({
                                         <ChatMessageActions
                                             message={audioOverview.transcript}
                                             references={references}
+                                            papers={papers}
                                         />
                                     </div>
                                     {papers && papers.length > 0 ? (

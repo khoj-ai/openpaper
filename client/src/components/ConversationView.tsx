@@ -378,7 +378,7 @@ export const ConversationView = ({
 								)}
 							</button>
 							{msg.role === "assistant" && (
-								<ChatMessageActions message={msg.content} references={msg.references} />
+								<ChatMessageActions message={msg.content} references={msg.references} papers={papers} />
 							)}
 						</div>
 						{!collapsedReferences.has(index) && (
@@ -542,6 +542,7 @@ export const ConversationView = ({
 								<ChatMessageActions
 									message={streamingChunks.join("")}
 									references={streamingReferences}
+									papers={papers}
 								/>
 							</div>
 						)}

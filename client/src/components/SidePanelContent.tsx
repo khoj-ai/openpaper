@@ -734,7 +734,7 @@ export function SidePanelContent({
                                 <div className="mt-0 pt-0 border-t border-gray-300 dark:border-gray-700 flex justify-between items-center" id="references-section">
                                     <h4 className="text-sm font-semibold">References</h4>
                                     {msg.role === 'assistant' && (
-                                        <ChatMessageActions message={msg.content} references={msg.references} />
+                                        <ChatMessageActions message={msg.content} references={msg.references} paperTitle={paperData.title} />
                                     )}
                                 </div>
                                 <ul className="list-none p-0">
@@ -768,7 +768,7 @@ export function SidePanelContent({
                 </div>
             </div>
         ));
-    }, [messages, user, handleCitationClick, handleCitationClickFromSummary, matchesCurrentCitation]);
+    }, [messages, user, paperData.title, handleCitationClick, handleCitationClickFromSummary, matchesCurrentCitation]);
 
     useEffect(() => {
         const date = new Date();
@@ -1016,6 +1016,7 @@ export function SidePanelContent({
                                                             <ChatMessageActions
                                                                 message={streamingChunks.join('')}
                                                                 references={streamingReferences}
+                                                                paperTitle={paperData.title}
                                                             />
                                                         </div>
                                                     )}

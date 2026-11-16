@@ -234,7 +234,7 @@ export default function SharedPaperView() {
                             <div className="flex items-center justify-between">
                                 <h4 className="text-sm font-semibold mb-2">References</h4>
                                 {msg.role === 'assistant' && (
-                                    <ChatMessageActions message={msg.content} references={msg.references} />
+                                    <ChatMessageActions message={msg.content} references={msg.references} paperTitle={paperData?.title} />
                                 )}
                             </div>
                             <ul className="list-none p-0">
@@ -272,7 +272,7 @@ export default function SharedPaperView() {
                 </div>
             </div>
         ));
-    }, [messages, handleCitationClick, matchesCurrentCitation]);
+    }, [messages, paperData?.title, handleCitationClick, matchesCurrentCitation]);
 
     useEffect(() => {
         if (!shareId) {

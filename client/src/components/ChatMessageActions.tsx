@@ -11,14 +11,19 @@ import {
 } from "./ui/dropdown-menu";
 import { Check, Copy } from "lucide-react";
 
-import { Reference } from "@/lib/schema";
+import { PaperItem, Reference } from "@/lib/schema";
+import { CITATION_MARKER, citationKeys } from "./utils/CustomCitationLink";
 
 interface ChatMessageActionsProps {
 	message: string;
 	references?: Reference;
+	// Title sources for "Copy with references": `papers` is matched on a
+	// citation's paper_id, `paperTitle` names the paper of a single-paper view.
+	papers?: PaperItem[];
+	paperTitle?: string;
 }
 
-export function ChatMessageActions({ message, references }: ChatMessageActionsProps) {
+export function ChatMessageActions({ message, references, papers, paperTitle }: ChatMessageActionsProps) {
 	const [hasCopied, setHasCopied] = useState(false);
 
 	const onCopy = (text: string) => {
@@ -38,13 +43,21 @@ export function ChatMessageActions({ message, references }: ChatMessageActionsPr
 		onCopy('```markdown\n' + message + '\n```');
 	};
 
+	// The answer and its references as Markdown footnotes.
 	const copyWithReferences = () => {
-		let textToCopy = message;
+		// Markdown has no grouped footnote marker, so [^6, ^7] becomes [^6][^7].
+		let textToCopy = message.replace(new RegExp(CITATION_MARKER, "g"), (_, keys: string) =>
+			citationKeys(keys).map(key => `[^${key}]`).join(""));
 		if (references && references.citations && references.citations.length > 0) {
-			const referenceText = references.citations
-				.map(citation => `[${citation.key}] ${citation.reference}`)
+			const footnotes = references.citations
+				.map(citation => {
+					const title = papers?.find(paper => paper.id === citation.paper_id)?.title ?? paperTitle;
+					// Kept to one line, as a blank line would end the footnote. Chat passages arrive quoted.
+					const passage = citation.reference.replace(/\s+/g, " ").trim().replace(/^"(.*)"$/, "$1");
+					return `[^${citation.key}]: ${title ? `${title}: ` : ""}"${passage}"`;
+				})
 				.join("\n");
-			textToCopy += `\n\nReferences:\n${referenceText}`;
+			textToCopy += `\n\n${footnotes}`;
 		}
 		onCopy(textToCopy);
 	};

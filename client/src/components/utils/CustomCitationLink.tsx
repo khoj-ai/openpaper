@@ -4,6 +4,12 @@ import { BREAK_TAG, hasBreakTag } from "@/lib/markdownPreFormat";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { PaperItem } from "@/lib/schema";
 
+// A citation marker in an answer: [^1], or several grouped as [^10, ^14].
+export const CITATION_MARKER = /\[\^(\d+(?:[a-zA-Z]*)?(?:,\s*\^?\d+(?:[a-zA-Z]*)?)*)\]/;
+
+// The citation keys in a marker's capture group.
+export const citationKeys = (group: string) => group.split(',').map(key => key.trim().replace(/^\^?/, ''));
+
 // Interface for the CustomCitationLink component props
 interface CustomCitationLinkProps extends HTMLAttributes<HTMLElement> {
     children?: ReactNode;
@@ -114,8 +120,7 @@ export default function CustomCitationLink({ children, handleCitationClick, mess
                         </>
                     );
                 }
-                // Updated regex to match both single citations [^1] and multiple citations [^10, ^14]
-                const citationRegex = /\[\^(\d+(?:[a-zA-Z]*)?(?:,\s*\^?\d+(?:[a-zA-Z]*)?)*)\]/g;
+                const citationRegex = new RegExp(CITATION_MARKER, 'g');
 
                 if (citationRegex.test(child)) {
                     // Reset regex state
@@ -137,9 +142,7 @@ export default function CustomCitationLink({ children, handleCitationClick, mess
                             parts.push(child.substring(lastIndex, match.index));
                         }
 
-                        // Parse multiple citations from the match
-                        const citationsStr = match[1];
-                        const individualCitations = citationsStr.split(',').map(c => c.trim().replace(/^\^?/, ''));
+                        const individualCitations = citationKeys(match[1]);
 
                         // Create a container for multiple citations
                         parts.push(
