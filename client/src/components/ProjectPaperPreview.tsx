@@ -3,7 +3,7 @@ import { Button } from "./ui/button";
 import { toast } from "sonner";
 import { FilePlus2 } from "lucide-react";
 import { PdfHighlighterViewer } from "./PdfHighlighterViewer";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { fetchFromApi, getProjectPaperFileUrl } from "@/lib/api";
 import { useEffect, useState, useCallback } from "react";
 import { CitePaperButton } from "./CitePaperButton";
@@ -16,7 +16,6 @@ interface ProjectPaperPreviewProps {
 }
 
 export function ProjectPaperPreview({ paper, projectId, searchTerm }: ProjectPaperPreviewProps) {
-    const router = useRouter();
     const [forkedPaper, setForkedPaper] = useState<PaperItem | null>(null);
     const [isCheckingFork, setIsCheckingFork] = useState(true);
 
@@ -95,6 +94,9 @@ export function ProjectPaperPreview({ paper, projectId, searchTerm }: ProjectPap
         }
     };
 
+    // The copy in the user's own library: the paper itself, or their fork of a collaborator's.
+    const libraryPaperId = paper.is_owner ? paper.id : forkedPaper?.id;
+
     return (
         // Flush container — the reader panel / dialog hosting this provides the frame.
         <div className="bg-card transition-all duration-300 ease-in-out min-w-0 overflow-hidden h-full w-full">
@@ -104,20 +106,17 @@ export function ProjectPaperPreview({ paper, projectId, searchTerm }: ProjectPap
                     <h3 className="min-w-0 flex-1 truncate text-sm font-medium" title={paper.title}>{paper.title}</h3>
                     <div className="flex shrink-0 items-center gap-1">
                         <CitePaperButton paper={[paper]} minimalist={true} />
-                        {paper.is_owner ? (
-                            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={() => router.push(`/paper/${paper.id}`)}>
-                                <FilePlus2 className="h-3.5 w-3.5 mr-1.5" />
-                                Open
+                        {libraryPaperId ? (
+                            <Button asChild variant="outline" size="sm" className="h-7 px-2.5 text-xs">
+                                <Link href={`/paper/${libraryPaperId}`} target="_blank">
+                                    <FilePlus2 className="h-3.5 w-3.5 mr-1.5" />
+                                    Open
+                                </Link>
                             </Button>
                         ) : isCheckingFork ? (
                             <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" disabled>
                                 <FilePlus2 className="h-3.5 w-3.5 mr-1.5" />
                                 Checking...
-                            </Button>
-                        ) : forkedPaper ? (
-                            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={() => router.push(`/paper/${forkedPaper.id}`)}>
-                                <FilePlus2 className="h-3.5 w-3.5 mr-1.5" />
-                                Open
                             </Button>
                         ) : (
                             <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={handleDuplicate}>
