@@ -58,7 +58,6 @@ def get_summary_payload(db: Session, user: User) -> dict:
             "referral_code_generated",
             user_id=str(user.id),
             properties={"code": code.code},
-            db=db,
         )
     summary = referral_crud.get_summary_for_referrer(db, user.id)  # type: ignore[arg-type]
     # Round up so that sub-day test windows (e.g. 180s) don't show as "0 days".
@@ -197,7 +196,6 @@ def handle_referee_converted(db: Session, referee_user_id: uuid.UUID) -> None:
             "referral_fraud_rejected",
             user_id=str(referee_user_id),
             properties={"referral_id": str(referral.id), "reason": reason},
-            db=db,
         )
         return
 
@@ -235,7 +233,6 @@ def handle_referee_converted(db: Session, referee_user_id: uuid.UUID) -> None:
             "referral_id": str(referral.id),
             "referrer_user_id": str(referrer.id),
         },
-        db=db,
     )
 
 

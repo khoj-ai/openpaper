@@ -79,14 +79,13 @@ class ProfileUpdateRequest(BaseModel):
 @auth_router.get("/me", response_model=AuthResponse)
 async def get_me(
     current_user: Optional[CurrentUser] = Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
     """Get the current user."""
     if not current_user:
         return AuthResponse(success=False, message="Not authenticated")
 
     # Track the event of fetching user details
-    track_event("user_details_fetched", user_id=str(current_user.id), db=db)
+    track_event("user_details_fetched", user_id=str(current_user.id))
     return AuthResponse(success=True, message="User found", user=current_user)
 
 
@@ -358,7 +357,6 @@ async def google_callback(
                 "user_signup",
                 properties={"auth_provider": "google"},
                 user_id=str(db_user.id),
-                db=db,
             )
 
             # Check for suspected signup abuse
@@ -460,7 +458,6 @@ async def zotero_callback(
     track_event(
         "zotero_connected",
         user_id=str(pending.user_id),
-        db=db,
     )
 
     success_redirect = f"{client_domain}/settings?zotero=connected"
@@ -595,7 +592,7 @@ async def email_signin(
         success = email_auth_client.send_verification_code(email, code)
 
         if success:
-            track_event("email_signin_initiated", user_id=str(db_user.id), db=db)
+            track_event("email_signin_initiated", user_id=str(db_user.id))
             needs_name = not newly_created and not db_user.name
             return AuthResponse(
                 success=True,
@@ -755,7 +752,7 @@ async def email_verify(
             response, token=session.token, expires_at=session.expires_at  # type: ignore
         )
 
-        track_event("email_signin_completed", user_id=str(db_user.id), db=db)
+        track_event("email_signin_completed", user_id=str(db_user.id))
 
         return response
 

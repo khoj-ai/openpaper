@@ -153,7 +153,6 @@ async def generate_audio_overview(
                 "num_citations": len(narrative_summary.citations),
             },
             user_id=str(user.id),
-            db=db,
         )
 
         # Strip any citation syntax from the summary before passing it to the TTS using a regex
@@ -232,7 +231,6 @@ async def generate_audio_overview(
                 "time_taken": (datetime.now(timezone.utc) - start_time).total_seconds(),
             },
             user_id=str(user.id),
-            db=db,
         )
 
     except Exception as e:
@@ -263,7 +261,6 @@ async def generate_audio_overview(
                     ).total_seconds(),
                 },
                 user_id=str(user.id),
-                db=db,
             )
 
         except Exception as update_error:

@@ -382,7 +382,6 @@ async def upload_raw_file_microservice(
                 "task_id": task_id,
             },
             user_id=str(current_user.id),
-            db=db,
         )
 
     except Exception as e:

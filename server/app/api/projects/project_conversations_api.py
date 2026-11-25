@@ -48,7 +48,7 @@ async def create_project_conversation(
                 detail="Failed to create conversation. Check permissions.",
             )
 
-        track_event("project_conversation_created", user_id=str(current_user.id), db=db)
+        track_event("project_conversation_created", user_id=str(current_user.id))
 
         return JSONResponse(
             status_code=201,

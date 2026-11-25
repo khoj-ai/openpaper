@@ -134,7 +134,6 @@ def change_subscription_interval(
                 "effective_date": effective_date.isoformat(),
             },
             user_id=str(current_user.id),
-            db=db,
         )
 
         logger.info(
@@ -206,7 +205,6 @@ def cancel_scheduled_change(
                 "schedule_id": schedule_id,
             },
             user_id=str(current_user.id),
-            db=db,
         )
 
         logger.info(

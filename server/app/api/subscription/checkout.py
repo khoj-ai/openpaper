@@ -143,7 +143,6 @@ def create_checkout_session(
                 ),
             },
             user_id=str(current_user.id),
-            db=db,
         )
 
         # Add customer if available
@@ -172,7 +171,6 @@ def create_checkout_session(
                 event_name="referral_coupon_expired_at_checkout",
                 properties={"interval": interval},
                 user_id=str(current_user.id),
-                db=db,
             )
             session_params.pop("discounts", None)
             # Restore the promo-code entry point we dropped earlier so the user

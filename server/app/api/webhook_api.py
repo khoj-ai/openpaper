@@ -323,7 +323,6 @@ def post_process_paper(
             "doi_resolved",
             properties={"has_doi": bool(doi)},
             user_id=str(job_user.id),
-            db=db,
         )
     finally:
         db.close()
@@ -462,7 +461,6 @@ async def handle_paper_processing_webhook(
                         "zotero_paper_processed",
                         properties={"worker_duration": result.duration},
                         user_id=str(user.id),
-                        db=db,
                     )
                     return {
                         "status": "webhook processed - zotero import",
@@ -642,7 +640,6 @@ async def handle_paper_processing_webhook(
                     "has_ai_highlights": bool(metadata.highlights),
                 },
                 user_id=str(user.id),
-                db=db,
             )
 
             start_time = job.created_at
@@ -656,7 +653,6 @@ async def handle_paper_processing_webhook(
                     "worker_duration": result.duration,
                 },
                 user_id=str(user.id),
-                db=db,
             )
 
             # Mark job as completed
@@ -1065,7 +1061,6 @@ async def settle_referral(referral_id: str, db: Session = Depends(get_db)):
             "referral_id": str(referral.id),
             "credit_cents": credit_cents,
         },
-        db=db,
     )
 
     return {"success": True, "referral_id": str(referral.id)}
@@ -1158,7 +1153,6 @@ async def _run_zotero_sync_all(user_ids: list[uuid.UUID]) -> None:
                             "papers": result.get("synced_papers_count", 0),
                             "annotations": result.get("new_annotations_count", 0),
                         },
-                        db=db,
                     )
 
                 # Auto-import is a best-effort secondary step. A failure here
@@ -1171,7 +1165,6 @@ async def _run_zotero_sync_all(user_ids: list[uuid.UUID]) -> None:
                             "zotero_auto_import_new_papers",
                             user_id=str(user_id),
                             properties={"count": import_result["auto_imported_count"]},
-                            db=db,
                         )
                 except Exception as e:
                     logger.error(

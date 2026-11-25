@@ -76,7 +76,6 @@ async def attribute(
             "referrer_user_id": str(referral.referrer_user_id),
             "attribution_method": str(referral.attribution_method),
         },
-        db=db,
     )
 
     return {"success": True, "referral_id": str(referral.id)}
@@ -133,6 +132,5 @@ async def mark_toast_seen(
         track_event(
             "referral_toast_shown",
             user_id=str(user.id),
-            db=db,
         )
     return {"success": True}

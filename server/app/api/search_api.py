@@ -74,7 +74,6 @@ async def search_knowledge_base_endpoint(
                 "limit": limit,
                 "offset": offset,
             },
-            db=db,
         )
 
         return JSONResponse(status_code=200, content=results.model_dump(mode="json"))

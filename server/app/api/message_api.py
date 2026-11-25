@@ -577,7 +577,6 @@ async def chat_message_multipaper(
                             "project_id": request.project_id,
                         },
                         user_id=str(current_user.id),
-                        db=db,
                     )
                     if not stream_errors:
                         yield f"{json.dumps({'type': 'error', 'content': ANSWER_FAILED_MESSAGE})}{END_DELIMITER}"
@@ -736,7 +735,6 @@ async def chat_message_multipaper(
                         **mention_scope_props,
                     },
                     user_id=str(current_user.id),
-                    db=db,
                 )
 
             except Exception as e:
@@ -750,7 +748,6 @@ async def chat_message_multipaper(
                         "conversation_id": str(request.conversation_id),
                     },
                     user_id=str(current_user.id),
-                    db=db,
                 )
 
                 logger.error(f"Error in streaming response: {e}", exc_info=True)
@@ -842,7 +839,6 @@ async def chat_message_stream(
                             "type": "paper",
                         },
                         user_id=str(current_user.id),
-                        db=db,
                     )
                     if not stream_errors:
                         yield f"{json.dumps({'type': 'error', 'content': ANSWER_FAILED_MESSAGE})}{END_DELIMITER}"
@@ -901,7 +897,6 @@ async def chat_message_stream(
                         "type": "paper",
                     },
                     user_id=str(current_user.id),
-                    db=db,
                 )
 
             except Exception as e:
@@ -915,7 +910,6 @@ async def chat_message_stream(
                         "conversation_id": str(request.conversation_id),
                     },
                     user_id=str(current_user.id),
-                    db=db,
                 )
 
                 if isinstance(e, PaperNotFoundError):

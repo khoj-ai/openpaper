@@ -40,23 +40,6 @@ _TERMINAL_EVENTS: dict[str, str] = {
 TERMINAL_STATUSES = tuple(_TERMINAL_EVENTS)
 
 
-def _track(
-    event: str, properties: dict[str, Any], *, user_id: Any, db: Session
-) -> None:
-    """Record a job event without letting telemetry decide the job's fate.
-
-    The terminal events fire from the same call that marks a chart finished,
-    and that call runs inside the background task's try block. An exception
-    escaping here would be caught there and recorded as a failed chart — a
-    delivered chart turned into a failure by an analytics call. Nothing about
-    a chart is worth that, so this swallows and logs.
-    """
-    try:
-        track_event(event, properties, user_id=str(user_id), db=db)
-    except Exception:
-        logger.warning("Could not record %s telemetry", event, exc_info=True)
-
-
 def _elapsed(job: ChartGenerationJob) -> dict[str, Any]:
     """How long the requester waited, and how long the work itself took.
 
@@ -115,7 +98,7 @@ class ChartJobCRUD:
         db.commit()
         db.refresh(job)
         project_crud.touch(db, project_id)
-        _track(
+        track_event(
             "chart_job_created",
             {
                 "job_id": str(job.id),
@@ -133,7 +116,6 @@ class ChartJobCRUD:
                 "prompt": prompt,
             },
             user_id=user.id,
-            db=db,
         )
         return job
 
@@ -222,7 +204,7 @@ class ChartJobCRUD:
                 # from an actual break, which otherwise look alike in the data.
                 properties["status_message"] = job.status_message
                 properties["error_message"] = (job.error_message or "")[:200]
-            _track(terminal_event, properties, user_id=job.user_id, db=db)
+            track_event(terminal_event, properties, user_id=job.user_id)
         return job
 
     @staticmethod
@@ -300,7 +282,7 @@ class ChartJobCRUD:
                 "Failed %d chart job(s) that stopped making progress", len(stopped)
             )
             for job_id, user_id, created_at, started_at, message_id in stopped:
-                _track(
+                track_event(
                     "chart_stopped",
                     {
                         "job_id": str(job_id),
@@ -316,7 +298,6 @@ class ChartJobCRUD:
                         ),
                     },
                     user_id=user_id,
-                    db=db,
                 )
         return len(stopped)
 

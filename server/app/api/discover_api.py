@@ -37,7 +37,6 @@ async def discover_search(
             "discover_search_quota_exceeded",
             properties={"error": error_msg},
             user_id=str(current_user.id),
-            db=db,
         )
         raise HTTPException(status_code=429, detail=error_msg)
 
@@ -89,7 +88,6 @@ async def discover_search(
                             "year_filter": request.year_filter,
                         },
                         user_id=str(current_user.id),
-                        db=db,
                     )
 
                     # Include the search ID in the done chunk
@@ -106,7 +104,6 @@ async def discover_search(
                     "error": str(e),
                 },
                 user_id=str(current_user.id),
-                db=db,
             )
             yield f"{json.dumps({'type': 'error', 'content': str(e)})}{END_DELIMITER}"
 
@@ -156,7 +153,6 @@ async def discover_get(
         "did_view_discover_search",
         properties={"search_id": search_id},
         user_id=str(current_user.id),
-        db=db,
     )
 
     return {

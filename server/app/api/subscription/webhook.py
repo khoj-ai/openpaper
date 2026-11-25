@@ -103,7 +103,6 @@ async def handle_stripe_webhook(
                             "subscription_id": subscription_id,
                             "customer_id": customer_id,
                         },
-                        db=db,
                     )
 
                 except Exception as e:
@@ -211,7 +210,6 @@ async def handle_stripe_webhook(
                             "status": stripe_sub.status,
                         },
                         user_id=str(user_id),
-                        db=db,
                     )
 
                     # If this user was referred, mark the referrer's credit
@@ -330,7 +328,6 @@ async def handle_stripe_webhook(
                                     "cancel_at_period_end": True,
                                 },
                                 user_id=str(subscription.user_id),
-                                db=db,
                             )
                         logger.info(
                             f"Subscription {subscription_id} scheduled for cancellation at period end"
@@ -401,7 +398,6 @@ async def handle_stripe_webhook(
                             ),
                         },
                         user_id=str(subscription.user_id),
-                        db=db,
                     )
 
             except Exception as e:
@@ -431,7 +427,6 @@ async def handle_stripe_webhook(
                                 "invoice_id": invoice.id,
                             },
                             user_id=str(subscription.user_id),
-                            db=db,
                         )
 
                         user = user_crud.get(db, id=subscription.user_id)
@@ -477,7 +472,6 @@ async def handle_stripe_webhook(
                                 "invoice_id": invoice.id,
                             },
                             user_id=str(subscription.user_id),
-                            db=db,
                         )
 
                         logger.info(
@@ -505,7 +499,6 @@ async def handle_stripe_webhook(
                                 "invoice_id": invoice.id,
                             },
                             user_id=str(subscription.user_id),
-                            db=db,
                         )
 
                         logger.info(
@@ -553,7 +546,6 @@ async def handle_stripe_webhook(
                             "subscription_id": subscription_id,
                         },
                         user_id=str(subscription.user_id),
-                        db=db,
                     )
 
                     logger.warning(f"Subscription {subscription_id} is now past due")
@@ -616,7 +608,6 @@ async def handle_stripe_webhook(
                         "charge_id": charge.id,
                     },
                     user_id=str(referral.referrer_user_id),
-                    db=db,
                 )
                 logger.info(
                     f"Clawed back referral {referral.id} due to refund {charge.id}"

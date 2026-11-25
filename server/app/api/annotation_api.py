@@ -58,7 +58,6 @@ async def create_annotation(
         track_event(
             "annotation_created",
             user_id=str(current_user.id),
-            db=db,
         )
 
         return JSONResponse(
@@ -174,7 +173,6 @@ async def update_annotation(
         track_event(
             "annotation_updated",
             user_id=str(current_user.id),
-            db=db,
         )
 
         return JSONResponse(status_code=200, content=annotation.to_dict())

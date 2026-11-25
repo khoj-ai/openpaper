@@ -46,7 +46,6 @@ def search_papers(
     # Accept filter in the body for more complex queries
     filter: Optional[OpenAlexFilter] = None,
     sort: Optional[PaperSort] = None,
-    db: Session = Depends(get_db),
     current_user: Optional[CurrentUser] = Depends(get_current_user),
 ):
     """
@@ -66,7 +65,6 @@ def search_papers(
                 "sort": sort.value if sort else None,
                 "results_count": len(results.results),
             },
-            db=db,
         )
         return Response(
             content=results.model_dump_json(), media_type="application/json"
@@ -140,7 +138,6 @@ def get_paper_graph(
                 "cited_by_count": graph.cited_by.meta.get("count", 0),
                 "cites_count": graph.cites.meta.get("count", 0),
             },
-            db=db,
         )
         return Response(content=graph.model_dump_json(), media_type="application/json")
     except HTTPException:
@@ -153,7 +150,6 @@ def get_paper_graph(
 def get_author_works(
     author_id: str,
     page: int = 1,
-    db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_required_user),
 ):
     """
@@ -174,7 +170,6 @@ def get_author_works(
                 "results_count": len(results.results),
                 "total_count": results.meta.get("count", 0),
             },
-            db=db,
         )
         return Response(
             content=results.model_dump_json(), media_type="application/json"

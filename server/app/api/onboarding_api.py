@@ -103,7 +103,6 @@ async def create_onboarding(
             "onboarding_completed",
             user_id=str(current_user.id),
             properties=prepared_onboarding,
-            db=db,
         )
 
         send_profile_email(onboarding)

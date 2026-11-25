@@ -56,7 +56,6 @@ async def get_paper_images_with_presigned_urls(
         track_event(
             "paper_images_with_urls_retrieved",
             user_id=str(current_user.id),
-            db=db,
         )
 
         return JSONResponse(
@@ -93,7 +92,7 @@ async def get_paper_image_by_id(
                 content={"message": f"Image with ID {image_id} not found"},
             )
 
-        track_event("paper_image_retrieved", user_id=str(current_user.id), db=db)
+        track_event("paper_image_retrieved", user_id=str(current_user.id))
 
         return JSONResponse(
             status_code=200,
@@ -142,7 +141,6 @@ async def get_paper_image_with_presigned_url(
         track_event(
             "paper_image_with_url_retrieved",
             user_id=str(current_user.id),
-            db=db,
         )
 
         return JSONResponse(

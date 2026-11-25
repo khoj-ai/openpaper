@@ -135,7 +135,6 @@ class DataTableJobCRUD(
                     "columns": obj_in.columns,
                 },
                 user_id=str(user.id),
-                db=db,
             )
 
             return db_obj
@@ -317,7 +316,6 @@ class DataTableJobCRUD(
                     "time_to_completion_seconds": time_elapsed,
                 },
                 user_id=str(job.user_id),
-                db=db,
             )
         elif status == JobStatus.FAILED:
             track_event(
@@ -329,7 +327,6 @@ class DataTableJobCRUD(
                     "error_message": (error_message or "")[:200],
                 },
                 user_id=str(job.user_id),
-                db=db,
             )
 
         return job
@@ -415,7 +412,6 @@ class DataTableResultCRUD(
                     "num_row_failures": len(obj_in.row_failures),
                 },
                 user_id=str(user.id) if user else None,
-                db=db,
             )
 
             return db_obj
@@ -572,7 +568,6 @@ class DataTableRowCRUD(CRUDBase[DataTableRow, DataTableRowCreate, DataTableRowUp
                     "data_table_id": str(rows[0].data_table_id) if rows else None,
                     "num_rows": len(db_objs),
                 },
-                db=db,
             )
 
             return db_objs

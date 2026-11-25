@@ -95,7 +95,6 @@ async def zotero_import(
             "zotero_import_batch",
             user_id=str(current_user.id),
             properties={"count": result["imported_count"]},
-            db=db,
         )
 
     return ZoteroImportResponse(
@@ -137,7 +136,6 @@ async def zotero_sync(
                 "papers": result.get("synced_papers_count", 0),
                 "annotations": result.get("new_annotations_count", 0),
             },
-            db=db,
         )
 
     return ZoteroSyncResponse(

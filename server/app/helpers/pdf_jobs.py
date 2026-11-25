@@ -361,7 +361,6 @@ class JobsClient:
                 properties={
                     "duration": upload_duration,
                 },
-                db=db,
             )
 
             # Create paper and project association in a single transaction.
