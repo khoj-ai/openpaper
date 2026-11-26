@@ -43,8 +43,8 @@ class LLMBlockedError(Exception):
         return self.reason in self.RESAMPLABLE_REASONS
 
 
-class EmptyStreamError(Exception):
-    """A stream finished cleanly without producing any answer text.
+class EmptyResponseError(Exception):
+    """A response finished cleanly without producing any answer.
 
     Distinct from LLMBlockedError: nothing refused the request. The model ran
     out of output budget mid-thought, or stopped with nothing visible to show.
@@ -72,8 +72,8 @@ RETRYABLE_STREAM_EXCEPTIONS = (
 
 
 # What a re-issued request can plausibly fix: the connection died with bytes
-# still owed, or the stream ran to completion having produced nothing to read.
-RETRYABLE_STREAM_FAILURES = RETRYABLE_STREAM_EXCEPTIONS + (EmptyStreamError,)
+# still owed, or the response ran to completion having produced nothing to read.
+RETRYABLE_STREAM_FAILURES = RETRYABLE_STREAM_EXCEPTIONS + (EmptyResponseError,)
 
 
 def is_provider_outage(exc: BaseException) -> bool:
@@ -82,8 +82,8 @@ def is_provider_outage(exc: BaseException) -> bool:
 
     True for what is wrong with the provider rather than the request: the
     connection died, the upstream is overloaded or rate-limiting (429/5xx), the
-    stream ended with nothing to show, or the model landed on a verdict a fresh
-    draw could have cleared. A stable content block, a malformed request, or a
+    answer came back empty, or the model landed on a verdict a fresh draw could
+    have cleared. A stable content block, a malformed request, or a
     bug in our own code would fail the same way anywhere.
     """
     if isinstance(exc, RETRYABLE_STREAM_FAILURES):

@@ -13,6 +13,7 @@ the multi-paper evidence loop runs on, is handed off the same way.
 
 import os
 import unittest
+from types import SimpleNamespace
 from typing import Optional
 from unittest.mock import patch
 
@@ -21,9 +22,10 @@ import anthropic
 import httpx
 import openai
 from app.llm.base import BaseLLMClient, _fallback_provider_from_env
-from app.llm.provider import LLMProvider, LLMResponse, StreamChunk
-from app.llm.utils import EmptyStreamError, LLMBlockedError, is_provider_outage
+from app.llm.provider import GeminiProvider, LLMProvider, LLMResponse, StreamChunk
+from app.llm.utils import EmptyResponseError, LLMBlockedError, is_provider_outage
 from google.genai import errors as genai_errors
+from google.genai.types import FinishReason
 from pydantic import BaseModel, Field
 
 
@@ -227,6 +229,34 @@ class GenerateContentFallbackTest(ScriptedProviders, unittest.TestCase):
             (False, ["title", "page"]),
         )
 
+    def test_an_empty_answer_is_answered_by_the_fallback(self):
+        client = self.make_client([])
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}):
+            gemini = GeminiProvider()
+        # Gemini spent its whole output budget thinking and answered nothing.
+        thought_only = SimpleNamespace(
+            text=None,
+            function_calls=None,
+            prompt_feedback=None,
+            candidates=[
+                SimpleNamespace(
+                    finish_reason=FinishReason.MAX_TOKENS,
+                    content=SimpleNamespace(parts=[SimpleNamespace(thought=True)]),
+                )
+            ],
+        )
+        gemini._client = SimpleNamespace(
+            models=SimpleNamespace(generate_content=lambda **kwargs: thought_only)
+        )
+        client._providers[LLMProvider.GEMINI] = gemini
+
+        response = client.generate_content("q")
+
+        self.assertEqual(
+            (response.text, response.provider),
+            ("a fallback answer", LLMProvider.OPENAI),
+        )
+
     def test_a_failure_another_provider_cannot_fix_is_not_handed_off(self):
         client = self.make_client([gemini_status(400, "INVALID_ARGUMENT")])
 
@@ -248,7 +278,7 @@ class ProviderOutageClassificationTest(unittest.TestCase):
             (httpx.RemoteProtocolError("incomplete chunked read"), True),
             (aiohttp.ClientPayloadError("Response payload is not completed"), True),
             (aiohttp.ServerDisconnectedError(), True),
-            (EmptyStreamError("no answer text"), True),
+            (EmptyResponseError("no answer text"), True),
             (LLMBlockedError("recited", reason="RECITATION"), True),
             (LLMBlockedError("unsafe", reason="SAFETY"), False),
             (ValueError("bug"), False),

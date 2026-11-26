@@ -13,7 +13,7 @@ from app.database.models import Message
 from app.llm.citation_handler import CitationHandler
 from app.llm.utils import (
     STREAM_RESTART,
-    EmptyStreamError,
+    EmptyResponseError,
     LLMBlockedError,
     stream_with_retry,
 )
@@ -399,7 +399,7 @@ class GeminiProvider(BaseLLMProvider):
         response: Optional[GenerateContentResponse], model: str
     ) -> None:
         if response is None:
-            raise ValueError(f"No response object from Gemini ({model})")
+            raise EmptyResponseError(f"No response object from Gemini ({model})")
 
         prompt_block = getattr(
             getattr(response, "prompt_feedback", None), "block_reason", None
@@ -411,7 +411,7 @@ class GeminiProvider(BaseLLMProvider):
 
         candidates = response.candidates or []
         if not candidates:
-            raise ValueError(
+            raise EmptyResponseError(
                 f"Gemini returned no candidates ({model}); prompt_feedback="
                 f"{getattr(response, 'prompt_feedback', None)}"
             )
@@ -436,9 +436,8 @@ class GeminiProvider(BaseLLMProvider):
                 reason=getattr(finish_reason, "name", str(finish_reason)),
             )
 
-        # MAX_TOKENS, OTHER, or STOP-with-empty-text fall through as retryable —
-        # but the message now tells us which one so we can act on it.
-        raise ValueError(f"Empty response from Gemini ({model}): {detail}")
+        # MAX_TOKENS, OTHER, or STOP-with-empty-text: another draw may answer.
+        raise EmptyResponseError(f"Empty response from Gemini ({model}): {detail}")
 
     async def send_message_stream(
         self,
@@ -537,7 +536,7 @@ class GeminiProvider(BaseLLMProvider):
                 reason=getattr(finish_reason, "name", str(finish_reason)),
             )
 
-        raise EmptyStreamError(
+        raise EmptyResponseError(
             f"Gemini stream produced no answer text ({model}): {detail}"
         )
 
@@ -805,7 +804,7 @@ class OpenAIProvider(BaseLLMProvider):
         )
 
         if not response.choices or not response.choices[0].message:
-            raise ValueError("Empty response from OpenAI API")
+            raise EmptyResponseError("Empty response from OpenAI API")
 
         message = response.choices[0].message
 
@@ -820,6 +819,9 @@ class OpenAIProvider(BaseLLMProvider):
                         args=json.loads(tool_call.function.arguments),
                     )
                 )
+
+        if not message.content and not tool_calls:
+            raise EmptyResponseError("Empty response from OpenAI API")
 
         return LLMResponse(
             text=message.content or "",
@@ -857,7 +859,7 @@ class OpenAIProvider(BaseLLMProvider):
 
         def raise_if_no_answer() -> None:
             if not state["saw_text"]:
-                raise EmptyStreamError(
+                raise EmptyResponseError(
                     f"OpenAI stream produced no answer text ({model})"
                 )
 
@@ -1190,7 +1192,7 @@ class AnthropicProvider(BaseLLMProvider):
                 )
 
         if not text_parts and not tool_calls:
-            raise ValueError("Empty response from Anthropic API")
+            raise EmptyResponseError("Empty response from Anthropic API")
 
         return LLMResponse(
             text="".join(text_parts),
@@ -1250,7 +1252,7 @@ class AnthropicProvider(BaseLLMProvider):
 
         def raise_if_no_answer() -> None:
             if not state["saw_text"]:
-                raise EmptyStreamError(
+                raise EmptyResponseError(
                     f"Anthropic stream produced no answer text ({model})"
                 )
 

@@ -29,7 +29,7 @@ from app.api.message_api import _stream_chat_chunks
 from app.llm.provider import GeminiProvider
 from app.llm.utils import (
     STREAM_RESTART,
-    EmptyStreamError,
+    EmptyResponseError,
     LLMBlockedError,
     stream_with_retry,
 )
@@ -134,7 +134,7 @@ class EmptyGeminiStreamTest(unittest.IsolatedAsyncioTestCase):
             return [chunk(), chunk(finish_reason=FinishReason.MAX_TOKENS)]
 
         provider, attempts = self.make_provider(script)
-        with self.assertRaises(EmptyStreamError):
+        with self.assertRaises(EmptyResponseError):
             await self.stream(provider)
 
         self.assertEqual(attempts["n"], 3)
@@ -196,7 +196,7 @@ class StreamWithRetryOnCompleteTest(unittest.IsolatedAsyncioTestCase):
     async def test_raising_from_on_complete_re_issues_the_request(self):
         def on_complete(attempt):
             if attempt == 1:
-                raise EmptyStreamError("nothing to show")
+                raise EmptyResponseError("nothing to show")
 
         collected, attempts = await self.run_stream(lambda n: ["a"], on_complete)
 
