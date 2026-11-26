@@ -19,7 +19,7 @@ from app.llm.provider import (
     ToolCallResult,
     strict_json_schema,
 )
-from app.llm.utils import is_provider_outage, retry_llm_operation
+from app.llm.utils import is_provider_outage
 from langfuse import get_client, observe
 from pydantic import BaseModel
 
@@ -123,11 +123,12 @@ class BaseLLMClient:
         schema: Optional[Union[Dict, type[BaseModel]]] = None,
         **kwargs,
     ) -> LLMResponse:
-        """Generate content using the specified provider. Automatically retries on transient errors.
+        """Generate content using the specified provider.
 
-        If the provider still fails outright, the same request is handed to
-        `fallback_provider`, as send_message_stream does. A failure another
-        provider cannot fix is raised as-is (see is_provider_outage).
+        If the provider still fails after its client's own retries, the same
+        request is handed to `fallback_provider`, as send_message_stream does.
+        A failure another provider cannot fix is raised as-is (see
+        is_provider_outage).
 
         Args:
             schema: Optional structured-output schema — a JSON schema dict, or a
@@ -184,7 +185,6 @@ class BaseLLMClient:
             )
             raise
 
-    @retry_llm_operation(max_retries=3, delay=1.0)
     def _generate_with(
         self,
         target_provider: LLMProvider,
@@ -198,7 +198,7 @@ class BaseLLMClient:
         schema: Optional[Union[Dict, type[BaseModel]]],
         **kwargs,
     ) -> LLMResponse:
-        """One provider's attempt at generate_content, retried on transient errors."""
+        """One provider's attempt at generate_content."""
         start_time = time.time()
         model = self._get_model_for_type(model_type, target_provider)
 

@@ -18,7 +18,7 @@ from app.llm.prompts import (
     NORMAL_MODE_INSTRUCTIONS,
 )
 from app.llm.provider import FileContent, LLMProvider, TextContent
-from app.llm.utils import LLMBlockedError, retry_llm_operation
+from app.llm.utils import LLMBlockedError
 from app.schemas.message import ResponseStyle
 from app.schemas.responses import AudioOverviewForLLM
 from app.schemas.user import CurrentUser
@@ -39,7 +39,6 @@ class PaperNotFoundError(ValueError):
 class PaperOperations(BaseLLMClient):
     """Operations related to paper analysis and chat functionality"""
 
-    @retry_llm_operation(max_retries=3, delay=1.0)
     def create_narrative_summary(
         self,
         paper_id: str,

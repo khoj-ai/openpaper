@@ -44,7 +44,6 @@ from app.llm.tools.file_tools import (
     view_file_function,
 )
 from app.llm.tools.meta_tools import stop_function
-from app.llm.utils import retry_llm_operation
 from app.schemas.citation import CitationResult
 from app.schemas.message import (
     EvidenceCollection,
@@ -115,7 +114,6 @@ def _summarize_citation(result: CitationResult) -> str:
 class EvidenceOperations(BaseLLMClient):
     """Operations related to evidence gathering and compaction from multiple papers."""
 
-    @retry_llm_operation(max_retries=3, delay=1.0)
     async def gather_evidence(
         self,
         question: str,

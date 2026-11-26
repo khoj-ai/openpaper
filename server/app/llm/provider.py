@@ -263,8 +263,8 @@ class GeminiProvider(BaseLLMProvider):
 
         self._client = genai.Client(
             api_key=self.api_key,
-            # Retry twice more on a 408/429/5xx or a connect/read timeout.
-            http_options=HttpOptions(retry_options=HttpRetryOptions(attempts=3)),
+            # Retry once more on a 408/429/5xx or a connect/read timeout.
+            http_options=HttpOptions(retry_options=HttpRetryOptions(attempts=2)),
         )
         self._default_model = "gemini-3.8-flash"
         self._fast_model = "gemini-3.5-flash-lite"
@@ -721,13 +721,20 @@ class OpenAIProvider(BaseLLMProvider):
 
         # For standard OpenAI, base_url should be None. For OpenAI-compatible
         # providers, pass a custom base_url when constructing this provider.
+        # Retry once more on a connection error, timeout, 408/409/429 or 5xx.
         self._client = LangfuseOpenAI(
-            api_key=self.api_key, base_url=base_url, timeout=MODEL_TIMEOUT_SECONDS
+            api_key=self.api_key,
+            base_url=base_url,
+            max_retries=1,
+            timeout=MODEL_TIMEOUT_SECONDS,
         )
         # Streaming runs on the async client so chunk reads don't block the
         # event loop; everything else still uses the sync client.
         self._async_client = LangfuseAsyncOpenAI(
-            api_key=self.api_key, base_url=base_url, timeout=MODEL_TIMEOUT_SECONDS
+            api_key=self.api_key,
+            base_url=base_url,
+            max_retries=1,
+            timeout=MODEL_TIMEOUT_SECONDS,
         )
         self._default_model = default_model or "gpt-6.1-terra"
         self._fast_model = fast_model or "gpt-6-luna"
@@ -1085,13 +1092,14 @@ class AnthropicProvider(BaseLLMProvider):
         if not self.api_key:
             raise ValueError("ANTHROPIC_API_KEY environment variable is required")
 
+        # Retry once more on a connection error, timeout, 408/409/429 or 5xx.
         self._client = anthropic.Anthropic(
-            api_key=self.api_key, timeout=MODEL_TIMEOUT_SECONDS
+            api_key=self.api_key, max_retries=1, timeout=MODEL_TIMEOUT_SECONDS
         )
         # Streaming runs on the async client so chunk reads don't block the
         # event loop; everything else still uses the sync client.
         self._async_client = anthropic.AsyncAnthropic(
-            api_key=self.api_key, timeout=MODEL_TIMEOUT_SECONDS
+            api_key=self.api_key, max_retries=1, timeout=MODEL_TIMEOUT_SECONDS
         )
         self._default_model = default_model or "claude-sonnet-5-5"
         self._fast_model = fast_model or "claude-haiku-5-5"

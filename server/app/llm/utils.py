@@ -1,10 +1,7 @@
 import asyncio
 import difflib
-import functools
-import json
 import logging
 import random
-import time
 from typing import Any, AsyncIterator, Callable, Tuple
 
 import aiohttp
@@ -53,99 +50,6 @@ class EmptyStreamError(Exception):
     out of output budget mid-thought, or stopped with nothing visible to show.
     Re-issuing the request is worth a try.
     """
-
-
-# Exceptions that should trigger a retry with backoff. LLMBlockedError is
-# deliberately excluded — retrying a safety block just burns time and tokens.
-RETRYABLE_EXCEPTIONS = (
-    ValueError,
-    json.JSONDecodeError,
-    openai.InternalServerError,  # 500, 503
-    openai.RateLimitError,  # 429
-    openai.APIConnectionError,  # Network issues
-    openai.APITimeoutError,  # Timeouts
-)
-
-
-def retry_llm_operation(max_retries: int = 3, delay: float = 1.0):
-    """
-    Decorator to retry LLM operations that may fail due to API errors or validation issues.
-
-    Args:
-        max_retries: Maximum number of retry attempts (default: 3)
-        delay: Base delay between retries in seconds (default: 1.0)
-    """
-
-    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            last_exception: BaseException | None = None
-
-            for attempt in range(max_retries + 1):
-                try:
-                    return func(*args, **kwargs)
-                except RETRYABLE_EXCEPTIONS as e:
-                    last_exception = e
-                    if attempt < max_retries:
-                        # Calculate exponential backoff with jitter
-                        backoff_time = (
-                            delay * (2**attempt) * (0.5 + 0.5 * random.random())
-                        )
-                        logger.warning(
-                            f"Retry {attempt+1}/{max_retries} for {func.__name__}: {type(e).__name__}: {str(e)[:100]}. Retrying in {backoff_time:.2f}s"
-                        )
-                        time.sleep(backoff_time)
-                    else:
-                        logger.warning(
-                            f"All {max_retries} retries failed for {func.__name__}"
-                        )
-
-            # If we reach here, all retries failed
-            if last_exception is not None:
-                logger.error(
-                    f"Final failure after {max_retries} retries for {func.__name__}: {str(last_exception)}",
-                    exc_info=last_exception,
-                )
-                raise last_exception
-
-        # Create async version for async functions
-        @functools.wraps(func)
-        async def async_wrapper(*args, **kwargs):
-            last_exception: BaseException | None = None
-
-            for attempt in range(max_retries + 1):
-                try:
-                    return await func(*args, **kwargs)
-                except RETRYABLE_EXCEPTIONS as e:
-                    last_exception = e
-                    if attempt < max_retries:
-                        # Calculate exponential backoff with jitter
-                        backoff_time = (
-                            delay * (2**attempt) * (0.5 + 0.5 * random.random())
-                        )
-                        logger.warning(
-                            f"Retry {attempt+1}/{max_retries} for {func.__name__}: {type(e).__name__}: {str(e)[:100]}. Retrying in {backoff_time:.2f}s"
-                        )
-                        await asyncio.sleep(backoff_time)
-                    else:
-                        logger.warning(
-                            f"All {max_retries} retries failed for {func.__name__}"
-                        )
-
-            # If we reach here, all retries failed
-            if last_exception is not None:
-                logger.error(
-                    f"Final failure after {max_retries} retries for {func.__name__}: {str(last_exception)}",
-                    exc_info=last_exception,
-                )
-                raise last_exception
-
-        # Return appropriate wrapper based on if the function is async or not
-        if asyncio.iscoroutinefunction(func):
-            return async_wrapper
-        return wrapper
-
-    return decorator
 
 
 # Transport-level failures that kill a response mid-body. These are not model

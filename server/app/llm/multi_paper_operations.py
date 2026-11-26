@@ -22,7 +22,6 @@ from app.llm.prompts import (
     format_scope,
 )
 from app.llm.provider import LLMProvider, StreamChunk, SupplementaryContent, TextContent
-from app.llm.utils import retry_llm_operation
 from app.schemas.artifact import CitationArtifactPayload
 from app.schemas.message import EvidenceCollection
 from app.schemas.responses import AudioOverviewForLLM
@@ -331,7 +330,6 @@ class MultiPaperOperations(EvidenceOperations):
         if text_buffer:
             yield {"type": "content", "content": text_buffer}
 
-    @retry_llm_operation(max_retries=3, delay=1.0)
     async def create_multi_paper_narrative_summary(
         self,
         current_user: CurrentUser,
