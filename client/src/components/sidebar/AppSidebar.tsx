@@ -6,7 +6,7 @@ import { Sidebar, SidebarContent } from "@/components/ui/sidebar";
 import { fetchFromApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useIsDarkMode } from "@/hooks/useDarkMode";
-import { useSubscription } from "@/hooks/useSubscription";
+import { isPaidPlan, useSubscription } from "@/hooks/useSubscription";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useActivePapers } from "@/hooks/useActivePapers";
 import { useReferralBalance } from "@/hooks/useReferralBalance";
@@ -29,7 +29,7 @@ export function AppSidebar() {
     const [dismissedWarning, setDismissedWarning] = useState<string | null>(null);
     const [referralOpen, setReferralOpen] = useState(false);
     const isMobile = useIsMobile();
-    const isPaid = subscription?.plan === "researcher";
+    const isPaid = isPaidPlan(subscription?.plan);
     const { balance: referralBalance } = useReferralBalance(!!user);
 
     const referralEntry = buildReferralEntry({

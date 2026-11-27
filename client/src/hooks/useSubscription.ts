@@ -34,6 +34,16 @@ export const useSubscription = (): UseSubscriptionReturn => {
 };
 
 // Helper functions for common subscription checks
+export const PLAN_LABELS: Record<SubscriptionData['plan'], string> = {
+    basic: 'Basic',
+    researcher: 'Researcher',
+    team: 'Team',
+};
+
+export const isPaidPlan = (plan: SubscriptionData['plan'] | null | undefined): boolean => {
+    return !!plan && plan !== 'basic';
+};
+
 export const getStorageUsagePercentage = (subscription: SubscriptionData | null): number => {
     if (!subscription) return 0;
     const total = subscription.limits.knowledge_base_size;

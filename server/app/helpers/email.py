@@ -1,6 +1,7 @@
 import logging
 import os
 from datetime import datetime, timedelta, timezone
+from html import escape
 from pathlib import Path
 from typing import Union
 
@@ -157,7 +158,12 @@ def notify_converted_billing_interval(
         logger.error(f"Failed to notify billing interval change: {e}", exc_info=True)
 
 
-def notify_billing_issue(email: str, issue: str, name: Union[str, None] = None) -> None:
+def notify_billing_issue(
+    email: str,
+    issue: str,
+    name: Union[str, None] = None,
+    manage_path: str = "/pricing",
+) -> None:
     """
     Notify user about a billing issue.
 
@@ -165,9 +171,10 @@ def notify_billing_issue(email: str, issue: str, name: Union[str, None] = None) 
         email (str): The email address of the user.
         name (str): The name of the user.
         issue (str): The type of billing issue (e.g., "payment").
+        manage_path (str): Where the user can fix it, relative to the client domain.
     """
     try:
-        manage_url = f"{CLIENT_DOMAIN}/pricing"
+        manage_url = f"{CLIENT_DOMAIN}{manage_path}"
         payload = resend.Emails.SendParams = {  # type: ignore
             "from": "Open Paper <support@updates.openpaper.ai>",
             "reply_to": REPLY_TO_DEFAULT_EMAIL,
@@ -321,6 +328,47 @@ def send_project_invite_email(
 
     except Exception as e:
         logger.error(f"Failed to send invite email to {to_email}: {e}", exc_info=True)
+        return False
+
+
+def send_organization_invite_email(
+    to_email: str,
+    from_name: str,
+    organization_name: str,
+) -> bool:
+    """
+    Send a team invitation email using Resend. The email names the invited
+    address, since only an account with that exact address can accept.
+
+    Returns:
+        bool: True if email was sent successfully, False otherwise
+    """
+    try:
+        invite_link = f"{CLIENT_DOMAIN}/team"
+        subject = f"{from_name} invited you to join {organization_name} on Open Paper"
+        # The names are user-chosen, so they mustn't be able to add markup.
+        html_content = (
+            load_email_template("team_invite.html")
+            .replace("{{from_name}}", escape(from_name))
+            .replace("{{organization_name}}", escape(organization_name))
+            .replace("{{to_email}}", escape(to_email))
+            .replace("{{invite_link}}", invite_link)
+        )
+
+        payload = resend.Emails.SendParams = {  # type: ignore
+            "from": f"Open Paper <noreply@updates.openpaper.ai>",
+            "to": to_email,
+            "subject": subject,
+            "html": html_content,
+        }
+
+        resend.Emails.send(payload)  # type: ignore
+        return True
+
+    except Exception as e:
+        logger.error(
+            f"Failed to send team invite email to {to_email}: {e}", exc_info=True
+        )
         return False
 
 

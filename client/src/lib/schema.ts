@@ -698,7 +698,7 @@ export interface SubscriptionUsage {
 }
 
 export interface SubscriptionData {
-    plan: 'basic' | 'researcher';
+    plan: 'basic' | 'researcher' | 'team';
     limits: SubscriptionLimits;
     usage: SubscriptionUsage;
 }
@@ -708,4 +708,75 @@ export interface UseSubscriptionReturn {
     loading: boolean;
     error: string | null;
     refetch: () => Promise<void>;
+}
+
+export type TeamRole = 'admin' | 'member';
+
+export interface Team {
+    id: string;
+    name: string;
+    plan: 'team';
+    status: string;
+    is_paid: boolean;
+    seats: number;
+    current_period_end: string | null;
+    cancel_at_period_end: boolean;
+    role: TeamRole | null;
+}
+
+export interface TeamMember {
+    user_id: string;
+    name: string | null;
+    email: string | null;
+    picture: string | null;
+    role: TeamRole;
+    joined_at: string | null;
+}
+
+export interface TeamInvitation {
+    id: string;
+    email: string;
+    role: TeamRole;
+    invited_at: string | null;
+    // False while the team is being set up; emailed once it's paid.
+    sent: boolean;
+}
+
+export interface MyTeamInvitation extends TeamInvitation {
+    organization_id: string;
+    organization_name: string;
+    invited_by: string | null;
+}
+
+export interface TeamDetail {
+    organization: Team;
+    members: TeamMember[];
+    // Admin-only
+    invitations?: TeamInvitation[];
+    seats_taken?: number;
+}
+
+export interface TeamMemberUsage extends TeamMember {
+    last_active_at: string | null;
+    questions_this_week: number;
+    papers_opened_this_month: number;
+    chat_credits_used: number;
+}
+
+export interface TeamUsageSummary {
+    members: number;
+    active_this_week: number;
+    questions_this_week: number;
+    papers_opened_this_month: number;
+}
+
+export interface TeamUsageResponse {
+    summary: TeamUsageSummary;
+    chat_credits_per_seat: number;
+    members: TeamMemberUsage[];
+}
+
+export interface MyTeamsResponse {
+    organizations: Team[];
+    has_active_personal_subscription: boolean;
 }
