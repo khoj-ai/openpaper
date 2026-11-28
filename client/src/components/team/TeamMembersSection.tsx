@@ -69,6 +69,10 @@ export function TeamMembersSection({
 }: TeamMembersSectionProps) {
     const [pendingRemoval, setPendingRemoval] = useState<PendingRemoval>(null);
     const usageByUser = new Map((usage?.members ?? []).map((u) => [u.user_id, u]));
+    // A team always keeps an admin, so its only admin can't leave or step down.
+    const soleAdminId = members.filter((m) => m.role === "admin").length === 1
+        ? members.find((m) => m.role === "admin")?.user_id
+        : undefined;
     const creditShare = (used: number) =>
         usage && usage.chat_credits_per_seat > 0 ? Math.round((used / usage.chat_credits_per_seat) * 100) : 0;
 
@@ -125,6 +129,7 @@ export function TeamMembersSection({
                 <TableBody>
                     {members.map((member) => {
                         const isSelf = member.user_id === currentUserId;
+                        const isSoleAdmin = member.user_id === soleAdminId;
                         const memberUsage = usageByUser.get(member.user_id);
                         return (
                             <TableRow key={member.user_id}>
@@ -175,14 +180,22 @@ export function TeamMembersSection({
                                                     <DropdownMenuItem onClick={() => setRole(member, "admin")}>Make admin</DropdownMenuItem>
                                                 )}
                                                 {isAdmin && member.role === "admin" && (
-                                                    <DropdownMenuItem onClick={() => setRole(member, "member")}>Remove admin</DropdownMenuItem>
+                                                    <DropdownMenuItem disabled={isSoleAdmin} onClick={() => setRole(member, "member")}>Remove admin</DropdownMenuItem>
                                                 )}
                                                 <DropdownMenuItem
                                                     className="text-destructive"
+                                                    disabled={isSoleAdmin}
                                                     onClick={() => setPendingRemoval({ member, isSelf })}
                                                 >
                                                     {isSelf ? "Leave team" : "Remove from team"}
                                                 </DropdownMenuItem>
+                                                {isSoleAdmin && (
+                                                    <p className="max-w-56 px-2 py-1.5 text-xs text-muted-foreground">
+                                                        {members.length > 1
+                                                            ? "A team needs an admin. Make another member an admin first."
+                                                            : "A team needs an admin, so its only member can't leave."}
+                                                    </p>
+                                                )}
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     )}
