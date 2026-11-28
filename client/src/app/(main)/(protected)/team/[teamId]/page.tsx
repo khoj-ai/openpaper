@@ -27,12 +27,12 @@ const CHECKOUT_POLL_ATTEMPTS = 15;
 // Statuses where the team has a subscription to manage rather than one to buy.
 const SUBSCRIBED_STATUSES = ["active", "trialing", "past_due"];
 
-function UsageSummary({ summary, seats, seatsTaken }: { summary: TeamUsageSummary; seats: number; seatsTaken: number }) {
+function UsageSummary({ summary, seats }: { summary: TeamUsageSummary; seats: number }) {
     const stats = [
         { label: "Active this week", value: `${summary.active_this_week} of ${summary.members}` },
         { label: "Questions this week", value: summary.questions_this_week.toLocaleString() },
         { label: "Papers opened, 30 days", value: summary.papers_opened_this_month.toLocaleString() },
-        { label: "Seats in use", value: `${seatsTaken} of ${seats}` },
+        { label: "Seats in use", value: `${summary.members} of ${seats}` },
     ];
     return (
         <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -225,7 +225,7 @@ function TeamContent() {
                 </p>
             )}
 
-            {isAdmin && usage && <UsageSummary summary={usage.summary} seats={team.seats} seatsTaken={seatsTaken} />}
+            {isAdmin && usage && <UsageSummary summary={usage.summary} seats={team.seats} />}
 
             <TeamMembersSection
                 teamId={team.id}
@@ -253,7 +253,7 @@ function TeamContent() {
             {isAdmin && (
                 <>
                     <Separator />
-                    <TeamBillingSection team={team} seatsTaken={seatsTaken} onChanged={load} />
+                    <TeamBillingSection team={team} members={detail.members.length} pendingInvitations={invitations.length} onChanged={load} />
                 </>
             )}
         </div>

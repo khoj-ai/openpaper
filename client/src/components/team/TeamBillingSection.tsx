@@ -12,14 +12,17 @@ import { toast } from "sonner";
 
 interface TeamBillingSectionProps {
     team: Team;
-    seatsTaken: number;
+    members: number;
+    // Each pending invitation holds a seat until it is accepted or retracted.
+    pendingInvitations: number;
     onChanged: () => void;
 }
 
 const formatDate = (iso: string | null) =>
     iso ? new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : null;
 
-export function TeamBillingSection({ team, seatsTaken, onChanged }: TeamBillingSectionProps) {
+export function TeamBillingSection({ team, members, pendingInvitations, onChanged }: TeamBillingSectionProps) {
+    const seatsTaken = members + pendingInvitations;
     const [seats, setSeats] = useState(Math.max(team.seats, seatsTaken));
     const [saving, setSaving] = useState(false);
     const [openingPortal, setOpeningPortal] = useState(false);
@@ -73,7 +76,8 @@ export function TeamBillingSection({ team, seatsTaken, onChanged }: TeamBillingS
             <div className="space-y-1">
                 <h2 className="text-lg font-medium">Billing</h2>
                 <p className="text-sm text-muted-foreground">
-                    {seatsTaken} of {team.seats} seats in use, counting pending invitations.
+                    {members} of {team.seats} seats in use.
+                    {pendingInvitations > 0 && ` ${pendingInvitations} more held for pending ${pendingInvitations === 1 ? "invitation" : "invitations"}.`}
                     {team.current_period_end && (
                         team.cancel_at_period_end
                             ? ` The team plan ends on ${formatDate(team.current_period_end)}.`
