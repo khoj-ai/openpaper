@@ -33,6 +33,7 @@ try:
         Organization,
         OrganizationMembership,
         OrganizationRoles,
+        Subscription,
         SubscriptionPlan,
         SubscriptionStatus,
         User,
@@ -429,6 +430,35 @@ class TestTeamApiPermissions(TeamTestCase):
         ]:
             response = self.client.request(method, path, json=body)
             self.assertEqual(response.status_code, 403, path)
+
+    def test_only_a_covered_member_can_cancel_their_personal_plan(self) -> None:
+        covered, uncovered = self._user(), self._user()
+        for person in (covered, uncovered):
+            self.db.add(
+                Subscription(
+                    user_id=person.id,
+                    plan=SubscriptionPlan.RESEARCHER.value,
+                    status=SubscriptionStatus.ACTIVE.value,
+                    current_period_end=datetime.now(timezone.utc) + timedelta(days=20),
+                    stripe_customer_id="cus_test",
+                    stripe_subscription_id=f"sub_personal_{secrets.token_hex(6)}",
+                )
+            )
+        self.db.commit()
+        self._team(covered)
+        personal_sub = self.db.query(Subscription).filter_by(user_id=covered.id).one()
+
+        with patch("stripe.Subscription.modify") as modify:
+            self._as(uncovered)
+            refused = self.client.post("/api/organization/personal-plan/cancel")
+            self._as(covered)
+            canceled = self.client.post("/api/organization/personal-plan/cancel")
+
+        self.assertEqual(refused.status_code, 400)
+        self.assertEqual(canceled.status_code, 200)
+        modify.assert_called_once_with(
+            personal_sub.stripe_subscription_id, cancel_at_period_end=True
+        )
 
     def test_member_can_leave(self) -> None:
         admin, member = self._user(), self._user()

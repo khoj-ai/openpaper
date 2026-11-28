@@ -8,6 +8,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
+import stripe
 from app.api.organization.invitation_emails import send_held_invitations
 from app.auth.dependencies import get_required_user
 from app.database.crud.message_crud import message_crud
@@ -192,6 +193,65 @@ def list_my_organizations(
         "has_active_personal_subscription": has_active_personal_subscription(
             db, current_user
         ),
+    }
+
+
+@router.post("/personal-plan/cancel")
+def cancel_personal_plan(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_required_user),
+):
+    """Stop a personal plan renewing once a paid team covers the person, so
+    nobody pays twice. They keep the plan to the end of the period they paid
+    for. Stripe's subscription update webhook records the change and sends the
+    cancellation email, as it does for a cancellation in the billing portal."""
+    if not organization_crud.get_paid_for_user(db, current_user.id):
+        raise HTTPException(
+            status_code=400,
+            detail="Only someone a paid team covers can cancel their plan here.",
+        )
+    subscription = subscription_crud.get_by_user_id(db, current_user.id)
+    if (
+        not subscription
+        or not subscription.stripe_subscription_id
+        or not has_active_personal_subscription(db, current_user)
+    ):
+        raise HTTPException(
+            status_code=400, detail="You don't have a personal plan that renews."
+        )
+
+    try:
+        # A scheduled billing interval change holds the subscription in a
+        # schedule, which has to be released before the subscription can change.
+        if subscription.stripe_schedule_id:
+            stripe.SubscriptionSchedule.release(str(subscription.stripe_schedule_id))
+            subscription_crud.create_or_update(
+                db, current_user.id, {"stripe_schedule_id": None}
+            )
+        stripe.Subscription.modify(
+            str(subscription.stripe_subscription_id), cancel_at_period_end=True
+        )
+    except Exception as e:
+        logger.error(
+            f"Error canceling personal plan for user {current_user.id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="Could not cancel your plan. Try again, or cancel it from Billing on the pricing page.",
+        )
+
+    track_event(
+        "personal_plan_canceled_for_team",
+        properties={"subscription_id": str(subscription.stripe_subscription_id)},
+        user_id=str(current_user.id),
+    )
+    return {
+        "current_period_end": (
+            subscription.current_period_end.isoformat()
+            if subscription.current_period_end
+            else None
+        )
     }
 
 

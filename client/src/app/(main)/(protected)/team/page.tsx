@@ -18,6 +18,7 @@ export default function TeamsPage() {
     const pricing = useTeamPricing();
     const [teams, setTeams] = useState<Team[] | null>(null);
     const [invitations, setInvitations] = useState<MyTeamInvitation[]>([]);
+    const [paysPersonally, setPaysPersonally] = useState(false);
     const [respondingTo, setRespondingTo] = useState<string | null>(null);
     const [settingUp, setSettingUp] = useState(false);
 
@@ -28,6 +29,7 @@ export default function TeamsPage() {
                 fetchFromApi("/api/organization/invitations") as Promise<{ invitations: MyTeamInvitation[] }>,
             ]);
             setTeams(mine.organizations);
+            setPaysPersonally(mine.has_active_personal_subscription);
             setInvitations(pending.invitations);
         } catch (error) {
             toast.error(error instanceof Error ? error.message : "Could not load your teams.");
@@ -46,7 +48,7 @@ export default function TeamsPage() {
             if (action === "accept") {
                 // Full load, so the plan shown across the app (sidebar badge,
                 // usage limits) picks up the team plan.
-                window.location.assign(`/team/${invitation.organization_id}`);
+                window.location.assign(`/team/${invitation.organization_id}?joined=1`);
                 return;
             }
             await load();
@@ -87,7 +89,7 @@ export default function TeamsPage() {
             )}
 
             {settingUp ? (
-                <TeamSetupWizard pricing={pricing} onCancel={() => setSettingUp(false)} />
+                <TeamSetupWizard pricing={pricing} paysPersonally={paysPersonally} onCancel={() => setSettingUp(false)} />
             ) : teams.length === 0 && invitations.length > 0 ? (
                 // Someone who was invited is here to join, not to buy.
                 <p className="text-sm text-muted-foreground">

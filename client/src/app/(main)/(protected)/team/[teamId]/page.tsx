@@ -57,6 +57,8 @@ function TeamContent() {
     const [paysPersonally, setPaysPersonally] = useState(false);
     const [notFound, setNotFound] = useState(false);
     const returningFromCheckout = searchParams.has("session_id");
+    // Set by accepting an invitation, so a new member is asked about their own plan.
+    const justJoined = searchParams.has("joined");
     const [waitingForPayment, setWaitingForPayment] = useState(returningFromCheckout);
     const [showSetupComplete, setShowSetupComplete] = useState(returningFromCheckout);
     const [editingName, setEditingName] = useState(false);
@@ -190,6 +192,7 @@ function TeamContent() {
         return (
             <div className="max-w-3xl p-6 space-y-8">
                 {header}
+                {paysPersonally && <PersonalPlanNotice teamName={team.name} askNow onCanceled={() => setPaysPersonally(false)} />}
                 <TeamSetupComplete team={team} invitations={invitations} onDone={finishSetup} />
             </div>
         );
@@ -208,6 +211,7 @@ function TeamContent() {
                     pricing={pricing}
                     existingTeam={team}
                     existingInvitations={invitations}
+                    paysPersonally={paysPersonally}
                 />
             </div>
         );
@@ -217,7 +221,9 @@ function TeamContent() {
         <div className="max-w-3xl p-6 space-y-8">
             {header}
 
-            {team.is_paid && paysPersonally && <PersonalPlanNotice teamName={team.name} />}
+            {team.is_paid && paysPersonally && (
+                <PersonalPlanNotice teamName={team.name} askNow={justJoined} onCanceled={() => setPaysPersonally(false)} />
+            )}
 
             {!team.is_paid && !isAdmin && (
                 <p className="text-sm text-muted-foreground">

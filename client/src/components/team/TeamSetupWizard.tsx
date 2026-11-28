@@ -27,10 +27,12 @@ interface TeamSetupWizardProps {
     // Resuming a team that was created but never paid for.
     existingTeam?: Team;
     existingInvitations?: TeamInvitation[];
+    // The admin still pays for a personal plan of their own.
+    paysPersonally?: boolean;
     onCancel?: () => void;
 }
 
-export function TeamSetupWizard({ pricing, existingTeam, existingInvitations = [], onCancel }: TeamSetupWizardProps) {
+export function TeamSetupWizard({ pricing, existingTeam, existingInvitations = [], paysPersonally = false, onCancel }: TeamSetupWizardProps) {
     const [step, setStep] = useState<Step>(existingTeam ? 1 : 0);
     const [team, setTeam] = useState<Team | null>(existingTeam ?? null);
     const [name, setName] = useState(existingTeam?.name ?? "");
@@ -249,6 +251,12 @@ export function TeamSetupWizard({ pricing, existingTeam, existingInvitations = [
                     <div className="space-y-2">
                         <h2 className="text-xl font-semibold">Review and pay</h2>
                         <p className="text-sm text-muted-foreground">Invitations go out as soon as payment goes through.</p>
+                        {paysPersonally && (
+                            <p className="text-sm text-muted-foreground">
+                                Your seat replaces the Researcher plan you pay for yourself. Once the team is paid,
+                                we&apos;ll offer to cancel it so you don&apos;t pay twice.
+                            </p>
+                        )}
                     </div>
 
                     {pricing ? (
