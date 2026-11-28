@@ -63,6 +63,8 @@ interface PricingTableProps {
     isActiveSubscription: boolean;
     canResubscribe: boolean;
     isCurrentlySubscribed: boolean;
+    // A paid team covers the user, so Teams is their plan whatever they pay for themselves.
+    onTeamPlan: boolean;
 }
 
 export default function PricingTable({
@@ -70,7 +72,8 @@ export default function PricingTable({
     setSelectedPlan,
     isActiveSubscription,
     canResubscribe,
-    isCurrentlySubscribed
+    isCurrentlySubscribed,
+    onTeamPlan
 }: PricingTableProps) {
 
     const planOptions = [
@@ -139,7 +142,12 @@ export default function PricingTable({
                                             Reactivate
                                         </Badge>
                                     )}
-                                    {option.value === "researcher" && !isCurrentlySubscribed && (
+                                    {option.value === "teams" && onTeamPlan && (
+                                        <Badge variant="secondary" className="ml-2 text-xs">
+                                            Current
+                                        </Badge>
+                                    )}
+                                    {option.value === "researcher" && !isCurrentlySubscribed && !onTeamPlan && (
                                         <Badge variant="secondary" className="ml-2 text-xs">
                                             Recommended
                                         </Badge>
@@ -167,9 +175,15 @@ export default function PricingTable({
                                         {canResubscribe && !isActiveSubscription && <Clock className="h-4 w-4 text-amber-600" />}
                                     </div>
                                 </th>
-                                <th className="text-center p-2 sm:p-4 font-semibold min-w-[80px]">
+                                <th className={cn(
+                                    "text-center p-2 sm:p-4 font-semibold min-w-[80px]",
+                                    onTeamPlan && "bg-green-50 dark:bg-green-950"
+                                )}>
                                     <div className="flex flex-col items-center gap-1">
-                                        Teams
+                                        <span className="flex items-center gap-2">
+                                            Teams
+                                            {onTeamPlan && <Crown className="h-4 w-4 text-green-600" />}
+                                        </span>
                                         <span className="text-xs font-normal text-muted-foreground">per seat</span>
                                     </div>
                                 </th>
@@ -203,7 +217,10 @@ export default function PricingTable({
                                         )}>
                                             {renderFeatureValue(feature.researcher, isComingSoon)}
                                         </td>
-                                        <td className="p-2 sm:p-4 text-center text-sm sm:text-base text-muted-foreground">
+                                        <td className={cn(
+                                            "p-2 sm:p-4 text-center text-sm sm:text-base text-muted-foreground",
+                                            onTeamPlan && "bg-green-50 dark:bg-green-950"
+                                        )}>
                                             {renderFeatureValue(feature.teams, isComingSoon)}
                                         </td>
                                     </tr>
@@ -218,8 +235,11 @@ export default function PricingTable({
                     <Card>
                         <CardHeader className="pb-4">
                             <CardTitle className="text-lg capitalize">{selectedPlan} Plan</CardTitle>
-                            {selectedPlan === "researcher" && (
+                            {selectedPlan === "researcher" && !onTeamPlan && (
                                 <Badge className="w-fit bg-blue-600 dark:bg-blue-400">Recommended</Badge>
+                            )}
+                            {selectedPlan === "teams" && onTeamPlan && (
+                                <Badge variant="secondary" className="w-fit">Current</Badge>
                             )}
                         </CardHeader>
                         <CardContent className="space-y-4">

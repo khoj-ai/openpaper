@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import CheckoutSheet from "./checkout";
 import { fetchFromApi } from "@/lib/api";
-import { SubscriptionStatus, UserSubscription } from "@/lib/schema";
+import { MyTeamsResponse, SubscriptionStatus, Team, UserSubscription } from "@/lib/schema";
 import PricingTable from "./pricingTable";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -25,6 +25,8 @@ export default function PricingPage() {
     const [selectedPlan, setSelectedPlan] = useState("basic");
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
     const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
+    // The paid team covering the user, if any. Its plan outranks a personal one.
+    const [coveringTeam, setCoveringTeam] = useState<Team | null>(null);
     const [loading, setLoading] = useState(true);
     const [isPortalLoading, setIsPortalLoading] = useState(false);
     const [isIntervalChangeLoading, setIsIntervalChangeLoading] = useState(false);
@@ -62,8 +64,18 @@ export default function PricingPage() {
             }
         };
 
+        const fetchTeams = async () => {
+            try {
+                const mine: MyTeamsResponse = await fetchFromApi("/api/organization");
+                setCoveringTeam(mine.organizations.find((team) => team.is_paid) ?? null);
+            } catch (error) {
+                console.error('Failed to fetch teams:', error);
+            }
+        };
+
         if (user) {
             fetchSubscription();
+            fetchTeams();
         } else {
             setLoading(false);
         }
@@ -426,9 +438,9 @@ export default function PricingPage() {
                             className="w-full font-medium border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
                             variant="outline"
                             onClick={() => { window.location.href = '/login' }}
-                            disabled={isActiveSubscription}
+                            disabled={isActiveSubscription || !!coveringTeam}
                         >
-                            {isActiveSubscription ? "Researcher Plan Active" : "Get Started"}
+                            {coveringTeam ? "Team Plan Active" : isActiveSubscription ? "Researcher Plan Active" : "Get Started"}
                         </Button>
                     </CardContent>
                 </Card>
@@ -440,7 +452,7 @@ export default function PricingPage() {
                         ? "border-slate-300 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-900/50 shadow-lg"
                         : "border-slate-900 dark:border-slate-100 bg-white dark:bg-slate-900 shadow-lg"
                 )}>
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    {!coveringTeam && <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                         <Badge className={cn(
                             "font-normal px-3 py-1",
                             isActiveSubscription
@@ -449,7 +461,7 @@ export default function PricingPage() {
                         )}>
                             {isActiveSubscription ? "Your Plan" : "Recommended"}
                         </Badge>
-                    </div>
+                    </div>}
                     <CardHeader className="pb-4">
                         <div className="space-y-2">
                             <div className="flex items-center gap-2">
@@ -572,6 +584,10 @@ export default function PricingPage() {
                             >
                                 {isPortalLoading ? "Loading..." : "Manage Subscription"}
                             </Button>
+                        ) : coveringTeam ? (
+                            <Button className="w-full font-medium" variant="outline" disabled>
+                                Included in your Team plan
+                            </Button>
                         ) : canResubscribe ? (
                             <Button
                                 className="w-full font-medium bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900"
@@ -607,14 +623,33 @@ export default function PricingPage() {
                 />
 
                 {/* Teams Plan */}
-                <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+                <Card className={cn(
+                    "relative bg-white dark:bg-slate-900",
+                    coveringTeam
+                        ? "border-2 border-slate-300 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-900/50 shadow-lg"
+                        : "border border-slate-200 dark:border-slate-700"
+                )}>
+                    {coveringTeam && (
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                            <Badge className="font-normal px-3 py-1 bg-blue-800 dark:bg-blue-200 text-white dark:text-slate-900">
+                                Your Plan
+                            </Badge>
+                        </div>
+                    )}
                     <CardHeader className="pb-4">
                         <div className="space-y-2">
-                            <CardTitle className="text-xl font-medium text-slate-900 dark:text-slate-100">
-                                Teams
-                            </CardTitle>
+                            <div className="flex items-center gap-2">
+                                <CardTitle className="text-xl font-medium text-slate-900 dark:text-slate-100">
+                                    Teams
+                                </CardTitle>
+                                {coveringTeam && (
+                                    <CheckCircle className="h-5 w-5 text-slate-700 dark:text-slate-300" />
+                                )}
+                            </div>
                             <CardDescription className="text-slate-600 dark:text-slate-400">
-                                For labs and research groups, billed to one admin
+                                {coveringTeam
+                                    ? `Your seat is paid for by ${coveringTeam.name}`
+                                    : "For labs and research groups, billed to one admin"}
                             </CardDescription>
                         </div>
                         <div className="pt-4">
@@ -638,10 +673,10 @@ export default function PricingPage() {
                                     setIsModalOpen(true);
                                     return;
                                 }
-                                router.push("/team");
+                                router.push(coveringTeam ? `/team/${coveringTeam.id}` : "/team");
                             }}
                         >
-                            Set up a team
+                            {coveringTeam ? "Go to your team" : "Set up a team"}
                         </Button>
                     </CardContent>
                 </Card>
@@ -650,9 +685,10 @@ export default function PricingPage() {
             <PricingTable
                 selectedPlan={selectedPlan}
                 setSelectedPlan={setSelectedPlan}
-                isActiveSubscription={isActiveSubscription}
-                canResubscribe={canResubscribe ?? false}
+                isActiveSubscription={isActiveSubscription && !coveringTeam}
+                canResubscribe={(canResubscribe && !coveringTeam) ?? false}
                 isCurrentlySubscribed={isCurrentlySubscribed || false}
+                onTeamPlan={!!coveringTeam}
             />
 
             {/* Support Section */}
